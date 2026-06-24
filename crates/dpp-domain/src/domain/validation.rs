@@ -17,12 +17,12 @@ use std::sync::OnceLock;
 use semver::Version;
 
 use crate::catalog::SectorCatalog;
+use crate::domain::field_error::{FieldError, ValidationErrors};
 use crate::domain::sector::{
     SectorData, SvhcSubstance, validate_fibre_composition, validate_surfactants,
     validate_svhc_substances,
 };
 use crate::schemas::VersionedSchemaRegistry;
-use crate::domain::field_error::{FieldError, ValidationErrors};
 
 // ─── Extensibility: runtime sector validators ─────────────────────────────────
 
