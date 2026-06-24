@@ -1,0 +1,22 @@
+[package]
+name        = "dpp-registry"
+description = "EU EUDPP Central Registry ghost connector — interface-only until EU API is published"
+keywords    = ["dpp", "eu-registry", "espr", "eudpp", "compliance"]
+categories  = ["data-structures"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+rust-version.workspace = true
+
+[dependencies]
+dpp-domain = { path = "../dpp-domain", version = "0.1.0" }
+dpp-rules  = { path = "../dpp-rules", version = "0.1.0" }
+
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+uuid       = { version = "1", features = ["v4", "serde", "js"] }
+chrono     = { workspace = true }
+getrandom  = { version = "0.3", features = ["wasm_js"] }
