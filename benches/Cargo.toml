@@ -1,0 +1,42 @@
+[package]
+name    = "dpp-benches"
+version = "0.0.0"
+edition.workspace      = true
+rust-version.workspace = true
+publish = false
+
+[dev-dependencies]
+criterion   = { workspace = true }
+dpp-calc    = { path = "../crates/dpp-calc" }
+dpp-crypto  = { path = "../crates/dpp-crypto" }
+dpp-domain  = { path = "../crates/dpp-domain" }
+dpp-digital-link     = { path = "../crates/dpp-digital-link" }
+chrono      = { workspace = true }
+serde_json  = { workspace = true }
+uuid        = { workspace = true }
+base64      = { workspace = true }
+
+[[bench]]
+name    = "crypto"
+harness = false
+path    = "src/crypto.rs"
+
+[[bench]]
+name    = "validation"
+harness = false
+path    = "src/validation.rs"
+
+[[bench]]
+name    = "gs1"
+harness = false
+path    = "src/gs1.rs"
+
+[[bench]]
+name    = "calc"
+harness = false
+path    = "src/calc.rs"
+
+[[bench]]
+name    = "aas"
+harness = false
+path    = "src/aas.rs"
