@@ -1,0 +1,26 @@
+[package]
+name        = "dpp-tests"
+description = "Cross-crate integration tests for Odal Node core (not published)"
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "dpp_tests"
+path = "src/lib.rs"
+
+# Integration tests in `tests/` exercise multiple core crates together
+# (domain + crypto + gs1), so they live in a dedicated member crate rather
+# than the virtual workspace root (where Cargo never compiled them).
+[dev-dependencies]
+dpp-domain = { path = "../dpp-domain" }
+dpp-crypto = { path = "../dpp-crypto" }
+dpp-digital-link    = { path = "../dpp-digital-link" }
+serde_json = { workspace = true }
+chrono     = { workspace = true }
+uuid       = { workspace = true }
+semver     = { workspace = true }
