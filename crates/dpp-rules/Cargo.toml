@@ -1,0 +1,17 @@
+[package]
+name        = "dpp-rules"
+description = "Pure EU ESPR cross-field regulatory rules, shared by dpp-domain and the Wasm sector plugins"
+keywords    = ["dpp", "espr", "validation", "no-std"]
+categories  = ["no-std"]
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_rules"
+path = "src/lib.rs"
+
+[dependencies]
