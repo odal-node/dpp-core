@@ -1,0 +1,36 @@
+[package]
+name        = "dpp-calc"
+description = "EU-methodology compliance calculators (CO2e, repairability) for Odal Node — pure, stateless"
+keywords    = ["dpp", "co2e", "pef", "repairability", "espr"]
+categories  = ["science", "mathematics"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_calc"
+path = "src/lib.rs"
+
+[features]
+# Expose SyntheticFactorProvider outside of test builds.
+# Enable only in integration test harnesses — never in production binaries.
+synthetic-factors = []
+
+# Gate licensed LCI factor-data implementations (ecoinvent, EF, Sphera).
+# This feature is DISABLED in the open-source build and MUST NOT be enabled
+# unless a valid reseller/embedding sublicense for the factor data is in place.
+# The platform build system enables it when deploying the managed service.
+real-factors = []
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+serde_jcs  = { workspace = true }
+chrono     = { workspace = true }
+uuid       = { workspace = true }
+sha2       = { workspace = true }
+hex        = { workspace = true }
+thiserror  = { workspace = true }
