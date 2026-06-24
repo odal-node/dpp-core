@@ -1,0 +1,5 @@
+# cargo-audit configuration
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md
+
+[advisories]
+ignore = []

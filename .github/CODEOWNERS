@@ -1,0 +1,46 @@
+# =============================================================================
+# CODEOWNERS — Odal Node Core (dpp-core)
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Rules are evaluated bottom-up; last matching rule wins.
+# All teams/users below must exist in the github.com/odal-node org.
+# =============================================================================
+
+# Default: all files require review from a core maintainer
+*                                   @odal-node/maintainers
+
+# -----------------------------------------------------------------------------
+# Legal — require maintainer + legal representative review
+# -----------------------------------------------------------------------------
+LICENSE                             @odal-node/maintainers @odal-node/legal
+docs/legal/                         @odal-node/maintainers @odal-node/legal
+
+# -----------------------------------------------------------------------------
+# Security policy — require maintainer review
+# -----------------------------------------------------------------------------
+docs/project/SECURITY.md            @odal-node/maintainers
+
+# -----------------------------------------------------------------------------
+# Architecture & governance docs (decision records; append-only intent —
+# superseding a decision requires a new record) — require maintainer review
+# -----------------------------------------------------------------------------
+docs/architecture/                  @odal-node/maintainers
+docs/governance/                    @odal-node/maintainers
+
+# -----------------------------------------------------------------------------
+# Open-core boundary — domain types, port traits, and the Wasm plugin ABI are
+# the Apache-2.0 / BSL-1.1 split line and a public contract
+# -----------------------------------------------------------------------------
+crates/dpp-domain/                  @odal-node/maintainers
+crates/dpp-plugin-traits/           @odal-node/maintainers
+
+# -----------------------------------------------------------------------------
+# Schemas — versioned sector schemas are a public contract
+# -----------------------------------------------------------------------------
+crates/dpp-domain/schemas/          @odal-node/maintainers
+
+# -----------------------------------------------------------------------------
+# CI / release automation and the workspace manifest
+# -----------------------------------------------------------------------------
+/.github/                           @odal-node/maintainers
+/Cargo.toml                         @odal-node/maintainers

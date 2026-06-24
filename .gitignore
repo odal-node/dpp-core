@@ -1,0 +1,51 @@
+# =============================================================================
+# Odal Node — .gitignore
+# Public repo: github.com/odal-node/dpp-core
+# =============================================================================
+
+# Keycloak dev realm (generated from template)
+ops/docker/keycloak/*-realm.json
+!ops/docker/keycloak/*-realm.template.json
+
+# -----------------------------------------------------------------------------
+# SECRETS & ENVIRONMENT
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# -----------------------------------------------------------------------------
+# RUST
+# -----------------------------------------------------------------------------
+/target/
+# Standalone crates excluded from the workspace each have their own target dir.
+# /target/ above only anchors to the repo root; these patterns catch the rest.
+plugins/*/target/
+Cargo.lock
+**/*.rs.bak
+
+# -----------------------------------------------------------------------------
+# EDITOR & OS
+# -----------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------------------------------------------------------------
+# BUILD ARTIFACTS
+# -----------------------------------------------------------------------------
+*.log
+*.tmp
+*.bak
+coverage/
+.nyc_output/

@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a defect in dpp-core
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Do not file a public issue for security vulnerabilities** —
+        follow the [security policy](../blob/main/docs/project/SECURITY.md) instead.
+  - type: input
+    id: crate
+    attributes:
+      label: Affected crate
+      placeholder: e.g. dpp-crypto, dpp-domain, dpp-digital-link
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: e.g. v0.1.0 or a commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what occurred instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Steps, a minimal code snippet, or a failing test.
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: OS, Rust toolchain (`rustc --version`)

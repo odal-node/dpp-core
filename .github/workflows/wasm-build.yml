@@ -1,0 +1,66 @@
+name: WASM Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "crates/dpp-registry/**"
+      - "crates/dpp-domain/**"
+      - "plugins/**"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  wasm-build:
+    name: WASM build — dpp-registry + dpp-domain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+
+      - name: Build dpp-registry (wasm32)
+        working-directory: crates/dpp-registry
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Build dpp-domain (wasm32)
+        working-directory: crates/dpp-domain
+        run: cargo build --target wasm32-unknown-unknown --release
+
+  sector-plugins:
+    name: WASM build — sector plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with wasm32-wasip1 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm-plugins
+
+      - name: Build sector-textile
+        working-directory: plugins/sector-textile
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-steel
+        working-directory: plugins/sector-steel
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-battery
+        working-directory: plugins/sector-battery
+        run: cargo build --target wasm32-wasip1 --release

@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Workspace members live under "/"; the sector plugins are separate crates
+  # excluded from the workspace (see Cargo.toml `exclude`), so list them too.
+  - package-ecosystem: cargo
+    directories:
+      - "/"
+      - "/plugins/*"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - rust
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci

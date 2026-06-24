@@ -1,0 +1,74 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/dpp-rules",
+    "crates/dpp-domain",
+    "crates/dpp-crypto",
+    "crates/dpp-digital-link",
+    "crates/dpp-plugin-traits",
+    "crates/dpp-plugin-sdk",
+    "crates/dpp-registry",
+    "crates/dpp-calc",
+    "crates/dpp-tests",
+    "benches",
+]
+exclude = [
+    "plugins/*",
+]
+
+[workspace.package]
+version     = "0.1.0"
+edition     = "2024"
+authors     = ["Odal Node <dev@odal-node.io>"]
+license     = "Apache-2.0"
+repository  = "https://github.com/odal-node/dpp-core"
+rust-version = "1.96"
+
+# ---------------------------------------------------------------------------
+# Shared dependency versions — crates inherit these with `workspace = true`
+# ---------------------------------------------------------------------------
+[workspace.dependencies]
+# Serialisation
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+serde_with   = "3"
+# RFC 8785 JSON Canonicalization Scheme (JCS) — the signing/content-binding contract
+serde_jcs    = "0.1"
+# GZIP — decoding W3C Bitstring Status List `encodedList` (pure, no infra)
+flate2       = "1"
+
+# Date/time
+chrono       = { version = "0.4", features = ["serde"] }
+
+# Async
+async-trait  = "0.1"
+
+# Identity & cryptography
+base64       = "0.22"
+hex          = "0.4"
+sha2         = "0.10"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+zeroize      = { version = "1", features = ["derive"] }
+aes-gcm      = "0.10"
+rand         = "0.8"
+
+# Schema validation
+jsonschema   = "0.17"
+semver       = "1"
+
+# Telemetry
+tracing      = "0.1"
+
+# Utilities
+uuid         = { version = "1", features = ["v7", "serde"] }
+anyhow       = "1"
+thiserror    = "1"
+
+# KDF
+argon2       = "0.5"
+
+# MAC
+hmac         = "0.12"
+
+# Benchmarking
+criterion    = { version = "0.5", features = ["html_reports"] }

@@ -1,0 +1,13 @@
+[build]
+# Uncomment and install sccache locally to speed up incremental builds:
+# rustc-wrapper = "sccache"
+
+[alias]
+b  = "build"
+t  = "nextest run"
+c  = "clippy"
+br = "build --release"
+
+# Configure getrandom for WASM32 targets
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]

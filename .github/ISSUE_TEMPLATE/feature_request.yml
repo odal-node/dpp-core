@@ -1,0 +1,26 @@
+name: Feature / regulatory request
+description: Propose a change to dpp-core (new sector, schema, standard, or API)
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Golden Rule: changes driven by an **EU regulation or open standard** belong in
+        `dpp-core`. Business-model / operational changes belong in `dpp-engine`.
+  - type: textarea
+    id: driver
+    attributes:
+      label: Problem / regulatory driver
+      description: What regulation, standard, or use case motivates this?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
