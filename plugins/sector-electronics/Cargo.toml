@@ -1,0 +1,22 @@
+[workspace]
+
+[package]
+name    = "sector-electronics"
+version = "0.2.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+dpp-plugin-sdk = { path = "../../crates/dpp-plugin-sdk" }
+serde_json     = "1"
+
+[profile.release]
+opt-level     = "z"
+lto           = true
+codegen-units = 1
+strip         = true
+panic         = "abort"

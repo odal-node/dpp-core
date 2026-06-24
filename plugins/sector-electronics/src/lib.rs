@@ -1,0 +1,159 @@
+//! Electronics sector plugin — EU Electronics DPP (adopted 18 March 2026).
+//!
+//! Compliance rules:
+//! - Energy class E/F/G → NON_COMPLIANT (fails minimum ecodesign requirement).
+//! - Repairability score < 4.0 → NON_COMPLIANT (below EU minimum).
+//! - Repairability ≥ 6.0 AND energy class A/B/C → COMPLIANT.
+//! - Otherwise (borderline) → NOT_ASSESSED.
+//!
+//! "electronics" is the **sector**; `productCategory` (`smartphone`, `laptop`,
+//! …) is a product category the plugin records but does not dispatch on.
+
+use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::traits::{
+    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
+    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
+};
+use dpp_plugin_sdk::validate::{num, str_of, Validator};
+use serde_json::Value;
+
+#[derive(Default)]
+struct ElectronicsPlugin;
+
+impl DppSectorPlugin for ElectronicsPlugin {
+    fn meta(&self) -> PluginMeta {
+        PluginMeta {
+            sector: "electronics".into(),
+            name: "Odal Node Electronics Plugin".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            license: "Apache-2.0".into(),
+            description: Some("EU Electronics DPP energy/repairability validation".into()),
+            author: Some("Odal Node".into()),
+            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+        }
+    }
+
+    fn capabilities(&self) -> PluginCapabilities {
+        PluginCapabilities {
+            abi_version: AbiVersion::current(),
+            supported_schemas: vec![SchemaVersionRange {
+                min_version: "1.0.0".into(),
+                max_version: "1.0.0".into(),
+            }],
+            capabilities: vec![
+                PluginCapability::Validate,
+                PluginCapability::ComputeMetrics,
+                PluginCapability::GeneratePassport,
+            ],
+            min_host_version: None,
+            max_fuel: None,
+            max_memory_bytes: None,
+        }
+    }
+
+    fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
+        Validator::new(input)
+            .require_gtin("gtin")
+            .require_str("productCategory")
+            .require_enum(
+                "energyEfficiencyClass",
+                &["A", "B", "C", "D", "E", "F", "G"],
+            )
+            .require_non_negative("co2ePerUnitKg")
+            .optional_pct("recycledContentPct")
+            .finish()
+    }
+
+    fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
+        self.validate_input(input)?;
+        let co2e = num(input, "co2ePerUnitKg");
+        let repair = num(input, "repairabilityScore");
+        let recycled = num(input, "recycledContentPct");
+        let energy_class = str_of(input, "energyEfficiencyClass");
+
+        let energy_fail = matches!(energy_class, Some("E") | Some("F") | Some("G"));
+        let energy_pass = matches!(energy_class, Some("A") | Some("B") | Some("C"));
+        let repair_fail = repair.is_some_and(|s| s < 4.0);
+        let repair_pass = repair.is_some_and(|s| s >= 6.0);
+
+        let status = if energy_fail || repair_fail {
+            PluginComplianceStatus::NonCompliant
+        } else if energy_pass && repair_pass {
+            PluginComplianceStatus::Compliant
+        } else {
+            PluginComplianceStatus::NotAssessed
+        };
+
+        Ok(PluginResult::new(status)
+            .maybe_metric(METRIC_CO2E_SCORE, co2e)
+            .maybe_metric(METRIC_REPAIRABILITY_INDEX, repair)
+            .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled))
+    }
+
+    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(input)?;
+        Ok(input.clone())
+    }
+}
+
+export_plugin!(ElectronicsPlugin);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn base() -> Value {
+        json!({
+            "gtin": "12345678901231",
+            "productCategory": "smartphone",
+            "energyEfficiencyClass": "A",
+            "co2ePerUnitKg": 55.0
+        })
+    }
+
+    #[test]
+    fn good_energy_and_repair_is_compliant() {
+        let mut d = base();
+        d["repairabilityScore"] = json!(7.5);
+        assert_eq!(
+            ElectronicsPlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::Compliant
+        );
+    }
+
+    #[test]
+    fn bad_energy_class_is_non_compliant() {
+        let mut d = base();
+        d["energyEfficiencyClass"] = json!("F");
+        assert_eq!(
+            ElectronicsPlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    #[test]
+    fn missing_repair_is_not_assessed() {
+        assert_eq!(
+            ElectronicsPlugin
+                .calculate_metrics(&base())
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NotAssessed
+        );
+    }
+
+    #[test]
+    fn invalid_energy_class_fails_validation() {
+        let mut d = base();
+        d["energyEfficiencyClass"] = json!("Z");
+        assert!(ElectronicsPlugin.validate_input(&d).is_err());
+    }
+}
