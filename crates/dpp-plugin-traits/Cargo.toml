@@ -1,0 +1,21 @@
+[package]
+name        = "dpp-plugin-traits"
+description = "Host/guest contract for Odal Node Wasm sector plugins — no_std compatible"
+keywords    = ["dpp", "wasm", "plugin", "sector", "compliance"]
+categories  = ["wasm", "no-std::no-alloc"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_plugin_traits"
+path = "src/lib.rs"
+
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+semver     = { workspace = true }
