@@ -1,0 +1,22 @@
+{
+  "key": "electronics",
+  "title": "Electronics (smartphones & tablets)",
+  "status": "in_force",
+  "legalBasis": [
+    "Regulation (EU) 2023/1670 (ecodesign — smartphones & tablets)",
+    "Regulation (EU) 2023/1669 (energy labelling — smartphones & tablets)"
+  ],
+  "dppAppliesFrom": "2025-06-20",
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0"],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": ["smartphone", "tablet", "laptop", "monitor", "tv", "server", "charger", "earphone"],
+  "accessTiers": {
+    "svhcSubstances": "professional",
+    "disassemblyInstructionsUrl": "professional",
+    "repairManualUrl": "professional",
+    "criticalRawMaterials": "professional"
+  },
+  "plugin": "sector-electronics",
+  "notes": "In force for smartphones & tablets since 2025-06-20 (repairability class A-E, durability, 7-year spare parts, OS updates). Broader consumer-electronics DPP delegated act anticipated ~2027 — schema will extend then."
+}

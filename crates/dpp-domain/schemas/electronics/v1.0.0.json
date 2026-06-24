@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/electronics-v1.0.0.json",
+  "title": "Odal Node — Electronics Sector Data (v1.0.0)",
+  "description": "ICT and electronics fields per EU Electronics DPP (adopted 18 March 2026, effective 1 April 2026). Mandatory immediately for AI servers, high-end PCBs, and foldable phones; from 1 January 2027 for low-end consumer electronics.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "productCategory",
+    "energyEfficiencyClass",
+    "co2ePerUnitKg"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "productCategory": {
+      "type": "string",
+      "enum": [
+        "smartphone",
+        "laptop",
+        "tablet",
+        "monitor",
+        "tv",
+        "server",
+        "router",
+        "charger",
+        "earphone",
+        "pcb",
+        "other"
+      ],
+      "description": "EU electronics product category."
+    },
+    "energyEfficiencyClass": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D", "E", "F", "G"],
+      "description": "EU energy label class (A = most efficient, G = least efficient)."
+    },
+    "co2ePerUnitKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Whole-lifecycle carbon footprint in kg CO2e per unit."
+    },
+    "repairabilityScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Repairability score 0.0-10.0 per EU ecodesign methodology. >= 6.0 is considered good."
+    },
+    "sparePartsAvailable": {
+      "type": ["boolean", "null"],
+      "description": "Whether spare parts are commercially available from the manufacturer."
+    },
+    "repairManualUrl": {
+      "type": ["string", "null"],
+      "description": "URL to the repair manual or repair information portal."
+    },
+    "disassemblyInstructionsUrl": {
+      "type": ["string", "null"],
+      "description": "URL to disassembly or dismantling instructions."
+    },
+    "svhcSubstances": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/svhcSubstance" },
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+    },
+    "rohsCompliant": {
+      "type": ["boolean", "null"],
+      "description": "Whether the product complies with RoHS Directive 2011/65/EU."
+    },
+    "criticalRawMaterials": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/criticalRawMaterial" },
+      "description": "Critical raw materials present per EU CRM Act 2024/1252."
+    },
+    "recycledContentPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled content as a percentage of total product weight."
+    },
+    "standbyPowerW": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Standby power consumption in watts."
+    },
+    "expectedLifetimeYears": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Expected product lifetime in years under normal use."
+    },
+    "firmwareUpdateUntil": {
+      "type": ["string", "null"],
+      "description": "Date until which firmware or software updates are guaranteed (ISO 8601)."
+    }
+  },
+  "definitions": {
+    "svhcSubstance": {
+      "type": "object",
+      "required": ["casNumber", "substanceName", "concentrationPct"],
+      "properties": {
+        "casNumber": { "type": "string", "minLength": 1 },
+        "substanceName": { "type": "string", "minLength": 1 },
+        "concentrationPct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "locationInProduct": { "type": ["string", "null"] },
+        "scipNotificationId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "criticalRawMaterial": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "casNumber": { "type": ["string", "null"] },
+        "weightGrams": { "type": ["number", "null"], "minimum": 0 },
+        "countryOfOrigin": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{2}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

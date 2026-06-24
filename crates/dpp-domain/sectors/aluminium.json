@@ -1,0 +1,15 @@
+{
+  "key": "aluminium",
+  "title": "Aluminium",
+  "status": "provisional",
+  "legalBasis": [
+    "Regulation (EU) 2024/1781 (ESPR Working Plan 2025-2030)",
+    "CBAM-aligned (Regulation (EU) 2023/956)"
+  ],
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0"],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": ["primary", "secondary-recycled", "mixed"],
+  "plugin": "sector-aluminium",
+  "notes": "ESPR working-plan priority; indicative adoption ~2028-2029 to ~2030. CO2e thresholds in the plugin are indicative pending the delegated act."
+}

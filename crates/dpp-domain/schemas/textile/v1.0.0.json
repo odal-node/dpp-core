@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/textile-v1.0.0.json",
+  "title": "Odal Node — Textile Sector Data (v1.0.0)",
+  "description": "Textile-specific fields for EU textile DPP compliance (anticipated 2025-2026 delegated act).",
+  "type": "object",
+  "required": [
+    "fibreComposition",
+    "countryOfManufacturing",
+    "careInstructions",
+    "chemicalComplianceStandard"
+  ],
+  "properties": {
+    "fibreComposition": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of fibres and their percentage composition. Must sum to ~100%.",
+      "items": {
+        "type": "object",
+        "required": ["fibre", "pct"],
+        "properties": {
+          "fibre": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Fibre name, e.g. cotton, polyester, recycled_polyester."
+          },
+          "pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Percentage by weight (0–100)."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "countryOfManufacturing": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured."
+    },
+    "careInstructions": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 3758 care symbols or free text care instructions."
+    },
+    "chemicalComplianceStandard": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS."
+    },
+    "recycledContentPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "repairScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10
+    },
+    "carbonFootprintKgCo2e": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "waterUseLitres": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "countryOfRawMaterialOrigin": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{2}$"
+    }
+  },
+  "additionalProperties": false
+}

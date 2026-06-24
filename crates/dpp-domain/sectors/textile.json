@@ -1,0 +1,20 @@
+{
+  "key": "textile",
+  "title": "Textiles (fibre DPP)",
+  "status": "provisional",
+  "legalBasis": [
+    "Regulation (EU) 2024/1781 (ESPR)",
+    "Textile delegated act (anticipated)"
+  ],
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0", "1.1.0"],
+  "currentSchemaVersion": "1.1.0",
+  "productCategories": ["apparel", "footwear", "home_textile"],
+  "accessTiers": {
+    "svhcSubstances": "professional",
+    "disassemblyInstructions": "professional",
+    "sparePartsAvailable": "professional"
+  },
+  "plugin": "sector-textile",
+  "notes": "Top ESPR working-plan priority. Delegated act expected ~Q2 2027, compliance ~2028-2029. Fields are provisional and may change; no binding determination yet. Commercially relevant for the textile pilot."
+}

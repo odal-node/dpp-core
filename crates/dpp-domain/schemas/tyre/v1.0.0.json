@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/tyre-v1.0.0.json",
+  "title": "Odal Node — Tyre Sector Data (v1.0.0)",
+  "description": "Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. DPP mandate expected ~2029. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "tyreClass",
+    "fuelEfficiencyClass",
+    "wetGripClass",
+    "externalRollingNoiseDb"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "tyreClass": {
+      "type": "string",
+      "enum": ["C1", "C2", "C3"],
+      "description": "Tyre class per EU 2020/740: C1 = passenger cars, C2 = vans and light trucks, C3 = heavy-duty trucks."
+    },
+    "fuelEfficiencyClass": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D", "E"],
+      "description": "Fuel efficiency class A-E per EU Regulation 2020/740 (A = lowest rolling resistance). The old A-G scale (Regulation 1222/2009) was replaced on 1 May 2021."
+    },
+    "wetGripClass": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D", "E"],
+      "description": "Wet grip class A-E per EU Regulation 2020/740 (A = shortest stopping distance on wet road)."
+    },
+    "externalRollingNoiseDb": {
+      "type": "number",
+      "minimum": 0,
+      "description": "External rolling noise in decibels (dB), measured per UN ECE R117."
+    },
+    "noisePerformanceClass": {
+      "type": ["string", "null"],
+      "enum": ["A", "B", "C", null],
+      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Class A = significantly below limit; B = below limit; C = at or above limit. Thresholds differ per tyre class (C1/C2/C3)."
+    },
+    "rollingResistanceNPerKn": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Rolling resistance coefficient in N/kN."
+    },
+    "recycledRubberPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled rubber content as a percentage of total rubber weight."
+    },
+    "co2ePerTyreKg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per tyre unit."
+    }
+  },
+  "additionalProperties": false
+}

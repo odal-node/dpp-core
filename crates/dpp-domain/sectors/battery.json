@@ -1,0 +1,22 @@
+{
+  "key": "battery",
+  "title": "Batteries",
+  "status": "in_force",
+  "legalBasis": ["Regulation (EU) 2023/1542"],
+  "dppAppliesFrom": "2027-02-18",
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0", "2.0.0"],
+  "currentSchemaVersion": "2.0.0",
+  "productCategories": ["portable", "industrial", "ev", "lmt", "sli"],
+  "accessTiers": {
+    "dueDiligenceUrl": "professional",
+    "criticalRawMaterials": "professional",
+    "disassemblyInstructionsUrl": "professional",
+    "cathodeMaterial": "professional",
+    "anodeMaterial": "professional",
+    "electrolyteMaterial": "professional",
+    "sohMethodology": "professional"
+  },
+  "plugin": "sector-battery",
+  "notes": "Battery passport mandatory for EV, LMT and industrial batteries >2 kWh from 2027-02-18. Regulation in full enforcement since Jan 2026."
+}

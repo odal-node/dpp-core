@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/textile-unsold-v1.0.0.json",
+  "title": "Odal Node — Textile Unsold Goods Report (v1.0.0)",
+  "description": "Unsold goods disposal report required by EU ESPR Article 25 (Annex VII) — destruction ban effective July 19, 2026.",
+  "type": "object",
+  "required": [
+    "reportingPeriod",
+    "volumeKg",
+    "productCategory",
+    "reason",
+    "destination",
+    "countryOfDisposal"
+  ],
+  "properties": {
+    "reportingPeriod": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference period covered by this report (e.g. '2026-Q2', '2026-07')."
+    },
+    "volumeKg": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Total volume of unsold goods disposed in this report, in kilograms."
+    },
+    "productCategory": {
+      "type": "string",
+      "enum": ["apparel", "footwear", "home-textile", "accessories", "other"],
+      "description": "High-level product category."
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "end_of_season",
+        "quality_defect",
+        "packaging_defect",
+        "over_production",
+        "customer_return",
+        "other"
+      ],
+      "description": "Reason the goods were unsold."
+    },
+    "destination": {
+      "type": "string",
+      "enum": [
+        "donation",
+        "recycling",
+        "repurposing",
+        "supplier_return",
+        "exempt_destruction"
+      ],
+      "description": "Disposal destination. 'exempt_destruction' requires destructionJustification."
+    },
+    "destructionJustification": {
+      "type": ["string", "null"],
+      "minLength": 10,
+      "description": "Mandatory justification text if destination is 'exempt_destruction'."
+    },
+    "countryOfDisposal": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country where disposal took place."
+    },
+    "operatorName": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "Name of the disposal operator, charity, or recycler — required for audit trail."
+    }
+  },
+  "if": {
+    "properties": {
+      "destination": { "const": "exempt_destruction" }
+    }
+  },
+  "then": {
+    "required": ["destructionJustification"],
+    "properties": {
+      "destructionJustification": {
+        "type": "string",
+        "minLength": 10
+      }
+    }
+  },
+  "additionalProperties": false
+}

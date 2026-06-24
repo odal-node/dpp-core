@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/battery-v1.0.0.json",
+  "title": "Odal Node — Battery Sector Data (v1.0.0)",
+  "description": "Battery-specific fields required by EU Battery Regulation 2023/1542.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "batteryChemistry",
+    "nominalVoltageV",
+    "nominalCapacityAh",
+    "expectedLifetimeCycles",
+    "co2ePerUnitKg"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "batteryChemistry": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Battery chemistry code, e.g. LFP, NMC, LCO."
+    },
+    "nominalVoltageV": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal voltage in volts."
+    },
+    "nominalCapacityAh": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal capacity in ampere-hours."
+    },
+    "expectedLifetimeCycles": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Expected lifetime in full charge-discharge cycles."
+    },
+    "co2ePerUnitKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per battery unit."
+    },
+    "recycledContentCobaltPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "recycledContentLithiumPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "recycledContentNickelPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "stateOfHealthPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "ratedCapacityKwh": {
+      "type": ["number", "null"],
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

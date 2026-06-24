@@ -1,0 +1,15 @@
+{
+  "key": "tyre",
+  "title": "Tyres",
+  "status": "provisional",
+  "legalBasis": [
+    "Regulation (EU) 2020/740 (tyre labelling — in force)",
+    "Regulation (EU) 2024/1781 (ESPR Working Plan)"
+  ],
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0"],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": ["C1", "C2", "C3"],
+  "plugin": "sector-tyre",
+  "notes": "Tyre labelling (2020/740) is in force, but the ESPR tyre DPP obligation is anticipated ~2028-2029. Treated as provisional until the DPP act is adopted."
+}

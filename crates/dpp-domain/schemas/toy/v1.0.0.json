@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/toy-v1.0.0.json",
+  "title": "Odal Node — Toy Sector Data (v1.0.0)",
+  "description": "Toy fields per EU Delegated Regulation 2025/2509. DPP mandate 2030.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "ageGroup",
+    "primaryMaterial",
+    "ceMarking",
+    "countryOfManufacture"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "ageGroup": {
+      "type": "string",
+      "enum": ["0-3", "3-6", "6-12", "12+"],
+      "description": "Intended age group per EU Toy Safety Directive."
+    },
+    "primaryMaterial": {
+      "type": "string",
+      "enum": ["plastic", "wood", "metal", "textile", "mixed", "other"],
+      "description": "Primary construction material."
+    },
+    "ceMarking": {
+      "type": "boolean",
+      "description": "Whether the toy bears CE marking under the EU Toy Safety Directive 2009/48/EC."
+    },
+    "countryOfManufacture": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of manufacture."
+    },
+    "svhcSubstances": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/svhcSubstance" },
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+    },
+    "containsBattery": {
+      "type": ["boolean", "null"],
+      "description": "Whether the toy contains a battery."
+    },
+    "repairabilityInfo": {
+      "type": ["string", "null"],
+      "description": "Free-text or URL pointing to repairability or spare parts information."
+    }
+  },
+  "definitions": {
+    "svhcSubstance": {
+      "type": "object",
+      "required": ["casNumber", "substanceName", "concentrationPct"],
+      "properties": {
+        "casNumber": { "type": "string", "minLength": 1 },
+        "substanceName": { "type": "string", "minLength": 1 },
+        "concentrationPct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "locationInProduct": { "type": ["string", "null"] },
+        "scipNotificationId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

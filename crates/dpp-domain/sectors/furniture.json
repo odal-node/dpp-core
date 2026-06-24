@@ -1,0 +1,16 @@
+{
+  "key": "furniture",
+  "title": "Furniture",
+  "status": "provisional",
+  "legalBasis": ["Regulation (EU) 2024/1781 (ESPR Working Plan 2025-2030)"],
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0"],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": ["chair", "table", "sofa", "mattress", "shelf"],
+  "accessTiers": {
+    "svhcSubstances": "professional",
+    "disassemblyInstructionsUrl": "professional"
+  },
+  "plugin": "sector-furniture",
+  "notes": "ESPR working-plan priority; indicative adoption ~2029-2030. No binding determination yet."
+}

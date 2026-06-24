@@ -1,0 +1,13 @@
+{
+  "key": "construction",
+  "title": "Construction Products",
+  "status": "provisional",
+  "legalBasis": ["Regulation (EU) 2024/3110 (CPR)"],
+  "retentionYears": 10,
+  "schemaVersions": ["1.0.0"],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": ["cement", "concrete", "structural-steel", "glass"],
+  "accessTiers": { "epdUrl": "professional" },
+  "plugin": "sector-construction",
+  "notes": "CPR adopted; DPP requirements phased ~2028-2032. No binding determination yet."
+}
