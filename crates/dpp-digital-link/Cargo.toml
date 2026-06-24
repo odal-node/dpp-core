@@ -1,0 +1,25 @@
+[package]
+name        = "dpp-digital-link"
+description = "GS1 Digital Link parser/builder and JSON-LD helpers for Odal Node"
+keywords    = ["gs1", "digital-link", "gtin", "aas", "industry-4-0"]
+categories  = ["parser-implementations", "encoding"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_digital_link"
+path = "src/lib.rs"
+
+[dependencies]
+dpp-domain = { path = "../dpp-domain", version = "0.1.0" }
+thiserror  = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+uuid   = { workspace = true }
