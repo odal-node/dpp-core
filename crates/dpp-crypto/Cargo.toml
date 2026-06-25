@@ -1,7 +1,7 @@
 [package]
 name        = "dpp-crypto"
 description = "Ed25519 key management, JWS signing/verification, and did:web document builder"
-keywords    = ["dpp", "ed25519", "jws", "did-web", "verifiable-credentials"]
+keywords    = ["dpp", "ed25519", "jws", "did-web", "credentials"]
 categories  = ["cryptography", "authentication"]
 version.workspace     = true
 edition.workspace     = true
