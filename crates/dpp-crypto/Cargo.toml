@@ -15,7 +15,7 @@ name = "dpp_crypto"
 path = "src/lib.rs"
 
 [dependencies]
-dpp-domain       = { path = "../dpp-domain", version = "0.1.0" }
+dpp-domain       = { path = "../dpp-domain", version = "0.1.1" }
 ed25519-dalek    = { workspace = true }
 zeroize          = { workspace = true }
 aes-gcm          = { workspace = true }

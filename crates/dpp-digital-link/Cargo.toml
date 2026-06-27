@@ -15,7 +15,7 @@ name = "dpp_digital_link"
 path = "src/lib.rs"
 
 [dependencies]
-dpp-domain = { path = "../dpp-domain", version = "0.1.0" }
+dpp-domain = { path = "../dpp-domain", version = "0.1.1" }
 thiserror  = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }
