@@ -224,6 +224,7 @@ mod tests {
             materials: vec![],
             co2e_per_unit: None,
             repairability_score: None,
+            compliance_result: None,
             sector_data: None,
             status: PassportStatus::Published,
             qr_code_url: Some("https://id.odal-node.io/01/09506000134352".into()),

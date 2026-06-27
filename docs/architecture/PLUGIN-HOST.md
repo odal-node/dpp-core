@@ -42,6 +42,34 @@ A computed determination is passed through `gate_determination(catalog.is_in_for
 
 **Validation is independent of all of this.** `validate_sector_data` (JSON Schema via the registry + cross-field `dpp-rules`) runs in pure core with no Wasm host. A self-hoster who disables plugins still gets full structural and cross-field validation; they only forgo a *computed determination*. A no-Wasm determination path is intentionally not offered (it would re-introduce closed per-sector logic into core). See `SECTOR-MODEL-CONSOLIDATION.md` §3.1.
 
+### Emitting findings (ABI 1.1)
+
+A plugin's `calculate_metrics` returns, in addition to metrics + status, two
+finding lists on `PluginResult` (ABI 1.1, backward-compatible):
+
+- `violations` — **binding**. The host blocks publish when the sector's DPP
+  obligation `is_in_force` and `violations` is non-empty.
+- `warnings` — **advisory / experimental**. Surfaced on the determination but
+  never block (e.g. a recycled-content target that is not yet in force).
+
+The plugin produces these by calling the shared regulatory rules the SDK
+re-exports as `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each
+`PluginFinding` to a `ComplianceFinding` on the core `ComplianceResult`
+(`plugin_result_to_compliance`), which the engine persists on the passport
+(`compliance_result`, part of the signed payload) and gates publish on.
+
+`sector-battery` is the reference: it scopes EU 2023/1542 Annex X recycled-content
+checks to the declared chemistry and emits them as **advisory** warnings (the
+Phase-1 minima are not binding until 18 Aug 2031), while data-integrity
+contradictions (cobalt declared on an LFP cell; inverted operating-temperature
+range) are hard **validation** errors raised in core `cross_field_errors`.
+
+**Recipe — add determination to a sector:** in that sector's plugin
+`calculate_metrics`, call the relevant `dpp_plugin_sdk::rules::<sector>` checks,
+push `PluginFinding`s onto `warnings` (not-yet-in-force / advisory) or
+`violations` (binding, in force), rebuild the `.wasm`. No engine change is
+required — the host routes by sector and the engine persists + gates the result.
+
 ---
 
 ## 2. ABI Contract

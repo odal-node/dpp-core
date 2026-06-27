@@ -23,7 +23,9 @@ use thiserror::Error;
 /// Increment the major version for breaking changes to the plugin interface.
 /// Increment the minor version for backward-compatible additions.
 pub const ABI_VERSION_MAJOR: u32 = 1;
-pub const ABI_VERSION_MINOR: u32 = 0;
+// 1.1: PluginResult gained backward-compatible `violations`/`warnings` finding
+// lists. Older (1.0) plugins omit them (serde defaults to empty) and still load.
+pub const ABI_VERSION_MINOR: u32 = 1;
 
 /// ABI version declared by a plugin.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -263,6 +265,41 @@ pub const METRIC_REPAIRABILITY_INDEX: &str = "repairability_index";
 /// Well-known metric key for recycled content percentage (0.0–100.0).
 pub const METRIC_RECYCLED_CONTENT_PCT: &str = "recycled_content_pct";
 
+/// A single determination finding emitted by a plugin's `calculate_metrics`.
+///
+/// Findings split into [`PluginResult::violations`] (binding — the host blocks
+/// publish for an in-force sector) and [`PluginResult::warnings`]
+/// (advisory/experimental — surfaced, never blocks). The vec encodes severity,
+/// so there is no separate severity field. Maps 1:1 onto the host's
+/// `ComplianceFinding`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginFinding {
+    /// Stable machine-readable code, e.g. `"battery.recycled_content.cobalt_below_2031"`.
+    pub code: String,
+    /// JSON-pointer-style field locator (e.g. `"/recycledContentCobaltPct"`), or
+    /// empty when the finding is not tied to a single field.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub field: String,
+    /// Human-readable explanation.
+    pub message: String,
+}
+
+impl PluginFinding {
+    /// Construct a finding from its code, field locator, and message.
+    pub fn new(
+        code: impl Into<String>,
+        field: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            field: field.into(),
+            message: message.into(),
+        }
+    }
+}
+
 /// Compliance result returned by the plugin.
 ///
 /// `metrics` is a sector-extensible map of named numeric values. Use the
@@ -276,6 +313,7 @@ pub const METRIC_RECYCLED_CONTENT_PCT: &str = "recycled_content_pct";
 /// repairability_index  ← metrics["repairability_index"]
 /// recycled_content_pct ← metrics["recycled_content_pct"]
 /// compliance_status    ← PluginComplianceStatus → ComplianceStatus (typed map)
+/// violations/warnings  ← PluginFinding → ComplianceFinding (host blocks on violations)
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -288,6 +326,14 @@ pub struct PluginResult {
     /// Non-numeric sector-specific data (free-form; stored verbatim in extra).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<serde_json::Value>,
+    /// Binding findings — the host blocks publish for an in-force sector. Empty
+    /// for passthrough / not-assessed determinations. (ABI 1.1+)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub violations: Vec<PluginFinding>,
+    /// Advisory / experimental findings — surfaced but never block publish (e.g.
+    /// recycled-content thresholds that are not yet in force). (ABI 1.1+)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<PluginFinding>,
 }
 
 impl PluginResult {
@@ -297,6 +343,8 @@ impl PluginResult {
             compliance_status: status,
             metrics: std::collections::HashMap::new(),
             extra: None,
+            violations: Vec::new(),
+            warnings: Vec::new(),
         }
     }
 
@@ -321,6 +369,18 @@ impl PluginResult {
     /// Attach free-form non-numeric extra data.
     pub fn with_extra(mut self, extra: serde_json::Value) -> Self {
         self.extra = Some(extra);
+        self
+    }
+
+    /// Append a binding violation (host blocks publish for an in-force sector).
+    pub fn with_violation(mut self, finding: PluginFinding) -> Self {
+        self.violations.push(finding);
+        self
+    }
+
+    /// Append an advisory warning (surfaced, never blocks publish).
+    pub fn with_warning(mut self, finding: PluginFinding) -> Self {
+        self.warnings.push(finding);
         self
     }
 

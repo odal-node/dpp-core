@@ -19,7 +19,8 @@ use semver::Version;
 use crate::catalog::SectorCatalog;
 use crate::domain::field_error::{FieldError, ValidationErrors};
 use crate::domain::sector::{
-    SectorData, SvhcSubstance, validate_fibre_composition, validate_surfactants,
+    SectorData, SvhcSubstance, battery_recycled_chemistry_conflicts,
+    validate_battery_operating_temp, validate_fibre_composition, validate_surfactants,
     validate_svhc_substances,
 };
 use crate::schemas::VersionedSchemaRegistry;
@@ -216,6 +217,45 @@ fn sector_data_instance(sector_data: &SectorData) -> serde_json::Value {
 /// `dpp-rules` through the `dpp-domain` adapters.
 fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
     match sector_data {
+        SectorData::Battery(d) => {
+            // Operating temperature range must be physically coherent (min < max).
+            if let Err(msg) =
+                validate_battery_operating_temp(d.operating_temp_min_c, d.operating_temp_max_c)
+            {
+                errors.push(FieldError {
+                    field: "/operatingTempMinC".to_owned(),
+                    message: msg,
+                });
+            }
+            // Recycled content declared for a metal the chemistry does not contain
+            // is a data-integrity contradiction (e.g. cobalt on LFP).
+            let chemistry = serde_json::to_value(&d.battery_chemistry)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_default();
+            for metal in battery_recycled_chemistry_conflicts(
+                &chemistry,
+                d.recycled_content_cobalt_pct,
+                d.recycled_content_lithium_pct,
+                d.recycled_content_nickel_pct,
+                d.recycled_content_lead_pct,
+            ) {
+                let field = match metal {
+                    "cobalt" => "/recycledContentCobaltPct",
+                    "lithium" => "/recycledContentLithiumPct",
+                    "nickel" => "/recycledContentNickelPct",
+                    "lead" => "/recycledContentLeadPct",
+                    _ => "/recycledContent",
+                };
+                errors.push(FieldError {
+                    field: field.to_owned(),
+                    message: format!(
+                        "{metal} recycled content declared for a {chemistry} battery, \
+                         which contains no {metal}"
+                    ),
+                });
+            }
+        }
         SectorData::Textile(d) => {
             if let Err(msg) = validate_fibre_composition(&d.fibre_composition) {
                 errors.push(FieldError {
@@ -378,6 +418,46 @@ mod tests {
     fn valid_battery_passes() {
         // Routed through the registry at the catalog's current battery version (v2.0.0).
         assert!(validate_sector_data(&valid_battery()).is_ok());
+    }
+
+    fn battery_inner() -> BatteryData {
+        match valid_battery() {
+            SectorData::Battery(b) => b,
+            _ => unreachable!("valid_battery is Battery"),
+        }
+    }
+
+    #[test]
+    fn battery_positive_cobalt_on_lfp_fails_cross_field() {
+        let mut b = battery_inner(); // chemistry = LFP (no cobalt)
+        b.recycled_content_cobalt_pct = Some(5.0);
+        let err = validate_sector_data(&SectorData::Battery(b)).unwrap_err();
+        assert!(
+            err.errors
+                .iter()
+                .any(|e| e.field == "/recycledContentCobaltPct"),
+            "expected cobalt-on-LFP conflict, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn battery_zero_cobalt_on_lfp_passes() {
+        let mut b = battery_inner();
+        b.recycled_content_cobalt_pct = Some(0.0); // "no recycled cobalt" — not a conflict
+        b.recycled_content_lithium_pct = Some(12.5);
+        assert!(validate_sector_data(&SectorData::Battery(b)).is_ok());
+    }
+
+    #[test]
+    fn battery_inverted_operating_temp_fails_cross_field() {
+        let mut b = battery_inner();
+        b.operating_temp_min_c = Some(60.0);
+        b.operating_temp_max_c = Some(-20.0);
+        let err = validate_sector_data(&SectorData::Battery(b)).unwrap_err();
+        assert!(
+            err.errors.iter().any(|e| e.field == "/operatingTempMinC"),
+            "expected operating-temp conflict, got: {err:?}"
+        );
     }
 
     #[test]

@@ -32,6 +32,34 @@ pub fn validate_fibre_composition(fibres: &[FibreEntry]) -> Result<(), String> {
     dpp_rules::validate_fibre_composition(&inputs)
 }
 
+/// Validate a battery's operating temperature range (`min < max` when both are
+/// declared). Delegates to [`dpp_rules`].
+pub fn validate_battery_operating_temp(
+    min_c: Option<f64>,
+    max_c: Option<f64>,
+) -> Result<(), String> {
+    dpp_rules::batteries::chemistry::validate_operating_temp_range(min_c, max_c)
+}
+
+/// Metals declared with recycled content `> 0` that the battery chemistry does
+/// not contain (a data-integrity contradiction, e.g. cobalt on LFP). Delegates
+/// to [`dpp_rules`]. `chemistry` is the serde code (`"LFP"`, `"NMC"`, …).
+pub fn battery_recycled_chemistry_conflicts(
+    chemistry: &str,
+    cobalt_pct: Option<f64>,
+    lithium_pct: Option<f64>,
+    nickel_pct: Option<f64>,
+    lead_pct: Option<f64>,
+) -> Vec<&'static str> {
+    dpp_rules::batteries::recycled_content::recycled_content_chemistry_conflicts(
+        chemistry,
+        cobalt_pct,
+        lithium_pct,
+        nickel_pct,
+        lead_pct,
+    )
+}
+
 /// Validate a detergent surfactant list. Delegates to [`dpp_rules`].
 pub fn validate_surfactants(surfactants: &[SurfactantEntry]) -> Result<(), String> {
     let inputs: Vec<dpp_rules::SurfactantInput<'_>> = surfactants

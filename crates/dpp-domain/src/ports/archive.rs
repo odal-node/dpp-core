@@ -299,6 +299,7 @@ mod tests {
             materials: vec![],
             co2e_per_unit: Some(CarbonFootprint::from_kg(3.5)),
             repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
+            compliance_result: None,
             sector_data: None,
             status: PassportStatus::Published,
             qr_code_url: None,

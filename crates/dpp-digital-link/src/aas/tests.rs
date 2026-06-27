@@ -29,6 +29,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(8.0)),
+        compliance_result: None,
         sector_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,

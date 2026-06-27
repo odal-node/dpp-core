@@ -164,6 +164,119 @@ fn check_targets(
     out
 }
 
+// ── Chemistry → regulated-metal applicability ──────────────────────────────────
+
+/// The Annex X regulated metals (cobalt, lithium, nickel, lead) that are
+/// *meaningfully present* for a given battery chemistry.
+///
+/// Used to scope recycled-content checks so a chemistry that does not contain a
+/// metal is never flagged for that metal's "shortfall" — e.g. an LFP cell
+/// (LiFePO₄, no cobalt or nickel) must not produce a cobalt shortfall just
+/// because the field defaulted to `0.0`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RegulatedMetals {
+    pub cobalt: bool,
+    pub lithium: bool,
+    pub nickel: bool,
+    pub lead: bool,
+}
+
+/// Map a battery chemistry code (e.g. `"LFP"`, `"NMC"`, `"lead-acid"`) to the
+/// Annex X regulated metals it contains.
+///
+/// Matching is case-insensitive. Unknown chemistries return **all `true`**
+/// (conservative: every declared value is checked, since we cannot rule a metal
+/// out). The caller still skips any metal whose declared percentage is absent.
+#[must_use]
+pub fn chemistry_regulated_metals(chemistry: &str) -> RegulatedMetals {
+    let c = chemistry.trim();
+    let eq = |s: &str| c.eq_ignore_ascii_case(s);
+    if eq("LFP") {
+        RegulatedMetals {
+            cobalt: false,
+            lithium: true,
+            nickel: false,
+            lead: false,
+        }
+    } else if eq("NMC") || eq("NCA") {
+        RegulatedMetals {
+            cobalt: true,
+            lithium: true,
+            nickel: true,
+            lead: false,
+        }
+    } else if eq("LCO") {
+        RegulatedMetals {
+            cobalt: true,
+            lithium: true,
+            nickel: false,
+            lead: false,
+        }
+    } else if eq("NiMH") || eq("NiCd") {
+        RegulatedMetals {
+            cobalt: false,
+            lithium: false,
+            nickel: true,
+            lead: false,
+        }
+    } else if eq("lead-acid") {
+        RegulatedMetals {
+            cobalt: false,
+            lithium: false,
+            nickel: false,
+            lead: true,
+        }
+    } else if eq("solid-state") {
+        RegulatedMetals {
+            cobalt: false,
+            lithium: true,
+            nickel: false,
+            lead: false,
+        }
+    } else {
+        // Unknown chemistry — cannot exclude any metal; check whatever is declared.
+        RegulatedMetals {
+            cobalt: true,
+            lithium: true,
+            nickel: true,
+            lead: true,
+        }
+    }
+}
+
+/// Metals whose recycled content is declared **> 0** but which the chemistry
+/// does **not** contain — a data-integrity contradiction (e.g. cobalt recycled
+/// content on an LFP cell, which has no cobalt).
+///
+/// A declared `0.0` is *not* a conflict (it states "no recycled content", which
+/// is trivially true for an absent metal). Unknown chemistries contain every
+/// metal per [`chemistry_regulated_metals`], so they never conflict.
+#[must_use]
+pub fn recycled_content_chemistry_conflicts(
+    chemistry: &str,
+    cobalt_pct: Option<f64>,
+    lithium_pct: Option<f64>,
+    nickel_pct: Option<f64>,
+    lead_pct: Option<f64>,
+) -> Vec<&'static str> {
+    let reg = chemistry_regulated_metals(chemistry);
+    let positive = |v: Option<f64>| matches!(v, Some(x) if x.is_finite() && x > 0.0);
+    let mut out = Vec::new();
+    if positive(cobalt_pct) && !reg.cobalt {
+        out.push("cobalt");
+    }
+    if positive(lithium_pct) && !reg.lithium {
+        out.push("lithium");
+    }
+    if positive(nickel_pct) && !reg.nickel {
+        out.push("nickel");
+    }
+    if positive(lead_pct) && !reg.lead {
+        out.push("lead");
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,5 +361,75 @@ mod tests {
         let shortfalls = annex_x_shortfalls_2031(&input);
         assert_eq!(shortfalls.len(), 1);
         assert_eq!(shortfalls[0].material, "cobalt");
+    }
+
+    #[test]
+    fn lfp_regulates_lithium_only() {
+        let m = chemistry_regulated_metals("LFP");
+        assert!(m.lithium);
+        assert!(!m.cobalt && !m.nickel && !m.lead);
+        // case-insensitive
+        assert_eq!(chemistry_regulated_metals("lfp"), m);
+    }
+
+    #[test]
+    fn nmc_and_nca_regulate_cobalt_lithium_nickel() {
+        for chem in ["NMC", "NCA"] {
+            let m = chemistry_regulated_metals(chem);
+            assert!(m.cobalt && m.lithium && m.nickel);
+            assert!(!m.lead);
+        }
+    }
+
+    #[test]
+    fn lead_acid_regulates_lead_only() {
+        let m = chemistry_regulated_metals("lead-acid");
+        assert!(m.lead);
+        assert!(!m.cobalt && !m.lithium && !m.nickel);
+    }
+
+    #[test]
+    fn unknown_chemistry_checks_all_metals() {
+        let m = chemistry_regulated_metals("mystery-cell");
+        assert!(m.cobalt && m.lithium && m.nickel && m.lead);
+    }
+
+    #[test]
+    fn positive_cobalt_on_lfp_is_a_conflict() {
+        let c = recycled_content_chemistry_conflicts("LFP", Some(5.0), Some(12.0), None, None);
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0], "cobalt");
+    }
+
+    #[test]
+    fn zero_cobalt_on_lfp_is_not_a_conflict() {
+        // 0.0 declares "no recycled cobalt" — trivially true for an absent metal.
+        let c = recycled_content_chemistry_conflicts("LFP", Some(0.0), Some(12.0), Some(0.0), None);
+        assert!(c.is_empty(), "got: {c:?}");
+    }
+
+    #[test]
+    fn nmc_cobalt_and_nickel_declared_no_conflict() {
+        let c = recycled_content_chemistry_conflicts("NMC", Some(16.0), Some(6.0), Some(8.0), None);
+        assert!(c.is_empty(), "got: {c:?}");
+    }
+
+    #[test]
+    fn lead_declared_on_lfp_is_a_conflict() {
+        let c = recycled_content_chemistry_conflicts("LFP", None, Some(12.0), None, Some(80.0));
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0], "lead");
+    }
+
+    #[test]
+    fn unknown_chemistry_never_conflicts() {
+        let c = recycled_content_chemistry_conflicts(
+            "mystery",
+            Some(5.0),
+            Some(5.0),
+            Some(5.0),
+            Some(5.0),
+        );
+        assert!(c.is_empty());
     }
 }

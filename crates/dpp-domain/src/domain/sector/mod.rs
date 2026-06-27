@@ -37,7 +37,10 @@ pub use enums::{
     ProductionRoute, SystemBoundary,
 };
 pub use metrics::{CarbonFootprint, RepairCriterion, RepairabilityScore};
-pub use validation::{validate_fibre_composition, validate_surfactants, validate_svhc_substances};
+pub use validation::{
+    battery_recycled_chemistry_conflicts, validate_battery_operating_temp,
+    validate_fibre_composition, validate_surfactants, validate_svhc_substances,
+};
 
 /// EU ESPR product sector — determines which delegated act schema applies.
 ///

@@ -9,6 +9,7 @@ use crate::domain::{
     sector::{CarbonFootprint, RepairabilityScore, Sector, SectorData},
     status::PassportStatus,
 };
+use crate::ports::compliance::ComplianceResult;
 
 #[cfg(test)]
 mod tests;
@@ -108,6 +109,13 @@ pub struct Passport {
     pub co2e_per_unit: Option<CarbonFootprint>,
     /// Repairability score per EU ecodesign methodology.
     pub repairability_score: Option<RepairabilityScore>,
+    /// The computed compliance determination — status, metrics, binding
+    /// `violations` + advisory `warnings`, and (when a calculation ran) a
+    /// receipt. Attached by the engine's `apply_compliance` at create/update.
+    /// Part of the signed payload and immutable after retention lock. `None`
+    /// until a determination is computed (e.g. a sector with no plugin loaded).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compliance_result: Option<ComplianceResult>,
     /// Typed, sector-specific DPP data (EU Battery Regulation, Textile DPP, etc.).
     ///
     /// `None` for passports where sector-specific data has not yet been supplied.

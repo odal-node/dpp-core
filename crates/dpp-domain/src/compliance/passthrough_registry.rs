@@ -3,8 +3,6 @@
 //! Returns manufacturer-supplied data verbatim for **every** sector, computing
 //! nothing. A *determination* (computed metrics, pass/fail) is the job of the
 //! Wasm sector plugins (the canonical OSS determination path) or a proprietary
-//! `PremiumComplianceRegistry` — see
-//! `docs/architecture/SECTOR-MODEL-CONSOLIDATION.md` §3.1.
 //!
 //! This is the Apache-2.0 default. The [`ComplianceRegistry`] /
 //! [`ComplianceStrategy`](crate::ports::compliance::ComplianceStrategy) traits
@@ -13,13 +11,14 @@
 
 use crate::{
     domain::sector::{Sector, SectorData},
-    ports::compliance::{ComplianceError, ComplianceRegistry, ComplianceResult, ComplianceStatus},
+    ports::compliance::{ComplianceError, ComplianceRegistry, ComplianceResult},
 };
 
 /// Open-source passthrough compliance registry.
 ///
 /// Sector-agnostic: it makes no determination for any sector and computes no
-/// metrics. Every sector yields [`ComplianceStatus::PassthroughNoValidation`].
+/// metrics. Every sector yields
+/// [`ComplianceStatus::PassthroughNoValidation`](crate::ports::compliance::ComplianceStatus::PassthroughNoValidation).
 pub struct PassthroughRegistry;
 
 impl PassthroughRegistry {
@@ -41,12 +40,7 @@ impl ComplianceRegistry for PassthroughRegistry {
         _sector: Sector,
         _data: &SectorData,
     ) -> Result<ComplianceResult, ComplianceError> {
-        Ok(ComplianceResult {
-            co2e_score: None,
-            repairability_index: None,
-            recycled_content_pct: None,
-            compliance_status: ComplianceStatus::PassthroughNoValidation,
-        })
+        Ok(ComplianceResult::passthrough())
     }
 }
 
@@ -59,6 +53,7 @@ mod tests {
     use crate::domain::sector::{
         BatteryChemistry, BatteryData, FibreEntry, SectorData, TextileData,
     };
+    use crate::ports::compliance::ComplianceStatus;
 
     fn battery_data() -> SectorData {
         SectorData::Battery(BatteryData {

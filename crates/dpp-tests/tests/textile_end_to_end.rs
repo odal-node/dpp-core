@@ -54,6 +54,7 @@ fn make_textile_passport() -> Passport {
         ],
         co2e_per_unit: Some(CarbonFootprint::from_kg(8.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(6.5)),
+        compliance_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
             fibre_composition: vec![
                 FibreEntry {

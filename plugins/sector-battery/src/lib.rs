@@ -15,9 +15,12 @@
 //! never interchangeable as dispatch keys.
 
 use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::rules::batteries::recycled_content::{
+    annex_x_shortfalls_2031, chemistry_regulated_metals, RecycledContentInput,
+};
 use dpp_plugin_sdk::traits::{
     AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    PluginError, PluginFinding, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
     METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
 };
 use dpp_plugin_sdk::validate::{num, Validator};
@@ -88,34 +91,106 @@ impl DppSectorPlugin for BatteryPlugin {
         // represent that faithfully, so we expose the mean of declared metals
         // there and the full per-metal breakdown under `extra` — no metal is
         // silently dropped.
-        let metals = [
-            ("cobaltPct", num(input, "recycledContentCobaltPct")),
-            ("lithiumPct", num(input, "recycledContentLithiumPct")),
-            ("nickelPct", num(input, "recycledContentNickelPct")),
-            ("leadPct", num(input, "recycledContentLeadPct")),
-        ];
-        let declared: Vec<f64> = metals.iter().filter_map(|(_, v)| *v).collect();
+        let cobalt = num(input, "recycledContentCobaltPct");
+        let lithium = num(input, "recycledContentLithiumPct");
+        let nickel = num(input, "recycledContentNickelPct");
+        let lead = num(input, "recycledContentLeadPct");
+
+        let declared: Vec<f64> = [cobalt, lithium, nickel, lead]
+            .into_iter()
+            .flatten()
+            .collect();
         let recycled_mean = if declared.is_empty() {
             None
         } else {
             Some(declared.iter().sum::<f64>() / declared.len() as f64)
         };
 
+        // Recycled-content target check (EU 2023/1542 Art. 8 + Annex X). The
+        // Phase-1 minima are not binding until 18 Aug 2031, so shortfalls are
+        // surfaced as **advisory warnings**, never blocking violations. We scope
+        // the check to the metals the declared chemistry actually contains (an
+        // LFP cell has no cobalt/nickel) and skip portable batteries, which are
+        // out of Annex X scope.
+        let chemistry = input
+            .get("batteryChemistry")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let battery_type = input
+            .get("batteryType")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let regulated = chemistry_regulated_metals(chemistry);
+
+        let mut warnings: Vec<PluginFinding> = Vec::new();
+        if !battery_type.eq_ignore_ascii_case("portable") {
+            let scoped = RecycledContentInput {
+                cobalt_pct: if regulated.cobalt { cobalt } else { None },
+                lithium_pct: if regulated.lithium { lithium } else { None },
+                nickel_pct: if regulated.nickel { nickel } else { None },
+                lead_pct: if regulated.lead { lead } else { None },
+            };
+            for sf in annex_x_shortfalls_2031(&scoped) {
+                let field = match sf.material {
+                    "cobalt" => "/recycledContentCobaltPct",
+                    "lithium" => "/recycledContentLithiumPct",
+                    "nickel" => "/recycledContentNickelPct",
+                    "lead" => "/recycledContentLeadPct",
+                    _ => "",
+                };
+                warnings.push(PluginFinding::new(
+                    format!("battery.recycled_content.{}_below_2031_target", sf.material),
+                    field,
+                    format!(
+                        "Declared {} recycled content {:.1}% is below the EU 2023/1542 \
+                         Annex X Phase-1 minimum of {:.0}% (binding from 18 Aug 2031).",
+                        sf.material, sf.declared_pct, sf.required_pct
+                    ),
+                ));
+            }
+        }
+
+        // Plausibility: rated energy (kWh) vs nominal V×Ah. A gross mismatch
+        // (outside [0.5×, 2×]) is almost always a unit-entry error (e.g. Wh
+        // typed as kWh). Advisory only — never blocks.
+        if let (Some(v), Some(ah), Some(kwh)) = (
+            num(input, "nominalVoltageV"),
+            num(input, "nominalCapacityAh"),
+            num(input, "ratedCapacityKwh"),
+        ) {
+            let nominal_kwh = v * ah / 1000.0;
+            if kwh > 0.0 && nominal_kwh > 0.0 {
+                let ratio = kwh / nominal_kwh;
+                if !(0.5..=2.0).contains(&ratio) {
+                    warnings.push(PluginFinding::new(
+                        "battery.rated_capacity.inconsistent_with_nominal",
+                        "/ratedCapacityKwh",
+                        format!(
+                            "Rated capacity {kwh:.2} kWh is inconsistent with nominal \
+                             {v}V × {ah}Ah = {nominal_kwh:.2} kWh — check units.",
+                        ),
+                    ));
+                }
+            }
+        }
+
         // CO2e compliance thresholds are set by pending delegated acts under
-        // Art. 7(2); a pass/fail determination is not yet possible.
-        Ok(PluginResult::new(PluginComplianceStatus::NotAssessed)
+        // Art. 7(2); a binding pass/fail determination is not yet possible, so
+        // the status stays NotAssessed and co2e is passed through as a metric.
+        let result = PluginResult::new(PluginComplianceStatus::NotAssessed)
             .maybe_metric(METRIC_CO2E_SCORE, co2e)
             .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled_mean)
             .with_extra(json!({
                 "recycledContentByMetal": {
-                    "cobaltPct": metals[0].1,
-                    "lithiumPct": metals[1].1,
-                    "nickelPct": metals[2].1,
-                    "leadPct": metals[3].1,
+                    "cobaltPct": cobalt,
+                    "lithiumPct": lithium,
+                    "nickelPct": nickel,
+                    "leadPct": lead,
                 },
                 "carbonFootprintClass": input.get("carbonFootprintClass"),
                 "batteryType": input.get("batteryType"),
-            })))
+            }));
+        Ok(warnings.into_iter().fold(result, PluginResult::with_warning))
     }
 
     fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
@@ -228,5 +303,110 @@ mod tests {
         let data = valid_battery();
         let out = BatteryPlugin.generate_passport(&data).unwrap();
         assert_eq!(out["gtin"], "12345678901231");
+    }
+
+    #[test]
+    fn nmc_below_2031_cobalt_emits_advisory_warning_not_violation() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "recycledContentCobaltPct": 12.0, // < 16 Phase-1 target
+            "recycledContentNickelPct": 8.0,  // >= 6 ok
+            "recycledContentLithiumPct": 6.0  // >= 6 ok
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert_eq!(result.compliance_status, PluginComplianceStatus::NotAssessed);
+        // Not-in-force threshold ⇒ advisory only, never blocking.
+        assert!(result.violations.is_empty());
+        assert!(
+            result.warnings.iter().any(|w| w.code.contains("cobalt")),
+            "expected cobalt advisory, got: {:?}",
+            result.warnings
+        );
+        assert!(!result.warnings.iter().any(|w| w.code.contains("nickel")));
+        assert!(!result.warnings.iter().any(|w| w.code.contains("lithium")));
+    }
+
+    #[test]
+    fn lfp_zero_cobalt_does_not_warn() {
+        // LFP contains no cobalt; a defaulted 0.0 must not produce a shortfall.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "LFP",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 45.2,
+            "recycledContentCobaltPct": 0.0,
+            "recycledContentLithiumPct": 12.5
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result.warnings.is_empty(),
+            "LFP cobalt 0.0 must not warn; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn portable_battery_skips_recycled_content_warnings() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "batteryType": "portable",
+            "nominalVoltageV": 3.6,
+            "nominalCapacityAh": 2.0,
+            "expectedLifetimeCycles": 500,
+            "co2ePerUnitKg": 5.0,
+            "recycledContentCobaltPct": 0.0
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result.warnings.is_empty(),
+            "portable batteries are out of Annex X Phase-1 scope; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn rated_capacity_unit_error_emits_advisory_warning() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "LFP",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0, // nominal = 4.8 kWh
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 45.2,
+            "ratedCapacityKwh": 48.0 // 10× off → unit error
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(result.violations.is_empty());
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.rated_capacity.inconsistent_with_nominal"),
+            "got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn consistent_rated_capacity_no_warning() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "LFP",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 45.2,
+            "ratedCapacityKwh": 4.8
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(result.warnings.is_empty(), "got: {:?}", result.warnings);
     }
 }

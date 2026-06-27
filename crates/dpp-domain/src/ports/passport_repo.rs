@@ -210,6 +210,7 @@ mod tests {
             materials: vec![],
             co2e_per_unit: None,
             repairability_score: None,
+            compliance_result: None,
             sector_data: None,
             status: PassportStatus::Draft,
             qr_code_url: None,

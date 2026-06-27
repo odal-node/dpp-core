@@ -33,13 +33,13 @@ Every technical decision starts from an open standard. No proprietary formats, n
 ### 4. The Golden Rule
 
 > If code changes because an EU regulation changed → it belongs in **dpp-core**.
-> If code changes because the business model changed → it belongs in **dpp-engine**.
+> If code changes because of how the system is deployed or operated → it belongs in **dpp-engine**.
 
-This separation keeps the regulatory implementation open, auditable, and free to use, regardless of what happens on the commercial side.
+This separation keeps the regulatory implementation open, auditable, and free to use.
 
 ### 5. Open-Core Boundary
 
-The boundary is a Rust trait (`ComplianceRegistry`). It is a **technical extension seam**, not a commercial paywall — compliance calculation is open (Apache-2.0 Wasm plugins and the platform's calculators). Every piece of code that implements an EU regulation or open standard is Apache-2.0. Revenue comes from operation, regulatory currency, and trust services, not from gating capability.
+The boundary is a Rust trait (`ComplianceRegistry`). It is a **technical extension seam** — compliance calculation is open (Apache-2.0 Wasm plugins and the engine's calculators). Every piece of code that implements an EU regulation or open standard is Apache-2.0.
 
 ### 6. Port Traits as the Extension Contract
 

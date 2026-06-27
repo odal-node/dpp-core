@@ -25,6 +25,7 @@ fn make_passport() -> Passport {
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(2.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(7.5)),
+        compliance_result: None,
         sector_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,

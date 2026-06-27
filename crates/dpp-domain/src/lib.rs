@@ -49,8 +49,8 @@ pub use ports::archive::{
     ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, GhostArchive,
 };
 pub use ports::compliance::{
-    ComplianceError, ComplianceErrorKind, ComplianceRegistry, ComplianceResult, ComplianceStatus,
-    ComplianceStrategy, gate_determination,
+    ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceRegistry, ComplianceResult,
+    ComplianceStatus, ComplianceStrategy, gate_determination,
 };
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus,

@@ -484,6 +484,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         materials: vec![],
         co2e_per_unit: None,
         repairability_score: None,
+        compliance_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
             // sum = 50%, should be ~100%
             fibre_composition: vec![FibreEntry {

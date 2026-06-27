@@ -49,6 +49,7 @@ fn base(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passpo
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.0)),
         repairability_score: Some(RepairabilityScore::from_scalar(6.0)),
+        compliance_result: None,
         sector_data: Some(sector_data),
         status: PassportStatus::Draft,
         qr_code_url: None,

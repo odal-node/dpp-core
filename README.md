@@ -187,7 +187,6 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 | [PROOF-BOUND-ARCHITECTURE.md](docs/architecture/PROOF-BOUND-ARCHITECTURE.md) | Data sovereignty, signed proof relay model, and passport retention guarantees |
 | [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
 | [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
-| [ECOSYSTEM-POSITIONING.md](docs/project/ECOSYSTEM-POSITIONING.md) | GS1 Solution Partner, JTC 24, pilot programme strategy |
 | [CONTRIBUTING.md](docs/governance/CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
 | [SECURITY.md](docs/project/SECURITY.md) | Vulnerability disclosure policy |
 
