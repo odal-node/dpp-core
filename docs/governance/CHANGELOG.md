@@ -5,6 +5,81 @@ All notable changes to dpp-core are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-01
+
+A final-validation-review pass against authoritative regulatory and standards
+sources (battery/ESPR citations, GS1, RFC 8037, IPCC AR6) found and fixed two
+real defects, added one ESPR-driven capability, plus regression tests that
+lock all three in. All crates bump together (workspace lockstep).
+
+### Breaking
+
+- **`PassportRepository::list` / `::count`** (`dpp-domain::ports::passport_repo`)
+  gained a new `facility_id: Option<&str>` parameter, filtering to passports
+  stamped with that exact ESPR Annex III facility identifier. Any external
+  implementor of `PassportRepository` must add the parameter to its `list`/
+  `count` impls. *Migration:* thread `facility_id` through (pass `None` to
+  preserve prior unfiltered behaviour).
+- **`unsold-goods` sector rename** — the sector previously keyed as
+  `textile-unsold` (Rust type, schema directory, sector-catalog JSON, and the
+  wire-format `sector` tag) is renamed to `unsold-goods`. *Migration:* update
+  any code or stored data referencing the old `"textile-unsold"` key or the
+  `crates/dpp-domain/schemas/textile-unsold/` path.
+- **`electronics` schema `v1.0.0`** is **unchanged** (kept byte-identical to
+  what `0.1.1` published, for historical immutability) — it still incorrectly
+  declares `repairabilityScore` as a bare number, which the Rust
+  `ElectronicsData` type never actually produced. A new **`electronics` schema
+  `v1.1.0`** (now the catalog's `currentSchemaVersion`) corrects
+  `repairabilityScore` to the structured `{overall, criteria}` shape that
+  matches the Rust type. *Migration:* any caller validating electronics
+  passports against the embedded schema should resolve the **current**
+  version via `SectorCatalog::resolve_schema_version`/`VersionedSchemaRegistry`
+  (as the write path already does) rather than hardcoding `v1.0.0`.
+
+### Fixed
+
+- Pinned the `Passport::retention_until` and `operator_identifier` ESPR
+  citations against the verbatim OJ text of Regulation (EU) 2024/1781 — was
+  previously `COMPLIANCE-PIN PENDING` (Art. 9(2)(i)/11(e) for the availability
+  period, Art. 10(4) for the back-up-copy duty, Annex III point (k)/Art. 12
+  for the responsible-operator identifier).
+- Corrected `registry::TransferNotification`'s doc comment: ESPR has **no**
+  distinct "transfer of responsibility" article; the prior "Article 9"
+  citation was unconfirmed and is now attributed to its actual basis
+  (Art. 9(1) general accuracy duty + Art. 13(4) registry-upload duty).
+- README, `dpp-calc` README, `dpp-plugin-traits` doc comments, and the
+  furniture/electronics schema descriptions no longer imply the repairability
+  heuristic is a regulatory index (EN 45554 / EU 2023/1669) — it is an
+  explicitly non-regulatory, transparent six-factor heuristic.
+
+### Added
+
+- `facility_id` filter on `PassportRepository::list`/`count` (see Breaking).
+- `validate_strict` fail-closed unit test, pinned independently of any
+  handler/service wiring (the contract the publish path relies on for Q-2).
+- Per-sector Rust-type-to-JSON-schema conformance suite covering all 11
+  sectors — round-trips a schema-valid instance constructed from each
+  sector's Rust type through that sector's current embedded schema. This is
+  the test class that would have caught the `electronics` schema bug above.
+- Independent (non-`ed25519-dalek`) Ed25519 cross-verification of a produced
+  JWS using `ring`, plus a full DID Core structural-validity test (referential
+  integrity between `authentication`/`assertionMethod` and
+  `verificationMethod`) on a realistic primary + archived + revoked keystore.
+- Official GS1 Digital Link conformance vectors, sourced from §5 of the GS1
+  Digital Link Standard — URI Syntax (Release 1.6.0, Ratified Mar 2025).
+
+## [0.1.1] - 2026-06-27
+
+- Added the `ComplianceRegistry` port (`dpp-domain::ports::compliance`) and
+  `ComplianceResult`/`ComplianceStatus` types, wiring compliance computation
+  into the passport pipeline (`Passport::compliance_result`).
+- Added a `PassthroughComplianceRegistry` reference implementation
+  (`dpp-domain::compliance::passthrough_registry`).
+- Added the battery recycled-content cross-field rule
+  (`dpp-rules::batteries::recycled_content`).
+- Extended `dpp-plugin-traits` with the metric/compliance surface plugins use
+  to report results back through the same pipeline.
+
 ## [0.1.0] - 2026-06-23
 
 Initial public release of the dpp-core workspace: nine Rust crates
