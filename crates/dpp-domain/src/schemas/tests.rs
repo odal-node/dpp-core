@@ -6,9 +6,9 @@ use super::*;
 fn registry_loads_all_embedded_schemas() {
     let reg = VersionedSchemaRegistry::new();
     // battery 1.0 + 2.0, textile 1.0 + 1.1, unsold-goods 1.0, steel 1.0,
-    // electronics 1.0, construction 1.0, tyre 1.0, toy 1.0, aluminium 1.0,
-    // furniture 1.0, detergent 1.0
-    assert_eq!(reg.len(), 13);
+    // electronics 1.0 + 1.1, construction 1.0, tyre 1.0, toy 1.0,
+    // aluminium 1.0, furniture 1.0, detergent 1.0
+    assert_eq!(reg.len(), 14);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn register_new_schema_succeeds() {
     let mut reg = VersionedSchemaRegistry::new();
     let schema = r#"{"type": "object", "properties": {"gtin": {"type": "string"}}}"#;
     assert!(reg.register("plastics", "1.0.0", schema.to_owned()).is_ok());
-    assert_eq!(reg.len(), 14);
+    assert_eq!(reg.len(), 15);
 
     let entry = reg
         .get_entry("plastics", &"1.0.0".parse().unwrap())
@@ -153,7 +153,7 @@ fn register_or_replace_new_returns_false() {
         .register_or_replace("plastics", "1.0.0", schema.to_owned())
         .unwrap();
     assert!(!replaced);
-    assert_eq!(reg.len(), 14);
+    assert_eq!(reg.len(), 15);
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn register_or_replace_existing_returns_true() {
         .register_or_replace("battery", "1.0.0", new_schema.to_owned())
         .unwrap();
     assert!(replaced);
-    assert_eq!(reg.len(), 13); // count unchanged
+    assert_eq!(reg.len(), 14); // count unchanged
     assert!(
         reg.get("battery", &"1.0.0".parse().unwrap())
             .unwrap()
@@ -189,11 +189,11 @@ fn unregister_runtime_schema_succeeds() {
     let schema = r#"{"type": "object"}"#;
     reg.register("plastics", "1.0.0", schema.to_owned())
         .unwrap();
-    assert_eq!(reg.len(), 14);
+    assert_eq!(reg.len(), 15);
 
     let removed = reg.unregister("plastics", &"1.0.0".parse().unwrap());
     assert!(removed);
-    assert_eq!(reg.len(), 13);
+    assert_eq!(reg.len(), 14);
     assert!(reg.get("plastics", &"1.0.0".parse().unwrap()).is_none());
 }
 
@@ -202,7 +202,7 @@ fn unregister_embedded_schema_does_nothing() {
     let mut reg = VersionedSchemaRegistry::new();
     let removed = reg.unregister("battery", &"1.0.0".parse().unwrap());
     assert!(!removed);
-    assert_eq!(reg.len(), 13); // still there
+    assert_eq!(reg.len(), 14); // still there
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn conformance_textile_v1_invalid_country_pattern() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn conformance_textile_unsold_v1_valid() {
+fn conformance_unsold_goods_v1_valid() {
     let reg = VersionedSchemaRegistry::new();
     let v: Version = "1.0.0".parse().unwrap();
     let data = serde_json::json!({
@@ -448,7 +448,7 @@ fn conformance_textile_unsold_v1_valid() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn conformance_textile_unsold_v1_invalid_destination_enum() {
+fn conformance_unsold_goods_v1_invalid_destination_enum() {
     let reg = VersionedSchemaRegistry::new();
     let v: Version = "1.0.0".parse().unwrap();
     // "incineration" is not a valid destination enum value.

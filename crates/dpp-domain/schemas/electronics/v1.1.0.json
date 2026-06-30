@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://schema.odal-node.io/dpp/electronics-v1.0.0.json",
-  "title": "Odal Node — Electronics Sector Data (v1.0.0)",
-  "description": "ICT and electronics fields per EU Electronics DPP (adopted 18 March 2026, effective 1 April 2026). Mandatory immediately for AI servers, high-end PCBs, and foldable phones; from 1 January 2027 for low-end consumer electronics.",
+  "$id": "https://schema.odal-node.io/dpp/electronics-v1.1.0.json",
+  "title": "Odal Node — Electronics Sector Data (v1.1.0)",
+  "description": "ICT and electronics fields per EU Electronics DPP (adopted 18 March 2026, effective 1 April 2026). Mandatory immediately for AI servers, high-end PCBs, and foldable phones; from 1 January 2027 for low-end consumer electronics. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape (v1.0.0 incorrectly declared it as a bare number, which the Rust type never actually produced).",
   "type": "object",
   "required": [
     "gtin",
@@ -44,10 +44,17 @@
       "description": "Whole-lifecycle carbon footprint in kg CO2e per unit."
     },
     "repairabilityScore": {
-      "type": ["number", "null"],
-      "minimum": 0,
-      "maximum": 10,
-      "description": "Repairability score 0.0-10.0 (non-regulatory heuristic, not EN 45554 / EU 2023/1669). >= 6.0 is considered good."
+      "type": ["object", "null"],
+      "description": "Repairability score (non-regulatory heuristic, not EN 45554 / EU 2023/1669). overall is 0.0-10.0; >= 6.0 is considered good.",
+      "required": ["overall"],
+      "properties": {
+        "overall": { "type": "number", "minimum": 0, "maximum": 10 },
+        "criteria": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/repairCriterion" }
+        }
+      },
+      "additionalProperties": false
     },
     "sparePartsAvailable": {
       "type": ["boolean", "null"],
@@ -120,6 +127,16 @@
           "type": ["string", "null"],
           "pattern": "^[A-Z]{2}$"
         }
+      },
+      "additionalProperties": false
+    },
+    "repairCriterion": {
+      "type": "object",
+      "required": ["name", "score", "weight"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "score": { "type": "number" },
+        "weight": { "type": "number" }
       },
       "additionalProperties": false
     }

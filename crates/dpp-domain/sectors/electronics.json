@@ -8,8 +8,8 @@
   ],
   "dppAppliesFrom": "2025-06-20",
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0"],
-  "currentSchemaVersion": "1.0.0",
+  "schemaVersions": ["1.0.0", "1.1.0"],
+  "currentSchemaVersion": "1.1.0",
   "productCategories": ["smartphone", "tablet", "laptop", "monitor", "tv", "server", "charger", "earphone"],
   "accessTiers": {
     "svhcSubstances": "professional",
@@ -18,5 +18,5 @@
     "criticalRawMaterials": "professional"
   },
   "plugin": "sector-electronics",
-  "notes": "In force for smartphones & tablets since 2025-06-20 (repairability class A-E, durability, 7-year spare parts, OS updates). Broader consumer-electronics DPP delegated act anticipated ~2027 — schema will extend then."
+  "notes": "In force for smartphones & tablets since 2025-06-20 (repairability class A-E, durability, 7-year spare parts, OS updates). Broader consumer-electronics DPP delegated act anticipated ~2027 — schema will extend then. v1.1.0 (current) corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 is kept for historical immutability (it incorrectly declared repairabilityScore as a bare number)."
 }
