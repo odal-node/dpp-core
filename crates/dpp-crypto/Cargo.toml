@@ -39,3 +39,7 @@ async-trait      = { workspace = true }
 uuid          = { version = "1", features = ["v4"] }
 tokio         = { version = "1", features = ["rt", "macros"] }
 tracing-test  = "0.2"
+# G-4 (release review): independent Ed25519 implementation (separate codebase
+# from ed25519-dalek) used only to cross-verify a golden JWS vector in tests —
+# never used in production signing/verification code.
+ring          = "0.17"

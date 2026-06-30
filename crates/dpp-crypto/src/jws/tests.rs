@@ -327,6 +327,96 @@ fn rotation_does_not_break_old_jws_verification() {
     assert!(ok_b, "new JWS must verify against current key");
 }
 
+// ── G-4: Cross-library JWS golden vector ──────────────────────────────────────
+
+/// G-4: Cross-library JWS golden vector.
+///
+/// Signs a payload with our signer (JCS-canonical bytes) and independently
+/// verifies with raw ed25519_dalek — bypassing our verifier module entirely.
+/// Also pins that the JWS payload part is exactly the JCS canonical bytes, not
+/// incidental serde output (proves canonicalization is applied before signing).
+#[test]
+fn jws_golden_vector_raw_dalek_verification() {
+    let store = temp_store("g4", "g4-key");
+    let loaded = store.load_key("g4-key").expect("load key");
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    // Out-of-order keys — JCS must sort them: {"a":1,"nested":{"x":"a","y":"b"},"z":2}
+    let payload = json!({"z": 2, "a": 1, "nested": {"y": "b", "x": "a"}});
+    let jws = super::signer::sign(&store, "g4-key", &payload).expect("sign");
+
+    let parts: Vec<&str> = jws.splitn(3, '.').collect();
+    assert_eq!(parts.len(), 3, "JWS must have 3 parts");
+
+    // Pin: payload part must be the JCS-canonical bytes (object keys sorted by UTF-16 code unit).
+    let jws_payload_bytes = b64.decode(parts[1]).expect("decode payload b64");
+    let expected_canonical = super::canonical::canonicalize(&payload).expect("canonicalize");
+    assert_eq!(
+        jws_payload_bytes, expected_canonical,
+        "JWS payload must be JCS canonical bytes; signer must not use incidental serde output"
+    );
+
+    // Cross-library verification: use raw ed25519_dalek::verify_strict,
+    // independent of our verifier module, to confirm the signing format is correct.
+    let sig_bytes = b64.decode(parts[2]).expect("decode sig b64");
+    let sig_arr: [u8; 64] = sig_bytes.try_into().expect("Ed25519 signature is 64 bytes");
+    let raw_sig = ed25519_dalek::Signature::from_bytes(&sig_arr);
+    let signing_input = format!("{}.{}", parts[0], parts[1]);
+    assert!(
+        loaded
+            .verifying_key
+            .verify_strict(signing_input.as_bytes(), &raw_sig)
+            .is_ok(),
+        "raw ed25519_dalek::verify_strict must accept the JWS produced by our signer"
+    );
+}
+
+/// G-4 (true independent cross-check): the test above
+/// (`jws_golden_vector_raw_dalek_verification`) uses raw `ed25519_dalek`,
+/// which is the **same** library the production signer/verifier already
+/// depend on — it bypasses our `verifier` module's logic, but it does not
+/// prove a genuinely different implementation accepts the signature. `ring`
+/// is a separate Ed25519 codebase (not built on `curve25519-dalek`), added
+/// as a dev-only dependency purely for this check. This is the strongest
+/// "an off-the-shelf JOSE-capable library can verify this" proof available
+/// without leaving the Rust/cargo toolchain.
+#[test]
+fn jws_golden_vector_independent_ring_verification() {
+    let store = temp_store("g4-ring", "g4-ring-key");
+    let loaded = store.load_key("g4-ring-key").expect("load key");
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    let payload = json!({"z": 2, "a": 1, "nested": {"y": "b", "x": "a"}});
+    let jws = super::signer::sign(&store, "g4-ring-key", &payload).expect("sign");
+
+    let parts: Vec<&str> = jws.splitn(3, '.').collect();
+    assert_eq!(parts.len(), 3, "JWS must have 3 parts");
+
+    let signing_input = format!("{}.{}", parts[0], parts[1]);
+    let sig_bytes = b64.decode(parts[2]).expect("decode sig b64");
+    let pub_key_bytes = loaded.verifying_key.as_bytes();
+
+    let ring_key =
+        ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, pub_key_bytes);
+    ring_key
+        .verify(signing_input.as_bytes(), &sig_bytes)
+        .expect(
+            "an independent Ed25519 implementation (ring) must accept the \
+             JWS our signer produced — proves the wire format is genuinely \
+             standard EdDSA, not an artefact of ed25519-dalek's own encoding",
+        );
+
+    // And the inverse: ring must reject a tampered signature, same as our verifier.
+    let mut tampered_sig = sig_bytes.clone();
+    tampered_sig[0] ^= 0xFF;
+    assert!(
+        ring_key
+            .verify(signing_input.as_bytes(), &tampered_sig)
+            .is_err(),
+        "ring must reject a tampered signature"
+    );
+}
+
 /// Gap 7 end-to-end: after a key is **revoked**, a JWS it produced must no
 /// longer be verifiable — the revoked key is absent from the DID document.
 #[test]
