@@ -25,7 +25,7 @@ pub struct ElectronicsData {
     /// Whole-lifecycle carbon footprint in kg CO₂e per unit.
     pub co2e_per_unit_kg: f64,
 
-    /// Repairability score per EU ecodesign methodology.
+    /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
     /// `overall` ≥ 6.0 = good; < 4.0 = fails minimum standard.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repairability_score: Option<RepairabilityScore>,

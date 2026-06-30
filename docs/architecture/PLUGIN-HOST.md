@@ -104,7 +104,7 @@ All ten plugins run on the SDK (`dpp-plugin-sdk` + `export_plugin!`):
 | Plugin | Sector | Schema | ABI |
 |---|---|---|---|
 | `sector-battery` | battery | `schemas/battery/v{1.0.0,2.0.0}.json` | SDK (`DppSectorPlugin`) |
-| `sector-textile` | textile, textile-unsold | `schemas/textile/*`, `textile-unsold/*` | SDK (`DppSectorPlugin`) |
+| `sector-textile` | textile, unsold-goods | `schemas/textile/*`, `unsold-goods/*` | SDK (`DppSectorPlugin`) |
 | `sector-steel` | steel | `schemas/steel/v1.0.0.json` | SDK (`DppSectorPlugin`) |
 | `sector-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-detergent` | resp. | `schemas/{sector}/v1.0.0.json` | SDK (`DppSectorPlugin`) |
 

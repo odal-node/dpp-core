@@ -229,6 +229,31 @@ impl VersionedSchemaRegistry {
         self.entries.is_empty()
     }
 
+    /// Validate `data` against the schema for `(sector, version)`, failing closed
+    /// when the version string is unparseable or no schema is registered for that
+    /// sector/version pair.
+    ///
+    /// Use this on write paths where silently skipping validation is not acceptable.
+    /// For optional validation that skips when no schema is registered, use
+    /// [`Self::validate_if_present`].
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn validate_strict(
+        &self,
+        sector: &str,
+        version: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), crate::domain::field_error::ValidationErrors> {
+        use crate::domain::field_error::{FieldError, ValidationErrors};
+
+        let version = version.parse::<Version>().map_err(|_| ValidationErrors {
+            errors: vec![FieldError {
+                field: "/schema_version".to_owned(),
+                message: format!("schema version '{version}' is not a valid semver string"),
+            }],
+        })?;
+        self.validate(sector, &version, data)
+    }
+
     /// Validate against the schema for `sector` at the given version *string*,
     /// **skipping** (returning `Ok`) when the version is unparseable or no such
     /// schema is registered.
@@ -308,13 +333,12 @@ impl VersionedSchemaRegistry {
             return Some(cached.clone());
         }
         let json = self.get(sector, version)?;
-        let value: serde_json::Value =
-            serde_json::from_str(json).expect("registered schema is valid JSON");
-        // Embedded schemas ship valid; runtime schemas are compile-checked at
-        // registration — so this compile is infallible.
-        let compiled = std::sync::Arc::new(
-            jsonschema::JSONSchema::compile(&value).expect("registered schema compiles"),
-        );
+        // Embedded schemas are valid JSON by construction; runtime schemas are
+        // compile-checked at registration. Use ok()? instead of expect() so
+        // a future broken schema returns None (→ "no schema found" error) rather
+        // than panicking the process.
+        let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
+        let compiled = std::sync::Arc::new(jsonschema::JSONSchema::compile(&value).ok()?);
         self.compiled
             .write()
             .expect("schema cache not poisoned")

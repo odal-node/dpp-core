@@ -185,7 +185,7 @@ fn steel_schema_v1_is_valid() {
 
 #[test]
 fn textile_unsold_schema_v1_is_valid() {
-    let schema = schema("textile-unsold", "1.0.0");
+    let schema = schema("unsold-goods", "1.0.0");
     assert_eq!(schema["type"].as_str().unwrap(), "object");
 }
 

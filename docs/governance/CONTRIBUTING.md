@@ -63,7 +63,7 @@ dpp-core/
       schemas/            # Versioned JSON schemas, embedded via include_str! (the product):
                           #   aluminium, battery (v1+v2), construction, detergent,
                           #   electronics, furniture, steel, textile (v1+v2),
-                          #   textile-unsold, toy, tyre  — 11 sectors
+                          #   unsold-goods, toy, tyre  — 11 sectors
     dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
     dpp-crypto/           # Ed25519, AES-GCM, JWS, DID builder, LocalIdentityService
     dpp-digital-link/     # GS1 Digital Link parser, link-type negotiation, AAS mapping

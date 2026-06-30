@@ -12,9 +12,9 @@ pub mod furniture;
 pub mod shared;
 pub mod steel;
 pub mod textile;
-pub mod textile_unsold;
 pub mod toy;
 pub mod tyre;
+pub mod unsold_goods;
 
 pub use aluminium::AluminiumData;
 pub use battery::{BatteryData, MaterialComposition};
@@ -25,9 +25,9 @@ pub use furniture::FurnitureData;
 pub use shared::{CriticalRawMaterial, SvhcSubstance};
 pub use steel::SteelData;
 pub use textile::{FibreEntry, TextileData};
-pub use textile_unsold::{UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport};
 pub use toy::ToyData;
 pub use tyre::TyreData;
+pub use unsold_goods::{UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport};
 
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +49,7 @@ use crate::domain::sector::Sector;
 pub enum SectorData {
     Battery(BatteryData),
     Textile(TextileData),
-    TextileUnsoldGoods(UnsoldGoodsReport),
+    UnsoldGoods(UnsoldGoodsReport),
     Steel(SteelData),
     Electronics(ElectronicsData),
     Construction(ConstructionData),
@@ -67,7 +67,7 @@ impl SectorData {
         match self {
             SectorData::Battery(_) => Sector::Battery,
             SectorData::Textile(_) => Sector::Textile,
-            SectorData::TextileUnsoldGoods(_) => Sector::TextileUnsoldGoods,
+            SectorData::UnsoldGoods(_) => Sector::UnsoldGoods,
             SectorData::Steel(_) => Sector::Steel,
             SectorData::Electronics(_) => Sector::Electronics,
             SectorData::Construction(_) => Sector::Construction,

@@ -28,8 +28,8 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &s
         elements.push(string_property("operatorName", v, None, None));
     }
     AasSubmodel {
-        id: format!("urn:odal-node:dpp:{passport_id}:textile-unsold-goods"),
-        id_short: "TextileUnsoldGoods".into(),
+        id: format!("urn:odal-node:dpp:{passport_id}:unsold-goods"),
+        id_short: "UnsoldGoods".into(),
         model_type: "Submodel".into(),
         kind: "Instance".into(),
         semantic_id: Some(AasSemId::external(semantic_ids::UNSOLD_GOODS_REPORT)),

@@ -35,7 +35,7 @@ src/
 │   ├── fibre.rs              fibre_sum_ok, validate_fibre_composition ✅
 │   └── care.rs               ISO 3758 care symbols                (placeholder)
 │
-├── batteries/                EU Regulation 2023/1542, Annex VII
+├── batteries/                EU Regulation 2023/1542, Annex XIII
 │   ├── chemistry.rs          allowed chemistries, voltage ranges  (placeholder)
 │   ├── degradation.rs        SOH estimation, cycle life           (placeholder)
 │   └── recycled_content.rs   Co / Li / Ni split thresholds       (placeholder)

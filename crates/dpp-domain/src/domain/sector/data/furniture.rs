@@ -23,7 +23,7 @@ pub struct FurnitureData {
     /// Recycled content as a percentage of total weight (0.0–100.0).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recycled_content_pct: Option<f64>,
-    /// Repairability score (0.0–10.0) per EU ecodesign methodology.
+    /// Repairability score (0.0–10.0, non-regulatory heuristic — not EN 45554 / EU 2023/1669).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repairability_score: Option<f64>,
     /// SVHC substances present above 0.1% w/w per REACH Article 33.

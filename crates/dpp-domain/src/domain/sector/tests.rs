@@ -707,7 +707,11 @@ fn every_sector_with_an_embedded_schema_round_trips_through_its_current_schema()
     ];
     // Every non-Other SectorData variant must be exercised — a future sector
     // added to the enum without a sample here would silently skip this gate.
-    assert_eq!(samples.len(), 11, "expected one sample per non-Other sector");
+    assert_eq!(
+        samples.len(),
+        11,
+        "expected one sample per non-Other sector"
+    );
 
     for sample in samples {
         let key = sample.sector().catalog_key();

@@ -30,9 +30,9 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/textile/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "textile-unsold",
+        sector: "unsold-goods",
         version: "1.0.0",
-        json: include_str!("../../schemas/textile-unsold/v1.0.0.json"),
+        json: include_str!("../../schemas/unsold-goods/v1.0.0.json"),
     },
     EmbeddedSchema {
         sector: "steel",

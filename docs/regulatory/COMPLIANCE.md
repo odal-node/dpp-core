@@ -42,7 +42,7 @@ Each JSON schema under `schemas/` is traceable to its regulatory basis:
 | `battery/v2.0.0.json` | 2023/1542 | Art. 77, Annex XIII | Extended fields for carbon footprint |
 | `textile/v1.0.0.json` | ESPR 2024/1781 | Art. 9-10 (framework) | Baseline textile passport |
 | `textile/v1.1.0.json` | ESPR 2024/1781 | Art. 9-10 + anticipated delegated act | Adds fibre composition, durability, microplastics |
-| `textile-unsold/v1.0.0.json` | ESPR 2024/1781 | Art. 22 | Unsold-goods destruction-ban compliance |
+| `unsold-goods/v1.0.0.json` | ESPR 2024/1781 | Art. 25 / Annex VII | Unsold-goods destruction-ban compliance |
 | `steel/v1.0.0.json` | CBAM 2023/956 | Art. 7 | Embedded emissions, production origin |
 | `electronics/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Repairability, spare parts, substances |
 | `aluminium/v1.0.0.json` | ESPR 2024/1781 / CBAM | (delegated act anticipated) | Production route, CO₂e/tonne, recycled content |

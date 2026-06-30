@@ -1,4 +1,4 @@
-//! Textile Unsold Goods (EU ESPR, destruction ban — effective July 19, 2026).
+//! Unsold Goods (EU ESPR, destruction ban — effective July 19, 2026).
 
 use serde::{Deserialize, Serialize};
 

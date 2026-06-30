@@ -121,7 +121,7 @@ schemas/
   battery/v1.0.0.json
   textile/v1.0.0.json
   textile/v1.1.0.json      # minor version adds optional fields
-  textile-unsold/v1.0.0.json
+  unsold-goods/v1.0.0.json
   steel/v1.0.0.json
 ```
 

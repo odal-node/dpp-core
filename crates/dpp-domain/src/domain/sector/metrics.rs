@@ -59,7 +59,7 @@ pub struct RepairCriterion {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepairabilityScore {
-    /// Overall score 0.0–10.0 per EU ecodesign scoring methodology.
+    /// Overall score 0.0–10.0. Non-regulatory heuristic — not EN 45554 / EU 2023/1669.
     pub overall: f64,
     /// Breakdown by individual criterion (may be empty if only overall is known).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -312,8 +312,8 @@ fn all_sector_cases() -> Vec<(Sector, SectorData, &'static str, &'static str)> {
             "DetergentProductData",
         ),
         (
-            Sector::TextileUnsoldGoods,
-            SectorData::TextileUnsoldGoods(unsold_goods_report()),
+            Sector::UnsoldGoods,
+            SectorData::UnsoldGoods(unsold_goods_report()),
             "1.0.0",
             "UnsoldGoodsReport",
         ),

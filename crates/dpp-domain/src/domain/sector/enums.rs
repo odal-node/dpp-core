@@ -40,6 +40,7 @@ pub enum BatteryType {
     Ev,
     Lmt,
     /// Starting, lighting, and ignition batteries.
+    #[serde(rename = "starting-lighting-ignition")]
     Sli,
     #[serde(other)]
     Other,

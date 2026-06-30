@@ -33,7 +33,7 @@ moved a number.
   `[[bench]]` in [Cargo.toml](Cargo.toml).
 - Setup work (key generation, validator warm-up, fixture construction) is done
   **outside** the `b.iter(...)` closure so only the operation under test is timed.
-- Fixtures use realistic sector data (a battery passport with Annex VII fields, a
+- Fixtures use realistic sector data (a battery passport with Annex XIII fields, a
   60/40 cotton/polyester textile) rather than minimal stubs, so the numbers reflect
   production-shaped inputs.
 

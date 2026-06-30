@@ -89,16 +89,16 @@ pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
                 expected_year: None,
             },
         },
-        // ── Textile (unsold goods) ────────────────────────────────────────────
+        // ── Unsold Goods ───────────────────────────────────────────────────────
         SectorCalculatorEntry {
-            sector_key: "textileUnsoldGoods",
+            sector_key: "unsoldGoods",
             product_category: "all",
             methodology: "unsold-goods-reporting",
             // Art. 25 imposes reporting/prohibition obligations only — no
             // quantitative calculation methodology is mandated.
             status: CalculatorStatus::ReportingOnly,
         },
-        // ── Household appliances ─────────────────────────────────────────────
+        // ── Household appliances ────────────────────────────────────────────────
         SectorCalculatorEntry {
             sector_key: "electronics",
             product_category: "washing-machine",

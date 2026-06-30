@@ -114,7 +114,7 @@ Per-crate inventory of what ships in this release.
   sectors with one embedded JSON manifest per sector; runtime-extensible via
   `register()`. Drives schema-version resolution and per-sector access policy.
 - `DppError` unified error type.
-- JSON schemas: battery v1.0.0, textile v1.0.0 + v1.1.0, steel v1.0.0, textile-unsold v1.0.0.
+- JSON schemas: battery v1.0.0, textile v1.0.0 + v1.1.0, steel v1.0.0, unsold-goods v1.0.0.
 - `create_batch` and `update_batch` async methods on `PassportRepository` with
   default sequential fallback.
 - `validate_sector_data_batch` and `batch_errors` helpers for bulk import pipelines.
@@ -183,7 +183,7 @@ Ten Wasm sector plugins on the SDK (`dpp-plugin-sdk` + `export_plugin!`);
 `sector-battery` is the reference implementation:
 
 - `sector-battery` — Battery Regulation 2023/1542.
-- `sector-textile` — Textile / ESPR (incl. Art. 22 unsold-goods).
+- `sector-textile` — Textile / ESPR (incl. Art. 25 / Annex VII unsold-goods).
 - `sector-steel` — Steel / CBAM carbon-intensity.
 - `sector-electronics`, `sector-aluminium`, `sector-construction`,
   `sector-detergent`, `sector-furniture`, `sector-toy`, `sector-tyre`.

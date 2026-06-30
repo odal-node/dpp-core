@@ -1,11 +1,11 @@
 //! Textile DPP compliance plugin.
 //!
 //! NOTE (legacy dual-sector): this one crate currently serves *two* registry
-//! sectors — `textile` (fibre composition) and `textile-unsold` (ESPR Article 25
+//! sectors — `textile` (fibre composition) and `unsold-goods` (ESPR Article 25
 //! destruction ban) — dispatched on the internally-tagged `sector` field of the
 //! input. That is the in-payload dispatch smell flagged in the design review:
 //! `meta().sector` can only name one sector, so the host cannot cleanly select a
-//! dedicated `textile-unsold` plugin. Splitting `textile-unsold` into its own
+//! dedicated `unsold-goods` plugin. Splitting `unsold-goods` into its own
 //! crate is a candidate for the sector-coverage plan — see
 //! docs/architecture/DATA-MODEL.md §3.5 and PLUGIN-HOST.md.
 
@@ -26,7 +26,7 @@ struct TextilePlugin;
 /// The unsold-goods report is distinguished by the internally-tagged sector
 /// discriminant carried on `SectorData`.
 fn is_unsold(input: &PluginInput) -> bool {
-    str_of(input, "sector") == Some("textileUnsoldGoods")
+    str_of(input, "sector") == Some("unsoldGoods")
 }
 
 impl DppSectorPlugin for TextilePlugin {
@@ -47,7 +47,7 @@ impl DppSectorPlugin for TextilePlugin {
     fn capabilities(&self) -> PluginCapabilities {
         PluginCapabilities {
             abi_version: AbiVersion::current(),
-            // Declares the textile schema range. The textile-unsold path is
+            // Declares the textile schema range. The unsold-goods path is
             // legacy (see module note) and not represented here.
             supported_schemas: vec![SchemaVersionRange {
                 min_version: "1.0.0".into(),
@@ -121,7 +121,7 @@ mod tests {
 
     fn unsold() -> Value {
         json!({
-            "sector": "textileUnsoldGoods",
+            "sector": "unsoldGoods",
             "reportingPeriod": "2026-Q2",
             "volumeKg": 120.0,
             "productCategory": "apparel",

@@ -217,9 +217,9 @@ Schemas: `schemas/textile/v1.0.0.json`, `schemas/textile/v1.1.0.json`
 
 CBAM-aligned. Schema at `schemas/steel/v1.0.0.json`.
 
-### 4.4 Textile Unsold Goods (`UnsoldGoodsReport`)
+### 4.4 Unsold Goods (`UnsoldGoodsReport`)
 
-ESPR Art. 22 reporting for unsold textiles. Schema at `schemas/textile-unsold/v1.0.0.json`.
+ESPR Art. 25 / Annex VII destruction-ban reporting for unsold consumer products. Schema at `schemas/unsold-goods/v1.0.0.json`.
 
 ### 4.5 Electronics, Other
 
@@ -275,4 +275,4 @@ Schemas follow semver. The `VersionedSchemaRegistry` in `dpp-domain` discovers a
 | Minor (`1.x.0`) | New optional fields; provisional -> strict | Yes |
 | Major (`x.0.0`) | Field renamed, type changed, or removed | No |
 
-Current schemas: battery/v2.0.0, textile/v1.0.0, textile/v1.1.0, textile-unsold/v1.0.0, steel/v1.0.0.
+Current schemas: battery/v2.0.0, textile/v1.0.0, textile/v1.1.0, unsold-goods/v1.0.0, steel/v1.0.0.

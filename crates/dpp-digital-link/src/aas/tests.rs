@@ -629,8 +629,8 @@ fn build_aas_detergent_produces_surfactant_collection() {
 
 #[test]
 fn build_aas_unsold_goods_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::TextileUnsoldGoods);
-    passport.sector_data = Some(SectorData::TextileUnsoldGoods(UnsoldGoodsReport {
+    let mut passport = minimal_passport(Sector::UnsoldGoods);
+    passport.sector_data = Some(SectorData::UnsoldGoods(UnsoldGoodsReport {
         reporting_period: "2026-Q2".into(),
         volume_kg: 1500.0,
         product_category: "apparel".into(),
@@ -641,10 +641,8 @@ fn build_aas_unsold_goods_produces_sector_submodel() {
         operator_name: Some("GoodWill e.V.".into()),
     }));
     let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels
-        .iter()
-        .find(|s| s.id_short == "TextileUnsoldGoods");
-    assert!(sub.is_some(), "TextileUnsoldGoods submodel missing");
+    let sub = submodels.iter().find(|s| s.id_short == "UnsoldGoods");
+    assert!(sub.is_some(), "UnsoldGoods submodel missing");
     let has_volume = sub.unwrap().submodel_elements.iter().any(|e| match e {
         AasSubmodelElement::Property(p) => p.id_short == "volumeKg",
         _ => false,

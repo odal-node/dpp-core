@@ -77,7 +77,7 @@ static SUBMODEL_TEMPLATES: &[SubmodelTemplate] = &[
         is_placeholder: true,
     },
     SubmodelTemplate {
-        sector_key: "textile-unsold-goods",
+        sector_key: "unsold-goods",
         semantic_id: semantic_ids::UNSOLD_GOODS_REPORT,
         version: "1.0",
         is_placeholder: true,

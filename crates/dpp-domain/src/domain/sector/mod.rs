@@ -52,7 +52,7 @@ pub use validation::{
 pub enum Sector {
     Battery,
     Textile,
-    TextileUnsoldGoods,
+    UnsoldGoods,
     Steel,
     Electronics,
     Construction,
@@ -72,7 +72,7 @@ impl Sector {
     pub const fn minimum_retention_years(&self) -> u32 {
         match self {
             Self::Battery => 10,
-            Self::Textile | Self::TextileUnsoldGoods => 10,
+            Self::Textile | Self::UnsoldGoods => 10,
             Self::Steel => 10,
             Self::Electronics => 10,
             Self::Construction => 10,
@@ -88,13 +88,13 @@ impl Sector {
     /// Canonical sector key used by the schema registry and the `SectorCatalog`.
     ///
     /// This is the one true spelling (kebab-case where needed), distinct from
-    /// the enum's camelCase serde tag — e.g. `TextileUnsoldGoods` serialises as
-    /// `"textileUnsoldGoods"` but its catalog/registry key is `"textile-unsold"`.
+    /// the enum's camelCase serde tag — e.g. `UnsoldGoods` serialises as
+    /// `"unsoldGoods"` but its catalog/registry key is `"unsold-goods"`.
     pub const fn catalog_key(&self) -> &'static str {
         match self {
             Self::Battery => "battery",
             Self::Textile => "textile",
-            Self::TextileUnsoldGoods => "textile-unsold",
+            Self::UnsoldGoods => "unsold-goods",
             Self::Steel => "steel",
             Self::Electronics => "electronics",
             Self::Construction => "construction",

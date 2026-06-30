@@ -77,7 +77,7 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
     let doc = json!({
         "@context": [
             "https://www.w3.org/ns/did/v1",
-            "https://w3id.org/security/suites/ed25519-2020/v1"
+            "https://w3id.org/security/suites/jws-2020/v1"
         ],
         "id": did,
         "verificationMethod": verification_methods,

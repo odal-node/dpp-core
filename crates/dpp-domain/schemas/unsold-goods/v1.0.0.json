@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://schema.odal-node.io/dpp/textile-unsold-v1.0.0.json",
-  "title": "Odal Node — Textile Unsold Goods Report (v1.0.0)",
+  "$id": "https://schema.odal-node.io/dpp/unsold-goods-v1.0.0.json",
+  "title": "Odal Node — Unsold Goods Report (v1.0.0)",
   "description": "Unsold goods disposal report required by EU ESPR Article 25 (Annex VII) — destruction ban effective July 19, 2026.",
   "type": "object",
   "required": [

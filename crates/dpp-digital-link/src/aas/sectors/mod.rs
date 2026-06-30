@@ -29,9 +29,7 @@ pub(super) fn build_sector_submodel(sector_data: &SectorData, passport_id: &str)
         SectorData::Aluminium(d) => aluminium::build_aluminium_submodel(d, passport_id),
         SectorData::Furniture(d) => furniture::build_furniture_submodel(d, passport_id),
         SectorData::Detergent(d) => detergent::build_detergent_submodel(d, passport_id),
-        SectorData::TextileUnsoldGoods(r) => {
-            unsold_goods::build_unsold_goods_submodel(r, passport_id)
-        }
+        SectorData::UnsoldGoods(r) => unsold_goods::build_unsold_goods_submodel(r, passport_id),
         SectorData::Other(v) => {
             let elements = match v {
                 serde_json::Value::Object(map) => map

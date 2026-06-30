@@ -38,8 +38,8 @@ const EMBEDDED: &[EmbeddedManifest] = &[
         json: include_str!("../../sectors/electronics.json"),
     },
     EmbeddedManifest {
-        key: "textile-unsold",
-        json: include_str!("../../sectors/textile-unsold.json"),
+        key: "unsold-goods",
+        json: include_str!("../../sectors/unsold-goods.json"),
     },
     EmbeddedManifest {
         key: "textile",
@@ -107,7 +107,7 @@ impl RegulatoryStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SectorDescriptor {
-    /// Canonical sector key, e.g. `"battery"`, `"textile-unsold"`. Matches the
+    /// Canonical sector key, e.g. `"battery"`, `"unsold-goods"`. Matches the
     /// schema-registry sector key and the plugin's `meta().sector`.
     pub key: String,
     /// Human-readable title.
@@ -312,7 +312,7 @@ mod tests {
         let catalog = SectorCatalog::new();
         let mut in_force: Vec<&str> = catalog.in_force().iter().map(|d| d.key.as_str()).collect();
         in_force.sort_unstable();
-        assert_eq!(in_force, vec!["battery", "electronics", "textile-unsold"]);
+        assert_eq!(in_force, vec!["battery", "electronics", "unsold-goods"]);
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod tests {
     fn in_force_gating_is_status_driven() {
         let catalog = SectorCatalog::new();
         assert!(catalog.is_in_force("battery"));
-        assert!(catalog.is_in_force("textile-unsold"));
+        assert!(catalog.is_in_force("unsold-goods"));
         assert!(catalog.is_in_force("electronics"));
         assert!(!catalog.is_in_force("detergent")); // partial → flagged
         assert!(!catalog.is_in_force("nonexistent"));
@@ -414,7 +414,7 @@ mod tests {
         let typed = [
             Sector::Battery,
             Sector::Textile,
-            Sector::TextileUnsoldGoods,
+            Sector::UnsoldGoods,
             Sector::Steel,
             Sector::Electronics,
             Sector::Construction,
@@ -450,9 +450,7 @@ mod tests {
     #[test]
     fn unsold_goods_cites_espr_article_25() {
         let catalog = SectorCatalog::new();
-        let textile = catalog
-            .get("textile-unsold")
-            .expect("textile-unsold present");
+        let textile = catalog.get("unsold-goods").expect("unsold-goods present");
         let basis = textile.legal_basis.join(" ");
         assert!(
             basis.contains("Article 25"),
