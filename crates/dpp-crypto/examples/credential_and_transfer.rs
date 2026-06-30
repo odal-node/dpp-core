@@ -48,7 +48,7 @@ fn main() {
     println!("Out-of-scope check: {:?}", out_of_scope);
     assert!(!out_of_scope.is_valid());
 
-    println!("\n=== Transfer of Responsibility (ESPR Art. 12) ===\n");
+    println!("\n=== Transfer of Responsibility ===\n");
 
     // 4. Set up a transfer chain
     let passport_id = PassportId::new();

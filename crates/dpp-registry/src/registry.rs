@@ -386,8 +386,15 @@ pub struct StatusResponse {
 
 /// Notification sent to the EU registry when a transfer of responsibility occurs.
 ///
-/// Per ESPR Article 9, the registry must be informed when the responsible
-/// economic operator changes (e.g., sale to distributor, import, remanufacturing).
+/// 🟠 COMPLIANCE-PIN PENDING: checked against the verbatim OJ text (Regulation (EU)
+/// 2024/1781) — there is **no distinct "transfer of responsibility" provision** by
+/// that name in Articles 9-15. The closest support is the general data-accuracy
+/// duty ("the data in the digital product passport shall be accurate, complete and
+/// up to date", **Art. 9(1)**) plus the registry-upload duty (**Art. 13(4)**); a
+/// dedicated transfer-notice obligation is not textually confirmed. The prior
+/// single-article "Article 9" citation is corrected to this honest, narrower basis
+/// — this notification is a sound compliance-hygiene design, not a verbatim-cited
+/// requirement.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferNotification {

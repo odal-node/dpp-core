@@ -58,8 +58,8 @@ dpp-core/
 
 | Regulation | Status | dpp-core Implementation |
 |---|---|---|
-| **ESPR** (EU 2024/1781) | In force | Core data model (Art. 8-13), three-tier access (Art. 10), transfer of responsibility (Art. 12) |
-| **Battery Regulation** (EU 2023/1542) | In force | `BatteryData` struct, Annex VII fields, sector schema |
+| **ESPR** (EU 2024/1781) | In force | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), transfer-of-responsibility design (not a distinct ESPR article — see below) |
+| **Battery Regulation** (EU 2023/1542) | In force | `BatteryData` struct, Annex XIII fields, sector schema |
 | **Textile DPP Delegated Act** | Anticipated 2025-2026 | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics |
 | **JTC 24 Data Standard** | Draft (CEN/CENELEC) | Schema fields track latest published draft |
 | **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
@@ -70,7 +70,12 @@ dpp-core/
 
 ## Key Features
 
-### Three-Tier Access Control (ESPR Art. 10)
+### Three-Tier Access Control (ESPR Art. 9(2)(f), Art. 11(b))
+
+The three-tier split (Public/Professional/Confidential) is this project's own design — ESPR
+requires per-actor access rights to be specified in each product group's delegated act (Art.
+9(2), point (f)) and guarantees free, easy access based on those rights (Art. 11, point (b)); it
+does not itself mandate exactly three tiers.
 
 The access tier system gates DPP data based on W3C Verifiable Credentials:
 
@@ -78,9 +83,9 @@ The access tier system gates DPP data based on W3C Verifiable Credentials:
 - **Professional** — SVHC substances, disassembly instructions, spare parts availability. Requires a VC proving role (repairer, recycler, remanufacturer).
 - **Confidential** — Compliance reports, audit history, supply chain traceability. Requires an institutional DID (market surveillance authority, customs).
 
-### Transfer of Responsibility (ESPR Art. 12)
+### Transfer of Responsibility
 
-When a product undergoes remanufacturing, repurposing, or preparation for reuse, DPP responsibility transfers to the new economic operator. The `TransferChain` provides:
+When a product undergoes remanufacturing, repurposing, or preparation for reuse, DPP responsibility transfers to the new economic operator. ESPR has no distinct "transfer of responsibility" article by that name — this design follows from the general data-accuracy duty (Art. 9(1): DPP data "shall be accurate, complete and up to date") and the registry-upload duty (Art. 13(4)). The `TransferChain` provides:
 
 - Append-only provenance log with state machine validation
 - DID-identified economic operators with typed roles
@@ -97,7 +102,7 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{sector}/v{version}.json` (
 | battery | v1.0.0, v2.0.0 | Chemistry, capacity, recycled content, state of health |
 | electronics | v1.0.0 | Repairability, spare parts, substances of concern |
 | steel | v1.0.0 | CO2 intensity, scrap content, production method |
-| textile-unsold | v1.0.0 | Art. 22 destruction ban compliance |
+| unsold-goods | v1.0.0 | Art. 25 destruction ban compliance |
 | aluminium, construction, detergent, furniture, toy, tyre | v1.0.0 each | Sector-specific delegated-act fields |
 
 The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtime hot-reload for new versions.
@@ -118,7 +123,7 @@ Highlights:
 | Plugin | Sectors | Key Rule |
 |---|---|---|
 | `sector-battery.wasm` | battery | Battery Regulation 2023/1542 (reference implementation) |
-| `sector-textile.wasm` | textile, textileUnsoldGoods | ESPR Art. 22 destruction ban (July 19, 2026) |
+| `sector-textile.wasm` | textile, unsoldGoods | ESPR Art. 25 destruction ban (July 19, 2026) |
 | `sector-steel.wasm` | steel | CBAM CO2e/tonne thresholds |
 
 Plugin ABI supports capability negotiation and semantic versioning with compatibility checking.

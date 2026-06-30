@@ -37,7 +37,7 @@ src/
 ├── factor.rs                 FactorProvider trait + SyntheticFactorProvider (test/CI only)
 ├── ruleset_registry.rs       date-based ruleset resolution; all_rulesets() CI iterator
 │
-├── repairability/            EN 45554 six-parameter A–E scorer
+├── repairability/            Simplified, non-regulatory six-parameter A–E heuristic
 │   ├── mod.rs                calculate(inputs, ruleset) → RepairabilityResult
 │   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0–2)
 │   ├── thresholds.rs         RepairabilityRuleset: Ruleset trait + SmartphoneTabletRuleset
@@ -55,7 +55,7 @@ src/
 
 | Module | Status |
 |---|---|
-| `repairability` | ✅ In force — EU 2023/1669, smartphones/tablets, June 2025 |
+| `repairability` | ✅ In force — non-regulatory heuristic, available since June 2025 (**not** the EU 2023/1669 Annex IV index — see module-level note) |
 | `co2e::calculate` | ✅ Baseline — operator-supplied emission factors |
 | `co2e::cfb` | 🔒 Stub — gated on signed ecoinvent/EF sublicense (Phase 1 gate) |
 | `pef/` (future) | 📋 Not yet — awaits per-sector PEFCR finalisation (2026–2030) |
@@ -64,7 +64,7 @@ src/
 
 ## Usage
 
-### Repairability (EN 45554 A–E)
+### Repairability (simplified non-regulatory heuristic, A–E)
 
 ```rust
 use dpp_calc::{

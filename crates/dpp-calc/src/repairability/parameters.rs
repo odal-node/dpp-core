@@ -1,10 +1,13 @@
-//! Input parameters for the EN 45554 repairability scorer.
+//! Input parameters for the simplified, non-regulatory repairability heuristic
+//! (see the module-level note in `repairability/mod.rs` — this is **not** the
+//! enacted EU 2023/1669 Annex IV index).
 
 use serde::{Deserialize, Serialize};
 
-/// EN 45554 six-parameter repairability inputs for one product.
+/// Six-parameter repairability inputs for one product.
 ///
-/// Each parameter uses the three-level ordinal scale defined in EN 45554:2021:
+/// Each parameter uses a three-level ordinal scale (in the style of EN 45554's
+/// per-criterion scoring, but not a faithful implementation of that standard):
 /// `0` = criterion not met, `1` = criterion partially met, `2` = criterion
 /// fully met. Values outside `[0, 2]` are rejected at calculation time.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

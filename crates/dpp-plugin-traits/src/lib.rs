@@ -260,7 +260,8 @@ pub enum PluginComplianceStatus {
 
 /// Well-known metric key for CO₂e score (kg CO₂e per functional unit).
 pub const METRIC_CO2E_SCORE: &str = "co2e_score";
-/// Well-known metric key for EN 45554 repairability index (0.0–10.0).
+/// Well-known metric key for the repairability index (0.0–10.0; non-regulatory
+/// heuristic, not EN 45554 / EU 2023/1669).
 pub const METRIC_REPAIRABILITY_INDEX: &str = "repairability_index";
 /// Well-known metric key for recycled content percentage (0.0–100.0).
 pub const METRIC_RECYCLED_CONTENT_PCT: &str = "recycled_content_pct";

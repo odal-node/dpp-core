@@ -14,7 +14,7 @@ programme evaluators.
 |---|---|---|
 | ESPR (EU) 2024/1781 | In force | Core data model follows Art. 8–13 requirements |
 | JTC 24 DPP Data Standard | Draft (CEN/CENELEC) | Schema fields track latest published draft |
-| EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex VII fields |
+| EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Anticipated 2025–2026 | `TextileData` struct based on leaked drafts and industry consultations |
 | GS1 Digital Link v1.2 | Published | `DigitalLink` parser covers AI 01, 21, 10 |
 | IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `aas` module maps DPP to AAS Submodel |
@@ -44,7 +44,13 @@ The ESPR mandates three levels of access to DPP data:
 - Integration test: `tests/access_tier_gatekeeping.rs` validates all three
   tiers with realistic credentials.
 
-## Transfer of Responsibility (ESPR Art. 12)
+## Transfer of Responsibility
+
+No distinct "transfer of responsibility" article exists in ESPR by that name (checked against the
+verbatim OJ text of Regulation (EU) 2024/1781); this design follows from the general data-accuracy
+duty (Art. 9(1)) and the registry-upload duty (Art. 13(4)), not a single dedicated article. The
+prior "Art. 12" citation was wrong — Art. 12 is "Unique identifiers" (operator/facility identifier
+issuance mechanics).
 
 When a product undergoes remanufacturing, repurposing, or preparation for
 reuse, the new economic operator assumes full DPP responsibility. The
@@ -69,7 +75,7 @@ time via `include_str!()`.
 | textile | v1.0.0, v1.1.0 | Fibre composition, SVHC, durability, microplastics |
 | battery | v1.0.0 | Chemistry, capacity, recycled content, SoH |
 | steel | v1.0.0 | CO₂ intensity, scrap content, production method |
-| textile-unsold | v1.0.0 | Unsold goods destruction reporting |
+| unsold-goods | v1.0.0 | Unsold goods destruction reporting |
 
 ### JTC 24 Field Coverage
 
