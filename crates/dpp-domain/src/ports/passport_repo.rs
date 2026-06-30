@@ -72,17 +72,25 @@ pub trait PassportRepository: Send + Sync {
         status: PassportStatus,
     ) -> Result<Passport, DppError>;
 
+    /// `facility_id` filters to passports stamped with that exact facility
+    /// identifier (ESPR Annex III; ADR-006 grouping, not isolation — see
+    /// `Passport::facility_id`). `None` returns passports for every facility.
     async fn list(
         &self,
         status: Option<PassportStatus>,
         q: Option<&str>,
+        facility_id: Option<&str>,
         limit: u32,
         offset: u32,
     ) -> Result<Vec<Passport>, DppError>;
 
     /// Total number of passports (ignoring pagination).
-    /// Optional `status` filter; `None` counts every status.
-    async fn count(&self, status: Option<PassportStatus>) -> Result<u64, DppError>;
+    /// Optional `status` and `facility_id` filters; `None` counts every match.
+    async fn count(
+        &self,
+        status: Option<PassportStatus>,
+        facility_id: Option<&str>,
+    ) -> Result<u64, DppError>;
 
     // ─── Batch operations ────────────────────────────────────────────────
 
@@ -185,12 +193,17 @@ mod tests {
             &self,
             _status: Option<PassportStatus>,
             _q: Option<&str>,
+            _facility_id: Option<&str>,
             _limit: u32,
             _offset: u32,
         ) -> Result<Vec<Passport>, DppError> {
             Ok(self.store.lock().unwrap().values().cloned().collect())
         }
-        async fn count(&self, _status: Option<PassportStatus>) -> Result<u64, DppError> {
+        async fn count(
+            &self,
+            _status: Option<PassportStatus>,
+            _facility_id: Option<&str>,
+        ) -> Result<u64, DppError> {
             Ok(self.store.lock().unwrap().len() as u64)
         }
     }
