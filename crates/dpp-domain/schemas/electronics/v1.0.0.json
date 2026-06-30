@@ -44,10 +44,17 @@
       "description": "Whole-lifecycle carbon footprint in kg CO2e per unit."
     },
     "repairabilityScore": {
-      "type": ["number", "null"],
-      "minimum": 0,
-      "maximum": 10,
-      "description": "Repairability score 0.0-10.0 per EU ecodesign methodology. >= 6.0 is considered good."
+      "type": ["object", "null"],
+      "description": "Repairability score (non-regulatory heuristic, not EN 45554 / EU 2023/1669). overall is 0.0-10.0; >= 6.0 is considered good.",
+      "required": ["overall"],
+      "properties": {
+        "overall": { "type": "number", "minimum": 0, "maximum": 10 },
+        "criteria": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/repairCriterion" }
+        }
+      },
+      "additionalProperties": false
     },
     "sparePartsAvailable": {
       "type": ["boolean", "null"],
@@ -120,6 +127,16 @@
           "type": ["string", "null"],
           "pattern": "^[A-Z]{2}$"
         }
+      },
+      "additionalProperties": false
+    },
+    "repairCriterion": {
+      "type": "object",
+      "required": ["name", "score", "weight"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "score": { "type": "number" },
+        "weight": { "type": "number" }
       },
       "additionalProperties": false
     }

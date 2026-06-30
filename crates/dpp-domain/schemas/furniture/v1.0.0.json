@@ -46,7 +46,7 @@
       "type": ["number", "null"],
       "minimum": 0,
       "maximum": 10,
-      "description": "Repairability score 0.0-10.0 per EU ecodesign methodology."
+      "description": "Repairability score 0.0-10.0 (non-regulatory heuristic, not EN 45554 / EU 2023/1669)."
     },
     "svhcSubstances": {
       "type": ["array", "null"],

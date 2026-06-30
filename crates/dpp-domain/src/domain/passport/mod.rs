@@ -107,7 +107,7 @@ pub struct Passport {
     pub materials: Vec<MaterialEntry>,
     /// CO₂ equivalent per unit — manufacturer-supplied or engine-calculated.
     pub co2e_per_unit: Option<CarbonFootprint>,
-    /// Repairability score per EU ecodesign methodology.
+    /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
     pub repairability_score: Option<RepairabilityScore>,
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
@@ -154,11 +154,15 @@ pub struct Passport {
     /// The passport ID this record supersedes. `None` for first-version passports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supersedes_id: Option<PassportId>,
-    /// Deadline by which this record must remain accessible. ESPR (EU) 2024/1781
-    /// requires DPP data to stay available for a period set by the applicable
-    /// delegated act (the back-up/availability obligation is reported at Art. 10(4)).
-    /// 🟠 COMPLIANCE-PIN PENDING: exact ESPR article unverified vs verbatim OJ — the
-    /// prior "Art. 9" citation is unconfirmed (EUR-Lex article HTML is JS-rendered).
+    /// Deadline by which this record must remain accessible. Confirmed against the
+    /// verbatim OJ text (Regulation (EU) 2024/1781): **Art. 9(2)(i)** requires the
+    /// delegated act to specify "the period during which the digital product
+    /// passport is to remain available, which shall correspond to at least the
+    /// expected lifetime of a specific product"; **Art. 11(e)** restates this as an
+    /// essential requirement, available "including after an insolvency, a
+    /// liquidation or a cessation of activity" of the responsible operator. The
+    /// separate back-up-copy obligation (via a DPP service provider) is **Art.
+    /// 10(4)**, not the retention period itself.
     /// Computed at publish time from the catalog `retention_years` for the sector.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention_until: Option<DateTime<Utc>>,
@@ -166,9 +170,14 @@ pub struct Passport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub product_id: Option<Uuid>,
     /// EORI or national economic-operator identifier for the responsible party.
-    /// 🟠 COMPLIANCE-PIN PENDING: exact ESPR article unverified vs verbatim OJ — the
-    /// responsible-operator identifier obligation is reported at Art. 13 (prior
-    /// "Art. 9(2)" citation unconfirmed). Populated by the engine from `operator_config`.
+    /// Confirmed against the verbatim OJ text (Regulation (EU) 2024/1781):
+    /// **Annex III, point (k)** is the data-content basis — "the name, contact
+    /// details and unique operator identifier of the economic operator established
+    /// in the Union responsible for carrying out the tasks set out in Article 4 of
+    /// Regulation (EU) 2019/1020 [...]"; the identifier-issuance mechanics are
+    /// **Art. 12**. (**Art. 13** governs uploading identifiers to the EU registry —
+    /// a related but distinct obligation, not the field's basis.) Populated by the
+    /// engine from `operator_config`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_identifier: Option<String>,
     /// Facility identifier where this product was manufactured or processed.
