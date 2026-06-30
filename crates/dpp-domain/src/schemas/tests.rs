@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn registry_loads_all_embedded_schemas() {
     let reg = VersionedSchemaRegistry::new();
-    // battery 1.0 + 2.0, textile 1.0 + 1.1, textile-unsold 1.0, steel 1.0,
+    // battery 1.0 + 2.0, textile 1.0 + 1.1, unsold-goods 1.0, steel 1.0,
     // electronics 1.0, construction 1.0, tyre 1.0, toy 1.0, aluminium 1.0,
     // furniture 1.0, detergent 1.0
     assert_eq!(reg.len(), 13);
@@ -64,9 +64,9 @@ fn sectors_returns_unique_sorted_list() {
             "furniture",
             "steel",
             "textile",
-            "textile-unsold",
             "toy",
             "tyre",
+            "unsold-goods",
         ]
     );
 }
@@ -279,6 +279,43 @@ fn validate_if_present_enforces_existing_schema_and_skips_absent() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
+fn validate_strict_is_fail_closed_unlike_validate_if_present() {
+    // G-3 (release review Report 5): the publish path uses `validate_strict`,
+    // not `validate_if_present`, precisely so an unresolved schema or version
+    // is a hard error rather than a silent skip (Q-2). This pins that contract
+    // directly at the registry, independent of any handler/service wiring.
+    let reg = VersionedSchemaRegistry::new();
+    let valid = serde_json::json!({
+        "gtin": "12345678901234",
+        "batteryChemistry": "LFP",
+        "nominalVoltageV": 48.0,
+        "nominalCapacityAh": 100.0,
+        "expectedLifetimeCycles": 3000,
+        "co2ePerUnitKg": 85.4
+    });
+    let invalid = serde_json::json!({ "batteryChemistry": "LFP" });
+
+    // Existing schema + valid data → Ok, same as validate_if_present.
+    assert!(reg.validate_strict("battery", "1.0.0", &valid).is_ok());
+    // Existing schema + invalid data → Err, same as validate_if_present.
+    assert!(reg.validate_strict("battery", "1.0.0", &invalid).is_err());
+
+    // Unknown sector → Err (validate_if_present would skip this as Ok).
+    assert!(
+        reg.validate_strict("no-such-sector", "1.0.0", &invalid)
+            .is_err()
+    );
+    // Known sector, unregistered version → Err (validate_if_present skips).
+    assert!(reg.validate_strict("battery", "9.9.9", &invalid).is_err());
+    // Unparseable version string → Err (validate_if_present skips).
+    assert!(
+        reg.validate_strict("battery", "not-a-version", &invalid)
+            .is_err()
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
 fn validate_textile_v1_1_with_new_fields() {
     let reg = VersionedSchemaRegistry::new();
     let v11: Version = "1.1.0".parse().unwrap();
@@ -322,6 +359,356 @@ fn validate_textile_v1_1_rejects_invalid_fibre_country() {
         "chemicalComplianceStandard": "REACH"
     });
     assert!(reg.validate("textile", &v11, &data).is_err());
+}
+
+// ── G-8: Per-sector conformance fixtures ──────────────────────────────────────
+//
+// Each embedded sector schema gets one valid fixture (all required fields) and
+// one invalid fixture (a targeted schema constraint that the Rust types alone
+// do not enforce). Battery v1 and textile v1.1 are already covered above; these
+// tests cover all remaining sector/version pairs.
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_battery_v2_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "2.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "batteryChemistry": "LFP",
+        "nominalVoltageV": 3.2,
+        "nominalCapacityAh": 100.0,
+        "expectedLifetimeCycles": 3000,
+        "co2ePerUnitKg": 85.4
+    });
+    assert!(reg.validate("battery", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_battery_v2_invalid_negative_co2e() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "2.0.0".parse().unwrap();
+    // co2ePerUnitKg has minimum: 0 — negative value must be rejected.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "batteryChemistry": "NMC",
+        "nominalVoltageV": 3.6,
+        "nominalCapacityAh": 50.0,
+        "expectedLifetimeCycles": 1000,
+        "co2ePerUnitKg": -1.0
+    });
+    assert!(reg.validate("battery", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_textile_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
+        "countryOfManufacturing": "MK",
+        "careInstructions": "Machine wash 30°C",
+        "chemicalComplianceStandard": "OEKO-TEX 100"
+    });
+    assert!(reg.validate("textile", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_textile_v1_invalid_country_pattern() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // countryOfManufacturing must match ^[A-Z]{2}$ — lowercase fails.
+    let data = serde_json::json!({
+        "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
+        "countryOfManufacturing": "macedonian",
+        "careInstructions": "Hand wash",
+        "chemicalComplianceStandard": "REACH"
+    });
+    assert!(reg.validate("textile", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_textile_unsold_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "reportingPeriod": "2026-Q2",
+        "volumeKg": 120.5,
+        "productCategory": "apparel",
+        "reason": "end_of_season",
+        "destination": "donation",
+        "countryOfDisposal": "DE"
+    });
+    assert!(reg.validate("unsold-goods", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_textile_unsold_v1_invalid_destination_enum() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "incineration" is not a valid destination enum value.
+    let data = serde_json::json!({
+        "reportingPeriod": "2026-Q2",
+        "volumeKg": 50.0,
+        "productCategory": "apparel",
+        "reason": "end_of_season",
+        "destination": "incineration",
+        "countryOfDisposal": "DE"
+    });
+    assert!(reg.validate("unsold-goods", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_steel_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "co2ePerTonneSteel": 1.8,
+        "recycledScrapContentPct": 35.0,
+        "productCategory": "flat",
+        "countryOfProduction": "DE",
+        "productionRoute": "electric-arc"
+    });
+    assert!(reg.validate("steel", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_steel_v1_invalid_production_route_enum() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "open-hearth" is not a valid productionRoute value.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "co2ePerTonneSteel": 2.5,
+        "recycledScrapContentPct": 10.0,
+        "productCategory": "long",
+        "countryOfProduction": "UA",
+        "productionRoute": "open-hearth"
+    });
+    assert!(reg.validate("steel", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_electronics_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productCategory": "smartphone",
+        "energyEfficiencyClass": "A",
+        "co2ePerUnitKg": 65.0
+    });
+    assert!(reg.validate("electronics", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_electronics_v1_invalid_efficiency_class_enum() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "H" is not in the A-G energy efficiency class enum.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productCategory": "laptop",
+        "energyEfficiencyClass": "H",
+        "co2ePerUnitKg": 200.0
+    });
+    assert!(reg.validate("electronics", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_construction_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productFamily": "cement",
+        "countryOfManufacture": "DE",
+        "co2ePerFunctionalUnitKg": 780.0,
+        "functionalUnit": "per tonne"
+    });
+    assert!(reg.validate("construction", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_construction_v1_invalid_missing_functional_unit() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // functionalUnit is required — omitting it must be rejected.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productFamily": "glass",
+        "countryOfManufacture": "PL",
+        "co2ePerFunctionalUnitKg": 5.2
+    });
+    assert!(reg.validate("construction", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_tyre_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "tyreClass": "C1",
+        "fuelEfficiencyClass": "A",
+        "wetGripClass": "B",
+        "externalRollingNoiseDb": 68.0
+    });
+    assert!(reg.validate("tyre", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_tyre_v1_invalid_old_scale_class() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "F" was valid on the old A-G scale but is NOT valid on the 2021 A-E scale.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "tyreClass": "C1",
+        "fuelEfficiencyClass": "F",
+        "wetGripClass": "A",
+        "externalRollingNoiseDb": 71.0
+    });
+    assert!(reg.validate("tyre", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_toy_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "ageGroup": "3-6",
+        "primaryMaterial": "wood",
+        "ceMarking": true,
+        "countryOfManufacture": "DE"
+    });
+    assert!(reg.validate("toy", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_toy_v1_invalid_missing_age_group() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // ageGroup is required — omitting it must be rejected.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "primaryMaterial": "plastic",
+        "ceMarking": true,
+        "countryOfManufacture": "CN"
+    });
+    assert!(reg.validate("toy", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_aluminium_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "alloyGrade": "6xxx",
+        "productionRoute": "primary",
+        "co2ePerTonneKg": 8500.0,
+        "recycledContentPct": 0.0,
+        "countryOfProduction": "NO"
+    });
+    assert!(reg.validate("aluminium", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_aluminium_v1_invalid_production_route_enum() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "secondary" is not valid; must be "secondary-recycled".
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "alloyGrade": "3xxx",
+        "productionRoute": "secondary",
+        "co2ePerTonneKg": 600.0,
+        "recycledContentPct": 95.0,
+        "countryOfProduction": "DE"
+    });
+    assert!(reg.validate("aluminium", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_furniture_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productType": "chair",
+        "primaryMaterial": "solid-wood",
+        "countryOfManufacture": "MK"
+    });
+    assert!(reg.validate("furniture", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_furniture_v1_invalid_product_type_enum() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // "desk" is not in the product type enum.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productType": "desk",
+        "primaryMaterial": "metal",
+        "countryOfManufacture": "PL"
+    });
+    assert!(reg.validate("furniture", &v, &data).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_detergent_v1_valid() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productType": "laundry",
+        "format": "liquid",
+        "surfactants": [
+            {"name": "SLES", "biodegradable": true, "concentrationBand": "5-15%"}
+        ],
+        "countryOfManufacture": "DE"
+    });
+    assert!(reg.validate("detergent", &v, &data).is_ok());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_detergent_v1_invalid_empty_surfactants() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "1.0.0".parse().unwrap();
+    // surfactants has minItems: 1 — empty array must be rejected.
+    let data = serde_json::json!({
+        "gtin": "09506000134352",
+        "productType": "dishwashing",
+        "format": "tablet",
+        "surfactants": [],
+        "countryOfManufacture": "FR"
+    });
+    assert!(reg.validate("detergent", &v, &data).is_err());
 }
 
 #[cfg(not(target_arch = "wasm32"))]

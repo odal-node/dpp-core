@@ -1,9 +1,10 @@
 //! Redaction, validation, and serde round-trip tests for sector data.
 
 use super::*;
-use crate::catalog::{RegulatoryStatus, SectorDescriptor};
+use crate::catalog::{RegulatoryStatus, SectorCatalog, SectorDescriptor};
 use crate::domain::gtin::Gtin;
 use crate::domain::identity::AccessTier;
+use crate::schemas::VersionedSchemaRegistry;
 
 // ── redact_sector_data ────────────────────────────────────────────────
 
@@ -352,6 +353,49 @@ fn sector_data_battery_round_trip() {
     assert_eq!(data, back);
 }
 
+// Regression: every BatteryType and BatteryChemistry variant must serialise to
+// a wire value the JSON schema accepts. D-1 (Sli "sli" vs schema
+// "starting-lighting-ignition") was silent without this.
+#[test]
+fn battery_enum_wire_values_match_schema() {
+    let cases: &[(BatteryType, &str)] = &[
+        (BatteryType::Portable, "portable"),
+        (BatteryType::Industrial, "industrial"),
+        (BatteryType::Ev, "ev"),
+        (BatteryType::Lmt, "lmt"),
+        (BatteryType::Sli, "starting-lighting-ignition"),
+    ];
+    for (variant, expected) in cases {
+        let json = serde_json::to_value(variant).unwrap();
+        assert_eq!(
+            json.as_str().unwrap(),
+            *expected,
+            "BatteryType::{variant:?} must serialise as \"{expected}\""
+        );
+        let back: BatteryType = serde_json::from_str(&format!("\"{expected}\"")).unwrap();
+        assert_eq!(back, *variant, "round-trip failed for \"{expected}\"");
+    }
+
+    let chem_cases: &[(BatteryChemistry, &str)] = &[
+        (BatteryChemistry::Lfp, "LFP"),
+        (BatteryChemistry::Nmc, "NMC"),
+        (BatteryChemistry::Nca, "NCA"),
+        (BatteryChemistry::Lco, "LCO"),
+        (BatteryChemistry::NiMh, "NiMH"),
+        (BatteryChemistry::NiCd, "NiCd"),
+        (BatteryChemistry::LeadAcid, "lead-acid"),
+        (BatteryChemistry::SolidState, "solid-state"),
+    ];
+    for (variant, expected) in chem_cases {
+        let json = serde_json::to_value(variant).unwrap();
+        assert_eq!(
+            json.as_str().unwrap(),
+            *expected,
+            "BatteryChemistry::{variant:?} must serialise as \"{expected}\""
+        );
+    }
+}
+
 #[test]
 fn sector_data_textile_round_trip() {
     let mut data = test_textile_data();
@@ -438,7 +482,7 @@ fn every_sector_declares_retention_and_catalog_key() {
     let all = [
         (Sector::Battery, "battery"),
         (Sector::Textile, "textile"),
-        (Sector::TextileUnsoldGoods, "textile-unsold"),
+        (Sector::UnsoldGoods, "unsold-goods"),
         (Sector::Steel, "steel"),
         (Sector::Electronics, "electronics"),
         (Sector::Construction, "construction"),
@@ -492,4 +536,198 @@ fn sector_discriminant_matches_variant() {
         battery_passport_number: None,
     });
     assert_eq!(battery.sector(), Sector::Battery);
+}
+
+// ── G-8: per-sector Rust type ↔ JSON schema conformance ─────────────────
+//
+// One schema-valid instance per sector, constructed through the *Rust type*
+// (not a hand-written JSON literal) and round-tripped through that sector's
+// own current embedded schema via `validate_strict` — the same fail-closed
+// call the publish path uses. This is the test class that would have caught
+// D-1 (`BatteryType::Sli` serialising to `"sli"` against a schema expecting
+// `"starting-lighting-ignition"`): a serde rename and the schema it targets
+// can drift independently, and only a value built from the Rust type (so its
+// wire shape is whatever serde actually emits today) catches that drift.
+
+fn sample_steel_data() -> SectorData {
+    SectorData::Steel(SteelData {
+        gtin: "09506000134352".into(),
+        co2e_per_tonne_steel: 1.8,
+        recycled_scrap_content_pct: 35.0,
+        product_category: "flat".into(),
+        country_of_production: "DE".into(),
+        production_route: ProductionRoute::ElectricArc,
+        annual_production_tonnes: None,
+    })
+}
+
+fn sample_aluminium_data() -> SectorData {
+    SectorData::Aluminium(AluminiumData {
+        gtin: "09506000134352".into(),
+        alloy_grade: "6xxx".into(),
+        production_route: ProductionRoute::SecondaryRecycled,
+        co2e_per_tonne_kg: 1200.0,
+        recycled_content_pct: 60.0,
+        country_of_production: "DE".into(),
+        annual_production_tonnes: None,
+    })
+}
+
+fn sample_electronics_data() -> SectorData {
+    SectorData::Electronics(ElectronicsData {
+        gtin: "09506000134352".into(),
+        product_category: "laptop".into(),
+        energy_efficiency_class: EnergyEfficiencyClass::B,
+        co2e_per_unit_kg: 120.0,
+        repairability_score: Some(RepairabilityScore {
+            overall: 7.5,
+            criteria: vec![RepairCriterion {
+                name: "spare-parts-availability".into(),
+                score: 8.0,
+                weight: 0.5,
+            }],
+        }),
+        spare_parts_available: Some(true),
+        repair_manual_url: None,
+        disassembly_instructions_url: None,
+        svhc_substances: None,
+        rohs_compliant: Some(true),
+        critical_raw_materials: None,
+        recycled_content_pct: None,
+        standby_power_w: None,
+        expected_lifetime_years: None,
+        firmware_update_until: None,
+    })
+}
+
+fn sample_construction_data() -> SectorData {
+    SectorData::Construction(ConstructionData {
+        gtin: "09506000134352".into(),
+        product_family: "cement".into(),
+        country_of_manufacture: "DE".into(),
+        co2e_per_functional_unit_kg: 0.8,
+        functional_unit: "per tonne".into(),
+        recycled_content_pct: None,
+        epd_url: None,
+        ce_marking: Some(true),
+    })
+}
+
+fn sample_tyre_data() -> SectorData {
+    SectorData::Tyre(TyreData {
+        gtin: "09506000134352".into(),
+        tyre_class: "C1".into(),
+        fuel_efficiency_class: "B".into(),
+        wet_grip_class: "A".into(),
+        external_rolling_noise_db: 68.0,
+        noise_performance_class: None,
+        rolling_resistance_n_per_kn: None,
+        recycled_rubber_pct: None,
+        co2e_per_tyre_kg: None,
+    })
+}
+
+fn sample_toy_data() -> SectorData {
+    SectorData::Toy(ToyData {
+        gtin: "09506000134352".into(),
+        age_group: "3-6".into(),
+        primary_material: "wood".into(),
+        ce_marking: true,
+        country_of_manufacture: "DE".into(),
+        svhc_substances: None,
+        contains_battery: Some(false),
+        repairability_info: None,
+    })
+}
+
+fn sample_furniture_data() -> SectorData {
+    SectorData::Furniture(FurnitureData {
+        gtin: "09506000134352".into(),
+        product_type: "chair".into(),
+        primary_material: "solid-wood".into(),
+        country_of_manufacture: "DE".into(),
+        co2e_per_unit_kg: None,
+        recycled_content_pct: None,
+        repairability_score: Some(7.0),
+        svhc_substances: None,
+        disassembly_instructions_url: None,
+        end_of_life_instructions: None,
+    })
+}
+
+fn sample_detergent_data() -> SectorData {
+    SectorData::Detergent(DetergentData {
+        gtin: "09506000134352".into(),
+        product_type: "laundry".into(),
+        format: "liquid".into(),
+        surfactants: vec![SurfactantEntry {
+            name: "Sodium Laureth Sulfate".into(),
+            biodegradable: true,
+            concentration_band: "5-15%".into(),
+            cas_number: None,
+        }],
+        country_of_manufacture: "DE".into(),
+        co2e_per_unit_kg: None,
+        packaging_recyclable: None,
+        recommended_dosage_ml: None,
+        biodegradable: None,
+    })
+}
+
+fn sample_unsold_goods_data() -> SectorData {
+    SectorData::UnsoldGoods(UnsoldGoodsReport {
+        reporting_period: "2026-Q3".into(),
+        volume_kg: 120.0,
+        product_category: "apparel".into(),
+        reason: UnsoldGoodsReason::EndOfSeason,
+        destination: UnsoldGoodsDestination::Donation,
+        destruction_justification: None,
+        country_of_disposal: "DE".into(),
+        operator_name: Some("Caritas Berlin".into()),
+    })
+}
+
+#[test]
+fn every_sector_with_an_embedded_schema_round_trips_through_its_current_schema() {
+    let catalog = SectorCatalog::new();
+    let registry = VersionedSchemaRegistry::new();
+
+    let samples: Vec<SectorData> = vec![
+        minimal_battery_data(),
+        SectorData::Textile(test_textile_data()),
+        sample_unsold_goods_data(),
+        sample_steel_data(),
+        sample_electronics_data(),
+        sample_construction_data(),
+        sample_tyre_data(),
+        sample_toy_data(),
+        sample_aluminium_data(),
+        sample_furniture_data(),
+        sample_detergent_data(),
+    ];
+    // Every non-Other SectorData variant must be exercised — a future sector
+    // added to the enum without a sample here would silently skip this gate.
+    assert_eq!(samples.len(), 11, "expected one sample per non-Other sector");
+
+    for sample in samples {
+        let key = sample.sector().catalog_key();
+        let Some(version) = catalog.resolve_schema_version(key, None) else {
+            panic!("sector '{key}' has no catalog entry — add one or exclude it here");
+        };
+        let mut json = serde_json::to_value(&sample).expect("serialize sector data");
+        // SectorData is internally tagged (`#[serde(tag = "sector")]`); schemas
+        // validate the inner object with `additionalProperties:false`, so
+        // strip the tag (mirrors `validate_against_schema` in create.rs).
+        json.as_object_mut().unwrap().remove("sector");
+
+        registry
+            .validate_strict(key, &version, &json)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "sector '{key}' v{version}: a Rust-type-constructed valid \
+                     instance failed its own embedded schema — type/schema \
+                     drift (the D-1 bug class): {e:?}"
+                )
+            });
+    }
 }
