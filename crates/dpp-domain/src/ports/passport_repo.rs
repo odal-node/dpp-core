@@ -74,7 +74,7 @@ pub trait PassportRepository: Send + Sync {
 
     /// `facility_id` filters to passports stamped with that exact facility
     /// identifier (ESPR Annex III; ADR-006 grouping, not isolation — see
-    /// `Passport::facility_id`). `None` returns passports for every facility.
+    /// `Passport::facility`). `None` returns passports for every facility.
     async fn list(
         &self,
         status: Option<PassportStatus>,
@@ -239,7 +239,7 @@ mod tests {
             retention_until: None,
             product_id: None,
             operator_identifier: None,
-            facility_id: None,
+            facility: None,
         }
     }
 

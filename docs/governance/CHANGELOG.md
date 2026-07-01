@@ -5,6 +5,34 @@ All notable changes to dpp-core are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking
+
+- **`Passport.facility_id: Option<String>`** is replaced by
+  **`Passport.facility: Option<FacilitySnapshot>`** (`dpp-domain::domain::passport`).
+  A passport now carries a self-contained snapshot of its ESPR Annex III facility
+  — `{ scheme, value, name, country, address }` — copied by value at create,
+  instead of only the bare identifier string. This keeps a published, signed DPP
+  a complete record even if the operator later retires the source facility.
+  The new `FacilitySnapshot` value object is re-exported at the crate root.
+  *Migration:* the wire/JSON field `facilityId` (string) becomes `facility`
+  (object); read the identifier as `passport.facility.as_ref().map(|f| &f.value)`;
+  `RegistrationRequest::from_published_passport` already extracts `facility.value`.
+  Persisted passports written before this change (with a `facilityId` string) do
+  not populate `facility` on read.
+- **`RegistrationRequest`** (`dpp-domain::ports::registry_sync`) gains a
+  `facility: Option<FacilitySnapshot>` field carrying the full Annex III facility
+  descriptor (name/country/scheme/address), alongside the existing flat
+  `facility_identifier` value. Registry adapters can now propagate the facility
+  descriptor instead of a bare identifier. *Migration:* struct-literal
+  constructors must add the field (`from_published_passport` populates it).
+
+### Added
+
+- **`FacilitySnapshot`** value object (`dpp-domain::domain::passport`),
+  re-exported at the crate root.
+
 ## [0.2.0] - 2026-07-01
 
 A final-validation-review pass against authoritative regulatory and standards

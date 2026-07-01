@@ -43,8 +43,16 @@ pub struct RegistrationRequest {
     pub passport_id: PassportId,
     /// Economic operator's DID or EU-assigned identifier.
     pub operator_identifier: String,
-    /// Facility identifier (EU-assigned or self-declared).
+    /// Facility identifier value (EU-assigned or self-declared) — the flat
+    /// convenience form of [`Self::facility`]`.value`, kept for registries/clients
+    /// that only consume the bare identifier.
     pub facility_identifier: String,
+    /// Full Annex III facility descriptor (scheme, value, name, country, address)
+    /// snapshotted onto the passport, so the registry payload can carry the
+    /// facility's name/country/scheme rather than a bare identifier. `None` when
+    /// the passport was published without a facility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facility: Option<crate::domain::passport::FacilitySnapshot>,
     /// Product category for sector routing within the registry.
     pub product_category: String,
     /// GS1 Digital Link URI or DID URI resolving to the DPP data.
@@ -81,7 +89,12 @@ impl RegistrationRequest {
         Self {
             passport_id: passport.id,
             operator_identifier: passport.operator_identifier.clone().unwrap_or_default(),
-            facility_identifier: passport.facility_id.clone().unwrap_or_default(),
+            facility_identifier: passport
+                .facility
+                .as_ref()
+                .map(|f| f.value.clone())
+                .unwrap_or_default(),
+            facility: passport.facility.clone(),
             product_category,
             data_carrier_uri: passport.qr_code_url.clone().unwrap_or_default(),
             schema_version: passport.schema_version.clone(),
@@ -240,7 +253,13 @@ mod tests {
             retention_until: None,
             product_id: None,
             operator_identifier: Some("did:web:acme.example.com".into()),
-            facility_id: Some("FAC-DE-001".into()),
+            facility: Some(crate::domain::passport::FacilitySnapshot {
+                scheme: "national".into(),
+                value: "FAC-DE-001".into(),
+                name: "Acme Plant".into(),
+                country: "DE".into(),
+                address: None,
+            }),
         }
     }
 
@@ -251,6 +270,7 @@ mod tests {
             passport_id: PassportId::new(),
             operator_identifier: "did:web:acme.example.com".into(),
             facility_identifier: "FAC-001".into(),
+            facility: None,
             product_category: "textile".into(),
             data_carrier_uri: "https://id.example.com/01/09506000134352".into(),
             schema_version: "1.0.0".into(),
@@ -287,6 +307,15 @@ mod tests {
         assert_eq!(req.passport_id, passport.id);
         assert_eq!(req.operator_identifier, "did:web:acme.example.com");
         assert_eq!(req.facility_identifier, "FAC-DE-001");
+        // The full facility descriptor is carried, not just the bare identifier.
+        assert_eq!(
+            req.facility.as_ref().map(|f| f.name.as_str()),
+            Some("Acme Plant")
+        );
+        assert_eq!(
+            req.facility.as_ref().map(|f| f.country.as_str()),
+            Some("DE")
+        );
         assert_eq!(req.product_category, "textile");
         assert_eq!(
             req.data_carrier_uri,
@@ -302,12 +331,13 @@ mod tests {
     fn from_published_passport_empty_optionals_produce_empty_strings() {
         let mut passport = make_published_passport();
         passport.operator_identifier = None;
-        passport.facility_id = None;
+        passport.facility = None;
         passport.qr_code_url = None;
         let req = RegistrationRequest::from_published_passport(&passport, "");
 
         assert!(req.operator_identifier.is_empty());
         assert!(req.facility_identifier.is_empty());
+        assert!(req.facility.is_none());
         assert!(req.data_carrier_uri.is_empty());
         assert!(req.country_code.is_empty());
     }

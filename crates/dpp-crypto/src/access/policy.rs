@@ -12,6 +12,14 @@ use dpp_domain::{AccessTier, SectorCatalog};
 /// key `disassemblyInstructions` also covers a payload key
 /// `disassembly_instructions` — closing the casing/nesting drift that let
 /// elevated fields leak at the Public tier (crypto Gap 6).
+///
+/// **Caution — leaf matching is path-insensitive.** A policy key matches that
+/// leaf *wherever* it appears, at any depth. Do **not** elevate a generic leaf
+/// name shared across objects (e.g. `name`, `value`, `country`, `address`): such
+/// a key would redact `facility.address` *and* `manufacturer.address` alike,
+/// over-redacting Annex III public fields. Use only specific, unambiguous field
+/// names (e.g. `dueDiligenceUrl`, `svhcSubstances`). Gating a shared leaf on a
+/// single path would require making the matcher path-aware first.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SectorAccessPolicy {

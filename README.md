@@ -5,6 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml/badge.svg)](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml)
 [![Rust 1.96+](https://img.shields.io/badge/Rust-1.96%2B-orange.svg)](https://www.rust-lang.org/)
+[![Status: Active Development](https://img.shields.io/badge/Status-Active%20Development-green.svg)]()
 
 Pure, stateless Rust library for EU ESPR Digital Product Passport compliance. Domain types, cryptographic signing (Ed25519 + JWS), W3C Verifiable Credentials, GS1 Digital Link resolution, schema validation, and AAS submodel mapping. No database, no HTTP framework, no infrastructure dependencies.
 

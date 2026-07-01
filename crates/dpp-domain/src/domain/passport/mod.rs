@@ -75,6 +75,29 @@ pub struct ManufacturerInfo {
     pub did_web_url: Option<String>,
 }
 
+/// A self-contained snapshot of the ESPR Annex III facility a passport was
+/// stamped with at creation.
+///
+/// Copied **by value** onto the passport so the published, signed record remains
+/// complete for its full retention period even if the operator later retires the
+/// source facility from their registry. Field shape matches
+/// `dpp_registry::FacilityIdentifier`. See DATA-MODEL §3.3 / ADR-006.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FacilitySnapshot {
+    /// Identifier scheme (e.g. `"gln"`, `"national"`).
+    pub scheme: String,
+    /// Identifier value (e.g. the 13-digit GLN) — the Annex III unique facility id.
+    pub value: String,
+    /// Human-readable facility name.
+    pub name: String,
+    /// ISO 3166-1 alpha-2 country code of the facility.
+    pub country: String,
+    /// Optional street address / location description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+}
+
 /// A single material entry in the passport's bill of materials.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -180,9 +203,12 @@ pub struct Passport {
     /// engine from `operator_config`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_identifier: Option<String>,
-    /// Facility identifier where this product was manufactured or processed.
+    /// Snapshot of the Annex III facility where this product was manufactured or
+    /// processed, copied by value at create time. Self-contained so the signed
+    /// passport stays a complete record independent of the operator's mutable
+    /// facility registry (a retired facility never orphans a published passport).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub facility_id: Option<String>,
+    pub facility: Option<FacilitySnapshot>,
 }
 
 fn default_version() -> u32 {
@@ -331,6 +357,12 @@ impl Passport {
     }
 
     /// Return a tier-filtered JSON view of this passport.
+    ///
+    /// NOTE: this is a self-contained domain convenience, **not** the authoritative
+    /// public view. The payload that is signed (`publicJwsSignature`) and served on
+    /// the public route is produced by the `dpp-crypto` policy engine (vault
+    /// `public_view`), which fails closed on unknown sectors. Do not wire this into
+    /// the public-serving path expecting byte-parity with the signed view.
     ///
     /// Fields removed per tier:
     /// - Below `Professional`: `batchId`

@@ -280,3 +280,51 @@ fn fail_closed_default_tier_redacts_unlisted() {
         "fail-closed: unlisted field must be redacted"
     );
 }
+
+/// Locks the current-correct Public view of a passport carrying both a nested
+/// `facility` snapshot and a `manufacturer`: under the default passport policy,
+/// Annex III facility + operator identity stay public (no requirement to redact).
+#[test]
+fn passport_default_keeps_facility_and_manufacturer_public() {
+    let policy = SectorAccessPolicy::passport_default();
+    let data = json!({
+        "id": "x",
+        "manufacturer": { "name": "GreenCell GmbH", "address": "Berlin, DE" },
+        "facility": { "scheme": "gln", "value": "4012345000009",
+                      "name": "Default Plant", "country": "DE", "address": "1 Allee, Berlin" },
+        "operatorIdentifier": "DE123456789"
+    });
+    let out = filter_by_access_tier(&data, &policy, AccessTier::Public).filtered_data;
+    assert_eq!(out["facility"]["value"], json!("4012345000009"));
+    assert_eq!(out["facility"]["address"], json!("1 Allee, Berlin"));
+    assert_eq!(out["manufacturer"]["address"], json!("Berlin, DE"));
+    assert_eq!(out["operatorIdentifier"], json!("DE123456789"));
+}
+
+/// Documents the leaf-key collision (crypto): elevating a *generic* leaf name
+/// redacts it in **every** object it appears in — here, gating `address` drops
+/// both `facility.address` and `manufacturer.address`. This is why policies must
+/// use specific field names, and why `facility.address` cannot be gated in
+/// isolation without a path-aware matcher. Guards against a naive future edit.
+#[test]
+fn generic_leaf_key_collides_across_objects() {
+    let mut policy = SectorAccessPolicy::passport_default();
+    policy
+        .field_tiers
+        .insert("address".into(), AccessTier::Professional);
+    let data = json!({
+        "manufacturer": { "name": "ACME", "address": "Berlin, DE" },
+        "facility": { "value": "4012345000009", "address": "1 Allee, Berlin" }
+    });
+    let out = filter_by_access_tier(&data, &policy, AccessTier::Public).filtered_data;
+    assert!(
+        out["manufacturer"].get("address").is_none(),
+        "collision: gating `address` also drops manufacturer.address"
+    );
+    assert!(
+        out["facility"].get("address").is_none(),
+        "collision: gating `address` also drops facility.address"
+    );
+    // Non-colliding leaves are untouched.
+    assert_eq!(out["facility"]["value"], json!("4012345000009"));
+}

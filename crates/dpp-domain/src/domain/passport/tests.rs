@@ -41,7 +41,7 @@ fn make_passport() -> Passport {
         retention_until: None,
         product_id: None,
         operator_identifier: None,
-        facility_id: None,
+        facility: None,
     }
 }
 
@@ -273,7 +273,13 @@ fn v02_fields_round_trip() {
     p.retention_until = Some(Utc::now() + chrono::Duration::days(3650));
     p.product_id = Some(Uuid::now_v7());
     p.operator_identifier = Some("DE12345678".to_owned());
-    p.facility_id = Some("FAC-001".to_owned());
+    p.facility = Some(crate::domain::passport::FacilitySnapshot {
+        scheme: "national".to_owned(),
+        value: "FAC-001".to_owned(),
+        name: "Plant One".to_owned(),
+        country: "DE".to_owned(),
+        address: None,
+    });
 
     let json = serde_json::to_string(&p).unwrap();
     let back: Passport = serde_json::from_str(&json).unwrap();
@@ -281,7 +287,14 @@ fn v02_fields_round_trip() {
     assert_eq!(back.supersedes_id, Some(predecessor_id));
     assert!(back.retention_until.is_some());
     assert_eq!(back.operator_identifier.as_deref(), Some("DE12345678"));
-    assert_eq!(back.facility_id.as_deref(), Some("FAC-001"));
+    assert_eq!(
+        back.facility.as_ref().map(|f| f.value.as_str()),
+        Some("FAC-001")
+    );
+    assert_eq!(
+        back.facility.as_ref().map(|f| f.name.as_str()),
+        Some("Plant One")
+    );
 }
 
 #[test]

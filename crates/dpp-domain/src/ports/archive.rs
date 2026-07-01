@@ -315,7 +315,7 @@ mod tests {
             retention_until: None,
             product_id: None,
             operator_identifier: None,
-            facility_id: None,
+            facility: None,
         }
     }
 

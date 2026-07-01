@@ -18,7 +18,8 @@ pub use domain::{
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
     identity::{AccessTier, PassportCredential, PassportCredentialSubject, SignedCredential},
     passport::{
-        ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportView, ProductCategory,
+        FacilitySnapshot, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportView,
+        ProductCategory,
     },
     sector::{
         AluminiumData, BatteryChemistry, BatteryData, BatteryType, CarbonFootprint,
