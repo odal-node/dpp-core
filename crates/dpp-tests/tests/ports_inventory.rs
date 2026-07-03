@@ -1,4 +1,4 @@
-//! Drift tripwire (chunk 01): the port inventory in `docs/architecture/PORTS.md`
+//! Drift tripwire: the port inventory in `docs/architecture/PORTS.md`
 //! must exactly match the modules declared in `dpp-domain::ports`.
 //!
 //! This kills the "six port traits" class of doc/code drift mechanically —
@@ -16,8 +16,7 @@ fn manifest_relative(rel: &str) -> PathBuf {
 /// Module names declared in `dpp-domain/src/ports/mod.rs` (`pub mod <name>;`).
 fn declared_ports() -> BTreeSet<String> {
     let path = manifest_relative("../dpp-domain/src/ports/mod.rs");
-    let src = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     src.lines()
         .map(str::trim)
         .filter_map(|l| l.strip_prefix("pub mod "))
@@ -29,8 +28,7 @@ fn declared_ports() -> BTreeSet<String> {
 /// Module names listed in the PORTS.md machine block.
 fn inventory_ports() -> BTreeSet<String> {
     let path = manifest_relative("../../docs/architecture/PORTS.md");
-    let src = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let begin = src
         .find("PORTS-INVENTORY:BEGIN")
         .expect("PORTS.md missing BEGIN marker");
@@ -56,7 +54,8 @@ fn ports_module_matches_canonical_inventory() {
         "parsed zero ports from ports/mod.rs — parser or path is wrong"
     );
     assert_eq!(
-        declared, inventory,
+        declared,
+        inventory,
         "\nport inventory drift — update docs/architecture/PORTS.md to match dpp-domain::ports.\n\
          declared in ports/mod.rs: {declared:?}\n\
          listed in PORTS.md:       {inventory:?}\n\

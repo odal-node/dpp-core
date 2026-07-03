@@ -354,8 +354,8 @@ fn sector_data_battery_round_trip() {
 }
 
 // Regression: every BatteryType and BatteryChemistry variant must serialise to
-// a wire value the JSON schema accepts. D-1 (Sli "sli" vs schema
-// "starting-lighting-ignition") was silent without this.
+// a wire value the JSON schema accepts. The Sli "sli" vs schema
+// "starting-lighting-ignition" mismatch was silent without this.
 #[test]
 fn battery_enum_wire_values_match_schema() {
     let cases: &[(BatteryType, &str)] = &[
@@ -544,8 +544,8 @@ fn sector_discriminant_matches_variant() {
 // (not a hand-written JSON literal) and round-tripped through that sector's
 // own current embedded schema via `validate_strict` — the same fail-closed
 // call the publish path uses. This is the test class that would have caught
-// D-1 (`BatteryType::Sli` serialising to `"sli"` against a schema expecting
-// `"starting-lighting-ignition"`): a serde rename and the schema it targets
+// `BatteryType::Sli` serialising to `"sli"` against a schema expecting
+// `"starting-lighting-ignition"`: a serde rename and the schema it targets
 // can drift independently, and only a value built from the Rust type (so its
 // wire shape is whatever serde actually emits today) catches that drift.
 
@@ -730,7 +730,7 @@ fn every_sector_with_an_embedded_schema_round_trips_through_its_current_schema()
                 panic!(
                     "sector '{key}' v{version}: a Rust-type-constructed valid \
                      instance failed its own embedded schema — type/schema \
-                     drift (the D-1 bug class): {e:?}"
+                     drift: {e:?}"
                 )
             });
     }

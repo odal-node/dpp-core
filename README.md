@@ -170,16 +170,6 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 
 ---
 
-## Integration Tests
-
-| Test Suite | What It Validates |
-|---|---|
-| `textile_end_to_end` | Full passport lifecycle: creation, serialisation, AAS mapping, GS1 parsing, credential issuance, access filtering |
-| `transfer_of_responsibility` | Transfer chain lifecycle, provenance audit trail, error cases, serialisation |
-| `access_tier_gatekeeping` | All three ESPR tiers with realistic credentials, edge cases, custom policies |
-| `schema_conformity` | JTC 24 field coverage, SVHC structure, ISO 3166 enforcement, schema strictness |
-
----
 
 ## Documentation
 
@@ -190,7 +180,6 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 | [DATA-MODEL.md](docs/architecture/DATA-MODEL.md) | DPP canonical schema (ESPR / Battery Regulation aligned) |
 | [IDENTITY.md](docs/architecture/IDENTITY.md) | `did:web` and Verifiable Credential deep dive |
 | [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md) | Wasm plugin sandbox design and ABI contract |
-| [PROOF-BOUND-ARCHITECTURE.md](docs/architecture/PROOF-BOUND-ARCHITECTURE.md) | Data sovereignty, signed proof relay model, and passport retention guarantees |
 | [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
 | [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
 | [CONTRIBUTING.md](docs/governance/CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
