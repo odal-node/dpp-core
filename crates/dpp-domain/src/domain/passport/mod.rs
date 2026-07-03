@@ -10,6 +10,7 @@ use crate::domain::{
     status::PassportStatus,
 };
 use crate::ports::compliance::ComplianceResult;
+use crate::ports::seal::SealedEnvelope;
 
 #[cfg(test)]
 mod tests;
@@ -209,6 +210,12 @@ pub struct Passport {
     /// facility registry (a retired facility never orphans a published passport).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facility: Option<FacilitySnapshot>,
+    /// The eIDAS qualified electronic seal applied to this passport, if any.
+    /// `placeholder: true` on the envelope means no legally valid seal exists yet —
+    /// consumers must check this flag rather than inferring validity from presence.
+    /// `None` until a seal (real or placeholder) has been applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seal: Option<SealedEnvelope>,
 }
 
 fn default_version() -> u32 {

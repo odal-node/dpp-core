@@ -532,6 +532,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         product_id: None,
         operator_identifier: None,
         facility: None,
+        seal: None,
     };
 
     let err = passport.validate().unwrap_err().to_string();

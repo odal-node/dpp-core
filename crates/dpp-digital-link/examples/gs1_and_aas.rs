@@ -164,6 +164,7 @@ fn main() {
         product_id: None,
         operator_identifier: None,
         facility: None,
+        seal: None,
     };
 
     let gtin = "09506000134352";

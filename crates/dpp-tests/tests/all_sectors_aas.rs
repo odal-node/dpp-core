@@ -66,6 +66,7 @@ fn base(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passpo
         product_id: None,
         operator_identifier: None,
         facility: None,
+        seal: None,
     }
 }
 

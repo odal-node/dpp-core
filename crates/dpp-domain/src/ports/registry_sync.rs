@@ -260,6 +260,7 @@ mod tests {
                 country: "DE".into(),
                 address: None,
             }),
+            seal: None,
         }
     }
 

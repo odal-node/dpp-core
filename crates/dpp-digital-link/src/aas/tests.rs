@@ -46,6 +46,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         product_id: None,
         operator_identifier: None,
         facility: None,
+        seal: None,
     }
 }
 

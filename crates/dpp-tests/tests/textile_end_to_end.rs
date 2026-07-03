@@ -116,6 +116,7 @@ fn make_textile_passport() -> Passport {
         product_id: None,
         operator_identifier: None,
         facility: None,
+        seal: None,
     }
 }
 

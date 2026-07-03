@@ -11,6 +11,17 @@ the pre-1.0 conventions in [VERSIONING.md](docs/governance/VERSIONING.md): a
 This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 0.1.0–0.3.0 are reconstructed from git history.
 
+## [Unreleased]
+
+### Breaking
+- `Passport` gains a `seal: Option<SealedEnvelope>` field (`domain::passport`),
+  carrying the eIDAS qualified electronic seal applied to the passport, if
+  any (`placeholder: true` on the envelope means no legally valid seal
+  exists yet). `Passport` is not `#[non_exhaustive]`, so any code
+  constructing a `Passport` struct literal directly must add a `seal` field
+  (typically `seal: None`); code that only reads existing fields is
+  unaffected.
+
 ## [0.4.1] - 2026-07-03
 
 ### Added
