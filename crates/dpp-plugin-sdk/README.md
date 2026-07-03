@@ -1,5 +1,9 @@
 # dpp-plugin-sdk
 
+[![crates.io](https://img.shields.io/crates/v/dpp-plugin-sdk.svg)](https://crates.io/crates/dpp-plugin-sdk)
+[![docs.rs](https://img.shields.io/docsrs/dpp-plugin-sdk)](https://docs.rs/dpp-plugin-sdk)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Guest-side SDK and ABI export macro for Odal Node Wasm sector plugins. This crate
 provides the glue and helper utilities that make writing a Wasm sector plugin
 straightforward: a single `export_plugin!` macro generates the linear-memory

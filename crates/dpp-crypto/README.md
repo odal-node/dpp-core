@@ -1,5 +1,9 @@
 # dpp-crypto
 
+[![crates.io](https://img.shields.io/crates/v/dpp-crypto.svg)](https://crates.io/crates/dpp-crypto)
+[![docs.rs](https://img.shields.io/docsrs/dpp-crypto)](https://docs.rs/dpp-crypto)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Cryptographic primitives for the [Odal Node](https://odal-node.io) Digital Product
 Passport system: Ed25519 key management, JWS signing and verification, AES-256-GCM
 field-level encryption, `did:web` document builder, W3C Verifiable Credentials, and

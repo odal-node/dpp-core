@@ -1,5 +1,9 @@
 # dpp-digital-link
 
+[![crates.io](https://img.shields.io/crates/v/dpp-digital-link.svg)](https://crates.io/crates/dpp-digital-link)
+[![docs.rs](https://img.shields.io/docsrs/dpp-digital-link)](https://docs.rs/dpp-digital-link)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 GS1 Digital Link URL parsing, link-type content negotiation, and
 [Asset Administration Shell](https://industrialdigitaltwin.org/en/content-hub/aasspecifications)
 (AAS) submodel mapping for the [Odal Node](https://odal-node.io) Digital Product

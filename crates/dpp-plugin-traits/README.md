@@ -1,5 +1,9 @@
 # dpp-plugin-traits
 
+[![crates.io](https://img.shields.io/crates/v/dpp-plugin-traits.svg)](https://crates.io/crates/dpp-plugin-traits)
+[![docs.rs](https://img.shields.io/docsrs/dpp-plugin-traits)](https://docs.rs/dpp-plugin-traits)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Host/guest ABI contract for [Odal Node](https://odal-node.io) Wasm sector plugins.
 
 `no_std` compatible. Defines the interface between the platform runtime (the Wasmtime

@@ -1,5 +1,9 @@
 # dpp-domain
 
+[![crates.io](https://img.shields.io/crates/v/dpp-domain.svg)](https://crates.io/crates/dpp-domain)
+[![docs.rs](https://img.shields.io/docsrs/dpp-domain)](https://docs.rs/dpp-domain)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Core domain types, port traits, and schema validation for the
 [Odal Node](https://odal-node.io) Digital Product Passport system.
 

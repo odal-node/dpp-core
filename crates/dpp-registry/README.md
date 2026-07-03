@@ -1,5 +1,9 @@
 # dpp-registry
 
+[![crates.io](https://img.shields.io/crates/v/dpp-registry.svg)](https://crates.io/crates/dpp-registry)
+[![docs.rs](https://img.shields.io/docsrs/dpp-registry)](https://docs.rs/dpp-registry)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 EU EUDPP Central Registry connector for the [Odal Node](https://odal-node.io)
 Digital Product Passport system.
 

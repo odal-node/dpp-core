@@ -1,5 +1,9 @@
 # dpp-calc
 
+[![crates.io](https://img.shields.io/crates/v/dpp-calc.svg)](https://crates.io/crates/dpp-calc)
+[![docs.rs](https://img.shields.io/docsrs/dpp-calc)](https://docs.rs/dpp-calc)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Pure, stateless EU-methodology compliance calculators for [Odal Node](https://odal-node.io).
 
 Every function in this crate is deterministic and side-effect free — no I/O, no infrastructure, no `async`.

@@ -1,5 +1,9 @@
 # dpp-rules
 
+[![crates.io](https://img.shields.io/crates/v/dpp-rules.svg)](https://crates.io/crates/dpp-rules)
+[![docs.rs](https://img.shields.io/docsrs/dpp-rules)](https://docs.rs/dpp-rules)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules.
 
 These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm sector plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.

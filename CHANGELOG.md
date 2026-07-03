@@ -11,6 +11,15 @@ the pre-1.0 conventions in [VERSIONING.md](docs/governance/VERSIONING.md): a
 This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 0.1.0–0.3.0 are reconstructed from git history.
 
+## [0.4.1] - 2026-07-03
+
+### Added
+- `homepage = "https://odal-node.io"` on the workspace and all 8 published
+  crates, so crates.io shows a Homepage link.
+- crates.io/docs.rs/license badges on each published crate's own README (the
+  one crates.io renders on the crate page), matching the badge style already
+  used in the root README.
+
 ## [0.4.0] - 2026-07-03
 
 ### Added
