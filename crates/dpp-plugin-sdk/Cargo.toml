@@ -15,7 +15,7 @@ name = "dpp_plugin_sdk"
 path = "src/lib.rs"
 
 [dependencies]
-dpp-plugin-traits = { path = "../dpp-plugin-traits", version = "0.3.0" }
-dpp-rules         = { path = "../dpp-rules", version = "0.3.0" }
+dpp-plugin-traits = { path = "../dpp-plugin-traits", version = "0.4.0" }
+dpp-rules         = { path = "../dpp-rules", version = "0.4.0" }
 serde      = { workspace = true }
 serde_json = { workspace = true }

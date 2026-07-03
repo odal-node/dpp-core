@@ -153,6 +153,25 @@ pub enum TransferStatus {
 }
 
 impl TransferRecord {
+    /// The canonical content both operators sign over: the immutable core
+    /// of the transfer, excluding the signatures themselves and the lifecycle
+    /// timestamps set *after* signing (`completed_at`/`rejected_at`/`cancelled_at`).
+    ///
+    /// Both `from_operator` and `to_operator` sign a JWS over the JCS
+    /// canonicalisation of this value, so the two signatures bind the same
+    /// immutable handover terms. Tampering any bound field invalidates both.
+    #[must_use]
+    pub fn signing_payload(&self) -> serde_json::Value {
+        serde_json::json!({
+            "transferId": self.transfer_id,
+            "passportId": self.passport_id,
+            "fromOperator": self.from_operator,
+            "toOperator": self.to_operator,
+            "reason": self.reason,
+            "initiatedAt": self.initiated_at,
+        })
+    }
+
     /// Determine the current status of this transfer.
     ///
     /// Terminal states (`Rejected`, `Cancelled`) take priority over signatures,

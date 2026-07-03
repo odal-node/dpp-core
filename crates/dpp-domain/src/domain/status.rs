@@ -7,15 +7,17 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// Valid transitions:
 /// ```text
 /// Draft      → Published  | Archived
-/// Published  → Suspended  | Archived  | Superseded
-/// Suspended  → Published  | Archived
+/// Published  → Suspended  | Archived  | Superseded | Deactivated
+/// Suspended  → Published  | Archived  | Deactivated
 /// ```
-/// `Archived` and `Superseded` are terminal — no further transitions.
+/// `Archived`, `Superseded`, and `Deactivated` are terminal — no further
+/// transitions. A `Deactivated` passport is retained (the DPP outlives the
+/// product, EN 18221) but is end-of-life; the reason lives in the EOL event.
 ///
 /// # Serialisation
 /// Serialises to the API wire format: `"draft"`, `"active"`, `"suspended"`,
-/// `"archived"`, `"superseded"`. The domain uses `Published` internally; the
-/// API and JSON use `"active"`.
+/// `"archived"`, `"superseded"`, `"deactivated"`. The domain uses `Published`
+/// internally; the API and JSON use `"active"`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PassportStatus {
@@ -30,6 +32,10 @@ pub enum PassportStatus {
     /// Replaced by a newer passport version. Terminal. The successor passport
     /// carries `supersedes_id` pointing back to this record.
     Superseded,
+    /// End-of-life: the product was recycled, destroyed (with a derogation),
+    /// exported, or lost. Terminal. The record is retained; the typed reason is
+    /// carried by the EOL event (`dpp_domain::domain::eol`). ESPR circularity.
+    Deactivated,
 }
 
 impl Serialize for PassportStatus {
@@ -40,6 +46,7 @@ impl Serialize for PassportStatus {
             PassportStatus::Suspended => "suspended",
             PassportStatus::Archived => "archived",
             PassportStatus::Superseded => "superseded",
+            PassportStatus::Deactivated => "deactivated",
         })
     }
 }
@@ -53,9 +60,17 @@ impl<'de> Deserialize<'de> for PassportStatus {
             "suspended" => Ok(PassportStatus::Suspended),
             "archived" => Ok(PassportStatus::Archived),
             "superseded" => Ok(PassportStatus::Superseded),
+            "deactivated" => Ok(PassportStatus::Deactivated),
             other => Err(serde::de::Error::unknown_variant(
                 other,
-                &["draft", "active", "suspended", "archived", "superseded"],
+                &[
+                    "draft",
+                    "active",
+                    "suspended",
+                    "archived",
+                    "superseded",
+                    "deactivated",
+                ],
             )),
         }
     }
@@ -72,8 +87,10 @@ impl PassportStatus {
                 | (Published, Suspended)
                 | (Published, Archived)
                 | (Published, Superseded)
+                | (Published, Deactivated)
                 | (Suspended, Published)
                 | (Suspended, Archived)
+                | (Suspended, Deactivated)
         )
     }
 }
@@ -86,6 +103,7 @@ impl std::fmt::Display for PassportStatus {
             PassportStatus::Suspended => "suspended",
             PassportStatus::Archived => "archived",
             PassportStatus::Superseded => "superseded",
+            PassportStatus::Deactivated => "deactivated",
         };
         write!(f, "{s}")
     }
@@ -104,6 +122,8 @@ mod tests {
         assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Superseded));
         assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Published));
         assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Archived));
+        assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Deactivated));
+        assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Deactivated));
     }
 
     #[test]
@@ -116,6 +136,12 @@ mod tests {
         assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Published));
         assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Draft));
         assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Archived));
+        // Deactivated is terminal.
+        assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Published));
+        assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Archived));
+        // Cannot deactivate a draft or archived record.
+        assert!(!PassportStatus::Draft.can_transition_to(&PassportStatus::Deactivated));
+        assert!(!PassportStatus::Archived.can_transition_to(&PassportStatus::Deactivated));
     }
 
     #[test]
@@ -135,6 +161,7 @@ mod tests {
             (PassportStatus::Suspended, "suspended"),
             (PassportStatus::Archived, "archived"),
             (PassportStatus::Superseded, "superseded"),
+            (PassportStatus::Deactivated, "deactivated"),
         ] {
             assert_eq!(
                 serde_json::to_value(&status).unwrap().as_str().unwrap(),
