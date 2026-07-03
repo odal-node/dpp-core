@@ -1,9 +1,14 @@
 //! Port trait for eIDAS qualified electronic sealing.
 //!
-//! ESPR Article 13 requires every DPP registered with the EU Central Registry
-//! to be signed with a qualified electronic signature or sealed with a qualified
-//! electronic seal (eIDAS Reg. (EU) No 910/2014). Registration without a valid
-//! seal is automatically rejected.
+//! ESPR Article 13 establishes the EU Central Registry. The Commission has
+//! **not yet published** the registry's API specification or its exact
+//! authentication/sealing mechanism; public guidance anticipates qualified
+//! electronic signatures or seals (eIDAS Reg. (EU) No 910/2014) for
+//! registration, and EN 18246 admits several authentication constructs.
+//!
+//! ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): treat a qualified seal as required
+//! for registration until the published registry spec confirms or relaxes it —
+//! do not state the requirement as enacted law.
 //!
 //! Two operating models exist:
 //! - **Provider seal (delegated):** the platform holds its own qualified seal;

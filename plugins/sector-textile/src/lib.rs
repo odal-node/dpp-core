@@ -37,7 +37,7 @@ impl DppSectorPlugin for TextilePlugin {
             version: env!("CARGO_PKG_VERSION").into(),
             license: "Apache-2.0".into(),
             description: Some(
-                "EU textile DPP fibre composition + ESPR Article 22 unsold goods".into(),
+                "EU textile DPP fibre composition + ESPR Art. 25 unsold goods".into(),
             ),
             author: Some("Odal Node".into()),
             homepage: Some("https://github.com/odal-node/dpp-core".into()),
