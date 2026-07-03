@@ -26,6 +26,17 @@ homepage    = "https://odal-node.io"
 rust-version = "1.96"
 
 # ---------------------------------------------------------------------------
+# cargo-release: all members share one lockstep version, so cut one tag for
+# the whole release instead of cargo-release's default per-crate tag scheme
+# (crate-name-v0.4.1 for every publishable member).
+# ---------------------------------------------------------------------------
+[workspace.metadata.release]
+consolidate-commits = true
+tag-name    = "v{{version}}"
+tag-prefix  = ""
+tag-message = "Release version {{version}}"
+
+# ---------------------------------------------------------------------------
 # Shared dependency versions — crates inherit these with `workspace = true`
 # ---------------------------------------------------------------------------
 [workspace.dependencies]

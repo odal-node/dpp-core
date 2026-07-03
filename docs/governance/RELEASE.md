@@ -50,21 +50,31 @@ order:
 7. `dpp-calc` (depends on dpp-domain)
 8. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)
 
-`dpp-tests` is `publish = false` and is not published. `cargo-release` handles
-this ordering automatically when run from the workspace root with `--workspace`.
+`dpp-tests` is `publish = false` and is not published, but it is still lockstep-
+versioned with everything else. `cargo-release` handles publish ordering
+automatically when run from the workspace root with `--workspace`.
+
+`dpp-benches` is deliberately pinned at `version = "0.0.0"`, outside lockstep
+(see [`VERSIONING.md`](VERSIONING.md)) — it must always be excluded or
+`cargo-release` will try to bump it too.
+
+`[workspace.metadata.release]` in the root `Cargo.toml` pins the tag scheme to
+one annotated `vX.Y.Z` tag with message `Release version X.Y.Z` for the whole
+release, instead of cargo-release's default of one tag per publishable crate.
 
 ## Release Command
 
 ```sh
 # Dry run first — always
-cargo release patch --workspace --dry-run
+cargo release patch --workspace --exclude dpp-benches --dry-run
 
 # If the dry run is clean
-cargo release patch --workspace --execute
+cargo release patch --workspace --exclude dpp-benches --execute
 ```
 
 Replace `patch` with `minor` or `major` as appropriate per the
-[versioning policy](VERSIONING.md).
+[versioning policy](VERSIONING.md). `--execute` also pushes the commit and tag
+to `origin` unless `--no-push` is given.
 
 ## Post-Release
 
