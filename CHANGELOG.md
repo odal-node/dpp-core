@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-04
+
 ### Breaking
 - `Passport` gains a `seal: Option<SealedEnvelope>` field (`domain::passport`),
   carrying the eIDAS qualified electronic seal applied to the passport, if
