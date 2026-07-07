@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 use rand::RngCore;
 use zeroize::Zeroize;
 
-use super::{KeyRecord, KeyStore, derive_aes_key_argon2};
+use super::crypto::derive_aes_key_argon2;
+use super::store::{KeyRecord, KeyRecordMap, KeyStore};
 
 impl KeyStore {
     /// Open the key store, run `migrate_if_needed` if the store uses the legacy
@@ -45,7 +46,7 @@ impl KeyStore {
         let new_cipher = Aes256Gcm::new(&new_key);
 
         let mut map = self.records.write().expect("key store write lock");
-        let mut migrated = super::KeyRecordMap::with_capacity(map.len());
+        let mut migrated = KeyRecordMap::with_capacity(map.len());
 
         for (id, record) in map.iter() {
             // Decrypt with legacy cipher.

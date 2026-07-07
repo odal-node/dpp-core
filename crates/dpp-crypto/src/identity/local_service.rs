@@ -16,7 +16,7 @@ use crate::jws::verifier::{
 use crate::keystore::KeyStore;
 
 use super::did_builder::build_did_document;
-use super::passport_credential::{PassportCredential, PassportCredentialSubject};
+use super::passport_credential::build_passport_credential;
 
 /// Concrete `IdentityPort` backed by a local `KeyStore`.
 ///
@@ -60,13 +60,7 @@ impl IdentityPort for LocalIdentityService {
 
         let issuer_did = did_doc["id"].as_str().unwrap_or_default().to_string();
 
-        let passport_vc = PassportCredential::new(
-            issuer_did.clone(),
-            PassportCredentialSubject {
-                id: format!("urn:uuid:{}", passport_id),
-                payload_hash,
-            },
-        );
+        let passport_vc = build_passport_credential(issuer_did.clone(), passport_id, payload_hash);
 
         Ok(SignedCredential {
             credential: passport_vc,

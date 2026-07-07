@@ -1,8 +1,8 @@
 //! Key derivation and HMAC-integrity helpers for the key store.
 //!
 //! These are pure functions that derive AES and HMAC keys from a passphrase
-//! and compute / verify the envelope HMAC. They are extracted here so
-//! `mod.rs` contains only the `KeyStore` API.
+//! and compute / verify the envelope HMAC, kept separate from
+//! [`super::store`]'s `KeyStore` API.
 
 use aes_gcm::{Aes256Gcm, Key};
 use anyhow::{Context, Result};
@@ -11,7 +11,7 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
-use super::{KeyRecord, KeyRecordMap};
+use super::store::{KeyRecord, KeyRecordMap};
 
 type HmacSha256 = Hmac<Sha256>;
 

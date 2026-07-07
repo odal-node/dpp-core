@@ -9,10 +9,8 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
-use super::{
-    KeyRecord, KeyRecordMap, KeyStore, compute_envelope_hmac, default_algorithm,
-    derive_aes_key_sha256,
-};
+use super::crypto::{compute_envelope_hmac, derive_aes_key_sha256};
+use super::store::{KeyRecord, KeyRecordMap, KeyStore, default_algorithm};
 
 fn temp_store() -> KeyStore {
     let dir = std::env::temp_dir();

@@ -7,10 +7,9 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
-use super::{KeyRecord, KeyStore, default_algorithm};
+use super::entry::KeyEntry;
+use super::store::{KeyRecord, KeyStore, default_algorithm};
 use ed25519_dalek::SigningKey;
-
-use crate::keystore::KeyEntry;
 
 impl KeyStore {
     /// Archive the current key under a timestamped key so it can still be used
