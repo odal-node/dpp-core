@@ -34,6 +34,10 @@ pub struct CalculationReceipt {
     pub ruleset_id: String,
     /// Version of the ruleset (semver-shaped string).
     pub ruleset_version: String,
+    /// Version of the signed Compliance-Current bundle that delivered this
+    /// ruleset. `None` when the ruleset came from the built-in baseline
+    /// (no signed bundle involved).
+    pub bundle_version: Option<String>,
     /// Identifier of the factor dataset (empty if no factor provider was used).
     pub factor_dataset_id: String,
     /// Version of the factor dataset (empty if no factor provider was used).
@@ -60,6 +64,7 @@ impl CalculationReceipt {
             output_hash: String::new(),
             ruleset_id: ruleset_id.into(),
             ruleset_version: ruleset_version.into(),
+            bundle_version: None,
             factor_dataset_id: String::new(),
             factor_dataset_version: String::new(),
             factor_set_hash: None,
@@ -71,6 +76,13 @@ impl CalculationReceipt {
     /// Bind the numeric output values to this receipt.
     pub fn with_output_hash(mut self, hash: impl Into<String>) -> Self {
         self.output_hash = hash.into();
+        self
+    }
+
+    /// Stamp the signed Compliance-Current bundle version that delivered this
+    /// ruleset. Leave unset (`None`) for the built-in baseline rulesets.
+    pub fn with_bundle_version(mut self, bundle_version: impl Into<String>) -> Self {
+        self.bundle_version = Some(bundle_version.into());
         self
     }
 
@@ -141,6 +153,18 @@ mod tests {
         assert_eq!(receipt.factor_dataset_version, "1.2.3");
         assert_eq!(receipt.factor_set_hash.as_deref(), Some("deadbeef"));
         assert_eq!(receipt.jws.as_deref(), Some("jws-token"));
+    }
+
+    #[test]
+    fn bundle_version_defaults_to_none_and_round_trips() {
+        let receipt = CalculationReceipt::new("in", "r", "1.0.0");
+        assert_eq!(receipt.bundle_version, None);
+
+        let json = serde_json::to_value(&receipt).unwrap();
+        assert_eq!(json["bundle_version"], serde_json::Value::Null);
+
+        let stamped = receipt.with_bundle_version("bundle-2026.07");
+        assert_eq!(stamped.bundle_version.as_deref(), Some("bundle-2026.07"));
     }
 
     #[test]
