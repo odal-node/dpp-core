@@ -9,12 +9,18 @@
 //! plugins — without this crate depending on either.
 //!
 //! See `docs/architecture/SECTOR-MODEL-CONSOLIDATION.md` §7.
+//!
+//! The `bundle` feature (off by default) adds the ruleset-bundle format +
+//! verification seam (the `bundle` module — conditionally compiled, so not
+//! linked here) and pulls in `std` — see that module's docs.
 
-#![no_std]
+#![cfg_attr(not(feature = "bundle"), no_std)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+// Only needed when `no_std` is actually active (default build); when the
+// `bundle` feature is on, `no_std` is off and `std` is already available.
 #[cfg(test)]
 extern crate std;
 
@@ -35,6 +41,12 @@ pub mod textiles;
 pub mod construction;
 pub mod metals;
 pub mod toys;
+
+// Ruleset-bundle format + verification seam (signed, versioned Compliance
+// Current bundles). Optional: signing and hot-swap runtime state stay
+// engine-side; this crate only carries the open format + fail-closed verify.
+#[cfg(feature = "bundle")]
+pub mod bundle;
 
 // ── Crate-root re-exports ────────────────────────────────────────────────────
 // Preserved for backward compatibility with existing callers
