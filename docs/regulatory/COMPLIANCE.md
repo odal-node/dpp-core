@@ -111,7 +111,7 @@ means:
 | Hashing | SHA-256 | `sha2` | Data fingerprinting | General integrity |
 | Entropy | OS CSPRNG | `rand` | Key generation | Cryptographic best practice |
 
-These choices are documented in [SECURITY.md](../project/SECURITY.md) and
+These choices are documented in [SECURITY.md](../../SECURITY.md) and
 the architecture docs under `docs/architecture/IDENTITY.md`.
 
 ## EU Registry Readiness
@@ -151,5 +151,5 @@ against EUR-Lex / the Commission before relying on any specific date.)
 - [CBAM Regulation (EU) 2023/956](https://eur-lex.europa.eu/eli/reg/2023/956)
 - [GS1 Digital Link Standard](https://www.gs1.org/standards/gs1-digital-link)
 - [W3C Verifiable Credentials Data Model v2.0](https://www.w3.org/TR/vc-data-model-2.0/)
-- [SECURITY.md](../project/SECURITY.md)
+- [SECURITY.md](../../SECURITY.md)
 - [VERSIONING.md](../governance/VERSIONING.md)

@@ -45,7 +45,7 @@ logic, or access-tier enforcement) require:
 
 1. A dedicated review focusing on cryptographic correctness.
 2. Explicit sign-off in the PR description noting the security implications.
-3. An update to [SECURITY.md](../project/SECURITY.md) if the change affects the
+3. An update to [SECURITY.md](SECURITY.md) if the change affects the
    threat model or supported cryptographic primitives.
 
 ## Evolution Path
@@ -80,6 +80,6 @@ external contributions.
 ## References
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
-- [SECURITY.md](../project/SECURITY.md)
-- [Architecture docs](../architecture/)
+- [SECURITY.md](SECURITY.md)
+- [Architecture docs](docs/architecture/)
 - [Developer Certificate of Origin](https://developercertificate.org/)

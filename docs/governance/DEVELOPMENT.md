@@ -98,7 +98,7 @@ the PR title:
 - Nit-level feedback (formatting, naming) is prefixed with `nit:` and is
   non-blocking.
 - Security-sensitive changes require explicit security-focused review (see
-  [GOVERNANCE.md](GOVERNANCE.md)).
+  [GOVERNANCE.md](../../GOVERNANCE.md)).
 
 ## Code Style
 

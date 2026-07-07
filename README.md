@@ -182,8 +182,10 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 | [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md) | Wasm plugin sandbox design and ABI contract |
 | [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
 | [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
-| [CONTRIBUTING.md](docs/governance/CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
-| [SECURITY.md](docs/project/SECURITY.md) | Vulnerability disclosure policy |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
+| [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
+| [GOVERNANCE.md](GOVERNANCE.md) | Decision-making structure and maintainer authority |
+| [CHANGELOG.md](CHANGELOG.md) | Release history, one entry per version |
 
 
 ## License
@@ -192,7 +194,7 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 
 ## Security
 
-Do **not** open public issues for security vulnerabilities. Report privately to **security@odal-node.io** — see [SECURITY.md](docs/project/SECURITY.md) for full disclosure policy.
+Do **not** open public issues for security vulnerabilities. Report privately to **security@odal-node.io** — see [SECURITY.md](SECURITY.md) for full disclosure policy.
 
 ---
 
