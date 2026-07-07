@@ -1,4 +1,5 @@
 use super::*;
+use semver::Version;
 
 // ── Embedded schema tests ─────────────────────────────────────────────
 

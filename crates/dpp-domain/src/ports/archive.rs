@@ -11,7 +11,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::domain::{
     error::DppError,
@@ -127,53 +126,7 @@ pub trait ArchivePort: Send + Sync {
 /// All operations succeed without performing any I/O. Returns synthetic
 /// receipts with `archive_id = "ghost-{uuid}"`. Use in tests and in the
 /// standalone `dpp-vault` binary where object storage is not configured.
-pub struct GhostArchive;
-
-#[async_trait]
-impl ArchivePort for GhostArchive {
-    async fn archive(
-        &self,
-        passport: &Passport,
-        retention_years: u32,
-    ) -> Result<ArchiveReceipt, DppError> {
-        let now = Utc::now();
-        Ok(ArchiveReceipt {
-            archive_id: format!("GHOST-{}", Uuid::now_v7()),
-            passport_id: passport.id,
-            content_hash: String::new(),
-            archived_at: now,
-            retention_until: now + chrono::Duration::days(365 * retention_years as i64),
-        })
-    }
-
-    async fn update_archive(&self, passport: &Passport) -> Result<ArchiveReceipt, DppError> {
-        let now = Utc::now();
-        Ok(ArchiveReceipt {
-            archive_id: format!("GHOST-{}", Uuid::now_v7()),
-            passport_id: passport.id,
-            content_hash: String::new(),
-            archived_at: now,
-            retention_until: now + chrono::Duration::days(365 * 10),
-        })
-    }
-
-    async fn verify(
-        &self,
-        _passport_id: PassportId,
-        _expected_hash: &str,
-    ) -> Result<ArchiveVerification, DppError> {
-        Ok(ArchiveVerification {
-            integrity_ok: false,
-            accessible: false,
-            status: ArchiveStatus::Expired,
-            last_verified_at: Utc::now(),
-        })
-    }
-
-    async fn retrieve(&self, _passport_id: PassportId) -> Result<Option<Passport>, DppError> {
-        Ok(None)
-    }
-}
+pub use crate::ports::ghosts::GhostArchive;
 
 // ─── In-memory stub (testing) ────────────────────────────────────────────
 

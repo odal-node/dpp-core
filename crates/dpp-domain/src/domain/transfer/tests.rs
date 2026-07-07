@@ -1,6 +1,9 @@
 //! Transfer state-machine, chain-tracking, and serde tests.
 
 use super::*;
+use crate::domain::passport::PassportId;
+use chrono::Utc;
+use uuid::Uuid;
 
 fn make_operator(did: &str, name: &str, role: OperatorRole) -> ResponsibleOperator {
     ResponsibleOperator {

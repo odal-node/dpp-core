@@ -2,8 +2,13 @@
 
 use super::*;
 use crate::domain::gtin::Gtin;
-use crate::domain::sector::{BatteryChemistry, BatteryData, SectorData};
+use crate::domain::identity::AccessTier;
+use crate::domain::sector::{
+    BatteryChemistry, BatteryData, CarbonFootprint, RepairabilityScore, Sector, SectorData,
+};
+use crate::domain::status::PassportStatus;
 use chrono::Utc;
+use uuid::Uuid;
 
 fn make_passport() -> Passport {
     Passport {

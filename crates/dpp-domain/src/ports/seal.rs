@@ -139,82 +139,11 @@ pub trait SealPort: Send + Sync {
 ///
 /// Returns synthetic envelopes marked `placeholder: true`. All operations
 /// succeed but perform no network I/O and carry no legal validity.
-pub struct GhostSeal;
-
-#[async_trait]
-impl SealPort for GhostSeal {
-    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, DppError> {
-        Ok(SealedEnvelope {
-            format: req.sig_format,
-            seal_value: format!(
-                "GHOST-SEAL-{}",
-                &req.payload_hash[..8.min(req.payload_hash.len())]
-            ),
-            signing_cert_ref: None,
-            sealed_at: Utc::now(),
-            placeholder: true,
-        })
-    }
-
-    async fn verify(&self, env: &SealedEnvelope) -> Result<SealVerification, DppError> {
-        Ok(SealVerification {
-            valid: false,
-            placeholder: env.placeholder,
-        })
-    }
-
-    fn capabilities(&self) -> SealCapabilities {
-        SealCapabilities {
-            supported_formats: vec![SealFormat::Jades],
-            supported_modes: vec![SealMode::ProviderSeal, SealMode::OperatorSeal],
-        }
-    }
-}
+pub use crate::ports::ghosts::GhostSeal;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn ghost_seal_returns_placeholder() {
-        let ghost = GhostSeal;
-        let req = SealRequest {
-            payload_hash: "abc123def456".into(),
-            mode: SealMode::ProviderSeal,
-            key_ref: SealCredentialRef {
-                qtsp_id: "test-qtsp".into(),
-                credential_id: "cred-001".into(),
-            },
-            sig_format: SealFormat::Jades,
-        };
-        let env = ghost.seal(req).await.unwrap();
-        assert!(env.placeholder);
-        assert!(env.seal_value.starts_with("GHOST-SEAL-"));
-        assert_eq!(env.format, SealFormat::Jades);
-    }
-
-    #[tokio::test]
-    async fn ghost_verify_returns_invalid_placeholder() {
-        let ghost = GhostSeal;
-        let env = SealedEnvelope {
-            format: SealFormat::Jades,
-            seal_value: "GHOST-SEAL-abc123".into(),
-            signing_cert_ref: None,
-            sealed_at: Utc::now(),
-            placeholder: true,
-        };
-        let result = ghost.verify(&env).await.unwrap();
-        assert!(!result.valid);
-        assert!(result.placeholder);
-    }
-
-    #[tokio::test]
-    async fn ghost_capabilities_include_jades_and_both_modes() {
-        let caps = GhostSeal.capabilities();
-        assert!(caps.supported_formats.contains(&SealFormat::Jades));
-        assert!(caps.supported_modes.contains(&SealMode::ProviderSeal));
-        assert!(caps.supported_modes.contains(&SealMode::OperatorSeal));
-    }
 
     #[test]
     fn seal_format_serde_round_trips() {

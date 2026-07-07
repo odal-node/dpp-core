@@ -11,7 +11,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::domain::{error::DppError, passport::PassportId};
 
@@ -176,41 +175,7 @@ pub trait RegistrySyncPort: Send + Sync {
 ///
 /// Returns synthetic records with `RegistryStatus::Pending` and placeholder
 /// identifiers. All operations succeed but perform no real network calls.
-pub struct GhostRegistrySync;
-
-#[async_trait]
-impl RegistrySyncPort for GhostRegistrySync {
-    async fn register(&self, request: RegistrationRequest) -> Result<RegistryRecord, DppError> {
-        let now = Utc::now();
-        Ok(RegistryRecord {
-            identifiers: RegistryIdentifiers {
-                product_id: format!("GHOST-PROD-{}", request.passport_id),
-                operator_id: format!("GHOST-OP-{}", &request.operator_identifier),
-                facility_id: format!("GHOST-FAC-{}", &request.facility_identifier),
-                registry_id: format!("GHOST-REG-{}", Uuid::now_v7()),
-            },
-            status: RegistryStatus::Pending,
-            registered_at: now,
-            updated_at: now,
-        })
-    }
-
-    async fn check_status(&self, passport_id: PassportId) -> Result<RegistryRecord, DppError> {
-        Err(DppError::NotFound(format!(
-            "ghost registry has no record for {passport_id}"
-        )))
-    }
-
-    async fn notify_transfer(
-        &self,
-        passport_id: PassportId,
-        _new_operator_identifier: String,
-    ) -> Result<RegistryRecord, DppError> {
-        Err(DppError::NotFound(format!(
-            "ghost registry has no record for {passport_id}"
-        )))
-    }
-}
+pub use crate::ports::ghosts::GhostRegistrySync;
 
 #[cfg(test)]
 mod tests {
@@ -262,42 +227,6 @@ mod tests {
             }),
             seal: None,
         }
-    }
-
-    #[tokio::test]
-    async fn ghost_register_returns_pending() {
-        let sync = GhostRegistrySync;
-        let request = RegistrationRequest {
-            passport_id: PassportId::new(),
-            operator_identifier: "did:web:acme.example.com".into(),
-            facility_identifier: "FAC-001".into(),
-            facility: None,
-            product_category: "textile".into(),
-            data_carrier_uri: "https://id.example.com/01/09506000134352".into(),
-            schema_version: "1.0.0".into(),
-            jws_signature: None,
-            published_at: None,
-            country_code: String::new(),
-        };
-        let record = sync.register(request).await.unwrap();
-        assert_eq!(record.status, RegistryStatus::Pending);
-        assert!(record.identifiers.product_id.starts_with("GHOST-PROD-"));
-    }
-
-    #[tokio::test]
-    async fn ghost_check_status_returns_not_found() {
-        let sync = GhostRegistrySync;
-        let result = sync.check_status(PassportId::new()).await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn ghost_notify_transfer_returns_not_found() {
-        let sync = GhostRegistrySync;
-        let result = sync
-            .notify_transfer(PassportId::new(), "did:web:new-operator.example.com".into())
-            .await;
-        assert!(result.is_err());
     }
 
     #[test]

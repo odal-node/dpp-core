@@ -1,3 +1,9 @@
+//! [`VersionedSchemaRegistry`]: the compiled-schema cache and hot-reload store.
+//!
+//! Split out of `schemas::registry` (removed) so the type lives one level
+//! shallower — `schemas::VersionedSchemaRegistry` — with `mod.rs` re-exporting
+//! it as a pure index. See the crate CHANGELOG for the migration note.
+
 use semver::Version;
 
 use super::{SchemaEntry, SchemaOrigin, SchemaRegistrationError};
