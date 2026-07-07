@@ -1,5 +1,7 @@
 //! JSON-LD frame/strip round-trip tests.
 
+use serde_json::json;
+
 use super::*;
 
 #[test]

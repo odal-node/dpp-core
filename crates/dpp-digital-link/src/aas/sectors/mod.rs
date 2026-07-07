@@ -1,7 +1,21 @@
+//! Sector-specific AAS submodel builders, dispatched by [`dispatch::build_sector_submodel`].
+//!
+//! One file per sector (`battery`, `textile`, `electronics`, …) plus the five
+//! cross-sector builders below (`build_product_identification_submodel` and
+//! siblings), which every sector shares regardless of `passport.sector` and
+//! so are not sector files themselves.
+//!
+//! **Deviation, accepted:** the five shared builders keep their logic here
+//! rather than in their own files (rule 2 target would be a `common.rs`).
+//! `dispatch.rs` was extracted per the pack's F2 finding; the shared builders
+//! were left as they are not the dispatch logic that finding named. Revisit
+//! if this file grows past the sector-file count.
+
 mod aluminium;
 mod battery;
 mod construction;
 mod detergent;
+mod dispatch;
 mod electronics;
 mod furniture;
 mod steel;
@@ -10,67 +24,13 @@ mod toy;
 mod tyre;
 mod unsold_goods;
 
-use dpp_domain::{Passport, SectorData};
+use dpp_domain::Passport;
 
-use super::mapper::json_value_to_element;
 use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
 use crate::aas::property::{double_property, string_property};
 use crate::aas::semantic_ids;
 
-pub(super) fn build_sector_submodel(sector_data: &SectorData, passport_id: &str) -> AasSubmodel {
-    match sector_data {
-        SectorData::Battery(b) => battery::build_battery_submodel(b, passport_id),
-        SectorData::Textile(t) => textile::build_textile_submodel(t, passport_id),
-        SectorData::Electronics(e) => electronics::build_electronics_submodel(e, passport_id),
-        SectorData::Steel(d) => steel::build_steel_submodel(d, passport_id),
-        SectorData::Construction(d) => construction::build_construction_submodel(d, passport_id),
-        SectorData::Tyre(d) => tyre::build_tyre_submodel(d, passport_id),
-        SectorData::Toy(d) => toy::build_toy_submodel(d, passport_id),
-        SectorData::Aluminium(d) => aluminium::build_aluminium_submodel(d, passport_id),
-        SectorData::Furniture(d) => furniture::build_furniture_submodel(d, passport_id),
-        SectorData::Detergent(d) => detergent::build_detergent_submodel(d, passport_id),
-        SectorData::UnsoldGoods(r) => unsold_goods::build_unsold_goods_submodel(r, passport_id),
-        SectorData::Other(v) => {
-            let elements = match v {
-                serde_json::Value::Object(map) => map
-                    .iter()
-                    .filter(|(k, _)| k.as_str() != "sector")
-                    .map(|(k, v)| json_value_to_element(k, v))
-                    .collect(),
-                _ => vec![],
-            };
-            AasSubmodel {
-                id: format!("urn:odal-node:dpp:{passport_id}:sector-data"),
-                id_short: "SectorData".into(),
-                model_type: "Submodel".into(),
-                kind: "Instance".into(),
-                semantic_id: None,
-                submodel_elements: elements,
-            }
-        }
-        // Forward-compat: an unmodelled sector variant is rendered as a generic
-        // submodel from its serialised fields (same shape as `Other`).
-        other => {
-            let value = serde_json::to_value(other).unwrap_or(serde_json::Value::Null);
-            let elements = match value {
-                serde_json::Value::Object(map) => map
-                    .iter()
-                    .filter(|(k, _)| k.as_str() != "sector")
-                    .map(|(k, v)| json_value_to_element(k, v))
-                    .collect(),
-                _ => vec![],
-            };
-            AasSubmodel {
-                id: format!("urn:odal-node:dpp:{passport_id}:sector-data"),
-                id_short: "SectorData".into(),
-                model_type: "Submodel".into(),
-                kind: "Instance".into(),
-                semantic_id: None,
-                submodel_elements: elements,
-            }
-        }
-    }
-}
+pub(super) use dispatch::build_sector_submodel;
 
 pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasSubmodel {
     let mut elements = vec![
