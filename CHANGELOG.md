@@ -13,6 +13,58 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-06
+
+Internal re-layout of all 8 published crates: every `mod.rs` becomes a pure
+index (module docs + `pub use` + `mod` decls only), each public type/trait
+moves to its own file. Mechanically enforced going forward by a new CI
+tripwire (`dpp-tests::mod_rs_is_pure_index`). The split is path-transparent
+everywhere except the one entry below — `cargo public-api` confirms
+`dpp-engine` builds and passes its full test suite against this tree with
+**zero source changes** on the engine side.
+
+### Breaking
+- `dpp-domain::schemas::registry` is removed. The type it held,
+  `VersionedSchemaRegistry`, is renamed to live in `schemas::versioned`
+  (private module) and re-exported directly at `schemas::VersionedSchemaRegistry`
+  — one level shallower than before. *Migration:* replace
+  `dpp_domain::schemas::registry::VersionedSchemaRegistry` with
+  `dpp_domain::schemas::VersionedSchemaRegistry` (already the path used by
+  every internal and engine-side caller, so most consumers need no change).
+
+### Changed
+- `dpp-domain`: `passport`, `transfer`, `sector`, `validation`, and `catalog`
+  each split into one file per type. The three no-op ("ghost") port
+  implementations moved out of the port trait files into a private
+  `ports::ghosts` module, re-exported at each port's original path
+  (`ports::archive::GhostArchive`, `ports::registry_sync::GhostRegistrySync`,
+  `ports::seal::GhostSeal`) — no import changes for existing callers.
+- `dpp-crypto`: `keystore` split into `entry`/`store`; credential construction
+  moved to `identity::build_passport_credential`.
+- `dpp-digital-link`: `digital_link` split into `link`/`gtin`/`qr`; the AAS
+  sector dispatch extracted to `aas::sectors::dispatch`.
+- `dpp-rules`: the ruleset-bundle format and verification promoted to a
+  `bundle` module, gated behind a new `bundle` feature so the crate's
+  default (no-feature) build stays `no_std`.
+- `dpp-calc`: CO2e and repairability calculators extracted out of their
+  `mod.rs` files; repairability thresholds split into one file per concrete
+  ruleset (`smartphone`, `laptop`, `displays`, `washing_machine`).
+- `dpp-registry`: the single 915-line `registry.rs` split into a `registry/`
+  module, one file per concern.
+- `dpp-plugin-traits`: `lib.rs` split into `version`/`meta`/`result`/
+  `plugin`/`error`.
+- `dpp-plugin-sdk`: `lib.rs` split into `abi`/`codec`/`entry`.
+- Governance docs (`CLAUDE.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`,
+  `SECURITY.md`) consolidated from `docs/agent/`, `docs/governance/`, and
+  `docs/project/` to the repo root; the duplicate
+  `docs/governance/CHANGELOG.md` removed in favor of this file.
+
+### Added
+- `bundle_version: Option<String>` on `dpp-calc::CalculationReceipt`
+  (`with_bundle_version` builder) — the signed Compliance-Current bundle
+  version that delivered the ruleset, `None` for the built-in baseline
+  rulesets. Additive, non-breaking.
+
 ## [0.5.0] - 2026-07-04
 
 ### Breaking
@@ -93,4 +145,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 Initial publication to crates.io: `dpp-domain`, `dpp-crypto`,
 `dpp-digital-link`, `dpp-registry`, `dpp-rules`, `dpp-calc`,
-`dpp-plugin-traits`, `dpp-plugin-sdk`.
+`dpp-plugin-traits`, `dpp-plugin-sdk`. Built out from an empty workspace in
+one pass, crate by crate:
+
+- `dpp-domain`: domain types, `Passport`, sector data, catalog, port traits,
+  the transfer-of-responsibility model, versioned schema registry.
+- `dpp-crypto`: Ed25519 key management, JWS sign/verify, `did:web` builder,
+  verifiable credentials, access policy engine.
+- `dpp-digital-link`: GS1 Digital Link parser, link-type negotiation,
+  JSON-LD context, AAS mapping.
+- `dpp-rules`: ESPR cross-field regulatory rules (`no_std`).
+- `dpp-registry`: EU Central Registry interface bridge.
+- `dpp-plugin-traits` / `dpp-plugin-sdk`: the Wasm sector-plugin ABI contract
+  and guest-side SDK.
+- `dpp-tests`: cross-crate integration tests (textile end-to-end, transfer
+  of responsibility, access tiers, schema conformity).
+
+Alongside the publishable crates: Wasm sector plugins (`plugins/sector-*`,
+released as `.wasm` artefacts, not to crates.io), Criterion micro-benchmarks
+(`dpp-benches`, pinned outside lockstep versioning), and the initial
+architecture/governance/regulatory documentation set. Internal
+workspace-path dependencies versioned and a `LICENSE` bundled per crate
+ahead of the crates.io publish.
