@@ -1,6 +1,7 @@
 //! Golden-vector regression tests for the cradle-to-gate CO₂e calculator.
 
 use super::*;
+use crate::error::CalcError;
 use crate::ruleset::Ruleset; // for `.regulatory_basis()` on the concrete ruleset
 
 fn inputs() -> Co2eInputs {
