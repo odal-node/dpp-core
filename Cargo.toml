@@ -41,6 +41,17 @@ tag-message = "Release version {{version}}"
 # Shared dependency versions — crates inherit these with `workspace = true`
 # ---------------------------------------------------------------------------
 [workspace.dependencies]
+# Internal workspace crates — path for local builds (always wins inside this
+# workspace), version for what `cargo publish` embeds for external consumers.
+# One line per crate here instead of one per dependent Cargo.toml, so a
+# lockstep version bump is a single edit, not N.
+dpp-rules         = { path = "crates/dpp-rules", version = "0.7.0" }
+dpp-domain        = { path = "crates/dpp-domain", version = "0.7.0" }
+dpp-plugin-traits = { path = "crates/dpp-plugin-traits", version = "0.7.0" }
+dpp-crypto        = { path = "crates/dpp-crypto", version = "0.7.0" }
+dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.7.0" }
+dpp-evidence      = { path = "crates/dpp-evidence", version = "0.7.0" }
+
 # Serialisation
 serde        = { version = "1", features = ["derive"] }
 serde_json   = "1"

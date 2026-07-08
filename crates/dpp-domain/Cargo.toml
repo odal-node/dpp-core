@@ -12,7 +12,7 @@ homepage.workspace    = true
 rust-version.workspace = true
 
 [dependencies]
-dpp-rules   = { path = "../dpp-rules", version = "0.7.0" }
+dpp-rules   = { workspace = true }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
 serde_with  = { workspace = true }

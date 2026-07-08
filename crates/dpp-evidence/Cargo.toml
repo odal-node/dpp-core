@@ -16,7 +16,7 @@ name = "dpp_evidence"
 path = "src/lib.rs"
 
 [dependencies]
-dpp-domain    = { path = "../dpp-domain", version = "0.7.0" }
+dpp-domain    = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 serde_jcs     = { workspace = true }
