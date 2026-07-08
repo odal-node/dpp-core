@@ -1,0 +1,33 @@
+[package]
+name        = "dpp-evidence"
+description = "Evidence dossier format and offline verification for EU DPP — the proof surface of the Odal Node standard"
+keywords    = ["dpp", "espr", "verification", "offline", "audit-trail"]
+categories  = ["cryptography", "data-structures"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_evidence"
+path = "src/lib.rs"
+
+[dependencies]
+dpp-domain    = { path = "../dpp-domain", version = "0.7.0" }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+serde_jcs     = { workspace = true }
+chrono        = { workspace = true }
+base64        = { workspace = true }
+hex           = { workspace = true }
+sha2          = { workspace = true }
+ed25519-dalek = { workspace = true }
+thiserror     = { workspace = true }
+# v7+serde+js: v7 generates time-sortable UUIDs (audit entries are ordered);
+# js enables getrandom's JS backend so crypto.getRandomValues is used on
+# wasm32-unknown-unknown — same declaration as dpp-domain, and the reason this
+# crate stays wasm-safe despite `AuditEntry::new` generating an id.
+uuid          = { version = "1", features = ["v7", "serde", "js"] }

@@ -17,10 +17,12 @@ path = "src/lib.rs"
 # (domain + crypto + gs1), so they live in a dedicated member crate rather
 # than the virtual workspace root (where Cargo never compiled them).
 [dev-dependencies]
-dpp-domain = { path = "../dpp-domain" }
-dpp-crypto = { path = "../dpp-crypto" }
+dpp-domain   = { path = "../dpp-domain" }
+dpp-crypto   = { path = "../dpp-crypto" }
+dpp-evidence = { path = "../dpp-evidence" }
 dpp-digital-link    = { path = "../dpp-digital-link" }
 serde_json = { workspace = true }
 chrono     = { workspace = true }
 uuid       = { workspace = true }
 semver     = { workspace = true }
+base64     = { workspace = true }
