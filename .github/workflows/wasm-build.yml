@@ -20,7 +20,7 @@ jobs:
     name: WASM build — dpp-registry + dpp-domain + dpp-evidence
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain with wasm32 target
         uses: dtolnay/rust-toolchain@stable
@@ -47,7 +47,7 @@ jobs:
     name: WASM build — sector plugins
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain with wasm32-wasip1 target
         uses: dtolnay/rust-toolchain@stable
