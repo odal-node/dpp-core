@@ -20,7 +20,7 @@ No HTTP framework. No database. No async runtime (except where port traits requi
         ^            ^             ^
         |            |             | depends on
 +-------------------+ |   +---------------------+
-|    dpp-crypto     | |   |     dpp-registry      |
+|    dpp-crypto     | |   |     dpp-registry    |
 |  Ed25519, JWS,    | |   |  EU registry types  |
 |  DID builder,     | |   |    (wasm32-safe)    |
 | LocalIdentitySvc  | |   +---------------------+

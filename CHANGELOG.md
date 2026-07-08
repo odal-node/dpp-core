@@ -13,6 +13,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-07
+
+New crate **`dpp-evidence`** — the evidence dossier wire format and offline
+verification engine (`DossierV1`, `verify_dossier_json`). Deliberately free
+of BSL-licensed and wasm-unsafe dependencies.
+
+Audit trail wire type (`AuditEntry`) and its hash-chain algorithm
+(`chain_hash`/`verify_audit_chain`) promoted from `dpp-engine`'s
+`dpp-types` crate into `dpp-evidence::audit` — the shape is
+third-party-verifiable, making it part of the standard rather than engine
+plumbing (the `dpp-types` module doc had flagged this as a "core-candidate"
+since the hash-chain format was introduced). `dpp-types::audit` now
+re-exports the type and keeps only the engine-side `AuditRepository`
+persistence port.
+
+Every dossier-owned type now rejects unknown fields at deserialization
+(`deny_unknown_fields`), and `verify_dossier_json` adds a 9th check,
+`input_fidelity`, comparing canonical input bytes against the canonical
+bytes of what was actually parsed — this catches content silently dropped
+inside tolerant nested types (e.g. an unknown field inside a `dpp-domain`
+`TransferRecord`) that field-level strictness alone can't reach. See
+`dpp-evidence/spec/dossier-v1.md` for the full format specification.
+
+Golden cross-tests (`dpp-tests/tests/jws_cross_verification.rs`) now pin
+agreement between `dpp-crypto`'s JWS signer/verifier and `dpp-evidence`'s
+vendored copy across a sign/verify round trip, a full tamper matrix, and
+key-rotation resolution — the drift guard for the one deliberately
+duplicated piece of logic in the two crates.
+
+### Breaking
+- `IdentityPort` gains a new required method, `own_did_document(&self) ->
+  Result<serde_json::Value, DppError>` — fetches the implementor's own
+  current `did:web` document. *Migration:* every `IdentityPort`
+  implementation (production adapters and test doubles alike) must add this
+  method; `dpp-crypto::LocalIdentityService` and the HTTP client adapter in
+  `dpp-vault` both already do.
+- `AuditEntry::new`'s signature changes from taking `&AuthContext` to taking
+  a plain `actor: impl Into<String>` — the type moved to `dpp-evidence`,
+  which cannot depend on the engine-only `AuthContext`. *Migration:*
+  replace `AuditEntry::new(id, action, auth, prev, new)` with
+  `AuditEntry::new(id, action, &auth.user_id, prev, new)` at every call site.
+
 ## [0.6.0] - 2026-07-06
 
 Internal re-layout of all 8 published crates: every `mod.rs` becomes a pure
