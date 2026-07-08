@@ -36,7 +36,7 @@ pub struct VersionedSchemaRegistry {
     /// `&mut self` mutators evict the affected key.
     #[cfg(not(target_arch = "wasm32"))]
     compiled: std::sync::RwLock<
-        std::collections::HashMap<(String, Version), std::sync::Arc<jsonschema::JSONSchema>>,
+        std::collections::HashMap<(String, Version), std::sync::Arc<jsonschema::Validator>>,
     >,
 }
 
@@ -59,7 +59,7 @@ impl VersionedSchemaRegistry {
         let value: serde_json::Value = serde_json::from_str(json)
             .map_err(|e| SchemaRegistrationError::InvalidJson(e.to_string()))?;
         #[cfg(not(target_arch = "wasm32"))]
-        jsonschema::JSONSchema::compile(&value).map_err(|e| {
+        jsonschema::validator_for(&value).map_err(|e| {
             SchemaRegistrationError::InvalidJson(format!("schema does not compile: {e}"))
         })?;
         #[cfg(target_arch = "wasm32")]
@@ -306,18 +306,17 @@ impl VersionedSchemaRegistry {
                 }],
             })?;
 
-        // Edition 2024 drops the trailing-expression temporary (the borrowing
-        // error iterator) before `compiled`, so the match can be returned directly.
-        match compiled.validate(data) {
-            Ok(()) => Ok(()),
-            Err(errors) => Err(ValidationErrors {
-                errors: errors
-                    .map(|e| FieldError {
-                        field: e.instance_path.to_string(),
-                        message: e.to_string(),
-                    })
-                    .collect(),
-            }),
+        let errors: Vec<FieldError> = compiled
+            .iter_errors(data)
+            .map(|e| FieldError {
+                field: e.instance_path().to_string(),
+                message: e.to_string(),
+            })
+            .collect();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(ValidationErrors { errors })
         }
     }
 
@@ -328,7 +327,7 @@ impl VersionedSchemaRegistry {
         &self,
         sector: &str,
         version: &Version,
-    ) -> Option<std::sync::Arc<jsonschema::JSONSchema>> {
+    ) -> Option<std::sync::Arc<jsonschema::Validator>> {
         let key = (sector.to_owned(), version.clone());
         if let Some(cached) = self
             .compiled
@@ -344,7 +343,7 @@ impl VersionedSchemaRegistry {
         // a future broken schema returns None (→ "no schema found" error) rather
         // than panicking the process.
         let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-        let compiled = std::sync::Arc::new(jsonschema::JSONSchema::compile(&value).ok()?);
+        let compiled = std::sync::Arc::new(jsonschema::validator_for(&value).ok()?);
         self.compiled
             .write()
             .expect("schema cache not poisoned")
