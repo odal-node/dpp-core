@@ -95,6 +95,11 @@ impl IdentityPort for LocalIdentityService {
             .map_err(|e| DppError::Signing(e.to_string()))?;
         Ok(signed_payload == expected)
     }
+
+    async fn own_did_document(&self) -> Result<serde_json::Value, DppError> {
+        build_did_document(&self.store, &self.base_url, &self.key_id)
+            .map_err(|e| DppError::Signing(e.to_string()))
+    }
 }
 
 #[cfg(test)]
