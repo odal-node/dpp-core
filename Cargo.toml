@@ -57,7 +57,7 @@ serde        = { version = "1", features = ["derive"] }
 serde_json   = "1"
 serde_with   = "3"
 # RFC 8785 JSON Canonicalization Scheme (JCS) — the signing/content-binding contract
-serde_jcs    = "0.1"
+serde_jcs    = "0.2"
 # GZIP — decoding W3C Bitstring Status List `encodedList` (pure, no infra)
 flate2       = "1"
 
