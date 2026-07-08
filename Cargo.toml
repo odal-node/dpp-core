@@ -70,7 +70,7 @@ async-trait  = "0.1"
 # Identity & cryptography
 base64       = "0.22"
 hex          = "0.4"
-sha2         = "0.10"
+sha2         = "0.11"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 zeroize      = { version = "1", features = ["derive"] }
 aes-gcm      = "0.10"
