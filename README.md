@@ -19,7 +19,7 @@ Anyone building DPP tooling can use this library as the foundation. It is the st
 
 ## Why This Exists
 
-By 2027, every product sold in the EU requires a machine-readable Digital Product Passport. The first delegated acts for batteries and textiles are already in force. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
+EU law is switching on machine-readable Digital Product Passports sector by sector: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow in 2029, and the ESPR working plan queues textiles, steel and more behind them. The eight European system standards (EN 18216–18246) published in 2026. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
 
 **Odal is that infrastructure**: sovereign, standards-compliant, self-hostable. No vendor lock-in, no black-box algorithms, no enterprise-tier licensing.
 
@@ -49,6 +49,8 @@ dpp-core/
     dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
     dpp-registry ........ EU Central Registry interface types (wasm32-safe)
     dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
+    dpp-evidence ........ Evidence dossier wire format (DossierV1) + offline verification engine —
+                          deliberately free of BSL-licensed and wasm-unsafe dependencies (spec/)
     dpp-tests ........... Cross-crate integration tests (domain + crypto + gs1)
   plugins/ .............. 10 Wasm sector plugins (wasm32-wasip1, excluded from workspace)
 ```
@@ -59,13 +61,13 @@ dpp-core/
 
 | Regulation | Status | dpp-core Implementation |
 |---|---|---|
-| **ESPR** (EU 2024/1781) | In force | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), transfer-of-responsibility design (not a distinct ESPR article — see below) |
-| **Battery Regulation** (EU 2023/1542) | In force | `BatteryData` struct, Annex XIII fields, sector schema |
-| **Textile DPP Delegated Act** | Anticipated 2025-2026 | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics |
-| **JTC 24 Data Standard** | Draft (CEN/CENELEC) | Schema fields track latest published draft |
+| **ESPR** (EU 2024/1781) | In force; unsold-goods rules (Art. 24/25) apply since Jul 2026 | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), unsold-goods sector, transfer-of-responsibility design (not a distinct ESPR article — see below) |
+| **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, sector schema |
+| **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
+| **CEN/CLC JTC 24 system standards** | **Published 2026** (EN 18216–18246; OJEU harmonisation citation pending) | Conformance tracked clause-by-clause; identifiers, carriers, API and authentication semantics aligned |
 | **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
 | **IDTA AAS Metamodel** | Published | DPP-to-AAS SubmodelElement mapping |
-| **W3C VC Data Model v2.0** | CR | `DppAccessCredential` with role-based access tiers |
+| **W3C VC Data Model v2.0** | Published | `DppAccessCredential` with role-based access tiers |
 
 ---
 
@@ -92,6 +94,10 @@ When a product undergoes remanufacturing, repurposing, or preparation for reuse,
 - DID-identified economic operators with typed roles
 - Dual-signature transfer records (JWS from both parties)
 - Rejection of invalid transfers (wrong operator, duplicate pending)
+
+### Evidence Dossiers & Offline Verification
+
+`dpp-evidence` defines a self-contained, signed **evidence dossier** (`DossierV1`) — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical JSON file — plus the verification engine that checks all of it **fully offline**: no resolver, no network, no trust in Odal. An auditor, customs officer, or skeptical buyer runs the independent checks (manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) and gets a named verdict per check. The crate is deliberately free of BSL-licensed and wasm-unsafe dependencies. Wire format specification: [`crates/dpp-evidence/spec/dossier-v1.md`](crates/dpp-evidence/spec/dossier-v1.md).
 
 ### Schema Validation
 
@@ -163,15 +169,17 @@ No Docker, no database, no env vars.
 ### Runnable Examples
 
 ```bash
-cargo run --example create_passport           # Create & validate a textile DPP
-cargo run --example credential_and_transfer   # Issue a VC, transfer responsibility
-cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submodel
+cargo run -p dpp-domain --example create_passport                # Create & validate a textile DPP
+cargo run -p dpp-crypto --example credential_and_transfer        # Issue a VC, transfer responsibility
+cargo run -p dpp-digital-link --example gs1_and_aas              # Parse GS1 links, map to AAS submodel
 ```
 
 ---
 
 
 ## Documentation
+
+**Start with the guided index: [docs/README.md](docs/README.md)** — grouped by question, with a three-document reading path for newcomers.
 
 | Document | Description |
 |---|---|
@@ -182,6 +190,7 @@ cargo run --example gs1_and_aas              # Parse GS1 links, map to AAS submo
 | [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md) | Wasm plugin sandbox design and ABI contract |
 | [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
 | [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
+| [dossier-v1.md](crates/dpp-evidence/spec/dossier-v1.md) | Evidence dossier wire-format specification (offline verification) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
 | [GOVERNANCE.md](GOVERNANCE.md) | Decision-making structure and maintainer authority |
@@ -198,4 +207,4 @@ Do **not** open public issues for security vulnerabilities. Report privately to 
 
 ---
 
-*Built by [Odal Node](https://odal-node.io)
+*Built by [Odal Node](https://odal-node.io)*
