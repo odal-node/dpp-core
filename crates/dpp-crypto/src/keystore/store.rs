@@ -6,11 +6,11 @@ use std::sync::RwLock;
 
 use aes_gcm::{
     Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit, consts::U12},
 };
 use anyhow::{Context, Result};
 use ed25519_dalek::SigningKey;
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
@@ -180,7 +180,7 @@ impl KeyStore {
 
                 // Generate a new salt for the eventual migration.
                 let mut salt = [0u8; ARGON2_SALT_LEN];
-                OsRng.fill_bytes(&mut salt);
+                crate::os_rng().fill_bytes(&mut salt);
 
                 // Integrity key will be derived properly after migration.
                 let integrity_key = derive_integrity_key(passphrase, &salt)?;
@@ -197,7 +197,7 @@ impl KeyStore {
         } else {
             // Brand new store — generate a fresh salt.
             let mut salt = [0u8; ARGON2_SALT_LEN];
-            OsRng.fill_bytes(&mut salt);
+            crate::os_rng().fill_bytes(&mut salt);
             let cipher_key = derive_aes_key_argon2(passphrase, &salt)?;
             let cipher = Aes256Gcm::new(&cipher_key);
             let integrity_key = derive_integrity_key(passphrase, &salt)?;
@@ -220,14 +220,14 @@ impl KeyStore {
                  call migrate_if_needed() first"
             );
         }
-        let signing_key = SigningKey::generate(&mut OsRng);
+        let signing_key = SigningKey::generate(&mut crate::os_rng());
         let verifying_key = signing_key.verifying_key();
         let fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
         let verifying_key_hex = hex::encode(verifying_key.as_bytes());
 
         let mut nonce_bytes = [0u8; 12];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        crate::os_rng().fill_bytes(&mut nonce_bytes);
+        let nonce = <&Nonce<U12>>::from(&nonce_bytes);
 
         let mut raw = signing_key.to_bytes();
         let encrypted = self
@@ -298,7 +298,8 @@ impl KeyStore {
     }
 
     fn decrypt_record(&self, record: &KeyRecord) -> Result<KeyEntry> {
-        let nonce = Nonce::from_slice(&record.nonce);
+        let nonce =
+            <&Nonce<U12>>::try_from(record.nonce.as_slice()).expect("nonce must be 12 bytes");
         let mut raw = self
             .cipher
             .decrypt(nonce, record.encrypted_signing_key.as_ref())

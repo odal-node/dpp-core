@@ -7,7 +7,7 @@
 use aes_gcm::{Aes256Gcm, Key};
 use anyhow::{Context, Result};
 use argon2::Argon2;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
@@ -31,7 +31,7 @@ pub(crate) fn derive_aes_key_argon2(passphrase: &str, salt: &[u8]) -> Result<Key
         .hash_password_into(passphrase.as_bytes(), salt, &mut key_bytes)
         .map_err(|e| anyhow::anyhow!("Argon2id key derivation failed: {e}"))?;
 
-    let key = *Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let key = Key::<Aes256Gcm>::from(key_bytes);
     key_bytes.zeroize();
     Ok(key)
 }
@@ -40,7 +40,7 @@ pub(crate) fn derive_aes_key_argon2(passphrase: &str, salt: &[u8]) -> Result<Key
 /// Only used for reading pre-0.1.0 key stores.
 pub(crate) fn derive_aes_key_sha256(passphrase: &str) -> Key<Aes256Gcm> {
     let digest = Sha256::digest(passphrase.as_bytes());
-    *Key::<Aes256Gcm>::from_slice(&digest)
+    Key::<Aes256Gcm>::try_from(digest.as_slice()).expect("SHA-256 digest is 32 bytes")
 }
 
 /// Derive a 32-byte integrity key for HMAC-SHA256 file integrity checks.
@@ -136,7 +136,7 @@ fn envelope_mac(
     );
 
     let canonical = serde_json::to_vec(&outer).context("Failed to serialise envelope for HMAC")?;
-    let mut mac = <HmacSha256 as Mac>::new_from_slice(integrity_key)
+    let mut mac = <HmacSha256 as KeyInit>::new_from_slice(integrity_key)
         .expect("HMAC key length is always valid");
     mac.update(&canonical);
     Ok(mac)

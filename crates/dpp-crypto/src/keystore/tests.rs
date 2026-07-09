@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use aes_gcm::{
     Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit, consts::U12},
 };
 use ed25519_dalek::SigningKey;
-use rand::RngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
@@ -94,13 +94,13 @@ fn legacy_sha256_store_can_be_opened_and_migrated() {
     let legacy_key = derive_aes_key_sha256(passphrase);
     let cipher = Aes256Gcm::new(&legacy_key);
 
-    let signing_key = SigningKey::generate(&mut OsRng);
+    let signing_key = SigningKey::generate(&mut crate::os_rng());
     let verifying_key = signing_key.verifying_key();
     let fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
 
     let mut nonce_bytes = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    crate::os_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = <&Nonce<U12>>::from(&nonce_bytes);
     let mut raw = signing_key.to_bytes();
     let encrypted = cipher.encrypt(nonce, raw.as_ref()).expect("encrypt");
     raw.zeroize();

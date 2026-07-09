@@ -120,7 +120,7 @@ fn pub_key_b64(signing_key: &SigningKey) -> String {
 
 #[test]
 fn valid_jws_verifies() {
-    let key = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test", "status": "published"});
     let jws = make_jws(&key, &payload);
     assert!(super::verifier::verify_jws(&jws, &pub_key_b64(&key)).unwrap());
@@ -128,7 +128,7 @@ fn valid_jws_verifies() {
 
 #[test]
 fn tampered_signature_fails() {
-    let key = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test"});
     let mut jws = make_jws(&key, &payload);
     let last = jws.pop().unwrap();
@@ -144,8 +144,8 @@ fn tampered_signature_fails() {
 
 #[test]
 fn wrong_key_fails() {
-    let key1 = SigningKey::generate(&mut rand::rngs::OsRng);
-    let key2 = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key1 = SigningKey::generate(&mut crate::os_rng());
+    let key2 = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test"});
     let jws = make_jws(&key1, &payload);
     assert!(!super::verifier::verify_jws(&jws, &pub_key_b64(&key2)).unwrap());
@@ -154,7 +154,7 @@ fn wrong_key_fails() {
 /// Regression (red-team ATK-4): the header `alg` is pinned to EdDSA.
 #[test]
 fn non_eddsa_alg_is_rejected() {
-    let key = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key = SigningKey::generate(&mut crate::os_rng());
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let payload_b64 = b64.encode(serde_json::to_vec(&json!({"id": "x"})).unwrap());
     for alg in ["none", "HS256", "RS256", "ES256"] {
@@ -229,7 +229,7 @@ fn key_not_in_assertion_method_is_rejected() {
 
 #[test]
 fn extract_kid_returns_kid_when_present() {
-    let key = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key = SigningKey::generate(&mut crate::os_rng());
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let payload = json!({"test": 1});
     let payload_b64 = b64.encode(serde_json::to_vec(&payload).unwrap());
@@ -246,7 +246,7 @@ fn extract_kid_returns_kid_when_present() {
 
 #[test]
 fn extract_kid_returns_none_when_absent() {
-    let key = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"test": 1});
     let jws = make_jws(&key, &payload);
     assert_eq!(super::verifier::extract_kid_from_jws(&jws), None);
@@ -254,8 +254,8 @@ fn extract_kid_returns_none_when_absent() {
 
 #[test]
 fn extract_key_by_fingerprint_finds_archived_key() {
-    let key1 = SigningKey::generate(&mut rand::rngs::OsRng);
-    let key2 = SigningKey::generate(&mut rand::rngs::OsRng);
+    let key1 = SigningKey::generate(&mut crate::os_rng());
+    let key2 = SigningKey::generate(&mut crate::os_rng());
 
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let key1_x = b64.encode(key1.verifying_key().as_bytes());

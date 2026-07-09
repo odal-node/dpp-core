@@ -1,9 +1,9 @@
 use aes_gcm::{
     Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit, consts::U12},
 };
 use anyhow::{Context, Result};
-use rand::RngCore;
+use rand::Rng;
 use zeroize::Zeroize;
 
 use super::crypto::derive_aes_key_argon2;
@@ -50,7 +50,8 @@ impl KeyStore {
 
         for (id, record) in map.iter() {
             // Decrypt with legacy cipher.
-            let nonce = Nonce::from_slice(&record.nonce);
+            let nonce =
+                <&Nonce<U12>>::try_from(record.nonce.as_slice()).expect("nonce must be 12 bytes");
             let mut raw = self
                 .cipher
                 .decrypt(nonce, record.encrypted_signing_key.as_ref())
@@ -60,8 +61,8 @@ impl KeyStore {
 
             // Re-encrypt with new cipher + fresh nonce.
             let mut nonce_bytes = [0u8; 12];
-            OsRng.fill_bytes(&mut nonce_bytes);
-            let new_nonce = Nonce::from_slice(&nonce_bytes);
+            crate::os_rng().fill_bytes(&mut nonce_bytes);
+            let new_nonce = <&Nonce<U12>>::from(&nonce_bytes);
             let encrypted = new_cipher
                 .encrypt(new_nonce, raw.as_ref())
                 .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed during migration"))?;

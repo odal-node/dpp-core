@@ -9,6 +9,14 @@ pub mod identity;
 pub mod jws;
 pub mod keystore;
 
+/// Infallible OS randomness source, used for Ed25519 key generation and
+/// AES-GCM nonce/salt generation. `SysRng` is fallible (`TryCryptoRng`);
+/// `UnwrapErr` panics on the (practically unreachable) OS-entropy-source
+/// failure instead of threading a `Result` through every call site.
+pub(crate) fn os_rng() -> rand::rand_core::UnwrapErr<rand::rngs::SysRng> {
+    rand::rand_core::UnwrapErr(rand::rngs::SysRng)
+}
+
 // ── Flat re-exports — maintain stable paths for external callers ─────────────
 
 pub use access::{
