@@ -293,6 +293,38 @@ fn misordered_qualifiers_rejected() {
     ));
 }
 
+#[test]
+fn trailing_unpaired_ai_rejected() {
+    // AI 21 with no following value must error, not silently drop the serial.
+    let uri = "https://id.odal-node.io/01/09506000134352/21";
+    assert!(matches!(
+        DigitalLink::parse(uri),
+        Err(DigitalLinkError::TrailingUnpairedSegment(_))
+    ));
+}
+
+#[test]
+fn duplicate_primary_key_rejected() {
+    // A second '01' segment must not overwrite the GTIN from the first.
+    let uri = "https://id.odal-node.io/01/09506000134352/21/SN1/01/00000000000001";
+    assert!(matches!(
+        DigitalLink::parse(uri),
+        Err(DigitalLinkError::DuplicatePrimaryKey)
+    ));
+}
+
+#[test]
+fn oversized_ai_value_rejected() {
+    // AI 21 (serial) has a GS1 max length of 20; a 21-char value must error.
+    let long_serial = "X".repeat(21);
+    let uri = format!("https://id.odal-node.io/01/09506000134352/21/{long_serial}");
+    assert!(matches!(
+        DigitalLink::parse(&uri),
+        Err(DigitalLinkError::ValueTooLong { code, max_len, actual })
+            if code == "21" && max_len == 20 && actual == 21
+    ));
+}
+
 // ── 3.4a: percent-encode / decode ────────────────────────────
 
 #[test]

@@ -1,8 +1,8 @@
 [package]
 name        = "dpp-plugin-traits"
-description = "Host/guest contract for Odal Node Wasm sector plugins — no_std compatible"
+description = "Host/guest contract for Odal Node Wasm sector plugins"
 keywords    = ["dpp", "wasm", "plugin", "sector", "compliance"]
-categories  = ["wasm", "no-std::no-alloc"]
+categories  = ["wasm"]
 version.workspace     = true
 edition.workspace     = true
 authors.workspace     = true

@@ -18,6 +18,7 @@
 //! country-specific grid factors, allocation rules) refines those factors and is
 //! gated on a signed data license (`real-factors` feature).
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::parameters::Co2eInputs;
@@ -80,6 +81,12 @@ pub struct Co2eResult {
 pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eResult, CalcError> {
     validate_inputs(inputs)?;
 
+    // A signed, dated receipt must never be computed from a ruleset that is not
+    // legally in force today (crate-wide invariant; see repairability::calculate).
+    ruleset
+        .effective_dates()
+        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
+
     let material_breakdown: Vec<MaterialLineResult> = inputs
         .materials
         .iter()
@@ -93,6 +100,16 @@ pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eR
     let material_co2e_kg: f64 = material_breakdown.iter().map(|l| l.co2e_kg).sum();
     let energy_co2e_kg = inputs.energy_kwh * inputs.grid_factor_kg_co2e_per_kwh;
     let total_co2e_kg = material_co2e_kg + energy_co2e_kg;
+
+    // Individually-valid inputs can still multiply/sum past f64's range (e.g.
+    // 1e200 × 1e200 = Infinity). Silent overflow into a legally cited figure is
+    // worse than silent clamping — reject it.
+    if !material_co2e_kg.is_finite() || !energy_co2e_kg.is_finite() || !total_co2e_kg.is_finite() {
+        return Err(CalcError::Overflow(format!(
+            "CO2e overflowed to a non-finite value \
+             (material={material_co2e_kg}, energy={energy_co2e_kg}, total={total_co2e_kg})"
+        )));
+    }
 
     // Hash outputs before building the result (avoids chicken-and-egg with receipt).
     let output_hash = jcs_hash(&(total_co2e_kg, material_co2e_kg, energy_co2e_kg))?;
@@ -149,12 +166,77 @@ mod tests {
     use super::*;
     use crate::co2e::parameters::MaterialFootprint;
     use crate::co2e::thresholds::CradleToGateRuleset;
+    use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+    use chrono::NaiveDate;
+    use std::sync::OnceLock;
 
     fn material(mass: f64, factor: f64) -> MaterialFootprint {
         MaterialFootprint {
             mass_kg: mass,
             emission_factor_kg_co2e_per_kg: factor,
         }
+    }
+
+    /// A CO₂e ruleset whose effective period starts in 2100 — not yet in force.
+    struct FutureCo2eRuleset;
+    static FUT_ID: OnceLock<RulesetId> = OnceLock::new();
+    static FUT_VER: OnceLock<RulesetVersion> = OnceLock::new();
+    static FUT_DATES: OnceLock<EffectiveDateBound> = OnceLock::new();
+    static FUT_BASIS: RegulatoryBasis = RegulatoryBasis {
+        regulation: "test",
+        article: "test",
+        standard: None,
+        technical_study: None,
+        source_url: None,
+        superseded_by: None,
+    };
+    impl Ruleset for FutureCo2eRuleset {
+        fn id(&self) -> &RulesetId {
+            FUT_ID.get_or_init(|| RulesetId("co2e-future".into()))
+        }
+        fn version(&self) -> &RulesetVersion {
+            FUT_VER.get_or_init(|| RulesetVersion("1.0.0".into()))
+        }
+        fn effective_dates(&self) -> &EffectiveDateBound {
+            FUT_DATES.get_or_init(|| {
+                EffectiveDateBound::open(NaiveDate::from_ymd_opt(2100, 1, 1).unwrap())
+            })
+        }
+        fn regulatory_basis(&self) -> &RegulatoryBasis {
+            &FUT_BASIS
+        }
+    }
+    impl Co2eRuleset for FutureCo2eRuleset {
+        fn declared_stages(&self) -> &[LifecycleStage] {
+            &[]
+        }
+    }
+
+    #[test]
+    fn rejects_ruleset_not_yet_in_force() {
+        let inputs = Co2eInputs {
+            materials: vec![material(1.0, 2.0)],
+            energy_kwh: 1.0,
+            grid_factor_kg_co2e_per_kwh: 0.4,
+        };
+        assert!(matches!(
+            calculate(&inputs, &FutureCo2eRuleset),
+            Err(CalcError::RulesetNotYetEffective { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_overflow_to_non_finite() {
+        // Each input is finite and in range, but the product overflows f64.
+        let inputs = Co2eInputs {
+            materials: vec![material(1e200, 1e200)],
+            energy_kwh: 0.0,
+            grid_factor_kg_co2e_per_kwh: 0.0,
+        };
+        assert!(matches!(
+            calculate(&inputs, &CradleToGateRuleset),
+            Err(CalcError::Overflow(_))
+        ));
     }
 
     #[test]

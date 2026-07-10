@@ -45,12 +45,17 @@ impl RegistrationPayload {
     /// (GTIN checksum, invalid country codes) before a network round-trip.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
         self.product_id.validate()?;
+        self.item_id.validate()?;
         self.facility_id.validate()?;
         self.operator_id.validate()?;
-        if self.digital_link_url.is_empty() {
-            return Err(RegistryValidationError::MissingRequiredField(
-                "digitalLinkUrl".into(),
-            ));
+        for (name, value) in [
+            ("sector", &self.sector),
+            ("schemaVersion", &self.schema_version),
+            ("digitalLinkUrl", &self.digital_link_url),
+        ] {
+            if value.is_empty() {
+                return Err(RegistryValidationError::MissingRequiredField(name.into()));
+            }
         }
         Ok(())
     }

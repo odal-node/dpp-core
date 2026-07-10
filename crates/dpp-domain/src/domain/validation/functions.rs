@@ -30,6 +30,12 @@ fn default_catalog() -> &'static SectorCatalog {
 /// Validate `sector_data` against the appropriate JSON Schema and any
 /// sector-specific cross-field rules (e.g. fibre composition sum).
 ///
+/// The JSON-Schema step resolves against the crate's **embedded** schema
+/// registry and catalog (built once at first use). Schemas registered at
+/// runtime into a separate [`VersionedSchemaRegistry`] are not visible here —
+/// validate those through that registry directly (its fail-closed
+/// `validate_strict`).
+///
 /// `SectorData::Other` is a **hard error** here — pass a
 /// [`SectorValidatorRegistry`] via [`validate_sector_data_with_registry`] to
 /// handle runtime-registered sectors.
@@ -100,11 +106,22 @@ pub fn validate_raw_sector_data(
     let catalog = default_catalog();
     let has_schema = catalog.current_schema_version(sector_key).is_some();
 
-    if let Some(version_str) = catalog.current_schema_version(sector_key)
-        && let Ok(version) = version_str.parse::<semver::Version>()
-        && let Err(ve) = default_registry().validate(sector_key, &version, data)
-    {
-        errors.extend(ve.errors);
+    if let Some(version_str) = catalog.current_schema_version(sector_key) {
+        match version_str.parse::<semver::Version>() {
+            Ok(version) => {
+                if let Err(ve) = default_registry().validate(sector_key, &version, data) {
+                    errors.extend(ve.errors);
+                }
+            }
+            // Fail closed: a registered sector with an unparseable current
+            // version must not silently skip schema validation.
+            Err(_) => errors.push(FieldError {
+                field: "/schemaVersion".to_owned(),
+                message: format!(
+                    "sector '{sector_key}' has an invalid current schema version '{version_str}'"
+                ),
+            }),
+        }
     }
 
     match registry.get(sector_key) {
@@ -138,8 +155,19 @@ fn schema_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
     let Some(version_str) = default_catalog().current_schema_version(key) else {
         return;
     };
-    let Ok(version) = version_str.parse::<Version>() else {
-        return;
+    // A catalog entry whose current version won't parse is a misconfiguration,
+    // not a reason to skip validation — surface it rather than fail open.
+    let version = match version_str.parse::<Version>() {
+        Ok(v) => v,
+        Err(_) => {
+            errors.push(FieldError {
+                field: "/schemaVersion".to_owned(),
+                message: format!(
+                    "sector '{key}' has an invalid current schema version '{version_str}'"
+                ),
+            });
+            return;
+        }
     };
     let instance = sector_data_instance(sector_data);
     if let Err(ve) = default_registry().validate(key, &version, &instance) {

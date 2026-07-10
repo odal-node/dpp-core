@@ -6,11 +6,11 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    METRIC_REPAIRABILITY_INDEX, PluginCapabilities, PluginCapability, PluginComplianceStatus,
     PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
 };
-use dpp_plugin_sdk::validate::{num, Validator};
+use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -54,6 +54,8 @@ impl DppSectorPlugin for FurniturePlugin {
             .require_str("primaryMaterial")
             .require_country("countryOfManufacture")
             .optional_pct("recycledContentPct")
+            .optional_non_negative("co2ePerUnitKg")
+            .optional_range("repairabilityScore", 0.0, 10.0)
             .finish()
     }
 
@@ -62,7 +64,10 @@ impl DppSectorPlugin for FurniturePlugin {
         Ok(PluginResult::new(PluginComplianceStatus::NotAssessed)
             .maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerUnitKg"))
             .maybe_metric(METRIC_REPAIRABILITY_INDEX, num(input, "repairabilityScore"))
-            .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, num(input, "recycledContentPct")))
+            .maybe_metric(
+                METRIC_RECYCLED_CONTENT_PCT,
+                num(input, "recycledContentPct"),
+            ))
     }
 
     fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
@@ -101,6 +106,17 @@ mod tests {
     fn invalid_country_fails() {
         let mut d = valid();
         d["countryOfManufacture"] = json!("Sweden");
+        assert!(FurniturePlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn negative_metrics_are_rejected() {
+        let mut d = valid();
+        d["co2ePerUnitKg"] = json!(-999.0);
+        assert!(FurniturePlugin.validate_input(&d).is_err());
+
+        let mut d = valid();
+        d["repairabilityScore"] = json!(-1.0);
         assert!(FurniturePlugin.validate_input(&d).is_err());
     }
 }

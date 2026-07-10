@@ -235,6 +235,30 @@ fn validate_invalid_semver() {
 }
 
 #[test]
+fn validate_rejects_vacuous_semver() {
+    // ".5.0" (empty major) and "1.0.abc" (non-numeric patch) previously slipped
+    // past the hand-rolled digit check and then silently skipped schema
+    // validation downstream.
+    for bad in [".5.0", "1.0.abc", "1.0", "1"] {
+        let mut p = make_passport();
+        p.schema_version = bad.to_owned();
+        let err = p.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("schema_version"),
+            "schema_version '{bad}' should be rejected, got: {err}"
+        );
+    }
+
+    // Pre-release / build metadata are still valid semver and must be accepted.
+    let mut p = make_passport();
+    p.schema_version = "1.0.0-alpha".to_owned();
+    assert!(
+        p.validate().is_ok(),
+        "pre-release semver should be accepted"
+    );
+}
+
+#[test]
 fn validate_negative_co2e() {
     let mut p = make_passport();
     p.co2e_per_unit = Some(CarbonFootprint::from_kg(-1.0));
@@ -551,4 +575,32 @@ fn redact_no_sector_data_leaves_passport_fields() {
     let view = p.redact(AccessTier::Public, &catalog).into_value();
     assert!(view.get("productName").is_some());
     assert!(view.get("sectorData").is_none());
+}
+
+#[test]
+fn redact_unknown_sector_withholds_sector_data_below_confidential() {
+    let catalog = crate::catalog::SectorCatalog::new();
+    let mut p = make_passport();
+    // `Other` maps to catalog key "other", which is absent from the embedded
+    // catalog — so there are no per-field access tiers to redact against.
+    p.sector = Sector::Other;
+    p.sector_data = Some(SectorData::Other(
+        serde_json::json!({ "secretField": "leak-me" }),
+    ));
+
+    // Public: no descriptor → withhold sector data entirely (fail closed).
+    let public = p.redact(AccessTier::Public, &catalog).into_value();
+    assert!(
+        public["sectorData"].is_null(),
+        "unknown-sector data must be withheld below Confidential, got: {}",
+        public["sectorData"]
+    );
+    assert!(
+        !public.to_string().contains("leak-me"),
+        "confidential sector field leaked to a Public viewer"
+    );
+
+    // Confidential: sees every field anyway → full data.
+    let conf = p.redact(AccessTier::Confidential, &catalog).into_value();
+    assert_eq!(conf["sectorData"]["secretField"], "leak-me");
 }

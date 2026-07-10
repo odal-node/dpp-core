@@ -16,15 +16,16 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::rules::batteries::recycled_content::{
-    annex_x_shortfalls_2031, chemistry_regulated_metals, RecycledContentInput,
+    RecycledContentInput, annex_x_shortfalls_2031, chemistry_regulated_metals,
+    recycled_content_chemistry_conflicts,
 };
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginFinding, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginFinding,
+    PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, Validator};
-use serde_json::{json, Value};
+use dpp_plugin_sdk::validate::{Validator, num};
+use serde_json::{Value, json};
 
 #[derive(Default)]
 struct BatteryPlugin;
@@ -106,12 +107,6 @@ impl DppSectorPlugin for BatteryPlugin {
             Some(declared.iter().sum::<f64>() / declared.len() as f64)
         };
 
-        // Recycled-content target check (EU 2023/1542 Art. 8 + Annex X). The
-        // Phase-1 minima are not binding until 18 Aug 2031, so shortfalls are
-        // surfaced as **advisory warnings**, never blocking violations. We scope
-        // the check to the metals the declared chemistry actually contains (an
-        // LFP cell has no cobalt/nickel) and skip portable batteries, which are
-        // out of Annex X scope.
         let chemistry = input
             .get("batteryChemistry")
             .and_then(Value::as_str)
@@ -121,9 +116,51 @@ impl DppSectorPlugin for BatteryPlugin {
             .and_then(Value::as_str)
             .unwrap_or("");
         let regulated = chemistry_regulated_metals(chemistry);
+        // Energy capacity for the Phase-1 ">2 kWh" scoping threshold: the rated
+        // value if given, else nominal V × Ah (both required, so always known).
+        let capacity_kwh = num(input, "ratedCapacityKwh").or_else(|| {
+            match (
+                num(input, "nominalVoltageV"),
+                num(input, "nominalCapacityAh"),
+            ) {
+                (Some(v), Some(ah)) => Some(v * ah / 1000.0),
+                _ => None,
+            }
+        });
 
         let mut warnings: Vec<PluginFinding> = Vec::new();
-        if !battery_type.eq_ignore_ascii_case("portable") {
+
+        // Data integrity: recycled content declared for a metal the chemistry
+        // does not contain (e.g. cobalt on an LFP cell) is a contradiction —
+        // surface it as an advisory rather than folding it into the mean silently.
+        for metal in recycled_content_chemistry_conflicts(chemistry, cobalt, lithium, nickel, lead)
+        {
+            let field = match metal {
+                "cobalt" => "/recycledContentCobaltPct",
+                "lithium" => "/recycledContentLithiumPct",
+                "nickel" => "/recycledContentNickelPct",
+                "lead" => "/recycledContentLeadPct",
+                _ => "",
+            };
+            warnings.push(PluginFinding::new(
+                format!("battery.recycled_content.{metal}_not_in_chemistry"),
+                field,
+                format!(
+                    "Declared {metal} recycled content, but a {chemistry} battery contains \
+                     no {metal} — check the declaration."
+                ),
+            ));
+        }
+
+        // Recycled-content target check (EU 2023/1542 Art. 8 + Annex X). Phase-1
+        // (from 18 Aug 2031) covers EV, SLI, and industrial batteries > 2 kWh;
+        // portable and LMT batteries are out of Phase-1 scope (LMT joins Phase 2
+        // in 2036). Applying the Phase-1 minima to an out-of-scope battery would
+        // surface a factually wrong "below minimum" advisory. The minima are not
+        // binding yet, so in-scope shortfalls are advisory warnings, never
+        // blocking violations, and are scoped to the metals the declared
+        // chemistry actually contains (an LFP cell has no cobalt/nickel).
+        if phase1_in_scope(battery_type, capacity_kwh) {
             let scoped = RecycledContentInput {
                 cobalt_pct: if regulated.cobalt { cobalt } else { None },
                 lithium_pct: if regulated.lithium { lithium } else { None },
@@ -190,7 +227,9 @@ impl DppSectorPlugin for BatteryPlugin {
                 "carbonFootprintClass": input.get("carbonFootprintClass"),
                 "batteryType": input.get("batteryType"),
             }));
-        Ok(warnings.into_iter().fold(result, PluginResult::with_warning))
+        Ok(warnings
+            .into_iter()
+            .fold(result, PluginResult::with_warning))
     }
 
     fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
@@ -198,6 +237,19 @@ impl DppSectorPlugin for BatteryPlugin {
         // normalisation is required by the schema today.
         self.validate_input(input)?;
         Ok(input.clone())
+    }
+}
+
+/// Whether a battery is within EU 2023/1542 Annex X **Phase-1** scope (from
+/// 18 Aug 2031): EV, SLI, and industrial batteries with capacity > 2 kWh.
+/// Portable and LMT (light means of transport) batteries are excluded — LMT
+/// joins only in Phase 2 (2036). An unknown/absent `battery_type` is treated as
+/// in-scope, so a mislabelled in-scope battery is not silently skipped.
+fn phase1_in_scope(battery_type: &str, capacity_kwh: Option<f64>) -> bool {
+    match battery_type.to_ascii_lowercase().as_str() {
+        "portable" | "lmt" => false,
+        "industrial" => capacity_kwh.is_some_and(|k| k > 2.0),
+        _ => true,
     }
 }
 
@@ -247,9 +299,10 @@ mod tests {
         let err = BatteryPlugin.validate_input(&data).unwrap_err();
         match err {
             PluginError::ValidationErrors(errs) => {
-                assert!(errs
-                    .iter()
-                    .any(|e| e.field == "/gtin" && e.code == "missing"));
+                assert!(
+                    errs.iter()
+                        .any(|e| e.field == "/gtin" && e.code == "missing")
+                );
             }
             other => panic!("expected ValidationErrors, got {other:?}"),
         }
@@ -282,7 +335,10 @@ mod tests {
     fn metrics_surface_all_declared_metals() {
         let result = BatteryPlugin.calculate_metrics(&valid_battery()).unwrap();
         assert_eq!(result.co2e_score(), Some(85.4));
-        assert_eq!(result.compliance_status, PluginComplianceStatus::NotAssessed);
+        assert_eq!(
+            result.compliance_status,
+            PluginComplianceStatus::NotAssessed
+        );
         // mean of cobalt(16) + lithium(6) = 11
         assert_eq!(result.recycled_content_pct(), Some(11.0));
         let extra = result.extra.unwrap();
@@ -319,7 +375,10 @@ mod tests {
             "recycledContentLithiumPct": 6.0  // >= 6 ok
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
-        assert_eq!(result.compliance_status, PluginComplianceStatus::NotAssessed);
+        assert_eq!(
+            result.compliance_status,
+            PluginComplianceStatus::NotAssessed
+        );
         // Not-in-force threshold ⇒ advisory only, never blocking.
         assert!(result.violations.is_empty());
         assert!(
@@ -408,5 +467,103 @@ mod tests {
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
         assert!(result.warnings.is_empty(), "got: {:?}", result.warnings);
+    }
+
+    #[test]
+    fn lmt_battery_below_target_gets_no_phase1_advisory() {
+        // LMT (e-bike/e-scooter) batteries are out of Phase-1 scope (Phase 2
+        // only, 2036), so a below-2031-target declaration must not be flagged.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "batteryType": "lmt",
+            "nominalVoltageV": 36.0,
+            "nominalCapacityAh": 10.0,
+            "expectedLifetimeCycles": 800,
+            "co2ePerUnitKg": 12.0,
+            "recycledContentCobaltPct": 5.0 // < 16, but LMT is out of scope
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code.contains("below_2031")),
+            "LMT must not get a Phase-1 shortfall advisory; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn small_industrial_below_target_gets_no_phase1_advisory() {
+        // Industrial batteries ≤ 2 kWh are out of Phase-1 scope.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "batteryType": "industrial",
+            "nominalVoltageV": 12.0,
+            "nominalCapacityAh": 100.0, // 1.2 kWh ≤ 2 kWh
+            "expectedLifetimeCycles": 1000,
+            "co2ePerUnitKg": 20.0,
+            "recycledContentCobaltPct": 5.0 // < 16, but ≤ 2 kWh is out of scope
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code.contains("below_2031")),
+            "≤2 kWh industrial must not get a Phase-1 shortfall advisory; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn large_industrial_below_target_gets_phase1_advisory() {
+        // > 2 kWh industrial IS in Phase-1 scope.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "batteryType": "industrial",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0, // 4.8 kWh > 2 kWh
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "recycledContentCobaltPct": 5.0 // < 16
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code.contains("cobalt_below_2031")),
+            "in-scope industrial shortfall must be flagged; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn cobalt_declared_on_lfp_emits_chemistry_conflict_advisory() {
+        // LFP contains no cobalt; a positive cobalt declaration is a data
+        // contradiction that must be surfaced, not silently accepted.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "LFP",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 45.2,
+            "recycledContentCobaltPct": 8.0,
+            "recycledContentLithiumPct": 12.0
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.cobalt_not_in_chemistry"),
+            "cobalt-on-LFP must emit a chemistry-conflict advisory; got: {:?}",
+            result.warnings
+        );
     }
 }

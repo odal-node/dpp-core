@@ -11,11 +11,11 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    METRIC_REPAIRABILITY_INDEX, PluginCapabilities, PluginCapability, PluginComplianceStatus,
     PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
 };
-use dpp_plugin_sdk::validate::{num, str_of, Validator};
+use dpp_plugin_sdk::validate::{Validator, num, str_of};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -62,6 +62,9 @@ impl DppSectorPlugin for ElectronicsPlugin {
             )
             .require_non_negative("co2ePerUnitKg")
             .optional_pct("recycledContentPct")
+            // Optional, but when present it gates the verdict (pass ≥ 6.0), so it
+            // must be a real 0–10 score, not an unbounded value.
+            .optional_range("repairabilityScore", 0.0, 10.0)
             .finish()
     }
 
@@ -154,6 +157,14 @@ mod tests {
     fn invalid_energy_class_fails_validation() {
         let mut d = base();
         d["energyEfficiencyClass"] = json!("Z");
+        assert!(ElectronicsPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn out_of_range_repairability_fails_validation() {
+        // An unbounded score must not sail through and force a Compliant verdict.
+        let mut d = base();
+        d["repairabilityScore"] = json!(999999.0);
         assert!(ElectronicsPlugin.validate_input(&d).is_err());
     }
 }

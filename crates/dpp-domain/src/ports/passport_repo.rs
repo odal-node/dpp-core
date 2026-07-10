@@ -13,6 +13,27 @@ use crate::domain::{
     status::PassportStatus,
 };
 
+/// Fields governed by the state machine, the retention lock, the publish/seal
+/// pipeline, or record identity — none of which is a user-editable content
+/// field. `patch_fields` rejects any delta touching one of these so it cannot
+/// be used to bypass `transition_to`/`update_status` (e.g. flip
+/// `retentionLocked` back to `false` or forge a `jwsSignature`). Serialized
+/// (camelCase) field names, matching the `Passport` JSON representation.
+const PROTECTED_PATCH_FIELDS: [&str; 12] = [
+    "id",
+    "status",
+    "retentionLocked",
+    "retentionUntil",
+    "jwsSignature",
+    "publicJwsSignature",
+    "seal",
+    "version",
+    "publishedAt",
+    "createdAt",
+    "supersedesId",
+    "schemaVersion",
+];
+
 /// Port trait for all DPP persistence operations.
 ///
 /// **No physical delete method is defined by design.** EU ESPR Article 9 and
@@ -70,14 +91,38 @@ pub trait PassportRepository: Send + Sync {
     /// Merge a JSON delta into an existing passport, touching only the
     /// specified fields. Safer than `update()` for user-initiated field
     /// edits: concurrent patches to different fields do not clobber each
-    /// other (B-03 fix). The default implementation falls back to the
-    /// read-modify-write pattern — implementations should override with a
-    /// targeted MERGE statement for real concurrent-write safety.
+    /// other. The default implementation falls back to the read-modify-write
+    /// pattern — implementations should override with a targeted MERGE
+    /// statement for real concurrent-write safety.
+    ///
+    /// A delta that tries to set any `PROTECTED_PATCH_FIELDS` key (status,
+    /// retention lock, signatures, seal, identity, …) is rejected with
+    /// [`DppError::Validation`]: those transitions belong to the state machine
+    /// (`transition_to`/`update_status`) and the publish pipeline, never to a
+    /// free-form field patch.
     async fn patch_fields(
         &self,
         id: PassportId,
         delta: serde_json::Value,
     ) -> Result<Passport, DppError> {
+        if let Some(obj) = delta.as_object() {
+            let mut forbidden: Vec<&str> = PROTECTED_PATCH_FIELDS
+                .iter()
+                .copied()
+                .filter(|k| obj.contains_key(*k))
+                .collect();
+            if !forbidden.is_empty() {
+                forbidden.sort_unstable();
+                return Err(DppError::Validation(
+                    format!(
+                        "patch_fields cannot modify protected field(s): {}",
+                        forbidden.join(", ")
+                    )
+                    .into(),
+                ));
+            }
+        }
+
         let Some(mut passport) = self.find_by_id(id).await? else {
             return Err(DppError::NotFound(id.to_string()));
         };
@@ -283,6 +328,32 @@ mod tests {
         assert_eq!(patched.product_name, "Renamed");
         // Untouched fields are preserved.
         assert_eq!(patched.id, p.id);
+    }
+
+    #[tokio::test]
+    async fn default_patch_fields_rejects_protected_fields() {
+        let repo = InMemoryRepo::default();
+        let p = repo.create(draft_passport("Original")).await.unwrap();
+
+        // A delta that tries to escape the state machine / forge integrity fields.
+        let err = repo
+            .patch_fields(
+                p.id,
+                serde_json::json!({
+                    "status": "active",
+                    "retentionLocked": false,
+                    "jwsSignature": "forged",
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DppError::Validation(_)), "got: {err:?}");
+
+        // The passport must be untouched — still a retention-unlocked draft.
+        let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
+        assert_eq!(stored.status, PassportStatus::Draft);
+        assert!(!stored.retention_locked);
+        assert!(stored.jws_signature.is_none());
     }
 
     #[tokio::test]

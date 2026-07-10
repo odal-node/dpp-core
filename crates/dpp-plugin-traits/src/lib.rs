@@ -4,9 +4,10 @@
 //! as `extern "C"` symbols. The host invokes them through the wasmtime
 //! component model or directly via the low-level ABI defined below.
 //!
-//! The interface is intentionally `no_std`-friendly: no heap allocations
-//! are required from the host's perspective. Data is passed as JSON strings
-//! over a shared-memory slice.
+//! Data crosses the host/guest boundary as JSON strings over a shared-memory
+//! slice, so the low-level ABI itself is just integer pointer/length pairs.
+//! (The crate uses `std` types — `String`, `Vec`, `HashMap` — so it is not
+//! `no_std`.)
 //!
 //! ## Versioning
 //!

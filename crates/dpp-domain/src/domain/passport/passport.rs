@@ -161,14 +161,12 @@ impl Passport {
             issues.push("manufacturer.address must not be empty");
         }
 
-        // Semver: digits.digits.digits, optionally with pre-release suffix
-        let sv = &self.schema_version;
-        let parts: Vec<&str> = sv.split('.').collect();
-        if parts.len() < 3
-            || !parts[0].chars().all(|c| c.is_ascii_digit())
-            || !parts[1].chars().all(|c| c.is_ascii_digit())
-            || parts[2].is_empty()
-        {
+        // Must parse as strict semver (major.minor.patch, optional pre-release
+        // / build metadata). A hand-rolled digit check let ".5.0" (empty major)
+        // and "1.0.abc" (non-numeric patch) through — both then fail
+        // `semver::Version` parsing at schema resolution and silently skip
+        // schema validation, so reject them here rather than downstream.
+        if self.schema_version.parse::<semver::Version>().is_err() {
             issues.push("schema_version must be valid semver (e.g. 1.0.0)");
         }
 
@@ -272,9 +270,11 @@ impl Passport {
     ///
     /// `sectorData`, when present, is independently redacted via
     /// [`crate::domain::sector::redact_sector_data`] against the sector descriptor
-    /// from `catalog`. If the sector is not in the catalog, sector data is left
-    /// unfiltered (fail-open at the domain layer; the vault layer applies
-    /// `filter_by_access_tier` as defence-in-depth).
+    /// from `catalog`. If the sector is not in the catalog, sector data is
+    /// **withheld** from viewers below `Confidential` (fail-closed): without the
+    /// descriptor's per-field access tiers the domain layer cannot tell which
+    /// fields are safe to expose, so it exposes none. `Confidential` viewers —
+    /// who may see every field anyway — still receive the full data.
     pub fn redact(
         &self,
         viewer_tier: AccessTier,
@@ -298,8 +298,15 @@ impl Passport {
                 let key = sd.sector().catalog_key();
                 let redacted = if let Some(descriptor) = catalog.get(key) {
                     crate::domain::sector::redact_sector_data(sd, viewer_tier, descriptor)
-                } else {
+                } else if viewer_tier >= AccessTier::Confidential {
+                    // Unknown sector: the full payload is only safe for the tier
+                    // that already sees every field.
                     serde_json::to_value(sd).unwrap_or(serde_json::Value::Null)
+                } else {
+                    // Fail closed: without per-field tiers we cannot tell which
+                    // fields are confidential, so withhold sector data entirely
+                    // rather than leak it to a lower tier.
+                    serde_json::Value::Null
                 };
                 obj.insert("sectorData".into(), redacted);
             } else {

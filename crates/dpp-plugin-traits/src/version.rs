@@ -117,18 +117,20 @@ pub fn check_compatibility(
         }
     }
 
-    // 3. Schema version check (semantic via semver crate; falls back to lexicographic)
+    // 3. Schema version check — strictly semantic (semver). A version string
+    // that isn't valid semver cannot be compared as a version; treat such a
+    // range as non-matching rather than falling back to a lexicographic string
+    // comparison (where e.g. "1.9.0" > "1.10.0" gives the wrong answer).
     if let Some(requested) = requested_schema_version {
         let req = semver::Version::parse(requested).ok();
         let supported = capabilities.supported_schemas.iter().any(|range| {
-            let lo = semver::Version::parse(&range.min_version).ok();
-            let hi = semver::Version::parse(&range.max_version).ok();
-            match (req.as_ref(), lo, hi) {
-                (Some(r), Some(l), Some(h)) => r >= &l && r <= &h,
-                _ => {
-                    requested >= range.min_version.as_str()
-                        && requested <= range.max_version.as_str()
-                }
+            match (
+                req.as_ref(),
+                semver::Version::parse(&range.min_version),
+                semver::Version::parse(&range.max_version),
+            ) {
+                (Some(r), Ok(l), Ok(h)) => r >= &l && r <= &h,
+                _ => false,
             }
         });
         if !supported {
