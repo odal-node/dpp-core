@@ -30,6 +30,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(8.0)),
         compliance_result: None,
+        lint_result: None,
         sector_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
@@ -268,6 +269,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
 fn build_aas_textile_has_fibre_composition_collection() {
     let mut passport = minimal_passport(Sector::Textile);
     passport.sector_data = Some(SectorData::Textile(TextileData {
+        gtin: "09506000134352".into(),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "organic cotton".into(),

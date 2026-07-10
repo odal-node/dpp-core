@@ -37,6 +37,9 @@ pub mod batteries;
 pub mod electronics;
 pub mod textiles;
 
+// Plausibility lints — non-binding findings, never a compliance gate.
+pub mod lint;
+
 // Placeholder sectors — rules to be implemented in a later phase.
 pub mod construction;
 pub mod metals;

@@ -13,6 +13,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+New **`dpp-rules::lint`** module: a non-binding plausibility lint pack —
+arithmetic and physical-plausibility checks distinct from the crate's binding
+regulatory rules (e.g. `ratedEnergyWh` vs. `nominalVoltageV × nominalCapacityAh`,
+material-composition sums, implausible date/range values). First pack covers
+battery, textile, and unsold-goods (15 lints total); each finding carries a
+`LintSeverity::{Warning,Notice}` and is phrased as a question, never a
+verdict. `no_std`, wasm32-safe. `dpp-domain::Passport` gains
+`lint_result: Option<LintResult>` plus a `lint_sector_data()` dispatcher and
+`LintResult::compute()` adapter mapping `SectorData` onto the pack.
+
 ## [0.7.0] - 2026-07-07
 
 New crate **`dpp-evidence`** — the evidence dossier wire format and offline

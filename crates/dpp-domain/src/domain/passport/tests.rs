@@ -31,6 +31,7 @@ fn make_passport() -> Passport {
         co2e_per_unit: Some(CarbonFootprint::from_kg(2.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(7.5)),
         compliance_result: None,
+        lint_result: None,
         sector_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
@@ -337,6 +338,7 @@ fn validate_wires_sector_data_validation() {
     let mut p = make_passport();
     p.sector = Sector::Textile;
     p.sector_data = Some(SectorData::Textile(TextileData {
+        gtin: "09506000134352".into(),
         // fibre sum = 50% — cross-field rule must catch this
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),

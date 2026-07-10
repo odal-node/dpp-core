@@ -146,6 +146,7 @@ fn polyester_fibre(pct: f64) -> FibreEntry {
 
 fn test_textile_data() -> TextileData {
     TextileData {
+        gtin: "09506000134352".into(),
         fibre_composition: vec![cotton_fibre(60.0), polyester_fibre(40.0)],
         country_of_manufacturing: "BD".into(),
         care_instructions: "Machine wash 40°C".into(),
@@ -456,6 +457,7 @@ fn textile_v1_data_deserializes_with_defaults() {
     // v1.0.0 JSON (without new fields) must still deserialize into the expanded struct
     let v1_json = serde_json::json!({
         "sector": "textile",
+        "gtin": "09506000134352",
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
         "countryOfManufacturing": "PT",
         "careInstructions": "Hand wash",

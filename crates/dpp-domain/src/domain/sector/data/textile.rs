@@ -33,6 +33,8 @@ pub struct FibreEntry {
 #[serde(rename_all = "camelCase")]
 pub struct TextileData {
     // ── Mandatory fields (v1.0.0) ──────────────────────────────────────────
+    /// 14-digit GTIN identifying the textile product.
+    pub gtin: String,
     /// List of fibres and their percentage composition. Must sum to ~100%.
     pub fibre_composition: Vec<FibreEntry>,
     /// ISO 3166-1 alpha-2 country code where the textile was manufactured.

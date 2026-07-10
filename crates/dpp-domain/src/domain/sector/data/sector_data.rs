@@ -61,6 +61,27 @@ impl SectorData {
             SectorData::Other(_) => Sector::Other,
         }
     }
+
+    /// The GTIN carried by this sector's typed data, if any.
+    ///
+    /// `UnsoldGoods` and `Other` carry no GTIN field — a discard-event report
+    /// and an untyped catch-all respectively, neither of which identifies a
+    /// trade item the way every other sector does.
+    pub fn gtin(&self) -> Option<&str> {
+        match self {
+            SectorData::Battery(d) => Some(d.gtin.as_str()),
+            SectorData::Textile(d) => Some(d.gtin.as_str()),
+            SectorData::Steel(d) => Some(d.gtin.as_str()),
+            SectorData::Electronics(d) => Some(d.gtin.as_str()),
+            SectorData::Construction(d) => Some(d.gtin.as_str()),
+            SectorData::Tyre(d) => Some(d.gtin.as_str()),
+            SectorData::Toy(d) => Some(d.gtin.as_str()),
+            SectorData::Aluminium(d) => Some(d.gtin.as_str()),
+            SectorData::Furniture(d) => Some(d.gtin.as_str()),
+            SectorData::Detergent(d) => Some(d.gtin.as_str()),
+            SectorData::UnsoldGoods(_) | SectorData::Other(_) => None,
+        }
+    }
 }
 
 /// Serialize `data` to a JSON object and strip any top-level field whose

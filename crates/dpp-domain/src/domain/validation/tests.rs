@@ -46,6 +46,7 @@ fn valid_battery() -> SectorData {
 
 fn valid_textile() -> SectorData {
     SectorData::Textile(TextileData {
+        gtin: "09506000134352".into(),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),
@@ -210,6 +211,7 @@ fn textile_empty_fibre_composition_fails() {
 fn textile_fibre_sum_not_100_fails() {
     // Schema passes (pct 0–100 individually); the cross-field rule fails.
     let data = SectorData::Textile(TextileData {
+        gtin: "09506000134352".into(),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),
@@ -349,6 +351,7 @@ fn batch_validation_mixed_results() {
         valid_textile(),
         // Invalid: fibre sum != 100
         SectorData::Textile(TextileData {
+            gtin: "09506000134352".into(),
             fibre_composition: vec![FibreEntry {
                 fibre: "cotton".into(),
                 pct: 50.0,

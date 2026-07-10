@@ -5,12 +5,18 @@
   "description": "Textile-specific fields for EU textile DPP compliance (anticipated 2025-2026 delegated act).",
   "type": "object",
   "required": [
+    "gtin",
     "fibreComposition",
     "countryOfManufacturing",
     "careInstructions",
     "chemicalComplianceStandard"
   ],
   "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
     "fibreComposition": {
       "type": "array",
       "minItems": 1,

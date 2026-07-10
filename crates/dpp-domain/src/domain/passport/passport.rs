@@ -9,6 +9,7 @@ use super::{
 };
 use crate::domain::{
     identity::AccessTier,
+    lint::LintResult,
     sector::{CarbonFootprint, RepairabilityScore, Sector, SectorData},
     status::PassportStatus,
 };
@@ -44,6 +45,14 @@ pub struct Passport {
     /// until a determination is computed (e.g. a sector with no plugin loaded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compliance_result: Option<ComplianceResult>,
+    /// Non-binding plausibility findings from the `dpp-rules` lint pack —
+    /// arithmetic and physical-plausibility checks distinct from binding
+    /// compliance rules. Never gates publish and may be recomputed at any
+    /// time after publish (a lint re-check), unlike `compliance_result` —
+    /// see the vault's `POST /dpp/{id}/lint` endpoint. `None` until a lint
+    /// pass has run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lint_result: Option<LintResult>,
     /// Typed, sector-specific DPP data (EU Battery Regulation, Textile DPP, etc.).
     ///
     /// `None` for passports where sector-specific data has not yet been supplied.

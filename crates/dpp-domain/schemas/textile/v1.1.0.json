@@ -5,12 +5,18 @@
   "description": "Textile-specific fields for EU textile DPP compliance. v1.1.0 adds SCIP/SVHC substance disclosure, per-fibre origin traceability, durability metrics, and microplastic shedding data.",
   "type": "object",
   "required": [
+    "gtin",
     "fibreComposition",
     "countryOfManufacturing",
     "careInstructions",
     "chemicalComplianceStandard"
   ],
   "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
     "fibreComposition": {
       "type": "array",
       "minItems": 1,

@@ -63,6 +63,7 @@ fn make_battery_passport() -> Passport {
         co2e_per_unit: Some(CarbonFootprint::from_kg(73.2)),
         repairability_score: Some(RepairabilityScore::from_scalar(4.5)),
         compliance_result: None,
+        lint_result: None,
         sector_data: Some(SectorData::Battery(BatteryData {
             gtin: Gtin::parse(VALID_GTIN).unwrap(),
             battery_chemistry: BatteryChemistry::Lfp,

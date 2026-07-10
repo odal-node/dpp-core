@@ -321,6 +321,7 @@ fn validate_textile_v1_1_with_new_fields() {
     let reg = VersionedSchemaRegistry::new();
     let v11: Version = "1.1.0".parse().unwrap();
     let data = serde_json::json!({
+        "gtin": "09506000134352",
         "fibreComposition": [
             { "fibre": "cotton", "pct": 70.0, "countryOfOrigin": "IN" },
             { "fibre": "polyester", "pct": 30.0, "countryOfOrigin": "CN" }
@@ -408,6 +409,7 @@ fn conformance_textile_v1_valid() {
     let reg = VersionedSchemaRegistry::new();
     let v: Version = "1.0.0".parse().unwrap();
     let data = serde_json::json!({
+        "gtin": "09506000134352",
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
         "countryOfManufacturing": "MK",
         "careInstructions": "Machine wash 30°C",

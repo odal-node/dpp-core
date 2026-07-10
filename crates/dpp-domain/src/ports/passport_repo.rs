@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use crate::domain::{
     error::DppError,
     passport::{Passport, PassportId},
+    product_identity::ProductIdentity,
     status::PassportStatus,
 };
 
@@ -38,6 +39,31 @@ pub trait PassportRepository: Send + Sync {
     /// Fetch a passport by ID regardless of status.
     /// Used by public endpoints to distinguish between 404 and 410 (suspended).
     async fn find_by_id_any_status(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
+
+    /// Find a passport by exact compound identity — sector, GTIN, and batch —
+    /// across `Draft` and `Published`. Used by the import delta-matcher to
+    /// classify a row as create/update_draft/conflict_published before any
+    /// write. Returns `None` on no match; `batch_id: None` matches only
+    /// passports with no batch set.
+    ///
+    /// Default implementation is an unindexed `list()` scan — correctness
+    /// only, suitable for tests and small in-memory stores. `PgPassportRepo`
+    /// overrides this with a real indexed query.
+    async fn find_by_identity(
+        &self,
+        identity: &ProductIdentity,
+    ) -> Result<Option<Passport>, DppError> {
+        let drafts = self
+            .list(Some(PassportStatus::Draft), None, None, u32::MAX, 0)
+            .await?;
+        let published = self
+            .list(Some(PassportStatus::Published), None, None, u32::MAX, 0)
+            .await?;
+        Ok(drafts
+            .into_iter()
+            .chain(published)
+            .find(|p| ProductIdentity::from_passport(p).as_ref() == Some(identity)))
+    }
 
     async fn update(&self, passport: Passport) -> Result<Passport, DppError>;
 
@@ -224,6 +250,7 @@ mod tests {
             co2e_per_unit: None,
             repairability_score: None,
             compliance_result: None,
+            lint_result: None,
             sector_data: None,
             status: PassportStatus::Draft,
             qr_code_url: None,
@@ -266,6 +293,66 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, DppError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn default_find_by_identity_matches_across_draft_and_published() {
+        use crate::domain::gtin::Gtin;
+        use crate::domain::sector::{BatteryChemistry, BatteryData, SectorData};
+
+        let repo = InMemoryRepo::default();
+        let mut p = draft_passport("Battery A");
+        p.sector = Sector::Battery;
+        p.sector_data = Some(SectorData::Battery(BatteryData {
+            gtin: Gtin::parse("09506000134352").unwrap(),
+            battery_chemistry: BatteryChemistry::Lfp,
+            nominal_voltage_v: 3.2,
+            nominal_capacity_ah: 100.0,
+            expected_lifetime_cycles: 3000,
+            co2e_per_unit_kg: 85.4,
+            recycled_content_cobalt_pct: None,
+            recycled_content_lithium_pct: None,
+            recycled_content_nickel_pct: None,
+            state_of_health_pct: None,
+            rated_capacity_kwh: None,
+            carbon_footprint_class: None,
+            due_diligence_url: None,
+            cathode_material: None,
+            anode_material: None,
+            electrolyte_material: None,
+            critical_raw_materials: None,
+            disassembly_instructions_url: None,
+            soh_methodology: None,
+            operating_temp_min_c: None,
+            operating_temp_max_c: None,
+            rated_energy_wh: None,
+            recycled_content_lead_pct: None,
+            battery_weight_kg: None,
+            battery_type: None,
+            round_trip_efficiency_pct: None,
+            internal_resistance_mohm: None,
+            manufacturing_date: None,
+            manufacturing_place: None,
+            battery_model_id: None,
+            battery_passport_number: None,
+        }));
+        p.batch_id = Some("BATCH-1".into());
+        let created = repo.create(p).await.unwrap();
+
+        let identity = ProductIdentity {
+            sector: Sector::Battery,
+            gtin: "09506000134352".into(),
+            batch_id: Some("BATCH-1".into()),
+        };
+        let found = repo.find_by_identity(&identity).await.unwrap();
+        assert_eq!(found.map(|p| p.id), Some(created.id));
+
+        let no_match = ProductIdentity {
+            sector: Sector::Battery,
+            gtin: "00000000000000".into(),
+            batch_id: None,
+        };
+        assert!(repo.find_by_identity(&no_match).await.unwrap().is_none());
     }
 
     #[tokio::test]

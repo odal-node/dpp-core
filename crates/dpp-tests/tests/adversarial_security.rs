@@ -485,7 +485,9 @@ fn passport_validate_catches_bad_fibre_sum() {
         co2e_per_unit: None,
         repairability_score: None,
         compliance_result: None,
+        lint_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
+            gtin: "09506000134352".into(),
             // sum = 50%, should be ~100%
             fibre_composition: vec![FibreEntry {
                 fibre: "cotton".into(),
