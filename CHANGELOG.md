@@ -23,6 +23,14 @@ verdict. `no_std`, wasm32-safe. `dpp-domain::Passport` gains
 `lint_result: Option<LintResult>` plus a `lint_sector_data()` dispatcher and
 `LintResult::compute()` adapter mapping `SectorData` onto the pack.
 
+### Removed
+
+- **`dpp-evidence`** removed from the workspace and dissolved into
+  `dpp-engine` — the evidence dossier format and its verification engine are
+  a DB-backed engine feature, not a core standard. `AuditEntry` and its hash-chain algorithm
+  (`chain_hash`/`verify_audit_chain`) return to `dpp-engine`'s `dpp-types`
+  crate. No other published core crate depended on `dpp-evidence`.
+
 ## [0.7.0] - 2026-07-07
 
 New crate **`dpp-evidence`** — the evidence dossier wire format and offline

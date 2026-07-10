@@ -8,7 +8,6 @@ on:
     paths:
       - "crates/dpp-registry/**"
       - "crates/dpp-domain/**"
-      - "crates/dpp-evidence/**"
       - "plugins/**"
 
 env:
@@ -17,7 +16,7 @@ env:
 
 jobs:
   wasm-build:
-    name: WASM build — dpp-registry + dpp-domain + dpp-evidence
+    name: WASM build — dpp-registry + dpp-domain
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,10 +36,6 @@ jobs:
 
       - name: Build dpp-domain (wasm32)
         working-directory: crates/dpp-domain
-        run: cargo build --target wasm32-unknown-unknown --release
-
-      - name: Build dpp-evidence (wasm32)
-        working-directory: crates/dpp-evidence
         run: cargo build --target wasm32-unknown-unknown --release
 
   sector-plugins:

@@ -49,8 +49,6 @@ dpp-core/
     dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
     dpp-registry ........ EU Central Registry interface types (wasm32-safe)
     dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
-    dpp-evidence ........ Evidence dossier wire format (DossierV1) + offline verification engine —
-                          deliberately free of BSL-licensed and wasm-unsafe dependencies (spec/)
     dpp-tests ........... Cross-crate integration tests (domain + crypto + gs1)
   plugins/ .............. 10 Wasm sector plugins (wasm32-wasip1, excluded from workspace)
 ```
@@ -95,9 +93,9 @@ When a product undergoes remanufacturing, repurposing, or preparation for reuse,
 - Dual-signature transfer records (JWS from both parties)
 - Rejection of invalid transfers (wrong operator, duplicate pending)
 
-### Evidence Dossiers & Offline Verification
+### Evidence Dossiers
 
-`dpp-evidence` defines a self-contained, signed **evidence dossier** (`DossierV1`) — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical JSON file — plus the verification engine that checks all of it **fully offline**: no resolver, no network, no trust in Odal. An auditor, customs officer, or skeptical buyer runs the independent checks (manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) and gets a named verdict per check. The crate is deliberately free of BSL-licensed and wasm-unsafe dependencies. Wire format specification: [`crates/dpp-evidence/spec/dossier-v1.md`](crates/dpp-evidence/spec/dossier-v1.md).
+A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a `dpp-engine` feature: dossiers are generated and persisted by the node, and checked via its API or the `odal verify` CLI command. Core contributes the primitives this depends on — `dpp-crypto`'s Ed25519/JWS and the domain types the dossier snapshots.
 
 ### Schema Validation
 
@@ -190,7 +188,6 @@ cargo run -p dpp-digital-link --example gs1_and_aas              # Parse GS1 lin
 | [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md) | Wasm plugin sandbox design and ABI contract |
 | [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
 | [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
-| [dossier-v1.md](crates/dpp-evidence/spec/dossier-v1.md) | Evidence dossier wire-format specification (offline verification) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
 | [GOVERNANCE.md](GOVERNANCE.md) | Decision-making structure and maintainer authority |

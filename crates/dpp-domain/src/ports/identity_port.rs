@@ -23,7 +23,7 @@ pub trait IdentityPort: Send + Sync {
 
     /// Fetch this node's own current `did:web` document — the same document
     /// external verifiers resolve, snapshotted for embedding in an evidence
-    /// dossier (`GET /dpp/{id}/evidence`) so offline verification never has
-    /// to trust the issuing node again after export.
+    /// dossier so a verifier checks signatures against the exact document
+    /// current at generation time.
     async fn own_did_document(&self) -> Result<serde_json::Value, DppError>;
 }

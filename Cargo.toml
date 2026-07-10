@@ -9,7 +9,6 @@ members = [
     "crates/dpp-plugin-sdk",
     "crates/dpp-registry",
     "crates/dpp-calc",
-    "crates/dpp-evidence",
     "crates/dpp-tests",
     "benches",
 ]
@@ -50,7 +49,6 @@ dpp-domain        = { path = "crates/dpp-domain", version = "0.7.0" }
 dpp-plugin-traits = { path = "crates/dpp-plugin-traits", version = "0.7.0" }
 dpp-crypto        = { path = "crates/dpp-crypto", version = "0.7.0" }
 dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.7.0" }
-dpp-evidence      = { path = "crates/dpp-evidence", version = "0.7.0" }
 
 # Serialisation
 serde        = { version = "1", features = ["derive"] }

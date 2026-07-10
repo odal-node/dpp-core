@@ -15,7 +15,6 @@ This folder documents **the standard, not the product**: what a Digital Product 
 | "How is the library structured, and why hexagonal?" | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) · [architecture/DESIGN-PATTERNS.md](architecture/DESIGN-PATTERNS.md) |
 | "How do identity, signing, and verifiable credentials work?" | [architecture/IDENTITY.md](architecture/IDENTITY.md) |
 | "How do sector plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
-| "Can a third party verify a passport without trusting anyone?" | [../crates/dpp-evidence/spec/dossier-v1.md](../crates/dpp-evidence/spec/dossier-v1.md) — the evidence-dossier wire format and its offline checks |
 | "Where does code meet regulation, formally?" | [regulatory/CONFORMITY.md](regulatory/CONFORMITY.md) — written for assessment bodies |
 | "How are releases, versions, and contributions governed?" | [governance/](governance/) — VERSIONING, RELEASE, CONTRIBUTING, CHANGELOG |
 

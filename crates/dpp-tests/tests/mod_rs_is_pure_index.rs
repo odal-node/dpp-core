@@ -18,7 +18,6 @@ const PUBLISHED_CRATES: &[&str] = &[
     "dpp-registry",
     "dpp-rules",
     "dpp-calc",
-    "dpp-evidence",
 ];
 
 fn workspace_root() -> PathBuf {
