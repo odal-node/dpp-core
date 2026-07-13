@@ -17,7 +17,7 @@ exclude = [
 ]
 
 [workspace.package]
-version     = "0.7.0"
+version     = "0.8.0"
 edition     = "2024"
 authors     = ["Odal Node <dev@odal-node.io>"]
 license     = "Apache-2.0"
@@ -44,11 +44,11 @@ tag-message = "Release version {{version}}"
 # workspace), version for what `cargo publish` embeds for external consumers.
 # One line per crate here instead of one per dependent Cargo.toml, so a
 # lockstep version bump is a single edit, not N.
-dpp-rules         = { path = "crates/dpp-rules", version = "0.7.0" }
-dpp-domain        = { path = "crates/dpp-domain", version = "0.7.0" }
-dpp-plugin-traits = { path = "crates/dpp-plugin-traits", version = "0.7.0" }
-dpp-crypto        = { path = "crates/dpp-crypto", version = "0.7.0" }
-dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.7.0" }
+dpp-rules         = { path = "crates/dpp-rules", version = "0.8.0" }
+dpp-domain        = { path = "crates/dpp-domain", version = "0.8.0" }
+dpp-plugin-traits = { path = "crates/dpp-plugin-traits", version = "0.8.0" }
+dpp-crypto        = { path = "crates/dpp-crypto", version = "0.8.0" }
+dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.8.0" }
 
 # Serialisation
 serde        = { version = "1", features = ["derive"] }
@@ -77,6 +77,9 @@ rand         = "0.10"
 # Schema validation
 jsonschema   = "0.46"
 semver       = "1"
+
+# Property-based testing (dev-only)
+proptest     = "1"
 
 # Telemetry
 tracing      = "0.1"

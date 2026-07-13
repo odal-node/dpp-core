@@ -110,7 +110,7 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{sector}/v{version}.json` (
 | unsold-goods | v1.0.0 | Art. 25 destruction ban compliance |
 | aluminium, construction, detergent, furniture, toy, tyre | v1.0.0 each | Sector-specific delegated-act fields |
 
-The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtime hot-reload for new versions.
+The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtime hot-reload for new versions. Read-time **upcast lenses** (`schemas::lens`) transform an old record's sector data to a newer schema version on read, so signed passports stay byte-identical yet remain consumable as delegated acts evolve the schema (upcast only).
 
 ### GS1 & Industry 4.0 Interoperability
 

@@ -4,6 +4,7 @@
 pub mod eol;
 pub mod error;
 pub mod field_error;
+pub mod graph;
 pub mod gtin;
 pub mod identity;
 pub mod lint;

@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{
-    FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportView, ProductCategory,
+    FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
+    ProductCategory,
 };
 use crate::domain::{
     identity::AccessTier,
@@ -91,6 +92,18 @@ pub struct Passport {
     /// The passport ID this record supersedes. `None` for first-version passports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supersedes_id: Option<PassportId>,
+    /// Cross-operator reference to the predecessor this passport derives from
+    /// (second-life successor linkage). `None` unless this record was issued as a
+    /// successor citing a source passport held by another operator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_passport_ref: Option<PassportRef>,
+    /// Cross-operator references to the constituent passports this product is
+    /// assembled from — its bill of materials. Empty for a unit with no modelled
+    /// sub-assemblies. The inverse edge of `parent_passport_ref`: `component_refs`
+    /// point down to many constituents, `parent_passport_ref` points up to one
+    /// predecessor.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub component_refs: Vec<PassportRef>,
     /// Deadline by which this record must remain accessible. Confirmed against the
     /// verbatim OJ text (Regulation (EU) 2024/1781): **Art. 9(2)(i)** requires the
     /// delegated act to specify "the period during which the digital product

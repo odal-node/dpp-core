@@ -68,6 +68,8 @@ All DPPs — regardless of sector — carry these fields. Source: `dpp-domain/sr
 | `published_at` | `Option<DateTime>` | `"publishedAt"` | First publish timestamp |
 | `schema_version` | `String` | `"schemaVersion"` | Semver of the sector schema used for validation |
 | `retention_locked` | `bool` | `"retentionLocked"` | Set permanently on first publish; prevents deletion |
+| `parent_passport_ref` | `Option<PassportRef>` | `"parentPassportRef"` | Cross-operator predecessor this record derives from (second-life lineage). Omitted when absent. |
+| `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports — the bill of materials. Omitted when empty. |
 
 ### 3.2 ManufacturerInfo
 

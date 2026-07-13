@@ -30,6 +30,19 @@ pub enum Gs1LinkType {
     /// `gs1:dpp` — EU Digital Product Passport (full DPP payload).
     /// This is the ESPR-specific link type for accessing the complete DPP.
     DigitalProductPassport,
+    /// `odal:predecessor` — the passport this record derives from (cross-operator
+    /// second-life successor linkage). Odal-owned vocabulary: the GS1 Web
+    /// Vocabulary has no lineage relation.
+    Predecessor,
+    /// `odal:successor` — the reverse of [`Self::Predecessor`]. Reserved: served
+    /// only once a reverse-lineage lookup exists to populate it.
+    Successor,
+    /// `odal:hasComponent` — a constituent passport in this product's bill of
+    /// materials (the assembly points down to a component). Odal-owned vocabulary.
+    HasComponent,
+    /// `odal:isComponentOf` — the reverse of [`Self::HasComponent`]. Reserved:
+    /// served only once a reverse component index exists to populate it.
+    IsComponentOf,
     /// Custom / unknown link type (stored as the raw URI).
     Custom(String),
 }
@@ -52,6 +65,12 @@ impl Gs1LinkType {
             "gs1:safetyInfo" | "https://ref.gs1.org/voc/safetyInfo" => Self::SafetyInfo,
             "gs1:traceability" | "https://ref.gs1.org/voc/traceability" => Self::Traceability,
             "gs1:dpp" | "https://ref.gs1.org/voc/dpp" => Self::DigitalProductPassport,
+            "odal:predecessor" | "https://ref.odal-node.io/voc/predecessor" => Self::Predecessor,
+            "odal:successor" | "https://ref.odal-node.io/voc/successor" => Self::Successor,
+            "odal:hasComponent" | "https://ref.odal-node.io/voc/hasComponent" => Self::HasComponent,
+            "odal:isComponentOf" | "https://ref.odal-node.io/voc/isComponentOf" => {
+                Self::IsComponentOf
+            }
             other => Self::Custom(other.to_owned()),
         }
     }
@@ -69,6 +88,10 @@ impl Gs1LinkType {
             Self::SafetyInfo => "https://ref.gs1.org/voc/safetyInfo",
             Self::Traceability => "https://ref.gs1.org/voc/traceability",
             Self::DigitalProductPassport => "https://ref.gs1.org/voc/dpp",
+            Self::Predecessor => "https://ref.odal-node.io/voc/predecessor",
+            Self::Successor => "https://ref.odal-node.io/voc/successor",
+            Self::HasComponent => "https://ref.odal-node.io/voc/hasComponent",
+            Self::IsComponentOf => "https://ref.odal-node.io/voc/isComponentOf",
             Self::Custom(uri) => uri.as_str(),
         }
     }
@@ -91,6 +114,10 @@ mod tests {
             Gs1LinkType::SafetyInfo,
             Gs1LinkType::Traceability,
             Gs1LinkType::DigitalProductPassport,
+            Gs1LinkType::Predecessor,
+            Gs1LinkType::Successor,
+            Gs1LinkType::HasComponent,
+            Gs1LinkType::IsComponentOf,
         ];
         for lt in all {
             let uri = lt.as_gs1_uri();

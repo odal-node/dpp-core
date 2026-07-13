@@ -8,10 +8,12 @@
 //! Runtime schemas are registered via [`VersionedSchemaRegistry::register`].
 
 mod embedded;
+pub mod lens;
 #[cfg(test)]
 mod tests;
 mod types;
 mod versioned;
 
+pub use lens::{DerivedView, Lens, LensError, LensRegistry, UpcastError};
 pub use types::{SchemaEntry, SchemaOrigin, SchemaRegistrationError};
 pub use versioned::VersionedSchemaRegistry;
