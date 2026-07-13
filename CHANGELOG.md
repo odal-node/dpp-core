@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-13
+
 ### Added
 
 - **Cross-operator passport references (`PassportRef`).** A resolvable,
