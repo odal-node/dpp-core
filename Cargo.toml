@@ -78,6 +78,9 @@ rand         = "0.10"
 jsonschema   = "0.46"
 semver       = "1"
 
+# Property-based testing (dev-only)
+proptest     = "1"
+
 # Telemetry
 tracing      = "0.1"
 

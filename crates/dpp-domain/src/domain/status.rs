@@ -181,4 +181,41 @@ mod tests {
         // An unknown status string is rejected (not silently defaulted).
         assert!(serde_json::from_str::<PassportStatus>("\"bogus\"").is_err());
     }
+
+    // ── Property tests ────────────────────────────────────────────────────────
+    use proptest::prelude::*;
+
+    fn any_status() -> impl Strategy<Value = PassportStatus> {
+        prop_oneof![
+            Just(PassportStatus::Draft),
+            Just(PassportStatus::Published),
+            Just(PassportStatus::Suspended),
+            Just(PassportStatus::Archived),
+            Just(PassportStatus::Superseded),
+            Just(PassportStatus::Deactivated),
+        ]
+    }
+
+    proptest! {
+        /// Terminal states (Archived, Superseded, Deactivated) have no outgoing
+        /// transition to any target — no path resurrects a terminal record.
+        #[test]
+        fn terminal_states_never_transition_out(to in any_status()) {
+            for from in [
+                PassportStatus::Archived,
+                PassportStatus::Superseded,
+                PassportStatus::Deactivated,
+            ] {
+                prop_assert!(!from.can_transition_to(&to));
+            }
+        }
+
+        /// Every status round-trips through its JSON wire form.
+        #[test]
+        fn serde_round_trips(s in any_status()) {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: PassportStatus = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(s, back);
+        }
+    }
 }

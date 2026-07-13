@@ -1,0 +1,24 @@
+# cargo-fuzz crate — standalone (its own [workspace]) because it requires the
+# nightly toolchain + libFuzzer, unlike the stable-pinned parent workspace.
+# Run on Linux: `cargo +nightly fuzz run <target>` from the dpp-core dir.
+[package]
+name = "dpp-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+dpp-digital-link = { path = "../crates/dpp-digital-link" }
+
+[[bin]]
+name = "digital_link_parse"
+path = "fuzz_targets/digital_link_parse.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
