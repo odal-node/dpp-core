@@ -13,6 +13,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **Cross-operator passport references (`PassportRef`).** A resolvable,
+  hash-pinned reference to another operator's passport
+  (`dpp-domain::domain::passport::PassportRef`: `{ uri, publicJwsHash }`).
+  `dpp-domain::Passport` builds two edges on it — `parent_passport_ref`
+  (second-life successor lineage) and `component_refs` (bill of materials).
+- **BOM cycle-detection graph (`dpp-domain::domain::graph`).** A pure, bounded
+  reachability check (`check_edge`) that refuses a component edge which would
+  close a cycle or exceed the depth cap (`DEFAULT_DEPTH_CAP = 6`) over the local
+  graph; cross-operator cycle safety stays a verify-time concern.
+- **Read-time schema upcast lenses (`dpp-domain::schemas::lens`).** Pure,
+  versioned `v_n → v_m` transforms so an old signed record stays byte-identical
+  yet remains consumable by new-schema readers. `LensRegistry` composes
+  multi-hop chains and refuses downcasts / missing hops with a typed error;
+  ships the battery `1.0.0 → 2.0.0` lens (derives `ratedEnergyWh` from
+  `ratedCapacityKwh`). Upcast only — the past can read the future never.
+- **Lineage / BOM linkset relations.** `dpp-digital-link::Gs1LinkType` gains
+  first-class `Predecessor` / `Successor` and `HasComponent` / `IsComponentOf`
+  variants under Odal's own vocabulary namespace (GS1 defines no lineage or BOM
+  relation).
+- Property-based test harness (`proptest`) plus a `cargo-fuzz` scaffold for the
+  GS1 Digital Link parser.
+
 New **`dpp-rules::lint`** module: a non-binding plausibility lint pack —
 arithmetic and physical-plausibility checks distinct from the crate's binding
 regulatory rules (e.g. `ratedEnergyWh` vs. `nominalVoltageV × nominalCapacityAh`,
@@ -22,6 +46,19 @@ battery, textile, and unsold-goods (15 lints total); each finding carries a
 verdict. `no_std`, wasm32-safe. `dpp-domain::Passport` gains
 `lint_result: Option<LintResult>` plus a `lint_sector_data()` dispatcher and
 `LintResult::compute()` adapter mapping `SectorData` onto the pack.
+
+### Breaking
+
+- **`dpp-domain::Passport` gains `parent_passport_ref: Option<PassportRef>` and
+  `component_refs: Vec<PassportRef>`.** Both are `#[serde(default)]`, so existing
+  serialized passports deserialize unchanged (absent → `None` / empty) — no data
+  migration. *Migration:* Rust code constructing a `Passport` via a struct
+  literal must add the two fields (`parent_passport_ref: None,
+  component_refs: Vec::new()`).
+- **`dpp-digital-link::Gs1LinkType` gains new variants** (`Predecessor`,
+  `Successor`, `HasComponent`, `IsComponentOf`). The enum is not
+  `#[non_exhaustive]`, so a downstream exhaustive `match` on it must add arms (or
+  a `_`).
 
 ### Removed
 
