@@ -14,12 +14,21 @@ use crate::domain::{
 };
 
 /// Fields governed by the state machine, the retention lock, the publish/seal
-/// pipeline, or record identity — none of which is a user-editable content
-/// field. `patch_fields` rejects any delta touching one of these so it cannot
-/// be used to bypass `transition_to`/`update_status` (e.g. flip
-/// `retentionLocked` back to `false` or forge a `jwsSignature`). Serialized
+/// pipeline, record identity, or a dedicated transition method — none of
+/// which is a user-editable content field. `patch_fields` rejects any delta
+/// touching one of these so it cannot be used to bypass `transition_to`/
+/// `update_status` (e.g. flip `retentionLocked` back to `false` or forge a
+/// `jwsSignature`), or `RegistrySyncPort::notify_transfer` (change
+/// `operatorIdentifier` without going through transfer-of-responsibility).
+/// `facility` is likewise excluded: it is a point-in-time snapshot copied at
+/// create time by design, not a field any flow updates in place. Serialized
 /// (camelCase) field names, matching the `Passport` JSON representation.
-const PROTECTED_PATCH_FIELDS: [&str; 12] = [
+///
+/// `parentPassportRef`/`componentRefs` (BOM/second-life linkage) are
+/// deliberately **not** in this list yet — that feature shipped ahead of its
+/// update-flow scoping; revisit once it's settled whether components attach
+/// progressively after creation.
+const PROTECTED_PATCH_FIELDS: [&str; 14] = [
     "id",
     "status",
     "retentionLocked",
@@ -32,6 +41,8 @@ const PROTECTED_PATCH_FIELDS: [&str; 12] = [
     "createdAt",
     "supersedesId",
     "schemaVersion",
+    "operatorIdentifier",
+    "facility",
 ];
 
 /// Port trait for all DPP persistence operations.
@@ -96,10 +107,11 @@ pub trait PassportRepository: Send + Sync {
     /// statement for real concurrent-write safety.
     ///
     /// A delta that tries to set any `PROTECTED_PATCH_FIELDS` key (status,
-    /// retention lock, signatures, seal, identity, …) is rejected with
-    /// [`DppError::Validation`]: those transitions belong to the state machine
-    /// (`transition_to`/`update_status`) and the publish pipeline, never to a
-    /// free-form field patch.
+    /// retention lock, signatures, seal, identity, operator, facility, …) is
+    /// rejected with [`DppError::Validation`]: those transitions belong to
+    /// the state machine (`transition_to`/`update_status`), the publish
+    /// pipeline, or a dedicated transfer method, never to a free-form field
+    /// patch.
     async fn patch_fields(
         &self,
         id: PassportId,
@@ -356,6 +368,34 @@ mod tests {
         assert_eq!(stored.status, PassportStatus::Draft);
         assert!(!stored.retention_locked);
         assert!(stored.jws_signature.is_none());
+    }
+
+    #[tokio::test]
+    async fn default_patch_fields_rejects_operator_and_facility() {
+        let repo = InMemoryRepo::default();
+        let p = repo.create(draft_passport("Original")).await.unwrap();
+
+        // operatorIdentifier changes belong to RegistrySyncPort::notify_transfer;
+        // facility is a create-time snapshot. Neither is patchable.
+        let err = repo
+            .patch_fields(
+                p.id,
+                serde_json::json!({
+                    "operatorIdentifier": "did:web:new-owner.example.com",
+                    "facility": {
+                        "scheme": "national",
+                        "value": "FAC-DE-999",
+                        "country": "DE",
+                    },
+                }),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DppError::Validation(_)), "got: {err:?}");
+
+        let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
+        assert!(stored.operator_identifier.is_none());
+        assert!(stored.facility.is_none());
     }
 
     #[tokio::test]
