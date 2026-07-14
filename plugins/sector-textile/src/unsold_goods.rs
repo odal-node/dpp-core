@@ -7,7 +7,7 @@
 
 use dpp_plugin_sdk::traits::{PluginComplianceStatus, PluginResult};
 use dpp_plugin_sdk::validate::{num, str_of};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub fn calculate(input: &Value) -> PluginResult {
     let destination = str_of(input, "destination").unwrap_or("");
@@ -16,19 +16,28 @@ pub fn calculate(input: &Value) -> PluginResult {
     let (status, detail): (PluginComplianceStatus, &str) = match destination {
         "exempt_destruction" => {
             let justification = str_of(input, "destructionJustification").unwrap_or("");
-            if justification.len() < 10 {
+            // Count trimmed characters — a run of whitespace is not a
+            // substantive justification.
+            if justification.trim().chars().count() < 10 {
                 (
                     PluginComplianceStatus::NonCompliant,
                     "exempt_destruction requires destructionJustification of at least 10 characters",
                 )
             } else {
-                (PluginComplianceStatus::Compliant, "exempt destruction with valid justification")
+                (
+                    PluginComplianceStatus::Compliant,
+                    "exempt destruction with valid justification",
+                )
             }
         }
-        "donation" | "recycling" | "repurposing" | "supplier_return" => {
-            (PluginComplianceStatus::Compliant, "approved disposal destination")
-        }
-        "" => (PluginComplianceStatus::NonCompliant, "missing destination field"),
+        "donation" | "recycling" | "repurposing" | "supplier_return" => (
+            PluginComplianceStatus::Compliant,
+            "approved disposal destination",
+        ),
+        "" => (
+            PluginComplianceStatus::NonCompliant,
+            "missing destination field",
+        ),
         _ => (PluginComplianceStatus::NonCompliant, "unknown destination"),
     };
 

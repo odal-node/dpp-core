@@ -138,9 +138,12 @@ fn generate_passport_error_when_input_parses_but_is_rejected() {
     assert!(json.get("ok").is_none());
 }
 
-// Note: the `write_output`/`read_input` packing uses 32-bit pointers and is
-// only valid on `wasm32` (host pointers are 64-bit and would truncate). The
-// host-testable surface is the pure `*_bytes` glue exercised above.
+// Note: the `write_output`/`read_input`/`host_alloc` pointer packing is a
+// 32-bit ABI. On a 64-bit host the raw functions guard against truncation —
+// `host_alloc`/`write_output` return null instead of a truncated pointer and
+// `read_input` never dereferences one — so the macro exports below are memory-
+// safe to drive on the host. The primary host-testable surface remains the pure
+// `*_bytes` glue exercised above.
 
 // ── `export_plugin!` macro expansion (host-target coverage) ──────────────
 //
@@ -163,12 +166,32 @@ fn out_len(packed: u64) -> usize {
 fn macro_alloc_dealloc_are_callable() {
     // Zero-length alloc returns a null pointer without allocating.
     assert_eq!(alloc(0), 0);
-    // Non-zero alloc returns a (truncated-on-host) pointer; the allocation
-    // is intentionally leaked — the truncated u32 cannot be safely freed on
-    // a 64-bit host, and dealloc's no-op path is covered below.
+    // Non-zero alloc: on a 64-bit host the address can't fit the 32-bit ABI, so
+    // host_alloc frees it and returns null rather than a truncated pointer.
     let _ = alloc(8);
     // dealloc's null/zero guard is the only branch safe to drive on host.
     dealloc(0, 0);
+}
+
+#[test]
+#[cfg(not(target_pointer_width = "32"))]
+fn read_input_never_dereferences_truncated_pointer_on_host() {
+    // On a 64-bit host a 32-bit ABI pointer is a truncated address; read_input
+    // must return an empty slice rather than dereferencing it, so a plugin's
+    // native test suite cannot trigger memory unsafety through the raw ABI.
+    let bytes = unsafe { crate::abi::read_input(0xDEAD_BEEF, 16) };
+    assert!(
+        bytes.is_empty(),
+        "must not deref a truncated pointer on host"
+    );
+}
+
+#[test]
+#[cfg(not(target_pointer_width = "32"))]
+fn host_alloc_does_not_hand_out_truncated_pointer_on_host() {
+    // A real 64-bit heap address cannot be represented in u32, so host_alloc
+    // returns null instead of a truncated (un-freeable) pointer.
+    assert_eq!(crate::abi::host_alloc(8), 0);
 }
 
 #[test]

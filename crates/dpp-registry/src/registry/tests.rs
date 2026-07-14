@@ -214,7 +214,9 @@ fn valid_iso_country_passes() {
 }
 
 #[test]
-fn empty_country_passes_as_unknown() {
+fn empty_country_rejected() {
+    // `country` is a mandatory Annex III field — an empty value is a missing
+    // required identifier, not an acceptable "unknown".
     let fac = FacilityIdentifier {
         scheme: "national".into(),
         value: "FAC-001".into(),
@@ -222,7 +224,10 @@ fn empty_country_passes_as_unknown() {
         country: String::new(),
         address: None,
     };
-    assert!(fac.validate().is_ok());
+    assert!(matches!(
+        fac.validate(),
+        Err(RegistryValidationError::MissingRequiredField(_))
+    ));
 }
 
 #[test]
@@ -357,6 +362,52 @@ fn payload_with_invalid_gtin_fails() {
     assert!(matches!(
         payload.validate(),
         Err(RegistryValidationError::InvalidGtin { .. })
+    ));
+}
+
+#[test]
+fn empty_item_id_rejected() {
+    let mut payload = sample_payload();
+    payload.item_id = ProductItemIdentifier {
+        scheme: String::new(),
+        value: String::new(),
+        batch_id: None,
+    };
+    assert!(matches!(
+        payload.validate(),
+        Err(RegistryValidationError::MissingRequiredField(_))
+    ));
+}
+
+#[test]
+fn empty_sector_or_schema_version_rejected() {
+    let mut payload = sample_payload();
+    payload.sector = String::new();
+    assert!(matches!(
+        payload.validate(),
+        Err(RegistryValidationError::MissingRequiredField(_))
+    ));
+
+    let mut payload = sample_payload();
+    payload.schema_version = String::new();
+    assert!(matches!(
+        payload.validate(),
+        Err(RegistryValidationError::MissingRequiredField(_))
+    ));
+}
+
+#[test]
+fn empty_operator_name_rejected() {
+    let op = OperatorIdentifier {
+        scheme: "vat".into(),
+        value: "DE123456789".into(),
+        name: String::new(),
+        country: "DE".into(),
+        did: None,
+    };
+    assert!(matches!(
+        op.validate(),
+        Err(RegistryValidationError::MissingRequiredField(_))
     ));
 }
 

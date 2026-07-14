@@ -31,6 +31,32 @@ impl EffectiveDateBound {
     pub fn is_active_on(&self, date: NaiveDate) -> bool {
         date >= self.from && self.until.is_none_or(|u| date <= u)
     }
+
+    /// Error if `date` falls outside the effective period, distinguishing a
+    /// ruleset that is **not yet effective** (before `from`) from one that has
+    /// **expired** (after `until`) — so a pending `2100` stub is never reported
+    /// as "expired".
+    pub fn ensure_active_on(
+        &self,
+        id: &RulesetId,
+        date: NaiveDate,
+    ) -> Result<(), crate::error::CalcError> {
+        if date < self.from {
+            return Err(crate::error::CalcError::RulesetNotYetEffective {
+                id: id.0.clone(),
+                from: self.from.to_string(),
+            });
+        }
+        if let Some(until) = self.until
+            && date > until
+        {
+            return Err(crate::error::CalcError::RulesetExpired {
+                id: id.0.clone(),
+                until: until.to_string(),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Structured legal citation for a regulatory ruleset.

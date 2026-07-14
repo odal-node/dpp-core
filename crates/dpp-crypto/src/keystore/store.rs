@@ -298,8 +298,12 @@ impl KeyStore {
     }
 
     fn decrypt_record(&self, record: &KeyRecord) -> Result<KeyEntry> {
-        let nonce =
-            <&Nonce<U12>>::try_from(record.nonce.as_slice()).expect("nonce must be 12 bytes");
+        let nonce = <&Nonce<U12>>::try_from(record.nonce.as_slice()).map_err(|_| {
+            anyhow::anyhow!(
+                "stored nonce is not 12 bytes ({} bytes) — corrupt or legacy key record",
+                record.nonce.len()
+            )
+        })?;
         let mut raw = self
             .cipher
             .decrypt(nonce, record.encrypted_signing_key.as_ref())

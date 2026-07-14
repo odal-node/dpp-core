@@ -134,6 +134,36 @@ fn legacy_sha256_store_can_be_opened_and_migrated() {
 }
 
 #[test]
+fn malformed_nonce_returns_error_not_panic() {
+    // A legacy V1 store (raw HashMap, no HMAC) whose record carries a truncated
+    // nonce. Opening must succeed; loading must return an error rather than
+    // panicking on the 12-byte nonce check.
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!(
+        "test-keystore-badnonce-{}.json",
+        uuid::Uuid::now_v7()
+    ));
+
+    let record = KeyRecord {
+        encrypted_signing_key: vec![0u8; 48],
+        nonce: vec![0u8; 11], // truncated — not 12 bytes
+        fingerprint: "deadbeef".to_string(),
+        verifying_key_hex: format!("{:064x}", 0),
+        revoked: false,
+        algorithm: default_algorithm(),
+    };
+    let mut map: KeyRecordMap = HashMap::new();
+    map.insert("bad-key".to_string(), record);
+    std::fs::write(&path, serde_json::to_vec(&map).expect("serialize")).expect("write");
+
+    let store = KeyStore::open(&path, "any-pass").expect("open legacy store");
+    assert!(
+        store.load_key("bad-key").is_err(),
+        "malformed nonce must return Err, not panic"
+    );
+}
+
+#[test]
 fn archive_key_creates_archived_entry() {
     let store = temp_store();
     store.generate_key("issuer-arc").expect("generate");

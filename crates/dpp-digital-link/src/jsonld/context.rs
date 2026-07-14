@@ -30,14 +30,21 @@ pub fn passport_context() -> Value {
 }
 
 /// Wrap a passport JSON value in a JSON-LD envelope.
+///
+/// A non-object payload cannot be merged into the `@context` object; it is
+/// returned **unchanged** rather than silently discarded into a bare, empty
+/// envelope.
 pub fn frame_passport(passport: Value) -> Value {
-    let mut framed = passport_context();
-    if let Value::Object(ref mut ctx_map) = framed
-        && let Value::Object(passport_map) = passport
-    {
-        ctx_map.extend(passport_map);
+    match passport {
+        Value::Object(passport_map) => {
+            let mut framed = passport_context();
+            if let Value::Object(ref mut ctx_map) = framed {
+                ctx_map.extend(passport_map);
+            }
+            framed
+        }
+        other => other,
     }
-    framed
 }
 
 /// Extract the plain data from a JSON-LD framed passport (strip `@context`).

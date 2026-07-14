@@ -50,8 +50,12 @@ impl KeyStore {
 
         for (id, record) in map.iter() {
             // Decrypt with legacy cipher.
-            let nonce =
-                <&Nonce<U12>>::try_from(record.nonce.as_slice()).expect("nonce must be 12 bytes");
+            let nonce = <&Nonce<U12>>::try_from(record.nonce.as_slice()).map_err(|_| {
+                anyhow::anyhow!(
+                    "stored nonce is not 12 bytes ({} bytes) for key {id} — corrupt or legacy record",
+                    record.nonce.len()
+                )
+            })?;
             let mut raw = self
                 .cipher
                 .decrypt(nonce, record.encrypted_signing_key.as_ref())

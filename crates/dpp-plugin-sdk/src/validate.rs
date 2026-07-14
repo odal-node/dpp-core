@@ -218,6 +218,39 @@ impl<'a> Validator<'a> {
         self
     }
 
+    /// If present (and non-null), the value must be a finite number in `[min, max]`.
+    ///
+    /// For a field that is optional (its absence is meaningful) but must be
+    /// bounded when supplied — e.g. a 0–10 repairability score that gates a
+    /// verdict only when present.
+    pub fn optional_range(&mut self, key: &str, min: f64, max: f64) -> &mut Self {
+        let err = match present(self.input, key) {
+            None => None,
+            Some(v) => match v.as_f64().filter(|n| n.is_finite()) {
+                Some(n) if (min..=max).contains(&n) => None,
+                _ => Some((
+                    "out_of_range",
+                    format!("{key} must be a number in {min}..={max}"),
+                )),
+            },
+        };
+        self.push_opt(key, err);
+        self
+    }
+
+    /// If present (and non-null), the value must be a finite number ≥ 0.
+    pub fn optional_non_negative(&mut self, key: &str) -> &mut Self {
+        let err = match present(self.input, key) {
+            None => None,
+            Some(v) => match v.as_f64().filter(|n| n.is_finite()) {
+                Some(n) if n >= 0.0 => None,
+                _ => Some(("out_of_range", format!("{key} must be a finite number ≥ 0"))),
+            },
+        };
+        self.push_opt(key, err);
+        self
+    }
+
     /// Finish validation, returning every collected error at once.
     pub fn finish(&mut self) -> Result<(), PluginError> {
         if self.errors.is_empty() {
@@ -388,6 +421,55 @@ mod tests {
         assert!(Validator::new(&ok).optional_pct("x").finish().is_ok());
         let bad = json!({ "x": 101.0 });
         assert!(Validator::new(&bad).optional_pct("x").finish().is_err());
+    }
+
+    #[test]
+    fn optional_range_absent_ok_present_bounded() {
+        // Absent → ok (the field's absence is meaningful).
+        assert!(
+            Validator::new(&json!({}))
+                .optional_range("s", 0.0, 10.0)
+                .finish()
+                .is_ok()
+        );
+        // In range → ok.
+        assert!(
+            Validator::new(&json!({ "s": 6.0 }))
+                .optional_range("s", 0.0, 10.0)
+                .finish()
+                .is_ok()
+        );
+        // Out of range → err (the fail-open case the plugins guard against).
+        for bad in [json!({ "s": 999999.0 }), json!({ "s": -1.0 })] {
+            assert!(
+                Validator::new(&bad)
+                    .optional_range("s", 0.0, 10.0)
+                    .finish()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn optional_non_negative_absent_ok_negative_fails() {
+        assert!(
+            Validator::new(&json!({}))
+                .optional_non_negative("c")
+                .finish()
+                .is_ok()
+        );
+        assert!(
+            Validator::new(&json!({ "c": 0.0 }))
+                .optional_non_negative("c")
+                .finish()
+                .is_ok()
+        );
+        assert!(
+            Validator::new(&json!({ "c": -999.0 }))
+                .optional_non_negative("c")
+                .finish()
+                .is_err()
+        );
     }
 
     #[test]

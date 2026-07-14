@@ -33,7 +33,7 @@ fn manifest(version: &str, content: &serde_json::Value) -> RulesetManifest {
         effective_date: chrono::Utc::now(),
         act_citations: vec!["ESPR Art. 25".into()],
         schema_versions: BTreeMap::from([("textile".to_owned(), "2.0.0".to_owned())]),
-        content_sha256: content_hash(content),
+        content_sha256: content_hash(content).expect("finite test content hashes"),
     }
 }
 
@@ -123,5 +123,33 @@ fn malformed_jws_payload_not_json_is_refused() {
 fn content_hash_is_stable_for_key_order() {
     let a = serde_json::json!({ "a": 1, "b": 2 });
     let b = serde_json::json!({ "b": 2, "a": 1 });
-    assert_eq!(content_hash(&a), content_hash(&b));
+    assert_eq!(content_hash(&a).unwrap(), content_hash(&b).unwrap());
+}
+
+#[test]
+fn content_hash_errors_on_non_finite_float() {
+    // serde_json parses a huge exponent to f64::INFINITY; JCS (RFC 8785)
+    // rejects non-finite floats. content_hash must return Err, not panic.
+    let content: serde_json::Value = serde_json::from_str(r#"{ "x": 1e400 }"#).unwrap();
+    assert!(content["x"].as_f64().unwrap().is_infinite());
+    assert!(matches!(
+        content_hash(&content),
+        Err(RulesetError::Malformed(_))
+    ));
+}
+
+#[test]
+fn verify_bundle_errors_on_non_finite_content() {
+    // A well-signed bundle whose unauthenticated content holds a non-finite
+    // float must fail closed on the integrity step, not panic.
+    let content: serde_json::Value = serde_json::from_str(r#"{ "threshold": 1e400 }"#).unwrap();
+    let m = manifest("1.0.0", &serde_json::json!({ "threshold": 0 }));
+    let bundle = SignedBundle {
+        manifest_jws: fake_jws(&m),
+        content,
+    };
+    assert!(matches!(
+        verify_bundle(&bundle, "pubkey", &AlwaysOk),
+        Err(RulesetError::Malformed(_))
+    ));
 }

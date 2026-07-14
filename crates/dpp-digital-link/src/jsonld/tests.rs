@@ -14,11 +14,11 @@ fn frame_and_strip_round_trip() {
 }
 
 #[test]
-fn frame_passport_ignores_non_object_payload() {
-    // A non-object payload can't be merged into the context map — the framed
-    // result is just the bare context.
+fn frame_passport_preserves_non_object_payload() {
+    // A non-object payload can't be merged into the context map, but it must be
+    // returned intact rather than silently discarded into a bare envelope.
     let framed = frame_passport(json!("not-an-object"));
-    assert!(framed.get("@context").is_some());
+    assert_eq!(framed, json!("not-an-object"));
 }
 
 #[test]

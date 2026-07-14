@@ -14,10 +14,10 @@ mod unsold_goods;
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginError, PluginInput,
+    PluginMeta, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{str_of, Validator};
+use dpp_plugin_sdk::validate::{Validator, str_of};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -80,6 +80,9 @@ impl DppSectorPlugin for TextilePlugin {
                 .require_country("countryOfManufacturing")
                 .require_str("careInstructions")
                 .require_str("chemicalComplianceStandard")
+                .optional_pct("recycledContentPct")
+                .optional_non_negative("carbonFootprintKgCo2e")
+                .optional_range("repairScore", 0.0, 10.0)
                 .finish()
         }
     }
@@ -104,6 +107,7 @@ export_plugin!(TextilePlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dpp_plugin_sdk::traits::PluginComplianceStatus;
     use serde_json::json;
 
     fn textile() -> Value {
@@ -173,6 +177,61 @@ mod tests {
     fn unsold_exempt_without_justification_is_non_compliant() {
         let mut d = unsold();
         d["destination"] = json!("exempt_destruction");
+        assert_eq!(
+            TextilePlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    #[test]
+    fn out_of_range_fibre_pcts_are_non_compliant() {
+        // Sums to 100 but neither percentage is physically valid.
+        let mut d = textile();
+        d["fibreComposition"] = json!([
+            { "fibre": "cotton", "pct": 150.0 },
+            { "fibre": "wool", "pct": -50.0 }
+        ]);
+        assert_eq!(
+            TextilePlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    #[test]
+    fn fibre_entry_missing_pct_is_non_compliant() {
+        // One entry has no pct — an incomplete declaration, not a 100% cotton.
+        let mut d = textile();
+        d["fibreComposition"] = json!([
+            { "fibre": "cotton" },
+            { "fibre": "wool", "pct": 100.0 }
+        ]);
+        assert_eq!(
+            TextilePlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    #[test]
+    fn negative_carbon_footprint_fails_validation() {
+        let mut d = textile();
+        d["carbonFootprintKgCo2e"] = json!(-10.0);
+        assert!(TextilePlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn whitespace_only_justification_is_non_compliant() {
+        let mut d = unsold();
+        d["destination"] = json!("exempt_destruction");
+        d["destructionJustification"] = json!("          "); // 10 spaces
         assert_eq!(
             TextilePlugin
                 .calculate_metrics(&d)

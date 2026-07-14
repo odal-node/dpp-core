@@ -9,6 +9,16 @@ pub enum CalcError {
     #[error("ruleset '{id}' expired on {until}")]
     RulesetExpired { id: String, until: String },
 
+    /// The ruleset's effective period has not started yet (e.g. a pending
+    /// delegated act using the `2100-01-01` sentinel).
+    #[error("ruleset '{id}' is not yet effective (in force from {from})")]
+    RulesetNotYetEffective { id: String, from: String },
+
+    /// A computation overflowed to a non-finite value despite finite, in-range
+    /// inputs — a legally cited figure must never silently become Infinity.
+    #[error("calculation overflow: {0}")]
+    Overflow(String),
+
     /// The requested activity UUID is not present in the injected factor dataset.
     #[error("emission factor not found for activity '{0}'")]
     FactorNotFound(String),

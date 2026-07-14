@@ -83,8 +83,24 @@ impl DigitalLink {
             let raw_value = ai_segments[i + 1];
             let value = percent_decode(raw_value);
 
+            // GS1 mandates a maximum length per AI; enforce it so an untrusted
+            // URI cannot smuggle an unbounded value downstream.
+            let value_len = value.chars().count();
+            if value_len > desc.max_len {
+                return Err(DigitalLinkError::ValueTooLong {
+                    code: code.to_owned(),
+                    max_len: desc.max_len,
+                    actual: value_len,
+                });
+            }
+
             match desc.role {
                 AiRole::PrimaryKey => {
+                    // A second '01' segment must not silently overwrite the
+                    // GTIN parsed from the first.
+                    if gtin.is_some() {
+                        return Err(DigitalLinkError::DuplicatePrimaryKey);
+                    }
                     let padded = normalize_gtin_to_14(&value)?;
                     gtin = Some(Gtin::parse(&padded)?);
                 }
@@ -114,6 +130,14 @@ impl DigitalLink {
             }
 
             i += 2;
+        }
+
+        // An odd segment count leaves a trailing AI code with no value — reject
+        // it rather than silently dropping the dangling qualifier.
+        if i < ai_segments.len() {
+            return Err(DigitalLinkError::TrailingUnpairedSegment(
+                ai_segments[i].to_owned(),
+            ));
         }
 
         let gtin = gtin.ok_or(DigitalLinkError::MissingGtin)?;

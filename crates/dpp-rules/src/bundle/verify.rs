@@ -29,10 +29,15 @@ pub trait JwsVerify {
 ///
 /// Exposed so a signer builds the exact same `content_sha256` a verifier
 /// will later check against — one hash function, two call sites.
-#[must_use]
-pub fn content_hash(content: &serde_json::Value) -> String {
-    let bytes = serde_jcs::to_vec(content).expect("JCS canonicalisation is infallible");
-    hex::encode(Sha256::digest(&bytes))
+///
+/// # Errors
+/// [`RulesetError::Malformed`] if `content` cannot be JCS-canonicalised — RFC
+/// 8785 rejects non-finite floats (`NaN`/`Infinity`), which can appear in a
+/// bundle's unauthenticated `content` deserialized straight off the wire.
+pub fn content_hash(content: &serde_json::Value) -> Result<String, RulesetError> {
+    let bytes = serde_jcs::to_vec(content)
+        .map_err(|e| RulesetError::Malformed(format!("JCS canonicalisation failed: {e}")))?;
+    Ok(hex::encode(Sha256::digest(&bytes)))
 }
 
 /// Verify a bundle against the pinned publisher public key (base64url). Both
@@ -53,7 +58,7 @@ pub fn verify_bundle(
     // (2) The manifest is now trusted — extract it from the JWS payload.
     let manifest: RulesetManifest = decode_jws_payload(&bundle.manifest_jws)?;
     // (3) Integrity: content must hash to what the signed manifest commits to.
-    if content_hash(&bundle.content) != manifest.content_sha256 {
+    if content_hash(&bundle.content)? != manifest.content_sha256 {
         return Err(RulesetError::ContentHashMismatch);
     }
     Ok(VerifiedRuleset {

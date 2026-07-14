@@ -156,11 +156,42 @@ impl SectorCatalog {
         keys
     }
 
-    /// Register a new sector at runtime. Returns `AlreadyExists` if the key is
-    /// taken.
+    /// Register a new sector at runtime.
+    ///
+    /// Enforces the descriptor invariant the schema-resolution path relies on:
+    /// `current_schema_version` must be valid semver **and** one of
+    /// `schema_versions`. A descriptor violating either would otherwise let a
+    /// caller register a sector whose version fails to parse downstream, which
+    /// silently skips JSON-Schema validation for every passport in that sector.
+    ///
+    /// # Errors
+    /// - [`CatalogError::AlreadyExists`] if the key is already taken.
+    /// - [`CatalogError::InvalidSchemaVersion`] if `current_schema_version` is
+    ///   not valid semver.
+    /// - [`CatalogError::CurrentVersionNotListed`] if `current_schema_version`
+    ///   is not present in `schema_versions`.
     pub fn register(&mut self, descriptor: SectorDescriptor) -> Result<(), CatalogError> {
         if self.get(&descriptor.key).is_some() {
             return Err(CatalogError::AlreadyExists(descriptor.key));
+        }
+        if descriptor
+            .current_schema_version
+            .parse::<semver::Version>()
+            .is_err()
+        {
+            return Err(CatalogError::InvalidSchemaVersion {
+                key: descriptor.key,
+                version: descriptor.current_schema_version,
+            });
+        }
+        if !descriptor
+            .schema_versions
+            .contains(&descriptor.current_schema_version)
+        {
+            return Err(CatalogError::CurrentVersionNotListed {
+                key: descriptor.key,
+                version: descriptor.current_schema_version,
+            });
         }
         self.entries.push(descriptor);
         Ok(())
