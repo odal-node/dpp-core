@@ -11,7 +11,11 @@ use super::error::RegistryValidationError;
 
 fn validate_country_code(code: &str) -> Result<(), RegistryValidationError> {
     if code.is_empty() {
-        return Ok(()); // unknown/not-yet-set is acceptable pre-go-live
+        // `country` is a non-optional Annex III field; an empty value is a
+        // missing mandatory identifier, not an acceptable "unknown".
+        return Err(RegistryValidationError::MissingRequiredField(
+            "country".into(),
+        ));
     }
     if dpp_rules::country_code_valid(code) {
         Ok(())
@@ -70,6 +74,25 @@ pub struct ProductItemIdentifier {
     /// Batch or lot number, if applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub batch_id: Option<String>,
+}
+
+impl ProductItemIdentifier {
+    /// Validate the item identifier: `scheme` and `value` must both be
+    /// non-empty. Scheme-specific structural checks (SGTIN layout, etc.) are
+    /// deferred until the EU fixes item-identifier formats.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.scheme.is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "itemId.scheme".into(),
+            ));
+        }
+        if self.value.is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "itemId.value".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Facility identifier — identifies the manufacturing or assembly facility.
@@ -137,9 +160,14 @@ pub struct OperatorIdentifier {
 impl OperatorIdentifier {
     /// Validate the operator identifier.
     ///
-    /// Checks the country code first, then applies a per-scheme structural or
-    /// checksum check (see `validate_operator_scheme`).
+    /// Checks that `name` is present, then the country code, then applies a
+    /// per-scheme structural or checksum check (see `validate_operator_scheme`).
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.name.is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "operatorId.name".into(),
+            ));
+        }
         validate_country_code(&self.country)?;
         validate_operator_scheme(&self.scheme, &self.value)
     }

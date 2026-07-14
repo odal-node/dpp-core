@@ -89,17 +89,9 @@ pub fn calculate(
     validate_inputs(inputs)?;
     ruleset.validate_cross_fields(inputs)?;
 
-    let today = Utc::now().date_naive();
-    if !ruleset.effective_dates().is_active_on(today) {
-        return Err(CalcError::RulesetExpired {
-            id: ruleset.id().0.clone(),
-            until: ruleset
-                .effective_dates()
-                .until
-                .map(|d| d.to_string())
-                .unwrap_or_else(|| "open-ended".into()),
-        });
-    }
+    ruleset
+        .effective_dates()
+        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
 
     let w = ruleset.weights();
     let scale = 5.0; // scale 0–2 ordinals to 0–10

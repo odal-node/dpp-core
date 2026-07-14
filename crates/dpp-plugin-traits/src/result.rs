@@ -63,6 +63,28 @@ impl PluginFinding {
     }
 }
 
+/// Serialise a metric map, failing on any non-finite value instead of letting
+/// `serde_json` silently emit `null` for it.
+fn serialize_finite_metrics<S>(
+    metrics: &std::collections::HashMap<String, f64>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::{Error, SerializeMap};
+    let mut map = serializer.serialize_map(Some(metrics.len()))?;
+    for (key, value) in metrics {
+        if !value.is_finite() {
+            return Err(S::Error::custom(format!(
+                "metric '{key}' is not finite ({value})"
+            )));
+        }
+        map.serialize_entry(key, value)?;
+    }
+    map.end()
+}
+
 /// Compliance result returned by the plugin.
 ///
 /// `metrics` is a sector-extensible map of named numeric values. Use the
@@ -84,7 +106,12 @@ pub struct PluginResult {
     /// Typed compliance determination.
     pub compliance_status: PluginComplianceStatus,
     /// Sector-extensible keyed metric map (all values finite f64).
-    #[serde(default)]
+    ///
+    /// Serialisation **fails** on a non-finite value (`NaN`/`Infinity`) rather
+    /// than silently coercing it to JSON `null`, so a metric inserted directly
+    /// into this `pub` field (bypassing the `with_metric` guard) cannot slip
+    /// through the ABI envelope as a spurious success.
+    #[serde(default, serialize_with = "serialize_finite_metrics")]
     pub metrics: std::collections::HashMap<String, f64>,
     /// Non-numeric sector-specific data (free-form; stored verbatim in extra).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -185,8 +212,18 @@ pub enum AbiResult {
 
 impl AbiResult {
     /// Build a successful response by serialising `value`.
+    ///
+    /// If serialisation fails — e.g. a plugin inserted a non-finite `f64` into
+    /// `PluginResult.metrics`, bypassing the `with_metric` finite-value guard —
+    /// this returns the [`AbiResult::Error`] variant rather than a spurious
+    /// `Ok(null)`, so the failure is not silently swallowed.
     pub fn ok<T: Serialize>(value: &T) -> Self {
-        Self::Ok(serde_json::to_value(value).unwrap_or(serde_json::Value::Null))
+        match serde_json::to_value(value) {
+            Ok(v) => Self::Ok(v),
+            Err(e) => Self::Error(PluginError::Internal(format!(
+                "failed to serialise plugin result: {e}"
+            ))),
+        }
     }
 
     /// Returns `true` if this is the success variant.

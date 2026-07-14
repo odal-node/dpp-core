@@ -23,9 +23,10 @@ proptest! {
     }
 
     /// A canonical `/01/<gtin>/21/<serial>` URI round-trips: parse recovers the
-    /// same GTIN and serial. (Fixed valid GTIN; the serial is the varied part.)
+    /// same GTIN and serial. (Fixed valid GTIN; the serial is the varied part,
+    /// bounded to GS1 AI 21's 20-char max length.)
     #[test]
-    fn serial_round_trips(serial in "[A-Za-z0-9]{1,24}") {
+    fn serial_round_trips(serial in "[A-Za-z0-9]{1,20}") {
         let uri = format!("https://id.odal-node.io/01/09506000134352/21/{serial}");
         let dl = DigitalLink::parse(&uri).expect("canonical DL must parse");
         prop_assert_eq!(dl.gtin.as_str(), "09506000134352");

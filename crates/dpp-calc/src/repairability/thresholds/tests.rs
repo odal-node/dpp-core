@@ -43,13 +43,17 @@ fn stub_rulesets_expose_consistent_metadata() {
 
 #[test]
 fn calculating_with_a_not_yet_in_force_ruleset_is_rejected() {
-    // Laptop/Displays/Washing all carry the 2100 effective-date sentinel,
-    // so calculate() must refuse them via the RulesetExpired guard.
+    // Laptop/Displays/Washing all carry the 2100 effective-date sentinel, so
+    // calculate() must refuse them — and as *not yet effective*, not "expired"
+    // (the from=2100/until=None period has not started, it has not ended).
     for result in [
         calculate(&valid_inputs(), &LaptopRuleset),
         calculate(&valid_inputs(), &DisplaysRuleset),
         calculate(&valid_inputs(), &WashingMachineRuleset),
     ] {
-        assert!(matches!(result, Err(CalcError::RulesetExpired { .. })));
+        assert!(matches!(
+            result,
+            Err(CalcError::RulesetNotYetEffective { .. })
+        ));
     }
 }

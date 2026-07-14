@@ -6,11 +6,11 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, PluginCapabilities, PluginCapability,
+    PluginComplianceStatus, PluginError, PluginFieldError, PluginInput, PluginMeta, PluginResult,
+    SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, Validator};
+use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -54,7 +54,31 @@ impl DppSectorPlugin for DetergentPlugin {
             .require_str("format")
             .require_non_empty_array("surfactants")
             .require_country("countryOfManufacture")
-            .finish()
+            .optional_non_negative("co2ePerUnitKg")
+            .finish()?;
+
+        // Each surfactant must declare biodegradability as a boolean. The
+        // sector's one hard check ("all surfactants readily biodegradable") is
+        // only meaningful if the field is actually present — an omitted, null,
+        // or non-boolean value must be rejected, not silently pass as
+        // NotAssessed.
+        let mut errors = Vec::new();
+        if let Some(arr) = input.get("surfactants").and_then(Value::as_array) {
+            for (i, s) in arr.iter().enumerate() {
+                if s.get("biodegradable").and_then(Value::as_bool).is_none() {
+                    errors.push(PluginFieldError {
+                        field: format!("/surfactants/{i}/biodegradable"),
+                        code: "missing".into(),
+                        message: "each surfactant must declare biodegradable as a boolean".into(),
+                    });
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(PluginError::ValidationErrors(errors))
+        }
     }
 
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
@@ -71,8 +95,7 @@ impl DppSectorPlugin for DetergentPlugin {
         } else {
             PluginComplianceStatus::NotAssessed
         };
-        Ok(PluginResult::new(status)
-            .maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerUnitKg")))
+        Ok(PluginResult::new(status).maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerUnitKg")))
     }
 
     fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
@@ -129,6 +152,21 @@ mod tests {
     fn empty_surfactants_fails_validation() {
         let mut d = valid();
         d["surfactants"] = json!([]);
+        assert!(DetergentPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn undeclared_biodegradable_fails_validation() {
+        // biodegradable omitted must be rejected, not silently NotAssessed.
+        let mut d = valid();
+        d["surfactants"] = json!([{ "name": "LAS", "concentrationBand": "5-15%" }]);
+        assert!(DetergentPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn negative_co2e_fails_validation() {
+        let mut d = valid();
+        d["co2ePerUnitKg"] = json!(-999.0);
         assert!(DetergentPlugin.validate_input(&d).is_err());
     }
 }

@@ -218,6 +218,46 @@ fn abi_result_ok_round_trip() {
 }
 
 #[test]
+fn abi_result_ok_rejects_non_finite_metric() {
+    // A plugin can insert a non-finite metric directly into the pub `metrics`
+    // field, bypassing the `with_metric` finite guard. Serialisation must fail,
+    // and `AbiResult::ok` must surface that as an Error — not a spurious Ok
+    // carrying a silently-nulled metric.
+    let mut result = PluginResult::new(PluginComplianceStatus::Compliant);
+    result
+        .metrics
+        .insert(METRIC_CO2E_SCORE.to_owned(), f64::INFINITY);
+    let envelope = AbiResult::ok(&result);
+    assert!(
+        !envelope.is_ok(),
+        "a non-finite metric must surface as an error, not Ok"
+    );
+}
+
+#[test]
+fn non_semver_range_bound_does_not_lexicographically_match() {
+    // A range with an unparseable bound must not fall back to string comparison
+    // (where "1.9.0" > "1.10.0"); the range simply can't match, so the check
+    // fails closed rather than returning a misleading answer.
+    let caps = PluginCapabilities {
+        abi_version: AbiVersion::current(),
+        supported_schemas: vec![SchemaVersionRange {
+            min_version: "1.0".into(), // not valid semver
+            max_version: "1.10.0".into(),
+        }],
+        capabilities: vec![],
+        min_host_version: None,
+        max_fuel: None,
+        max_memory_bytes: None,
+    };
+    let result = check_compatibility(&caps, Some("1.9.0"), &[]);
+    assert!(matches!(
+        result,
+        CompatibilityStatus::SchemaUnsupported { .. }
+    ));
+}
+
+#[test]
 fn abi_result_error_round_trip() {
     let envelope = AbiResult::Error(PluginError::ValidationErrors(vec![PluginFieldError {
         field: "/gtin".into(),

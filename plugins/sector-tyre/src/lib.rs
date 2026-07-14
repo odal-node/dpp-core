@@ -7,11 +7,11 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginInput,
+    PluginMeta, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, Validator};
+use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -51,11 +51,12 @@ impl DppSectorPlugin for TyrePlugin {
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
             .require_gtin("gtin")
-            .require_str("tyreClass")
+            .require_enum("tyreClass", &["C1", "C2", "C3"])
             .require_enum("fuelEfficiencyClass", &["A", "B", "C", "D", "E"])
             .require_enum("wetGripClass", &["A", "B", "C", "D", "E"])
             .require_non_negative("externalRollingNoiseDb")
             .optional_pct("recycledRubberPct")
+            .optional_non_negative("co2ePerTyreKg")
             .finish()
     }
 
@@ -102,6 +103,20 @@ mod tests {
     fn old_a_to_g_grip_scale_is_rejected() {
         let mut d = valid();
         d["wetGripClass"] = json!("F"); // 2020/740 is A–E only
+        assert!(TyrePlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn invalid_tyre_class_is_rejected() {
+        let mut d = valid();
+        d["tyreClass"] = json!("garbage"); // must be C1/C2/C3
+        assert!(TyrePlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn negative_co2e_per_tyre_is_rejected() {
+        let mut d = valid();
+        d["co2ePerTyreKg"] = json!(-50.0);
         assert!(TyrePlugin.validate_input(&d).is_err());
     }
 }

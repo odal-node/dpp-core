@@ -98,6 +98,48 @@ fn register_runtime_sector() {
     ));
 }
 
+fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescriptor {
+    SectorDescriptor {
+        key: "plastics".into(),
+        title: "Plastics".into(),
+        status: RegulatoryStatus::Provisional,
+        legal_basis: vec!["ESPR Working Plan".into()],
+        dpp_applies_from: None,
+        retention_years: 10,
+        schema_versions: versions,
+        current_schema_version: current.into(),
+        product_categories: vec![],
+        access_tiers: std::collections::HashMap::new(),
+        plugin: None,
+        notes: None,
+    }
+}
+
+#[test]
+fn register_rejects_invalid_current_schema_version() {
+    let mut catalog = SectorCatalog::new();
+    let descriptor = provisional_descriptor("not-semver", vec!["not-semver".into()]);
+    assert!(matches!(
+        catalog.register(descriptor),
+        Err(CatalogError::InvalidSchemaVersion { .. })
+    ));
+    // A rejected descriptor must never reach the catalog — otherwise every
+    // passport in that sector silently skips schema validation.
+    assert_eq!(catalog.len(), 11);
+}
+
+#[test]
+fn register_rejects_current_version_not_in_list() {
+    let mut catalog = SectorCatalog::new();
+    // Valid semver, but not one of the declared schema_versions.
+    let descriptor = provisional_descriptor("2.0.0", vec!["1.0.0".into()]);
+    assert!(matches!(
+        catalog.register(descriptor),
+        Err(CatalogError::CurrentVersionNotListed { .. })
+    ));
+    assert_eq!(catalog.len(), 11);
+}
+
 /// Parity guard: the closed [`Sector`](crate::domain::sector::Sector) enum
 /// and the open [`SectorCatalog`] must describe the same set of
 /// *compile-time* sectors. Runtime-registered sectors degrade to

@@ -28,6 +28,18 @@ pub enum DigitalLinkError {
         after: String,
         after_ord: u8,
     },
+    #[error("URI contains more than one '/01/' GTIN (primary key) segment")]
+    DuplicatePrimaryKey,
+    #[error("URI has a trailing Application Identifier '{0}' with no value")]
+    TrailingUnpairedSegment(String),
+    #[error(
+        "Application Identifier '{code}' value exceeds its maximum length of {max_len} (got {actual})"
+    )]
+    ValueTooLong {
+        code: String,
+        max_len: usize,
+        actual: usize,
+    },
 }
 
 impl From<GtinError> for DigitalLinkError {

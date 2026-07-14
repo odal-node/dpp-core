@@ -8,12 +8,12 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginInput,
+    PluginMeta, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, str_of, Validator};
-use serde_json::{json, Value};
+use dpp_plugin_sdk::validate::{Validator, num, str_of};
+use serde_json::{Value, json};
 
 #[derive(Default)]
 struct SteelPlugin;
@@ -55,7 +55,10 @@ impl DppSectorPlugin for SteelPlugin {
             .require_non_negative("co2ePerTonneSteel")
             .require_pct("recycledScrapContentPct")
             .require_str("productCategory")
-            .require_str("productionRoute")
+            .require_enum(
+                "productionRoute",
+                &["blast-furnace", "electric-arc", "direct-reduction"],
+            )
             .require_country("countryOfProduction")
             .finish()
     }
@@ -69,7 +72,9 @@ impl DppSectorPlugin for SteelPlugin {
             "blast-furnace" => 2.1,
             "electric-arc" => 0.4,
             "direct-reduction" => 1.0,
-            _ => 2.5, // conservative default for unknown routes
+            // Unreachable after validate_input rejects unknown routes; fail
+            // closed on the strictest threshold rather than the most permissive.
+            _ => 0.4,
         };
         let status = if co2e.is_some_and(|v| v <= threshold) {
             PluginComplianceStatus::Compliant
@@ -132,5 +137,19 @@ mod tests {
         let mut d = valid();
         d.as_object_mut().unwrap().remove("countryOfProduction");
         assert!(SteelPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn unrecognized_production_route_fails_validation() {
+        // A wrong-case or unlisted route must be rejected, not scored against
+        // the most-permissive wildcard threshold.
+        for route in ["Electric-Arc", "electric_arc", "unknown"] {
+            let mut d = valid();
+            d["productionRoute"] = json!(route);
+            assert!(
+                SteelPlugin.validate_input(&d).is_err(),
+                "route {route:?} should fail validation"
+            );
+        }
     }
 }

@@ -5,12 +5,12 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginInput,
+    PluginMeta, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, str_of, Validator};
-use serde_json::{json, Value};
+use dpp_plugin_sdk::validate::{Validator, num, str_of};
+use serde_json::{Value, json};
 
 #[derive(Default)]
 struct AluminiumPlugin;
@@ -50,7 +50,10 @@ impl DppSectorPlugin for AluminiumPlugin {
         Validator::new(input)
             .require_gtin("gtin")
             .require_str("alloyGrade")
-            .require_str("productionRoute")
+            .require_enum(
+                "productionRoute",
+                &["primary", "secondary-recycled", "mixed"],
+            )
             .require_non_negative("co2ePerTonneKg")
             .require_pct("recycledContentPct")
             .require_country("countryOfProduction")
@@ -66,7 +69,9 @@ impl DppSectorPlugin for AluminiumPlugin {
             "primary" => 10_000.0,
             "secondary-recycled" => 1_000.0,
             "mixed" => 5_000.0,
-            _ => 12_000.0, // conservative default
+            // Unreachable after validate_input rejects unknown routes; fail
+            // closed on the strictest threshold rather than the most permissive.
+            _ => 1_000.0,
         };
         let status = if co2e_kg.is_some_and(|v| v <= threshold_kg) {
             PluginComplianceStatus::Compliant
@@ -136,5 +141,19 @@ mod tests {
         let mut d = valid();
         d["recycledContentPct"] = json!(120.0);
         assert!(AluminiumPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn unrecognized_production_route_fails_validation() {
+        // Wrong case / unlisted route must be rejected, not fall through to the
+        // most-permissive threshold.
+        for route in ["Primary", "electric_arc", "unknown"] {
+            let mut d = valid();
+            d["productionRoute"] = json!(route);
+            assert!(
+                AluminiumPlugin.validate_input(&d).is_err(),
+                "route {route:?} should fail validation"
+            );
+        }
     }
 }
