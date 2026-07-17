@@ -13,6 +13,65 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-17
+
+### Added
+
+- **`dpp-digital-link::short_serial`** — derives a GS1-conformant AI 21 serial
+  from a passport UUID: the first 10 bytes encoded as lowercase hex, exactly
+  20 characters, drawn only from `[0-9a-f]` (URL-safe and within the GS1
+  encodable set). Non-sequential, so a public carrier leaks no production
+  volume. This is the intended way to put a passport id on a physical carrier
+  now that AI value lengths are enforced (see Breaking).
+- **Typed errors for the new validation** (additive variants):
+  `DigitalLinkError::ValueTooLong` (an AI value exceeds its GS1 length cap);
+  `dpp-calc` kernel errors for a ruleset whose effective period has not started
+  and for a computation that overflows to a non-finite value; catalog
+  descriptor errors for a `current_schema_version` that is not valid semver or
+  not listed in `schema_versions`.
+
+### Breaking
+
+- **GS1 AI value lengths are enforced at parse time.** `DigitalLink` parsing
+  rejects an AI value exceeding its GS1 General Specifications cap with
+  `DigitalLinkError::ValueTooLong { code, max_len, actual }` — notably a serial
+  (AI 21) longer than 20 characters, which previous releases accepted. A raw
+  36-character passport UUID can no longer be carried in AI 21. *Migration:*
+  derive the carrier serial with the new `short_serial`, or supply your own
+  GS1-conformant value. `build_qr_url` documents the same contract: GTIN
+  (AI 01), optional batch/lot (AI 10), serial (AI 21) — values percent-encoded,
+  serial GS1-conformant.
+
+### Fixed
+
+- **Non-finite values can no longer masquerade as results.** A plugin metric
+  inserted directly into `PluginResult.metrics` (bypassing the `with_metric`
+  guard) fails serialisation on `NaN`/`Infinity` instead of silently becoming
+  JSON `null`, and the ABI envelope returns `AbiResult::Error` rather than a
+  spurious success. `dpp-calc` refuses a computation that overflows to a
+  non-finite value — a legally cited figure must never silently become
+  Infinity.
+- `dpp-calc` rejects a ruleset whose effective period has not started (e.g. a
+  pending delegated act using the `2100-01-01` sentinel) instead of computing
+  against it.
+- Catalog descriptor validation: `current_schema_version` must be valid semver
+  and appear in `schema_versions`.
+- Input-validation and error-handling hardening across the keystore (migration
+  and store), registry identifier parsing, passport validation functions,
+  rules bundle verification, JSON-LD context handling, and the in-repo Wasm
+  sector plugins.
+
+### Documentation
+
+- `docs/architecture/IDENTITY.md` §6 rewritten to the shipped carrier design:
+  the QR encodes a GS1 Digital Link built from verified passport fields on the
+  deployment's configured resolver base (replaces the description of a
+  proprietary-path scheme with a `sig` hint that was never implemented).
+- `README.md` proof-bound wording made precise (what is discarded vs. what is
+  retained and served under tiered access) and the standards sentence corrected
+  (six of the eight JTC 24 ENs published 27 May 2026; EN 18239/18246 pending).
+- `docs/regulatory/CONFORMITY.md` standards currency updated.
+
 ## [0.8.0] - 2026-07-13
 
 ### Added

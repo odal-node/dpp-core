@@ -18,7 +18,7 @@ pub use aas::{
 };
 pub use digital_link::{
     AI_TABLE, AiDescriptor, AiRole, DigitalLink, DigitalLinkError, ai_descriptor, build_qr_url,
-    validate_gtin,
+    short_serial, validate_gtin,
 };
 pub use linktype::{
     AccessTier, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,

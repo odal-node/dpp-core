@@ -119,13 +119,18 @@ The verifier:
 
 ## 6. QR Code Trust Anchor
 
-The QR code on a physical product encodes:
+The carrier (QR or Data Matrix) on a physical product encodes a **GS1 Digital Link** URI, not a proprietary path:
 
 ```
-https://p.odal-node.io/{dpp_id}?sig={sig_hash}
+{resolver_base}/01/{gtin}/10/{batchId}/21/{dpp_id}
 ```
 
-Where `sig_hash` is `base64url(sha256(jws_compact)[0..16])` — 22 characters. The full JWS (~180 characters) would require Version 7+ QR codes, which are difficult to scan on small or damaged labels. The `sig` hint is an anti-counterfeiting layer that binds the physical QR print to a specific JWS signature.
+- `resolver_base` is per-deployment configuration (`RESOLVER_BASE_URL`). A self-hoster sets it to their **own domain**, so the printed label carries the same trust root as their `did:web` identity; Odal's managed default is `https://id.odal-node.io`.
+- The `/10/{batchId}` (batch/lot) segment is omitted when the passport carries no batch.
+- The GTIN and identifier come from the **verified** passport fields — the resolver checks the JWS before building the URI and never trusts a stored `qrCodeUrl` value.
+- The `/21/` serial segment carries a GS1-conformant 20-character serial derived from the passport id — a raw 36-character UUID exceeds the GS1 AI 21 limit.
+
+The carrier **fails closed**: if the passport does not verify, no URI is produced; if the sector data has no GTIN (for example an unsold-goods report), resolution returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital Link, any conformant resolver serving the same path answers the same scan — re-homing a passport is a DNS or registry change, not a reprint.
 
 ---
 

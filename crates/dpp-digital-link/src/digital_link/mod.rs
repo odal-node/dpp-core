@@ -38,4 +38,4 @@ pub use ai::{AI_TABLE, AiDescriptor, AiRole, ai_descriptor};
 pub use error::DigitalLinkError;
 pub use gtin::validate_gtin;
 pub use link::DigitalLink;
-pub use qr::build_qr_url;
+pub use qr::{build_qr_url, short_serial};

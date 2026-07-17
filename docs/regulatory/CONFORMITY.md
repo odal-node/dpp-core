@@ -13,7 +13,7 @@ programme evaluators.
 | Reference | Status | dpp-core Alignment |
 |---|---|---|
 | ESPR (EU) 2024/1781 | In force | Core data model follows Art. 8–13 requirements |
-| CEN/CLC JTC 24 system standards | **Published 2026** — EN 18216–18246 (OJEU harmonisation citation pending) | Schema fields and API/authentication semantics tracked clause-by-clause against the published ENs |
+| CEN/CLC JTC 24 system standards | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | Schema fields and API/authentication semantics tracked clause-by-clause against the published ENs |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Pending — an ESPR working-plan priority | `TextileData` struct held provisional; validated structurally until the act finalises |
 | GS1 Digital Link v1.2 | Published | `DigitalLink` parser covers AI 01, 21, 10 |
@@ -79,8 +79,9 @@ time via `include_str!()`.
 
 ### JTC 24 Field Coverage
 
-The textile v1.1.0 schema covers the fields carried by the published
-CEN/CLC JTC 24 system standards (EN 18216–18246, 2026) and their data-model
+The textile v1.1.0 schema covers the fields carried by the
+CEN/CLC JTC 24 system standards (the six ENs published May 2026 —
+EN 18216/18219/18220/18221/18222/18223) and their data-model
 semantics:
 
 - `fibreComposition` (with per-fibre `countryOfOrigin`)
