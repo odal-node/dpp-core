@@ -13,13 +13,13 @@ Anyone building DPP tooling can use this library as the foundation. It is the st
 
 > Note: This project is in active development.
 
-> *"We provide the pipe, not the truth."* Odal Node uses a **proof-bound architecture**: product data is validated locally, signed with your key, and published as a verifiable passport — the raw inputs are discarded after signing, never retained by the node. What the world sees is a cryptographic proof; what the node keeps is only that signed proof.
+> *"We provide the pipe, not the truth."* Odal Node uses a **proof-bound architecture**: product data is validated locally, signed with your key, and published as a verifiable passport. The transient import files are discarded after signing; the signed passport itself — the full product data, every field bound to a proof and gated by access tier — is what the node retains and serves. What the world verifies is a cryptographic proof over real, tiered data, not a bare hash standing in for it.
 
 ---
 
 ## Why This Exists
 
-EU law is switching on machine-readable Digital Product Passports sector by sector: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow in 2029, and the ESPR working plan queues textiles, steel and more behind them. The eight European system standards (EN 18216–18246) published in 2026. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
+EU law is switching on machine-readable Digital Product Passports sector by sector: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow in 2029, and the ESPR working plan queues textiles, steel and more behind them. The first six European DPP system standards (EN 18216/18219/18220/18221/18222/18223) were published in May 2026; the remaining two (EN 18239 access/security, EN 18246 authentication) are at FprEN stage, expected around September 2026. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
 
 **Odal is that infrastructure**: sovereign, standards-compliant, self-hostable. No vendor lock-in, no black-box algorithms, no enterprise-tier licensing.
 
@@ -62,7 +62,7 @@ dpp-core/
 | **ESPR** (EU 2024/1781) | In force; unsold-goods rules (Art. 24/25) apply since Jul 2026 | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), unsold-goods sector, transfer-of-responsibility design (not a distinct ESPR article — see below) |
 | **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, sector schema |
 | **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
-| **CEN/CLC JTC 24 system standards** | **Published 2026** (EN 18216–18246; OJEU harmonisation citation pending) | Conformance tracked clause-by-clause; identifiers, carriers, API and authentication semantics aligned |
+| **CEN/CLC JTC 24 system standards** | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | Conformance tracked clause-by-clause; identifiers, carriers, API and authentication semantics aligned |
 | **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
 | **IDTA AAS Metamodel** | Published | DPP-to-AAS SubmodelElement mapping |
 | **W3C VC Data Model v2.0** | Published | `DppAccessCredential` with role-based access tiers |
