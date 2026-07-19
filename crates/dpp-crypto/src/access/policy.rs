@@ -85,11 +85,25 @@ impl SectorAccessPolicy {
     }
 
     /// Default access policy for top-level passport fields (sector-agnostic).
+    ///
+    /// **Invariant — nothing mutable-after-publish may sit at `Public`.** The
+    /// public view is what a passport's public signature is computed over, so a
+    /// `Public` field that can still change after publish makes the served view
+    /// stop verifying against its own signature. A field that must stay
+    /// re-writable post-publish therefore has to be tiered *up*, out of the
+    /// signed public payload — see `lintResult` below.
     pub fn passport_default() -> Self {
         let mut field_tiers = HashMap::new();
 
         // Professional tier
         field_tiers.insert("batchId".into(), AccessTier::Professional);
+        // `lintResult` is advisory plausibility output that is deliberately
+        // re-computable at any time (including after publish), and every re-run
+        // restamps `assessedAt`. Keeping it Public would put a guaranteed-to-
+        // change field inside the signed public view. It is also operator- and
+        // auditor-facing QA data — the findings carry free-text messages about
+        // *our own* data quality — which is not consumer-facing content.
+        field_tiers.insert("lintResult".into(), AccessTier::Professional);
 
         // Confidential tier — signature / internal
         field_tiers.insert("jwsSignature".into(), AccessTier::Confidential);
