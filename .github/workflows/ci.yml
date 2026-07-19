@@ -32,7 +32,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   test:
     name: Tests (unit + integration)
@@ -43,10 +43,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      # --all-features is load-bearing: no crate in this workspace enables
+      # dpp-rules' `bundle` feature, so without it the signed-ruleset format and
+      # its fail-closed verification are never built or tested in CI.
       - name: Unit tests
-        run: cargo nextest run --workspace --lib
+        run: cargo nextest run --workspace --all-features --lib
       - name: Integration tests
-        run: cargo nextest run --workspace --test '*'
+        run: cargo nextest run --workspace --all-features --test '*'
       - name: Assert integration count > 0
         run: |
           COUNT=$(cargo test -p dpp-tests --tests -- --list 2>&1 | grep -c ': test' || echo 0)
