@@ -134,6 +134,41 @@ These types are explicitly unstable and will be updated when the official
 specification is published. (The expected go-live date has shifted; verify
 against EUR-Lex / the Commission before relying on any specific date.)
 
+## Transfer-of-Responsibility Article Pin
+
+Verified against the OJ text of Regulation (EU) 2024/1781, 2026-07-04, to
+resolve an internal citation ambiguity (the transfer-of-responsibility
+obligation had been cited inconsistently as either Art. 9 or Art. 12):
+
+- **No single article establishes a transfer-of-responsibility mechanism**
+  for a DPP moving between economic operators (resale, recycler take-over,
+  insolvency succession, etc.).
+- **Art. 11(e)** is the closest fit: it requires the passport to "remain
+  available ... including after an insolvency, a liquidation or a cessation
+  of activity ... of the economic operator responsible for the creation of
+  the digital product passport" — a continuity/availability obligation, not
+  a transfer-mechanics one.
+- **Art. 10(4)** is the adjacent back-up-copy obligation (via a DPP service
+  provider), already cited above.
+- **Art. 9** establishes no transfer *mechanism*, but it is not silent
+  either: alongside the placing-on-market gate, **Art. 9(1)** requires that
+  passport data "shall be accurate, complete and up to date" — the standing
+  duty that makes a stale post-transfer passport non-compliant. That duty,
+  together with the registry-upload duty (**Art. 13(4)**), is the narrow
+  basis cited in `docs/regulatory/CONFORMITY.md` and
+  `dpp-registry::registry::transfer`; it stands and is not superseded here.
+- **Art. 12** (unique-*identifier* issuance mechanics, not registry upload)
+  does not address transfer at all — the "Art. 12" leg of the earlier
+  "Art. 9/12" citation was not traceable to operative text and is superseded
+  by this entry.
+
+Given no article mandates transfer mechanics, `domain::transfer`'s
+dual-signed transfer handshake is a design choice that satisfies — and
+exceeds — Art. 11(e)'s continuity requirement; it is not a literal
+implementation of a numbered transfer obligation, because none exists.
+Treat this as engineering due diligence, not legal advice — verify
+independently before relying on it in a filing or contract.
+
 ## Transparency Commitments
 
 1. **All compliance-relevant code is open-source** under Apache-2.0.
