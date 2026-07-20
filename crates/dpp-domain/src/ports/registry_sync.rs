@@ -81,10 +81,7 @@ impl RegistrationRequest {
         passport: &crate::domain::passport::Passport,
         country_code: &str,
     ) -> Self {
-        let product_category = serde_json::to_value(&passport.sector)
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or_default();
+        let product_category = passport.sector.wire_str().to_owned();
         Self {
             passport_id: passport.id,
             operator_identifier: passport.operator_identifier.clone().unwrap_or_default(),

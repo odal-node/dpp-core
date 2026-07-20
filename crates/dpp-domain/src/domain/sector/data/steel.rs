@@ -21,5 +21,6 @@ pub struct SteelData {
     /// Steel production route — determines carbon intensity calculation basis.
     pub production_route: ProductionRoute,
     /// Annual production volume in tonnes (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub annual_production_tonnes: Option<f64>,
 }

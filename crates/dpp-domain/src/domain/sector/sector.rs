@@ -66,4 +66,57 @@ impl Sector {
             Self::Other => "other",
         }
     }
+
+    /// The serde wire tag for this sector (its `camelCase` JSON discriminant),
+    /// e.g. `"unsoldGoods"` — distinct from [`Self::catalog_key`], which is
+    /// kebab-case (`"unsold-goods"`) and used by the schema registry/catalog.
+    ///
+    /// Equivalent to `serde_json::to_value(self)` but without the allocation
+    /// and `Value` round trip.
+    pub const fn wire_str(&self) -> &'static str {
+        match self {
+            Self::Battery => "battery",
+            Self::Textile => "textile",
+            Self::UnsoldGoods => "unsoldGoods",
+            Self::Steel => "steel",
+            Self::Electronics => "electronics",
+            Self::Construction => "construction",
+            Self::Tyre => "tyre",
+            Self::Toy => "toy",
+            Self::Aluminium => "aluminium",
+            Self::Furniture => "furniture",
+            Self::Detergent => "detergent",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wire_str_matches_serde_serialization() {
+        for sector in [
+            Sector::Battery,
+            Sector::Textile,
+            Sector::UnsoldGoods,
+            Sector::Steel,
+            Sector::Electronics,
+            Sector::Construction,
+            Sector::Tyre,
+            Sector::Toy,
+            Sector::Aluminium,
+            Sector::Furniture,
+            Sector::Detergent,
+            Sector::Other,
+        ] {
+            let serialized = serde_json::to_value(&sector).unwrap();
+            assert_eq!(
+                serialized.as_str().unwrap(),
+                sector.wire_str(),
+                "wire_str() disagrees with serde for {sector:?}"
+            );
+        }
+    }
 }

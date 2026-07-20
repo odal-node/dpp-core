@@ -17,6 +17,12 @@ use crate::domain::{
     passport::{Passport, PassportId},
 };
 
+/// The archive deadline for a passport retained `years` from `now` — the
+/// shared 365-day-per-year approximation used by every archive adapter.
+pub(crate) fn retention_deadline(now: DateTime<Utc>, years: u32) -> DateTime<Utc> {
+    now + chrono::Duration::days(365 * i64::from(years))
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────
 
 /// Confirmation receipt from the third-party archive.
@@ -173,7 +179,7 @@ pub mod stub {
             retention_years: u32,
         ) -> Result<ArchiveReceipt, DppError> {
             let now = Utc::now();
-            let retention_until = now + chrono::Duration::days(365 * retention_years as i64);
+            let retention_until = retention_deadline(now, retention_years);
             let hash = Self::hash_passport(passport);
             let receipt = ArchiveReceipt {
                 archive_id: format!("ARCHIVE-{}", uuid::Uuid::now_v7()),

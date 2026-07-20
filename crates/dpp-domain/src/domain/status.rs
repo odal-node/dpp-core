@@ -38,16 +38,24 @@ pub enum PassportStatus {
     Deactivated,
 }
 
-impl Serialize for PassportStatus {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(match self {
+impl PassportStatus {
+    /// The API wire string for this status — shared by [`Serialize`] and
+    /// [`std::fmt::Display`] so the two can never drift on the mapping.
+    const fn wire_str(&self) -> &'static str {
+        match self {
             PassportStatus::Draft => "draft",
             PassportStatus::Published => "active",
             PassportStatus::Suspended => "suspended",
             PassportStatus::Archived => "archived",
             PassportStatus::Superseded => "superseded",
             PassportStatus::Deactivated => "deactivated",
-        })
+        }
+    }
+}
+
+impl Serialize for PassportStatus {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.wire_str())
     }
 }
 
@@ -97,15 +105,7 @@ impl PassportStatus {
 
 impl std::fmt::Display for PassportStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            PassportStatus::Draft => "draft",
-            PassportStatus::Published => "active",
-            PassportStatus::Suspended => "suspended",
-            PassportStatus::Archived => "archived",
-            PassportStatus::Superseded => "superseded",
-            PassportStatus::Deactivated => "deactivated",
-        };
-        write!(f, "{s}")
+        write!(f, "{}", self.wire_str())
     }
 }
 
