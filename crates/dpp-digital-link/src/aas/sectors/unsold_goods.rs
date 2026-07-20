@@ -1,18 +1,12 @@
 use dpp_domain::domain::sector::UnsoldGoodsReport;
 
 use crate::aas::model::{AasSemId, AasSubmodel};
-use crate::aas::property::{double_property, string_property};
+use crate::aas::property::{double_property, enum_wire_str, string_property};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &str) -> AasSubmodel {
-    let reason_str = serde_json::to_value(&r.reason)
-        .ok()
-        .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_default();
-    let destination_str = serde_json::to_value(&r.destination)
-        .ok()
-        .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_default();
+    let reason_str = enum_wire_str(&r.reason);
+    let destination_str = enum_wire_str(&r.destination);
     let mut elements = vec![
         string_property("reportingPeriod", &r.reporting_period, None, None),
         double_property("volumeKg", r.volume_kg, None, Some("kg")),

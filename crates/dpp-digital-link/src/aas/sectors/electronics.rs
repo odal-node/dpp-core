@@ -1,7 +1,9 @@
 use dpp_domain::domain::sector::ElectronicsData;
 
 use crate::aas::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{boolean_property, double_property, integer_property, string_property};
+use crate::aas::property::{
+    boolean_property, double_property, enum_wire_str, integer_property, string_property,
+};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str) -> AasSubmodel {
@@ -10,10 +12,7 @@ pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str)
         string_property("productCategory", &e.product_category, None, None),
         string_property(
             "energyEfficiencyClass",
-            &serde_json::to_value(&e.energy_efficiency_class)
-                .ok()
-                .and_then(|j| j.as_str().map(String::from))
-                .unwrap_or_default(),
+            &enum_wire_str(&e.energy_efficiency_class),
             None,
             None,
         ),

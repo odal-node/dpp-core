@@ -1,7 +1,7 @@
 use dpp_domain::domain::sector::FurnitureData;
 
 use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{double_property, string_property};
+use crate::aas::property::{double_property, string_property, svhc_substance_element};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> AasSubmodel {
@@ -50,19 +50,13 @@ pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> 
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                let mut elems = vec![
-                    string_property("casNumber", &s.cas_number, None, None),
-                    string_property("substanceName", &s.substance_name, None, None),
-                    double_property("concentrationPct", s.concentration_pct, None, Some("%")),
-                ];
-                if let Some(ref loc) = s.location_in_product {
-                    elems.push(string_property("locationInProduct", loc, None, None));
-                }
-                AasSubmodelElement::SubmodelElementCollection(AasCollection {
-                    id_short: format!("svhc_{i}"),
-                    value: elems,
-                    semantic_id: None,
-                })
+                AasSubmodelElement::SubmodelElementCollection(svhc_substance_element(
+                    i,
+                    &s.cas_number,
+                    &s.substance_name,
+                    s.concentration_pct,
+                    s.location_in_product.as_deref(),
+                ))
             })
             .collect();
         elements.push(AasSubmodelElement::SubmodelElementCollection(

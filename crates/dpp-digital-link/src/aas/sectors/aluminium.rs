@@ -1,14 +1,11 @@
 use dpp_domain::domain::sector::AluminiumData;
 
 use crate::aas::model::{AasSemId, AasSubmodel};
-use crate::aas::property::{double_property, string_property};
+use crate::aas::property::{double_property, enum_wire_str, string_property};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_aluminium_submodel(d: &AluminiumData, passport_id: &str) -> AasSubmodel {
-    let route_str = serde_json::to_value(&d.production_route)
-        .ok()
-        .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_default();
+    let route_str = enum_wire_str(&d.production_route);
     let mut elements = vec![
         string_property("gtin", &d.gtin, None, None),
         string_property("alloyGrade", &d.alloy_grade, None, None),
