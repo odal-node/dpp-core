@@ -116,10 +116,18 @@ the architecture docs under `docs/architecture/IDENTITY.md`.
 
 ## EU Registry Readiness
 
-The EU DPP Registry (ESPR Article 13) will define an API for passport
-registration and lookup; the official specification was not yet published as of
-this release. dpp-core's `dpp-registry` crate is a **ghost connector** carrying
-preparatory interface types:
+The EU DPP Registry (ESPR Article 13) **became operational on 20 July 2026**,
+together with a testing environment and User Guidelines. Its operating rules are
+Commission Implementing Regulation (EU) 2026/1778.
+
+🟠 **COMPLIANCE-PIN PENDING:** IR 2026/1778 has not been read against the OJ text
+for this release. Its article-level detail — who may register, the required
+credential, and the registration field list — is recorded here from secondary
+sources only and must be pinned before any of it is stated as enacted law or
+relied upon in a filing.
+
+dpp-core's `dpp-registry` crate is a **ghost connector** carrying preparatory
+interface types that **predate the published specification**:
 
 - `RegistrationPayload`, `EuRegistryEnvelope`, `EuRegistryResponse`,
   `StatusResponse`, `TransferNotification`, the four Art. 13 identifier structs
@@ -130,9 +138,56 @@ preparatory interface types:
   `GhostRegistrySync` placeholder) that the platform implements once the
   official API specification is released.
 
-These types are explicitly unstable and will be updated when the official
-specification is published. (The expected go-live date has shifted; verify
-against EUR-Lex / the Commission before relying on any specific date.)
+These types remain explicitly unstable, and are now **known to diverge** from the
+published specification rather than merely being provisional. Divergences
+identified so far (🟠 — from secondary reading of IR 2026/1778, pending
+confirmation against the OJ text):
+
+- **Commodity code** appears in registration and its validation, and is absent
+  from these types and from the passport model entirely.
+- **Registration granularity** — the specification admits model, batch or item
+  level, with the corresponding identifiers linked; `RegistrationPayload`
+  requires an item identifier unconditionally.
+- **Authentication** — the envelope anticipates a bearer-token mechanism; the
+  specification rests on eIDAS verified-operator identity instead.
+
+Reconciling these is a breaking change to a core crate and is scheduled for the
+next minor. Do not treat the current shapes as an implementation target.
+
+## Transfer-of-Responsibility Article Pin
+
+Verified against the OJ text of Regulation (EU) 2024/1781, 2026-07-04, to
+resolve an internal citation ambiguity (the transfer-of-responsibility
+obligation had been cited inconsistently as either Art. 9 or Art. 12):
+
+- **No single article establishes a transfer-of-responsibility mechanism**
+  for a DPP moving between economic operators (resale, recycler take-over,
+  insolvency succession, etc.).
+- **Art. 11(e)** is the closest fit: it requires the passport to "remain
+  available ... including after an insolvency, a liquidation or a cessation
+  of activity ... of the economic operator responsible for the creation of
+  the digital product passport" — a continuity/availability obligation, not
+  a transfer-mechanics one.
+- **Art. 10(4)** is the adjacent back-up-copy obligation (via a DPP service
+  provider), already cited above.
+- **Art. 9** establishes no transfer *mechanism*, but it is not silent
+  either: alongside the placing-on-market gate, **Art. 9(1)** requires that
+  passport data "shall be accurate, complete and up to date" — the standing
+  duty that makes a stale post-transfer passport non-compliant. That duty,
+  together with the registry-upload duty (**Art. 13(4)**), is the narrow
+  basis cited in `docs/regulatory/CONFORMITY.md` and
+  `dpp-registry::registry::transfer`; it stands and is not superseded here.
+- **Art. 12** (unique-*identifier* issuance mechanics, not registry upload)
+  does not address transfer at all — the "Art. 12" leg of the earlier
+  "Art. 9/12" citation was not traceable to operative text and is superseded
+  by this entry.
+
+Given no article mandates transfer mechanics, `domain::transfer`'s
+dual-signed transfer handshake is a design choice that satisfies — and
+exceeds — Art. 11(e)'s continuity requirement; it is not a literal
+implementation of a numbered transfer obligation, because none exists.
+Treat this as engineering due diligence, not legal advice — verify
+independently before relying on it in a filing or contract.
 
 ## Transparency Commitments
 
