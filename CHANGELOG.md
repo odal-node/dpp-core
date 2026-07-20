@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-20
+
 ### Added
 
 - **`dpp_rules::canonical::content_hash`** — the single canonical JCS
