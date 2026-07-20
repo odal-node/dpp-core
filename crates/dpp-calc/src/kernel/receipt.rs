@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::CalcError;
+use super::ruleset::Ruleset;
 
 // Re-export the JCS hashing helpers so callers keep using `receipt::jcs_hash` /
 // `receipt::input_hash` — they are split into `hashing.rs` for readability but
@@ -71,6 +72,24 @@ impl CalculationReceipt {
             computed_at: Utc::now(),
             jws: None,
         }
+    }
+
+    /// Build the receipt for a `calculate()` call: hashes `inputs`, cites
+    /// `ruleset`'s id/version, and attaches `output_hash`. The one-liner every
+    /// calculator's `calculate()` should use instead of hand-assembling
+    /// `CalculationReceipt::new(...).with_output_hash(...)` — see
+    /// `co2e::calculator::calculate` / `repairability::calculator::calculate`.
+    pub fn for_ruleset<T: Serialize>(
+        inputs: &T,
+        ruleset: &dyn Ruleset,
+        output_hash: impl Into<String>,
+    ) -> Result<Self, CalcError> {
+        Ok(Self::new(
+            input_hash(inputs)?,
+            ruleset.id().0.as_str(),
+            ruleset.version().0.as_str(),
+        )
+        .with_output_hash(output_hash))
     }
 
     /// Bind the numeric output values to this receipt.

@@ -10,7 +10,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::error::CalcError;
 use crate::repairability::parameters::RepairabilityInputs;
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
@@ -22,15 +25,6 @@ static SMARTPHONE_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     diagnostic_tools: 0.15,
     software_updatability: 0.15,
     customer_support: 0.15,
-};
-
-// Heuristic band boundaries (a=8.5, b=7.0, c=5.5, d=4.0) — design choices, not a
-// regulatory grade table. Below `d` ⇒ band E.
-static SMARTPHONE_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
 };
 
 static SMARTPHONE_BASIS: RegulatoryBasis = RegulatoryBasis {
@@ -80,7 +74,7 @@ impl RepairabilityRuleset for SimplifiedRepairabilityHeuristic {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &SMARTPHONE_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 
     fn validate_cross_fields(&self, inputs: &RepairabilityInputs) -> Result<(), CalcError> {

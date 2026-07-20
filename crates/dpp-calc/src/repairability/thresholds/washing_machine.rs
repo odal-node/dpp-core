@@ -6,7 +6,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct WashingMachineRuleset;
@@ -18,13 +21,6 @@ static WASHING_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     diagnostic_tools: 0.15,
     software_updatability: 0.10,
     customer_support: 0.10,
-};
-
-static WASHING_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
 };
 
 static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
@@ -67,6 +63,6 @@ impl RepairabilityRuleset for WashingMachineRuleset {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &WASHING_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 }

@@ -27,5 +27,5 @@ pub use displays::DisplaysRuleset;
 pub use laptop::LaptopRuleset;
 pub use ruleset::RepairabilityRuleset;
 pub use smartphone::SimplifiedRepairabilityHeuristic;
-pub use types::{RepairabilityThresholds, RepairabilityWeights};
+pub use types::{DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityThresholds, RepairabilityWeights};
 pub use washing_machine::WashingMachineRuleset;

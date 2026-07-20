@@ -18,13 +18,12 @@
 //! country-specific grid factors, allocation rules) refines those factors and is
 //! gated on a signed data license (`real-factors` feature).
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::parameters::Co2eInputs;
 use super::thresholds::Co2eRuleset;
 use crate::error::CalcError;
-use crate::receipt::{CalculationReceipt, input_hash, jcs_hash};
+use crate::receipt::{CalculationReceipt, jcs_hash};
 
 /// A single stage in the EU PEF product lifecycle.
 ///
@@ -80,12 +79,7 @@ pub struct Co2eResult {
 /// silent clamping is not appropriate for a legally cited compliance figure.
 pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eResult, CalcError> {
     validate_inputs(inputs)?;
-
-    // A signed, dated receipt must never be computed from a ruleset that is not
-    // legally in force today (crate-wide invariant; see repairability::calculate).
-    ruleset
-        .effective_dates()
-        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
+    ruleset.ensure_active_today()?;
 
     let material_breakdown: Vec<MaterialLineResult> = inputs
         .materials
@@ -114,12 +108,7 @@ pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eR
     // Hash outputs before building the result (avoids chicken-and-egg with receipt).
     let output_hash = jcs_hash(&(total_co2e_kg, material_co2e_kg, energy_co2e_kg))?;
 
-    let receipt = CalculationReceipt::new(
-        input_hash(inputs)?,
-        ruleset.id().0.as_str(),
-        ruleset.version().0.as_str(),
-    )
-    .with_output_hash(output_hash);
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
 
     Ok(Co2eResult {
         material_co2e_kg,

@@ -6,7 +6,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct DisplaysRuleset;
@@ -18,13 +21,6 @@ static DISPLAYS_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     diagnostic_tools: 0.15,
     software_updatability: 0.15,
     customer_support: 0.10,
-};
-
-static DISPLAYS_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
 };
 
 static DISPLAYS_BASIS: RegulatoryBasis = RegulatoryBasis {
@@ -67,6 +63,6 @@ impl RepairabilityRuleset for DisplaysRuleset {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &DISPLAYS_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 }

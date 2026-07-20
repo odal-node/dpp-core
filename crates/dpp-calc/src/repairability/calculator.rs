@@ -1,12 +1,11 @@
 //! The simplified repairability heuristic calculation: inputs → A–E band.
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::parameters::RepairabilityInputs;
 use super::thresholds::RepairabilityRuleset;
 use crate::error::CalcError;
-use crate::receipt::{CalculationReceipt, input_hash, jcs_hash};
+use crate::receipt::{CalculationReceipt, jcs_hash};
 
 /// A–E heuristic band from the simplified repairability indicator.
 ///
@@ -88,10 +87,7 @@ pub fn calculate(
 ) -> Result<RepairabilityResult, CalcError> {
     validate_inputs(inputs)?;
     ruleset.validate_cross_fields(inputs)?;
-
-    ruleset
-        .effective_dates()
-        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
+    ruleset.ensure_active_today()?;
 
     let w = ruleset.weights();
     let scale = 5.0; // scale 0–2 ordinals to 0–10
@@ -129,12 +125,7 @@ pub fn calculate(
 
     let output_hash = jcs_hash(&(numeric_score, class.as_ordinal()))?;
 
-    let receipt = CalculationReceipt::new(
-        input_hash(inputs)?,
-        ruleset.id().0.as_str(),
-        ruleset.version().0.as_str(),
-    )
-    .with_output_hash(output_hash);
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
 
     Ok(RepairabilityResult {
         class,

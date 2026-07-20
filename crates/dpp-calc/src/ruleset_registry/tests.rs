@@ -149,6 +149,38 @@ fn all_sector_calculator_entries_have_non_empty_strings() {
     }
 }
 
+/// Drift guard: `sector_calculator_map()` and `resolve_repairability`'s
+/// internal category table are hand-maintained independently, with nothing
+/// else tying them together — a category added to one and forgotten in the
+/// other fails silently (the status view is simply wrong, not a crash). For
+/// every repairability-heuristic entry, its declared status must agree with
+/// what `resolve_repairability` actually resolves today.
+#[test]
+fn status_map_agrees_with_resolve_repairability_today() {
+    let today = Utc::now().date_naive();
+    for entry in sector_calculator_map() {
+        if entry.methodology != "repairability-heuristic" {
+            continue;
+        }
+        let resolves_today = resolve_repairability(entry.product_category, today).is_some();
+        match &entry.status {
+            CalculatorStatus::Active { .. } => assert!(
+                resolves_today,
+                "sector_calculator_map marks '{}' Active, but resolve_repairability finds \
+                 no ruleset for it today",
+                entry.product_category
+            ),
+            CalculatorStatus::PendingDelegatedAct { .. } => assert!(
+                !resolves_today,
+                "sector_calculator_map marks '{}' PendingDelegatedAct, but \
+                 resolve_repairability already resolves a ruleset for it today",
+                entry.product_category
+            ),
+            CalculatorStatus::ReportingOnly => {}
+        }
+    }
+}
+
 /// Every `Active` map entry must reference a `ruleset_id` that actually exists
 /// in `all_rulesets()`. Guards against the map and the concrete `Ruleset::id()`
 /// drifting apart (e.g. map saying `"cradle-to-gate-pef"` while the impl returns

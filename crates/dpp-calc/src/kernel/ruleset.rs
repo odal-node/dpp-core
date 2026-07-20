@@ -88,4 +88,15 @@ pub trait Ruleset {
     fn effective_dates(&self) -> &EffectiveDateBound;
     /// Structured citation for the EU regulation that mandates this calculation.
     fn regulatory_basis(&self) -> &RegulatoryBasis;
+
+    /// Error unless this ruleset is legally in force today.
+    ///
+    /// A signed, dated receipt must never be computed from a ruleset that is
+    /// not legally in force today — every methodology's `calculate()` must
+    /// call this before computing a result (see `co2e::calculator::calculate`
+    /// / `repairability::calculator::calculate`).
+    fn ensure_active_today(&self) -> Result<(), crate::error::CalcError> {
+        self.effective_dates()
+            .ensure_active_on(self.id(), chrono::Utc::now().date_naive())
+    }
 }
