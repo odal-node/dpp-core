@@ -43,11 +43,11 @@ order:
 
 1. `dpp-rules` (no workspace dependencies)
 2. `dpp-plugin-traits` (no workspace dependencies)
-3. `dpp-domain` (depends on dpp-rules)
-4. `dpp-registry` (depends on dpp-domain)
-5. `dpp-digital-link` (depends on dpp-domain)
-6. `dpp-crypto` (depends on dpp-domain)
-7. `dpp-calc` (depends on dpp-domain)
+3. `dpp-calc` (no workspace dependencies)
+4. `dpp-domain` (depends on dpp-rules)
+5. `dpp-registry` (depends on dpp-domain + dpp-rules)
+6. `dpp-digital-link` (depends on dpp-domain)
+7. `dpp-crypto` (depends on dpp-domain)
 8. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)
 
 `dpp-tests` is `publish = false` and is not published, but it is still lockstep-
