@@ -86,12 +86,21 @@ impl SectorAccessPolicy {
 
     /// Default access policy for top-level passport fields (sector-agnostic).
     ///
-    /// **Invariant — nothing mutable-after-publish may sit at `Public`.** The
-    /// public view is what a passport's public signature is computed over, so a
-    /// `Public` field that can still change after publish makes the served view
-    /// stop verifying against its own signature. A field that must stay
-    /// re-writable post-publish therefore has to be tiered *up*, out of the
-    /// signed public payload — see `lintResult` below.
+    /// **Invariant — no mutable-after-publish *compliance content* may sit at
+    /// `Public`.** The public view is what a passport's public signature is
+    /// computed over, so `Public` content that changes after publish makes the
+    /// served body stop verifying against its own signature. Content that must
+    /// stay re-writable post-publish is therefore tiered *up*, out of the signed
+    /// public payload — see `lintResult` below.
+    ///
+    /// **The exemption, stated so it is not read as an oversight.** Lifecycle
+    /// metadata — `status`, `publishedAt`, `updatedAt`, `qrCodeUrl` — is `Public`
+    /// *and* mutable after publish. That is consistent only because a conforming
+    /// server serves the **signed payload**, not the live row: what it emits is
+    /// frozen at publish time and therefore agrees with the attached signature by
+    /// construction. A server that redacts the live row into a public view and
+    /// attaches the publish-time proof to it reintroduces exactly the divergence
+    /// this invariant exists to prevent, for these fields and any future one.
     pub fn passport_default() -> Self {
         let mut field_tiers = HashMap::new();
 

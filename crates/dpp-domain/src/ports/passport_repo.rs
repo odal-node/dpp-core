@@ -23,11 +23,6 @@ use crate::domain::{
 /// `facility` is likewise excluded: it is a point-in-time snapshot copied at
 /// create time by design, not a field any flow updates in place. Serialized
 /// (camelCase) field names, matching the `Passport` JSON representation.
-///
-/// `parentPassportRef`/`componentRefs` (BOM/second-life linkage) are
-/// deliberately **not** in this list yet — that feature shipped ahead of its
-/// update-flow scoping; revisit once it's settled whether components attach
-/// progressively after creation.
 const PROTECTED_PATCH_FIELDS: [&str; 16] = [
     "id",
     "status",
