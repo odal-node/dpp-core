@@ -59,8 +59,10 @@ impl RegistryEndpoint {
     ///
     /// The **auth flow in particular rests on a wrong assumption** —
     /// `token_endpoint` models a bearer-token exchange, whereas registration
-    /// identity is eIDAS-based (a verified operator proving identity by qualified
-    /// electronic seal). That is a structural mismatch, not a wrong URL.
+    /// identity is eIDAS-based: a verified operator proves identity by qualified
+    /// electronic seal or qualified electronic attestation of attributes
+    /// (IR 2026/1778 Arts. 4–5). That is a structural mismatch, not a wrong URL.
+    /// Registration itself is performed over the registry's API (Art. 3(b)).
     ///
     /// Do NOT point this at real products. Reconciliation against the published
     /// specification is a breaking change scheduled for the next minor
