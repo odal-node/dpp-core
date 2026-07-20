@@ -120,11 +120,37 @@ The EU DPP Registry (ESPR Article 13) **became operational on 20 July 2026**,
 together with a testing environment and User Guidelines. Its operating rules are
 Commission Implementing Regulation (EU) 2026/1778.
 
-🟠 **COMPLIANCE-PIN PENDING:** IR 2026/1778 has not been read against the OJ text
-for this release. Its article-level detail — who may register, the required
-credential, and the registration field list — is recorded here from secondary
-sources only and must be pinned before any of it is stated as enacted law or
-relied upon in a filing.
+Verified against the OJ text of IR 2026/1778 (adopted 16 July 2026, published
+17 July 2026, in force on the twentieth day thereafter — **Art. 24**):
+
+- **Who may register.** A digital product passport is registered by a *verified
+  economic operator* placing the product on the market (**Art. 8(1)**).
+  Verification is by eIDAS credential: for a legal person, a **qualified
+  electronic seal** supported by a qualified certificate issued by a QTSP, or a
+  qualified electronic attestation of attributes (**Art. 4(2)**). Establishment
+  in the Union is **not** a precondition — Art. 4(2)(b) provides expressly for
+  operators not required to be so established.
+- **Registration by a third party is permitted.** Where a verified economic
+  operator authorises a third party to perform registration actions on its
+  behalf, that third party must itself complete the verification process of
+  **Art. 5** (value chain actors — which the recitals enumerate as including a
+  digital product passport service provider). The economic operator "shall
+  remain fully responsible for compliance with the obligations set out in this
+  Regulation" (**Art. 19(4)**) and is the controller of the data it submits
+  (**Art. 19(5)**). Delegating the mechanics does not move the liability.
+- **Registry structure** (**Art. 3**) includes an API for registering passports
+  and retrieving information (Art. 3(b)), a list of verified digital product
+  passport service providers (Art. 3(f)), and a storage component for unique
+  identifiers *and commodity codes for products intended to be placed under the
+  customs procedure "release for free circulation"* (Art. 3(e)).
+- **Granularity.** Registration occurs at model, batch or item level as the
+  applicable delegated act requires (**Art. 8(1)**); where rules conflict, at
+  the most granular level required (**Art. 8(3)**). An item-level passport must
+  link **both** batch and model identifiers where those exist (**Art. 8(4)**);
+  a batch-level passport must link the model identifier (**Art. 8(5)**).
+- **Automated checks on submission** (**Art. 8(7)**): semantic conformity,
+  coherence of mandatory data, conformity with the required granularity level,
+  and — *where relevant* — validity of the commodity code.
 
 dpp-core's `dpp-registry` crate is a **ghost connector** carrying preparatory
 interface types that **predate the published specification**:
@@ -138,18 +164,22 @@ interface types that **predate the published specification**:
   `GhostRegistrySync` placeholder) that the platform implements once the
   official API specification is released.
 
-These types remain explicitly unstable, and are now **known to diverge** from the
+These types remain explicitly unstable, and are **known to diverge** from the
 published specification rather than merely being provisional. Divergences
-identified so far (🟠 — from secondary reading of IR 2026/1778, pending
-confirmation against the OJ text):
+confirmed against the OJ text:
 
-- **Commodity code** appears in registration and its validation, and is absent
-  from these types and from the passport model entirely.
-- **Registration granularity** — the specification admits model, batch or item
-  level, with the corresponding identifiers linked; `RegistrationPayload`
-  requires an item identifier unconditionally.
-- **Authentication** — the envelope anticipates a bearer-token mechanism; the
-  specification rests on eIDAS verified-operator identity instead.
+- **Commodity code** is absent from these types and from the passport model
+  entirely. It is stored by the registry for products intended for the customs
+  procedure "release for free circulation" (Art. 3(e)) and validated *where
+  relevant* on submission (Art. 8(7)(d)) — so it is conditional on the customs
+  path, not universal, but unrepresentable for us today either way.
+- **Registration granularity** — the specification requires model, batch or item
+  level with the corresponding identifiers linked (Art. 8(1), (4), (5));
+  `RegistrationPayload` carries an unconditional item identifier and models no
+  granularity or identifier-linking concept at all.
+- **Authentication** — `EuRegistryEnvelope` anticipates a bearer-token
+  mechanism; registration rests on eIDAS verified-operator identity instead
+  (Arts. 4–5). This is a structural mismatch, not a wrong endpoint.
 
 Reconciling these is a breaking change to a core crate and is scheduled for the
 next minor. Do not treat the current shapes as an implementation target.
