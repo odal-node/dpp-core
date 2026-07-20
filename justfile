@@ -8,13 +8,16 @@
 # Quality gates
 # ---------------------------------------------------------------------------
 
-# Run all tests with nextest
+# Run all tests with nextest.
+# --all-features is required, not cosmetic: no crate in this workspace turns on
+# dpp-rules' `bundle` feature, so without it the signed-ruleset format and its
+# fail-closed verification are never compiled or tested here at all.
 test:
-    cargo nextest run --workspace
+    cargo nextest run --workspace --all-features
 
-# Run clippy (all warnings are errors)
+# Run clippy (all warnings are errors). --all-features for the reason above.
 lint:
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # Format all code
 fmt:
@@ -30,7 +33,7 @@ audit:
 
 # Build documentation (warns on missing docs)
 doc:
-    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features
 
 # Run Criterion benchmarks
 bench:

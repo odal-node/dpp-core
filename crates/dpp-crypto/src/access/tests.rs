@@ -156,6 +156,45 @@ fn passport_policy_public_redacts_jws() {
     assert!(decision.filtered_data.get("batchId").is_none());
 }
 
+/// Locks the "nothing mutable-after-publish sits at `Public`" invariant for
+/// `lintResult`. The public view is what `publicJwsSignature` is computed over,
+/// and the lint result is deliberately re-computable after publish — serving it
+/// at `Public` would make the live body stop verifying against its own frozen
+/// signature for reasons that are not tampering. Other mutable-after-publish
+/// keys (`status`, `publishedAt`, `updatedAt`, `qrCodeUrl`) stay `Public` by
+/// design: they are lifecycle metadata, not compliance content.
+#[test]
+fn passport_default_keeps_lint_result_out_of_public_view() {
+    let policy = SectorAccessPolicy::passport_default();
+    let data = json!({
+        "id": "abc-123",
+        "productName": "Widget",
+        "status": "published",
+        "lintResult": {
+            "findings": [{ "code": "implausible_mass", "message": "net mass exceeds gross" }],
+            "assessedAt": "2026-07-19T00:00:00Z"
+        }
+    });
+    let decision = filter_by_access_tier(&data, &policy, AccessTier::Public);
+    assert!(
+        decision.filtered_data.get("lintResult").is_none(),
+        "lintResult is rewritten post-publish; it must not sit inside the signed public view"
+    );
+    assert_eq!(
+        policy.tier_for_field("lintResult"),
+        AccessTier::Professional
+    );
+    // The domain field is `lint_result`; leaf matching is separator-insensitive,
+    // so a snake_case payload must be gated identically.
+    assert_eq!(
+        policy.tier_for_field("lint_result"),
+        AccessTier::Professional
+    );
+    // Exempt-by-design lifecycle metadata is unaffected.
+    assert_eq!(policy.tier_for_field("status"), AccessTier::Public);
+    assert!(decision.filtered_data.get("status").is_some());
+}
+
 #[test]
 fn non_object_input_returned_unchanged() {
     let policy = textile_policy();

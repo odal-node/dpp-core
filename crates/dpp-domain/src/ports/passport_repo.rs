@@ -23,12 +23,7 @@ use crate::domain::{
 /// `facility` is likewise excluded: it is a point-in-time snapshot copied at
 /// create time by design, not a field any flow updates in place. Serialized
 /// (camelCase) field names, matching the `Passport` JSON representation.
-///
-/// `parentPassportRef`/`componentRefs` (BOM/second-life linkage) are
-/// deliberately **not** in this list yet — that feature shipped ahead of its
-/// update-flow scoping; revisit once it's settled whether components attach
-/// progressively after creation.
-const PROTECTED_PATCH_FIELDS: [&str; 14] = [
+const PROTECTED_PATCH_FIELDS: [&str; 16] = [
     "id",
     "status",
     "retentionLocked",
@@ -43,6 +38,8 @@ const PROTECTED_PATCH_FIELDS: [&str; 14] = [
     "schemaVersion",
     "operatorIdentifier",
     "facility",
+    "parentPassportRef",
+    "componentRefs",
 ];
 
 /// Port trait for all DPP persistence operations.
@@ -107,11 +104,19 @@ pub trait PassportRepository: Send + Sync {
     /// statement for real concurrent-write safety.
     ///
     /// A delta that tries to set any `PROTECTED_PATCH_FIELDS` key (status,
-    /// retention lock, signatures, seal, identity, operator, facility, …) is
-    /// rejected with [`DppError::Validation`]: those transitions belong to
-    /// the state machine (`transition_to`/`update_status`), the publish
-    /// pipeline, or a dedicated transfer method, never to a free-form field
-    /// patch.
+    /// retention lock, signatures, seal, identity, operator, facility,
+    /// lineage, …) is rejected with [`DppError::Validation`]: those
+    /// transitions belong to the state machine (`transition_to`/
+    /// `update_status`), the publish pipeline, or a dedicated transfer method,
+    /// never to a free-form field patch.
+    ///
+    /// The lineage edges (`parentPassportRef`, `componentRefs`) are protected
+    /// because they are create-time by construction and sit inside the signed
+    /// public view: a second-life passport is a *new* record issued alongside
+    /// its predecessors, and changing a published bill of materials is a new
+    /// passport version (`supersedesId`), not an in-place edit. Patching either
+    /// would leave the served body no longer verifying against its own
+    /// signature. See `docs/architecture/PRODUCT-LINEAGE.md`.
     async fn patch_fields(
         &self,
         id: PassportId,
@@ -396,6 +401,38 @@ mod tests {
         let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
         assert!(stored.operator_identifier.is_none());
         assert!(stored.facility.is_none());
+    }
+
+    /// Lineage edges are create-time by construction and live in the signed
+    /// public view, so a free-form patch must not reach them: a second-life
+    /// passport is issued as a new record, and a bill-of-materials change is a
+    /// new passport version. See `docs/architecture/PRODUCT-LINEAGE.md`.
+    #[tokio::test]
+    async fn default_patch_fields_rejects_lineage_edges() {
+        let repo = InMemoryRepo::default();
+        let p = repo.create(draft_passport("Original")).await.unwrap();
+
+        for delta in [
+            serde_json::json!({
+                "parentPassportRef": {
+                    "uri": "https://id.example.com/dpp/other",
+                    "publicJwsHash": "00",
+                }
+            }),
+            serde_json::json!({
+                "componentRefs": [{
+                    "uri": "https://id.example.com/dpp/cell",
+                    "publicJwsHash": "00",
+                }]
+            }),
+        ] {
+            let err = repo.patch_fields(p.id, delta).await.unwrap_err();
+            assert!(matches!(err, DppError::Validation(_)), "got: {err:?}");
+        }
+
+        let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
+        assert!(stored.parent_passport_ref.is_none());
+        assert!(stored.component_refs.is_empty());
     }
 
     #[tokio::test]

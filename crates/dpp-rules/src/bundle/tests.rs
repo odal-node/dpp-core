@@ -126,30 +126,26 @@ fn content_hash_is_stable_for_key_order() {
     assert_eq!(content_hash(&a).unwrap(), content_hash(&b).unwrap());
 }
 
+/// Tripwire on the upstream guarantee that keeps [`content_hash`]'s error path
+/// unreachable in practice. RFC 8785 rejects non-finite floats, so the question
+/// is whether one can reach the hasher at all: today it cannot, because
+/// `serde_json` refuses to build one — an overflowing literal fails to parse
+/// rather than coercing to infinity, and there is no `Number` for a non-finite
+/// `f64`.
+///
+/// The fallible signature stays regardless. This guarantee is upstream's to
+/// change (and `serde_json`'s `arbitrary_precision` feature would change it),
+/// so the contract must not be relaxed to an infallible one that papers the
+/// case over with a panic. If this test ever fails, that error path became
+/// reachable and the hazard is live again.
 #[test]
-fn content_hash_errors_on_non_finite_float() {
-    // serde_json parses a huge exponent to f64::INFINITY; JCS (RFC 8785)
-    // rejects non-finite floats. content_hash must return Err, not panic.
-    let content: serde_json::Value = serde_json::from_str(r#"{ "x": 1e400 }"#).unwrap();
-    assert!(content["x"].as_f64().unwrap().is_infinite());
-    assert!(matches!(
-        content_hash(&content),
-        Err(RulesetError::Malformed(_))
-    ));
-}
-
-#[test]
-fn verify_bundle_errors_on_non_finite_content() {
-    // A well-signed bundle whose unauthenticated content holds a non-finite
-    // float must fail closed on the integrity step, not panic.
-    let content: serde_json::Value = serde_json::from_str(r#"{ "threshold": 1e400 }"#).unwrap();
-    let m = manifest("1.0.0", &serde_json::json!({ "threshold": 0 }));
-    let bundle = SignedBundle {
-        manifest_jws: fake_jws(&m),
-        content,
-    };
-    assert!(matches!(
-        verify_bundle(&bundle, "pubkey", &AlwaysOk),
-        Err(RulesetError::Malformed(_))
-    ));
+fn non_finite_floats_cannot_enter_a_json_value() {
+    // Parse side: an overflowing literal is rejected, not coerced to infinity.
+    assert!(
+        serde_json::from_str::<serde_json::Value>(r#"{ "x": 1e400 }"#).is_err(),
+        "overflowing float literal must not parse into a Value"
+    );
+    // Constructor side: no non-finite f64 can become a JSON number.
+    assert!(serde_json::Number::from_f64(f64::INFINITY).is_none());
+    assert!(serde_json::Number::from_f64(f64::NAN).is_none());
 }

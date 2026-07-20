@@ -2,7 +2,15 @@
 //!
 //! This crate models the data exchange with the EU Central Registry mandated by
 //! ESPR Article 13. It provides request/response envelopes, error types, and
-//! identifier structures aligned with the anticipated EU API specification.
+//! identifier structures.
+//!
+//! ⚠️ **These shapes predate the published specification.** The registry became
+//! operational on 20 July 2026 under Commission Implementing Regulation (EU)
+//! 2026/1778; the types here were derived from ESPR articles and JTC 24 draft
+//! discussions before that, and are known to diverge from it — see the EU
+//! Registry Readiness section of `docs/regulatory/COMPLIANCE.md` for the
+//! specific gaps. Reconciliation is a breaking change scheduled for the next
+//! minor. Do not treat these as an implementation target.
 //!
 //! The crate is safe to compile for `wasm32-unknown-unknown` — it contains no
 //! I/O, no HTTP clients, no async runtime. The platform repo provides the

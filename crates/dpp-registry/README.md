@@ -7,11 +7,17 @@
 EU EUDPP Central Registry connector for the [Odal Node](https://odal-node.io)
 Digital Product Passport system.
 
-Currently a **ghost connector**: the EU Central Registry API has not been published
-yet. This crate defines all interface types (registration payloads, sync requests,
-response envelopes, error models) so that platform code can be written against a
-stable interface today. The real HTTP adapter lives in `dpp-engine` and will be
-wired in once the EU endpoint is live.
+Currently a **ghost connector**. This crate defines interface types (registration
+payloads, sync requests, response envelopes, error models) so that platform code
+can be written against a stable interface. The real HTTP adapter lives in
+`dpp-engine`.
+
+⚠️ **These shapes predate the published specification.** The registry became
+operational on 20 July 2026 under Commission Implementing Regulation (EU)
+2026/1778; the types here were derived before it and are known to diverge — see
+the EU Registry Readiness section of `docs/regulatory/COMPLIANCE.md`.
+Reconciliation is a breaking change scheduled for the next minor. Do not treat
+these as an implementation target.
 
 `wasm32-unknown-unknown` safe — no I/O, no `std` networking.
 

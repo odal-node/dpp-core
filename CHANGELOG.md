@@ -13,6 +13,76 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **`dpp_rules::canonical::content_hash`** — the single canonical JCS
+  (RFC 8785) content hasher, shared by ruleset-bundle verification and by
+  downstream evidence consumers that previously re-implemented it. Fallible by
+  design: RFC 8785 rejects non-finite floats, and a hasher fed untrusted input
+  must be able to return an error rather than abort the process. Behind the
+  `bundle` feature, which supplies the JCS and SHA-256 dependencies.
+
+### Breaking
+
+- **`lintResult` is no longer served at the `Public` access tier.**
+  `SectorAccessPolicy::passport_default()` now maps it to
+  `AccessTier::Professional`. The lint result is deliberately re-computable
+  after publish and every re-run restamps `assessedAt`, so serving it `Public`
+  placed a guaranteed-to-change field inside the payload the public signature
+  is computed over — a served body that stops verifying against its own proof
+  for reasons that are not tampering. *Migration:* consumers that read
+  `lintResult` from an unauthenticated public view must request the
+  Professional tier; it is operator- and auditor-facing quality data, not
+  consumer-facing content.
+
+### Changed
+
+- **`patch_fields` now rejects the lineage edges.** `parentPassportRef` and
+  `componentRefs` joined `PROTECTED_PATCH_FIELDS`. Both are create-time by
+  construction and sit inside the signed public view: a second-life passport is
+  issued as a *new* record, and changing a published bill of materials is a new
+  passport version (`supersedesId`), not an in-place edit.
+- **`dpp_rules::bundle::verify::content_hash` now delegates** to
+  `canonical::content_hash`, mapping its error into `RulesetError::Malformed`.
+  Signature and behaviour are unchanged; a consumer outside the ruleset channel
+  should call the canonical function directly rather than adopt `RulesetError`.
+
+### Fixed
+
+- **The `bundle` module was never compiled or tested by this workspace's own
+  gate.** No crate enables `dpp-rules`' `bundle` feature, so `just check` and CI
+  silently skipped the signed-ruleset format and its fail-closed verification
+  entirely — two tests in it had been failing on `main` since before 0.9.0.
+  `--all-features` is now passed to test, lint and doc in both the justfile and
+  CI, and the two tests were repaired: their premise (that `serde_json` coerces
+  an overflowing float literal to infinity) no longer holds, so they became
+  tripwires on the upstream guarantee that keeps the hasher's error path
+  unreachable.
+
+### Documentation
+
+- **`docs/architecture/PRODUCT-LINEAGE.md`** — design proposal for the
+  bill-of-materials and second-life edges, recording the requirements pass the
+  initial cut shipped without. Headline finding: Battery Regulation (EU)
+  2023/1542 Art. 77 requires a second-life passport linked to "the battery
+  passport **or passports** of the original battery **or batteries**", which
+  `parent_passport_ref: Option<PassportRef>` cannot express. Not implemented;
+  phases 2–3 are breaking and scheduled for a later minor.
+- **EU registry status corrected.** The registry became operational on
+  20 July 2026 under Commission Implementing Regulation (EU) 2026/1778;
+  `COMPLIANCE.md`, `dpp-registry` and its README no longer state that the
+  specification is unpublished, and now record that the preparatory types are
+  *known to diverge* from it rather than merely provisional.
+- **`SealPort` records what "qualified" requires**, verified against the OJ text
+  of Regulation (EU) No 910/2014: a qualified electronic seal is the conjunction
+  of an advanced seal (Art. 36), a qualified signature creation device
+  (Art. 3(32)) and a qualified certificate (Art. 3(30), Annex III). An adapter
+  producing an advanced seal over a qualified certificate does not satisfy it.
+- **Transfer-of-responsibility article pin** in `COMPLIANCE.md`, reconciled
+  against the operative text: no article establishes a transfer mechanism;
+  Art. 11(1)(e) carries the continuity duty, while Art. 9(1)'s data-accuracy
+  duty — cited elsewhere in the repo as part of the transfer basis — stands.
+
 ## [0.9.0] - 2026-07-17
 
 ### Added

@@ -6,12 +6,11 @@
 //! check itself is delegated to a caller-supplied [`JwsVerify`] rather than
 //! implemented here, so this crate never depends on a JWS/crypto crate (which
 //! would create a dependency cycle back through `dpp-domain`) and never grows
-//! a second, drifting copy of signature-verification code. Content hashing
-//! (`sha2`) stays inline — it is deterministic and carries none of a
-//! signature check's duplication risk.
+//! a second, drifting copy of signature-verification code. Content hashing is
+//! delegated for the same anti-duplication reason, to [`crate::canonical`],
+//! which is shared with every other integrity-hash consumer.
 
 use base64::Engine;
-use sha2::{Digest, Sha256};
 
 use super::types::{RulesetError, RulesetManifest, SignedBundle, VerifiedRuleset};
 
@@ -25,19 +24,22 @@ pub trait JwsVerify {
     fn verify_eddsa(&self, jws: &str, public_key_b64: &str) -> Result<bool, RulesetError>;
 }
 
-/// Canonical SHA-256 (hex) of a content value (RFC 8785 / JCS bytes).
+/// Canonical SHA-256 (hex) of a content value (RFC 8785 / JCS bytes), in this
+/// module's error type.
 ///
-/// Exposed so a signer builds the exact same `content_sha256` a verifier
-/// will later check against — one hash function, two call sites.
+/// Exposed so a signer builds the exact same `content_sha256` a verifier will
+/// later check against. The hashing itself lives in [`crate::canonical`] and is
+/// shared with every other integrity-hash consumer — a consumer outside the
+/// ruleset channel should call that directly rather than adopt
+/// [`RulesetError`], and must not re-implement it.
 ///
 /// # Errors
 /// [`RulesetError::Malformed`] if `content` cannot be JCS-canonicalised — RFC
 /// 8785 rejects non-finite floats (`NaN`/`Infinity`), which can appear in a
 /// bundle's unauthenticated `content` deserialized straight off the wire.
 pub fn content_hash(content: &serde_json::Value) -> Result<String, RulesetError> {
-    let bytes = serde_jcs::to_vec(content)
-        .map_err(|e| RulesetError::Malformed(format!("JCS canonicalisation failed: {e}")))?;
-    Ok(hex::encode(Sha256::digest(&bytes)))
+    crate::canonical::content_hash(content)
+        .map_err(|e| RulesetError::Malformed(format!("JCS canonicalisation failed: {e}")))
 }
 
 /// Verify a bundle against the pinned publisher public key (base64url). Both

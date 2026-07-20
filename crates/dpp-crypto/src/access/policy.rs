@@ -85,11 +85,34 @@ impl SectorAccessPolicy {
     }
 
     /// Default access policy for top-level passport fields (sector-agnostic).
+    ///
+    /// **Invariant — no mutable-after-publish *compliance content* may sit at
+    /// `Public`.** The public view is what a passport's public signature is
+    /// computed over, so `Public` content that changes after publish makes the
+    /// served body stop verifying against its own signature. Content that must
+    /// stay re-writable post-publish is therefore tiered *up*, out of the signed
+    /// public payload — see `lintResult` below.
+    ///
+    /// **The exemption, stated so it is not read as an oversight.** Lifecycle
+    /// metadata — `status`, `publishedAt`, `updatedAt`, `qrCodeUrl` — is `Public`
+    /// *and* mutable after publish. That is consistent only because a conforming
+    /// server serves the **signed payload**, not the live row: what it emits is
+    /// frozen at publish time and therefore agrees with the attached signature by
+    /// construction. A server that redacts the live row into a public view and
+    /// attaches the publish-time proof to it reintroduces exactly the divergence
+    /// this invariant exists to prevent, for these fields and any future one.
     pub fn passport_default() -> Self {
         let mut field_tiers = HashMap::new();
 
         // Professional tier
         field_tiers.insert("batchId".into(), AccessTier::Professional);
+        // `lintResult` is advisory plausibility output that is deliberately
+        // re-computable at any time (including after publish), and every re-run
+        // restamps `assessedAt`. Keeping it Public would put a guaranteed-to-
+        // change field inside the signed public view. It is also operator- and
+        // auditor-facing QA data — the findings carry free-text messages about
+        // *our own* data quality — which is not consumer-facing content.
+        field_tiers.insert("lintResult".into(), AccessTier::Professional);
 
         // Confidential tier — signature / internal
         field_tiers.insert("jwsSignature".into(), AccessTier::Confidential);

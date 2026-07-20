@@ -45,6 +45,12 @@ pub mod construction;
 pub mod metals;
 pub mod toys;
 
+// Canonical JCS content hashing — the one hasher shared by the bundle
+// verifier and by downstream evidence/dossier consumers, so an integrity
+// hash cannot drift between the code that writes it and the code that checks it.
+#[cfg(feature = "bundle")]
+pub mod canonical;
+
 // Ruleset-bundle format + verification seam (signed, versioned Compliance
 // Current bundles). Optional: signing and hot-swap runtime state stay
 // engine-side; this crate only carries the open format + fail-closed verify.

@@ -41,7 +41,8 @@ impl RegistryEndpoint {
             // spec before enabling live calls. Track: ESPR implementing acts / DG GROW.
             base_url: "https://sandbox.eudpp-registry.europa.eu/api/v1".into(),
             // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): api_version "1.0" is provisional.
-            // Update when the EU publishes the registry API specification.
+            // Update once the registry API specification is obtained — whether it is
+            // publicly available is itself unconfirmed.
             api_version: "1.0".into(),
             mtls_required: false,
             token_endpoint: Some("https://sandbox.eudpp-registry.europa.eu/oauth2/token".into()),
@@ -50,11 +51,20 @@ impl RegistryEndpoint {
 
     /// Create a production endpoint.
     ///
-    /// ⚠️ **PROVISIONAL**: The EU Central DPP Registry API has not been published
-    /// as of 2026-06. All URLs, `api_version`, and auth flows are educated guesses
-    /// based on the ESPR implementing acts and DG GROW work programme. Do NOT point
-    /// this at real products until the Commission publishes the final spec and these
-    /// constants are confirmed (COMPLIANCE-PIN PENDING).
+    /// ⚠️ **PROVISIONAL, and now known to be partly wrong.** The registry became
+    /// operational on 20 July 2026 under Commission Implementing Regulation (EU)
+    /// 2026/1778, but these constants predate it: all URLs, `api_version` and auth
+    /// flows were guessed from the ESPR implementing acts and the DG GROW work
+    /// programme.
+    ///
+    /// The **auth flow in particular rests on a wrong assumption** —
+    /// `token_endpoint` models a bearer-token exchange, whereas registration
+    /// identity is eIDAS-based (a verified operator proving identity by qualified
+    /// electronic seal). That is a structural mismatch, not a wrong URL.
+    ///
+    /// Do NOT point this at real products. Reconciliation against the published
+    /// specification is a breaking change scheduled for the next minor
+    /// (COMPLIANCE-PIN PENDING).
     pub fn production() -> Self {
         Self {
             authority: RegistryAuthority::EuCentral,

@@ -15,6 +15,7 @@ This folder documents **the standard, not the product**: what a Digital Product 
 | "How is the library structured, and why hexagonal?" | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) · [architecture/DESIGN-PATTERNS.md](architecture/DESIGN-PATTERNS.md) |
 | "How do identity, signing, and verifiable credentials work?" | [architecture/IDENTITY.md](architecture/IDENTITY.md) |
 | "How do sector plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
+| "How do passports link to their components and predecessors?" | [architecture/PRODUCT-LINEAGE.md](architecture/PRODUCT-LINEAGE.md) — design proposal, not yet implemented |
 | "Where does code meet regulation, formally?" | [regulatory/CONFORMITY.md](regulatory/CONFORMITY.md) — written for assessment bodies |
 | "How are releases, versions, and contributions governed?" | [governance/](governance/) — VERSIONING, RELEASE, CONTRIBUTING, CHANGELOG |
 
