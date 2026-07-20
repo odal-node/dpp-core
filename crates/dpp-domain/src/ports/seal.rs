@@ -4,11 +4,12 @@
 //! operational on **20 July 2026**; its operating rules are Commission
 //! Implementing Regulation (EU) 2026/1778.
 //!
-//! ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): IR 2026/1778 has not been read
-//! against the OJ text here. Treat its article-level detail as unconfirmed —
-//! including whether a qualified seal is the required registration credential,
-//! and whether a service provider may act for an operator. Do not state either
-//! as enacted law.
+//! Verified against the OJ text of IR 2026/1778: for a legal person, verified
+//! status rests on a **qualified electronic seal** supported by a qualified
+//! certificate issued by a QTSP, or on a qualified electronic attestation of
+//! attributes (**Art. 4(2)** for economic operators, **Art. 5(2)** for value
+//! chain actors). Establishment in the Union is not a precondition — both
+//! articles provide expressly for parties not required to be so established.
 //!
 //! ## What "qualified" actually requires
 //!
@@ -54,10 +55,14 @@ use crate::domain::error::DppError;
 pub enum SealMode {
     /// Platform holds its own qualified seal; operators use delegated access.
     ///
-    /// 🟠 Whether the registry admits a registration performed by a service
-    /// provider acting for an economic operator is **unconfirmed** — see the
-    /// module docs. This variant models the possibility; it does not assert the
-    /// mode is available.
+    /// Permitted: a verified economic operator may authorise a third party to
+    /// perform registration actions on its behalf, provided that third party has
+    /// itself completed the verification process for value chain actors
+    /// (IR 2026/1778 **Art. 19(4)**). Note what does *not* transfer — the
+    /// operator "shall remain fully responsible for compliance with the
+    /// obligations set out in this Regulation" and remains the controller of the
+    /// data it submits (**Art. 19(5)**). This mode moves the mechanics, never
+    /// the liability.
     ProviderSeal,
     /// Operator holds and manages their own qualified seal.
     OperatorSeal,

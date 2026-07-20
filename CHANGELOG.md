@@ -68,11 +68,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   passport **or passports** of the original battery **or batteries**", which
   `parent_passport_ref: Option<PassportRef>` cannot express. Not implemented;
   phases 2–3 are breaking and scheduled for a later minor.
-- **EU registry status corrected.** The registry became operational on
-  20 July 2026 under Commission Implementing Regulation (EU) 2026/1778;
-  `COMPLIANCE.md`, `dpp-registry` and its README no longer state that the
-  specification is unpublished, and now record that the preparatory types are
-  *known to diverge* from it rather than merely provisional.
+- **EU registry status corrected, and its rules pinned to the OJ text.** The
+  registry became operational on 20 July 2026 under Commission Implementing
+  Regulation (EU) 2026/1778. `COMPLIANCE.md` now records, with article
+  citations, who may register and on what credential (Arts. 4–5, 8(1)), that a
+  third party may register on an authorised operator's behalf while the operator
+  remains fully responsible (Art. 19(4)–(5)), the registry's structure
+  (Art. 3), the granularity and identifier-linking rules (Art. 8(1), (3)–(5)),
+  and the automated checks applied on submission (Art. 8(7)). The preparatory
+  `dpp-registry` types are recorded as *known to diverge* from it: no commodity
+  code (stored for customs "release for free circulation" per Art. 3(e) and
+  validated where relevant per Art. 8(7)(d)), no granularity or
+  identifier-linking concept, and a bearer-token auth assumption where the
+  specification uses eIDAS verified-operator identity.
 - **`SealPort` records what "qualified" requires**, verified against the OJ text
   of Regulation (EU) No 910/2014: a qualified electronic seal is the conjunction
   of an advanced seal (Art. 36), a qualified signature creation device
