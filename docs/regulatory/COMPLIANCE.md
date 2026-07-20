@@ -116,10 +116,18 @@ the architecture docs under `docs/architecture/IDENTITY.md`.
 
 ## EU Registry Readiness
 
-The EU DPP Registry (ESPR Article 13) will define an API for passport
-registration and lookup; the official specification was not yet published as of
-this release. dpp-core's `dpp-registry` crate is a **ghost connector** carrying
-preparatory interface types:
+The EU DPP Registry (ESPR Article 13) **became operational on 20 July 2026**,
+together with a testing environment and User Guidelines. Its operating rules are
+Commission Implementing Regulation (EU) 2026/1778.
+
+🟠 **COMPLIANCE-PIN PENDING:** IR 2026/1778 has not been read against the OJ text
+for this release. Its article-level detail — who may register, the required
+credential, and the registration field list — is recorded here from secondary
+sources only and must be pinned before any of it is stated as enacted law or
+relied upon in a filing.
+
+dpp-core's `dpp-registry` crate is a **ghost connector** carrying preparatory
+interface types that **predate the published specification**:
 
 - `RegistrationPayload`, `EuRegistryEnvelope`, `EuRegistryResponse`,
   `StatusResponse`, `TransferNotification`, the four Art. 13 identifier structs
@@ -130,9 +138,21 @@ preparatory interface types:
   `GhostRegistrySync` placeholder) that the platform implements once the
   official API specification is released.
 
-These types are explicitly unstable and will be updated when the official
-specification is published. (The expected go-live date has shifted; verify
-against EUR-Lex / the Commission before relying on any specific date.)
+These types remain explicitly unstable, and are now **known to diverge** from the
+published specification rather than merely being provisional. Divergences
+identified so far (🟠 — from secondary reading of IR 2026/1778, pending
+confirmation against the OJ text):
+
+- **Commodity code** appears in registration and its validation, and is absent
+  from these types and from the passport model entirely.
+- **Registration granularity** — the specification admits model, batch or item
+  level, with the corresponding identifiers linked; `RegistrationPayload`
+  requires an item identifier unconditionally.
+- **Authentication** — the envelope anticipates a bearer-token mechanism; the
+  specification rests on eIDAS verified-operator identity instead.
+
+Reconciling these is a breaking change to a core crate and is scheduled for the
+next minor. Do not treat the current shapes as an implementation target.
 
 ## Transfer-of-Responsibility Article Pin
 

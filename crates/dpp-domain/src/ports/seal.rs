@@ -1,14 +1,33 @@
 //! Port trait for eIDAS qualified electronic sealing.
 //!
-//! ESPR Article 13 establishes the EU Central Registry. The Commission has
-//! **not yet published** the registry's API specification or its exact
-//! authentication/sealing mechanism; public guidance anticipates qualified
-//! electronic signatures or seals (eIDAS Reg. (EU) No 910/2014) for
-//! registration, and EN 18246 admits several authentication constructs.
+//! ESPR Article 13 establishes the EU Central Registry, which became
+//! operational on **20 July 2026**; its operating rules are Commission
+//! Implementing Regulation (EU) 2026/1778.
 //!
-//! ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): treat a qualified seal as required
-//! for registration until the published registry spec confirms or relaxes it —
-//! do not state the requirement as enacted law.
+//! ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): IR 2026/1778 has not been read
+//! against the OJ text here. Treat its article-level detail as unconfirmed —
+//! including whether a qualified seal is the required registration credential,
+//! and whether a service provider may act for an operator. Do not state either
+//! as enacted law.
+//!
+//! ## What "qualified" actually requires
+//!
+//! Verified against the OJ text of Regulation (EU) No 910/2014. A **qualified
+//! electronic seal** is a three-part conjunction (**Art. 3(27)**):
+//!
+//! 1. an *advanced* electronic seal (**Art. 36**), **and**
+//! 2. created by a *qualified electronic seal creation device* (**Art. 3(32)**),
+//!    **and**
+//! 3. based on a *qualified certificate* issued by a QTSP (**Art. 3(30)**,
+//!    **Annex III**).
+//!
+//! An adapter that produces an advanced seal over a qualified certificate does
+//! **not** satisfy this: the creation-device leg is separate and independently
+//! required. **Annex III(j)** makes it machine-detectable — the certificate must
+//! indicate, in a form suitable for automated processing, that the creation data
+//! resides in such a device. The payoff is **Art. 35(2)**: a qualified seal
+//! carries a presumption of integrity of the data and of correctness of its
+//! origin.
 //!
 //! Two operating models exist:
 //! - **Provider seal (delegated):** the platform holds its own qualified seal;
@@ -34,6 +53,11 @@ use crate::domain::error::DppError;
 #[non_exhaustive]
 pub enum SealMode {
     /// Platform holds its own qualified seal; operators use delegated access.
+    ///
+    /// 🟠 Whether the registry admits a registration performed by a service
+    /// provider acting for an economic operator is **unconfirmed** — see the
+    /// module docs. This variant models the possibility; it does not assert the
+    /// mode is available.
     ProviderSeal,
     /// Operator holds and manages their own qualified seal.
     OperatorSeal,
