@@ -96,7 +96,7 @@ pub(crate) fn sample_battery_data() -> BatteryData {
 /// exercising fibre-sum rules override `fibre_composition` explicitly.
 pub(crate) fn sample_textile_data() -> TextileData {
     TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
         fibre_composition: vec![],
         country_of_manufacturing: "PT".into(),
         care_instructions: "Machine wash 30°C".into(),

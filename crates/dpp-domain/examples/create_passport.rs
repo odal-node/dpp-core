@@ -4,14 +4,14 @@
 
 use chrono::Utc;
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, ManufacturerInfo, MaterialEntry, Passport, PassportId,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
 };
 
 fn main() {
     // 1. Build sector-specific data (Textile DPP)
     let textile_data = TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "organic cotton".into(),

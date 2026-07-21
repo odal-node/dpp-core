@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
 use crate::domain::sector::enums::ProductionRoute;
 
 /// Iron and Steel sector data for EU ESPR carbon intensity reporting.
@@ -9,7 +10,7 @@ use crate::domain::sector::enums::ProductionRoute;
 #[serde(rename_all = "camelCase")]
 pub struct SteelData {
     /// 14-digit GTIN identifying the steel product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Carbon intensity in tonne CO₂e per tonne of steel produced.
     pub co2e_per_tonne_steel: f64,
     /// Recycled scrap content as a percentage of total input material (0.0–100.0).

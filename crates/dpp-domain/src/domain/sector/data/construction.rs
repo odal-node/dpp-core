@@ -2,12 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 /// Construction products sector data for EU CPR 2024/3110 compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConstructionData {
     /// 14-digit GTIN identifying the construction product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Product family, e.g. `"cement"`, `"concrete"`, `"structural-steel"`, `"glass"`.
     pub product_family: String,
     /// ISO 3166-1 alpha-2 country of manufacture.

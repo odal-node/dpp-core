@@ -6,7 +6,7 @@ use crate::aas::semantic_ids;
 
 pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", &d.gtin, None, None),
+        string_property("gtin", d.gtin.as_str(), None, None),
         string_property("productType", &d.product_type, None, None),
         string_property("primaryMaterial", &d.primary_material, None, None),
         string_property(

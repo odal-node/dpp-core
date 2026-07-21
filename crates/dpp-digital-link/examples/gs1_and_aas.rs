@@ -12,7 +12,7 @@ use dpp_digital_link::{
     ResolutionRequest, build_aas_from_passport, negotiate,
 };
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, ManufacturerInfo, MaterialEntry, Passport, PassportId,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
 };
 
@@ -113,7 +113,7 @@ fn main() {
         compliance_result: None,
         lint_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
-            gtin: "09506000134352".into(),
+            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             fibre_composition: vec![
                 FibreEntry {
                     fibre: "organic cotton".into(),

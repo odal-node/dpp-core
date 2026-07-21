@@ -17,10 +17,10 @@ use dpp_digital_link::aas::{
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
     AluminiumData, CarbonFootprint, ConstructionData, DetergentData, ElectronicsData,
-    EnergyEfficiencyClass, FibreEntry, FurnitureData, ManufacturerInfo, MaterialEntry, Passport,
-    PassportId, PassportStatus, ProductionRoute, RepairabilityScore, Sector, SectorData, SteelData,
-    SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
-    UnsoldGoodsReason, UnsoldGoodsReport,
+    EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, ManufacturerInfo, MaterialEntry,
+    Passport, PassportId, PassportStatus, ProductionRoute, RepairabilityScore, Sector, SectorData,
+    SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
+    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
 
 const VALID_GTIN: &str = "09506000134352";
@@ -94,7 +94,7 @@ fn crm() -> CriticalRawMaterial {
 
 fn electronics_data() -> ElectronicsData {
     ElectronicsData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_category: "laptop".into(),
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 210.0,
@@ -114,7 +114,7 @@ fn electronics_data() -> ElectronicsData {
 
 fn textile_data() -> TextileData {
     TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),
             pct: 100.0,
@@ -149,7 +149,7 @@ fn textile_data() -> TextileData {
 
 fn steel_data() -> SteelData {
     SteelData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 85.0,
         product_category: "flat".into(),
@@ -161,7 +161,7 @@ fn steel_data() -> SteelData {
 
 fn construction_data() -> ConstructionData {
     ConstructionData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_family: "cement".into(),
         country_of_manufacture: "DE".into(),
         co2e_per_functional_unit_kg: 0.6,
@@ -174,7 +174,7 @@ fn construction_data() -> ConstructionData {
 
 fn tyre_data() -> TyreData {
     TyreData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -188,7 +188,7 @@ fn tyre_data() -> TyreData {
 
 fn toy_data() -> ToyData {
     ToyData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
@@ -201,7 +201,7 @@ fn toy_data() -> ToyData {
 
 fn aluminium_data() -> AluminiumData {
     AluminiumData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 4000.0,
@@ -213,7 +213,7 @@ fn aluminium_data() -> AluminiumData {
 
 fn furniture_data() -> FurnitureData {
     FurnitureData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
         country_of_manufacture: "SE".into(),
@@ -228,7 +228,7 @@ fn furniture_data() -> FurnitureData {
 
 fn detergent_data() -> DetergentData {
     DetergentData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {

@@ -453,7 +453,7 @@ fn sector_discriminant_matches_variant() {
 
 fn sample_steel_data() -> SectorData {
     SectorData::Steel(SteelData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 35.0,
         product_category: "flat".into(),
@@ -465,7 +465,7 @@ fn sample_steel_data() -> SectorData {
 
 fn sample_aluminium_data() -> SectorData {
     SectorData::Aluminium(AluminiumData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 1200.0,
@@ -477,7 +477,7 @@ fn sample_aluminium_data() -> SectorData {
 
 fn sample_electronics_data() -> SectorData {
     SectorData::Electronics(ElectronicsData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_category: "laptop".into(),
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 120.0,
@@ -504,7 +504,7 @@ fn sample_electronics_data() -> SectorData {
 
 fn sample_construction_data() -> SectorData {
     SectorData::Construction(ConstructionData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_family: "cement".into(),
         country_of_manufacture: "DE".into(),
         co2e_per_functional_unit_kg: 0.8,
@@ -517,7 +517,7 @@ fn sample_construction_data() -> SectorData {
 
 fn sample_tyre_data() -> SectorData {
     SectorData::Tyre(TyreData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -531,7 +531,7 @@ fn sample_tyre_data() -> SectorData {
 
 fn sample_toy_data() -> SectorData {
     SectorData::Toy(ToyData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
@@ -544,7 +544,7 @@ fn sample_toy_data() -> SectorData {
 
 fn sample_furniture_data() -> SectorData {
     SectorData::Furniture(FurnitureData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
         country_of_manufacture: "DE".into(),
@@ -559,7 +559,7 @@ fn sample_furniture_data() -> SectorData {
 
 fn sample_detergent_data() -> SectorData {
     SectorData::Detergent(DetergentData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {

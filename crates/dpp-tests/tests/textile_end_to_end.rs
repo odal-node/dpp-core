@@ -20,7 +20,7 @@ use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
 use dpp_digital_link::DigitalLink;
 use dpp_digital_link::aas::map_dpp_to_aas_submodel;
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, ManufacturerInfo, MaterialEntry, Passport, PassportId,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,
 };
 
@@ -57,7 +57,7 @@ fn make_textile_passport() -> Passport {
         compliance_result: None,
         lint_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
-            gtin: "09506000134352".into(),
+            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             fibre_composition: vec![
                 FibreEntry {
                     fibre: "cotton".into(),

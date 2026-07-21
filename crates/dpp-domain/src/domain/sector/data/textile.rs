@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 use super::shared::SvhcSubstance;
 
 /// A single fibre entry in a textile product's composition list.
@@ -34,7 +36,7 @@ pub struct FibreEntry {
 pub struct TextileData {
     // ── Mandatory fields (v1.0.0) ──────────────────────────────────────────
     /// 14-digit GTIN identifying the textile product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// List of fibres and their percentage composition. Must sum to ~100%.
     pub fibre_composition: Vec<FibreEntry>,
     /// ISO 3166-1 alpha-2 country code where the textile was manufactured.

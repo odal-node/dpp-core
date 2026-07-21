@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 use super::shared::SvhcSubstance;
 
 /// Toy sector data for EU Toy Safety Directive and 2025/2509 DPP compliance.
@@ -9,7 +11,7 @@ use super::shared::SvhcSubstance;
 #[serde(rename_all = "camelCase")]
 pub struct ToyData {
     /// 14-digit GTIN identifying the toy model.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Intended age group, e.g. `"0-3"`, `"3-6"`, `"6-12"`, `"12+"`.
     pub age_group: String,
     /// Primary material, e.g. `"plastic"`, `"wood"`, `"metal"`, `"textile"`, `"mixed"`.

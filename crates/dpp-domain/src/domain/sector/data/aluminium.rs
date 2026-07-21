@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
 use crate::domain::sector::enums::ProductionRoute;
 
 /// Aluminium sector data for EU ESPR carbon intensity reporting.
@@ -9,7 +10,7 @@ use crate::domain::sector::enums::ProductionRoute;
 #[serde(rename_all = "camelCase")]
 pub struct AluminiumData {
     /// 14-digit GTIN identifying the aluminium product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Alloy series designation, e.g. `"1xxx"`, `"3xxx"`, `"5xxx"`, `"6xxx"`.
     pub alloy_grade: String,
     /// Aluminium production route — determines carbon intensity calculation basis.

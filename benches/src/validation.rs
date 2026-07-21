@@ -43,7 +43,7 @@ fn valid_battery() -> SectorData {
 
 fn valid_textile() -> SectorData {
     SectorData::Textile(TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),

@@ -7,7 +7,7 @@ use crate::aas::semantic_ids;
 pub(super) fn build_steel_submodel(d: &SteelData, passport_id: &str) -> AasSubmodel {
     let route_str = enum_wire_str(&d.production_route);
     let mut elements = vec![
-        string_property("gtin", &d.gtin, None, None),
+        string_property("gtin", d.gtin.as_str(), None, None),
         double_property(
             "co2ePerTonneSteel",
             d.co2e_per_tonne_steel,

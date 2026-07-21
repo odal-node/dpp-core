@@ -22,7 +22,7 @@ use dpp_crypto::{
     verify_credential_with_revocation,
 };
 use dpp_domain::{
-    FibreEntry, ManufacturerInfo, Passport, PassportId, PassportStatus, Sector, SectorData,
+    FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, PassportStatus, Sector, SectorData,
     TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
 };
 use serde_json::json;
@@ -487,7 +487,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         compliance_result: None,
         lint_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
-            gtin: "09506000134352".into(),
+            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             // sum = 50%, should be ~100%
             fibre_composition: vec![FibreEntry {
                 fibre: "cotton".into(),
