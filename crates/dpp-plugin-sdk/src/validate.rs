@@ -7,9 +7,10 @@
 //! the first — better for surfacing form errors to a manufacturer.
 //!
 //! The free functions [`num`] and [`str_of`] are convenience readers for
-//! `calculate_metrics` bodies.
+//! `calculate_metrics` bodies, and [`threshold_status`] is the shared
+//! "measured value at or under threshold" classification they compare against.
 
-use dpp_plugin_traits::{PluginError, PluginFieldError, PluginInput};
+use dpp_plugin_traits::{PluginComplianceStatus, PluginError, PluginFieldError, PluginInput};
 use serde_json::Value;
 
 /// A present, non-null value for `key`, or `None` if absent/null.
@@ -33,6 +34,18 @@ pub fn num(input: &PluginInput, key: &str) -> Option<f64> {
 #[must_use]
 pub fn str_of<'a>(input: &'a PluginInput, key: &str) -> Option<&'a str> {
     input.get(key).and_then(Value::as_str)
+}
+
+/// Classify a measured value against a compliance threshold: `Compliant` if
+/// present and at or under `threshold`, `NonCompliant` otherwise (including
+/// when `value` is absent — a missing measurement is not assumed compliant).
+#[must_use]
+pub fn threshold_status(value: Option<f64>, threshold: f64) -> PluginComplianceStatus {
+    if value.is_some_and(|v| v <= threshold) {
+        PluginComplianceStatus::Compliant
+    } else {
+        PluginComplianceStatus::NonCompliant
+    }
 }
 
 /// Fluent per-field validator. See module docs.

@@ -5,10 +5,10 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
-    PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError, PluginIdentity,
+    PluginInput, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{Validator, num, str_of};
+use dpp_plugin_sdk::validate::{Validator, num, str_of, threshold_status};
 use serde_json::{Value, json};
 
 #[derive(Default)]
@@ -58,11 +58,7 @@ impl DppSectorPlugin for AluminiumPlugin {
             // closed on the strictest threshold rather than the most permissive.
             _ => 1_000.0,
         };
-        let status = if co2e_kg.is_some_and(|v| v <= threshold_kg) {
-            PluginComplianceStatus::Compliant
-        } else {
-            PluginComplianceStatus::NonCompliant
-        };
+        let status = threshold_status(co2e_kg, threshold_kg);
         Ok(PluginResult::new(status)
             .maybe_metric(METRIC_CO2E_SCORE, co2e_kg)
             .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled)
@@ -83,6 +79,7 @@ export_plugin!(AluminiumPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dpp_plugin_sdk::traits::PluginComplianceStatus;
     use serde_json::json;
 
     fn valid() -> Value {

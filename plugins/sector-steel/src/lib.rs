@@ -8,10 +8,10 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
-    PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError, PluginIdentity,
+    PluginInput, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{Validator, num, str_of};
+use dpp_plugin_sdk::validate::{Validator, num, str_of, threshold_status};
 use serde_json::{Value, json};
 
 #[derive(Default)]
@@ -61,11 +61,7 @@ impl DppSectorPlugin for SteelPlugin {
             // closed on the strictest threshold rather than the most permissive.
             _ => 0.4,
         };
-        let status = if co2e.is_some_and(|v| v <= threshold) {
-            PluginComplianceStatus::Compliant
-        } else {
-            PluginComplianceStatus::NonCompliant
-        };
+        let status = threshold_status(co2e, threshold);
         Ok(PluginResult::new(status)
             .maybe_metric(METRIC_CO2E_SCORE, co2e)
             .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled)
@@ -86,6 +82,7 @@ export_plugin!(SteelPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dpp_plugin_sdk::traits::PluginComplianceStatus;
     use serde_json::json;
 
     fn valid() -> Value {
