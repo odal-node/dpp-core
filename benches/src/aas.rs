@@ -30,7 +30,7 @@ fn battery_passport() -> Passport {
             name: "LFP".into(),
             weight_kg: 12.0,
             recycled_pct: Some(15.0),
-            origin_country: Some("CN".into()),
+            country_of_origin: Some("CN".into()),
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(73.0)),
         repairability_score: None,

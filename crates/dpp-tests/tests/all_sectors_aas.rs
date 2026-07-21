@@ -45,7 +45,7 @@ fn base(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passpo
             name: "Primary material".into(),
             weight_kg: 1.5,
             recycled_pct: Some(20.0),
-            origin_country: Some("DE".into()),
+            country_of_origin: Some("DE".into()),
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.0)),
         repairability_score: Some(RepairabilityScore::from_scalar(6.0)),

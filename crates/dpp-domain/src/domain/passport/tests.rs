@@ -25,7 +25,7 @@ fn make_passport() -> Passport {
             name: "Recycled Aluminium".to_owned(),
             weight_kg: 0.5,
             recycled_pct: Some(80.0),
-            origin_country: Some("DE".to_owned()),
+            country_of_origin: Some("DE".to_owned()),
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(2.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(7.5)),

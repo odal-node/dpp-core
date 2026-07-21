@@ -25,7 +25,7 @@ fn minimal_passport(sector: Sector) -> Passport {
             name: "Aluminium".into(),
             weight_kg: 0.3,
             recycled_pct: Some(60.0),
-            origin_country: Some("DE".into()),
+            country_of_origin: Some("DE".into()),
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(8.0)),
