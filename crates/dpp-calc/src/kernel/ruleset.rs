@@ -96,9 +96,10 @@ pub trait Ruleset {
     /// Error unless this ruleset is legally in force today.
     ///
     /// A signed, dated receipt must never be computed from a ruleset that is
-    /// not legally in force today — every methodology's `calculate()` must
-    /// call this before computing a result (see `co2e::calculator::calculate`
-    /// / `repairability::calculator::calculate`).
+    /// not legally in force. Each methodology's `calculate()` performs this
+    /// check itself (via the date-parameterized `calculate_asof`, so tests can
+    /// supply a fixed date instead of the wall clock) — this default method is
+    /// for callers who need the same today-relative check standalone.
     fn ensure_active_today(&self) -> Result<(), crate::error::CalcError> {
         self.effective_dates()
             .ensure_active_on(self.id(), chrono::Utc::now().date_naive())

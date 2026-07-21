@@ -1,5 +1,6 @@
 //! The simplified repairability heuristic calculation: inputs → A–E band.
 
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::parameters::RepairabilityInputs;
@@ -76,7 +77,8 @@ pub struct RepairabilityResult {
     pub receipt: CalculationReceipt,
 }
 
-/// Calculate the simplified repairability heuristic band for one product.
+/// Calculate the simplified repairability heuristic band for one product, as
+/// of today.
 ///
 /// The result is a non-regulatory heuristic, not the EU 2023/1669 class.
 /// Returns `Err` if any parameter value is outside `[0, 2]` or if the
@@ -85,9 +87,25 @@ pub fn calculate(
     inputs: &RepairabilityInputs,
     ruleset: &dyn RepairabilityRuleset,
 ) -> Result<RepairabilityResult, CalcError> {
+    calculate_asof(inputs, ruleset, Utc::now().date_naive())
+}
+
+/// Calculate the simplified repairability heuristic band for one product, as
+/// of `on_date`.
+///
+/// Lets a caller check "was this ruleset legally in force on date X" without
+/// depending on the wall clock — e.g. testing the not-yet-effective/expired
+/// paths with a fixed date rather than a far-future fixture.
+pub fn calculate_asof(
+    inputs: &RepairabilityInputs,
+    ruleset: &dyn RepairabilityRuleset,
+    on_date: NaiveDate,
+) -> Result<RepairabilityResult, CalcError> {
     validate_inputs(inputs)?;
     ruleset.validate_cross_fields(inputs)?;
-    ruleset.ensure_active_today()?;
+    ruleset
+        .effective_dates()
+        .ensure_active_on(ruleset.id(), on_date)?;
 
     let w = ruleset.weights();
     let scale = 5.0; // scale 0–2 ordinals to 0–10
