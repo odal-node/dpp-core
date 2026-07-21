@@ -12,6 +12,22 @@ fn parse_input(bytes: &[u8]) -> Result<PluginInput, PluginError> {
     serde_json::from_slice(bytes).map_err(|e| PluginError::InvalidInput(e.to_string()))
 }
 
+/// Parse `input`, run `call` on success, wrap the outcome as an [`AbiResult`],
+/// and serialise it to bytes. Shared by every entry point below — they differ
+/// only in which plugin method `call` invokes and how `wrap` turns a success
+/// value into the envelope's JSON payload.
+fn dispatch<T>(
+    input: &[u8],
+    call: impl FnOnce(PluginInput) -> Result<T, PluginError>,
+    wrap: impl FnOnce(T) -> AbiResult,
+) -> Vec<u8> {
+    let outcome = match parse_input(input).and_then(call) {
+        Ok(value) => wrap(value),
+        Err(e) => AbiResult::Error(e),
+    };
+    to_bytes(&outcome)
+}
+
 /// Serialise the plugin's [`PluginMeta`](dpp_plugin_traits::PluginMeta) to JSON bytes.
 pub fn metadata_bytes<P: DppSectorPlugin>(plugin: &P) -> Vec<u8> {
     to_bytes(&plugin.meta())
@@ -24,36 +40,27 @@ pub fn describe_bytes<P: DppSectorPlugin>(plugin: &P) -> Vec<u8> {
 
 /// Run `validate_input` and serialise the [`AbiResult`] envelope.
 pub fn validate_bytes<P: DppSectorPlugin>(plugin: &P, input: &[u8]) -> Vec<u8> {
-    let outcome = match parse_input(input) {
-        Ok(value) => match plugin.validate_input(&value) {
-            Ok(()) => AbiResult::Ok(serde_json::Value::Null),
-            Err(e) => AbiResult::Error(e),
-        },
-        Err(e) => AbiResult::Error(e),
-    };
-    to_bytes(&outcome)
+    dispatch(
+        input,
+        |value| plugin.validate_input(&value),
+        |()| AbiResult::Ok(serde_json::Value::Null),
+    )
 }
 
 /// Run `calculate_metrics` and serialise the [`AbiResult`] envelope.
 pub fn calculate_metrics_bytes<P: DppSectorPlugin>(plugin: &P, input: &[u8]) -> Vec<u8> {
-    let outcome = match parse_input(input) {
-        Ok(value) => match plugin.calculate_metrics(&value) {
-            Ok(result) => AbiResult::ok(&result),
-            Err(e) => AbiResult::Error(e),
-        },
-        Err(e) => AbiResult::Error(e),
-    };
-    to_bytes(&outcome)
+    dispatch(
+        input,
+        |value| plugin.calculate_metrics(&value),
+        |result| AbiResult::ok(&result),
+    )
 }
 
 /// Run `generate_passport` and serialise the [`AbiResult`] envelope.
 pub fn generate_passport_bytes<P: DppSectorPlugin>(plugin: &P, input: &[u8]) -> Vec<u8> {
-    let outcome = match parse_input(input) {
-        Ok(value) => match plugin.generate_passport(value) {
-            Ok(payload) => AbiResult::Ok(payload),
-            Err(e) => AbiResult::Error(e),
-        },
-        Err(e) => AbiResult::Error(e),
-    };
-    to_bytes(&outcome)
+    dispatch(
+        input,
+        |value| plugin.generate_passport(value),
+        AbiResult::Ok,
+    )
 }
