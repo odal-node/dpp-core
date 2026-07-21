@@ -10,6 +10,8 @@ pub mod compliance;
 pub mod domain;
 pub mod ports;
 pub mod schemas;
+#[cfg(test)]
+mod test_support;
 
 pub use catalog::{CatalogError, RegulatoryStatus, SectorCatalog, SectorDescriptor};
 

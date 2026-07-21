@@ -178,45 +178,25 @@ pub use crate::ports::ghosts::GhostRegistrySync;
 mod tests {
     use super::*;
     use crate::domain::{
-        passport::{ManufacturerInfo, Passport, PassportId},
-        sector::Sector,
+        passport::{ManufacturerInfo, Passport},
         status::PassportStatus,
     };
     use chrono::Utc;
 
     fn make_published_passport() -> Passport {
         Passport {
-            id: PassportId::new(),
-            batch_id: None,
             product_name: "Test".into(),
-            sector: Sector::Textile,
-            product_category: None,
             manufacturer: ManufacturerInfo {
                 name: "ACME".into(),
                 address: "Berlin".into(),
                 did_web_url: None,
             },
-            materials: vec![],
-            co2e_per_unit: None,
-            repairability_score: None,
-            compliance_result: None,
-            lint_result: None,
-            sector_data: None,
             status: PassportStatus::Published,
             qr_code_url: Some("https://id.odal-node.io/01/09506000134352".into()),
             jws_signature: Some("eyJ0eXAiOiJKV1QifQ.payload.sig".into()),
-            public_jws_signature: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
             published_at: Some(Utc::now()),
             schema_version: "1.1.0".into(),
             retention_locked: true,
-            version: 1,
-            supersedes_id: None,
-            parent_passport_ref: None,
-            component_refs: Vec::new(),
-            retention_until: None,
-            product_id: None,
             operator_identifier: Some("did:web:acme.example.com".into()),
             facility: Some(crate::domain::passport::FacilitySnapshot {
                 scheme: "national".into(),
@@ -225,7 +205,7 @@ mod tests {
                 country: "DE".into(),
                 address: None,
             }),
-            seal: None,
+            ..crate::test_support::sample_passport()
         }
     }
 

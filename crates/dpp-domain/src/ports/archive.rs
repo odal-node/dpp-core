@@ -239,46 +239,25 @@ mod tests {
     use super::stub::InMemoryArchive;
     use super::*;
     use crate::domain::passport::*;
-    use crate::domain::sector::{CarbonFootprint, RepairabilityScore, Sector};
+    use crate::domain::sector::{CarbonFootprint, RepairabilityScore};
     use crate::domain::status::PassportStatus;
     use chrono::Utc;
 
     fn make_test_passport() -> Passport {
         Passport {
-            id: PassportId::new(),
-            batch_id: None,
             product_name: "Test Textile".into(),
-            sector: Sector::Textile,
-            product_category: None,
             manufacturer: ManufacturerInfo {
                 name: "Test Brand".into(),
                 address: "Berlin, DE".into(),
                 did_web_url: Some("https://test.example.com/.well-known/did.json".into()),
             },
-            materials: vec![],
             co2e_per_unit: Some(CarbonFootprint::from_kg(3.5)),
             repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
-            compliance_result: None,
-            lint_result: None,
-            sector_data: None,
             status: PassportStatus::Published,
-            qr_code_url: None,
             jws_signature: Some("eyJ0eXAiOiJKV1QifQ.test.signature".into()),
-            public_jws_signature: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
             published_at: Some(Utc::now()),
-            schema_version: "1.0.0".into(),
             retention_locked: true,
-            version: 1,
-            supersedes_id: None,
-            parent_passport_ref: None,
-            component_refs: Vec::new(),
-            retention_until: None,
-            product_id: None,
-            operator_identifier: None,
-            facility: None,
-            seal: None,
+            ..crate::test_support::sample_passport()
         }
     }
 
