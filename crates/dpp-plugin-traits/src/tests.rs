@@ -76,15 +76,12 @@ fn semver_multi_digit_minor_accepted() {
     // Lexicographic comparison would reject "1.10.0" within ["1.0.0", "1.10.0"]
     // because "1.10.0" < "1.2.0" as strings. Semantic comparison must handle this.
     let caps = PluginCapabilities {
-        abi_version: AbiVersion::current(),
         supported_schemas: vec![SchemaVersionRange {
             min_version: "1.0.0".into(),
             max_version: "1.10.0".into(),
         }],
         capabilities: vec![],
-        min_host_version: None,
-        max_fuel: None,
-        max_memory_bytes: None,
+        ..sample_capabilities()
     };
     let result = check_compatibility(&caps, Some("1.10.0"), &[]);
     assert!(
@@ -97,15 +94,12 @@ fn semver_multi_digit_minor_accepted() {
 fn semver_multi_digit_minor_rejected_correctly() {
     // "1.10.0" must be rejected when max is "1.2.0"
     let caps = PluginCapabilities {
-        abi_version: AbiVersion::current(),
         supported_schemas: vec![SchemaVersionRange {
             min_version: "1.0.0".into(),
             max_version: "1.2.0".into(),
         }],
         capabilities: vec![],
-        min_host_version: None,
-        max_fuel: None,
-        max_memory_bytes: None,
+        ..sample_capabilities()
     };
     let result = check_compatibility(&caps, Some("1.10.0"), &[]);
     assert!(
@@ -240,15 +234,12 @@ fn non_semver_range_bound_does_not_lexicographically_match() {
     // (where "1.9.0" > "1.10.0"); the range simply can't match, so the check
     // fails closed rather than returning a misleading answer.
     let caps = PluginCapabilities {
-        abi_version: AbiVersion::current(),
         supported_schemas: vec![SchemaVersionRange {
             min_version: "1.0".into(), // not valid semver
             max_version: "1.10.0".into(),
         }],
         capabilities: vec![],
-        min_host_version: None,
-        max_fuel: None,
-        max_memory_bytes: None,
+        ..sample_capabilities()
     };
     let result = check_compatibility(&caps, Some("1.9.0"), &[]);
     assert!(matches!(
