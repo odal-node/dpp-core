@@ -49,6 +49,8 @@ dpp-domain        = { path = "crates/dpp-domain", version = "0.10.0" }
 dpp-plugin-traits = { path = "crates/dpp-plugin-traits", version = "0.10.0" }
 dpp-crypto        = { path = "crates/dpp-crypto", version = "0.10.0" }
 dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.10.0" }
+dpp-calc          = { path = "crates/dpp-calc", version = "0.10.0" }
+dpp-tests         = { path = "crates/dpp-tests", version = "0.10.0" }
 
 # Serialisation
 serde        = { version = "1", features = ["derive"] }
