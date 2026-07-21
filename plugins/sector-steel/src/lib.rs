@@ -8,9 +8,8 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
-    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginInput,
-    PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
+    PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num, str_of};
 use serde_json::{Value, json};
@@ -19,33 +18,19 @@ use serde_json::{Value, json};
 struct SteelPlugin;
 
 impl DppSectorPlugin for SteelPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "steel".into(),
-            name: "Odal Node Steel Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU ESPR steel carbon-intensity validation and metrics".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "steel",
+            name: "Odal Node Steel Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU ESPR steel carbon-intensity validation and metrics",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -59,7 +44,7 @@ impl DppSectorPlugin for SteelPlugin {
                 "productionRoute",
                 &["blast-furnace", "electric-arc", "direct-reduction"],
             )
-            .require_country("countryOfProduction")
+            .require_country("countryOfOrigin")
             .finish()
     }
 
@@ -90,9 +75,9 @@ impl DppSectorPlugin for SteelPlugin {
             })))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -110,7 +95,7 @@ mod tests {
             "recycledScrapContentPct": 90.0,
             "productCategory": "long",
             "productionRoute": "electric-arc",
-            "countryOfProduction": "DE"
+            "countryOfOrigin": "DE"
         })
     }
 
@@ -135,7 +120,7 @@ mod tests {
     #[test]
     fn missing_country_fails_validation() {
         let mut d = valid();
-        d.as_object_mut().unwrap().remove("countryOfProduction");
+        d.as_object_mut().unwrap().remove("countryOfOrigin");
         assert!(SteelPlugin.validate_input(&d).is_err());
     }
 

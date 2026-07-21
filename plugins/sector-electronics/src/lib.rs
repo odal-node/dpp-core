@@ -11,9 +11,9 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
-    METRIC_REPAIRABILITY_INDEX, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
+    PluginComplianceStatus, PluginError, PluginIdentity, PluginInput, PluginResult,
+    SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num, str_of};
 use serde_json::Value;
@@ -22,33 +22,19 @@ use serde_json::Value;
 struct ElectronicsPlugin;
 
 impl DppSectorPlugin for ElectronicsPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "electronics".into(),
-            name: "Odal Node Electronics Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU Electronics DPP energy/repairability validation".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "electronics",
+            name: "Odal Node Electronics Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU Electronics DPP energy/repairability validation",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.0.0".into(),
         }
     }
 
@@ -94,9 +80,9 @@ impl DppSectorPlugin for ElectronicsPlugin {
             .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 

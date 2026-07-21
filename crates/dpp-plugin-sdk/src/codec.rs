@@ -49,7 +49,7 @@ pub fn calculate_metrics_bytes<P: DppSectorPlugin>(plugin: &P, input: &[u8]) -> 
 /// Run `generate_passport` and serialise the [`AbiResult`] envelope.
 pub fn generate_passport_bytes<P: DppSectorPlugin>(plugin: &P, input: &[u8]) -> Vec<u8> {
     let outcome = match parse_input(input) {
-        Ok(value) => match plugin.generate_passport(&value) {
+        Ok(value) => match plugin.generate_passport(value) {
             Ok(payload) => AbiResult::Ok(payload),
             Err(e) => AbiResult::Error(e),
         },
