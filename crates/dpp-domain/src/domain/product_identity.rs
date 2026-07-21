@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn textile_passport_yields_identity() {
         let textile_data = SectorData::Textile(TextileData {
-            country_of_manufacturing: "BD".into(),
+            country_of_origin: "BD".into(),
             care_instructions: "wash".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             ..crate::test_support::sample_textile_data()

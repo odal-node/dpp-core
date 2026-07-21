@@ -315,7 +315,7 @@ fn nested_confidential_field_cannot_bypass_via_nesting() {
 
     let data = json!({
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
-        "countryOfManufacturing": "DE",
+        "countryOfOrigin": "DE",
         "sectorData": {
             "careInstructions": "cold wash",
             "jwsSignature": "eyJhbGciOiJFZERTQSJ9.nested-leak-attempt",
@@ -494,7 +494,7 @@ fn passport_validate_catches_bad_fibre_sum() {
                 pct: 50.0,
                 country_of_origin: None,
             }],
-            country_of_manufacturing: "DE".into(),
+            country_of_origin: "DE".into(),
             care_instructions: "Machine wash 30°C".into(),
             chemical_compliance_standard: "REACH".into(),
             recycled_content_pct: None,

@@ -34,7 +34,7 @@ pub struct DetergentData {
     /// List of surfactants in the product formulation.
     pub surfactants: Vec<SurfactantEntry>,
     /// ISO 3166-1 alpha-2 country of manufacture.
-    pub country_of_manufacture: String,
+    pub country_of_origin: String,
 
     /// Carbon footprint in kg CO₂e per product unit (bottle or pack).
     #[serde(skip_serializing_if = "Option::is_none")]

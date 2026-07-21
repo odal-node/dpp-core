@@ -18,7 +18,7 @@ pub struct SteelData {
     /// Steel grade / product category, e.g. `"flat"`, `"long"`, `"tube"`.
     pub product_category: String,
     /// ISO 3166-1 alpha-2 country of production.
-    pub country_of_production: String,
+    pub country_of_origin: String,
     /// Steel production route — determines carbon intensity calculation basis.
     pub production_route: ProductionRoute,
     /// Annual production volume in tonnes (optional).

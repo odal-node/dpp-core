@@ -10,12 +10,7 @@ pub(super) fn build_toy_submodel(d: &ToyData, passport_id: &str) -> AasSubmodel 
         string_property("ageGroup", &d.age_group, None, None),
         string_property("primaryMaterial", &d.primary_material, None, None),
         boolean_property("ceMarking", d.ce_marking, None, None),
-        string_property(
-            "countryOfManufacture",
-            &d.country_of_manufacture,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
     ];
     if let Some(v) = d.contains_battery {
         elements.push(boolean_property("containsBattery", v, None, None));

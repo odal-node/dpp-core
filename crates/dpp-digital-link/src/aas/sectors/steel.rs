@@ -21,7 +21,7 @@ pub(super) fn build_steel_submodel(d: &SteelData, passport_id: &str) -> AasSubmo
             Some("%"),
         ),
         string_property("productCategory", &d.product_category, None, None),
-        string_property("countryOfProduction", &d.country_of_production, None, None),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
         string_property("productionRoute", &route_str, None, None),
     ];
     if let Some(v) = d.annual_production_tonnes {

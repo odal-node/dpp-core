@@ -56,7 +56,7 @@ fn valid_textile() -> SectorData {
                 country_of_origin: None,
             },
         ],
-        country_of_manufacturing: "BD".into(),
+        country_of_origin: "BD".into(),
         care_instructions: "30\u{00B0}C machine wash".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
         recycled_content_pct: None,

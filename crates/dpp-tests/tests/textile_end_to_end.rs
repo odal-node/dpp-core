@@ -70,7 +70,7 @@ fn make_textile_passport() -> Passport {
                     country_of_origin: Some("DE".into()),
                 },
             ],
-            country_of_manufacturing: "BD".into(),
+            country_of_origin: "BD".into(),
             care_instructions: "Machine wash 30°C, do not tumble dry, iron low".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             recycled_content_pct: Some(28.0),
@@ -137,7 +137,7 @@ fn textile_passport_serialisation_round_trip() {
     // Sector data survived round-trip
     if let Some(SectorData::Textile(td)) = &back.sector_data {
         assert_eq!(td.fibre_composition.len(), 2);
-        assert_eq!(td.country_of_manufacturing, "BD");
+        assert_eq!(td.country_of_origin, "BD");
         assert!(td.svhc_substances.as_ref().unwrap().len() == 1);
     } else {
         panic!("expected TextileData after round-trip");

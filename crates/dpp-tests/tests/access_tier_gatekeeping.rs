@@ -26,7 +26,7 @@ fn sample_textile_payload() -> serde_json::Value {
             { "fibre": "cotton", "pct": 70.0 },
             { "fibre": "recycled_polyester", "pct": 30.0 }
         ],
-        "countryOfManufacturing": "BD",
+        "countryOfOrigin": "BD",
         "careInstructions": "Machine wash 30°C",
         "carbonFootprintKgCo2e": 8.5,
         "durabilityScore": 7.5,
@@ -86,12 +86,7 @@ fn public_tier_sees_only_public_fields() {
 
     // Public fields present
     assert!(decision.filtered_data.get("fibreComposition").is_some());
-    assert!(
-        decision
-            .filtered_data
-            .get("countryOfManufacturing")
-            .is_some()
-    );
+    assert!(decision.filtered_data.get("countryOfOrigin").is_some());
     assert!(decision.filtered_data.get("careInstructions").is_some());
     assert!(
         decision

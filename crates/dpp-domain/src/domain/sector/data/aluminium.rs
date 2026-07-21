@@ -20,7 +20,7 @@ pub struct AluminiumData {
     /// Recycled scrap content as a percentage of total input (0.0–100.0).
     pub recycled_content_pct: f64,
     /// ISO 3166-1 alpha-2 country of primary production.
-    pub country_of_production: String,
+    pub country_of_origin: String,
     /// Annual production volume in tonnes (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annual_production_tonnes: Option<f64>,

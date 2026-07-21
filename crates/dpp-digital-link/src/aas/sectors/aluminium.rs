@@ -22,7 +22,7 @@ pub(super) fn build_aluminium_submodel(d: &AluminiumData, passport_id: &str) -> 
             None,
             Some("%"),
         ),
-        string_property("countryOfProduction", &d.country_of_production, None, None),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
     ];
     if let Some(v) = d.annual_production_tonnes {
         elements.push(double_property(

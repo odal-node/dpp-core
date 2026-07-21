@@ -98,7 +98,7 @@ pub(crate) fn sample_textile_data() -> TextileData {
     TextileData {
         gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
         fibre_composition: vec![],
-        country_of_manufacturing: "PT".into(),
+        country_of_origin: "PT".into(),
         care_instructions: "Machine wash 30°C".into(),
         chemical_compliance_standard: "OEKO-TEX Standard 100".into(),
         recycled_content_pct: None,

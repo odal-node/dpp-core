@@ -6,12 +6,7 @@ use crate::aas::semantic_ids;
 
 pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property(
-            "countryOfManufacturing",
-            &t.country_of_manufacturing,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &t.country_of_origin, None, None),
         string_property("careInstructions", &t.care_instructions, None, None),
         string_property(
             "chemicalComplianceStandard",

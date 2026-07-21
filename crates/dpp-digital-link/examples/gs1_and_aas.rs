@@ -126,7 +126,7 @@ fn main() {
                     country_of_origin: None,
                 },
             ],
-            country_of_manufacturing: "PT".into(),
+            country_of_origin: "PT".into(),
             care_instructions: "Machine wash 30°C, do not tumble dry".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             recycled_content_pct: Some(30.0),

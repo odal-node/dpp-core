@@ -17,7 +17,7 @@ pub struct FurnitureData {
     /// Primary material, e.g. `"solid-wood"`, `"engineered-wood"`, `"metal"`, `"upholstered"`, `"mixed"`.
     pub primary_material: String,
     /// ISO 3166-1 alpha-2 country of manufacture.
-    pub country_of_manufacture: String,
+    pub country_of_origin: String,
 
     /// Carbon footprint in kg CO₂e per unit.
     #[serde(skip_serializing_if = "Option::is_none")]

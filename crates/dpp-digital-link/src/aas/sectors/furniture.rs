@@ -9,12 +9,7 @@ pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> 
         string_property("gtin", d.gtin.as_str(), None, None),
         string_property("productType", &d.product_type, None, None),
         string_property("primaryMaterial", &d.primary_material, None, None),
-        string_property(
-            "countryOfManufacture",
-            &d.country_of_manufacture,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
     ];
     if let Some(v) = d.co2e_per_unit_kg {
         elements.push(double_property(

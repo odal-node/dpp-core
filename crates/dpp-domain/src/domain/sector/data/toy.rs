@@ -19,7 +19,7 @@ pub struct ToyData {
     /// Whether the product bears CE marking under the EU Toy Safety Directive.
     pub ce_marking: bool,
     /// ISO 3166-1 alpha-2 country of manufacture.
-    pub country_of_manufacture: String,
+    pub country_of_origin: String,
 
     /// SVHC substances present above 0.1% w/w per REACH Article 33.
     #[serde(skip_serializing_if = "Option::is_none")]

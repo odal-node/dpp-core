@@ -119,7 +119,7 @@ fn polyester_fibre(pct: f64) -> FibreEntry {
 fn test_textile_data() -> TextileData {
     TextileData {
         fibre_composition: vec![cotton_fibre(60.0), polyester_fibre(40.0)],
-        country_of_manufacturing: "BD".into(),
+        country_of_origin: "BD".into(),
         care_instructions: "Machine wash 40°C".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
         ..crate::test_support::sample_textile_data()
@@ -345,7 +345,7 @@ fn sector_data_textile_round_trip() {
     let sector = SectorData::Textile(data.clone());
     let json = serde_json::to_value(&sector).unwrap();
     assert_eq!(json["sector"], "textile", "sector tag must be lowercase");
-    assert_eq!(json["countryOfManufacturing"], "BD");
+    assert_eq!(json["countryOfOrigin"], "BD");
     assert_eq!(json["durabilityScore"], 7.5);
     assert_eq!(json["microplasticSheddingMgPerWash"], 12.3);
     assert!(json["svhcSubstances"].is_array());
@@ -378,18 +378,19 @@ fn textile_none_fields_not_serialized() {
 
 #[test]
 fn textile_v1_data_deserializes_with_defaults() {
-    // v1.0.0 JSON (without new fields) must still deserialize into the expanded struct
+    // Minimal JSON (only required fields, current wire shape) must still
+    // deserialize into the expanded struct with every optional field defaulted.
     let v1_json = serde_json::json!({
         "sector": "textile",
         "gtin": "09506000134352",
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
-        "countryOfManufacturing": "PT",
+        "countryOfOrigin": "PT",
         "careInstructions": "Hand wash",
         "chemicalComplianceStandard": "REACH"
     });
     let parsed: SectorData = serde_json::from_value(v1_json).unwrap();
     if let SectorData::Textile(t) = parsed {
-        assert_eq!(t.country_of_manufacturing, "PT");
+        assert_eq!(t.country_of_origin, "PT");
         assert!(t.svhc_substances.is_none());
         assert!(t.durability_score.is_none());
         assert!(t.microplastic_shedding_mg_per_wash.is_none());
@@ -457,7 +458,7 @@ fn sample_steel_data() -> SectorData {
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 35.0,
         product_category: "flat".into(),
-        country_of_production: "DE".into(),
+        country_of_origin: "DE".into(),
         production_route: ProductionRoute::ElectricArc,
         annual_production_tonnes: None,
     })
@@ -470,7 +471,7 @@ fn sample_aluminium_data() -> SectorData {
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 1200.0,
         recycled_content_pct: 60.0,
-        country_of_production: "DE".into(),
+        country_of_origin: "DE".into(),
         annual_production_tonnes: None,
     })
 }
@@ -506,7 +507,7 @@ fn sample_construction_data() -> SectorData {
     SectorData::Construction(ConstructionData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         product_family: "cement".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.8,
         functional_unit: "per tonne".into(),
         recycled_content_pct: None,
@@ -535,7 +536,7 @@ fn sample_toy_data() -> SectorData {
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         svhc_substances: None,
         contains_battery: Some(false),
         repairability_info: None,
@@ -547,7 +548,7 @@ fn sample_furniture_data() -> SectorData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: None,
         recycled_content_pct: None,
         repairability_score: Some(7.0),
@@ -568,7 +569,7 @@ fn sample_detergent_data() -> SectorData {
             concentration_band: "5-15%".into(),
             cas_number: None,
         }],
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: None,
         packaging_recyclable: None,
         recommended_dosage_ml: None,

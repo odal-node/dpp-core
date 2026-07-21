@@ -319,7 +319,7 @@ fn validate_wires_sector_data_validation() {
             pct: 50.0,
             country_of_origin: None,
         }],
-        country_of_manufacturing: "DE".into(),
+        country_of_origin: "DE".into(),
         chemical_compliance_standard: "REACH".into(),
         ..crate::test_support::sample_textile_data()
     }));

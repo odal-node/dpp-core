@@ -67,7 +67,7 @@ mod tests {
                 pct: 100.0,
                 country_of_origin: None,
             }],
-            country_of_manufacturing: "BD".into(),
+            country_of_origin: "BD".into(),
             care_instructions: "40°C wash".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             recycled_content_pct: Some(30.0),
