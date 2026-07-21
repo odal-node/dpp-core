@@ -9,6 +9,9 @@ pub mod identity;
 pub mod jws;
 pub mod keystore;
 
+#[cfg(test)]
+mod test_support;
+
 /// Infallible OS randomness source, used for Ed25519 key generation and
 /// AES-GCM nonce/salt generation. `SysRng` is fallible (`TryCryptoRng`);
 /// `UnwrapErr` panics on the (practically unreachable) OS-entropy-source
