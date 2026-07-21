@@ -168,8 +168,8 @@ mod tests {
 
     /// A CO₂e ruleset whose effective period starts in 2100 — not yet in force.
     struct FutureCo2eRuleset;
-    static FUT_ID: OnceLock<RulesetId> = OnceLock::new();
-    static FUT_VER: OnceLock<RulesetVersion> = OnceLock::new();
+    static FUT_ID: RulesetId = RulesetId("co2e-future");
+    static FUT_VER: RulesetVersion = RulesetVersion("1.0.0");
     static FUT_DATES: OnceLock<EffectiveDateBound> = OnceLock::new();
     static FUT_BASIS: RegulatoryBasis = RegulatoryBasis {
         regulation: "test",
@@ -181,10 +181,10 @@ mod tests {
     };
     impl Ruleset for FutureCo2eRuleset {
         fn id(&self) -> &RulesetId {
-            FUT_ID.get_or_init(|| RulesetId("co2e-future".into()))
+            &FUT_ID
         }
         fn version(&self) -> &RulesetVersion {
-            FUT_VER.get_or_init(|| RulesetVersion("1.0.0".into()))
+            &FUT_VER
         }
         fn effective_dates(&self) -> &EffectiveDateBound {
             FUT_DATES.get_or_init(|| {

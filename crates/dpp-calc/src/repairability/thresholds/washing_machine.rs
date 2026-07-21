@@ -32,18 +32,18 @@ static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static WASHING_RULESET_ID: std::sync::OnceLock<RulesetId> = std::sync::OnceLock::new();
-static WASHING_RULESET_VERSION: std::sync::OnceLock<RulesetVersion> = std::sync::OnceLock::new();
+static WASHING_RULESET_ID: RulesetId = RulesetId("washing-machine-repairability");
+static WASHING_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
 static WASHING_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
     std::sync::OnceLock::new();
 
 impl Ruleset for WashingMachineRuleset {
     fn id(&self) -> &RulesetId {
-        WASHING_RULESET_ID.get_or_init(|| RulesetId("washing-machine-repairability".into()))
+        &WASHING_RULESET_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        WASHING_RULESET_VERSION.get_or_init(|| RulesetVersion("0.0.0-stub".into()))
+        &WASHING_RULESET_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {

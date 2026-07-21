@@ -84,12 +84,10 @@ impl CalculationReceipt {
         ruleset: &dyn Ruleset,
         output_hash: impl Into<String>,
     ) -> Result<Self, CalcError> {
-        Ok(Self::new(
-            input_hash(inputs)?,
-            ruleset.id().0.as_str(),
-            ruleset.version().0.as_str(),
+        Ok(
+            Self::new(input_hash(inputs)?, ruleset.id().0, ruleset.version().0)
+                .with_output_hash(output_hash),
         )
-        .with_output_hash(output_hash))
     }
 
     /// Bind the numeric output values to this receipt.

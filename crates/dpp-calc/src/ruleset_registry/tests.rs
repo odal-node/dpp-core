@@ -187,8 +187,7 @@ fn status_map_agrees_with_resolve_repairability_today() {
 /// `"co2e-cradle-to-gate"`), which would make a lookup-by-id silently fail.
 #[test]
 fn active_map_entries_reference_real_rulesets() {
-    let known: std::collections::HashSet<&str> =
-        all_rulesets().iter().map(|r| r.id().0.as_str()).collect();
+    let known: std::collections::HashSet<&str> = all_rulesets().iter().map(|r| r.id().0).collect();
     for entry in sector_calculator_map() {
         if let CalculatorStatus::Active { ruleset_id } = &entry.status {
             assert!(
