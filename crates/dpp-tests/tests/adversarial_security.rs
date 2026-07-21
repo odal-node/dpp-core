@@ -17,29 +17,19 @@
 use chrono::Utc;
 use dpp_crypto::access::{AccessTier, SectorAccessPolicy, filter_by_access_tier};
 use dpp_crypto::{
-    AllowAllIssuers, CredentialBuilder, CredentialRole, CredentialStatus, DppCredentialSubject,
-    StaticTrustedIssuers, StatusList, VerificationResult, verify_credential_claims_with_trust,
+    AllowAllIssuers, CredentialBuilder, CredentialRole, CredentialStatus, StaticTrustedIssuers,
+    StatusList, VerificationResult, verify_credential_claims_with_trust,
     verify_credential_with_revocation,
 };
 use dpp_domain::{
-    FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, PassportStatus, Sector, SectorData,
-    TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
+    FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData, TextileData,
+    TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
 };
+use dpp_tests::fixtures::{base_passport, make_operator, make_subject};
 use serde_json::json;
 use uuid::Uuid;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-fn make_subject(role: CredentialRole, sectors: Vec<String>) -> DppCredentialSubject {
-    DppCredentialSubject {
-        id: "did:web:holder.example.com".into(),
-        name: "Test Holder".into(),
-        role,
-        country: "DE".into(),
-        sectors,
-        product_categories: vec![],
-    }
-}
 
 /// A StatusList where bit 5 is SET (revoked).
 fn status_list_with_bit_5_set() -> StatusList {
@@ -53,7 +43,12 @@ fn status_list_all_clear() -> StatusList {
 }
 
 fn credential_with_status_at_index(index: &str) -> dpp_crypto::DppAccessCredential {
-    let subject = make_subject(CredentialRole::AuthorisedRepairer, vec!["textile".into()]);
+    let subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::AuthorisedRepairer,
+        vec!["textile".into()],
+    );
     CredentialBuilder::new("did:web:authority.example.com".into(), subject)
         .with_status(CredentialStatus {
             id: format!("https://status.example.com/list#{index}"),
@@ -125,7 +120,12 @@ fn non_revoked_credential_passes_revocation_check() {
 /// A credential with no credentialStatus declared is not subject to revocation.
 #[test]
 fn credential_without_status_declaration_unaffected_by_revocation_check() {
-    let subject = make_subject(CredentialRole::AuthorisedRepairer, vec!["textile".into()]);
+    let subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::AuthorisedRepairer,
+        vec!["textile".into()],
+    );
     let credential = CredentialBuilder::new("did:web:authority.example.com".into(), subject)
         .expires_in_days(365)
         .build();
@@ -145,7 +145,12 @@ fn credential_without_status_declaration_unaffected_by_revocation_check() {
 /// claims are otherwise structurally valid.
 #[test]
 fn forged_issuer_credential_rejected() {
-    let subject = make_subject(CredentialRole::AuthorisedRepairer, vec!["textile".into()]);
+    let subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::AuthorisedRepairer,
+        vec!["textile".into()],
+    );
     // Issued by an attacker DID — not in the operator's trust registry.
     let credential = CredentialBuilder::new("did:web:evil-attacker.example.com".into(), subject)
         .expires_in_days(365)
@@ -170,7 +175,12 @@ fn forged_issuer_credential_rejected() {
 /// A credential from the registered trusted issuer must pass the trust check.
 #[test]
 fn trusted_issuer_credential_passes() {
-    let subject = make_subject(CredentialRole::AuthorisedRepairer, vec!["textile".into()]);
+    let subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::AuthorisedRepairer,
+        vec!["textile".into()],
+    );
     let trusted_did = "did:web:legit-authority.eu";
     let credential = CredentialBuilder::new(trusted_did.into(), subject)
         .expires_in_days(365)
@@ -195,7 +205,12 @@ fn trusted_issuer_credential_passes() {
 /// AllowAllIssuers is only safe in tests; confirms the bypass semantics.
 #[test]
 fn allow_all_issuers_accepts_any_did() {
-    let subject = make_subject(CredentialRole::Recycler, vec![]);
+    let subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::Recycler,
+        vec![],
+    );
     let credential = CredentialBuilder::new("did:web:whoever.example.com".into(), subject).build();
 
     let result =
@@ -336,16 +351,6 @@ fn nested_confidential_field_cannot_bypass_via_nesting() {
 
 // ─── Transfer state machine tests ─────────────────────────────────────────────
 
-fn make_operator(did: &str, role: dpp_domain::OperatorRole) -> dpp_domain::ResponsibleOperator {
-    dpp_domain::ResponsibleOperator {
-        did: did.into(),
-        name: "Test".into(),
-        role,
-        eu_operator_id: None,
-        country: "DE".into(),
-    }
-}
-
 fn make_initiated_transfer(
     passport_id: PassportId,
     from: &dpp_domain::ResponsibleOperator,
@@ -374,9 +379,24 @@ fn transfer_reject_unblocks_chain() {
     use dpp_domain::OperatorRole;
 
     let pid = PassportId::new();
-    let manufacturer = make_operator("did:web:maker.com", OperatorRole::Manufacturer);
-    let buyer_a = make_operator("did:web:buyer-a.com", OperatorRole::Distributor);
-    let buyer_b = make_operator("did:web:buyer-b.com", OperatorRole::Distributor);
+    let manufacturer = make_operator(
+        "did:web:maker.com",
+        "Test",
+        OperatorRole::Manufacturer,
+        "DE",
+    );
+    let buyer_a = make_operator(
+        "did:web:buyer-a.com",
+        "Test",
+        OperatorRole::Distributor,
+        "DE",
+    );
+    let buyer_b = make_operator(
+        "did:web:buyer-b.com",
+        "Test",
+        OperatorRole::Distributor,
+        "DE",
+    );
 
     let mut chain = TransferChain::new(pid, manufacturer.clone());
 
@@ -417,8 +437,13 @@ fn transfer_cancel_unblocks_chain() {
     use dpp_domain::OperatorRole;
 
     let pid = PassportId::new();
-    let manufacturer = make_operator("did:web:maker.com", OperatorRole::Manufacturer);
-    let buyer = make_operator("did:web:buyer.com", OperatorRole::Distributor);
+    let manufacturer = make_operator(
+        "did:web:maker.com",
+        "Test",
+        OperatorRole::Manufacturer,
+        "DE",
+    );
+    let buyer = make_operator("did:web:buyer.com", "Test", OperatorRole::Distributor, "DE");
 
     let mut chain = TransferChain::new(pid, manufacturer.clone());
 
@@ -449,8 +474,8 @@ fn reject_completed_transfer_returns_invalid_state() {
     use dpp_domain::OperatorRole;
 
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", OperatorRole::Distributor);
+    let from = make_operator("did:web:a.com", "Test", OperatorRole::Manufacturer, "DE");
+    let to = make_operator("did:web:b.com", "Test", OperatorRole::Distributor, "DE");
 
     let mut t = make_initiated_transfer(pid, &from, &to);
     t.to_signature = Some("sig-to".into());
@@ -471,11 +496,8 @@ fn reject_completed_transfer_returns_invalid_state() {
 fn passport_validate_catches_bad_fibre_sum() {
     let now = Utc::now();
     let mut passport = Passport {
-        id: PassportId::new(),
         batch_id: None,
         product_name: "Test Shirt".into(),
-        sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "Factory GmbH".into(),
             address: "Berlin, DE".into(),
@@ -484,59 +506,45 @@ fn passport_validate_catches_bad_fibre_sum() {
         materials: vec![],
         co2e_per_unit: None,
         repairability_score: None,
-        compliance_result: None,
-        lint_result: None,
-        sector_data: Some(SectorData::Textile(TextileData {
-            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
-            // sum = 50%, should be ~100%
-            fibre_composition: vec![FibreEntry {
-                fibre: "cotton".into(),
-                pct: 50.0,
-                country_of_origin: None,
-            }],
-            country_of_origin: "DE".into(),
-            care_instructions: "Machine wash 30°C".into(),
-            chemical_compliance_standard: "REACH".into(),
-            recycled_content_pct: None,
-            carbon_footprint_kg_co2e: None,
-            water_use_litres: None,
-            microplastic_shedding_mg_per_wash: None,
-            repair_score: None,
-            durability_score: None,
-            expected_wash_cycles: None,
-            country_of_raw_material_origin: None,
-            svhc_substances: None,
-            allergens: None,
-            substances_of_concern: None,
-            recyclability_class: None,
-            end_of_life_instructions: None,
-            reuse_condition: None,
-            prior_use_cycles: None,
-            disassembly_instructions: None,
-            spare_parts_available: None,
-            product_weight_grams: None,
-            repair_history_url: None,
-            repair_count: None,
-            pef_score: None,
-        })),
-        status: PassportStatus::Draft,
-        qr_code_url: None,
-        jws_signature: None,
-        public_jws_signature: None,
         created_at: now,
         updated_at: now,
-        published_at: None,
-        schema_version: "1.1.0".into(),
-        retention_locked: false,
-        version: 1,
-        supersedes_id: None,
-        parent_passport_ref: None,
-        component_refs: Vec::new(),
-        retention_until: None,
-        product_id: None,
-        operator_identifier: None,
-        facility: None,
-        seal: None,
+        ..base_passport(
+            Sector::Textile,
+            SectorData::Textile(TextileData {
+                gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                // sum = 50%, should be ~100%
+                fibre_composition: vec![FibreEntry {
+                    fibre: "cotton".into(),
+                    pct: 50.0,
+                    country_of_origin: None,
+                }],
+                country_of_origin: "DE".into(),
+                care_instructions: "Machine wash 30°C".into(),
+                chemical_compliance_standard: "REACH".into(),
+                recycled_content_pct: None,
+                carbon_footprint_kg_co2e: None,
+                water_use_litres: None,
+                microplastic_shedding_mg_per_wash: None,
+                repair_score: None,
+                durability_score: None,
+                expected_wash_cycles: None,
+                country_of_raw_material_origin: None,
+                svhc_substances: None,
+                allergens: None,
+                substances_of_concern: None,
+                recyclability_class: None,
+                end_of_life_instructions: None,
+                reuse_condition: None,
+                prior_use_cycles: None,
+                disassembly_instructions: None,
+                spare_parts_available: None,
+                product_weight_grams: None,
+                repair_history_url: None,
+                repair_count: None,
+                pef_score: None,
+            }),
+            "1.1.0",
+        )
     };
 
     let err = passport.validate().unwrap_err().to_string();

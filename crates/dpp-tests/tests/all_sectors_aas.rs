@@ -16,62 +16,14 @@ use dpp_digital_link::aas::{
 };
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
-    AluminiumData, CarbonFootprint, ConstructionData, DetergentData, ElectronicsData,
-    EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, ManufacturerInfo, MaterialEntry,
-    Passport, PassportId, PassportStatus, ProductionRoute, RepairabilityScore, Sector, SectorData,
+    AluminiumData, ConstructionData, DetergentData, ElectronicsData, EnergyEfficiencyClass,
+    FibreEntry, FurnitureData, Gtin, ProductionRoute, RepairabilityScore, Sector, SectorData,
     SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
     UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
+use dpp_tests::fixtures::base_passport as base;
 
 const VALID_GTIN: &str = "09506000134352";
-
-/// A base passport with the sector-agnostic fields populated so the five core
-/// AAS submodels (identification, manufacturer, environmental, materials,
-/// repairability) all exercise their optional branches.
-fn base(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passport {
-    let now = Utc::now();
-    Passport {
-        id: PassportId::new(),
-        batch_id: Some("LOT-X-0001".into()),
-        product_name: format!("{} reference product", sector.catalog_key()),
-        sector,
-        product_category: None,
-        manufacturer: ManufacturerInfo {
-            name: "Acme Manufacturing GmbH".into(),
-            address: "Hauptstraße 1, 10115 Berlin, DE".into(),
-            did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
-        },
-        materials: vec![MaterialEntry {
-            name: "Primary material".into(),
-            weight_kg: 1.5,
-            recycled_pct: Some(20.0),
-            country_of_origin: Some("DE".into()),
-        }],
-        co2e_per_unit: Some(CarbonFootprint::from_kg(12.0)),
-        repairability_score: Some(RepairabilityScore::from_scalar(6.0)),
-        compliance_result: None,
-        lint_result: None,
-        sector_data: Some(sector_data),
-        status: PassportStatus::Draft,
-        qr_code_url: None,
-        jws_signature: None,
-        public_jws_signature: None,
-        created_at: now,
-        updated_at: now,
-        published_at: None,
-        schema_version: schema_version.into(),
-        retention_locked: false,
-        version: 1,
-        supersedes_id: None,
-        parent_passport_ref: None,
-        component_refs: Vec::new(),
-        retention_until: None,
-        product_id: None,
-        operator_identifier: None,
-        facility: None,
-        seal: None,
-    }
-}
 
 fn svhc() -> SvhcSubstance {
     SvhcSubstance {

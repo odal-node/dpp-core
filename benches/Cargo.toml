@@ -11,6 +11,7 @@ dpp-calc    = { path = "../crates/dpp-calc" }
 dpp-crypto  = { path = "../crates/dpp-crypto" }
 dpp-domain  = { path = "../crates/dpp-domain" }
 dpp-digital-link     = { path = "../crates/dpp-digital-link" }
+dpp-tests   = { path = "../crates/dpp-tests" }
 chrono      = { workspace = true }
 serde_json  = { workspace = true }
 uuid        = { workspace = true }

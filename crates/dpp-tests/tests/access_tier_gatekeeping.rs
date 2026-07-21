@@ -12,10 +12,11 @@
 
 use chrono::Utc;
 use dpp_crypto::access::credential::{
-    AccessTier, CredentialBuilder, CredentialRole, CredentialStatus, DppCredentialSubject,
-    VerificationResult, verify_credential_claims,
+    AccessTier, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,
+    verify_credential_claims,
 };
 use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
+use dpp_tests::fixtures::make_subject;
 use serde_json::json;
 
 /// Build a realistic textile JSON payload with fields spanning all three tiers.
@@ -56,22 +57,6 @@ fn sample_textile_payload() -> serde_json::Value {
             "spinningMill": "BanglaThread Co"
         }
     })
-}
-
-fn make_subject(
-    did: &str,
-    name: &str,
-    role: CredentialRole,
-    sectors: Vec<String>,
-) -> DppCredentialSubject {
-    DppCredentialSubject {
-        id: did.into(),
-        name: name.into(),
-        role,
-        country: "DE".into(),
-        sectors,
-        product_categories: vec![],
-    }
 }
 
 // ─── Three-tier access tests ─────────────────────────────────────────────
