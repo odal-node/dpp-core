@@ -80,6 +80,7 @@ fn register_runtime_sector() {
         key: "plastics".into(),
         title: "Plastics".into(),
         status: RegulatoryStatus::Provisional,
+        regime: Regime::Espr,
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
@@ -103,6 +104,7 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
         key: "plastics".into(),
         title: "Plastics".into(),
         status: RegulatoryStatus::Provisional,
+        regime: Regime::Espr,
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
@@ -357,6 +359,109 @@ fn catalog_agrees_with_schema_registry() {
         assert!(
             d.plugin.is_some(),
             "in-force sector '{}' must declare a plugin binding",
+            d.key
+        );
+    }
+}
+
+// ── Regime axis ──────────────────────────────────────────────────────────────
+
+#[test]
+fn every_manifest_declares_a_regime() {
+    for d in SectorCatalog::new().all().iter() {
+        assert_ne!(
+            d.regime,
+            Regime::None,
+            "sector '{}' must declare a real regime; Regime::None is reserved for \
+             Watch sectors with no DPP instrument",
+            d.key
+        );
+    }
+}
+
+#[test]
+fn manifest_without_regime_is_rejected() {
+    // `regime` is required — a manifest omitting it must fail to deserialise
+    // rather than silently defaulting to some instrument.
+    let no_regime = r#"{
+        "key": "x", "title": "X", "status": "provisional",
+        "legalBasis": [], "retentionYears": 10,
+        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
+    }"#;
+    assert!(serde_json::from_str::<SectorDescriptor>(no_regime).is_err());
+}
+
+#[test]
+fn most_sectors_are_not_espr() {
+    // Guards the assumption that ESPR is the only source of a DPP obligation.
+    // Battery, toy, detergent, construction and electronics each derive from
+    // their own instrument; if this ever collapses to all-ESPR, something has
+    // been flattened wrongly.
+    let catalog = SectorCatalog::new();
+    let non_espr = catalog
+        .all()
+        .iter()
+        .filter(|d| d.regime != Regime::Espr)
+        .count();
+    assert_eq!(
+        non_espr, 5,
+        "expected 5 non-ESPR sectors (battery, toy, detergent, construction, electronics)"
+    );
+}
+
+#[test]
+fn regime_does_not_affect_determination_gating() {
+    // The two axes must be orthogonal: a Provisional sector gates identically
+    // whatever instrument it derives from. If this fails, regime has leaked
+    // into the determination path.
+    let catalog = SectorCatalog::new();
+    for d in catalog
+        .all()
+        .iter()
+        .filter(|d| d.status == RegulatoryStatus::Provisional)
+    {
+        assert!(
+            !d.status.allows_determination(),
+            "provisional sector '{}' (regime {:?}) must not allow determinations",
+            d.key,
+            d.regime
+        );
+    }
+}
+
+// ── Watch status ─────────────────────────────────────────────────────────────
+
+#[test]
+fn watch_never_allows_determination() {
+    assert!(!RegulatoryStatus::Watch.allows_determination());
+}
+
+#[test]
+fn in_force_with_future_passport_date_still_determines() {
+    // Regression guard. `dppAppliesFrom` is the passport-obligation date and is
+    // NOT the determination gate. Battery's passport is required from
+    // 2027-02-18, but its Art. 9 mercury/cadmium prohibitions have applied
+    // since 2008 and are determinable today. Gating determinations on
+    // `dppAppliesFrom` would suppress a legally valid non-compliance finding.
+    let catalog = SectorCatalog::new();
+    let battery = catalog.get("battery").expect("battery in catalog");
+    assert_eq!(battery.status, RegulatoryStatus::InForce);
+    assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
+    assert!(battery.status.allows_determination());
+}
+
+#[test]
+fn every_manifest_round_trips() {
+    for d in SectorCatalog::new().all().iter() {
+        let json = serde_json::to_string(d).expect("serialise");
+        let back: SectorDescriptor = serde_json::from_str(&json).expect("deserialise");
+        // SectorDescriptor is not PartialEq, and `accessTiers` is a HashMap whose
+        // serialised key order is not stable — compare as Value, which is
+        // order-insensitive for maps.
+        assert_eq!(
+            serde_json::to_value(&back).expect("re-serialise"),
+            serde_json::to_value(d).expect("serialise"),
+            "round-trip changed sector '{}'",
             d.key
         );
     }

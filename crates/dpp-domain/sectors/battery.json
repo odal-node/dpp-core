@@ -2,6 +2,7 @@
   "key": "battery",
   "title": "Batteries",
   "status": "in_force",
+  "regime": "battery-regulation",
   "legalBasis": ["Regulation (EU) 2023/1542"],
   "dppAppliesFrom": "2027-02-18",
   "retentionYears": 10,

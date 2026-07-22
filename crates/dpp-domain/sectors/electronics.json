@@ -2,6 +2,7 @@
   "key": "electronics",
   "title": "Electronics (smartphones & tablets)",
   "status": "in_force",
+  "regime": "ecodesign-energy-labelling",
   "legalBasis": [
     "Regulation (EU) 2023/1670 (ecodesign — smartphones & tablets)",
     "Regulation (EU) 2023/1669 (energy labelling — smartphones & tablets)"

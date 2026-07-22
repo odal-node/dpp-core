@@ -2,6 +2,7 @@
   "key": "construction",
   "title": "Construction Products",
   "status": "provisional",
+  "regime": "cpr",
   "legalBasis": ["Regulation (EU) 2024/3110 (CPR)"],
   "retentionYears": 10,
   "schemaVersions": ["1.0.0", "1.1.0"],
