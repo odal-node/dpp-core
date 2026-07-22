@@ -389,3 +389,55 @@ fn aas_submodel_templates_resolve_for_known_sectors() {
     // Battery (ratified) must NOT appear among placeholders.
     assert!(!placeholders.iter().any(|t| t.sector_key == "battery"));
 }
+
+/// Every catalog sector must be exercised through the AAS path somewhere.
+///
+/// Without this, adding a sector to the catalog and forgetting to extend
+/// `all_sector_cases` leaves that sector's AAS mapping untested — silently,
+/// because the loop above simply iterates one case fewer.
+#[test]
+fn every_catalog_sector_has_an_aas_case() {
+    // Battery is exercised by `battery_end_to_end.rs` rather than here, so it is
+    // covered but not by this table. Any other absence is a real gap.
+    const COVERED_ELSEWHERE: &[&str] = &["battery"];
+
+    let catalog = dpp_domain::catalog::SectorCatalog::new();
+    let covered: Vec<&str> = all_sector_cases()
+        .iter()
+        .map(|(s, _, _, _)| s.catalog_key())
+        .collect();
+
+    for d in catalog.all().iter() {
+        let key = d.key.as_str();
+        assert!(
+            covered.contains(&key) || COVERED_ELSEWHERE.contains(&key),
+            "catalog sector '{key}' has no case in all_sector_cases() — its AAS              mapping is untested"
+        );
+    }
+}
+
+/// No catalog sector may fall through to the generic submodel builder.
+///
+/// `dispatch::build_sector_submodel` ends in a deliberate catch-all that renders
+/// an unmodelled `SectorData` variant as a generic key-value submodel with
+/// `idShort = "SectorData"` and no semantic IDs. That fallback is correct for
+/// forward compatibility — it keeps a new variant from breaking the build in
+/// this crate — but it means a newly added sector would ship with a silently
+/// degraded AAS mapping: no build error, no test failure, just lower-fidelity
+/// interop output.
+///
+/// This closes that gap without removing the fallback: the compiler stays
+/// permissive, and CI catches the omission instead.
+#[test]
+fn no_catalog_sector_falls_back_to_the_generic_submodel() {
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key();
+        let passport = base(sector, data, version);
+        let (_, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+
+        assert!(
+            !submodels.iter().any(|s| s.id_short == "SectorData"),
+            "sector '{key}' fell back to the generic submodel builder — it needs              a dedicated builder in aas::sectors and a dispatch arm"
+        );
+    }
+}
