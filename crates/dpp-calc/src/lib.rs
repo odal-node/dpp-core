@@ -78,6 +78,7 @@ mod kernel;
 
 pub mod co2e;
 pub mod repairability;
+pub mod repairability_index;
 pub mod ruleset_registry;
 
 // ── Stable public paths for the spine ────────────────────────────────────────

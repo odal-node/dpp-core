@@ -7,6 +7,7 @@ use crate::repairability::thresholds::{
     DisplaysRuleset, LaptopRuleset, RepairabilityRuleset, SimplifiedRepairabilityHeuristic,
     WashingMachineRuleset,
 };
+use crate::repairability_index::Eu2023_1669Ruleset;
 use crate::ruleset::Ruleset;
 
 /// Every concrete ruleset known to this build, as base-trait references.
@@ -21,6 +22,7 @@ pub fn all_rulesets() -> &'static [&'static dyn Ruleset] {
         &DisplaysRuleset,
         &WashingMachineRuleset,
         &CradleToGateRuleset,
+        &Eu2023_1669Ruleset,
     ]
 }
 
