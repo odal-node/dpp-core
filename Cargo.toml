@@ -98,4 +98,4 @@ argon2       = "0.5"
 hmac         = "0.13"
 
 # Benchmarking
-criterion    = { version = "0.5", features = ["html_reports"] }
+criterion    = { version = "0.8", features = ["html_reports"] }
