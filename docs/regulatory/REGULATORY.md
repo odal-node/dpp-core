@@ -99,7 +99,7 @@ ISO 3758:2012 is a published standard — the symbols themselves are well-define
 
 ---
 
-## Electronics — EU Electronics DPP (adopted 18 March 2026)
+## Electronics — EU Reg. 2023/1670 (ecodesign) + 2023/1669 (energy labelling)
 
 ### `electronics/spare_parts.rs` — Schema change needed 🔧
 

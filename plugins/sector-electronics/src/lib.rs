@@ -1,4 +1,4 @@
-//! Electronics sector plugin — EU Electronics DPP (adopted 18 March 2026).
+//! Electronics sector plugin — EU Reg. 2023/1670 + 2023/1669.
 //!
 //! Compliance rules:
 //! - Energy class E/F/G → NON_COMPLIANT (fails minimum ecodesign requirement).
