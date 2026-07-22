@@ -90,7 +90,7 @@ Elements of `Passport.materials` — bill of materials entries.
 | `name` | `String` | `"name"` | Material name |
 | `weight_kg` | `f64` | `"weightKg"` | Weight in kg |
 | `recycled_pct` | `Option<f64>` | `"recycledPct"` | Recycled content percentage (0–100) |
-| `origin_country` | `Option<String>` | `"originCountry"` | ISO 3166-1 alpha-2 country of origin |
+| `country_of_origin` | `Option<String>` | `"countryOfOrigin"` | ISO 3166-1 alpha-2 country of origin |
 
 ### 3.4 ProductCategory
 
@@ -205,7 +205,7 @@ Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2
 | Field | Rust Type | JSON name |
 |---|---|---|
 | `fibre_composition` | `Vec<FibreEntry>` | `"fibreComposition"` — must sum to 100% |
-| `country_of_manufacturing` | `String` (ISO 3166-1) | `"countryOfManufacturing"` |
+| `country_of_origin` | `String` (ISO 3166-1) | `"countryOfOrigin"` |
 | `care_instructions` | `String` | `"careInstructions"` — ISO 3758 or plain text |
 | `chemical_compliance_standard` | `String` | `"chemicalComplianceStandard"` |
 

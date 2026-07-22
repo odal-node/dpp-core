@@ -4,7 +4,7 @@
 against the initial BOM/second-life cut.
 **Affects:** `dpp-domain` passport model, `dpp-domain::domain::transfer`, engine
 verification (`verify_tree`, evidence `componentGraph`).
-**Version impact:** breaking — targets the next minor (`0.10.0`), see §8.
+**Version impact:** breaking — targets a future minor once implemented, see §8.
 
 Two edges relate one passport to another, and they were shipped as an initial cut
 ahead of a requirements pass:
@@ -309,7 +309,7 @@ Phase 0 is independently landable and should not wait for the rest.
 
 Phases 2–3 change published field names and types (`parentPassportRef` →
 `derivedFrom`; `componentRefs` element type object-ified). Under the lockstep
-versioning policy this is a single coordinated `0.10.0` across all core crates,
+versioning policy this is a single coordinated minor version bump across all core crates,
 with the engine following.
 
 Passports already published with the current shape must keep verifying — their

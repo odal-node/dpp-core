@@ -131,8 +131,8 @@ The `just build-plugins` recipe builds all sector plugins in one command.
 
 1. Create a new crate in `plugins/sector-{name}/` (`crate-type = ["cdylib"]`, empty `[workspace]` to detach).
 2. Add `dpp-plugin-sdk = { path = "../../crates/dpp-plugin-sdk" }`.
-3. Define a unit struct, implement `DppSectorPlugin` (`meta`, `capabilities`, `validate_input`, `calculate_metrics`, `generate_passport`), and call `export_plugin!(MyPlugin)` once. Do **not** hand-write `alloc`/`dealloc`/etc.
-4. In `capabilities()`, declare the ABI version (`AbiVersion::current()`) and the `SchemaVersionRange`(s) the plugin supports — the host enforces these via `describe()`.
+3. Define a unit struct, implement `DppSectorPlugin` (`plugin_identity`, `schema_version_range`, `validate_input`, `calculate_metrics`, `generate_passport`), and call `export_plugin!(MyPlugin)` once. Do **not** hand-write `alloc`/`dealloc`/etc. `meta()`/`capabilities()` default from these; override directly only if a plugin needs non-default values.
+4. `capabilities()`'s default declares the ABI version (`AbiVersion::current()`) and the `SchemaVersionRange`(s) returned by `schema_version_range()` — the host enforces these via `describe()`.
 5. Add the JSON schema at `schemas/{sector}/v1.0.0.json`; the `VersionedSchemaRegistry` picks it up automatically.
 6. Add unit tests for the trait impl (they run on the host target with `cargo test`).
 
