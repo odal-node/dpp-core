@@ -201,12 +201,9 @@ fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
             }
             // Recycled content declared for a metal the chemistry does not contain
             // is a data-integrity contradiction (e.g. cobalt on LFP).
-            let chemistry = serde_json::to_value(&d.battery_chemistry)
-                .ok()
-                .and_then(|v| v.as_str().map(str::to_owned))
-                .unwrap_or_default();
+            let chemistry = d.battery_chemistry.wire_str();
             for metal in battery_recycled_chemistry_conflicts(
-                &chemistry,
+                chemistry,
                 d.recycled_content_cobalt_pct,
                 d.recycled_content_lithium_pct,
                 d.recycled_content_nickel_pct,

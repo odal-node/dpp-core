@@ -91,10 +91,12 @@ build-plugin PLUGIN:
     fi
     echo "Building $PLUGIN_DIR"
     (cd "$PLUGIN_DIR" && cargo build --target wasm32-wasip1 --release)
-    # Copy artifact to sibling dpp-engine/plugins as sector-<name>.wasm
+    # Copy artifact to sibling dpp-engine/plugins as sector-<name>.wasm.
+    # All 10 plugins share one workspace (plugins/Cargo.toml), so the build
+    # output lands in plugins/target, not plugins/sector-<name>/target.
     DEST_DIR="${ROOT_DIR}/../dpp-engine/plugins"
     mkdir -p "$DEST_DIR"
-    ART="$(ls "${PLUGIN_DIR}/target/wasm32-wasip1/release/"*.wasm | head -n1)"
+    ART="${ROOT_DIR}/plugins/target/wasm32-wasip1/release/sector_${PLUGIN_NAME}.wasm"
     cp "$ART" "${DEST_DIR}/sector-${PLUGIN_NAME}.wasm"
     echo "Copied $ART → ${DEST_DIR}/sector-${PLUGIN_NAME}.wasm"
 

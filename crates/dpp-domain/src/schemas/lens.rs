@@ -268,15 +268,106 @@ impl Default for LensRegistry {
 /// The compiled-in lenses shipped with core, versioned alongside the schemas
 /// they bridge.
 fn builtin_lenses() -> Vec<Lens> {
-    vec![Lens::new(
-        "battery",
-        Version::new(1, 0, 0),
-        Version::new(2, 0, 0),
-        false,
-        "EU Battery Regulation 2023/1542 Annex XIII v2.0.0: derives ratedEnergyWh (Wh) \
-         from v1 ratedCapacityKwh (kWh); every other v2 field is an optional addition.",
-        battery_v1_to_v2,
-    )]
+    vec![
+        Lens::new(
+            "battery",
+            Version::new(1, 0, 0),
+            Version::new(2, 0, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Annex XIII v2.0.0: derives ratedEnergyWh (Wh) \
+             from v1 ratedCapacityKwh (kWh); every other v2 field is an optional addition.",
+            battery_v1_to_v2,
+        ),
+        Lens::new(
+            "steel",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfProduction to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_production,
+        ),
+        Lens::new(
+            "aluminium",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfProduction to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_production,
+        ),
+        Lens::new(
+            "construction",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfManufacture to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_manufacture,
+        ),
+        Lens::new(
+            "detergent",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfManufacture to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_manufacture,
+        ),
+        Lens::new(
+            "furniture",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfManufacture to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_manufacture,
+        ),
+        Lens::new(
+            "toy",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfManufacture to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_manufacture,
+        ),
+        Lens::new(
+            "textile",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "Cross-sector naming consistency: renames countryOfManufacturing to \
+             countryOfOrigin. Pure rename, no information lost.",
+            rename_country_of_manufacturing,
+        ),
+    ]
+}
+
+/// Renames a top-level JSON key to `countryOfOrigin`, leaving every other
+/// field untouched. Shared by the country-of-origin naming-unification lenses
+/// above — each sector's old key differs, so the key name is a parameter.
+fn rename_country_field(v: &Value, old_key: &str) -> Result<Value, LensError> {
+    let mut out = v.clone();
+    let obj = out
+        .as_object_mut()
+        .ok_or_else(|| LensError("sector data must be a JSON object".to_owned()))?;
+    if let Some(val) = obj.remove(old_key) {
+        obj.insert("countryOfOrigin".to_owned(), val);
+    }
+    Ok(out)
+}
+
+fn rename_country_of_production(v: &Value) -> Result<Value, LensError> {
+    rename_country_field(v, "countryOfProduction")
+}
+
+fn rename_country_of_manufacture(v: &Value) -> Result<Value, LensError> {
+    rename_country_field(v, "countryOfManufacture")
+}
+
+fn rename_country_of_manufacturing(v: &Value) -> Result<Value, LensError> {
+    rename_country_field(v, "countryOfManufacturing")
 }
 
 /// Battery `v1.0.0 → v2.0.0`: pass all fields through, and derive `ratedEnergyWh`
@@ -352,6 +443,70 @@ mod tests {
 
         // The original is untouched (lens clones its input).
         assert!(original.get("ratedEnergyWh").is_none());
+    }
+
+    /// A minimal but valid v1.0.0 steel record (schema-required fields).
+    fn steel_v1() -> Value {
+        serde_json::json!({
+            "gtin": "09506000134352",
+            "co2ePerTonneSteel": 1.8,
+            "recycledScrapContentPct": 35.0,
+            "productCategory": "flat",
+            "countryOfProduction": "DE",
+            "productionRoute": "electric-arc"
+        })
+    }
+
+    #[test]
+    fn steel_v1_upcasts_to_v1_1_and_renames_country_field() {
+        let lenses = LensRegistry::new();
+        let schemas = VersionedSchemaRegistry::new();
+        let original = steel_v1();
+
+        let derived = lenses
+            .upcast("steel", &original, &v("1.0.0"), &v("1.1.0"))
+            .unwrap();
+
+        assert!(!derived.lossy);
+        assert_eq!(derived.data["countryOfOrigin"], "DE");
+        assert!(derived.data.get("countryOfProduction").is_none());
+
+        schemas
+            .validate("steel", &v("1.1.0"), &derived.data)
+            .expect("derived view must validate against v1.1.0");
+
+        // The original is untouched (lens clones its input).
+        assert_eq!(original["countryOfProduction"], "DE");
+    }
+
+    /// A minimal but valid v1.1.0 textile record (schema-required fields).
+    fn textile_v1_1() -> Value {
+        serde_json::json!({
+            "gtin": "09506000134352",
+            "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
+            "countryOfManufacturing": "PT",
+            "careInstructions": "Hand wash",
+            "chemicalComplianceStandard": "REACH"
+        })
+    }
+
+    #[test]
+    fn textile_v1_1_upcasts_to_v1_2_and_renames_country_field() {
+        let lenses = LensRegistry::new();
+        let schemas = VersionedSchemaRegistry::new();
+        let original = textile_v1_1();
+
+        let derived = lenses
+            .upcast("textile", &original, &v("1.1.0"), &v("1.2.0"))
+            .unwrap();
+
+        assert!(!derived.lossy);
+        assert_eq!(derived.data["countryOfOrigin"], "PT");
+        assert!(derived.data.get("countryOfManufacturing").is_none());
+
+        schemas
+            .validate("textile", &v("1.2.0"), &derived.data)
+            .expect("derived view must validate against v1.2.0");
     }
 
     #[test]

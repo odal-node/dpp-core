@@ -23,8 +23,12 @@ secrets/
 # RUST
 # -----------------------------------------------------------------------------
 /target/
-# Standalone crates excluded from the workspace each have their own target dir.
-# /target/ above only anchors to the repo root; these patterns catch the rest.
+# The sector plugins are excluded from the main workspace (different toolchain
+# target) and form their own workspace at plugins/Cargo.toml, with its own
+# shared target dir. /target/ above only anchors to the repo root, so it's
+# listed explicitly; the second pattern catches any pre-restructuring
+# per-member target dirs left over locally.
+plugins/target/
 plugins/*/target/
 Cargo.lock
 **/*.rs.bak

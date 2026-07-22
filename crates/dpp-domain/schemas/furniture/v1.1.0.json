@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/furniture-v1.1.0.json",
+  "title": "Odal Node — Furniture Sector Data (v1.1.0)",
+  "description": "Furniture (including mattresses) fields per EU ESPR Working Plan 2025-2030. DPP mandate expected ~2028-2031. v1.1.0 renames countryOfManufacture to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "productType",
+    "primaryMaterial",
+    "countryOfOrigin"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "productType": {
+      "type": "string",
+      "enum": ["chair", "table", "sofa", "mattress", "shelf", "bed", "other"],
+      "description": "EU furniture product type."
+    },
+    "primaryMaterial": {
+      "type": "string",
+      "enum": ["solid-wood", "engineered-wood", "metal", "upholstered", "mixed", "other"],
+      "description": "Primary construction material."
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of origin (manufacture)."
+    },
+    "co2ePerUnitKg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per product unit."
+    },
+    "recycledContentPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled content as a percentage of total weight."
+    },
+    "repairabilityScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Repairability score 0.0-10.0 (non-regulatory heuristic, not EN 45554 / EU 2023/1669)."
+    },
+    "svhcSubstances": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/svhcSubstance" },
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+    },
+    "disassemblyInstructionsUrl": {
+      "type": ["string", "null"],
+      "description": "URL to disassembly or deconstruction instructions."
+    },
+    "endOfLifeInstructions": {
+      "type": ["string", "null"],
+      "description": "End-of-life disposal or recycling instructions."
+    }
+  },
+  "definitions": {
+    "svhcSubstance": {
+      "type": "object",
+      "required": ["casNumber", "substanceName", "concentrationPct"],
+      "properties": {
+        "casNumber": { "type": "string", "minLength": 1 },
+        "substanceName": { "type": "string", "minLength": 1 },
+        "concentrationPct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "locationInProduct": { "type": ["string", "null"] },
+        "scipNotificationId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

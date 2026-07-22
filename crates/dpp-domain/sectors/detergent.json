@@ -4,8 +4,8 @@
   "status": "provisional",
   "legalBasis": ["Regulation (EU) 2026/405 (Detergents)"],
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0"],
-  "currentSchemaVersion": "1.0.0",
+  "schemaVersions": ["1.0.0", "1.1.0"],
+  "currentSchemaVersion": "1.1.0",
   "productCategories": ["laundry", "dishwashing", "surface-cleaner", "personal-care"],
   "plugin": "sector-detergent",
   "notes": "Detergents Regulation adopted; surfactant biodegradability already required, but the DPP obligation is anticipated ~2029. Provisional until then."

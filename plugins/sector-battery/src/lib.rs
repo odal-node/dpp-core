@@ -20,9 +20,8 @@ use dpp_plugin_sdk::rules::batteries::recycled_content::{
     recycled_content_chemistry_conflicts,
 };
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
-    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginFinding,
-    PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
+    PluginError, PluginFinding, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::{Value, json};
@@ -31,36 +30,20 @@ use serde_json::{Value, json};
 struct BatteryPlugin;
 
 impl DppSectorPlugin for BatteryPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "battery".into(),
-            name: "Odal Node Battery Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some(
-                "EU Battery Regulation 2023/1542 structural validation and metrics".into(),
-            ),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "battery",
+            name: "Odal Node Battery Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU Battery Regulation 2023/1542 structural validation and metrics",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            // Battery schema ships as v1.0.0 and v2.0.0 (Annex XIII fields).
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "2.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    // Battery schema ships as v1.0.0 and v2.0.0 (Annex XIII fields).
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "2.0.0".into(),
         }
     }
 
@@ -232,11 +215,11 @@ impl DppSectorPlugin for BatteryPlugin {
             .fold(result, PluginResult::with_warning))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
         // Battery data is stored verbatim once structurally valid; no
         // normalisation is required by the schema today.
-        self.validate_input(input)?;
-        Ok(input.clone())
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -260,6 +243,7 @@ export_plugin!(BatteryPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dpp_plugin_sdk::traits::{AbiVersion, PluginCapability};
 
     fn valid_battery() -> Value {
         json!({
@@ -357,7 +341,7 @@ mod tests {
     #[test]
     fn generate_passport_is_passthrough_on_valid() {
         let data = valid_battery();
-        let out = BatteryPlugin.generate_passport(&data).unwrap();
+        let out = BatteryPlugin.generate_passport(data).unwrap();
         assert_eq!(out["gtin"], "12345678901231");
     }
 

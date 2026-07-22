@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 /// Tyre sector data for EU tyre labelling compliance.
 ///
 /// Per EU Regulation 2020/740 (effective 1 May 2021, replacing 1222/2009).
@@ -11,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TyreData {
     /// 14-digit GTIN identifying the tyre model.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Tyre class per EU 2020/740: `"C1"` (passenger cars), `"C2"` (vans/light trucks), `"C3"` (heavy trucks).
     pub tyre_class: String,
     /// Fuel efficiency class **A–E** per EU 2020/740 (A = lowest rolling resistance).

@@ -5,44 +5,29 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
-    PluginCapabilities, PluginCapability, PluginComplianceStatus, PluginError, PluginInput,
-    PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError, PluginIdentity,
+    PluginInput, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{Validator, num, str_of};
+use dpp_plugin_sdk::validate::{Validator, num, str_of, threshold_status};
 use serde_json::{Value, json};
 
 #[derive(Default)]
 struct AluminiumPlugin;
 
 impl DppSectorPlugin for AluminiumPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "aluminium".into(),
-            name: "Odal Node Aluminium Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU ESPR aluminium carbon-intensity validation".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "aluminium",
+            name: "Odal Node Aluminium Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU ESPR aluminium carbon-intensity validation",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -56,7 +41,7 @@ impl DppSectorPlugin for AluminiumPlugin {
             )
             .require_non_negative("co2ePerTonneKg")
             .require_pct("recycledContentPct")
-            .require_country("countryOfProduction")
+            .require_country("countryOfOrigin")
             .finish()
     }
 
@@ -73,11 +58,7 @@ impl DppSectorPlugin for AluminiumPlugin {
             // closed on the strictest threshold rather than the most permissive.
             _ => 1_000.0,
         };
-        let status = if co2e_kg.is_some_and(|v| v <= threshold_kg) {
-            PluginComplianceStatus::Compliant
-        } else {
-            PluginComplianceStatus::NonCompliant
-        };
+        let status = threshold_status(co2e_kg, threshold_kg);
         Ok(PluginResult::new(status)
             .maybe_metric(METRIC_CO2E_SCORE, co2e_kg)
             .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled)
@@ -87,9 +68,9 @@ impl DppSectorPlugin for AluminiumPlugin {
             })))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -98,6 +79,7 @@ export_plugin!(AluminiumPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dpp_plugin_sdk::traits::PluginComplianceStatus;
     use serde_json::json;
 
     fn valid() -> Value {
@@ -107,7 +89,7 @@ mod tests {
             "productionRoute": "secondary-recycled",
             "co2ePerTonneKg": 600.0,
             "recycledContentPct": 75.0,
-            "countryOfProduction": "NO"
+            "countryOfOrigin": "NO"
         })
     }
 

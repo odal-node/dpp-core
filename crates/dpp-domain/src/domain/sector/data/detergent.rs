@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 /// A single surfactant ingredient in a detergent product.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +26,7 @@ pub struct SurfactantEntry {
 #[serde(rename_all = "camelCase")]
 pub struct DetergentData {
     /// 14-digit GTIN identifying the detergent product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Product type, e.g. `"laundry"`, `"dishwashing"`, `"surface-cleaner"`, `"personal-care"`, `"other"`.
     pub product_type: String,
     /// Physical format, e.g. `"liquid"`, `"powder"`, `"tablet"`, `"gel"`, `"concentrate"`.
@@ -32,7 +34,7 @@ pub struct DetergentData {
     /// List of surfactants in the product formulation.
     pub surfactants: Vec<SurfactantEntry>,
     /// ISO 3166-1 alpha-2 country of manufacture.
-    pub country_of_manufacture: String,
+    pub country_of_origin: String,
 
     /// Carbon footprint in kg CO₂e per product unit (bottle or pack).
     #[serde(skip_serializing_if = "Option::is_none")]

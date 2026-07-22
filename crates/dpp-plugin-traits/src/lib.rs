@@ -23,7 +23,8 @@
 //! - `result` — [`PluginComplianceStatus`], [`PluginFinding`], [`PluginResult`],
 //!   [`AbiResult`] (the call-outcome envelope).
 //! - `error` — [`PluginError`], [`PluginFieldError`].
-//! - `plugin` — [`DppSectorPlugin`], the trait a plugin author implements.
+//! - `plugin` — [`DppSectorPlugin`], the trait a plugin author implements,
+//!   and [`PluginIdentity`], the per-plugin fields its default `meta()` uses.
 
 mod error;
 mod meta;
@@ -35,7 +36,7 @@ mod version;
 
 pub use error::{PluginError, PluginFieldError};
 pub use meta::{PluginCapabilities, PluginCapability, PluginMeta};
-pub use plugin::{DppSectorPlugin, PluginInput};
+pub use plugin::{DppSectorPlugin, PluginIdentity, PluginInput};
 pub use result::{
     AbiResult, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
     PluginComplianceStatus, PluginFinding, PluginResult,

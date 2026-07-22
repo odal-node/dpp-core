@@ -6,8 +6,8 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, PluginComplianceStatus, PluginError, PluginIdentity, PluginInput,
+    PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::Validator;
 use serde_json::Value;
@@ -16,33 +16,19 @@ use serde_json::Value;
 struct ToyPlugin;
 
 impl DppSectorPlugin for ToyPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "toy".into(),
-            name: "Odal Node Toy Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU 2025/2509 toy safety and CE-marking validation".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "toy",
+            name: "Odal Node Toy Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU 2025/2509 toy safety and CE-marking validation",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -52,7 +38,7 @@ impl DppSectorPlugin for ToyPlugin {
             .require_str("ageGroup")
             .require_str("primaryMaterial")
             .require_bool("ceMarking")
-            .require_country("countryOfManufacture")
+            .require_country("countryOfOrigin")
             .finish()
     }
 
@@ -67,9 +53,9 @@ impl DppSectorPlugin for ToyPlugin {
         Ok(PluginResult::new(status))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -86,7 +72,7 @@ mod tests {
             "ageGroup": "3-6",
             "primaryMaterial": "wood",
             "ceMarking": true,
-            "countryOfManufacture": "DE"
+            "countryOfOrigin": "DE"
         })
     }
 

@@ -6,14 +6,9 @@ use crate::aas::semantic_ids;
 
 pub(super) fn build_construction_submodel(d: &ConstructionData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", &d.gtin, None, None),
+        string_property("gtin", d.gtin.as_str(), None, None),
         string_property("productFamily", &d.product_family, None, None),
-        string_property(
-            "countryOfManufacture",
-            &d.country_of_manufacture,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
         double_property(
             "co2ePerFunctionalUnitKg",
             d.co2e_per_functional_unit_kg,

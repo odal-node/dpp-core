@@ -162,16 +162,27 @@ impl Passport {
     /// - `sector_data` passes JSON Schema + cross-field rules via
     ///   [`crate::domain::validation::validate_sector_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
-        let mut issues = Vec::new();
+        use crate::domain::field_error::{FieldError, ValidationErrors};
+
+        let mut errors: Vec<FieldError> = Vec::new();
 
         if self.product_name.trim().is_empty() {
-            issues.push("product_name must not be empty");
+            errors.push(FieldError {
+                field: "/productName".to_owned(),
+                message: "product_name must not be empty".to_owned(),
+            });
         }
         if self.manufacturer.name.trim().is_empty() {
-            issues.push("manufacturer.name must not be empty");
+            errors.push(FieldError {
+                field: "/manufacturer/name".to_owned(),
+                message: "manufacturer.name must not be empty".to_owned(),
+            });
         }
         if self.manufacturer.address.trim().is_empty() {
-            issues.push("manufacturer.address must not be empty");
+            errors.push(FieldError {
+                field: "/manufacturer/address".to_owned(),
+                message: "manufacturer.address must not be empty".to_owned(),
+            });
         }
 
         // Must parse as strict semver (major.minor.patch, optional pre-release
@@ -180,55 +191,55 @@ impl Passport {
         // `semver::Version` parsing at schema resolution and silently skip
         // schema validation, so reject them here rather than downstream.
         if self.schema_version.parse::<semver::Version>().is_err() {
-            issues.push("schema_version must be valid semver (e.g. 1.0.0)");
+            errors.push(FieldError {
+                field: "/schemaVersion".to_owned(),
+                message: "schema_version must be valid semver (e.g. 1.0.0)".to_owned(),
+            });
         }
 
         if let Some(ref cf) = self.co2e_per_unit
             && cf.value_kg < 0.0
         {
-            issues.push("co2e_per_unit must not be negative");
+            errors.push(FieldError {
+                field: "/co2ePerUnit".to_owned(),
+                message: "co2e_per_unit must not be negative".to_owned(),
+            });
         }
 
         if let Some(ref rs) = self.repairability_score
             && !(0.0..=10.0).contains(&rs.overall)
         {
-            issues.push("repairability_score must be between 0.0 and 10.0");
+            errors.push(FieldError {
+                field: "/repairabilityScore".to_owned(),
+                message: "repairability_score must be between 0.0 and 10.0".to_owned(),
+            });
         }
 
         // The declared sector must match the sector of the typed data, if present.
         if let Some(ref data) = self.sector_data
             && data.sector() != self.sector
         {
-            issues.push("sector must match sector_data's sector");
+            errors.push(FieldError {
+                field: "/sector".to_owned(),
+                message: "sector must match sector_data's sector".to_owned(),
+            });
         }
-
-        let structural_err = if issues.is_empty() {
-            None
-        } else {
-            Some(issues.join("; "))
-        };
 
         // Sector-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).
         // Excluded from wasm32 builds because jsonschema depends on reqwest's blocking API.
         #[cfg(not(target_arch = "wasm32"))]
-        let sector_err: Option<String> = if let Some(ref data) = self.sector_data {
-            crate::domain::validation::validate_sector_data(data)
-                .err()
-                .map(|ve| ve.to_display())
-        } else {
-            None
-        };
-        #[cfg(target_arch = "wasm32")]
-        let sector_err: Option<String> = None;
+        if let Some(ref data) = self.sector_data
+            && let Err(ve) = crate::domain::validation::validate_sector_data(data)
+        {
+            errors.extend(ve.errors);
+        }
 
-        match (structural_err, sector_err) {
-            (None, None) => Ok(()),
-            (Some(s), None) | (None, Some(s)) => {
-                Err(crate::domain::error::DppError::Validation(s.into()))
-            }
-            (Some(a), Some(b)) => Err(crate::domain::error::DppError::Validation(
-                format!("{a}; {b}").into(),
-            )),
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(crate::domain::error::DppError::Validation(
+                ValidationErrors { errors },
+            ))
         }
     }
 

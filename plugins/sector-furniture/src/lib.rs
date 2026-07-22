@@ -6,9 +6,9 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
-    METRIC_REPAIRABILITY_INDEX, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
+    PluginComplianceStatus, PluginError, PluginIdentity, PluginInput, PluginResult,
+    SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
@@ -17,33 +17,19 @@ use serde_json::Value;
 struct FurniturePlugin;
 
 impl DppSectorPlugin for FurniturePlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "furniture".into(),
-            name: "Odal Node Furniture Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU ESPR furniture validation and metrics".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "furniture",
+            name: "Odal Node Furniture Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU ESPR furniture validation and metrics",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -52,7 +38,7 @@ impl DppSectorPlugin for FurniturePlugin {
             .require_gtin("gtin")
             .require_str("productType")
             .require_str("primaryMaterial")
-            .require_country("countryOfManufacture")
+            .require_country("countryOfOrigin")
             .optional_pct("recycledContentPct")
             .optional_non_negative("co2ePerUnitKg")
             .optional_range("repairabilityScore", 0.0, 10.0)
@@ -70,9 +56,9 @@ impl DppSectorPlugin for FurniturePlugin {
             ))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -88,7 +74,7 @@ mod tests {
             "gtin": "12345678901231",
             "productType": "chair",
             "primaryMaterial": "solid-wood",
-            "countryOfManufacture": "SE",
+            "countryOfOrigin": "SE",
             "co2ePerUnitKg": 22.0,
             "repairabilityScore": 8.0
         })
@@ -105,7 +91,7 @@ mod tests {
     #[test]
     fn invalid_country_fails() {
         let mut d = valid();
-        d["countryOfManufacture"] = json!("Sweden");
+        d["countryOfOrigin"] = json!("Sweden");
         assert!(FurniturePlugin.validate_input(&d).is_err());
     }
 

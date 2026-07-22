@@ -118,8 +118,8 @@ pub(super) fn build_material_composition_submodel(passport: &Passport) -> AasSub
             if let Some(pct) = mat.recycled_pct {
                 mat_elems.push(double_property("recycledPct", pct, None, Some("%")));
             }
-            if let Some(ref country) = mat.origin_country {
-                mat_elems.push(string_property("originCountry", country, None, None));
+            if let Some(ref country) = mat.country_of_origin {
+                mat_elems.push(string_property("countryOfOrigin", country, None, None));
             }
             AasSubmodelElement::SubmodelElementCollection(AasCollection {
                 id_short: format!("material_{i}"),

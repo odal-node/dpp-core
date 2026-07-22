@@ -6,44 +6,29 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginError, PluginInput, PluginMeta, PluginResult, SchemaVersionRange,
-    METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
+    PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
-use dpp_plugin_sdk::validate::{num, Validator};
+use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
 
 #[derive(Default)]
 struct ConstructionPlugin;
 
 impl DppSectorPlugin for ConstructionPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "construction".into(),
-            name: "Odal Node Construction Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU CPR 2024/3110 construction product validation".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "construction",
+            name: "Odal Node Construction Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU CPR 2024/3110 construction product validation",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -51,7 +36,7 @@ impl DppSectorPlugin for ConstructionPlugin {
         Validator::new(input)
             .require_gtin("gtin")
             .require_str("productFamily")
-            .require_country("countryOfManufacture")
+            .require_country("countryOfOrigin")
             .require_non_negative("co2ePerFunctionalUnitKg")
             .require_str("functionalUnit")
             .optional_pct("recycledContentPct")
@@ -62,12 +47,15 @@ impl DppSectorPlugin for ConstructionPlugin {
         self.validate_input(input)?;
         Ok(PluginResult::new(PluginComplianceStatus::NotAssessed)
             .maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerFunctionalUnitKg"))
-            .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, num(input, "recycledContentPct")))
+            .maybe_metric(
+                METRIC_RECYCLED_CONTENT_PCT,
+                num(input, "recycledContentPct"),
+            ))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -82,7 +70,7 @@ mod tests {
         json!({
             "gtin": "12345678901231",
             "productFamily": "cement",
-            "countryOfManufacture": "PL",
+            "countryOfOrigin": "PL",
             "co2ePerFunctionalUnitKg": 780.0,
             "functionalUnit": "per tonne"
         })

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/aluminium-v1.1.0.json",
+  "title": "Odal Node — Aluminium Sector Data (v1.1.0)",
+  "description": "Aluminium sector fields for EU ESPR carbon intensity reporting, aligned with CBAM benchmarks. DPP mandate expected ~2030. v1.1.0 renames countryOfProduction to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "alloyGrade",
+    "productionRoute",
+    "co2ePerTonneKg",
+    "recycledContentPct",
+    "countryOfOrigin"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "alloyGrade": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Alloy series designation, e.g. 1xxx, 3xxx, 5xxx, 6xxx."
+    },
+    "productionRoute": {
+      "type": "string",
+      "enum": ["primary", "secondary-recycled", "mixed"],
+      "description": "Production route: primary (Hall-Heroult electrolysis), secondary-recycled (scrap remelting), or mixed."
+    },
+    "co2ePerTonneKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Carbon intensity in kg CO2e per tonne of aluminium produced."
+    },
+    "recycledContentPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled scrap content as a percentage of total input."
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of origin (primary production)."
+    },
+    "annualProductionTonnes": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Annual production volume in tonnes (optional)."
+    }
+  },
+  "additionalProperties": false
+}

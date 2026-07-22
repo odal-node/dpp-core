@@ -6,6 +6,7 @@
 use alloc::{format, string::String, vec::Vec};
 
 use super::cas::validate_cas_format;
+use crate::common::numeric::percentage_in_range;
 
 /// REACH Art. 33 threshold: at or above this w/w concentration in a finished article,
 /// the supplier must proactively communicate SVHC presence to downstream recipients.
@@ -116,10 +117,7 @@ pub fn validate_svhc_substances(substances: &[SvhcInput<'_>]) -> Result<(), Stri
                 "svhc_substances[{i}]: substance_name must not be empty"
             ));
         }
-        if !s.concentration_pct.is_finite()
-            || s.concentration_pct < 0.0
-            || s.concentration_pct > 100.0
-        {
+        if !percentage_in_range(s.concentration_pct) {
             return Err(format!(
                 "svhc_substances[{i}]: concentration_pct must be a finite value in 0–100, got {}",
                 s.concentration_pct

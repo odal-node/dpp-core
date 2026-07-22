@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
+
 use super::shared::SvhcSubstance;
 
 /// Furniture sector data for EU ESPR DPP compliance.
@@ -9,13 +11,13 @@ use super::shared::SvhcSubstance;
 #[serde(rename_all = "camelCase")]
 pub struct FurnitureData {
     /// 14-digit GTIN identifying the furniture product.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Product type, e.g. `"chair"`, `"table"`, `"sofa"`, `"mattress"`, `"shelf"`, `"other"`.
     pub product_type: String,
     /// Primary material, e.g. `"solid-wood"`, `"engineered-wood"`, `"metal"`, `"upholstered"`, `"mixed"`.
     pub primary_material: String,
     /// ISO 3166-1 alpha-2 country of manufacture.
-    pub country_of_manufacture: String,
+    pub country_of_origin: String,
 
     /// Carbon footprint in kg CO₂e per unit.
     #[serde(skip_serializing_if = "Option::is_none")]

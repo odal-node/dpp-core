@@ -1,12 +1,12 @@
 //! The simplified repairability heuristic calculation: inputs → A–E band.
 
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::parameters::RepairabilityInputs;
 use super::thresholds::RepairabilityRuleset;
 use crate::error::CalcError;
-use crate::receipt::{CalculationReceipt, input_hash, jcs_hash};
+use crate::receipt::{CalculationReceipt, jcs_hash};
 
 /// A–E heuristic band from the simplified repairability indicator.
 ///
@@ -77,7 +77,8 @@ pub struct RepairabilityResult {
     pub receipt: CalculationReceipt,
 }
 
-/// Calculate the simplified repairability heuristic band for one product.
+/// Calculate the simplified repairability heuristic band for one product, as
+/// of today.
 ///
 /// The result is a non-regulatory heuristic, not the EU 2023/1669 class.
 /// Returns `Err` if any parameter value is outside `[0, 2]` or if the
@@ -86,12 +87,25 @@ pub fn calculate(
     inputs: &RepairabilityInputs,
     ruleset: &dyn RepairabilityRuleset,
 ) -> Result<RepairabilityResult, CalcError> {
+    calculate_asof(inputs, ruleset, Utc::now().date_naive())
+}
+
+/// Calculate the simplified repairability heuristic band for one product, as
+/// of `on_date`.
+///
+/// Lets a caller check "was this ruleset legally in force on date X" without
+/// depending on the wall clock — e.g. testing the not-yet-effective/expired
+/// paths with a fixed date rather than a far-future fixture.
+pub fn calculate_asof(
+    inputs: &RepairabilityInputs,
+    ruleset: &dyn RepairabilityRuleset,
+    on_date: NaiveDate,
+) -> Result<RepairabilityResult, CalcError> {
     validate_inputs(inputs)?;
     ruleset.validate_cross_fields(inputs)?;
-
     ruleset
         .effective_dates()
-        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
+        .ensure_active_on(ruleset.id(), on_date)?;
 
     let w = ruleset.weights();
     let scale = 5.0; // scale 0–2 ordinals to 0–10
@@ -129,12 +143,7 @@ pub fn calculate(
 
     let output_hash = jcs_hash(&(numeric_score, class.as_ordinal()))?;
 
-    let receipt = CalculationReceipt::new(
-        input_hash(inputs)?,
-        ruleset.id().0.as_str(),
-        ruleset.version().0.as_str(),
-    )
-    .with_output_hash(output_hash);
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
 
     Ok(RepairabilityResult {
         class,

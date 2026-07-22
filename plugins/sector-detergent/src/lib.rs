@@ -6,9 +6,8 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, METRIC_CO2E_SCORE, PluginCapabilities, PluginCapability,
-    PluginComplianceStatus, PluginError, PluginFieldError, PluginInput, PluginMeta, PluginResult,
-    SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus, PluginError, PluginFieldError,
+    PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
@@ -17,33 +16,19 @@ use serde_json::Value;
 struct DetergentPlugin;
 
 impl DppSectorPlugin for DetergentPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "detergent".into(),
-            name: "Odal Node Detergent Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some("EU 2026/405 detergent biodegradability validation".into()),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "detergent",
+            name: "Odal Node Detergent Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU 2026/405 detergent biodegradability validation",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
@@ -53,7 +38,7 @@ impl DppSectorPlugin for DetergentPlugin {
             .require_str("productType")
             .require_str("format")
             .require_non_empty_array("surfactants")
-            .require_country("countryOfManufacture")
+            .require_country("countryOfOrigin")
             .optional_non_negative("co2ePerUnitKg")
             .finish()?;
 
@@ -98,9 +83,9 @@ impl DppSectorPlugin for DetergentPlugin {
         Ok(PluginResult::new(status).maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerUnitKg")))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -119,7 +104,7 @@ mod tests {
             "surfactants": [
                 { "name": "LAS", "biodegradable": true, "concentrationBand": "5-15%" }
             ],
-            "countryOfManufacture": "DE",
+            "countryOfOrigin": "DE",
             "co2ePerUnitKg": 1.2
         })
     }

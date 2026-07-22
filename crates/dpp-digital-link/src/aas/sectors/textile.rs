@@ -1,17 +1,12 @@
 use dpp_domain::TextileData;
 
 use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{double_property, string_property};
+use crate::aas::property::{double_property, string_property, svhc_substance_element};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property(
-            "countryOfManufacturing",
-            &t.country_of_manufacturing,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &t.country_of_origin, None, None),
         string_property("careInstructions", &t.care_instructions, None, None),
         string_property(
             "chemicalComplianceStandard",
@@ -85,22 +80,19 @@ pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasS
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                let mut svhc_elems = vec![
-                    string_property("casNumber", &s.cas_number, None, None),
-                    string_property("substanceName", &s.substance_name, None, None),
-                    double_property("concentrationPct", s.concentration_pct, None, Some("%")),
-                ];
-                if let Some(ref loc) = s.location_in_product {
-                    svhc_elems.push(string_property("locationInProduct", loc, None, None));
-                }
+                let mut collection = svhc_substance_element(
+                    i,
+                    &s.cas_number,
+                    &s.substance_name,
+                    s.concentration_pct,
+                    s.location_in_product.as_deref(),
+                );
                 if let Some(ref scip) = s.scip_notification_id {
-                    svhc_elems.push(string_property("scipNotificationId", scip, None, None));
+                    collection
+                        .value
+                        .push(string_property("scipNotificationId", scip, None, None));
                 }
-                AasSubmodelElement::SubmodelElementCollection(AasCollection {
-                    id_short: format!("svhc_{i}"),
-                    value: svhc_elems,
-                    semantic_id: None,
-                })
+                AasSubmodelElement::SubmodelElementCollection(collection)
             })
             .collect();
         elements.push(AasSubmodelElement::SubmodelElementCollection(

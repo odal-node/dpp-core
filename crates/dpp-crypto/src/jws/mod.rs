@@ -2,6 +2,8 @@
 
 pub mod algorithm;
 pub mod canonical;
+#[cfg(test)]
+mod proptests;
 pub mod signer;
 #[cfg(test)]
 mod tests;

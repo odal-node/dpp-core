@@ -21,7 +21,12 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
         store.generate_key(key_id)?;
     }
 
-    let current = store.load_key(key_id)?;
+    // Only the public key is needed to build a DID document — read it
+    // directly from the store's plaintext `verifying_key_hex` rather than
+    // decrypting the private signing key just to derive it back.
+    let current = store
+        .public_key(key_id)
+        .ok_or_else(|| anyhow::anyhow!("no key found for {key_id}"))?;
 
     let hostname = base_url
         .trim_start_matches("https://")
@@ -34,7 +39,7 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
     let primary_vm_id = format!("{did}#key-1");
-    let primary_pub_b64 = b64.encode(current.verifying_key.as_bytes());
+    let primary_pub_b64 = b64.encode(hex::decode(&current.verifying_key_hex)?);
 
     let mut verification_methods = vec![json!({
         "id": primary_vm_id,
@@ -50,13 +55,13 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
     // Revoked keys are excluded entirely — neither a verification method nor an
     // assertionMethod — so signatures they produced no longer verify (Gap 7).
     let archived: Vec<_> = store
-        .load_archived_keys(key_id)
+        .archived_public_keys(key_id)
         .into_iter()
         .filter(|k| !k.revoked)
         .collect();
     for (idx, archived_key) in archived.iter().enumerate() {
         let vm_id = format!("{did}#key-{}", idx + 2);
-        let pub_b64 = b64.encode(archived_key.verifying_key.as_bytes());
+        let pub_b64 = b64.encode(hex::decode(&archived_key.verifying_key_hex)?);
         verification_methods.push(json!({
             "id": vm_id,
             "type": "JsonWebKey2020",

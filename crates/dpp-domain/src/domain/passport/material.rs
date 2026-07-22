@@ -11,5 +11,5 @@ pub struct MaterialEntry {
     /// Percentage of recycled content (0.0–100.0).
     pub recycled_pct: Option<f64>,
     /// ISO 3166-1 alpha-2 country code of material origin.
-    pub origin_country: Option<String>,
+    pub country_of_origin: Option<String>,
 }

@@ -14,8 +14,7 @@ mod unsold_goods;
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    AbiVersion, DppSectorPlugin, PluginCapabilities, PluginCapability, PluginError, PluginInput,
-    PluginMeta, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, str_of};
 use serde_json::Value;
@@ -30,37 +29,21 @@ fn is_unsold(input: &PluginInput) -> bool {
 }
 
 impl DppSectorPlugin for TextilePlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "textile".into(),
-            name: "Odal Node Textile Plugin".into(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            license: "Apache-2.0".into(),
-            description: Some(
-                "EU textile DPP fibre composition + ESPR Art. 25 unsold goods".into(),
-            ),
-            author: Some("Odal Node".into()),
-            homepage: Some("https://github.com/odal-node/dpp-core".into()),
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "textile",
+            name: "Odal Node Textile Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU textile DPP fibre composition + ESPR Art. 25 unsold goods",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            // Declares the textile schema range. The unsold-goods path is
-            // legacy (see module note) and not represented here.
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.1.0".into(),
-            }],
-            capabilities: vec![
-                PluginCapability::Validate,
-                PluginCapability::ComputeMetrics,
-                PluginCapability::GeneratePassport,
-            ],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    // Declares the textile schema range. The unsold-goods path is legacy
+    // (see module note) and not represented here.
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.2.0".into(),
         }
     }
 
@@ -77,7 +60,7 @@ impl DppSectorPlugin for TextilePlugin {
         } else {
             Validator::new(input)
                 .require_non_empty_array("fibreComposition")
-                .require_country("countryOfManufacturing")
+                .require_country("countryOfOrigin")
                 .require_str("careInstructions")
                 .require_str("chemicalComplianceStandard")
                 .optional_pct("recycledContentPct")
@@ -96,9 +79,9 @@ impl DppSectorPlugin for TextilePlugin {
         })
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 
@@ -116,7 +99,7 @@ mod tests {
                 { "fibre": "cotton", "pct": 60.0 },
                 { "fibre": "polyester", "pct": 40.0 }
             ],
-            "countryOfManufacturing": "BD",
+            "countryOfOrigin": "BD",
             "careInstructions": "Machine wash 40C",
             "chemicalComplianceStandard": "OEKO-TEX 100",
             "recycledContentPct": 30.0

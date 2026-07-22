@@ -5,14 +5,18 @@ use serde::{Deserialize, Serialize};
 
 /// Opaque machine-readable identifier for a regulatory ruleset.
 ///
-/// Examples: `"repairability-heuristic-v1"`, `"battery-cfb"`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RulesetId(pub String);
+/// Examples: `"repairability-heuristic-v1"`, `"battery-cfb"`. Always a
+/// compile-time literal in every concrete `Ruleset` impl in this crate — never
+/// constructed from external/deserialized input — hence `&'static str` rather
+/// than `String`: every ruleset's `id()`/`version()` becomes a plain `static`
+/// instead of `OnceLock`-wrapped lazy-init ceremony.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub struct RulesetId(pub &'static str);
 
 /// Semver-shaped version for a ruleset, tracking parameter changes across
 /// delegated-act amendments.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RulesetVersion(pub String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct RulesetVersion(pub &'static str);
 
 /// The calendar range within which a ruleset version is legally valid.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,7 +47,7 @@ impl EffectiveDateBound {
     ) -> Result<(), crate::error::CalcError> {
         if date < self.from {
             return Err(crate::error::CalcError::RulesetNotYetEffective {
-                id: id.0.clone(),
+                id: id.0.to_owned(),
                 from: self.from.to_string(),
             });
         }
@@ -51,7 +55,7 @@ impl EffectiveDateBound {
             && date > until
         {
             return Err(crate::error::CalcError::RulesetExpired {
-                id: id.0.clone(),
+                id: id.0.to_owned(),
                 until: until.to_string(),
             });
         }
@@ -88,4 +92,16 @@ pub trait Ruleset {
     fn effective_dates(&self) -> &EffectiveDateBound;
     /// Structured citation for the EU regulation that mandates this calculation.
     fn regulatory_basis(&self) -> &RegulatoryBasis;
+
+    /// Error unless this ruleset is legally in force today.
+    ///
+    /// A signed, dated receipt must never be computed from a ruleset that is
+    /// not legally in force. Each methodology's `calculate()` performs this
+    /// check itself (via the date-parameterized `calculate_asof`, so tests can
+    /// supply a fixed date instead of the wall clock) — this default method is
+    /// for callers who need the same today-relative check standalone.
+    fn ensure_active_today(&self) -> Result<(), crate::error::CalcError> {
+        self.effective_dates()
+            .ensure_active_on(self.id(), chrono::Utc::now().date_naive())
+    }
 }

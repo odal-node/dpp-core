@@ -79,13 +79,13 @@ time via `include_str!()`.
 
 ### JTC 24 Field Coverage
 
-The textile v1.1.0 schema covers the fields carried by the
+The textile v1.2.0 schema covers the fields carried by the
 CEN/CLC JTC 24 system standards (the six ENs published May 2026 —
 EN 18216/18219/18220/18221/18222/18223) and their data-model
 semantics:
 
 - `fibreComposition` (with per-fibre `countryOfOrigin`)
-- `countryOfManufacturing` (ISO 3166-1 alpha-2 enforced)
+- `countryOfOrigin` (ISO 3166-1 alpha-2 enforced)
 - `careInstructions`
 - `chemicalComplianceStandard`
 

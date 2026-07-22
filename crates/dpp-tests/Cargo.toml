@@ -13,15 +13,20 @@ publish = false
 name = "dpp_tests"
 path = "src/lib.rs"
 
+# The library hosts shared test fixtures (see `src/fixtures.rs`) consumed by
+# the integration tests below, so its own core-crate dependencies are real
+# (not dev-only) dependencies.
+[dependencies]
+dpp-domain = { workspace = true }
+dpp-crypto = { workspace = true }
+chrono     = { workspace = true }
+
 # Integration tests in `tests/` exercise multiple core crates together
 # (domain + crypto + gs1), so they live in a dedicated member crate rather
 # than the virtual workspace root (where Cargo never compiled them).
 [dev-dependencies]
-dpp-domain   = { workspace = true }
-dpp-crypto   = { workspace = true }
 dpp-digital-link    = { workspace = true }
 serde_json = { workspace = true }
-chrono     = { workspace = true }
 uuid       = { workspace = true }
 semver     = { workspace = true }
 base64     = { workspace = true }

@@ -26,7 +26,7 @@ pub(crate) type KeyRecordMap = HashMap<String, KeyRecord>;
 /// Salt length for Argon2id key derivation (16 bytes = 128 bits).
 const ARGON2_SALT_LEN: usize = 16;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct KeyRecord {
     pub(crate) encrypted_signing_key: Vec<u8>,
     pub(crate) nonce: Vec<u8>,
@@ -43,8 +43,46 @@ pub(crate) struct KeyRecord {
     pub(crate) algorithm: String,
 }
 
+impl KeyRecord {
+    /// Construct a fresh, non-revoked record for a newly generated key pair.
+    pub(crate) fn new(
+        encrypted_signing_key: Vec<u8>,
+        nonce: Vec<u8>,
+        fingerprint: String,
+        verifying_key_hex: String,
+    ) -> Self {
+        Self {
+            encrypted_signing_key,
+            nonce,
+            fingerprint,
+            verifying_key_hex,
+            revoked: false,
+            algorithm: default_algorithm(),
+        }
+    }
+}
+
 pub(crate) fn default_algorithm() -> String {
     crate::jws::algorithm::EDDSA_ALG.to_owned()
+}
+
+/// A key's public half plus its revocation state, read directly from a
+/// [`KeyRecord`]'s plaintext `verifying_key_hex`/`revoked` fields — no
+/// private-key decryption involved. For callers (like the DID document
+/// builder) that only ever need the public key, this avoids an AES-GCM
+/// decrypt per key on every call.
+pub(crate) struct PublicKeyInfo {
+    pub(crate) verifying_key_hex: String,
+    pub(crate) revoked: bool,
+}
+
+impl From<&KeyRecord> for PublicKeyInfo {
+    fn from(record: &KeyRecord) -> Self {
+        Self {
+            verifying_key_hex: record.verifying_key_hex.clone(),
+            revoked: record.revoked,
+        }
+    }
 }
 
 /// On-disk envelope for the key store file.
@@ -236,14 +274,12 @@ impl KeyStore {
             .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
         raw.zeroize();
 
-        let record = KeyRecord {
-            encrypted_signing_key: encrypted,
-            nonce: nonce_bytes.to_vec(),
-            fingerprint: fingerprint.clone(),
-            verifying_key_hex: verifying_key_hex.clone(),
-            revoked: false,
-            algorithm: default_algorithm(),
-        };
+        let record = KeyRecord::new(
+            encrypted,
+            nonce_bytes.to_vec(),
+            fingerprint.clone(),
+            verifying_key_hex,
+        );
 
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
@@ -270,6 +306,33 @@ impl KeyStore {
     pub fn has_key(&self, key_id: &str) -> bool {
         let map = self.records.read().expect("key store read lock poisoned");
         map.contains_key(key_id)
+    }
+
+    /// The public key and revocation state of the current key under `key_id`,
+    /// without decrypting the private key. Returns `None` if no such key exists.
+    pub(crate) fn public_key(&self, key_id: &str) -> Option<PublicKeyInfo> {
+        let map = self.records.read().expect("key store read lock poisoned");
+        map.get(key_id).map(PublicKeyInfo::from)
+    }
+
+    /// Public keys of all archived records for `key_id`, in the same ascending
+    /// timestamp order as [`Self::load_archived_keys`], without decrypting any
+    /// private key material.
+    pub(crate) fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
+        let prefix = format!("{key_id}#archived-");
+        let map = self.records.read().expect("key store read lock poisoned");
+
+        let mut entries: Vec<(&str, &KeyRecord)> = map
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(k, v)| (k.as_str(), v))
+            .collect();
+        entries.sort_by_key(|(k, _)| *k);
+
+        entries
+            .into_iter()
+            .map(|(_, record)| PublicKeyInfo::from(record))
+            .collect()
     }
 
     /// Return all archived keys for the given identifier in ascending timestamp order.
@@ -326,22 +389,7 @@ impl KeyStore {
     }
 
     pub(crate) fn persist_envelope(&self, map: &KeyRecordMap) -> Result<()> {
-        let keys_clone: KeyRecordMap = map
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    KeyRecord {
-                        encrypted_signing_key: v.encrypted_signing_key.clone(),
-                        nonce: v.nonce.clone(),
-                        fingerprint: v.fingerprint.clone(),
-                        verifying_key_hex: v.verifying_key_hex.clone(),
-                        revoked: v.revoked,
-                        algorithm: v.algorithm.clone(),
-                    },
-                )
-            })
-            .collect();
+        let keys_clone: KeyRecordMap = map.clone();
 
         let salt_b64 =
             base64::Engine::encode(&base64::engine::general_purpose::STANDARD, self.salt);

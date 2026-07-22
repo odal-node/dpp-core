@@ -17,12 +17,12 @@
 //! Source: CBAM benchmark values / `sector-aluminium` plugin. These are
 //! informational reference points until a finalized EU DPP threshold is adopted.
 //!
-//! ## Schema fields (aluminium v1.0.0)
+//! ## Schema fields (aluminium v1.1.0)
 //! - `alloyGrade`         — free-form string (e.g. `"1xxx"`, `"6061"`)
 //! - `productionRoute`    — enum: `primary | secondary-recycled | mixed`
 //! - `co2ePerTonneKg`     — kg CO₂e per tonne, non-negative
 //! - `recycledContentPct` — 0–100 %
-//! - `countryOfProduction`— ISO 3166-1 alpha-2
+//! - `countryOfOrigin`    — ISO 3166-1 alpha-2
 
 // ── Production route CO₂e reference thresholds ───────────────────────────────
 // These values are CBAM benchmarks used by the sector-aluminium plugin.

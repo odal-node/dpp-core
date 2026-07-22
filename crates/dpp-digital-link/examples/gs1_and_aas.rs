@@ -12,7 +12,7 @@ use dpp_digital_link::{
     ResolutionRequest, build_aas_from_passport, negotiate,
 };
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, ManufacturerInfo, MaterialEntry, Passport, PassportId,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
 };
 
@@ -99,13 +99,13 @@ fn main() {
                 name: "Organic Cotton".into(),
                 weight_kg: 0.18,
                 recycled_pct: None,
-                origin_country: Some("IN".into()),
+                country_of_origin: Some("IN".into()),
             },
             MaterialEntry {
                 name: "Recycled Polyester".into(),
                 weight_kg: 0.07,
                 recycled_pct: Some(100.0),
-                origin_country: Some("DE".into()),
+                country_of_origin: Some("DE".into()),
             },
         ],
         co2e_per_unit: Some(CarbonFootprint::from_kg(8.2)),
@@ -113,7 +113,7 @@ fn main() {
         compliance_result: None,
         lint_result: None,
         sector_data: Some(SectorData::Textile(TextileData {
-            gtin: "09506000134352".into(),
+            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             fibre_composition: vec![
                 FibreEntry {
                     fibre: "organic cotton".into(),
@@ -126,7 +126,7 @@ fn main() {
                     country_of_origin: None,
                 },
             ],
-            country_of_manufacturing: "PT".into(),
+            country_of_origin: "PT".into(),
             care_instructions: "Machine wash 30°C, do not tumble dry".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             recycled_content_pct: Some(30.0),

@@ -28,3 +28,17 @@ pub struct RepairabilityThresholds {
     /// Minimum score for grade D. Below this value → grade E.
     pub d: f64,
 }
+
+/// Default A–E band boundaries — the smartphone/tablet heuristic's own design
+/// choice (see `thresholds::smartphone`), reused as a placeholder by the
+/// other, not-yet-effective product categories until each gets its own band
+/// boundaries from a real delegated act or a dedicated heuristic revision.
+/// The four concrete rulesets share this by construction, not coincidence —
+/// a single point of truth means a future change to it is a one-line edit
+/// instead of a four-file find-and-replace.
+pub static DEFAULT_REPAIRABILITY_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
+    a: 8.5,
+    b: 7.0,
+    c: 5.5,
+    d: 4.0,
+};

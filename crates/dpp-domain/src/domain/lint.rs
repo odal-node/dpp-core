@@ -172,44 +172,16 @@ pub fn lint_sector_data(data: &SectorData, as_of: DateTime<Utc>) -> Vec<LintFind
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::gtin::Gtin;
-    use crate::domain::sector::{
-        BatteryChemistry, BatteryData, UnsoldGoodsReason, UnsoldGoodsReport,
-    };
+    use crate::domain::sector::{BatteryData, UnsoldGoodsReason, UnsoldGoodsReport};
 
     fn battery() -> BatteryData {
         BatteryData {
-            gtin: Gtin::parse("09506000134352").unwrap(),
-            battery_chemistry: BatteryChemistry::Lfp,
             nominal_voltage_v: 3.7,
             nominal_capacity_ah: 10.0,
             expected_lifetime_cycles: 500,
             co2e_per_unit_kg: 5.0,
-            recycled_content_cobalt_pct: None,
-            recycled_content_lithium_pct: None,
-            recycled_content_nickel_pct: None,
-            state_of_health_pct: None,
-            rated_capacity_kwh: None,
-            carbon_footprint_class: None,
-            due_diligence_url: None,
-            cathode_material: None,
-            anode_material: None,
-            electrolyte_material: None,
-            critical_raw_materials: None,
-            disassembly_instructions_url: None,
-            soh_methodology: None,
-            operating_temp_min_c: None,
-            operating_temp_max_c: None,
             rated_energy_wh: Some(37.0),
-            recycled_content_lead_pct: None,
-            battery_weight_kg: None,
-            battery_type: None,
-            round_trip_efficiency_pct: None,
-            internal_resistance_mohm: None,
-            manufacturing_date: None,
-            manufacturing_place: None,
-            battery_model_id: None,
-            battery_passport_number: None,
+            ..crate::test_support::sample_battery_data()
         }
     }
 

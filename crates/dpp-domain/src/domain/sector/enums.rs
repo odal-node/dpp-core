@@ -30,6 +30,52 @@ pub enum BatteryChemistry {
     Other,
 }
 
+impl BatteryChemistry {
+    /// The serde wire tag for this chemistry code, e.g. `"LFP"`, `"lead-acid"`.
+    /// Equivalent to `serde_json::to_value(self)` but without the allocation
+    /// and `Value` round trip.
+    pub const fn wire_str(&self) -> &'static str {
+        match self {
+            Self::Lfp => "LFP",
+            Self::Nmc => "NMC",
+            Self::Nca => "NCA",
+            Self::Lco => "LCO",
+            Self::NiMh => "NiMH",
+            Self::NiCd => "NiCd",
+            Self::LeadAcid => "lead-acid",
+            Self::SolidState => "solid-state",
+            Self::Other => "Other",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn battery_chemistry_wire_str_matches_serde_serialization() {
+        for chem in [
+            BatteryChemistry::Lfp,
+            BatteryChemistry::Nmc,
+            BatteryChemistry::Nca,
+            BatteryChemistry::Lco,
+            BatteryChemistry::NiMh,
+            BatteryChemistry::NiCd,
+            BatteryChemistry::LeadAcid,
+            BatteryChemistry::SolidState,
+            BatteryChemistry::Other,
+        ] {
+            let serialized = serde_json::to_value(&chem).unwrap();
+            assert_eq!(
+                serialized.as_str().unwrap(),
+                chem.wire_str(),
+                "wire_str() disagrees with serde for {chem:?}"
+            );
+        }
+    }
+}
+
 /// Battery type category per EU Battery Regulation 2023/1542 Art. 2.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

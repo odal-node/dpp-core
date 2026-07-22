@@ -77,10 +77,7 @@ impl KeyStore {
                 KeyRecord {
                     encrypted_signing_key: encrypted,
                     nonce: nonce_bytes.to_vec(),
-                    fingerprint: record.fingerprint.clone(),
-                    verifying_key_hex: record.verifying_key_hex.clone(),
-                    revoked: record.revoked,
-                    algorithm: record.algorithm.clone(),
+                    ..record.clone()
                 },
             );
         }

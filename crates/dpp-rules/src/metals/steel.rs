@@ -18,12 +18,12 @@
 //! Source: worldsteel CO₂ data collection, IEA Iron & Steel Tracker 2023.
 //! These are **reference ranges**, not mandated compliance thresholds.
 //!
-//! ## Schema fields (steel v1.0.0)
+//! ## Schema fields (steel v1.1.0)
 //! - `productionRoute`        — enum: `blast-furnace | electric-arc | direct-reduction`
 //! - `recycledScrapContentPct`— 0–100 % (scrap share of total charge)
 //! - `co2ePerTonneSteel`      — tCO₂e per tonne of steel, non-negative
 //! - `productCategory`        — enum: `flat | long | tube | specialty | other`
-//! - `countryOfProduction`    — ISO 3166-1 alpha-2
+//! - `countryOfOrigin`        — ISO 3166-1 alpha-2
 
 // ── Production route CO₂e reference ranges (tCO₂e / tonne steel) ─────────────
 // worldsteel / IEA benchmark values — NOT finalized EU DPP thresholds.

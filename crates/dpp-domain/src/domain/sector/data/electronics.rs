@@ -3,6 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::domain::gtin::Gtin;
 use crate::domain::sector::enums::EnergyEfficiencyClass;
 use crate::domain::sector::metrics::RepairabilityScore;
 
@@ -16,7 +17,7 @@ use super::shared::{CriticalRawMaterial, SvhcSubstance};
 #[serde(rename_all = "camelCase")]
 pub struct ElectronicsData {
     /// 14-digit GTIN identifying the product model.
-    pub gtin: String,
+    pub gtin: Gtin,
     /// Product category, e.g. `"smartphone"`, `"laptop"`, `"tablet"`, `"monitor"`,
     /// `"tv"`, `"server"`, `"charger"`, `"earphone"`, `"other"`.
     pub product_category: String,

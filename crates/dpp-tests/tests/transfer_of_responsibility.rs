@@ -15,17 +15,8 @@ use dpp_domain::{
     OperatorRole, PassportId, ResponsibleOperator, TransferChain, TransferError, TransferReason,
     TransferRecord, TransferStatus,
 };
+use dpp_tests::fixtures::make_operator;
 use uuid::Uuid;
-
-fn make_operator(did: &str, name: &str, role: OperatorRole, country: &str) -> ResponsibleOperator {
-    ResponsibleOperator {
-        did: did.into(),
-        name: name.into(),
-        role,
-        eu_operator_id: None,
-        country: country.into(),
-    }
-}
 
 fn make_transfer(
     passport_id: PassportId,

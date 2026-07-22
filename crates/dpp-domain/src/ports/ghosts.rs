@@ -28,7 +28,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use super::archive::{ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification};
+use super::archive::{
+    ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, retention_deadline,
+};
 use super::registry_sync::{
     RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
 };
@@ -60,7 +62,7 @@ impl ArchivePort for GhostArchive {
             passport_id: passport.id,
             content_hash: String::new(),
             archived_at: now,
-            retention_until: now + chrono::Duration::days(365 * retention_years as i64),
+            retention_until: retention_deadline(now, retention_years),
         })
     }
 
@@ -71,7 +73,11 @@ impl ArchivePort for GhostArchive {
             passport_id: passport.id,
             content_hash: String::new(),
             archived_at: now,
-            retention_until: now + chrono::Duration::days(365 * 10),
+            // `update_archive` has no `retention_years` parameter (see
+            // `ArchivePort` trait) so the general 10-year default is the best
+            // this ghost can do without tracking state from the original
+            // `archive` call.
+            retention_until: retention_deadline(now, 10),
         })
     }
 

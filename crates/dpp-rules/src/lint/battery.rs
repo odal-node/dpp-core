@@ -92,11 +92,9 @@ fn material_sum_finding(field: &'static str, pcts: &[f64]) -> Option<LintFinding
     if pcts.is_empty() {
         return None;
     }
-    let total: f64 = pcts.iter().copied().sum();
-    if !total.is_finite() {
-        return None;
-    }
-    if (total - 100.0).abs() <= MATERIAL_SUM_TOLERANCE_PCT {
+    let (within_tolerance, total) =
+        crate::common::numeric::sums_to(pcts.iter().copied(), 100.0, MATERIAL_SUM_TOLERANCE_PCT);
+    if !total.is_finite() || within_tolerance {
         return None;
     }
     Some(LintFinding {

@@ -36,6 +36,6 @@ pub mod registry;
 pub use registry::{
     EuRegistryEnvelope, EuRegistryError, EuRegistryErrorKind, EuRegistryResponse,
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
-    RegistrationPayload, RegistryAuthority, RegistryEndpoint, RegistryValidationError,
-    StatusResponse, TransferNotification,
+    RegistrationPayload, RegistryAuthority, RegistryEndpoint, RegistryStatusCode,
+    RegistryValidationError, StatusResponse, TransferNotification,
 };
