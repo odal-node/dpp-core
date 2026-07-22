@@ -50,7 +50,16 @@ fn check_gs1_key(s: &str, len: usize) -> Result<(), Gs1KeyCheck> {
     if s.len() != len || !s.bytes().all(|b| b.is_ascii_digit()) {
         return Err(Gs1KeyCheck::InvalidFormat);
     }
-    let digits: Vec<u8> = s.bytes().map(|b| b - b'0').collect();
+    // Stack buffer, not a Vec: every GS1 key this is called with (GTIN-14,
+    // GLN-13) fits comfortably within 14 digits.
+    debug_assert!(
+        len <= 14,
+        "check_gs1_key only supports keys up to 14 digits"
+    );
+    let mut digits = [0u8; 14];
+    for (i, b) in s.bytes().enumerate() {
+        digits[i] = b - b'0';
+    }
     let expected = gs1_check_digit(&digits[..len - 1]);
     if digits[len - 1] != expected {
         return Err(Gs1KeyCheck::InvalidCheckDigit {
