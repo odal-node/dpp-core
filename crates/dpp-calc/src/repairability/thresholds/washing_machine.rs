@@ -6,7 +6,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct WashingMachineRuleset;
@@ -20,13 +23,6 @@ static WASHING_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     customer_support: 0.10,
 };
 
-static WASHING_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
-};
-
 static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
     regulation: "pending — ESPR washing machine repairability delegated act (expected ~2026)",
     article: "TBD",
@@ -36,18 +32,18 @@ static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static WASHING_RULESET_ID: std::sync::OnceLock<RulesetId> = std::sync::OnceLock::new();
-static WASHING_RULESET_VERSION: std::sync::OnceLock<RulesetVersion> = std::sync::OnceLock::new();
+static WASHING_RULESET_ID: RulesetId = RulesetId("washing-machine-repairability");
+static WASHING_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
 static WASHING_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
     std::sync::OnceLock::new();
 
 impl Ruleset for WashingMachineRuleset {
     fn id(&self) -> &RulesetId {
-        WASHING_RULESET_ID.get_or_init(|| RulesetId("washing-machine-repairability".into()))
+        &WASHING_RULESET_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        WASHING_RULESET_VERSION.get_or_init(|| RulesetVersion("0.0.0-stub".into()))
+        &WASHING_RULESET_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {
@@ -67,6 +63,6 @@ impl RepairabilityRuleset for WashingMachineRuleset {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &WASHING_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 }

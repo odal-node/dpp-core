@@ -20,19 +20,17 @@ use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
 use dpp_digital_link::DigitalLink;
 use dpp_digital_link::aas::map_dpp_to_aas_submodel;
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, ManufacturerInfo, MaterialEntry, Passport, PassportId,
-    PassportStatus, RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport,
+    RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,
 };
+use dpp_tests::fixtures::base_passport;
 
 /// Build a realistic textile passport for testing.
 fn make_textile_passport() -> Passport {
     let now = Utc::now();
     Passport {
-        id: PassportId::new(),
         batch_id: Some("LOT-2026-T-0451".into()),
         product_name: "EcoWeave Organic Cotton T-Shirt".into(),
-        sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "EcoTextile GmbH".into(),
             address: "Friedrichstraße 123, 10117 Berlin, DE".into(),
@@ -43,84 +41,70 @@ fn make_textile_passport() -> Passport {
                 name: "Organic Cotton".into(),
                 weight_kg: 0.18,
                 recycled_pct: None,
-                origin_country: Some("IN".into()),
+                country_of_origin: Some("IN".into()),
             },
             MaterialEntry {
                 name: "Recycled Polyester".into(),
                 weight_kg: 0.07,
                 recycled_pct: Some(100.0),
-                origin_country: Some("DE".into()),
+                country_of_origin: Some("DE".into()),
             },
         ],
         co2e_per_unit: Some(CarbonFootprint::from_kg(8.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(6.5)),
-        compliance_result: None,
-        lint_result: None,
-        sector_data: Some(SectorData::Textile(TextileData {
-            gtin: "09506000134352".into(),
-            fibre_composition: vec![
-                FibreEntry {
-                    fibre: "cotton".into(),
-                    pct: 72.0,
-                    country_of_origin: Some("IN".into()),
-                },
-                FibreEntry {
-                    fibre: "recycled_polyester".into(),
-                    pct: 28.0,
-                    country_of_origin: Some("DE".into()),
-                },
-            ],
-            country_of_manufacturing: "BD".into(),
-            care_instructions: "Machine wash 30°C, do not tumble dry, iron low".into(),
-            chemical_compliance_standard: "OEKO-TEX 100".into(),
-            recycled_content_pct: Some(28.0),
-            carbon_footprint_kg_co2e: Some(8.5),
-            water_use_litres: Some(2700.0),
-            microplastic_shedding_mg_per_wash: Some(12.5),
-            repair_score: Some(6.5),
-            durability_score: Some(7.5),
-            expected_wash_cycles: Some(50),
-            country_of_raw_material_origin: Some("IN".into()),
-            svhc_substances: Some(vec![SvhcSubstance {
-                cas_number: "80-05-7".into(),
-                substance_name: "Bisphenol A".into(),
-                concentration_pct: 0.15,
-                location_in_product: Some("coating".into()),
-                scip_notification_id: Some("SCIP-2025-001234".into()),
-            }]),
-            allergens: None,
-            substances_of_concern: None,
-            recyclability_class: Some("mono-material".into()),
-            end_of_life_instructions: Some("Return to store for textile recycling".into()),
-            reuse_condition: None,
-            prior_use_cycles: Some(0),
-            disassembly_instructions: Some(
-                "Remove buttons, separate layers by colour group".into(),
-            ),
-            spare_parts_available: Some(true),
-            product_weight_grams: Some(250.0),
-            repair_history_url: None,
-            repair_count: None,
-            pef_score: None,
-        })),
-        status: PassportStatus::Draft,
-        qr_code_url: None,
-        jws_signature: None,
-        public_jws_signature: None,
         created_at: now,
         updated_at: now,
-        published_at: None,
-        schema_version: "1.1.0".into(),
-        retention_locked: false,
-        version: 1,
-        supersedes_id: None,
-        parent_passport_ref: None,
-        component_refs: Vec::new(),
-        retention_until: None,
-        product_id: None,
-        operator_identifier: None,
-        facility: None,
-        seal: None,
+        ..base_passport(
+            Sector::Textile,
+            SectorData::Textile(TextileData {
+                gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                fibre_composition: vec![
+                    FibreEntry {
+                        fibre: "cotton".into(),
+                        pct: 72.0,
+                        country_of_origin: Some("IN".into()),
+                    },
+                    FibreEntry {
+                        fibre: "recycled_polyester".into(),
+                        pct: 28.0,
+                        country_of_origin: Some("DE".into()),
+                    },
+                ],
+                country_of_origin: "BD".into(),
+                care_instructions: "Machine wash 30°C, do not tumble dry, iron low".into(),
+                chemical_compliance_standard: "OEKO-TEX 100".into(),
+                recycled_content_pct: Some(28.0),
+                carbon_footprint_kg_co2e: Some(8.5),
+                water_use_litres: Some(2700.0),
+                microplastic_shedding_mg_per_wash: Some(12.5),
+                repair_score: Some(6.5),
+                durability_score: Some(7.5),
+                expected_wash_cycles: Some(50),
+                country_of_raw_material_origin: Some("IN".into()),
+                svhc_substances: Some(vec![SvhcSubstance {
+                    cas_number: "80-05-7".into(),
+                    substance_name: "Bisphenol A".into(),
+                    concentration_pct: 0.15,
+                    location_in_product: Some("coating".into()),
+                    scip_notification_id: Some("SCIP-2025-001234".into()),
+                }]),
+                allergens: None,
+                substances_of_concern: None,
+                recyclability_class: Some("mono-material".into()),
+                end_of_life_instructions: Some("Return to store for textile recycling".into()),
+                reuse_condition: None,
+                prior_use_cycles: Some(0),
+                disassembly_instructions: Some(
+                    "Remove buttons, separate layers by colour group".into(),
+                ),
+                spare_parts_available: Some(true),
+                product_weight_grams: Some(250.0),
+                repair_history_url: None,
+                repair_count: None,
+                pef_score: None,
+            }),
+            "1.1.0",
+        )
     }
 }
 
@@ -137,7 +121,7 @@ fn textile_passport_serialisation_round_trip() {
     // Sector data survived round-trip
     if let Some(SectorData::Textile(td)) = &back.sector_data {
         assert_eq!(td.fibre_composition.len(), 2);
-        assert_eq!(td.country_of_manufacturing, "BD");
+        assert_eq!(td.country_of_origin, "BD");
         assert!(td.svhc_substances.as_ref().unwrap().len() == 1);
     } else {
         panic!("expected TextileData after round-trip");

@@ -18,13 +18,13 @@
 //! country-specific grid factors, allocation rules) refines those factors and is
 //! gated on a signed data license (`real-factors` feature).
 
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::parameters::Co2eInputs;
 use super::thresholds::Co2eRuleset;
 use crate::error::CalcError;
-use crate::receipt::{CalculationReceipt, input_hash, jcs_hash};
+use crate::receipt::{CalculationReceipt, jcs_hash};
 
 /// A single stage in the EU PEF product lifecycle.
 ///
@@ -74,18 +74,28 @@ pub struct Co2eResult {
     pub receipt: CalculationReceipt,
 }
 
-/// Calculate the cradle-to-gate CO₂e footprint for one unit.
+/// Calculate the cradle-to-gate CO₂e footprint for one unit, as of today.
 ///
 /// Returns `Err(CalcError::InvalidInput)` for negative or non-finite inputs —
 /// silent clamping is not appropriate for a legally cited compliance figure.
 pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eResult, CalcError> {
-    validate_inputs(inputs)?;
+    calculate_asof(inputs, ruleset, Utc::now().date_naive())
+}
 
-    // A signed, dated receipt must never be computed from a ruleset that is not
-    // legally in force today (crate-wide invariant; see repairability::calculate).
+/// Calculate the cradle-to-gate CO₂e footprint for one unit, as of `on_date`.
+///
+/// Lets a caller check "was this ruleset legally in force on date X" without
+/// depending on the wall clock — e.g. testing the not-yet-effective/expired
+/// paths with a fixed date rather than a far-future fixture.
+pub fn calculate_asof(
+    inputs: &Co2eInputs,
+    ruleset: &dyn Co2eRuleset,
+    on_date: NaiveDate,
+) -> Result<Co2eResult, CalcError> {
+    validate_inputs(inputs)?;
     ruleset
         .effective_dates()
-        .ensure_active_on(ruleset.id(), Utc::now().date_naive())?;
+        .ensure_active_on(ruleset.id(), on_date)?;
 
     let material_breakdown: Vec<MaterialLineResult> = inputs
         .materials
@@ -114,12 +124,7 @@ pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eR
     // Hash outputs before building the result (avoids chicken-and-egg with receipt).
     let output_hash = jcs_hash(&(total_co2e_kg, material_co2e_kg, energy_co2e_kg))?;
 
-    let receipt = CalculationReceipt::new(
-        input_hash(inputs)?,
-        ruleset.id().0.as_str(),
-        ruleset.version().0.as_str(),
-    )
-    .with_output_hash(output_hash);
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
 
     Ok(Co2eResult {
         material_co2e_kg,
@@ -166,9 +171,6 @@ mod tests {
     use super::*;
     use crate::co2e::parameters::MaterialFootprint;
     use crate::co2e::thresholds::CradleToGateRuleset;
-    use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
-    use chrono::NaiveDate;
-    use std::sync::OnceLock;
 
     fn material(mass: f64, factor: f64) -> MaterialFootprint {
         MaterialFootprint {
@@ -177,50 +179,19 @@ mod tests {
         }
     }
 
-    /// A CO₂e ruleset whose effective period starts in 2100 — not yet in force.
-    struct FutureCo2eRuleset;
-    static FUT_ID: OnceLock<RulesetId> = OnceLock::new();
-    static FUT_VER: OnceLock<RulesetVersion> = OnceLock::new();
-    static FUT_DATES: OnceLock<EffectiveDateBound> = OnceLock::new();
-    static FUT_BASIS: RegulatoryBasis = RegulatoryBasis {
-        regulation: "test",
-        article: "test",
-        standard: None,
-        technical_study: None,
-        source_url: None,
-        superseded_by: None,
-    };
-    impl Ruleset for FutureCo2eRuleset {
-        fn id(&self) -> &RulesetId {
-            FUT_ID.get_or_init(|| RulesetId("co2e-future".into()))
-        }
-        fn version(&self) -> &RulesetVersion {
-            FUT_VER.get_or_init(|| RulesetVersion("1.0.0".into()))
-        }
-        fn effective_dates(&self) -> &EffectiveDateBound {
-            FUT_DATES.get_or_init(|| {
-                EffectiveDateBound::open(NaiveDate::from_ymd_opt(2100, 1, 1).unwrap())
-            })
-        }
-        fn regulatory_basis(&self) -> &RegulatoryBasis {
-            &FUT_BASIS
-        }
-    }
-    impl Co2eRuleset for FutureCo2eRuleset {
-        fn declared_stages(&self) -> &[LifecycleStage] {
-            &[]
-        }
-    }
-
     #[test]
     fn rejects_ruleset_not_yet_in_force() {
+        // CradleToGateRuleset is effective from 2021-01-01 — querying a date
+        // before that exercises the not-yet-effective path on the real
+        // ruleset, with no need for a synthetic future-dated test double.
         let inputs = Co2eInputs {
             materials: vec![material(1.0, 2.0)],
             energy_kwh: 1.0,
             grid_factor_kg_co2e_per_kwh: 0.4,
         };
+        let before_effective = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
         assert!(matches!(
-            calculate(&inputs, &FutureCo2eRuleset),
+            calculate_asof(&inputs, &CradleToGateRuleset, before_effective),
             Err(CalcError::RulesetNotYetEffective { .. })
         ));
     }

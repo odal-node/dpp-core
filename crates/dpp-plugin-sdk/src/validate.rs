@@ -7,9 +7,10 @@
 //! the first — better for surfacing form errors to a manufacturer.
 //!
 //! The free functions [`num`] and [`str_of`] are convenience readers for
-//! `calculate_metrics` bodies.
+//! `calculate_metrics` bodies, and [`threshold_status`] is the shared
+//! "measured value at or under threshold" classification they compare against.
 
-use dpp_plugin_traits::{PluginError, PluginFieldError, PluginInput};
+use dpp_plugin_traits::{PluginComplianceStatus, PluginError, PluginFieldError, PluginInput};
 use serde_json::Value;
 
 /// A present, non-null value for `key`, or `None` if absent/null.
@@ -33,6 +34,18 @@ pub fn num(input: &PluginInput, key: &str) -> Option<f64> {
 #[must_use]
 pub fn str_of<'a>(input: &'a PluginInput, key: &str) -> Option<&'a str> {
     input.get(key).and_then(Value::as_str)
+}
+
+/// Classify a measured value against a compliance threshold: `Compliant` if
+/// present and at or under `threshold`, `NonCompliant` otherwise (including
+/// when `value` is absent — a missing measurement is not assumed compliant).
+#[must_use]
+pub fn threshold_status(value: Option<f64>, threshold: f64) -> PluginComplianceStatus {
+    if value.is_some_and(|v| v <= threshold) {
+        PluginComplianceStatus::Compliant
+    } else {
+        PluginComplianceStatus::NonCompliant
+    }
 }
 
 /// Fluent per-field validator. See module docs.
@@ -107,7 +120,7 @@ impl<'a> Validator<'a> {
         let err = match present(self.input, key).and_then(Value::as_str) {
             None => Some(("missing", format!("{key} is required"))),
             Some(c) if c.len() == 2 && c.bytes().all(|b| b.is_ascii_uppercase()) => {
-                if ISO_3166_1_A2.binary_search(&c).is_ok() {
+                if dpp_rules::country_code_valid(c) {
                     None
                 } else {
                     Some((
@@ -281,26 +294,6 @@ fn gs1_check_digit_valid(gtin: &str) -> bool {
     let expected = (10 - sum % 10) % 10;
     expected == (bytes[13] - b'0') as u32
 }
-
-/// All 249 ISO 3166-1 alpha-2 country codes, sorted for binary search.
-const ISO_3166_1_A2: &[&str] = &[
-    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
-    "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
-    "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN",
-    "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE",
-    "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
-    "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
-    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM",
-    "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
-    "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK",
-    "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
-    "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG",
-    "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW",
-    "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
-    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO",
-    "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
-    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
-];
 
 #[cfg(test)]
 mod tests {

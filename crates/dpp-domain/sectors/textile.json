@@ -7,8 +7,8 @@
     "Textile delegated act (anticipated)"
   ],
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0", "1.1.0"],
-  "currentSchemaVersion": "1.1.0",
+  "schemaVersions": ["1.0.0", "1.1.0", "1.2.0"],
+  "currentSchemaVersion": "1.2.0",
   "productCategories": ["apparel", "footwear", "home_textile"],
   "accessTiers": {
     "svhcSubstances": "professional",

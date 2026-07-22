@@ -30,6 +30,11 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/textile/v1.1.0.json"),
     },
     EmbeddedSchema {
+        sector: "textile",
+        version: "1.2.0",
+        json: include_str!("../../schemas/textile/v1.2.0.json"),
+    },
+    EmbeddedSchema {
         sector: "unsold-goods",
         version: "1.0.0",
         json: include_str!("../../schemas/unsold-goods/v1.0.0.json"),
@@ -38,6 +43,11 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         sector: "steel",
         version: "1.0.0",
         json: include_str!("../../schemas/steel/v1.0.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "steel",
+        version: "1.1.0",
+        json: include_str!("../../schemas/steel/v1.1.0.json"),
     },
     EmbeddedSchema {
         sector: "electronics",
@@ -55,6 +65,11 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/construction/v1.0.0.json"),
     },
     EmbeddedSchema {
+        sector: "construction",
+        version: "1.1.0",
+        json: include_str!("../../schemas/construction/v1.1.0.json"),
+    },
+    EmbeddedSchema {
         sector: "tyre",
         version: "1.0.0",
         json: include_str!("../../schemas/tyre/v1.0.0.json"),
@@ -65,9 +80,19 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/toy/v1.0.0.json"),
     },
     EmbeddedSchema {
+        sector: "toy",
+        version: "1.1.0",
+        json: include_str!("../../schemas/toy/v1.1.0.json"),
+    },
+    EmbeddedSchema {
         sector: "aluminium",
         version: "1.0.0",
         json: include_str!("../../schemas/aluminium/v1.0.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "aluminium",
+        version: "1.1.0",
+        json: include_str!("../../schemas/aluminium/v1.1.0.json"),
     },
     EmbeddedSchema {
         sector: "furniture",
@@ -75,9 +100,19 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/furniture/v1.0.0.json"),
     },
     EmbeddedSchema {
+        sector: "furniture",
+        version: "1.1.0",
+        json: include_str!("../../schemas/furniture/v1.1.0.json"),
+    },
+    EmbeddedSchema {
         sector: "detergent",
         version: "1.0.0",
         json: include_str!("../../schemas/detergent/v1.0.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "detergent",
+        version: "1.1.0",
+        json: include_str!("../../schemas/detergent/v1.1.0.json"),
     },
 ];
 

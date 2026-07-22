@@ -186,6 +186,44 @@ fn sector_enum_and_catalog_agree() {
     }
 }
 
+/// Drift guard: [`crate::domain::sector::Sector::minimum_retention_years`] is
+/// a compile-time constant kept on the domain enum for wasm32/no-catalog
+/// callers; the catalog's own `retention_years` is the value production code
+/// actually applies at publish time (see `Passport.retention_until`'s doc
+/// comment). Nothing else ties the two together — this is what stops them
+/// from silently diverging if a future delegated act sets a sector-specific
+/// retention floor.
+#[test]
+fn retention_years_matches_sector_enum() {
+    use crate::domain::sector::Sector;
+
+    let catalog = SectorCatalog::new();
+    let typed = [
+        Sector::Battery,
+        Sector::Textile,
+        Sector::UnsoldGoods,
+        Sector::Steel,
+        Sector::Electronics,
+        Sector::Construction,
+        Sector::Tyre,
+        Sector::Toy,
+        Sector::Aluminium,
+        Sector::Furniture,
+        Sector::Detergent,
+    ];
+    for sector in &typed {
+        let key = sector.catalog_key();
+        let descriptor = catalog
+            .get(key)
+            .unwrap_or_else(|| panic!("Sector::{sector:?} (key '{key}') has no catalog entry"));
+        assert_eq!(
+            sector.minimum_retention_years(),
+            descriptor.retention_years,
+            "Sector::{sector:?}.minimum_retention_years() disagrees with catalog '{key}'.retention_years"
+        );
+    }
+}
+
 /// Compliance citation (domain Gap / watchlist 🔴): the ESPR unsold-goods
 /// destruction ban is **Article 25 / Annex VII**, not Article 22. A wrong
 /// citation in a compliance artifact erodes auditor trust.

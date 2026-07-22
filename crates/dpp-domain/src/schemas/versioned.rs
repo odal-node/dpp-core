@@ -36,7 +36,10 @@ pub struct VersionedSchemaRegistry {
     /// `&mut self` mutators evict the affected key.
     #[cfg(not(target_arch = "wasm32"))]
     compiled: std::sync::RwLock<
-        std::collections::HashMap<(String, Version), std::sync::Arc<jsonschema::Validator>>,
+        std::collections::HashMap<
+            String,
+            std::collections::HashMap<Version, std::sync::Arc<jsonschema::Validator>>,
+        >,
     >,
 }
 
@@ -70,10 +73,14 @@ impl VersionedSchemaRegistry {
     /// Drop the cached compiled schema for a `(sector, version)`.
     #[cfg(not(target_arch = "wasm32"))]
     fn evict(&mut self, sector: &str, version: &Version) {
-        self.compiled
+        if let Some(inner) = self
+            .compiled
             .get_mut()
             .expect("schema cache not poisoned")
-            .remove(&(sector.to_owned(), version.clone()));
+            .get_mut(sector)
+        {
+            inner.remove(version);
+        }
     }
     #[cfg(target_arch = "wasm32")]
     fn evict(&mut self, _sector: &str, _version: &Version) {}
@@ -328,12 +335,12 @@ impl VersionedSchemaRegistry {
         sector: &str,
         version: &Version,
     ) -> Option<std::sync::Arc<jsonschema::Validator>> {
-        let key = (sector.to_owned(), version.clone());
         if let Some(cached) = self
             .compiled
             .read()
             .expect("schema cache not poisoned")
-            .get(&key)
+            .get(sector)
+            .and_then(|inner| inner.get(version))
         {
             return Some(cached.clone());
         }
@@ -347,7 +354,9 @@ impl VersionedSchemaRegistry {
         self.compiled
             .write()
             .expect("schema cache not poisoned")
-            .insert(key, compiled.clone());
+            .entry(sector.to_owned())
+            .or_default()
+            .insert(version.clone(), compiled.clone());
         Some(compiled)
     }
 }

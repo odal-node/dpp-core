@@ -8,15 +8,9 @@ use sha2::Digest;
 use super::did_builder::build_did_document;
 use super::local_service::LocalIdentityService;
 use crate::keystore::KeyStore;
+use crate::test_support::temp_store;
 
 use dpp_domain::{PassportId, ports::identity_port::IdentityPort};
-
-fn temp_store(label: &str, key_id: &str) -> KeyStore {
-    let path = std::env::temp_dir().join(format!("test-{label}-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(path, "test-pass").expect("open store");
-    store.generate_key(key_id).expect("generate key");
-    store
-}
 
 fn test_service() -> LocalIdentityService {
     let path = std::env::temp_dir().join(format!("test-identity-{}.json", uuid::Uuid::now_v7()));

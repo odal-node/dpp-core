@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/textile-v1.2.0.json",
+  "title": "Odal Node — Textile Sector Data (v1.2.0)",
+  "description": "Textile-specific fields for EU textile DPP compliance. v1.1.0 adds SCIP/SVHC substance disclosure, per-fibre origin traceability, durability metrics, and microplastic shedding data. v1.2.0 renames countryOfManufacturing to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "fibreComposition",
+    "countryOfOrigin",
+    "careInstructions",
+    "chemicalComplianceStandard"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "fibreComposition": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of fibres and their percentage composition. Must sum to ~100%.",
+      "items": {
+        "type": "object",
+        "required": ["fibre", "pct"],
+        "properties": {
+          "fibre": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Fibre name, e.g. cotton, polyester, recycled_polyester."
+          },
+          "pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Percentage by weight (0–100)."
+          },
+          "countryOfOrigin": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code where this fibre was sourced."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured."
+    },
+    "careInstructions": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO 3758 care symbols or free text care instructions."
+    },
+    "chemicalComplianceStandard": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS."
+    },
+    "recycledContentPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Total recycled content as a percentage of total weight."
+    },
+    "carbonFootprintKgCo2e": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per unit."
+    },
+    "waterUseLitres": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Water consumption in litres per unit produced."
+    },
+    "microplasticSheddingMgPerWash": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Microplastic fibre shedding in milligrams per wash cycle (ISO/DIS 4484)."
+    },
+    "repairScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Repairability score (0–10) per EU methodology."
+    },
+    "durabilityScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Durability score (0–10) covering pilling, colour fastness, dimensional stability, seam strength."
+    },
+    "expectedWashCycles": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Expected number of wash cycles before significant quality degradation."
+    },
+    "countryOfRawMaterialOrigin": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of raw material origin (product-level fallback)."
+    },
+    "svhcSubstances": {
+      "type": ["array", "null"],
+      "description": "SVHC substances present above 0.1% w/w (REACH Art.33 / ECHA SCIP). Null = not yet checked. Empty array = checked, none found.",
+      "items": {
+        "type": "object",
+        "required": ["casNumber", "substanceName", "concentrationPct"],
+        "properties": {
+          "casNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CAS Registry Number, e.g. 80-05-7."
+          },
+          "substanceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable substance name."
+          },
+          "concentrationPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Concentration in the article as weight-%."
+          },
+          "locationInProduct": {
+            "type": "string",
+            "description": "Where in the product the substance is found, e.g. coating, dye, finish."
+          },
+          "scipNotificationId": {
+            "type": "string",
+            "description": "ECHA SCIP database notification reference."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "disassemblyInstructions": {
+      "type": ["string", "null"],
+      "description": "Disassembly / deconstruction instructions (Professional tier)."
+    },
+    "sparePartsAvailable": {
+      "type": ["boolean", "null"],
+      "description": "Whether spare parts or replacement components are available."
+    },
+    "productWeightGrams": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Product net weight in grams."
+    },
+    "allergens": {
+      "type": ["array", "null"],
+      "description": "Contact allergens regulated under REACH Annex XVII entry 72 (e.g. certain disperse dyes, chromium VI, nickel in accessories).",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "substancesOfConcern": {
+      "type": ["array", "null"],
+      "description": "Restricted substances not classified as SVHC but regulated under sector-specific rules (e.g. PFASs, flame retardants, biocides).",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "recyclabilityClass": {
+      "type": ["string", "null"],
+      "description": "Recyclability classification, e.g. mono-material, multi-material, not-recyclable."
+    },
+    "endOfLifeInstructions": {
+      "type": ["string", "null"],
+      "description": "How to dispose of or recycle the product. Free text or URL to take-back/collection point information."
+    },
+    "reuseCondition": {
+      "type": ["string", "null"],
+      "description": "Condition grade of a refurbished or reused product, e.g. like-new, good, fair."
+    },
+    "priorUseCycles": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Number of prior ownership cycles (0 for new products)."
+    },
+    "repairHistoryUrl": {
+      "type": ["string", "null"],
+      "description": "URL or structured log of repair events performed on this specific item."
+    },
+    "repairCount": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Number of completed professional repairs on this item."
+    },
+    "pefScore": {
+      "type": ["number", "null"],
+      "description": "Environmental impact score per garment lifecycle (PEF/OEF methodology). Dimensionless single score aggregating multiple impact categories."
+    }
+  },
+  "additionalProperties": false
+}

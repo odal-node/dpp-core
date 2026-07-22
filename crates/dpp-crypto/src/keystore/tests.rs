@@ -9,13 +9,29 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
+use std::path::PathBuf;
+
 use super::crypto::{compute_envelope_hmac, derive_aes_key_sha256};
 use super::store::{KeyRecord, KeyRecordMap, KeyStore, default_algorithm};
 
+/// A unique temp-file path for a keystore under test.
+fn temp_path(label: &str) -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "test-keystore-{label}-{}.json",
+        uuid::Uuid::now_v7()
+    ))
+}
+
 fn temp_store() -> KeyStore {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("test-keystore-{}.json", uuid::Uuid::now_v7()));
-    KeyStore::open(path, "test-passphrase").expect("open key store")
+    KeyStore::open(temp_path("default"), "test-passphrase").expect("open key store")
+}
+
+/// A fresh [`KeyStore`] plus its backing path, for tests that need to read
+/// back or reopen the store file.
+fn temp_store_at(label: &str, passphrase: &str) -> (KeyStore, PathBuf) {
+    let path = temp_path(label);
+    let store = KeyStore::open(&path, passphrase).expect("open key store");
+    (store, path)
 }
 
 #[test]
@@ -32,9 +48,7 @@ fn generate_then_load_roundtrip() {
 
 #[test]
 fn stored_bytes_differ_from_plaintext() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("test-keystore-enc-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "test-passphrase").expect("open");
+    let (store, path) = temp_store_at("enc", "test-passphrase");
     let key = store.generate_key("issuer-enc").expect("generate");
 
     let raw_file = std::fs::read_to_string(&path).expect("read file");
@@ -47,9 +61,7 @@ fn stored_bytes_differ_from_plaintext() {
 
 #[test]
 fn store_file_contains_argon2id_kdf_marker() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("test-keystore-kdf-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "test-passphrase").expect("open");
+    let (store, path) = temp_store_at("kdf", "test-passphrase");
     store.generate_key("issuer-kdf").expect("generate");
 
     let raw_file = std::fs::read_to_string(&path).expect("read file");
@@ -65,12 +77,7 @@ fn store_file_contains_argon2id_kdf_marker() {
 
 #[test]
 fn reopen_store_from_disk_with_argon2id() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-reopen-{}.json",
-        uuid::Uuid::now_v7()
-    ));
-    let store = KeyStore::open(&path, "my-passphrase").expect("open");
+    let (store, path) = temp_store_at("reopen", "my-passphrase");
     let generated = store.generate_key("issuer-reopen").expect("generate");
     drop(store);
 
@@ -83,11 +90,7 @@ fn reopen_store_from_disk_with_argon2id() {
 #[test]
 fn legacy_sha256_store_can_be_opened_and_migrated() {
     // Simulate a V1 (raw HashMap) key store created with SHA-256.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-legacy-{}.json",
-        uuid::Uuid::now_v7()
-    ));
+    let path = temp_path("legacy");
 
     // Create a legacy-format store by directly writing the old format.
     let passphrase = "legacy-pass";
@@ -138,11 +141,7 @@ fn malformed_nonce_returns_error_not_panic() {
     // A legacy V1 store (raw HashMap, no HMAC) whose record carries a truncated
     // nonce. Opening must succeed; loading must return an error rather than
     // panicking on the 12-byte nonce check.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-badnonce-{}.json",
-        uuid::Uuid::now_v7()
-    ));
+    let path = temp_path("badnonce");
 
     let record = KeyRecord {
         encrypted_signing_key: vec![0u8; 48],
@@ -226,12 +225,7 @@ fn revoke_and_rotate_marks_old_key_revoked() {
 
 #[test]
 fn revoked_state_persists_across_reopen() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-revoke-{}.json",
-        uuid::Uuid::now_v7()
-    ));
-    let store = KeyStore::open(&path, "rev").expect("open");
+    let (store, path) = temp_store_at("revoke", "rev");
     store.generate_key("iss").expect("gen");
     let revoked_fp = store.load_key("iss").unwrap().fingerprint.clone();
     store.revoke_and_rotate("iss").expect("revoke+rotate");
@@ -249,9 +243,7 @@ fn revoked_state_persists_across_reopen() {
 
 #[test]
 fn store_file_contains_hmac() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("test-keystore-hmac-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "hmac-test").expect("open");
+    let (store, path) = temp_store_at("hmac", "hmac-test");
     store.generate_key("issuer-hmac").expect("generate");
 
     let raw = std::fs::read_to_string(&path).expect("read file");
@@ -268,12 +260,7 @@ fn store_file_contains_hmac() {
 
 #[test]
 fn tampered_store_file_rejected_on_open() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-tamper-{}.json",
-        uuid::Uuid::now_v7()
-    ));
-    let store = KeyStore::open(&path, "tamper-test").expect("open");
+    let (store, path) = temp_store_at("tamper", "tamper-test");
     store.generate_key("issuer-tamper").expect("generate");
     drop(store);
 
@@ -308,12 +295,7 @@ fn tampered_store_file_rejected_on_open() {
 
 #[test]
 fn reopen_with_hmac_succeeds() {
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!(
-        "test-keystore-hmac-ok-{}.json",
-        uuid::Uuid::now_v7()
-    ));
-    let store = KeyStore::open(&path, "hmac-ok").expect("open");
+    let (store, path) = temp_store_at("hmac-ok", "hmac-ok");
     store.generate_key("issuer-ok").expect("generate");
     drop(store);
 

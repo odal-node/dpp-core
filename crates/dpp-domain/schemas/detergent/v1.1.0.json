@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/detergent-v1.1.0.json",
+  "title": "Odal Node — Detergent Sector Data (v1.1.0)",
+  "description": "Detergent and surfactant fields per EU Regulation 2026/405. DPP mandate 2029. Surfactant concentrations use the EU-standard disclosure bands from Annex VII (same bands as Regulation 648/2004 labelling tradition). v1.1.0 renames countryOfManufacture to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "productType",
+    "format",
+    "surfactants",
+    "countryOfOrigin"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "productType": {
+      "type": "string",
+      "enum": ["laundry", "dishwashing", "surface-cleaner", "personal-care", "other"],
+      "description": "Detergent product type."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["liquid", "powder", "tablet", "gel", "concentrate", "other"],
+      "description": "Physical format of the product."
+    },
+    "surfactants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/surfactantEntry" },
+      "description": "List of surfactants in the product formulation. All must be readily biodegradable per EU 2026/405 (no derogations)."
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of origin (manufacture)."
+    },
+    "co2ePerUnitKg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per product unit."
+    },
+    "packagingRecyclable": {
+      "type": ["boolean", "null"],
+      "description": "Whether the primary packaging is recyclable."
+    },
+    "recommendedDosageMl": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Recommended dosage in millilitres (or grams for powder)."
+    },
+    "biodegradable": {
+      "type": ["boolean", "null"],
+      "description": "Summary flag: whether all surfactants are readily biodegradable."
+    }
+  },
+  "definitions": {
+    "surfactantEntry": {
+      "type": "object",
+      "required": ["name", "biodegradable", "concentrationBand"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "INCI or IUPAC name of the surfactant."
+        },
+        "biodegradable": {
+          "type": "boolean",
+          "description": "Whether the surfactant is readily biodegradable per EU 2026/405 (ultimate biodegradability). All surfactants must be true; false triggers NON_COMPLIANT."
+        },
+        "concentrationBand": {
+          "type": "string",
+          "enum": ["<5%", "5-15%", "15-30%", ">=30%"],
+          "description": "Concentration band per EU detergent labelling convention (Annex VII). Use the band that contains the actual w/w percentage."
+        },
+        "casNumber": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

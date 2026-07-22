@@ -13,6 +13,84 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-22
+
+### Breaking
+
+- **`DppSectorPlugin::generate_passport` now takes `PluginInput` by value**
+  instead of `&PluginInput`, so a pass-through implementation returns its
+  input directly instead of cloning it. `meta()` and `capabilities()` now
+  have default implementations built from two new required methods,
+  `plugin_identity()` and `schema_version_range()` — a plugin supplies its
+  identity fields and supported schema range once, instead of hand-assembling
+  the full `PluginMeta`/`PluginCapabilities` structs. *Migration:* implement
+  `plugin_identity()` and `schema_version_range()`; drop a hand-rolled
+  `meta()`/`capabilities()` unless it genuinely needs non-default values.
+- **`RulesetId`/`RulesetVersion` now wrap `&'static str`** instead of
+  `String`, and no longer derive `Deserialize` — every concrete `Ruleset`
+  impl in this crate constructs them from a compile-time literal, never from
+  external input. *Migration:* replace `RulesetId("...".to_owned())` with
+  `RulesetId("...")`; a caller that was deserializing a `RulesetId` from
+  untrusted input was never a supported use and has no replacement.
+- **Sector GTIN fields migrated from `String` to the validated `Gtin`
+  newtype** across aluminium, construction, detergent, electronics,
+  furniture, steel, textile, toy, and tyre sector data. *Migration:* build
+  with `Gtin::parse(&s)?` instead of assigning a raw string; read with
+  `.as_str()` or `Display` where a `&str`/`String` is needed.
+- **Country-of-origin field unified across sectors.** Aluminium,
+  construction, detergent, furniture, steel, textile, and toy sector data
+  previously used sector-specific names (`countryOfManufacture`,
+  `countryOfProduction`, `countryOfManufacturing`); all now use
+  `countryOfOrigin` (`country_of_origin` in Rust). Each affected sector's
+  JSON Schema gained a new minor version reflecting the renamed field.
+  *Migration:* update field access and any stored/transmitted JSON using the
+  old per-sector names.
+- **`MaterialEntry::origin_country` renamed to `country_of_origin`** for
+  consistency with the sector-level rename above.
+
+### Added
+
+- **`dpp_calc::co2e::calculate_asof`** — computes a CO2e footprint against
+  the ruleset version effective on a caller-supplied date, rather than always
+  the latest registered version. Needed to reproduce a historical calculation
+  (e.g. re-verifying an evidence dossier) under the ruleset that was actually
+  in force when it was originally computed.
+- A libFuzzer target round-tripping the plugin ABI envelope
+  (`AbiResult`/`PluginCapabilities`) through encode/decode, catching panics
+  on malformed Wasm-boundary input. CI-only; not part of `just check`.
+
+### Changed
+
+- **`dpp-registry::RegistryStatusCode` is now re-exported from the crate
+  root** — previously reachable only via its full internal module path.
+- Sector plugins (`plugins/sector-*`) consolidated into a shared Cargo
+  workspace instead of 10 independently-versioned crates, and their
+  duplicated codec-dispatch, country-code table, and `threshold_status`
+  logic now live in `dpp-plugin-sdk`, shared instead of copy-pasted per
+  plugin.
+- `Passport::validate()` now returns structured, JSON-Pointer-addressed
+  field errors (`ValidationErrors`) instead of a flat error list, and
+  consolidates several previously-scattered validation helpers.
+- Numerous internal-only dedup refactors with no public API change: shared
+  test fixtures across `dpp-tests`/benches/`dpp-crypto`/`dpp-plugin-traits`,
+  shared numeric-tolerance helpers in `dpp-rules`, shared receipt/threshold
+  helpers in `dpp-calc`, and `dpp-crypto` keystore cleanup avoiding an
+  unnecessary decrypt-for-pubkey round trip.
+
+### Fixed
+
+- Two stale architecture claims in `dpp-digital-link`'s and
+  `dpp-plugin-traits`' docs corrected.
+
+### Performance
+
+- **`dpp-digital-link`'s JSON-LD passport context is now cached** instead of
+  rebuilt on every call.
+- `BatteryData`'s AAS submodel builder now calls `BatteryChemistry::wire_str()`
+  directly instead of the generic JSON-round-trip `enum_wire_str()` helper.
+- `Gtin`/`Gln` check-digit validation no longer heap-allocates a `Vec` per
+  call — uses a fixed stack buffer instead.
+
 ## [0.10.0] - 2026-07-20
 
 ### Added

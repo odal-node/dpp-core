@@ -42,13 +42,23 @@ fn tier_public() -> AccessTier {
     AccessTier::Public
 }
 
-/// Normalize a JSON key for tier matching: drop non-alphanumerics (`_`, `-`)
-/// and lowercase, so `disassemblyInstructions` == `disassembly_instructions`.
-pub(super) fn normalize_key(key: &str) -> String {
-    key.chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .map(|c| c.to_ascii_lowercase())
-        .collect()
+/// Whether `a` and `b` are equal for tier-matching purposes once both are
+/// normalized — non-alphanumerics (`_`, `-`) dropped, case-folded, so
+/// `disassemblyInstructions` == `disassembly_instructions` — without
+/// allocating a `String` for either side. [`SectorAccessPolicy::tier_for_field`]
+/// runs this once per policy-tiered field, per document key, at every
+/// recursion depth of [`super::filter::filter_by_access_tier`], so avoiding an
+/// allocation per comparison matters there.
+fn keys_match_normalized(a: &str, b: &str) -> bool {
+    let mut a_chars = a.chars().filter(char::is_ascii_alphanumeric);
+    let mut b_chars = b.chars().filter(char::is_ascii_alphanumeric);
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (Some(x), Some(y)) if x.eq_ignore_ascii_case(&y) => {}
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
 }
 
 /// Universal confidential fields present on every published passport payload
@@ -129,10 +139,9 @@ impl SectorAccessPolicy {
     /// Get the minimum access tier for a field, matched by normalized key name
     /// (case/separator-insensitive). Unlisted fields fall back to `default_tier`.
     pub fn tier_for_field(&self, field_name: &str) -> AccessTier {
-        let target = normalize_key(field_name);
         self.field_tiers
             .iter()
-            .find(|(k, _)| normalize_key(k) == target)
+            .find(|(k, _)| keys_match_normalized(k, field_name))
             .map(|(_, t)| *t)
             .unwrap_or(self.default_tier)
     }

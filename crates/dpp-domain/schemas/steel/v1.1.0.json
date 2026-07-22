@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/steel-v1.1.0.json",
+  "title": "Odal Node — Iron & Steel Sector Data (v1.1.0)",
+  "description": "Iron and Steel sector fields for EU ESPR carbon intensity and recycled content reporting. v1.1.0 renames countryOfProduction to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "co2ePerTonneSteel",
+    "recycledScrapContentPct",
+    "productCategory",
+    "countryOfOrigin",
+    "productionRoute"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "co2ePerTonneSteel": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Carbon intensity in tonne CO2e per tonne of steel produced."
+    },
+    "recycledScrapContentPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled scrap content as a percentage of total input material."
+    },
+    "productCategory": {
+      "type": "string",
+      "enum": ["flat", "long", "tube", "specialty", "other"],
+      "description": "Steel product category."
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of origin (production)."
+    },
+    "productionRoute": {
+      "type": "string",
+      "enum": ["blast-furnace", "electric-arc", "direct-reduction"],
+      "description": "Primary production route."
+    },
+    "annualProductionTonnes": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Annual production volume in tonnes (optional)."
+    }
+  },
+  "additionalProperties": false
+}

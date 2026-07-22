@@ -2,7 +2,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 /// EN 45554 ruleset for laptops. **Not yet in force.**
@@ -21,13 +24,6 @@ static LAPTOP_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     customer_support: 0.10,
 };
 
-static LAPTOP_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
-};
-
 static LAPTOP_BASIS: RegulatoryBasis = RegulatoryBasis {
     regulation: "pending — ESPR laptop repairability delegated act (expected ~2027)",
     article: "TBD",
@@ -37,17 +33,17 @@ static LAPTOP_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static LAPTOP_RULESET_ID: std::sync::OnceLock<RulesetId> = std::sync::OnceLock::new();
-static LAPTOP_RULESET_VERSION: std::sync::OnceLock<RulesetVersion> = std::sync::OnceLock::new();
+static LAPTOP_RULESET_ID: RulesetId = RulesetId("laptop-repairability");
+static LAPTOP_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
 static LAPTOP_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> = std::sync::OnceLock::new();
 
 impl Ruleset for LaptopRuleset {
     fn id(&self) -> &RulesetId {
-        LAPTOP_RULESET_ID.get_or_init(|| RulesetId("laptop-repairability".into()))
+        &LAPTOP_RULESET_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        LAPTOP_RULESET_VERSION.get_or_init(|| RulesetVersion("0.0.0-stub".into()))
+        &LAPTOP_RULESET_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {
@@ -69,6 +65,6 @@ impl RepairabilityRuleset for LaptopRuleset {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &LAPTOP_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 }

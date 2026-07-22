@@ -26,8 +26,8 @@ static CTG_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static CTG_ID: OnceLock<RulesetId> = OnceLock::new();
-static CTG_VERSION: OnceLock<RulesetVersion> = OnceLock::new();
+static CTG_ID: RulesetId = RulesetId("co2e-cradle-to-gate");
+static CTG_VERSION: RulesetVersion = RulesetVersion("1.0.0");
 static CTG_DATES: OnceLock<EffectiveDateBound> = OnceLock::new();
 static CTG_STAGES: [LifecycleStage; 2] = [LifecycleStage::RawMaterials, LifecycleStage::Production];
 
@@ -39,11 +39,11 @@ pub struct CradleToGateRuleset;
 
 impl Ruleset for CradleToGateRuleset {
     fn id(&self) -> &RulesetId {
-        CTG_ID.get_or_init(|| RulesetId("co2e-cradle-to-gate".into()))
+        &CTG_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        CTG_VERSION.get_or_init(|| RulesetVersion("1.0.0".into()))
+        &CTG_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {

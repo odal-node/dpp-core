@@ -3,8 +3,8 @@
 use super::*;
 use crate::codec::to_bytes;
 use dpp_plugin_traits::{
-    AbiVersion, METRIC_CO2E_SCORE, PluginCapabilities, PluginCapability, PluginComplianceStatus,
-    PluginFieldError, PluginMeta, PluginResult, SchemaVersionRange,
+    AbiVersion, METRIC_CO2E_SCORE, PluginCapabilities, PluginComplianceStatus, PluginFieldError,
+    PluginIdentity, PluginResult, SchemaVersionRange,
 };
 use serde_json::{Value, json};
 
@@ -13,29 +13,19 @@ use serde_json::{Value, json};
 struct DummyPlugin;
 
 impl DppSectorPlugin for DummyPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            sector: "dummy".into(),
-            name: "Dummy".into(),
-            version: "0.1.0".into(),
-            license: "Apache-2.0".into(),
-            description: None,
-            author: None,
-            homepage: None,
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "dummy",
+            name: "Dummy",
+            version: "0.1.0",
+            description: "Minimal plugin exercising every glue path",
         }
     }
 
-    fn capabilities(&self) -> PluginCapabilities {
-        PluginCapabilities {
-            abi_version: AbiVersion::current(),
-            supported_schemas: vec![SchemaVersionRange {
-                min_version: "1.0.0".into(),
-                max_version: "1.0.0".into(),
-            }],
-            capabilities: vec![PluginCapability::ComputeMetrics],
-            min_host_version: None,
-            max_fuel: None,
-            max_memory_bytes: None,
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.0.0".into(),
         }
     }
 
@@ -57,9 +47,9 @@ impl DppSectorPlugin for DummyPlugin {
             .maybe_metric(METRIC_CO2E_SCORE, input.get("co2e").and_then(Value::as_f64)))
     }
 
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> {
-        self.validate_input(input)?;
-        Ok(input.clone())
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
     }
 }
 

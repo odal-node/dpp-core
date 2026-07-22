@@ -43,7 +43,7 @@ fn open_ended_always_active_after_from() {
 
 #[test]
 fn ensure_active_on_distinguishes_not_yet_effective_from_expired() {
-    let id = RulesetId("test".into());
+    let id = RulesetId("test");
     let day = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
 
     // Before `from` → not yet effective (not "expired").

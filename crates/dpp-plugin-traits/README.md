@@ -6,10 +6,11 @@
 
 Host/guest ABI contract for [Odal Node](https://odal-node.io) Wasm sector plugins.
 
-`no_std` compatible. Defines the interface between the platform runtime (the Wasmtime
-host in `dpp-engine`) and sector-specific compliance rules compiled to
-`wasm32-wasip1`. This crate contains no business logic — only the shared types that
-both sides of the boundary agree on.
+Uses `std` types (`String`, `Vec`, `HashMap`) — **not** `no_std`. Defines the
+interface between the platform runtime (the Wasmtime host in `dpp-engine`) and
+sector-specific compliance rules compiled to `wasm32-wasip1`. This crate
+contains no business logic — only the shared types that both sides of the
+boundary agree on.
 
 ## When to use this crate
 
@@ -21,25 +22,44 @@ both sides of the boundary agree on.
 ## Example
 
 ```rust
-use dpp_plugin_traits::{DppSectorPlugin, PluginMeta, PluginFieldError, AbiVersion};
+use dpp_plugin_traits::{
+    DppSectorPlugin, PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+};
+use serde_json::Value;
 
 struct BatteryPlugin;
 
 impl DppSectorPlugin for BatteryPlugin {
-    fn meta(&self) -> PluginMeta {
-        PluginMeta {
-            name: "sector-battery".into(),
-            version: "0.1.0".into(),
-            sector: "battery".into(),
-            abi: AbiVersion::CURRENT,
-            capabilities: Default::default(),
-            schema_constraint: None,
+    // `meta()` and `capabilities()` are built from these two for you —
+    // override them directly only if a plugin needs different values.
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            sector: "battery",
+            name: "Odal Node Battery Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU Battery Regulation 2023/1542 structural validation",
         }
     }
 
-    fn validate(&self, data: &[u8]) -> Vec<PluginFieldError> {
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "2.0.0".into(),
+        }
+    }
+
+    fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         // sector-specific validation logic
-        vec![]
+        Ok(())
+    }
+
+    fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
+        // sector-specific compliance metrics
+        todo!()
+    }
+
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        Ok(input)
     }
 }
 ```

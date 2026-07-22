@@ -35,6 +35,41 @@ pub enum GtinError {
     },
 }
 
+/// Outcome of the shared fixed-length GS1 key check, before it's wrapped in a
+/// key-specific error type (`GtinError`/`GlnError`) by each caller.
+enum Gs1KeyCheck {
+    InvalidFormat,
+    InvalidCheckDigit { expected: u8, actual: u8 },
+}
+
+/// Validate a fixed-length numeric GS1 key: exactly `len` ASCII digits with a
+/// correct GS1 modulo-10 check digit. Shared by [`Gtin::parse`] (`len = 14`)
+/// and [`Gln::parse`] (`len = 13`) — the two differ only in length and in
+/// which error type the caller wraps the result into.
+fn check_gs1_key(s: &str, len: usize) -> Result<(), Gs1KeyCheck> {
+    if s.len() != len || !s.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(Gs1KeyCheck::InvalidFormat);
+    }
+    // Stack buffer, not a Vec: every GS1 key this is called with (GTIN-14,
+    // GLN-13) fits comfortably within 14 digits.
+    debug_assert!(
+        len <= 14,
+        "check_gs1_key only supports keys up to 14 digits"
+    );
+    let mut digits = [0u8; 14];
+    for (i, b) in s.bytes().enumerate() {
+        digits[i] = b - b'0';
+    }
+    let expected = gs1_check_digit(&digits[..len - 1]);
+    if digits[len - 1] != expected {
+        return Err(Gs1KeyCheck::InvalidCheckDigit {
+            expected,
+            actual: digits[len - 1],
+        });
+    }
+    Ok(())
+}
+
 /// A validated GS1 GTIN-14 (14-digit trade item number, GS1 mod-10 check digit verified).
 ///
 /// Construct via [`Gtin::parse`]. Serialises/deserialises as a bare string;
@@ -49,19 +84,17 @@ impl Gtin {
     /// (alternating weights 3,1,3,1,… from left). Returns `Err` for wrong length,
     /// non-digit characters, or a bad check digit.
     pub fn parse(s: &str) -> Result<Self, GtinError> {
-        if s.len() != 14 || !s.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(GtinError::InvalidFormat(s.to_owned()));
+        match check_gs1_key(s, 14) {
+            Ok(()) => Ok(Self(s.to_owned())),
+            Err(Gs1KeyCheck::InvalidFormat) => Err(GtinError::InvalidFormat(s.to_owned())),
+            Err(Gs1KeyCheck::InvalidCheckDigit { expected, actual }) => {
+                Err(GtinError::InvalidCheckDigit {
+                    gtin: s.to_owned(),
+                    expected,
+                    actual,
+                })
+            }
         }
-        let digits: Vec<u8> = s.bytes().map(|b| b - b'0').collect();
-        let expected = gs1_check_digit(&digits[..13]);
-        if digits[13] != expected {
-            return Err(GtinError::InvalidCheckDigit {
-                gtin: s.to_owned(),
-                expected,
-                actual: digits[13],
-            });
-        }
-        Ok(Self(s.to_owned()))
     }
 
     pub fn as_str(&self) -> &str {
@@ -117,19 +150,17 @@ impl Gln {
     /// Parse a GLN: exactly 13 ASCII digits with a correct GS1 modulo-10 check
     /// digit. Returns `Err` for wrong length, non-digits, or a bad check digit.
     pub fn parse(s: &str) -> Result<Self, GlnError> {
-        if s.len() != 13 || !s.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(GlnError::InvalidFormat(s.to_owned()));
+        match check_gs1_key(s, 13) {
+            Ok(()) => Ok(Self(s.to_owned())),
+            Err(Gs1KeyCheck::InvalidFormat) => Err(GlnError::InvalidFormat(s.to_owned())),
+            Err(Gs1KeyCheck::InvalidCheckDigit { expected, actual }) => {
+                Err(GlnError::InvalidCheckDigit {
+                    gln: s.to_owned(),
+                    expected,
+                    actual,
+                })
+            }
         }
-        let digits: Vec<u8> = s.bytes().map(|b| b - b'0').collect();
-        let expected = gs1_check_digit(&digits[..12]);
-        if digits[12] != expected {
-            return Err(GlnError::InvalidCheckDigit {
-                gln: s.to_owned(),
-                expected,
-                actual: digits[12],
-            });
-        }
-        Ok(Self(s.to_owned()))
     }
 
     #[must_use]

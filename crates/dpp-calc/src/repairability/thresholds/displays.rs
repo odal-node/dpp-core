@@ -6,7 +6,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct DisplaysRuleset;
@@ -20,13 +23,6 @@ static DISPLAYS_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     customer_support: 0.10,
 };
 
-static DISPLAYS_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
-};
-
 static DISPLAYS_BASIS: RegulatoryBasis = RegulatoryBasis {
     regulation: "pending — ESPR electronic displays repairability delegated act",
     article: "TBD",
@@ -36,18 +32,18 @@ static DISPLAYS_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static DISPLAYS_RULESET_ID: std::sync::OnceLock<RulesetId> = std::sync::OnceLock::new();
-static DISPLAYS_RULESET_VERSION: std::sync::OnceLock<RulesetVersion> = std::sync::OnceLock::new();
+static DISPLAYS_RULESET_ID: RulesetId = RulesetId("displays-repairability");
+static DISPLAYS_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
 static DISPLAYS_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
     std::sync::OnceLock::new();
 
 impl Ruleset for DisplaysRuleset {
     fn id(&self) -> &RulesetId {
-        DISPLAYS_RULESET_ID.get_or_init(|| RulesetId("displays-repairability".into()))
+        &DISPLAYS_RULESET_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        DISPLAYS_RULESET_VERSION.get_or_init(|| RulesetVersion("0.0.0-stub".into()))
+        &DISPLAYS_RULESET_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {
@@ -67,6 +63,6 @@ impl RepairabilityRuleset for DisplaysRuleset {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &DISPLAYS_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 }

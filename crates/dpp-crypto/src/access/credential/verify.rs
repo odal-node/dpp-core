@@ -110,6 +110,20 @@ pub fn verify_credential_with_revocation(
     if !base.is_valid() {
         return base;
     }
+    apply_revocation_check(base, credential, status_list)
+}
+
+/// Apply the fail-closed revocation check on top of an already-`Valid` `base`
+/// result: no declared status → pass `base` through unchanged; a declared
+/// status whose list is unresolvable or revoking → `Revoked`. Shared by
+/// [`verify_credential_with_revocation`] and
+/// [`verify_credential_with_revocation_and_trust`], which differ only in the
+/// claims check performed before this point.
+fn apply_revocation_check(
+    base: VerificationResult,
+    credential: &DppAccessCredential,
+    status_list: Option<&StatusList>,
+) -> VerificationResult {
     if credential.credential_status.is_none() {
         return base;
     }
@@ -180,16 +194,5 @@ pub fn verify_credential_with_revocation_and_trust(
     if !base.is_valid() {
         return base;
     }
-    if credential.credential_status.is_none() {
-        return base;
-    }
-    match status_list {
-        None => VerificationResult::Revoked,
-        Some(list) => match check_revocation(credential, list) {
-            RevocationOutcome::NotRevoked => base,
-            RevocationOutcome::Revoked | RevocationOutcome::Indeterminate => {
-                VerificationResult::Revoked
-            }
-        },
-    }
+    apply_revocation_check(base, credential, status_list)
 }

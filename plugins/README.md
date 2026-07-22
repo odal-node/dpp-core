@@ -34,11 +34,13 @@ use serde_json::Value;
 struct MyPlugin;
 
 impl DppSectorPlugin for MyPlugin {
-    fn meta(&self) -> PluginMeta { /* sector key, name, version, license */ }
-    fn capabilities(&self) -> PluginCapabilities { /* ABI version + supported schema ranges */ }
+    fn plugin_identity(&self) -> PluginIdentity { /* sector key, name, version, description */ }
+    fn schema_version_range(&self) -> SchemaVersionRange { /* supported schema versions */ }
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> { /* field checks */ }
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> { /* metrics */ }
-    fn generate_passport(&self, input: &PluginInput) -> Result<Value, PluginError> { /* normalise */ }
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> { /* normalise */ }
+    // meta()/capabilities() default to PluginIdentity + schema_version_range() above —
+    // override only if this plugin needs non-default values.
 }
 
 export_plugin!(MyPlugin);

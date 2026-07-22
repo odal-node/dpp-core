@@ -35,37 +35,9 @@ fn battery_descriptor_with_tiers() -> SectorDescriptor {
 
 fn minimal_battery_data() -> SectorData {
     SectorData::Battery(BatteryData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        battery_chemistry: BatteryChemistry::Lfp,
-        nominal_voltage_v: 3.2,
-        nominal_capacity_ah: 100.0,
-        expected_lifetime_cycles: 3000,
-        co2e_per_unit_kg: 85.4,
-        recycled_content_cobalt_pct: None,
-        recycled_content_lithium_pct: None,
-        recycled_content_nickel_pct: None,
-        state_of_health_pct: None,
-        rated_capacity_kwh: None,
-        carbon_footprint_class: None,
         due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
-        cathode_material: None,
-        anode_material: None,
-        electrolyte_material: None,
-        critical_raw_materials: None,
         disassembly_instructions_url: Some("https://acme.example.com/disassembly".into()),
-        soh_methodology: None,
-        operating_temp_min_c: None,
-        operating_temp_max_c: None,
-        rated_energy_wh: None,
-        recycled_content_lead_pct: None,
-        battery_weight_kg: None,
-        battery_type: None,
-        round_trip_efficiency_pct: None,
-        internal_resistance_mohm: None,
-        manufacturing_date: None,
-        manufacturing_place: None,
-        battery_model_id: None,
-        battery_passport_number: None,
+        ..crate::test_support::sample_battery_data()
     })
 }
 
@@ -146,32 +118,11 @@ fn polyester_fibre(pct: f64) -> FibreEntry {
 
 fn test_textile_data() -> TextileData {
     TextileData {
-        gtin: "09506000134352".into(),
         fibre_composition: vec![cotton_fibre(60.0), polyester_fibre(40.0)],
-        country_of_manufacturing: "BD".into(),
+        country_of_origin: "BD".into(),
         care_instructions: "Machine wash 40°C".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
-        recycled_content_pct: None,
-        carbon_footprint_kg_co2e: None,
-        water_use_litres: None,
-        microplastic_shedding_mg_per_wash: None,
-        repair_score: None,
-        durability_score: None,
-        expected_wash_cycles: None,
-        country_of_raw_material_origin: None,
-        svhc_substances: None,
-        allergens: None,
-        substances_of_concern: None,
-        recyclability_class: None,
-        end_of_life_instructions: None,
-        reuse_condition: None,
-        prior_use_cycles: None,
-        disassembly_instructions: None,
-        spare_parts_available: None,
-        product_weight_grams: None,
-        repair_history_url: None,
-        repair_count: None,
-        pef_score: None,
+        ..crate::test_support::sample_textile_data()
     }
 }
 
@@ -314,37 +265,10 @@ fn surfactants_invalid_band_rejects() {
 #[test]
 fn sector_data_battery_round_trip() {
     let data = SectorData::Battery(BatteryData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        battery_chemistry: BatteryChemistry::Lfp,
-        nominal_voltage_v: 3.2,
-        nominal_capacity_ah: 100.0,
-        expected_lifetime_cycles: 3000,
-        co2e_per_unit_kg: 85.4,
-        recycled_content_cobalt_pct: None,
         recycled_content_lithium_pct: Some(12.5),
-        recycled_content_nickel_pct: None,
-        state_of_health_pct: None,
         rated_capacity_kwh: Some(32.0),
         carbon_footprint_class: Some(CarbonFootprintClass::B),
-        due_diligence_url: None,
-        cathode_material: None,
-        anode_material: None,
-        electrolyte_material: None,
-        critical_raw_materials: None,
-        disassembly_instructions_url: None,
-        soh_methodology: None,
-        operating_temp_min_c: None,
-        operating_temp_max_c: None,
-        rated_energy_wh: None,
-        recycled_content_lead_pct: None,
-        battery_weight_kg: None,
-        battery_type: None,
-        round_trip_efficiency_pct: None,
-        internal_resistance_mohm: None,
-        manufacturing_date: None,
-        manufacturing_place: None,
-        battery_model_id: None,
-        battery_passport_number: None,
+        ..crate::test_support::sample_battery_data()
     });
     let json = serde_json::to_value(&data).unwrap();
     assert_eq!(json["sector"], "battery", "sector tag must be lowercase");
@@ -421,7 +345,7 @@ fn sector_data_textile_round_trip() {
     let sector = SectorData::Textile(data.clone());
     let json = serde_json::to_value(&sector).unwrap();
     assert_eq!(json["sector"], "textile", "sector tag must be lowercase");
-    assert_eq!(json["countryOfManufacturing"], "BD");
+    assert_eq!(json["countryOfOrigin"], "BD");
     assert_eq!(json["durabilityScore"], 7.5);
     assert_eq!(json["microplasticSheddingMgPerWash"], 12.3);
     assert!(json["svhcSubstances"].is_array());
@@ -454,18 +378,19 @@ fn textile_none_fields_not_serialized() {
 
 #[test]
 fn textile_v1_data_deserializes_with_defaults() {
-    // v1.0.0 JSON (without new fields) must still deserialize into the expanded struct
+    // Minimal JSON (only required fields, current wire shape) must still
+    // deserialize into the expanded struct with every optional field defaulted.
     let v1_json = serde_json::json!({
         "sector": "textile",
         "gtin": "09506000134352",
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
-        "countryOfManufacturing": "PT",
+        "countryOfOrigin": "PT",
         "careInstructions": "Hand wash",
         "chemicalComplianceStandard": "REACH"
     });
     let parsed: SectorData = serde_json::from_value(v1_json).unwrap();
     if let SectorData::Textile(t) = parsed {
-        assert_eq!(t.country_of_manufacturing, "PT");
+        assert_eq!(t.country_of_origin, "PT");
         assert!(t.svhc_substances.is_none());
         assert!(t.durability_score.is_none());
         assert!(t.microplastic_shedding_mg_per_wash.is_none());
@@ -511,31 +436,7 @@ fn sector_discriminant_matches_variant() {
         nominal_capacity_ah: 50.0,
         expected_lifetime_cycles: 1000,
         co2e_per_unit_kg: 40.0,
-        recycled_content_cobalt_pct: None,
-        recycled_content_lithium_pct: None,
-        recycled_content_nickel_pct: None,
-        state_of_health_pct: None,
-        rated_capacity_kwh: None,
-        carbon_footprint_class: None,
-        due_diligence_url: None,
-        cathode_material: None,
-        anode_material: None,
-        electrolyte_material: None,
-        critical_raw_materials: None,
-        disassembly_instructions_url: None,
-        soh_methodology: None,
-        operating_temp_min_c: None,
-        operating_temp_max_c: None,
-        rated_energy_wh: None,
-        recycled_content_lead_pct: None,
-        battery_weight_kg: None,
-        battery_type: None,
-        round_trip_efficiency_pct: None,
-        internal_resistance_mohm: None,
-        manufacturing_date: None,
-        manufacturing_place: None,
-        battery_model_id: None,
-        battery_passport_number: None,
+        ..crate::test_support::sample_battery_data()
     });
     assert_eq!(battery.sector(), Sector::Battery);
 }
@@ -553,11 +454,11 @@ fn sector_discriminant_matches_variant() {
 
 fn sample_steel_data() -> SectorData {
     SectorData::Steel(SteelData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 35.0,
         product_category: "flat".into(),
-        country_of_production: "DE".into(),
+        country_of_origin: "DE".into(),
         production_route: ProductionRoute::ElectricArc,
         annual_production_tonnes: None,
     })
@@ -565,19 +466,19 @@ fn sample_steel_data() -> SectorData {
 
 fn sample_aluminium_data() -> SectorData {
     SectorData::Aluminium(AluminiumData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 1200.0,
         recycled_content_pct: 60.0,
-        country_of_production: "DE".into(),
+        country_of_origin: "DE".into(),
         annual_production_tonnes: None,
     })
 }
 
 fn sample_electronics_data() -> SectorData {
     SectorData::Electronics(ElectronicsData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_category: "laptop".into(),
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 120.0,
@@ -604,9 +505,9 @@ fn sample_electronics_data() -> SectorData {
 
 fn sample_construction_data() -> SectorData {
     SectorData::Construction(ConstructionData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_family: "cement".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.8,
         functional_unit: "per tonne".into(),
         recycled_content_pct: None,
@@ -617,7 +518,7 @@ fn sample_construction_data() -> SectorData {
 
 fn sample_tyre_data() -> SectorData {
     SectorData::Tyre(TyreData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -631,11 +532,11 @@ fn sample_tyre_data() -> SectorData {
 
 fn sample_toy_data() -> SectorData {
     SectorData::Toy(ToyData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         svhc_substances: None,
         contains_battery: Some(false),
         repairability_info: None,
@@ -644,10 +545,10 @@ fn sample_toy_data() -> SectorData {
 
 fn sample_furniture_data() -> SectorData {
     SectorData::Furniture(FurnitureData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: None,
         recycled_content_pct: None,
         repairability_score: Some(7.0),
@@ -659,7 +560,7 @@ fn sample_furniture_data() -> SectorData {
 
 fn sample_detergent_data() -> SectorData {
     SectorData::Detergent(DetergentData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {
@@ -668,7 +569,7 @@ fn sample_detergent_data() -> SectorData {
             concentration_band: "5-15%".into(),
             cas_number: None,
         }],
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: None,
         packaging_recyclable: None,
         recommended_dosage_ml: None,

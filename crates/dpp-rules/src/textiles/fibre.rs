@@ -1,8 +1,9 @@
 //! Fibre composition validation — EU textile DPP regulation.
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::String};
 
 use crate::common::country::country_code_valid;
+use crate::common::numeric::{percentage_in_range, sums_to};
 
 // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): 2.0 pp tolerance is the commonly
 // cited value but confirm against EU 1007/2011 Annex IX (agreed tolerance for
@@ -24,9 +25,7 @@ pub struct FibreInput<'a> {
 /// [`validate_fibre_composition`] for the cross-field validation rule.
 #[must_use]
 pub fn fibre_sum_ok(pcts: &[f64]) -> bool {
-    let total: f64 = pcts.iter().copied().sum();
-    let delta = total - 100.0;
-    (-FIBRE_SUM_TOLERANCE..=FIBRE_SUM_TOLERANCE).contains(&delta)
+    sums_to(pcts.iter().copied(), 100.0, FIBRE_SUM_TOLERANCE).0
 }
 
 /// Validate a textile fibre composition: non-empty, each `pct` in `[0, 100]`,
@@ -37,7 +36,7 @@ pub fn validate_fibre_composition(fibres: &[FibreInput<'_>]) -> Result<(), Strin
         return Err(String::from("fibre_composition must not be empty"));
     }
     for f in fibres {
-        if !f.pct.is_finite() || f.pct < 0.0 || f.pct > 100.0 {
+        if !percentage_in_range(f.pct) {
             return Err(format!(
                 "fibre '{}' has invalid pct {} — must be a finite value in 0–100",
                 f.fibre, f.pct
@@ -52,9 +51,8 @@ pub fn validate_fibre_composition(fibres: &[FibreInput<'_>]) -> Result<(), Strin
             ));
         }
     }
-    let pcts: Vec<f64> = fibres.iter().map(|f| f.pct).collect();
-    if !fibre_sum_ok(&pcts) {
-        let total: f64 = pcts.iter().copied().sum();
+    let (sum_ok, total) = sums_to(fibres.iter().map(|f| f.pct), 100.0, FIBRE_SUM_TOLERANCE);
+    if !sum_ok {
         return Err(format!(
             "fibreComposition percentages sum to {total:.1}, expected 100.0 (± {FIBRE_SUM_TOLERANCE:.1})"
         ));

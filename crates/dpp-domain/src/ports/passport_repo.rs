@@ -298,40 +298,14 @@ mod tests {
 
     fn draft_passport(name: &str) -> Passport {
         Passport {
-            id: PassportId::new(),
-            batch_id: None,
             product_name: name.into(),
-            sector: Sector::Textile,
-            product_category: None,
             manufacturer: ManufacturerInfo {
                 name: "Brand".into(),
                 address: "Berlin, DE".into(),
                 did_web_url: None,
             },
-            materials: vec![],
-            co2e_per_unit: None,
-            repairability_score: None,
-            compliance_result: None,
-            lint_result: None,
-            sector_data: None,
-            status: PassportStatus::Draft,
-            qr_code_url: None,
-            jws_signature: None,
-            public_jws_signature: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-            published_at: None,
             schema_version: "1.1.0".into(),
-            retention_locked: false,
-            version: 1,
-            supersedes_id: None,
-            parent_passport_ref: None,
-            component_refs: Vec::new(),
-            retention_until: None,
-            product_id: None,
-            operator_identifier: None,
-            facility: None,
-            seal: None,
+            ..crate::test_support::sample_passport()
         }
     }
 
@@ -447,45 +421,14 @@ mod tests {
 
     #[tokio::test]
     async fn default_find_by_identity_matches_across_draft_and_published() {
-        use crate::domain::gtin::Gtin;
-        use crate::domain::sector::{BatteryChemistry, BatteryData, SectorData};
+        use crate::domain::sector::SectorData;
 
         let repo = InMemoryRepo::default();
         let mut p = draft_passport("Battery A");
         p.sector = Sector::Battery;
-        p.sector_data = Some(SectorData::Battery(BatteryData {
-            gtin: Gtin::parse("09506000134352").unwrap(),
-            battery_chemistry: BatteryChemistry::Lfp,
-            nominal_voltage_v: 3.2,
-            nominal_capacity_ah: 100.0,
-            expected_lifetime_cycles: 3000,
-            co2e_per_unit_kg: 85.4,
-            recycled_content_cobalt_pct: None,
-            recycled_content_lithium_pct: None,
-            recycled_content_nickel_pct: None,
-            state_of_health_pct: None,
-            rated_capacity_kwh: None,
-            carbon_footprint_class: None,
-            due_diligence_url: None,
-            cathode_material: None,
-            anode_material: None,
-            electrolyte_material: None,
-            critical_raw_materials: None,
-            disassembly_instructions_url: None,
-            soh_methodology: None,
-            operating_temp_min_c: None,
-            operating_temp_max_c: None,
-            rated_energy_wh: None,
-            recycled_content_lead_pct: None,
-            battery_weight_kg: None,
-            battery_type: None,
-            round_trip_efficiency_pct: None,
-            internal_resistance_mohm: None,
-            manufacturing_date: None,
-            manufacturing_place: None,
-            battery_model_id: None,
-            battery_passport_number: None,
-        }));
+        p.sector_data = Some(SectorData::Battery(
+            crate::test_support::sample_battery_data(),
+        ));
         p.batch_id = Some("BATCH-1".into());
         let created = repo.create(p).await.unwrap();
 

@@ -25,7 +25,7 @@ fn minimal_passport(sector: Sector) -> Passport {
             name: "Aluminium".into(),
             weight_kg: 0.3,
             recycled_pct: Some(60.0),
-            origin_country: Some("DE".into()),
+            country_of_origin: Some("DE".into()),
         }],
         co2e_per_unit: Some(CarbonFootprint::from_kg(12.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(8.0)),
@@ -271,7 +271,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
 fn build_aas_textile_has_fibre_composition_collection() {
     let mut passport = minimal_passport(Sector::Textile);
     passport.sector_data = Some(SectorData::Textile(TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "organic cotton".into(),
@@ -284,7 +284,7 @@ fn build_aas_textile_has_fibre_composition_collection() {
                 country_of_origin: None,
             },
         ],
-        country_of_manufacturing: "PT".into(),
+        country_of_origin: "PT".into(),
         care_instructions: "Machine wash 30°C".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
         recycled_content_pct: Some(30.0),
@@ -478,11 +478,11 @@ fn non_object_input_produces_empty_submodel() {
 fn build_aas_steel_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Steel);
     passport.sector_data = Some(SectorData::Steel(SteelData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 30.0,
         product_category: "flat".into(),
-        country_of_production: "DE".into(),
+        country_of_origin: "DE".into(),
         production_route: ProductionRoute::ElectricArc,
         annual_production_tonnes: Some(50000.0),
     }));
@@ -502,9 +502,9 @@ fn build_aas_steel_produces_sector_submodel() {
 fn build_aas_construction_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Construction);
     passport.sector_data = Some(SectorData::Construction(ConstructionData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_family: "cement".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.83,
         functional_unit: "per tonne".into(),
         recycled_content_pct: None,
@@ -527,7 +527,7 @@ fn build_aas_construction_produces_sector_submodel() {
 fn build_aas_tyre_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Tyre);
     passport.sector_data = Some(SectorData::Tyre(TyreData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -546,11 +546,11 @@ fn build_aas_tyre_produces_sector_submodel() {
 fn build_aas_toy_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Toy);
     passport.sector_data = Some(SectorData::Toy(ToyData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         age_group: "3-6".into(),
         primary_material: "plastic".into(),
         ce_marking: true,
-        country_of_manufacture: "CN".into(),
+        country_of_origin: "CN".into(),
         svhc_substances: None,
         contains_battery: Some(false),
         repairability_info: None,
@@ -564,12 +564,12 @@ fn build_aas_toy_produces_sector_submodel() {
 fn build_aas_aluminium_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Aluminium);
     passport.sector_data = Some(SectorData::Aluminium(AluminiumData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 2.1,
         recycled_content_pct: 75.0,
-        country_of_production: "NO".into(),
+        country_of_origin: "NO".into(),
         annual_production_tonnes: None,
     }));
     let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
@@ -583,10 +583,10 @@ fn build_aas_aluminium_produces_sector_submodel() {
 fn build_aas_furniture_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::Furniture);
     passport.sector_data = Some(SectorData::Furniture(FurnitureData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
-        country_of_manufacture: "PT".into(),
+        country_of_origin: "PT".into(),
         co2e_per_unit_kg: Some(18.5),
         recycled_content_pct: Some(20.0),
         repairability_score: Some(7.5),
@@ -605,7 +605,7 @@ fn build_aas_furniture_produces_sector_submodel() {
 fn build_aas_detergent_produces_surfactant_collection() {
     let mut passport = minimal_passport(Sector::Detergent);
     passport.sector_data = Some(SectorData::Detergent(DetergentData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {
@@ -614,7 +614,7 @@ fn build_aas_detergent_produces_surfactant_collection() {
             concentration_band: "15-30%".into(),
             cas_number: Some("68411-30-3".into()),
         }],
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: Some(0.35),
         packaging_recyclable: Some(true),
         recommended_dosage_ml: Some(55.0),

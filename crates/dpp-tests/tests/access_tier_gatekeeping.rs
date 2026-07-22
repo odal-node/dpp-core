@@ -12,10 +12,11 @@
 
 use chrono::Utc;
 use dpp_crypto::access::credential::{
-    AccessTier, CredentialBuilder, CredentialRole, CredentialStatus, DppCredentialSubject,
-    VerificationResult, verify_credential_claims,
+    AccessTier, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,
+    verify_credential_claims,
 };
 use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
+use dpp_tests::fixtures::make_subject;
 use serde_json::json;
 
 /// Build a realistic textile JSON payload with fields spanning all three tiers.
@@ -26,7 +27,7 @@ fn sample_textile_payload() -> serde_json::Value {
             { "fibre": "cotton", "pct": 70.0 },
             { "fibre": "recycled_polyester", "pct": 30.0 }
         ],
-        "countryOfManufacturing": "BD",
+        "countryOfOrigin": "BD",
         "careInstructions": "Machine wash 30°C",
         "carbonFootprintKgCo2e": 8.5,
         "durabilityScore": 7.5,
@@ -58,22 +59,6 @@ fn sample_textile_payload() -> serde_json::Value {
     })
 }
 
-fn make_subject(
-    did: &str,
-    name: &str,
-    role: CredentialRole,
-    sectors: Vec<String>,
-) -> DppCredentialSubject {
-    DppCredentialSubject {
-        id: did.into(),
-        name: name.into(),
-        role,
-        country: "DE".into(),
-        sectors,
-        product_categories: vec![],
-    }
-}
-
 // ─── Three-tier access tests ─────────────────────────────────────────────
 
 #[test]
@@ -86,12 +71,7 @@ fn public_tier_sees_only_public_fields() {
 
     // Public fields present
     assert!(decision.filtered_data.get("fibreComposition").is_some());
-    assert!(
-        decision
-            .filtered_data
-            .get("countryOfManufacturing")
-            .is_some()
-    );
+    assert!(decision.filtered_data.get("countryOfOrigin").is_some());
     assert!(decision.filtered_data.get("careInstructions").is_some());
     assert!(
         decision

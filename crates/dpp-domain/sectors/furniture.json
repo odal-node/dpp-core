@@ -4,8 +4,8 @@
   "status": "provisional",
   "legalBasis": ["Regulation (EU) 2024/1781 (ESPR Working Plan 2025-2030)"],
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0"],
-  "currentSchemaVersion": "1.0.0",
+  "schemaVersions": ["1.0.0", "1.1.0"],
+  "currentSchemaVersion": "1.1.0",
   "productCategories": ["chair", "table", "sofa", "mattress", "shelf"],
   "accessTiers": {
     "svhcSubstances": "professional",

@@ -16,62 +16,14 @@ use dpp_digital_link::aas::{
 };
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
-    AluminiumData, CarbonFootprint, ConstructionData, DetergentData, ElectronicsData,
-    EnergyEfficiencyClass, FibreEntry, FurnitureData, ManufacturerInfo, MaterialEntry, Passport,
-    PassportId, PassportStatus, ProductionRoute, RepairabilityScore, Sector, SectorData, SteelData,
-    SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
-    UnsoldGoodsReason, UnsoldGoodsReport,
+    AluminiumData, ConstructionData, DetergentData, ElectronicsData, EnergyEfficiencyClass,
+    FibreEntry, FurnitureData, Gtin, ProductionRoute, RepairabilityScore, Sector, SectorData,
+    SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
+    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
+use dpp_tests::fixtures::base_passport as base;
 
 const VALID_GTIN: &str = "09506000134352";
-
-/// A base passport with the sector-agnostic fields populated so the five core
-/// AAS submodels (identification, manufacturer, environmental, materials,
-/// repairability) all exercise their optional branches.
-fn base(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passport {
-    let now = Utc::now();
-    Passport {
-        id: PassportId::new(),
-        batch_id: Some("LOT-X-0001".into()),
-        product_name: format!("{} reference product", sector.catalog_key()),
-        sector,
-        product_category: None,
-        manufacturer: ManufacturerInfo {
-            name: "Acme Manufacturing GmbH".into(),
-            address: "Hauptstraße 1, 10115 Berlin, DE".into(),
-            did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
-        },
-        materials: vec![MaterialEntry {
-            name: "Primary material".into(),
-            weight_kg: 1.5,
-            recycled_pct: Some(20.0),
-            origin_country: Some("DE".into()),
-        }],
-        co2e_per_unit: Some(CarbonFootprint::from_kg(12.0)),
-        repairability_score: Some(RepairabilityScore::from_scalar(6.0)),
-        compliance_result: None,
-        lint_result: None,
-        sector_data: Some(sector_data),
-        status: PassportStatus::Draft,
-        qr_code_url: None,
-        jws_signature: None,
-        public_jws_signature: None,
-        created_at: now,
-        updated_at: now,
-        published_at: None,
-        schema_version: schema_version.into(),
-        retention_locked: false,
-        version: 1,
-        supersedes_id: None,
-        parent_passport_ref: None,
-        component_refs: Vec::new(),
-        retention_until: None,
-        product_id: None,
-        operator_identifier: None,
-        facility: None,
-        seal: None,
-    }
-}
 
 fn svhc() -> SvhcSubstance {
     SvhcSubstance {
@@ -94,7 +46,7 @@ fn crm() -> CriticalRawMaterial {
 
 fn electronics_data() -> ElectronicsData {
     ElectronicsData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_category: "laptop".into(),
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 210.0,
@@ -114,13 +66,13 @@ fn electronics_data() -> ElectronicsData {
 
 fn textile_data() -> TextileData {
     TextileData {
-        gtin: "09506000134352".into(),
+        gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),
             pct: 100.0,
             country_of_origin: Some("IN".into()),
         }],
-        country_of_manufacturing: "BD".into(),
+        country_of_origin: "BD".into(),
         care_instructions: "Machine wash 30°C".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
         recycled_content_pct: Some(10.0),
@@ -149,11 +101,11 @@ fn textile_data() -> TextileData {
 
 fn steel_data() -> SteelData {
     SteelData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 85.0,
         product_category: "flat".into(),
-        country_of_production: "SE".into(),
+        country_of_origin: "SE".into(),
         production_route: ProductionRoute::ElectricArc,
         annual_production_tonnes: Some(120000.0),
     }
@@ -161,9 +113,9 @@ fn steel_data() -> SteelData {
 
 fn construction_data() -> ConstructionData {
     ConstructionData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_family: "cement".into(),
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.6,
         functional_unit: "per tonne".into(),
         recycled_content_pct: Some(25.0),
@@ -174,7 +126,7 @@ fn construction_data() -> ConstructionData {
 
 fn tyre_data() -> TyreData {
     TyreData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -188,11 +140,11 @@ fn tyre_data() -> TyreData {
 
 fn toy_data() -> ToyData {
     ToyData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         svhc_substances: Some(vec![svhc()]),
         contains_battery: Some(false),
         repairability_info: Some("https://acme.example.com/toy-repair".into()),
@@ -201,22 +153,22 @@ fn toy_data() -> ToyData {
 
 fn aluminium_data() -> AluminiumData {
     AluminiumData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 4000.0,
         recycled_content_pct: 75.0,
-        country_of_production: "NO".into(),
+        country_of_origin: "NO".into(),
         annual_production_tonnes: Some(50000.0),
     }
 }
 
 fn furniture_data() -> FurnitureData {
     FurnitureData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
-        country_of_manufacture: "SE".into(),
+        country_of_origin: "SE".into(),
         co2e_per_unit_kg: Some(22.0),
         recycled_content_pct: Some(15.0),
         repairability_score: Some(6.5),
@@ -228,7 +180,7 @@ fn furniture_data() -> FurnitureData {
 
 fn detergent_data() -> DetergentData {
     DetergentData {
-        gtin: VALID_GTIN.into(),
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {
@@ -237,7 +189,7 @@ fn detergent_data() -> DetergentData {
             concentration_band: "5-15%".into(),
             cas_number: Some("9004-82-4".into()),
         }],
-        country_of_manufacture: "DE".into(),
+        country_of_origin: "DE".into(),
         co2e_per_unit_kg: Some(1.2),
         packaging_recyclable: Some(true),
         recommended_dosage_ml: Some(35.0),

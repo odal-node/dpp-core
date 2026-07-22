@@ -8,8 +8,21 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 use super::entry::KeyEntry;
-use super::store::{KeyRecord, KeyStore, default_algorithm};
+use super::store::{KeyRecord, KeyStore};
 use ed25519_dalek::SigningKey;
+
+/// Build the archived-record key for `key_id`.
+///
+/// Suffixed with a time-ordered UUID (v7) rather than a raw nanosecond
+/// timestamp: two rotations landing on the same clock tick (or a tight
+/// successive-rotation loop, e.g. in tests) previously collided on the same
+/// map key, silently overwriting an already-archived record — a signature
+/// made with the overwritten key would then never verify again. `load_archived_keys`'s
+/// `entries.sort_by_key` still recovers chronological order, since a v7 UUID's
+/// leading bits are a millisecond timestamp.
+fn archived_key_name(key_id: &str) -> String {
+    format!("{key_id}#archived-{}", uuid::Uuid::now_v7())
+}
 
 impl KeyStore {
     /// Archive the current key under a timestamped key so it can still be used
@@ -23,19 +36,8 @@ impl KeyStore {
         }
         let mut map = self.records.write().expect("key store write lock poisoned");
         if let Some(record) = map.get(key_id) {
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos();
-            let archive_key = format!("{key_id}#archived-{ts}");
-            let archived = KeyRecord {
-                encrypted_signing_key: record.encrypted_signing_key.clone(),
-                nonce: record.nonce.clone(),
-                fingerprint: record.fingerprint.clone(),
-                verifying_key_hex: record.verifying_key_hex.clone(),
-                revoked: record.revoked,
-                algorithm: record.algorithm.clone(),
-            };
+            let archived = record.clone();
+            let archive_key = archived_key_name(key_id);
             map.insert(archive_key, archived);
             self.persist_envelope(&map)?;
         }
@@ -85,32 +87,22 @@ impl KeyStore {
             .encrypt(nonce, raw.as_ref())
             .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
         raw.zeroize();
-        let new_record = KeyRecord {
-            encrypted_signing_key: encrypted,
-            nonce: nonce_bytes.to_vec(),
-            fingerprint: fingerprint.clone(),
+        let new_record = KeyRecord::new(
+            encrypted,
+            nonce_bytes.to_vec(),
+            fingerprint.clone(),
             verifying_key_hex,
-            revoked: false,
-            algorithm: default_algorithm(),
-        };
+        );
 
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
             // Archive the existing current key (if any), marking it revoked when
             // this is a compromise rotation.
             if let Some(record) = map.get(key_id) {
-                let ts = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos();
-                let archive_name = format!("{key_id}#archived-{ts}");
+                let archive_name = archived_key_name(key_id);
                 let archived = KeyRecord {
-                    encrypted_signing_key: record.encrypted_signing_key.clone(),
-                    nonce: record.nonce.clone(),
-                    fingerprint: record.fingerprint.clone(),
-                    verifying_key_hex: record.verifying_key_hex.clone(),
                     revoked: revoke_old,
-                    algorithm: record.algorithm.clone(),
+                    ..record.clone()
                 };
                 map.insert(archive_name, archived);
             }

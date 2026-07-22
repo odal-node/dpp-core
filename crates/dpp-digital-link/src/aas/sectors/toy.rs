@@ -1,21 +1,16 @@
 use dpp_domain::domain::sector::ToyData;
 
 use crate::aas::model::{AasCollection, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{boolean_property, double_property, string_property};
+use crate::aas::property::{boolean_property, string_property, svhc_substance_element};
 use crate::aas::semantic_ids;
 
 pub(super) fn build_toy_submodel(d: &ToyData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", &d.gtin, None, None),
+        string_property("gtin", d.gtin.as_str(), None, None),
         string_property("ageGroup", &d.age_group, None, None),
         string_property("primaryMaterial", &d.primary_material, None, None),
         boolean_property("ceMarking", d.ce_marking, None, None),
-        string_property(
-            "countryOfManufacture",
-            &d.country_of_manufacture,
-            None,
-            None,
-        ),
+        string_property("countryOfOrigin", &d.country_of_origin, None, None),
     ];
     if let Some(v) = d.contains_battery {
         elements.push(boolean_property("containsBattery", v, None, None));
@@ -28,19 +23,13 @@ pub(super) fn build_toy_submodel(d: &ToyData, passport_id: &str) -> AasSubmodel 
             .iter()
             .enumerate()
             .map(|(i, s)| {
-                let mut elems = vec![
-                    string_property("casNumber", &s.cas_number, None, None),
-                    string_property("substanceName", &s.substance_name, None, None),
-                    double_property("concentrationPct", s.concentration_pct, None, Some("%")),
-                ];
-                if let Some(ref loc) = s.location_in_product {
-                    elems.push(string_property("locationInProduct", loc, None, None));
-                }
-                AasSubmodelElement::SubmodelElementCollection(AasCollection {
-                    id_short: format!("svhc_{i}"),
-                    value: elems,
-                    semantic_id: None,
-                })
+                AasSubmodelElement::SubmodelElementCollection(svhc_substance_element(
+                    i,
+                    &s.cas_number,
+                    &s.substance_name,
+                    s.concentration_pct,
+                    s.location_in_product.as_deref(),
+                ))
             })
             .collect();
         elements.push(AasSubmodelElement::SubmodelElementCollection(

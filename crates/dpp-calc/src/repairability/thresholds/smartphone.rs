@@ -10,7 +10,10 @@
 
 use chrono::NaiveDate;
 
-use super::{RepairabilityRuleset, RepairabilityThresholds, RepairabilityWeights};
+use super::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
+    RepairabilityWeights,
+};
 use crate::error::CalcError;
 use crate::repairability::parameters::RepairabilityInputs;
 use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
@@ -24,15 +27,6 @@ static SMARTPHONE_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     customer_support: 0.15,
 };
 
-// Heuristic band boundaries (a=8.5, b=7.0, c=5.5, d=4.0) — design choices, not a
-// regulatory grade table. Below `d` ⇒ band E.
-static SMARTPHONE_THRESHOLDS: RepairabilityThresholds = RepairabilityThresholds {
-    a: 8.5,
-    b: 7.0,
-    c: 5.5,
-    d: 4.0,
-};
-
 static SMARTPHONE_BASIS: RegulatoryBasis = RegulatoryBasis {
     regulation: "Non-regulatory: simplified repairability heuristic (NOT EU 2023/1669 Annex IV)",
     article: "Six-factor heuristic — disassembly, spare parts, repair info, \
@@ -43,8 +37,8 @@ static SMARTPHONE_BASIS: RegulatoryBasis = RegulatoryBasis {
     superseded_by: None,
 };
 
-static SMARTPHONE_RULESET_ID: std::sync::OnceLock<RulesetId> = std::sync::OnceLock::new();
-static SMARTPHONE_RULESET_VERSION: std::sync::OnceLock<RulesetVersion> = std::sync::OnceLock::new();
+static SMARTPHONE_RULESET_ID: RulesetId = RulesetId("repairability-heuristic-v1");
+static SMARTPHONE_RULESET_VERSION: RulesetVersion = RulesetVersion("1.0.0");
 static SMARTPHONE_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
     std::sync::OnceLock::new();
 
@@ -56,11 +50,11 @@ pub struct SimplifiedRepairabilityHeuristic;
 
 impl Ruleset for SimplifiedRepairabilityHeuristic {
     fn id(&self) -> &RulesetId {
-        SMARTPHONE_RULESET_ID.get_or_init(|| RulesetId("repairability-heuristic-v1".into()))
+        &SMARTPHONE_RULESET_ID
     }
 
     fn version(&self) -> &RulesetVersion {
-        SMARTPHONE_RULESET_VERSION.get_or_init(|| RulesetVersion("1.0.0".into()))
+        &SMARTPHONE_RULESET_VERSION
     }
 
     fn effective_dates(&self) -> &EffectiveDateBound {
@@ -80,7 +74,7 @@ impl RepairabilityRuleset for SimplifiedRepairabilityHeuristic {
     }
 
     fn thresholds(&self) -> &RepairabilityThresholds {
-        &SMARTPHONE_THRESHOLDS
+        &DEFAULT_REPAIRABILITY_THRESHOLDS
     }
 
     fn validate_cross_fields(&self, inputs: &RepairabilityInputs) -> Result<(), CalcError> {
