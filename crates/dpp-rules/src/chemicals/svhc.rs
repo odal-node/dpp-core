@@ -12,15 +12,23 @@ use crate::common::numeric::percentage_in_range;
 /// the supplier must proactively communicate SVHC presence to downstream recipients.
 pub const SVHC_THRESHOLD_PCT: f64 = 0.1;
 
-/// Embedded subset of the ECHA SVHC Candidate List (CAS numbers only).
+/// Embedded **partial** snapshot of the ECHA SVHC Candidate List (CAS numbers only).
 ///
 /// Source: ECHA Candidate List of Substances of Very High Concern for Authorisation —
 /// <https://echa.europa.eu/candidate-list-table>
 ///
-/// COMPLIANCE-PIN: Update on each ECHA Candidate List publication (typically June and
-/// December each year). This list covers well-established entries across phthalates,
-/// bisphenols, chromium(VI) compounds, cobalt, and key solvents/monomers. Newly added
-/// SVHCs must be appended manually; newly removed SVHCs are extremely rare.
+/// ⚠️ **This is a small subset, not the list.** It holds well-established entries
+/// across phthalates, bisphenols, chromium(VI) compounds, cobalt and key
+/// solvents/monomers — see [`candidate_list_provenance`] for how far short of the
+/// official list that falls. A CAS absent from here yields
+/// [`SvhcFindingKind::NotInEmbeddedList`], which means *unknown to this snapshot*,
+/// never *not an SVHC*.
+///
+/// COMPLIANCE-PIN: update on each ECHA Candidate List publication. Additions do
+/// **not** follow a fixed calendar — the 2026-02-04 revision is the most recent —
+/// so this cannot be maintained on a schedule; it has to track ECHA. Each addition
+/// starts a six-month SCIP notification deadline for affected articles. Newly
+/// removed SVHCs are extremely rare.
 pub const ECHA_CANDIDATE_LIST: &[&str] = &[
     // ── Phthalates (reproductive toxicants) ──────────────────────────────────
     "117-81-7", // Bis(2-ethylhexyl) phthalate (DEHP)
@@ -62,7 +70,54 @@ pub const ECHA_CANDIDATE_LIST: &[&str] = &[
     // ── Other ────────────────────────────────────────────────────────────────
     "79-06-1",   // Acrylamide (carcinogen + mutagenic)
     "1763-23-1", // Perfluorooctane sulfonic acid (PFOS) — PBT
+    // ── Added by the ECHA revision of 2026-02-04 ─────────────────────────────
+    "110-54-3",  // n-Hexane (reproductive toxicant)
+    "1478-61-1", // BPAF — 4,4'-(hexafluoroisopropylidene)diphenol, and its salts
 ];
+
+/// Publication date of the ECHA revision this snapshot is aligned to.
+pub const ECHA_CANDIDATE_LIST_AS_OF: &str = "2026-02-04";
+
+/// Number of substances on the **official** Candidate List at
+/// [`ECHA_CANDIDATE_LIST_AS_OF`].
+pub const ECHA_CANDIDATE_LIST_OFFICIAL_COUNT: usize = 253;
+
+/// How the embedded snapshot relates to the official list.
+///
+/// Exists so a caller can record *what a passport was actually checked against*
+/// rather than inferring completeness. A finding set produced from a partial
+/// snapshot is not the same claim as one produced from the full list, and the
+/// difference must survive into whatever the caller stores.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CandidateListProvenance {
+    /// ECHA revision this snapshot targets, ISO-8601.
+    pub as_of: &'static str,
+    /// Substances embedded here.
+    pub embedded_count: usize,
+    /// Substances on the official list at `as_of`.
+    pub official_count: usize,
+}
+
+impl CandidateListProvenance {
+    /// Whether the embedded snapshot covers the whole official list.
+    ///
+    /// Currently always `false`. When it is not, a clean finding set means
+    /// "nothing matched the substances we know about" — not "no SVHCs present".
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.embedded_count >= self.official_count
+    }
+}
+
+/// Provenance of the embedded candidate-list snapshot.
+#[must_use]
+pub const fn candidate_list_provenance() -> CandidateListProvenance {
+    CandidateListProvenance {
+        as_of: ECHA_CANDIDATE_LIST_AS_OF,
+        embedded_count: ECHA_CANDIDATE_LIST.len(),
+        official_count: ECHA_CANDIDATE_LIST_OFFICIAL_COUNT,
+    }
+}
 
 /// Classification of an SVHC declaration relative to the ECHA candidate list
 /// and the REACH Art. 33 concentration threshold.
@@ -309,5 +364,62 @@ mod tests {
                 "embedded candidate list entry fails CAS format check: {cas}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+
+    #[test]
+    fn provenance_reports_the_embedded_count() {
+        let p = candidate_list_provenance();
+        assert_eq!(p.embedded_count, ECHA_CANDIDATE_LIST.len());
+        assert_eq!(p.as_of, "2026-02-04");
+    }
+
+    #[test]
+    fn snapshot_is_known_incomplete() {
+        // The point of this type: a caller must be able to see that a clean
+        // finding set was produced from a partial list. If this ever becomes
+        // true, the coverage gap has genuinely been closed and the docs saying
+        // otherwise need updating with it.
+        assert!(
+            !candidate_list_provenance().is_complete(),
+            "snapshot now claims completeness — update the module docs and the \
+             adjacent-obligations research note if that is genuinely true"
+        );
+    }
+
+    #[test]
+    fn the_2026_02_04_additions_are_present() {
+        assert!(
+            ECHA_CANDIDATE_LIST.contains(&"110-54-3"),
+            "n-Hexane missing"
+        );
+        assert!(ECHA_CANDIDATE_LIST.contains(&"1478-61-1"), "BPAF missing");
+    }
+
+    #[test]
+    fn embedded_list_has_no_duplicates() {
+        for (i, cas) in ECHA_CANDIDATE_LIST.iter().enumerate() {
+            assert!(
+                !ECHA_CANDIDATE_LIST[..i].contains(cas),
+                "duplicate CAS {cas} in the embedded candidate list"
+            );
+        }
+    }
+
+    #[test]
+    fn absent_cas_is_unknown_not_cleared() {
+        // A real SVHC we do not embed must not read as "fine". This guards the
+        // semantics of NotInEmbeddedList against a future well-meaning rename.
+        let unknown = SvhcInput {
+            cas_number: "50-00-0", // formaldehyde — on the official list, not embedded
+            substance_name: "Formaldehyde",
+            concentration_pct: 5.0,
+        };
+        let f = check_svhc_declarations(&[unknown]);
+        assert_eq!(f[0].kind, SvhcFindingKind::NotInEmbeddedList);
     }
 }
