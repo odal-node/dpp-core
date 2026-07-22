@@ -20,9 +20,12 @@
 //! | Servers                     | pending        | ESPR delegated act TBD |
 //! | All other categories        | pending        | ESPR delegated act TBD |
 //!
-//! These period minimums apply to those pre-ESPR ecodesign regulations. The ESPR
-//! delegated act for the electronics DPP (adopted 18 March 2026) does not yet
-//! specify minimum period values for smartphones, laptops, or servers.
+//! These period minimums apply to those pre-ESPR ecodesign regulations. No ESPR
+//! delegated act for an electronics DPP has been adopted; under the ESPR working
+//! plan (COM(2025) 187 final) electronics is addressed through horizontal
+//! repairability and EEE-recyclability measures rather than as a product group.
+//! Reg. 2023/1670 does set requirements for smartphones and slate tablets; those
+//! are not yet reflected in this module.
 //!
 //! ## Placeholder note
 //! Once the ESPR delegated act adds a `sparePartsAvailabilityYears` field to the
