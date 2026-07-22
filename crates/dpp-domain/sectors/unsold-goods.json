@@ -2,6 +2,7 @@
   "key": "unsold-goods",
   "title": "Unsold Textiles (destruction ban)",
   "status": "in_force",
+  "regime": "espr",
   "legalBasis": [
     "Regulation (EU) 2024/1781 (ESPR) Article 25 / Annex VII",
     "Delegated Act + Implementing Act (adopted Feb 2026)"

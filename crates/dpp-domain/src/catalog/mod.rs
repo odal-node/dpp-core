@@ -19,6 +19,7 @@
 //!
 //! ## Module layout
 //!
+//! - [`regime`] — the [`Regime`] legal-instrument axis.
 //! - [`status`] — the [`RegulatoryStatus`] gate.
 //! - [`descriptor`] — the [`SectorDescriptor`] record shape.
 //! - [`error`] — [`CatalogError`].
@@ -28,6 +29,7 @@
 pub mod catalog;
 pub mod descriptor;
 pub mod error;
+pub mod regime;
 pub mod status;
 
 #[cfg(test)]
@@ -36,4 +38,5 @@ mod tests;
 pub use catalog::SectorCatalog;
 pub use descriptor::SectorDescriptor;
 pub use error::CatalogError;
+pub use regime::Regime;
 pub use status::RegulatoryStatus;

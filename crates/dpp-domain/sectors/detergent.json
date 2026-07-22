@@ -2,6 +2,7 @@
   "key": "detergent",
   "title": "Detergents & Surfactants",
   "status": "provisional",
+  "regime": "detergents",
   "legalBasis": ["Regulation (EU) 2026/405 (Detergents)"],
   "retentionYears": 10,
   "schemaVersions": ["1.0.0", "1.1.0"],

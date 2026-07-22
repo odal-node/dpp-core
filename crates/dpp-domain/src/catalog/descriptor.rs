@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::regime::Regime;
 use super::status::RegulatoryStatus;
 
 /// A single sector's catalog entry — the canonical record every component
@@ -16,9 +17,22 @@ pub struct SectorDescriptor {
     pub title: String,
     /// Regulatory status — gates whether determinations are binding.
     pub status: RegulatoryStatus,
+    /// Which EU legal instrument family this sector derives from.
+    ///
+    /// Orthogonal to [`Self::status`]: the regime says *which law*, the status
+    /// says *whether it binds yet*. Determination gating must never branch on
+    /// this field.
+    pub regime: Regime,
     /// EU legal instrument(s) this sector derives from.
     pub legal_basis: Vec<String>,
-    /// ISO-8601 date the DPP obligation applies from, when known.
+    /// ISO-8601 date the **passport obligation** applies from, when known.
+    ///
+    /// Scope note: this is when the DPP itself becomes mandatory. It is **not**
+    /// the determination gate and must not be used as one — a regulation may
+    /// bind long before its passport is required (see [`RegulatoryStatus`]).
+    /// Where a sector carries several obligations with different dates, this
+    /// records the earliest that binds an in-scope operator; the manifest
+    /// `notes` carry the rest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dpp_applies_from: Option<String>,
     /// Minimum data retention in years required by the applicable act.
