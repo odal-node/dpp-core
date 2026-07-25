@@ -148,6 +148,39 @@ physical item, or a reissued passport receiving a different serial for the same
 battery. That is an operational guarantee the engine must make, not one this
 crate can enforce.
 
+## Processor Limits — Art. 78(d)
+
+Art. 78(d) of Regulation (EU) 2023/1542 forbids an operator authorised to act on
+behalf of the responsible economic operator from selling, re-using or processing
+passport data *"beyond what is necessary for the provision of the relevant
+storing or processing services"*.
+
+**What satisfies it is architectural, not a policy promise.** Every deployment is
+single-operator — one node per operator, self-hosted or hosted, with no shared
+cluster — so no surface exists on which one customer's passport data and
+another's can be seen together. A cross-customer benchmark is not something the
+system declines to build; it is something it has no place to compute.
+
+**Where the constraint lives in code.** `PassportRepository` is the entire
+persistence surface, and its `list` and `count` methods are the only ones that
+see more than one passport. The port documents the Art. 78(d) limit on
+implementors directly, so a future backing store cannot acquire an analytics
+sideline without someone editing past the constraint.
+
+**What it does not restrict.** An operator analysing its own passports. The
+prohibition binds the processor acting on the operator's behalf, not the
+operator.
+
+**Already applied.** Resolver scan telemetry records only per-passport, per-day,
+per-variant counts — no IP address, user agent or session identifier, because the
+schema has no column for one. That design predates this section; Art. 78(d) is
+the article it answers to.
+
+**Residual, engine-side.** `dpp-core` is stateless and holds no data, so it can
+only state the constraint and place it at the seam. Enforcement — retention of
+logs, backup handling, what a hosted control plane may read — is a `dpp-engine`
+and infrastructure concern and is not evidenced here.
+
 ## Cryptographic Foundations
 
 - **Ed25519** — All signing operations use Ed25519 (EdDSA) as specified by
