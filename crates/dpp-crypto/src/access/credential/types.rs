@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// Re-export the canonical `AccessTier` from dpp-domain.
-pub use dpp_domain::AccessTier;
+/// Re-export the canonical access vocabulary from dpp-domain.
+pub use dpp_domain::Audience;
 
 // ─── Credential role ─────────────────────────────────────────────────────────
 
@@ -34,13 +34,19 @@ pub enum CredentialRole {
 }
 
 impl CredentialRole {
-    /// Returns the minimum access tier this role grants.
-    pub fn access_tier(&self) -> AccessTier {
+    /// The Art. 77(2) audience this role belongs to.
+    ///
+    /// Note the consequence of the lattice: an authority does **not** thereby
+    /// gain the individual-item data of Annex XIII point 4, which Art. 77(2)(b)
+    /// does not grant it. A market surveillance authority that also needs that
+    /// data needs a separate legitimate-interest basis for it.
+    #[must_use]
+    pub fn audience(&self) -> Audience {
         match self {
             Self::MarketSurveillanceAuthority | Self::CustomsAuthority | Self::NotifiedBody => {
-                AccessTier::Confidential
+                Audience::Authority
             }
-            _ => AccessTier::Professional,
+            _ => Audience::LegitimateInterest,
         }
     }
 }

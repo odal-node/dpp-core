@@ -84,18 +84,20 @@ impl SectorData {
     }
 }
 
-/// Serialize `data` to a JSON object and strip any top-level field whose
-/// required access tier exceeds `viewer_tier`.
+/// Serialize `data` to a JSON object and strip any top-level field the
+/// `audience` may not see.
 ///
-/// `descriptor.access_tiers` maps camelCase JSON field names to the minimum
-/// [`crate::domain::identity::AccessTier`] a viewer must hold to see that field.
-/// Fields not listed in the map are always retained (default: Public).
+/// `descriptor.disclosure` maps camelCase JSON field names to their
+/// [`Disclosure`](crate::domain::identity::Disclosure) class; visibility is
+/// decided by [`Audience::may_see`](crate::domain::identity::Audience::may_see),
+/// which is a lattice and not a threshold. Fields not listed in the map are
+/// always retained (default: Public).
 ///
 /// Returns a `serde_json::Value::Object` with redacted fields removed.
 /// Returns `serde_json::Value::Null` if serialization fails.
 pub fn redact_sector_data(
     data: &SectorData,
-    viewer_tier: crate::domain::identity::AccessTier,
+    audience: crate::domain::identity::Audience,
     descriptor: &crate::catalog::SectorDescriptor,
 ) -> serde_json::Value {
     let mut value = match serde_json::to_value(data) {
@@ -103,8 +105,8 @@ pub fn redact_sector_data(
         Err(_) => return serde_json::Value::Null,
     };
     if let Some(obj) = value.as_object_mut() {
-        obj.retain(|key, _| match descriptor.access_tiers.get(key) {
-            Some(&required) => viewer_tier >= required,
+        obj.retain(|key, _| match descriptor.disclosure.get(key) {
+            Some(&class) => audience.may_see(class),
             None => true,
         });
     }

@@ -10,10 +10,10 @@
   "schemaVersions": ["1.0.0", "1.1.0", "1.2.0"],
   "currentSchemaVersion": "1.2.0",
   "productCategories": ["apparel", "footwear", "home_textile"],
-  "accessTiers": {
-    "svhcSubstances": "professional",
-    "disassemblyInstructions": "professional",
-    "sparePartsAvailable": "professional"
+  "disclosure": {
+    "svhcSubstances": "restricted",
+    "disassemblyInstructions": "restricted",
+    "sparePartsAvailable": "restricted"
   },
   "plugin": "sector-textile",
   "notes": "Top ESPR working-plan priority. Delegated act expected ~Q2 2027, compliance ~2028-2029. Fields are provisional and may change; no binding determination yet."

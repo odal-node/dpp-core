@@ -3,20 +3,18 @@
 use super::*;
 use crate::catalog::{RegulatoryStatus, SectorCatalog, SectorDescriptor};
 use crate::domain::gtin::Gtin;
-use crate::domain::identity::AccessTier;
+use crate::domain::identity::Audience;
+use crate::domain::identity::Disclosure;
 use crate::schemas::VersionedSchemaRegistry;
 
 // ── redact_sector_data ────────────────────────────────────────────────
 
 fn battery_descriptor_with_tiers() -> SectorDescriptor {
     use std::collections::HashMap;
-    let mut access_tiers = HashMap::new();
-    access_tiers.insert("dueDiligenceUrl".into(), AccessTier::Professional);
-    access_tiers.insert("criticalRawMaterials".into(), AccessTier::Professional);
-    access_tiers.insert(
-        "disassemblyInstructionsUrl".into(),
-        AccessTier::Professional,
-    );
+    let mut disclosure = HashMap::new();
+    disclosure.insert("dueDiligenceUrl".into(), Disclosure::Restricted);
+    disclosure.insert("criticalRawMaterials".into(), Disclosure::Restricted);
+    disclosure.insert("disassemblyInstructionsUrl".into(), Disclosure::Restricted);
     SectorDescriptor {
         key: "battery".into(),
         title: "Battery".into(),
@@ -27,7 +25,7 @@ fn battery_descriptor_with_tiers() -> SectorDescriptor {
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],
-        access_tiers,
+        disclosure,
         plugin: None,
         notes: None,
     }
@@ -45,7 +43,7 @@ fn minimal_battery_data() -> SectorData {
 fn public_viewer_sees_public_fields_only() {
     let data = minimal_battery_data();
     let descriptor = battery_descriptor_with_tiers();
-    let json = redact_sector_data(&data, AccessTier::Public, &descriptor);
+    let json = redact_sector_data(&data, Audience::Public, &descriptor);
     // Public fields must be present
     assert!(json.get("batteryChemistry").is_some());
     assert!(json.get("co2ePerUnitKg").is_some());
@@ -65,7 +63,7 @@ fn public_viewer_sees_public_fields_only() {
 fn professional_viewer_sees_gated_fields() {
     let data = minimal_battery_data();
     let descriptor = battery_descriptor_with_tiers();
-    let json = redact_sector_data(&data, AccessTier::Professional, &descriptor);
+    let json = redact_sector_data(&data, Audience::LegitimateInterest, &descriptor);
     assert!(
         json.get("dueDiligenceUrl").is_some(),
         "Professional must see due_diligence_url"
@@ -75,7 +73,7 @@ fn professional_viewer_sees_gated_fields() {
 }
 
 #[test]
-fn empty_access_tiers_retains_all_fields() {
+fn empty_disclosure_retains_all_fields() {
     let data = minimal_battery_data();
     let descriptor = SectorDescriptor {
         key: "battery".into(),
@@ -87,11 +85,11 @@ fn empty_access_tiers_retains_all_fields() {
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     };
-    let json = redact_sector_data(&data, AccessTier::Public, &descriptor);
+    let json = redact_sector_data(&data, Audience::Public, &descriptor);
     // No tiers = nothing gated = all fields visible
     assert!(json.get("dueDiligenceUrl").is_some());
     assert!(json.get("disassemblyInstructionsUrl").is_some());

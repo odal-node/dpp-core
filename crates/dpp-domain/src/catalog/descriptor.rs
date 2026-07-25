@@ -39,7 +39,7 @@ pub struct SectorDescriptor {
     /// Universal confidential fields (signatures, audit trails) are folded in by
     /// the access-policy engine, so they are not repeated per sector here.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub access_tiers: std::collections::HashMap<String, crate::domain::identity::AccessTier>,
+    pub disclosure: std::collections::HashMap<String, crate::domain::identity::Disclosure>,
     /// Plugin that handles this sector (crate / filename stem, e.g.
     /// `"sector-battery"`). `None` if no plugin is bound yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]

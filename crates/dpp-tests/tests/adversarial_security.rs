@@ -8,22 +8,22 @@
 //! - **Forged-issuer rejected**: `StaticTrustedIssuers` blocks untrusted issuer DID.
 //! - **Content-binding tamper rejected**: JWS signed over canonical payload A cannot
 //!   be presented with payload B — swapping the payload segment fails verification.
-//! - **Fail-closed redaction**: `default_tier = Confidential` gates unlisted fields.
+//! - **Fail-closed redaction**: `default_disclosure = Confidential` gates unlisted fields.
 //! - **Transfer deadlock resolved**: `reject()` / `cancel()` make terminal states
 //!   reachable, unblocking the chain for a new transfer.
 //! - **Passport sector-data validation**: `Passport::validate()` now wires into
 //!   `validate_sector_data()`, catching cross-field errors (e.g. fibre sum ≠ 100).
 
 use chrono::Utc;
-use dpp_crypto::access::{AccessTier, SectorAccessPolicy, filter_by_access_tier};
+use dpp_crypto::access::{Audience, SectorAccessPolicy, filter_by_audience};
 use dpp_crypto::{
     AllowAllIssuers, CredentialBuilder, CredentialRole, CredentialStatus, StaticTrustedIssuers,
     StatusList, VerificationResult, verify_credential_claims_with_trust,
     verify_credential_with_revocation,
 };
 use dpp_domain::{
-    FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData, TextileData,
-    TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
+    Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData,
+    TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
 };
 use dpp_tests::fixtures::{base_passport, make_operator, make_subject};
 use serde_json::json;
@@ -279,22 +279,22 @@ fn signature_tamper_rejected() {
 
 // ─── Fail-closed redaction tests ──────────────────────────────────────────────
 
-/// With `default_tier = Confidential`, fields absent from the policy are
+/// With `default_disclosure = Confidential`, fields absent from the policy are
 /// redacted at the Public tier — no unlisted field leaks.
 #[test]
-fn fail_closed_default_tier_blocks_unlisted_fields() {
+fn fail_closed_default_disclosure_blocks_unlisted_fields() {
     use std::collections::HashMap;
 
     let policy = SectorAccessPolicy {
         name: "strict-policy".into(),
         sector: "test".into(),
-        field_tiers: {
+        field_disclosure: {
             let mut m = HashMap::new();
-            m.insert("productName".into(), AccessTier::Public);
-            m.insert("co2ePerUnit".into(), AccessTier::Public);
+            m.insert("productName".into(), Disclosure::Public);
+            m.insert("co2ePerUnit".into(), Disclosure::Public);
             m
         },
-        default_tier: AccessTier::Confidential, // fail-closed: unlisted = Confidential
+        default_disclosure: Disclosure::Conformity, // fail-closed: unlisted = Confidential
     };
 
     let data = json!({
@@ -304,7 +304,7 @@ fn fail_closed_default_tier_blocks_unlisted_fields() {
         "supplyChainSecret": "...",  // unlisted — must be redacted
     });
 
-    let decision = filter_by_access_tier(&data, &policy, AccessTier::Public);
+    let decision = filter_by_audience(&data, &policy, Audience::Public);
 
     assert_eq!(decision.filtered_data["productName"], json!("EcoWidget"));
     assert!(
@@ -337,7 +337,7 @@ fn nested_confidential_field_cannot_bypass_via_nesting() {
         }
     });
 
-    let decision = filter_by_access_tier(&data, &policy, AccessTier::Public);
+    let decision = filter_by_audience(&data, &policy, Audience::Public);
 
     assert!(
         decision.filtered_data["sectorData"]
