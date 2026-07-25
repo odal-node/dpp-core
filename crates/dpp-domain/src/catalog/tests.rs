@@ -1,4 +1,4 @@
-//! `SectorCatalog` load, gating, registration, and cross-artifact parity tests.
+﻿//! `SectorCatalog` load, gating, registration, and cross-artifact parity tests.
 
 use super::*;
 
@@ -483,7 +483,7 @@ fn every_manifest_round_trips() {
     for d in SectorCatalog::new().all().iter() {
         let json = serde_json::to_string(d).expect("serialise");
         let back: SectorDescriptor = serde_json::from_str(&json).expect("deserialise");
-        // SectorDescriptor is not PartialEq, and `accessTiers` is a HashMap whose
+        // SectorDescriptor is not PartialEq, and `disclosure` is a HashMap whose
         // serialised key order is not stable — compare as Value, which is
         // order-insensitive for maps.
         assert_eq!(

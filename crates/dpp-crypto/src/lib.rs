@@ -1,5 +1,5 @@
 //! `dpp-crypto` — Ed25519 signing, JWS compact serialisation, DID documents,
-//! and access-tier Verifiable Credentials.
+//! and audience-scoped Verifiable Credentials.
 //!
 //! All modules are pure (no I/O, no network). The crate compiles to `std` for
 //! the node and to `wasm32` (where conditional) for plugin guests.

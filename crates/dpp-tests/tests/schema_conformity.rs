@@ -1,4 +1,4 @@
-//! Integration test: Schema conformity validation.
+﻿//! Integration test: Schema conformity validation.
 //!
 //! Validates that:
 //! 1. All JSON schemas are syntactically valid and loadable.
@@ -49,7 +49,7 @@ const JTC24_TEXTILE_ENVIRONMENTAL_FIELDS: &[&str] = &[
 /// Fields required for SVHC/SCIP disclosure under REACH Article 33.
 const JTC24_SVHC_FIELDS: &[&str] = &["svhcSubstances"];
 
-/// Fields for professional-tier access (disassembly, spare parts).
+/// Fields classified Restricted (disassembly, spare parts).
 const JTC24_PROFESSIONAL_FIELDS: &[&str] = &["disassemblyInstructions", "sparePartsAvailable"];
 
 #[test]

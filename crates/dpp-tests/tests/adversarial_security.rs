@@ -1,4 +1,4 @@
-//! Integration tests: adversarial security scenarios (Phase 3.0a).
+﻿//! Integration tests: adversarial security scenarios (Phase 3.0a).
 //!
 //! Each test targets a specific Phase-1 security fix, turning the audit
 //! finding into a cross-crate verifiable assertion. Scenarios covered:
@@ -280,7 +280,7 @@ fn signature_tamper_rejected() {
 // ─── Fail-closed redaction tests ──────────────────────────────────────────────
 
 /// With `default_disclosure = Confidential`, fields absent from the policy are
-/// redacted at the Public tier — no unlisted field leaks.
+/// redacted from the public audience — no unlisted field leaks.
 #[test]
 fn fail_closed_default_disclosure_blocks_unlisted_fields() {
     use std::collections::HashMap;
@@ -343,7 +343,7 @@ fn nested_confidential_field_cannot_bypass_via_nesting() {
         decision.filtered_data["sectorData"]
             .get("jwsSignature")
             .is_none(),
-        "nested jwsSignature must be redacted at Public tier"
+        "nested jwsSignature must be redacted from the public audience"
     );
     // The surrounding object is still present (the redaction is field-level, not subtree-level)
     assert!(decision.filtered_data.get("sectorData").is_some());

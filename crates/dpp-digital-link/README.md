@@ -15,14 +15,14 @@ Pure Rust, no I/O, no network calls.
 
 - You need to parse or build GS1 Digital Link URLs (GTIN, serial, batch).
 - You are resolving DPP links and need to negotiate content by link type, media type,
-  or access tier.
+  or requesting audience.
 - You want to map a DPP `serde_json::Value` to an AAS submodel for Industry 4.0
   interoperability.
 
 ## Example
 
 ```rust
-use dpp_digital_link::{DigitalLink, AccessTier, negotiate, Gs1LinkType};
+use dpp_digital_link::{DigitalLink, Audience, negotiate, Gs1LinkType};
 
 // Parse a GS1 Digital Link URL
 let link = DigitalLink::parse(
@@ -31,16 +31,16 @@ let link = DigitalLink::parse(
 println!("GTIN: {}", link.gtin);
 println!("Serial: {}", link.serial.unwrap());
 
-// Negotiate the best link for a professional-tier consumer
+// Negotiate the best link for a legitimate-interest consumer
 let descriptors = vec![/* LinkDescriptor items */];
-let best = negotiate(&descriptors, None, None, AccessTier::Professional);
+let best = negotiate(&descriptors, None, None, Audience::LegitimateInterest);
 ```
 
 ## Relationship to other crates
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `AccessTier` — required by this crate |
+| `dpp-domain` | Provides `Audience` and `Disclosure` — required by this crate |
 
 ## Minimum Rust version
 

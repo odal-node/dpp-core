@@ -20,7 +20,7 @@ pub struct LinkDescriptor {
     pub link_type: Gs1LinkType,
     /// Media type served at this URL.
     pub media_type: DppMediaType,
-    /// Minimum access tier required to view this resource.
+    /// Disclosure class of this resource — which audiences may view it.
     pub disclosure: Disclosure,
     /// Human-readable title.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,7 +35,7 @@ pub struct LinkDescriptor {
 /// Priority:
 /// 1. Match link type exactly (if specified).
 /// 2. Among matches, prefer the requested media type.
-/// 3. Filter by access tier (return only resources the caller can see).
+/// 3. Filter by audience (return only resources the caller may see).
 /// 4. If nothing matches, return `None`.
 pub fn negotiate<'a>(
     available: &'a [LinkDescriptor],
@@ -43,7 +43,7 @@ pub fn negotiate<'a>(
 ) -> Option<&'a LinkDescriptor> {
     let audience = request.audience.unwrap_or(Audience::Public);
 
-    // Filter by access tier
+    // Filter by audience
     let accessible: Vec<&LinkDescriptor> = available
         .iter()
         .filter(|d| audience.may_see(d.disclosure))

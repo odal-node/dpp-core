@@ -1,4 +1,4 @@
-//! End-to-end integration test: Textile DPP lifecycle.
+﻿//! End-to-end integration test: Textile DPP lifecycle.
 //!
 //! This test exercises the full lifecycle of a textile Digital Product Passport
 //! across multiple dpp-core crates:
@@ -8,7 +8,7 @@
 //! 3. Parse a GS1 Digital Link for the product (dpp-digital-link)
 //! 4. Map the passport to an AAS submodel (dpp-digital-link::aas)
 //! 5. Issue a Verifiable Credential for a repairer (dpp-crypto)
-//! 6. Verify the credential and apply access tier filtering (dpp-crypto)
+//! 6. Verify the credential and apply audience filtering (dpp-crypto)
 //! 7. Serialise / deserialise the full passport round-trip
 
 use chrono::Utc;
@@ -177,33 +177,33 @@ fn credential_issuance_and_audience_filtering() {
     let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
         .expect("textile in catalog");
 
-    // ── Public tier ────────────────────────────────────────────────────────
+    // ── Public audience ────────────────────────────────────────────────────
     let public_decision = filter_by_audience(&textile_fields, &policy, Audience::Public);
-    // Public tier must NOT see professional fields
+    // The public audience must NOT see restricted fields
     assert!(
         public_decision
             .filtered_data
             .get("svhcSubstances")
             .is_none(),
-        "public tier should not see SVHC data"
+        "the public audience should not see SVHC data"
     );
     assert!(
         public_decision
             .filtered_data
             .get("disassemblyInstructions")
             .is_none(),
-        "public tier should not see disassembly instructions"
+        "the public audience should not see disassembly instructions"
     );
-    // Public tier MUST see basic fields
+    // The public audience MUST see basic fields
     assert!(
         public_decision
             .filtered_data
             .get("fibreComposition")
             .is_some(),
-        "public tier must see fibre composition"
+        "the public audience must see fibre composition"
     );
 
-    // ── Professional tier (via VC) ─────────────────────────────────────────
+    // ── Legitimate interest (via VC) ───────────────────────────────────────
     let subject = DppCredentialSubject {
         id: "did:web:repair-shop.example.com".into(),
         name: "GreenFix Textile Repair".into(),
@@ -220,7 +220,7 @@ fn credential_issuance_and_audience_filtering() {
     let result = verify_credential_claims(&credential, Some("textile"), Utc::now());
     assert!(result.is_valid(), "credential should be valid");
 
-    // The credential grants Professional tier
+    // The credential grants Audience::LegitimateInterest
     if let dpp_crypto::access::credential::VerificationResult::Valid { audience, .. } = &result {
         assert_eq!(*audience, Audience::LegitimateInterest);
 
@@ -228,14 +228,14 @@ fn credential_issuance_and_audience_filtering() {
         // Professional MUST see SVHC and disassembly data
         assert!(
             pro_decision.filtered_data.get("svhcSubstances").is_some(),
-            "professional tier must see SVHC data"
+            "legitimate interest must see SVHC data"
         );
         assert!(
             pro_decision
                 .filtered_data
                 .get("disassemblyInstructions")
                 .is_some(),
-            "professional tier must see disassembly instructions"
+            "legitimate interest must see disassembly instructions"
         );
     } else {
         panic!("expected Valid result from credential verification");

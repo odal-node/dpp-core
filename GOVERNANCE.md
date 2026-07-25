@@ -41,7 +41,7 @@ are prohibited.
 ## Security Decisions
 
 Security-sensitive changes (anything touching `dpp-crypto`, schema validation
-logic, or access-tier enforcement) require:
+logic, or audience/disclosure enforcement) require:
 
 1. A dedicated review focusing on cryptographic correctness.
 2. Explicit sign-off in the PR description noting the security implications.

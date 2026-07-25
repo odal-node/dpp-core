@@ -1,4 +1,4 @@
-use chrono::{Duration, Utc};
+﻿use chrono::{Duration, Utc};
 
 use crate::access::status_list::StatusList;
 
@@ -283,7 +283,7 @@ fn professional_only_issuer_cannot_grant_confidential_tier() {
     let result = verify_credential_claims_with_trust(&cred, None, None, Utc::now(), &trusted);
     assert!(
         matches!(result, VerificationResult::UntrustedIssuer { .. }),
-        "professional-only issuer cannot grant Confidential tier"
+        "a legitimate-interest-only issuer cannot grant Audience::Authority"
     );
 }
 

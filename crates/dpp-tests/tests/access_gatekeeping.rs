@@ -1,12 +1,12 @@
-//! Integration test: Access tier gatekeeping.
+﻿//! Integration test: audience gatekeeping.
 //!
 //! Exercises the full credential → policy → data-filtering pipeline
-//! that protects DPP data behind the ESPR three-tier access model.
+//! that protects DPP data behind the Art. 77(2) audience model.
 //!
-//! 1. Build a textile DPP JSON payload with fields across all tiers.
-//! 2. Create credentials for Public, Professional, and Confidential roles.
+//! 1. Build a textile DPP JSON payload with fields across all disclosure classes.
+//! 2. Create credentials for public, legitimate-interest and authority roles.
 //! 3. Verify each credential and apply the SectorAccessPolicy.
-//! 4. Assert that each tier sees only the fields it is allowed to see.
+//! 4. Assert that each audience sees only the fields it is allowed to see.
 //! 5. Test edge cases: expired credentials, wrong-sector credentials,
 //!    custom policies, and authority access.
 
@@ -20,10 +20,10 @@ use dpp_domain::Disclosure;
 use dpp_tests::fixtures::make_subject;
 use serde_json::json;
 
-/// Build a realistic textile JSON payload with fields spanning all three tiers.
+/// Build a realistic textile JSON payload spanning all disclosure classes.
 fn sample_textile_payload() -> serde_json::Value {
     json!({
-        // ── Public tier fields ──
+        // ── Public fields ──
         "fibreComposition": [
             { "fibre": "cotton", "pct": 70.0 },
             { "fibre": "recycled_polyester", "pct": 30.0 }
@@ -35,14 +35,14 @@ fn sample_textile_payload() -> serde_json::Value {
         "waterUseLitres": 2700.0,
         "recycledContentPct": 30.0,
 
-        // ── Professional tier fields (repairer/recycler access) ──
+        // ── Restricted fields (repairer/recycler access) ──
         "svhcSubstances": [
             { "casNumber": "80-05-7", "substanceName": "Bisphenol A", "concentrationPct": 0.15 }
         ],
         "disassemblyInstructions": "Remove buttons, separate layers by colour group",
         "sparePartsAvailable": true,
 
-        // ── Confidential tier fields (market surveillance) ──
+        // ── Conformity fields (market surveillance) ──
         "jwsSignature": "eyJhbGciOiJFZERTQSJ9.payload.signature",
         "complianceReport": {
             "status": "compliant",
@@ -60,7 +60,7 @@ fn sample_textile_payload() -> serde_json::Value {
     })
 }
 
-// ─── Three-tier access tests ─────────────────────────────────────────────
+// ─── Audience access tests ───────────────────────────────────────────────
 
 #[test]
 fn public_tier_sees_only_public_fields() {
@@ -287,7 +287,7 @@ fn custom_policy_restricts_additional_fields() {
     let mut policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
         .expect("textile in catalog");
 
-    // Make durabilityScore professional-only (stricter than default)
+    // Make durabilityScore restricted (stricter than default)
     policy
         .field_disclosure
         .insert("durabilityScore".into(), Disclosure::Restricted);
@@ -298,7 +298,7 @@ fn custom_policy_restricts_additional_fields() {
             .filtered_data
             .get("durabilityScore")
             .is_none(),
-        "custom policy should restrict durabilityScore at public tier"
+        "custom policy should restrict durabilityScore from the public audience"
     );
     assert!(
         public_decision
@@ -326,7 +326,7 @@ fn all_credential_roles_map_to_correct_tiers() {
         assert_eq!(
             role.audience(),
             Audience::LegitimateInterest,
-            "{role:?} should map to Professional tier"
+            "{role:?} should map to Audience::LegitimateInterest"
         );
     }
 
@@ -340,7 +340,7 @@ fn all_credential_roles_map_to_correct_tiers() {
         assert_eq!(
             role.audience(),
             Audience::Authority,
-            "{role:?} should map to Confidential tier"
+            "{role:?} should map to Audience::Authority"
         );
     }
 }

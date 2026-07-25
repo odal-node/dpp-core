@@ -10,7 +10,6 @@
 //! through that registry directly (its fail-closed `validate_strict`).
 //! Cross-field regulatory rules (which JSON Schema cannot express, e.g. "fibre
 //! percentages sum to ~100%") come from `dpp-rules` via the `dpp-domain` adapters.
-//! See `docs/architecture/SECTOR-MODEL-CONSOLIDATION.md` (step C2).
 //!
 //! **Note**: excluded from wasm32 builds since jsonschema depends on reqwest's
 //! blocking API.

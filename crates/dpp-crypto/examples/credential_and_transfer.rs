@@ -1,6 +1,6 @@
 //! Example: Issue a Verifiable Credential and transfer passport responsibility.
 //!
-//! Demonstrates the W3C VC access tier model and the dual-signature
+//! Demonstrates the W3C VC audience model and the dual-signature
 //! transfer-of-responsibility chain.
 //!
 //! Run with: `cargo run --example credential_and_transfer`
