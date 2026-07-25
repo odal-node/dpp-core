@@ -44,9 +44,23 @@ pub struct BatteryData {
     pub rated_capacity_kwh: Option<f64>,
 
     // ── v2.0.0 — Annex XIII compliance fields (Battery Reg. 2023/1542) ──
-    /// Carbon footprint performance class (A–E) per Battery Regulation Art. 7(2).
+    /// Carbon footprint performance class label per Battery Regulation
+    /// Art. 7(2), verbatim from the delegated act that established the scale.
+    ///
+    /// Meaningless without the two provenance fields below: the same label
+    /// denotes different thresholds under different revisions of the scale, and
+    /// Art. 7(2) requires those thresholds to be reviewed every three years.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub carbon_footprint_class: Option<CarbonFootprintClass>,
+
+    /// Identifier of the ruleset whose class boundaries produced
+    /// `carbon_footprint_class`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub carbon_footprint_class_ruleset_id: Option<String>,
+
+    /// Version of the ruleset identified by `carbon_footprint_class_ruleset_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub carbon_footprint_class_ruleset_version: Option<String>,
 
     /// URL to supply chain due diligence documentation (Art. 47–52).
     /// Must link to a publicly accessible policy describing the due
