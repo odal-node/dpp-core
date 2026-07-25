@@ -76,7 +76,9 @@ fn make_battery_passport() -> Passport {
                 recycled_content_nickel_pct: Some(9.0),
                 state_of_health_pct: Some(100.0),
                 rated_capacity_kwh: Some(0.32),
-                carbon_footprint_class: Some(CarbonFootprintClass::B),
+                carbon_footprint_class: Some(CarbonFootprintClass::new("B").expect("valid label")),
+                carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
+                carbon_footprint_class_ruleset_version: Some("0.0.0-test".into()),
                 due_diligence_url: Some("https://voltdynamics.example.com/due-diligence".into()),
                 cathode_material: Some(vec![MaterialComposition {
                     name: "LiFePO4".into(),
