@@ -166,6 +166,16 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub battery_passport_number: Option<String>,
 
+    // ── v2.3.0 — Art. 8(1) declaration provenance ───────────────────────
+    /// Calendar year the recycled-content shares pertain to.
+    ///
+    /// Art. 8(1) requires the shares "for each battery model **per year and per
+    /// manufacturing plant**", so a percentage without both anchors is not the
+    /// Art. 8(1) declaration — it is an unattributed number. The plant is
+    /// `manufacturing_place`; this is the year.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recycled_content_reporting_year: Option<u16>,
+
     // ── v2.2.0 — Annex VII Part A state of health ────────────────────────
     /// State-of-health parameters per Annex VII Part A, in the parameter set
     /// its battery category requires. Supersedes `state_of_health_pct`.
