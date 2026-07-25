@@ -85,7 +85,15 @@ Both application dates are conditional — Art. 10(2)/(3) read "or 18 months aft
 | Electric vehicle | state of certified energy (SOCE) — and nothing else |
 | Stationary storage + LMT | remaining capacity and evolution of self-discharging rates (unconditional); remaining power capability, remaining round trip efficiency, ohmic resistance (each "where possible") |
 
-`dpp_rules::batteries::degradation::annex_vii_parameter_set_for` maps a battery type onto the applicable list. Portable and SLI return `None` — Art. 14(1) names only stationary storage, LMT and EV batteries.
+**Annex VII Part B (expected lifetime) is now modelled too** (schema v2.4.0, `BatteryData::expected_lifetime`): date of putting into service ("where appropriate"), energy throughput, capacity throughput, tracking of harmful events, and the number of full equivalent charge-discharge cycles.
+
+**Part B is narrower than Part A.** Part A names *"electric vehicle batteries, stationary battery energy storage systems and LMT batteries"*; Part B names only the latter two. An EV battery reports a state of health but **no** expected-lifetime parameter set — see `annex_vii_part_b_applies_to`.
+
+Part B item 4 lists its harmful events *"such as"*, so that set is illustrative and every member is optional; an implementation tracking a further event type is conforming, not extending.
+
+`expectedLifetime` (measured, per item) is `individual` under Annex XIII point 4(d). It is deliberately distinct from `expectedLifetimeCycles`, the model-level design figure Annex XIII point 1(j) makes **public**.
+
+`dpp_rules::batteries::degradation::annex_vii_parameter_set_for` maps a battery type onto the applicable Part A list. Portable and SLI return `None` — Art. 14(1) names only stationary storage, LMT and EV batteries.
 
 Annex XIII point 4(b) puts state of health in the individual-battery set, so `stateOfHealth` and the deprecated `stateOfHealthPct` both carry the `individual` disclosure class: legitimate-interest holders see them, authorities do not. Before v2.2.0 neither field was classified, so both defaulted to public.
 

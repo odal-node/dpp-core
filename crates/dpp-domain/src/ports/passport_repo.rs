@@ -13,7 +13,7 @@
 //! necessary for the provision of the relevant storing or processing
 //! services"*.
 //!
-//! This port is the whole surface that constraint applies to, and [`list`] and
+//! This port is the primary surface that constraint applies to, and [`list`] and
 //! [`count`] are the parts of it that see more than one passport at a time. An
 //! implementation backing a **hosted** node is a processor in the Art. 78(d)
 //! sense, and may use those methods only to serve the operator's own requests —
