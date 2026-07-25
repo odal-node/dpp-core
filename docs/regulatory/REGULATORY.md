@@ -49,7 +49,11 @@ The Art. 8(2)/(3) recycled content targets are **finalized law** — they appear
 
 The module exposes `art8_shortfalls_2031` and `art8_shortfalls_2036` (renamed from `annex_x_shortfalls_*` on 2026-07-25, when the citation was corrected). The battery plugin returns `NOT_ASSESSED` because neither phase is in force yet. When 2031 arrives, the plugin switches from `NOT_ASSESSED` to a real determination by calling these functions — **no change to `dpp-rules` is needed at that point**.
 
-**Not modelled:** Art. 8(1) requires documentation of the *actual* shares (no minimum) from 18 Aug 2028 for industrial > 2 kWh / EV / SLI and 18 Aug 2033 for LMT, or 24 months after the Art. 8(1) methodology delegated act enters into force, whichever is later. Annex XIII point 1(e) makes that public passport content.
+**Art. 8(1) — the declaration duty, now modelled.** Separate from the minimums above: it requires documentation of the *actual* shares, with no minimum, from 18 Aug 2028 (industrial > 2 kWh / EV / SLI) and 18 Aug 2033 (LMT) — "or 24 months after the date of entry into force of the delegated act …, whichever is the latest". Annex XIII point 1(e) makes that documentation publicly accessible passport content.
+
+Because that date is conditional and the act is unadopted, `art8_declaration_duty_for` returns one of three answers rather than a yes/no: `NotYetDue` below the floor (certain, since the real date can only be the floor or later), `Undetermined` on or after it, and `NotCovered` outside scope.
+
+Art. 8(1) also requires the shares "for each battery model **per year and per manufacturing plant**". A percentage without both anchors is not the Art. 8(1) declaration, so schema v2.3.0 adds `recycledContentReportingYear` to pair with the existing `manufacturingPlace`, and the battery plugin flags shares declared without it.
 
 **When to update:** Only if Art. 8 is amended by a subsequent regulation, or when the Art. 8(1) methodology delegated act (due 18 Aug 2026) is adopted.
 

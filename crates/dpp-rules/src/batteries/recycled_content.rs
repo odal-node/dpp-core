@@ -23,15 +23,19 @@
 //! present **in the battery**. The percentages below therefore do not share a
 //! denominator, and a caller must not sum or average them across metals.
 //!
-//! ## Not modelled here — the Art. 8(1) declaration duty
+//! ## Two duties, not one
 //!
 //! Art. 8(1) requires documentation of the *actual* shares, with no minimum,
 //! from **18 Aug 2028** (industrial > 2 kWh, EV, SLI) and **18 Aug 2033** (LMT)
 //! — or 24 months after the Art. 8(1) methodology delegated act enters into
 //! force, whichever is later. Annex XIII point 1(e) makes that documentation
-//! publicly accessible passport content. This module covers only the
-//! minimum-share determination; the declaration duty is a passport-content
-//! concern, not a cross-field rule.
+//! publicly accessible passport content. See [`art8_declaration_duty_for`].
+//!
+//! Art. 8(2) and 8(3) then impose *minimum* shares from 18 Aug 2031 and
+//! 18 Aug 2036 — fixed dates, unconditional. See [`art8_phase_for`].
+//!
+//! The two ladders are independent: a battery can owe the declaration without
+//! yet owing a minimum.
 //!
 //! ## Which phase binds is a function of the placing-on-market date
 //!
@@ -585,6 +589,82 @@ mod tests {
         }
     }
 
+    // ── Art. 8(1) declaration duty ───────────────────────────────────────────
+
+    #[test]
+    fn declaration_is_certainly_not_due_before_its_floor() {
+        // The one thing that *is* knowable while the delegated act is
+        // unadopted: the real date is never earlier than the floor, so anything
+        // placed on the market before it definitely owes nothing yet.
+        assert_eq!(
+            art8_declaration_duty_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2028, 8, 17)
+            ),
+            Art8DeclarationDuty::NotYetDue {
+                not_before: CalendarDate::new(2028, 8, 18)
+            }
+        );
+    }
+
+    #[test]
+    fn declaration_is_undetermined_on_and_after_the_floor() {
+        // Art. 8(1) applies from the floor "or 24 months after the date of entry
+        // into force of the delegated act, whichever is the latest". The act is
+        // unadopted, so on/after the floor the answer is genuinely unknown —
+        // reporting it as "due" would assert a date the regulation does not set.
+        let got =
+            art8_declaration_duty_for(Art8Category::IndustrialEvSli, CalendarDate::new(2029, 1, 1));
+        let Art8DeclarationDuty::Undetermined {
+            not_before,
+            empowerment,
+        } = got
+        else {
+            panic!("expected Undetermined, got {got:?}");
+        };
+        assert_eq!(not_before, CalendarDate::new(2028, 8, 18));
+        assert!(empowerment.contains("Art. 8(1)"));
+    }
+
+    #[test]
+    fn lmt_declaration_floor_is_five_years_later() {
+        // Art. 8(1) second subparagraph: LMT from 18 Aug 2033, not 2028.
+        assert_eq!(
+            art8_declaration_duty_for(Art8Category::Lmt, CalendarDate::new(2030, 1, 1)),
+            Art8DeclarationDuty::NotYetDue {
+                not_before: CalendarDate::new(2033, 8, 18)
+            }
+        );
+        assert!(matches!(
+            art8_declaration_duty_for(Art8Category::Lmt, CalendarDate::new(2034, 1, 1)),
+            Art8DeclarationDuty::Undetermined { .. }
+        ));
+    }
+
+    #[test]
+    fn out_of_scope_categories_owe_no_declaration() {
+        assert_eq!(
+            art8_declaration_duty_for(Art8Category::NotCovered, CalendarDate::new(2040, 1, 1)),
+            Art8DeclarationDuty::NotCovered
+        );
+    }
+
+    #[test]
+    fn the_declaration_and_minimum_ladders_are_independent() {
+        // A battery placed on the market in 2029 is past the declaration floor
+        // but years short of the Art. 8(2) minimums. Conflating the two would
+        // report a shortfall against a duty that does not yet exist.
+        let placed = CalendarDate::new(2029, 1, 1);
+        assert!(matches!(
+            art8_declaration_duty_for(Art8Category::IndustrialEvSli, placed),
+            Art8DeclarationDuty::Undetermined { .. }
+        ));
+        assert_eq!(
+            art8_phase_for(Art8Category::IndustrialEvSli, placed),
+            Art8Phase::NotYetBinding
+        );
+    }
+
     // ── Target checks ────────────────────────────────────────────────────────
 
     #[test]
@@ -728,5 +808,66 @@ mod tests {
             Some(5.0),
         );
         assert!(c.is_empty());
+    }
+}
+
+// ── Art. 8(1) — the declaration duty ─────────────────────────────────────────
+
+/// Floor date for the Art. 8(1) documentation duty for industrial batteries
+/// > 2 kWh, EV and SLI — 18 August 2028.
+pub const ART8_DECLARATION_FLOOR_2028: CalendarDate = CalendarDate::new(2028, 8, 18);
+
+/// Floor date for the Art. 8(1) documentation duty for LMT batteries —
+/// 18 August 2033.
+pub const ART8_DECLARATION_FLOOR_2033: CalendarDate = CalendarDate::new(2033, 8, 18);
+
+/// The empowerment whose entry into force can push the Art. 8(1) duty later.
+pub const ART8_DECLARATION_EMPOWERMENT: &str = "EU 2023/1542 Art. 8(1), third subparagraph — recycled content calculation,      verification and documentation format";
+
+/// Whether the Art. 8(1) documentation duty has begun for a battery.
+///
+/// Unlike the Art. 8(2)/(3) minimums, whose dates are stated outright, Art. 8(1)
+/// applies from *"18 August 2028 or 24 months after the date of entry into force
+/// of the delegated act …, whichever is the latest"*. That act has not been
+/// adopted, so the real start date is unknown — but it is never **earlier** than
+/// the floor, which is enough to answer the question for anything placed on the
+/// market before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art8DeclarationDuty {
+    /// Art. 8(1) does not reach this category.
+    NotCovered,
+    /// Certainly not yet owed: placed on the market before the floor date, and
+    /// the real date can only be that floor or later.
+    NotYetDue { not_before: CalendarDate },
+    /// Cannot be determined. Placed on the market on or after the floor, but
+    /// whether the duty had begun depends on when the delegated act entered
+    /// into force — and it has not been adopted.
+    Undetermined {
+        not_before: CalendarDate,
+        empowerment: &'static str,
+    },
+}
+
+/// Whether a battery owes the Art. 8(1) recycled-content declaration.
+///
+/// Keyed on the date the battery was **placed on the EU market**, like every
+/// other Art. 8 duty — not on the date of assessment.
+#[must_use]
+pub fn art8_declaration_duty_for(
+    category: Art8Category,
+    placed_on_market: CalendarDate,
+) -> Art8DeclarationDuty {
+    let floor = match category {
+        Art8Category::NotCovered => return Art8DeclarationDuty::NotCovered,
+        Art8Category::IndustrialEvSli => ART8_DECLARATION_FLOOR_2028,
+        Art8Category::Lmt => ART8_DECLARATION_FLOOR_2033,
+    };
+    if placed_on_market < floor {
+        Art8DeclarationDuty::NotYetDue { not_before: floor }
+    } else {
+        Art8DeclarationDuty::Undetermined {
+            not_before: floor,
+            empowerment: ART8_DECLARATION_EMPOWERMENT,
+        }
     }
 }
