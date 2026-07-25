@@ -2,6 +2,7 @@
   "key": "toy",
   "title": "Toys",
   "status": "provisional",
+  "regime": "toy-safety",
   "legalBasis": ["Regulation (EU) 2025/2509 (Toy Safety)"],
   "retentionYears": 10,
   "schemaVersions": ["1.0.0", "1.1.0"],
