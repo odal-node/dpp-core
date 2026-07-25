@@ -7,14 +7,15 @@
 Cryptographic primitives for the [Odal Node](https://odal-node.io) Digital Product
 Passport system: Ed25519 key management, JWS signing and verification, AES-256-GCM
 field-level encryption, `did:web` document builder, W3C Verifiable Credentials, and
-the ESPR Art. 10 access-tier policy engine.
+the audience/disclosure access policy engine.
 
 ## When to use this crate
 
 - You need to sign or verify DPP data with Ed25519.
 - You are issuing or verifying W3C Verifiable Credentials for supply-chain actors.
 - You need to enforce read access by audience (Public / LegitimateInterest / Authority) on
-  passport fields per ESPR Article 10.
+  passport fields, per ESPR Art. 11(b) and the access rights each product group's
+  delegated act sets.
 - You are building a `did:web` identity for a manufacturer or operator.
 
 ## Example
