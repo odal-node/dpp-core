@@ -106,6 +106,26 @@ pub fn annex_vii_parameter_set_for(battery_type: &str) -> Option<Annex7Parameter
     }
 }
 
+/// Whether Annex VII **Part B** (expected-lifetime parameters) reaches a battery
+/// of `battery_type`.
+///
+/// Part B is narrower than Part A, and the difference is easy to miss: Part A
+/// names *"electric vehicle batteries, stationary battery energy storage systems
+/// and LMT batteries"*, while Part B names only *"stationary battery energy
+/// storage systems and LMT batteries"*. **Electric-vehicle batteries report a
+/// state of health under Part A but no expected-lifetime parameter set under
+/// Part B.**
+///
+/// The `"industrial"` imprecision described on [`annex_vii_parameter_set_for`]
+/// applies here too.
+#[must_use]
+pub fn annex_vii_part_b_applies_to(battery_type: &str) -> bool {
+    matches!(
+        annex_vii_parameter_set_for(battery_type),
+        Some(Annex7ParameterSet::StationaryOrLmt)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,6 +167,31 @@ mod tests {
                 annex_vii_parameter_set_for(t),
                 None,
                 "{t} should be out of scope"
+            );
+        }
+    }
+
+    #[test]
+    fn part_b_excludes_electric_vehicle_batteries() {
+        // The asymmetry between the two parts. Part A names EV batteries;
+        // Part B does not. An EV battery reports SOCE and no expected-lifetime
+        // parameter set at all.
+        assert_eq!(
+            annex_vii_parameter_set_for("ev"),
+            Some(Annex7ParameterSet::ElectricVehicle)
+        );
+        assert!(!annex_vii_part_b_applies_to("ev"));
+    }
+
+    #[test]
+    fn part_b_covers_stationary_and_lmt() {
+        for t in ["lmt", "industrial", "LMT"] {
+            assert!(annex_vii_part_b_applies_to(t), "{t} should be in Part B");
+        }
+        for t in ["portable", "sli", "starting-lighting-ignition", "mystery"] {
+            assert!(
+                !annex_vii_part_b_applies_to(t),
+                "{t} should be outside Part B"
             );
         }
     }

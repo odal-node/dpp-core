@@ -166,6 +166,13 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub battery_passport_number: Option<String>,
 
+    // ── v2.4.0 — Annex VII Part B expected lifetime ─────────────────────
+    /// Measured expected-lifetime parameters per Annex VII Part B.
+    ///
+    /// Stationary storage and LMT only — Part B does not reach EV batteries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lifetime: Option<Box<ExpectedLifetime>>,
+
     // ── v2.3.0 — Art. 8(1) declaration provenance ───────────────────────
     /// Calendar year the recycled-content shares pertain to.
     ///
@@ -179,8 +186,12 @@ pub struct BatteryData {
     // ── v2.2.0 — Annex VII Part A state of health ────────────────────────
     /// State-of-health parameters per Annex VII Part A, in the parameter set
     /// its battery category requires. Supersedes `state_of_health_pct`.
+    ///
+    /// Boxed: the two Annex VII measurement blocks are large relative to the
+    /// rest of `BatteryData` and populated only for batteries that actually
+    /// report them, so `SectorData` should not carry their weight inline.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub state_of_health: Option<StateOfHealth>,
+    pub state_of_health: Option<Box<StateOfHealth>>,
 }
 
 /// State-of-health parameters per Annex VII Part A of Reg. (EU) 2023/1542.
@@ -229,6 +240,58 @@ pub enum StateOfHealth {
         #[serde(skip_serializing_if = "Option::is_none")]
         ohmic_resistance_mohm: Option<f64>,
     },
+}
+
+/// Harmful events tracked under Annex VII Part B item 4.
+///
+/// The annex says *"the tracking of harmful events, **such as** the number of
+/// deep discharge events, time spent in extreme temperatures, time spent
+/// charging in extreme temperatures"*. "Such as" makes that list illustrative,
+/// not closed — so every field here is optional, and an implementation tracking
+/// a further event type is conforming, not extending.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HarmfulEvents {
+    /// Number of deep discharge events.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deep_discharge_events: Option<u32>,
+    /// Cumulative hours spent outside the battery's rated temperature range.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hours_in_extreme_temperature: Option<f64>,
+    /// Cumulative hours spent *charging* outside that range.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hours_charging_in_extreme_temperature: Option<f64>,
+}
+
+/// Expected-lifetime parameters per Annex VII **Part B**.
+///
+/// Part B is narrower than Part A: it names only *"stationary battery energy
+/// storage systems and LMT batteries"*. Electric-vehicle batteries report a
+/// state of health under Part A but no expected-lifetime parameter set here —
+/// see `dpp_rules::batteries::degradation::annex_vii_part_b_applies_to`.
+///
+/// **Not the same thing as [`BatteryData::expected_lifetime_cycles`].** That
+/// field is the model-level design figure Annex XIII point 1(j) makes *public*
+/// ("expected battery lifetime expressed in cycles, and reference test used").
+/// These are *measured* values for one physical battery, which Annex XIII point
+/// 4(d) restricts to persons with a legitimate interest — hence the `individual`
+/// disclosure class.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpectedLifetime {
+    /// 1. Date of putting into service, *"where appropriate"* — the only
+    ///    qualified item in Part B. The date of manufacture, the other half of
+    ///    item 1, is [`BatteryData::manufacturing_date`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub put_into_service_date: Option<NaiveDate>,
+    /// 2. The energy throughput, in kWh.
+    pub energy_throughput_kwh: f64,
+    /// 3. The capacity throughput, in ampere-hours.
+    pub capacity_throughput_ah: f64,
+    /// 4. Tracking of harmful events.
+    pub harmful_events: HarmfulEvents,
+    /// 5. The number of full equivalent charge-discharge cycles.
+    pub full_equivalent_cycles: f64,
 }
 
 /// Material composition entry for cathode, anode, or electrolyte.

@@ -161,9 +161,9 @@ cluster — so no surface exists on which one customer's passport data and
 another's can be seen together. A cross-customer benchmark is not something the
 system declines to build; it is something it has no place to compute.
 
-**Where the constraint lives in code.** `PassportRepository` is the entire
-persistence surface, and its `list` and `count` methods are the only ones that
-see more than one passport. The port documents the Art. 78(d) limit on
+**Where the constraint lives in code.** `PassportRepository` is the primary
+persistence surface — resolver scan telemetry is processed data too — and its
+`list` and `count` methods are the only ones that see more than one passport. The port documents the Art. 78(d) limit on
 implementors directly, so a future backing store cannot acquire an analytics
 sideline without someone editing past the constraint.
 

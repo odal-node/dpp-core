@@ -18,6 +18,7 @@ fn valid_battery() -> SectorData {
         recycled_content_nickel_pct: None,
         state_of_health_pct: None,
         state_of_health: None,
+        expected_lifetime: None,
         recycled_content_reporting_year: None,
         rated_capacity_kwh: None,
         carbon_footprint_class: None,

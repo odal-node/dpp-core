@@ -31,12 +31,12 @@ pub use domain::{
     sector::{
         AluminiumData, BatteryChemistry, BatteryData, BatteryType, CarbonFootprint,
         CarbonFootprintClass, CarbonFootprintClassError, ConstructionData, DetergentData,
-        ElectronicsData, EnergyEfficiencyClass, FibreEntry, FurnitureData, LifecycleStage,
-        MaterialComposition, ProductionRoute, RepairCriterion, RepairabilityScore, Sector,
-        SectorData, StateOfHealth, SteelData, SurfactantEntry, SvhcSubstance, SystemBoundary,
-        TextileData, ToyData, TyreData, UnsoldGoodsDestination, UnsoldGoodsReason,
-        UnsoldGoodsReport, redact_sector_data, validate_fibre_composition, validate_surfactants,
-        validate_svhc_substances,
+        ElectronicsData, EnergyEfficiencyClass, ExpectedLifetime, FibreEntry, FurnitureData,
+        HarmfulEvents, LifecycleStage, MaterialComposition, ProductionRoute, RepairCriterion,
+        RepairabilityScore, Sector, SectorData, StateOfHealth, SteelData, SurfactantEntry,
+        SvhcSubstance, SystemBoundary, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
+        UnsoldGoodsReason, UnsoldGoodsReport, redact_sector_data, validate_fibre_composition,
+        validate_surfactants, validate_svhc_substances,
     },
     status::PassportStatus,
     transfer::{

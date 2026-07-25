@@ -76,6 +76,7 @@ fn make_battery_passport() -> Passport {
                 recycled_content_nickel_pct: Some(9.0),
                 state_of_health_pct: Some(100.0),
                 state_of_health: None,
+                expected_lifetime: None,
                 recycled_content_reporting_year: None,
                 rated_capacity_kwh: Some(0.32),
                 carbon_footprint_class: Some(CarbonFootprintClass::new("B").expect("valid label")),
