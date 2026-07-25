@@ -7,7 +7,7 @@
   "schemaVersions": ["1.0.0", "1.1.0"],
   "currentSchemaVersion": "1.1.0",
   "productCategories": ["cement", "concrete", "structural-steel", "glass"],
-  "accessTiers": { "epdUrl": "professional" },
+  "disclosure": { "epdUrl": "restricted" },
   "plugin": "sector-construction",
   "notes": "CPR adopted; DPP requirements phased ~2028-2032. No binding determination yet."
 }

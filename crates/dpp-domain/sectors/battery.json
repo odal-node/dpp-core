@@ -8,14 +8,14 @@
   "schemaVersions": ["1.0.0", "2.0.0"],
   "currentSchemaVersion": "2.0.0",
   "productCategories": ["portable", "industrial", "ev", "lmt", "sli"],
-  "accessTiers": {
-    "dueDiligenceUrl": "professional",
-    "criticalRawMaterials": "professional",
-    "disassemblyInstructionsUrl": "professional",
-    "cathodeMaterial": "professional",
-    "anodeMaterial": "professional",
-    "electrolyteMaterial": "professional",
-    "sohMethodology": "professional"
+  "disclosure": {
+    "dueDiligenceUrl": "restricted",
+    "criticalRawMaterials": "restricted",
+    "disassemblyInstructionsUrl": "restricted",
+    "cathodeMaterial": "restricted",
+    "anodeMaterial": "restricted",
+    "electrolyteMaterial": "restricted",
+    "sohMethodology": "restricted"
   },
   "plugin": "sector-battery",
   "notes": "Battery passport mandatory for EV, LMT and industrial batteries >2 kWh from 2027-02-18. Regulation in full enforcement since Jan 2026."

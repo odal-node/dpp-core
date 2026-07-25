@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 
 use super::revocation::{RevocationOutcome, check_revocation};
 use super::trust::TrustedIssuerRegistry;
-use super::types::{AccessTier, CredentialRole, DppAccessCredential};
+use super::types::{Audience, CredentialRole, DppAccessCredential};
 use crate::access::status_list::StatusList;
 
 // ─── Verification result ────────────────────────────────────────────────────
@@ -12,7 +12,7 @@ use crate::access::status_list::StatusList;
 pub enum VerificationResult {
     /// Credential is valid — the granted access tier is returned.
     Valid {
-        access_tier: AccessTier,
+        audience: Audience,
         role: CredentialRole,
         holder_did: String,
     },
@@ -83,9 +83,9 @@ pub fn verify_credential_claims(
     }
 
     let role = credential.credential_subject.role.clone();
-    let access_tier = role.access_tier();
+    let audience = role.audience();
     VerificationResult::Valid {
-        access_tier,
+        audience,
         role,
         holder_did: credential.credential_subject.id.clone(),
     }
@@ -164,8 +164,8 @@ pub fn verify_credential_claims_with_trust(
         }
     }
 
-    let required_tier = credential.credential_subject.role.access_tier();
-    if !trusted_issuers.is_trusted_for_tier(&credential.issuer, required_tier) {
+    let required_audience = credential.credential_subject.role.audience();
+    if !trusted_issuers.is_trusted_for_audience(&credential.issuer, required_audience) {
         return VerificationResult::UntrustedIssuer {
             issuer_did: credential.issuer.clone(),
         };

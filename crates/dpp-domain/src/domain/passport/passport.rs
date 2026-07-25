@@ -9,7 +9,7 @@ use super::{
     ProductCategory,
 };
 use crate::domain::{
-    identity::AccessTier,
+    identity::{Audience, Disclosure},
     lint::LintResult,
     sector::{CarbonFootprint, RepairabilityScore, Sector, SectorData},
     status::PassportStatus,
@@ -295,13 +295,12 @@ impl Passport {
     /// `sectorData`, when present, is independently redacted via
     /// [`crate::domain::sector::redact_sector_data`] against the sector descriptor
     /// from `catalog`. If the sector is not in the catalog, sector data is
-    /// **withheld** from viewers below `Confidential` (fail-closed): without the
-    /// descriptor's per-field access tiers the domain layer cannot tell which
-    /// fields are safe to expose, so it exposes none. `Confidential` viewers —
-    /// who may see every field anyway — still receive the full data.
+    /// **withheld** from every audience except `Authority` (fail-closed): without
+    /// the descriptor's per-field disclosure classes the domain layer cannot tell
+    /// which fields are safe to expose, so it exposes none.
     pub fn redact(
         &self,
-        viewer_tier: AccessTier,
+        audience: Audience,
         catalog: &crate::catalog::SectorCatalog,
     ) -> PassportView {
         let mut value = match serde_json::to_value(self) {
@@ -310,26 +309,26 @@ impl Passport {
         };
 
         if let Some(obj) = value.as_object_mut() {
-            if viewer_tier < AccessTier::Professional {
+            if !audience.may_see(Disclosure::Restricted) {
                 obj.remove("batchId");
             }
-            if viewer_tier < AccessTier::Confidential {
+            if !audience.may_see(Disclosure::Conformity) {
                 obj.remove("jwsSignature");
                 obj.remove("retentionLocked");
             }
-            // Re-redact sectorData using the catalog's per-field access_tiers.
+            // Re-redact sectorData using the catalog's per-field disclosure map.
             if let Some(ref sd) = self.sector_data {
                 let key = sd.sector().catalog_key();
                 let redacted = if let Some(descriptor) = catalog.get(key) {
-                    crate::domain::sector::redact_sector_data(sd, viewer_tier, descriptor)
-                } else if viewer_tier >= AccessTier::Confidential {
-                    // Unknown sector: the full payload is only safe for the tier
-                    // that already sees every field.
+                    crate::domain::sector::redact_sector_data(sd, audience, descriptor)
+                } else if audience.may_see(Disclosure::Conformity) {
+                    // Unknown sector: the full payload is only safe for the
+                    // audience that already sees conformity evidence.
                     serde_json::to_value(sd).unwrap_or(serde_json::Value::Null)
                 } else {
-                    // Fail closed: without per-field tiers we cannot tell which
-                    // fields are confidential, so withhold sector data entirely
-                    // rather than leak it to a lower tier.
+                    // Fail closed: without per-field classes we cannot tell
+                    // which fields are restricted, so withhold sector data
+                    // entirely rather than leak it.
                     serde_json::Value::Null
                 };
                 obj.insert("sectorData".into(), redacted);

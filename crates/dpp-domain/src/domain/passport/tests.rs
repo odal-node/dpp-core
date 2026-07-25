@@ -1,7 +1,7 @@
 //! Serde round-trip, state-machine, validation, and redaction tests for `Passport`.
 
 use super::*;
-use crate::domain::identity::AccessTier;
+use crate::domain::identity::Audience;
 use crate::domain::sector::{
     BatteryChemistry, BatteryData, CarbonFootprint, RepairabilityScore, Sector, SectorData,
 };
@@ -368,7 +368,7 @@ fn battery_passport_with_due_diligence() -> Passport {
 fn redact_public_strips_batch_id_jws_and_retention() {
     let catalog = crate::catalog::SectorCatalog::new();
     let p = battery_passport_with_due_diligence();
-    let view = p.redact(AccessTier::Public, &catalog).into_value();
+    let view = p.redact(Audience::Public, &catalog).into_value();
     assert!(
         view.get("batchId").is_none(),
         "batchId must be stripped at Public"
@@ -391,7 +391,7 @@ fn redact_public_strips_batch_id_jws_and_retention() {
 fn redact_public_strips_gated_sector_fields() {
     let catalog = crate::catalog::SectorCatalog::new();
     let p = battery_passport_with_due_diligence();
-    let view = p.redact(AccessTier::Public, &catalog).into_value();
+    let view = p.redact(Audience::Public, &catalog).into_value();
     let sd = &view["sectorData"];
     assert!(
         sd.get("dueDiligenceUrl").is_none(),
@@ -415,7 +415,9 @@ fn redact_public_strips_gated_sector_fields() {
 fn redact_professional_exposes_gated_sector_fields() {
     let catalog = crate::catalog::SectorCatalog::new();
     let p = battery_passport_with_due_diligence();
-    let view = p.redact(AccessTier::Professional, &catalog).into_value();
+    let view = p
+        .redact(Audience::LegitimateInterest, &catalog)
+        .into_value();
     let sd = &view["sectorData"];
     assert!(
         sd.get("dueDiligenceUrl").is_some(),
@@ -433,7 +435,7 @@ fn redact_professional_exposes_gated_sector_fields() {
 fn redact_confidential_exposes_everything() {
     let catalog = crate::catalog::SectorCatalog::new();
     let p = battery_passport_with_due_diligence();
-    let view = p.redact(AccessTier::Confidential, &catalog).into_value();
+    let view = p.redact(Audience::Authority, &catalog).into_value();
     assert!(view.get("batchId").is_some());
     assert!(view.get("jwsSignature").is_some());
     assert!(view.get("retentionLocked").is_some());
@@ -445,7 +447,7 @@ fn redact_confidential_exposes_everything() {
 fn redact_no_sector_data_leaves_passport_fields() {
     let catalog = crate::catalog::SectorCatalog::new();
     let p = make_passport(); // no sector_data, no batchId
-    let view = p.redact(AccessTier::Public, &catalog).into_value();
+    let view = p.redact(Audience::Public, &catalog).into_value();
     assert!(view.get("productName").is_some());
     assert!(view.get("sectorData").is_none());
 }
@@ -462,7 +464,7 @@ fn redact_unknown_sector_withholds_sector_data_below_confidential() {
     ));
 
     // Public: no descriptor → withhold sector data entirely (fail closed).
-    let public = p.redact(AccessTier::Public, &catalog).into_value();
+    let public = p.redact(Audience::Public, &catalog).into_value();
     assert!(
         public["sectorData"].is_null(),
         "unknown-sector data must be withheld below Confidential, got: {}",
@@ -474,6 +476,6 @@ fn redact_unknown_sector_withholds_sector_data_below_confidential() {
     );
 
     // Confidential: sees every field anyway → full data.
-    let conf = p.redact(AccessTier::Confidential, &catalog).into_value();
+    let conf = p.redact(Audience::Authority, &catalog).into_value();
     assert_eq!(conf["sectorData"]["secretField"], "leak-me");
 }

@@ -18,7 +18,9 @@ pub use catalog::{CatalogError, RegulatoryStatus, SectorCatalog, SectorDescripto
 pub use domain::{
     error::DppError,
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
-    identity::{AccessTier, PassportCredential, PassportCredentialSubject, SignedCredential},
+    identity::{
+        Audience, Disclosure, PassportCredential, PassportCredentialSubject, SignedCredential,
+    },
     lint::{LintFinding, LintResult, LintSeverity, lint_sector_data},
     passport::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportView,

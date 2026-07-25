@@ -57,11 +57,8 @@ fn verify_valid_credential() {
     let cred = sample_credential();
     let result = verify_credential_claims(&cred, Some("textile"), Utc::now());
     assert!(result.is_valid());
-    if let VerificationResult::Valid {
-        access_tier, role, ..
-    } = result
-    {
-        assert_eq!(access_tier, AccessTier::Professional);
+    if let VerificationResult::Valid { audience, role, .. } = result {
+        assert_eq!(audience, Audience::LegitimateInterest);
         assert_eq!(role, CredentialRole::AuthorisedRepairer);
     }
 }
@@ -105,8 +102,8 @@ fn authority_role_grants_confidential_tier() {
     subject.sectors = vec![];
     let cred = CredentialBuilder::new("did:web:surveillance.europa.eu".into(), subject).build();
     let result = verify_credential_claims(&cred, None, Utc::now());
-    if let VerificationResult::Valid { access_tier, .. } = result {
-        assert_eq!(access_tier, AccessTier::Confidential);
+    if let VerificationResult::Valid { audience, .. } = result {
+        assert_eq!(audience, Audience::Authority);
     } else {
         panic!("expected Valid result");
     }
@@ -218,27 +215,24 @@ fn expired_credential_short_circuits_before_revocation() {
 }
 
 #[test]
-fn credential_role_access_tiers() {
+fn credential_role_disclosure() {
     assert_eq!(
-        CredentialRole::AuthorisedRepairer.access_tier(),
-        AccessTier::Professional
+        CredentialRole::AuthorisedRepairer.audience(),
+        Audience::LegitimateInterest
     );
     assert_eq!(
-        CredentialRole::Recycler.access_tier(),
-        AccessTier::Professional
+        CredentialRole::Recycler.audience(),
+        Audience::LegitimateInterest
     );
     assert_eq!(
-        CredentialRole::MarketSurveillanceAuthority.access_tier(),
-        AccessTier::Confidential
+        CredentialRole::MarketSurveillanceAuthority.audience(),
+        Audience::Authority
     );
     assert_eq!(
-        CredentialRole::CustomsAuthority.access_tier(),
-        AccessTier::Confidential
+        CredentialRole::CustomsAuthority.audience(),
+        Audience::Authority
     );
-    assert_eq!(
-        CredentialRole::NotifiedBody.access_tier(),
-        AccessTier::Confidential
-    );
+    assert_eq!(CredentialRole::NotifiedBody.audience(), Audience::Authority);
 }
 
 // ── Gap 9: issuer trust anchor ────────────────────────────────────────────

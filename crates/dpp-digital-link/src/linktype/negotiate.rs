@@ -1,6 +1,6 @@
 //! Link descriptors and the content-negotiation algorithm.
 
-use dpp_domain::AccessTier;
+use dpp_domain::{Audience, Disclosure};
 use serde::{Deserialize, Serialize};
 
 use super::media_type::DppMediaType;
@@ -21,7 +21,7 @@ pub struct LinkDescriptor {
     /// Media type served at this URL.
     pub media_type: DppMediaType,
     /// Minimum access tier required to view this resource.
-    pub min_access_tier: AccessTier,
+    pub disclosure: Disclosure,
     /// Human-readable title.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -41,12 +41,12 @@ pub fn negotiate<'a>(
     available: &'a [LinkDescriptor],
     request: &ResolutionRequest,
 ) -> Option<&'a LinkDescriptor> {
-    let caller_tier = request.access_tier.as_ref().unwrap_or(&AccessTier::Public);
+    let audience = request.audience.unwrap_or(Audience::Public);
 
     // Filter by access tier
     let accessible: Vec<&LinkDescriptor> = available
         .iter()
-        .filter(|d| d.min_access_tier <= *caller_tier)
+        .filter(|d| audience.may_see(d.disclosure))
         .collect();
 
     if accessible.is_empty() {

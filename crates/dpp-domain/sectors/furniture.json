@@ -7,9 +7,9 @@
   "schemaVersions": ["1.0.0", "1.1.0"],
   "currentSchemaVersion": "1.1.0",
   "productCategories": ["chair", "table", "sofa", "mattress", "shelf"],
-  "accessTiers": {
-    "svhcSubstances": "professional",
-    "disassemblyInstructionsUrl": "professional"
+  "disclosure": {
+    "svhcSubstances": "restricted",
+    "disassemblyInstructionsUrl": "restricted"
   },
   "plugin": "sector-furniture",
   "notes": "ESPR working-plan priority; indicative adoption ~2029-2030. No binding determination yet."
