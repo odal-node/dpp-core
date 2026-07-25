@@ -220,6 +220,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
         battery_type: Some(BatteryType::Ev),
         round_trip_efficiency_pct: Some(94.0),
         internal_resistance_mohm: Some(3.2),
+        placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
         manufacturing_date: None,
         manufacturing_place: None,
         battery_model_id: None,

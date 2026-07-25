@@ -1,0 +1,216 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/battery-v2.1.0.json",
+  "title": "Odal Node — Battery Sector Data (v2.1.0)",
+  "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.1.0 removes the invented A-E enumeration on carbonFootprintClass — Art. 7(2) defines no class labels and requires the Commission to review the number of classes every three years — and adds the ruleset id and version that produced the label, since a class is meaningless without the scale it came from. It also adds placedOnMarketDate, which is what determines whether a staged obligation attaches to a given battery.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "batteryChemistry",
+    "nominalVoltageV",
+    "nominalCapacityAh",
+    "expectedLifetimeCycles",
+    "co2ePerUnitKg"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "batteryChemistry": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Battery chemistry code, e.g. LFP, NMC, LCO."
+    },
+    "nominalVoltageV": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal voltage in volts."
+    },
+    "nominalCapacityAh": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal capacity in ampere-hours."
+    },
+    "expectedLifetimeCycles": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Expected lifetime in full charge-discharge cycles."
+    },
+    "co2ePerUnitKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per battery unit."
+    },
+    "recycledContentCobaltPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "recycledContentLithiumPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "recycledContentNickelPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "stateOfHealthPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "placedOnMarketDate": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible."
+    },
+    "ratedCapacityKwh": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Rated energy in kilowatt-hours."
+    },
+    "carbonFootprintClass": {
+      "type": ["string", "null"],
+      "maxLength": 8,
+      "description": "Carbon footprint performance class label per Art. 7(2), verbatim from the delegated act that established the scale. Not enumerated here: Art. 7(2) defines no labels and requires the Commission to review the number of classes and their thresholds every three years. Meaningless without carbonFootprintClassRulesetId and carbonFootprintClassRulesetVersion."
+    },
+    "carbonFootprintClassRulesetId": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "Identifier of the ruleset whose class boundaries produced carbonFootprintClass."
+    },
+    "carbonFootprintClassRulesetVersion": {
+      "type": ["string", "null"],
+      "maxLength": 32,
+      "description": "Version of the ruleset identified by carbonFootprintClassRulesetId."
+    },
+    "dueDiligenceUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL to supply chain due diligence documentation (Arts. 48-53)."
+    },
+    "cathodeMaterial": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/materialComposition" },
+      "description": "Cathode active material composition."
+    },
+    "anodeMaterial": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/materialComposition" },
+      "description": "Anode active material composition."
+    },
+    "electrolyteMaterial": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/materialComposition" },
+      "description": "Electrolyte composition."
+    },
+    "criticalRawMaterials": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/criticalRawMaterial" },
+      "description": "Critical raw materials per EU CRM Act 2024/1252."
+    },
+    "disassemblyInstructionsUrl": {
+      "type": ["string", "null"],
+      "description": "URL or text for disassembly/dismantling instructions (Annex XIII point 2(c))."
+    },
+    "sohMethodology": {
+      "type": ["string", "null"],
+      "description": "State-of-health determination methodology identifier."
+    },
+    "operatingTempMinC": {
+      "type": ["number", "null"],
+      "description": "Minimum operating temperature in degrees Celsius."
+    },
+    "operatingTempMaxC": {
+      "type": ["number", "null"],
+      "description": "Maximum operating temperature in degrees Celsius."
+    },
+    "ratedEnergyWh": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Rated energy in watt-hours (Wh)."
+    },
+    "recycledContentLeadPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled lead content percentage (lead-acid batteries). Note: Art. 8(2)/(3) measure lead as the share present in the battery, whereas cobalt, lithium and nickel are measured in active materials."
+    },
+    "batteryWeightKg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Battery weight in kilograms."
+    },
+    "batteryType": {
+      "type": ["string", "null"],
+      "enum": ["portable", "industrial", "ev", "lmt", "starting-lighting-ignition", null],
+      "description": "Battery type category per regulation."
+    },
+    "roundTripEfficiencyPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Round-trip energy efficiency at 50% SoC."
+    },
+    "internalResistanceMohm": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Internal resistance in milliohms at 50% SoC."
+    }
+  },
+  "definitions": {
+    "materialComposition": {
+      "type": "object",
+      "required": ["name", "weightPct"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Chemical name or formula."
+        },
+        "weightPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Weight percentage in the component."
+        },
+        "casNumber": {
+          "type": ["string", "null"],
+          "description": "CAS Registry Number."
+        }
+      },
+      "additionalProperties": false
+    },
+    "criticalRawMaterial": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Material name, e.g. cobalt, lithium."
+        },
+        "casNumber": {
+          "type": ["string", "null"],
+          "description": "CAS or EC number."
+        },
+        "weightGrams": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Weight in grams present in the battery."
+        },
+        "countryOfOrigin": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{2}$",
+          "description": "ISO 3166-1 alpha-2 country of primary extraction."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
