@@ -92,18 +92,103 @@ pub enum BatteryType {
     Other,
 }
 
-/// Carbon footprint performance class (A–E) per EU Battery Regulation Art. 7(2).
-/// Also used for electronics energy-rating analogues.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Error from constructing a [`CarbonFootprintClass`].
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum CarbonFootprintClass {
-    A,
-    B,
-    C,
-    D,
-    E,
-    #[serde(other)]
-    Other,
+pub enum CarbonFootprintClassError {
+    #[error("carbon footprint class label must not be empty or blank")]
+    Empty,
+    #[error(
+        "carbon footprint class label '{label}' is {len} characters, \
+         exceeding the maximum of {max}"
+    )]
+    TooLong {
+        label: String,
+        len: usize,
+        max: usize,
+    },
+    #[error("carbon footprint class label '{0}' contains a control character")]
+    ControlCharacter(String),
+}
+
+/// A carbon footprint performance class label, preserved verbatim as declared.
+///
+/// **Deliberately not an enumeration.** Art. 7(2) of Regulation (EU) 2023/1542
+/// defines no class labels — it defers them to a delegated act that has not been
+/// adopted, and in the same paragraph requires the Commission to "review the
+/// number of performance classes and the thresholds between them, every three
+/// years". A fixed variant set is therefore wrong on a three-year cycle.
+///
+/// An `#[serde(other)]` catch-all is worse than wrong: an earlier version of
+/// this type mapped every unrecognised label to `Other`, discarding the declared
+/// string. Since a published passport carries a qualified electronic seal, a
+/// lossy round-trip is a correctness defect — "F" and "A+" under a future
+/// seven-class scale would both have been stored, and re-served, as `Other`.
+///
+/// A label means nothing on its own: it is only interpretable against the
+/// ruleset whose boundaries produced it. Always carry it alongside
+/// [`BatteryData::carbon_footprint_class_ruleset_id`](crate::BatteryData) and
+/// its version.
+///
+/// The length bound matches battery schema v2.1.0 (`maxLength: 8`), so a value
+/// that validates here also validates against the schema.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct CarbonFootprintClass(String);
+
+impl CarbonFootprintClass {
+    /// Maximum label length in characters, matching the schema's `maxLength`.
+    pub const MAX_LEN: usize = 8;
+
+    /// Construct a class label, rejecting anything the schema would reject.
+    ///
+    /// The label is stored exactly as given — no case folding, no trimming of
+    /// interior content — because the declared value is what an auditor
+    /// re-checks against the delegated act.
+    pub fn new(label: impl Into<String>) -> Result<Self, CarbonFootprintClassError> {
+        let label = label.into();
+        if label.trim().is_empty() {
+            return Err(CarbonFootprintClassError::Empty);
+        }
+        if label.chars().any(char::is_control) {
+            return Err(CarbonFootprintClassError::ControlCharacter(label));
+        }
+        let len = label.chars().count();
+        if len > Self::MAX_LEN {
+            return Err(CarbonFootprintClassError::TooLong {
+                label,
+                len,
+                max: Self::MAX_LEN,
+            });
+        }
+        Ok(Self(label))
+    }
+
+    /// The label as declared.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for CarbonFootprintClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl TryFrom<String> for CarbonFootprintClass {
+    type Error = CarbonFootprintClassError;
+
+    fn try_from(label: String) -> Result<Self, Self::Error> {
+        Self::new(label)
+    }
+}
+
+impl From<CarbonFootprintClass> for String {
+    fn from(class: CarbonFootprintClass) -> Self {
+        class.0
+    }
 }
 
 /// EU energy label class per EU Energy Labelling Regulation 2017/1369 (A–G scale).
@@ -166,4 +251,72 @@ pub enum SystemBoundary {
     GhgProtocol,
     #[serde(other)]
     Other,
+}
+
+#[cfg(test)]
+mod carbon_footprint_class_tests {
+    use super::*;
+
+    #[test]
+    fn round_trip_preserves_a_label_this_build_has_never_seen() {
+        // The regression this type exists to prevent. The previous enum mapped
+        // every unrecognised label to `Other`, so a future scale's "F" and "A+"
+        // both round-tripped to the string "Other" — under a qualified seal.
+        for label in ["A", "F", "A+", "A+++", "CLASS-1"] {
+            let json = serde_json::to_string(&CarbonFootprintClass::new(label).unwrap()).unwrap();
+            assert_eq!(json, format!("\"{label}\""));
+            let back: CarbonFootprintClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(back.as_str(), label, "label must survive the round trip");
+        }
+    }
+
+    #[test]
+    fn deserialization_validates_rather_than_silently_accepting() {
+        // A catch-all variant would have swallowed these. `try_from` rejects
+        // them at the boundary, where the caller can still report a field path.
+        for bad in ["\"\"", "\"   \"", "\"TOOLONGLABEL\""] {
+            assert!(
+                serde_json::from_str::<CarbonFootprintClass>(bad).is_err(),
+                "should reject {bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_empty_blank_overlong_and_control_characters() {
+        assert!(matches!(
+            CarbonFootprintClass::new(""),
+            Err(CarbonFootprintClassError::Empty)
+        ));
+        assert!(matches!(
+            CarbonFootprintClass::new("  \t "),
+            Err(CarbonFootprintClassError::Empty)
+        ));
+        assert!(matches!(
+            CarbonFootprintClass::new("A\u{7}"),
+            Err(CarbonFootprintClassError::ControlCharacter(_))
+        ));
+        let err = CarbonFootprintClass::new("ABCDEFGHI").unwrap_err();
+        assert!(matches!(
+            err,
+            CarbonFootprintClassError::TooLong { len: 9, max: 8, .. }
+        ));
+    }
+
+    #[test]
+    fn length_bound_matches_the_schema_and_counts_characters() {
+        assert_eq!(CarbonFootprintClass::MAX_LEN, 8);
+        // Exactly at the bound is accepted.
+        assert!(CarbonFootprintClass::new("ABCDEFGH").is_ok());
+        // maxLength in JSON Schema counts code points, not bytes — a
+        // byte-length check would wrongly reject this 4-character label.
+        assert!(CarbonFootprintClass::new("Ä+++").is_ok());
+    }
+
+    #[test]
+    fn label_is_stored_verbatim_without_case_folding() {
+        let c = CarbonFootprintClass::new("a+").unwrap();
+        assert_eq!(c.as_str(), "a+");
+        assert_eq!(c.to_string(), "a+");
+    }
 }

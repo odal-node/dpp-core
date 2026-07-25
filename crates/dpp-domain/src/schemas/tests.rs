@@ -741,3 +741,32 @@ fn validate_runtime_registered_schema() {
     let invalid = serde_json::json!({});
     assert!(reg.validate("plastics", &v1, &invalid).is_err());
 }
+
+#[test]
+fn carbon_footprint_class_bound_matches_the_schema() {
+    // Drift guard: the newtype's length bound and the schema's `maxLength` are
+    // two statements of one fact. If they disagree, a value can pass schema
+    // validation and fail typed deserialization (or the reverse), and the
+    // failure surfaces far from either declaration.
+    use crate::domain::sector::CarbonFootprintClass;
+
+    let reg = VersionedSchemaRegistry::new();
+    let json = reg
+        .get("battery", &"2.1.0".parse::<Version>().unwrap())
+        .expect("battery v2.1.0 is embedded");
+    let schema: serde_json::Value = serde_json::from_str(json).unwrap();
+    let max_length = schema["properties"]["carbonFootprintClass"]["maxLength"]
+        .as_u64()
+        .expect("carbonFootprintClass must declare maxLength");
+
+    assert_eq!(max_length as usize, CarbonFootprintClass::MAX_LEN);
+
+    // And the field must not have regained an enumeration: Art. 7(2) defines no
+    // labels and requires the class count to be reviewed every three years.
+    assert!(
+        schema["properties"]["carbonFootprintClass"]
+            .get("enum")
+            .is_none(),
+        "carbonFootprintClass must not enumerate labels"
+    );
+}

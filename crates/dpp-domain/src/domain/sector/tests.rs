@@ -265,7 +265,9 @@ fn sector_data_battery_round_trip() {
     let data = SectorData::Battery(BatteryData {
         recycled_content_lithium_pct: Some(12.5),
         rated_capacity_kwh: Some(32.0),
-        carbon_footprint_class: Some(CarbonFootprintClass::B),
+        carbon_footprint_class: Some(CarbonFootprintClass::new("B").expect("valid label")),
+        carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
+        carbon_footprint_class_ruleset_version: Some("0.0.0-test".into()),
         ..crate::test_support::sample_battery_data()
     });
     let json = serde_json::to_value(&data).unwrap();

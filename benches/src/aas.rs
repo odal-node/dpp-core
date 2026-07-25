@@ -47,6 +47,8 @@ fn battery_passport() -> Passport {
                 state_of_health_pct: Some(100.0),
                 rated_capacity_kwh: Some(0.32),
                 carbon_footprint_class: None,
+                carbon_footprint_class_ruleset_id: None,
+                carbon_footprint_class_ruleset_version: None,
                 due_diligence_url: Some("https://bench.example.com/dd".into()),
                 cathode_material: None,
                 anode_material: None,
