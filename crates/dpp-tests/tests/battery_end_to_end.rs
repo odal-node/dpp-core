@@ -111,6 +111,7 @@ fn make_battery_passport() -> Passport {
                 battery_type: Some(BatteryType::Ev),
                 round_trip_efficiency_pct: Some(94.5),
                 internal_resistance_mohm: Some(0.8),
+                placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
                 manufacturing_date: Some(now),
                 manufacturing_place: Some("DE:München".into()),
                 battery_model_id: Some("VD-4680-LFP".into()),

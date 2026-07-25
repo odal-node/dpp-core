@@ -58,7 +58,7 @@ re-exports as `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each
 (`plugin_result_to_compliance`), which the engine persists on the passport
 (`compliance_result`, part of the signed payload) and gates publish on.
 
-`sector-battery` is the reference: it scopes EU 2023/1542 Annex X recycled-content
+`sector-battery` is the reference: it scopes EU 2023/1542 Art. 8(2) recycled-content
 checks to the declared chemistry and emits them as **advisory** warnings (the
 Phase-1 minima are not binding until 18 Aug 2031), while data-integrity
 contradictions (cobalt declared on an LFP cell; inverted operating-temperature

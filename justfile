@@ -39,8 +39,24 @@ doc:
 bench:
     cargo bench --package dpp-benches
 
-# Run all gate checks (fmt → lint → test → doc → audit)
-check: fmt-check lint test doc audit
+# Run each sector plugin's own test suite on the host target.
+#
+# The plugins are excluded from the workspace, so `just test` does not reach
+# them: a plugin can be broken while the workspace gate is green. Runs on the
+# host (not wasm32) because these are ordinary #[cfg(test)] unit tests; the
+# wasm build is covered separately by `build-plugins`.
+test-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for plugin in plugins/sector-*; do
+        [ -f "$plugin/Cargo.toml" ] || continue
+        echo "Testing $plugin..."
+        (cd "$plugin" && cargo test --quiet)
+    done
+    echo "All plugin tests passed."
+
+# Run all gate checks (fmt → lint → test → plugin tests → doc → audit)
+check: fmt-check lint test test-plugins doc audit
 
 # ---------------------------------------------------------------------------
 # Build
