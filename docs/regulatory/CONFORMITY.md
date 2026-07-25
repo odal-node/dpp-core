@@ -107,6 +107,47 @@ Integration test: `tests/schema_conformity.rs` asserts field coverage.
 - **AAS Submodel Mapping** — Automatic conversion of DPP JSON to IDTA AAS
   SubmodelElement structures for Industry 4.0 / Catena-X interoperability.
 
+## Unique Identifier — ISO/IEC 15459 (Battery Reg. Art. 77(3))
+
+Art. 77(3) of Regulation (EU) 2023/1542 requires that *"the QR code and the
+unique identifier shall comply with ISO/IEC standards 15459-1:2014,
+15459-2:2015, 15459-3:2014, 15459-4:2014, 15459-5:2014 and 15459-6:2014"*.
+
+**Position.** The carrier is a GS1 Digital Link URI over a GS1 identification
+key: GTIN (AI 01) plus an item serial (AI 21), optionally a batch/lot (AI 10) —
+i.e. a serialised GTIN. 🔶 GS1 is a registered Issuing Agency under ISO/IEC
+15459, so identifiers issued under GS1 keys carry a registered Issuing Agency
+Code and inherit the scheme's global-uniqueness guarantees. Conformance is
+therefore claimed **through GS1**, not by independent implementation of the
+ISO parts.
+
+**What is verified.** The AI 21 serial is exactly 20 characters from `[0-9a-f]`,
+within the GS1 General Specifications limit that the `DigitalLink` parser
+enforces; the URI syntax is GS1 Digital Link v1.2. Both are covered by tests.
+
+**What is not.** 🔶 The ISO/IEC 15459 parts are paywalled and have **not** been
+read against primary text. The claim above rests on GS1's registration as an
+Issuing Agency and on secondary sources, not on the standard's own wording. Do
+not restate it as a verified conformance assertion, and do not put it in
+customer-facing material, until someone has read the parts — in particular
+15459-3 (common rules) and 15459-4 (individual products), which are the two that
+bear on a per-item product identifier.
+
+**Serial construction.** The AI 21 serial is derived from the passport UUIDv7's
+last ten bytes (`rand_a` + `rand_b`, 74 random bits), not its first ten. The
+leading six bytes of a UUIDv7 are a millisecond timestamp: deriving the serial
+from them produced a monotonically increasing serial whose first twelve hex
+characters decoded to the passport's creation instant, so a QR code on a
+physical battery disclosed when it was created and, across several codes, the
+production order and rate. Fixed; regression tests cover both properties.
+
+**Open question.** ISO/IEC 15459 requires uniqueness to be *persistent over
+time*. The serial is deterministic from the passport UUID and unique per
+passport, but nothing currently prevents two passports being issued for one
+physical item, or a reissued passport receiving a different serial for the same
+battery. That is an operational guarantee the engine must make, not one this
+crate can enforce.
+
 ## Cryptographic Foundations
 
 - **Ed25519** — All signing operations use Ed25519 (EdDSA) as specified by
