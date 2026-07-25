@@ -23,10 +23,10 @@ pub(crate) fn os_rng() -> rand::rand_core::UnwrapErr<rand::rngs::SysRng> {
 // ── Flat re-exports — maintain stable paths for external callers ─────────────
 
 pub use access::{
-    AccessTier, AllowAllIssuers, CredentialBuilder, CredentialRole, CredentialStatus,
+    AllowAllIssuers, Audience, CredentialBuilder, CredentialRole, CredentialStatus,
     DppAccessCredential, DppCredentialSubject, PolicyDecision, RevocationOutcome,
     SectorAccessPolicy, StaticTrustedIssuers, StatusList, TrustedIssuerRegistry,
-    VerificationResult, check_revocation, filter_by_access_tier, verify_credential_claims,
+    VerificationResult, check_revocation, filter_by_audience, verify_credential_claims,
     verify_credential_claims_with_trust, verify_credential_with_revocation,
     verify_credential_with_revocation_and_trust,
 };

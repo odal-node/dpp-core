@@ -6,7 +6,7 @@
 /// Produced by [`Passport::redact`](crate::domain::passport::Passport::redact).
 /// Serialises transparently to JSON — use this type wherever a consumer
 /// should only see the fields allowed by their
-/// [`AccessTier`](crate::domain::identity::AccessTier).
+/// [`Audience`](crate::domain::identity::Audience).
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(transparent)]
 pub struct PassportView(pub serde_json::Value);

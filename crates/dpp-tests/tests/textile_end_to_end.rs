@@ -14,9 +14,9 @@
 use chrono::Utc;
 use dpp_crypto::access::credential::verify_credential_claims;
 use dpp_crypto::access::credential::{
-    AccessTier, CredentialBuilder, CredentialRole, DppCredentialSubject,
+    Audience, CredentialBuilder, CredentialRole, DppCredentialSubject,
 };
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
+use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
 use dpp_digital_link::aas::map_dpp_to_aas_submodel;
 use dpp_domain::{
@@ -160,7 +160,7 @@ fn gs1_digital_link_parsing_for_textile() {
 }
 
 #[test]
-fn credential_issuance_and_access_tier_filtering() {
+fn credential_issuance_and_audience_filtering() {
     let passport = make_textile_passport();
 
     // Extract just the sector data as a flat JSON for access filtering
@@ -178,7 +178,7 @@ fn credential_issuance_and_access_tier_filtering() {
         .expect("textile in catalog");
 
     // ── Public tier ────────────────────────────────────────────────────────
-    let public_decision = filter_by_access_tier(&textile_fields, &policy, AccessTier::Public);
+    let public_decision = filter_by_audience(&textile_fields, &policy, Audience::Public);
     // Public tier must NOT see professional fields
     assert!(
         public_decision
@@ -221,10 +221,10 @@ fn credential_issuance_and_access_tier_filtering() {
     assert!(result.is_valid(), "credential should be valid");
 
     // The credential grants Professional tier
-    if let dpp_crypto::access::credential::VerificationResult::Valid { access_tier, .. } = &result {
-        assert_eq!(*access_tier, AccessTier::Professional);
+    if let dpp_crypto::access::credential::VerificationResult::Valid { audience, .. } = &result {
+        assert_eq!(*audience, Audience::LegitimateInterest);
 
-        let pro_decision = filter_by_access_tier(&textile_fields, &policy, *access_tier);
+        let pro_decision = filter_by_audience(&textile_fields, &policy, *audience);
         // Professional MUST see SVHC and disassembly data
         assert!(
             pro_decision.filtered_data.get("svhcSubstances").is_some(),

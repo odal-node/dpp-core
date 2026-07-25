@@ -89,7 +89,7 @@ fn register_runtime_sector() {
         schema_versions: vec!["1.0.0".into()],
         current_schema_version: "1.0.0".into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     };
@@ -112,7 +112,7 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
         schema_versions: versions,
         current_schema_version: current.into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     }
@@ -257,18 +257,18 @@ fn descriptor_round_trips_camel_case() {
     assert_eq!(back.key, "battery");
 }
 
-// Drift guard: every key in a sector's access_tiers manifest must correspond to
+// Drift guard: every key in a sector's disclosure manifest must correspond to
 // a real JSON field in that sector's current schema. A key that doesn't match any
 // schema property silently fails to gate any field — the redaction is a no-op.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn access_tiers_keys_match_schema_properties() {
+fn disclosure_keys_match_schema_properties() {
     use crate::schemas::VersionedSchemaRegistry;
     let catalog = SectorCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
     for descriptor in catalog.all() {
-        if descriptor.access_tiers.is_empty() {
+        if descriptor.disclosure.is_empty() {
             continue;
         }
         let version: semver::Version =
@@ -299,10 +299,10 @@ fn access_tiers_keys_match_schema_properties() {
                 )
             });
 
-        for key in descriptor.access_tiers.keys() {
+        for key in descriptor.disclosure.keys() {
             assert!(
                 properties.contains_key(key),
-                "access_tiers key '{}' in sector '{}' does not match any property in schema v{} \
+                "disclosure key '{}' in sector '{}' does not match any property in schema v{} \
                  (properties: {:?}). Either rename the key to match the serialised field name, \
                  or remove it — a mismatched key silently fails to gate the field.",
                 key,
