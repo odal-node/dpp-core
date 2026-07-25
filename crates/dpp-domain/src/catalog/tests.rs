@@ -365,3 +365,71 @@ fn catalog_agrees_with_schema_registry() {
         );
     }
 }
+
+/// Sectors whose catalog `productCategories` mirror a schema enum, and the
+/// property that enumerates them.
+///
+/// The correspondence is **not derivable** from the data — depending on sector
+/// the categories live under `productCategory`, `productType`, `batteryType`,
+/// `productFamily`, `productionRoute` or `tyreClass` — so it is declared here.
+/// A sector absent from this table is simply not cross-checked; `textile`, for
+/// example, declares categories but its schema has no enum for them.
+const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
+    ("aluminium", "productionRoute"),
+    ("battery", "batteryType"),
+    ("construction", "productFamily"),
+    ("detergent", "productType"),
+    ("electronics", "productCategory"),
+    ("furniture", "productType"),
+    ("steel", "productCategory"),
+    ("tyre", "tyreClass"),
+    ("unsold-goods", "productCategory"),
+];
+
+/// Drift guard: a catalog product category that is not a legal value of the
+/// corresponding schema enum is a value nothing can ever validate against.
+///
+/// This existed as two spellings of one concept — the catalog said `sli` and
+/// `clothing_accessories` where the schemas said `starting-lighting-ignition`
+/// and `accessories`. Neither was load-bearing, because
+/// `SectorDescriptor::product_categories` has no reader in Rust today; both
+/// would have become load-bearing the moment one appeared.
+#[test]
+fn product_categories_are_legal_values_of_their_schema_enum() {
+    use crate::schemas::VersionedSchemaRegistry;
+
+    let catalog = SectorCatalog::new();
+    let registry = VersionedSchemaRegistry::new();
+
+    for (sector_key, property) in CATEGORY_ENUM_PROPERTY {
+        let descriptor = catalog
+            .get(sector_key)
+            .unwrap_or_else(|| panic!("sector '{sector_key}' is in the table but not the catalog"));
+        let version: semver::Version = descriptor
+            .current_schema_version
+            .parse()
+            .expect("currentSchemaVersion is valid semver");
+        let schema_json = registry
+            .get(sector_key, &version)
+            .unwrap_or_else(|| panic!("no schema for '{sector_key}' v{version}"));
+        let schema: serde_json::Value =
+            serde_json::from_str(schema_json).expect("schema is valid JSON");
+
+        let allowed: Vec<&str> = schema["properties"][property]["enum"]
+            .as_array()
+            .unwrap_or_else(|| {
+                panic!("'{sector_key}' schema property '{property}' has no enum — stale table row")
+            })
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect();
+
+        for category in &descriptor.product_categories {
+            assert!(
+                allowed.contains(&category.as_str()),
+                "sector '{sector_key}' lists product category '{category}', which is not a legal \
+                 value of schema property '{property}' ({allowed:?})"
+            );
+        }
+    }
+}
