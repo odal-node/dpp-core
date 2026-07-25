@@ -28,9 +28,9 @@ mod tests;
 
 pub use data::{
     AluminiumData, BatteryData, ConstructionData, CriticalRawMaterial, DetergentData,
-    ElectronicsData, FibreEntry, FurnitureData, MaterialComposition, SectorData, SteelData,
-    SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
-    UnsoldGoodsReason, UnsoldGoodsReport, redact_sector_data,
+    ElectronicsData, FibreEntry, FurnitureData, MaterialComposition, SectorData, StateOfHealth,
+    SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
+    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport, redact_sector_data,
 };
 pub use enums::{
     BatteryChemistry, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,

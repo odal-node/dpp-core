@@ -57,15 +57,105 @@
 //! energy throughput, capacity throughput, tracking of harmful events, and the
 //! number of full equivalent charge-discharge cycles.
 //!
-//! The battery schema currently carries a single `stateOfHealthPct` and an
-//! `expectedLifetimeCycles`, both range-checked by JSON Schema. That is narrower
-//! than Annex VII and cannot represent SOCE or the five-parameter set.
-//!
-//! ## Placeholder note
-//!
-//! No cross-field rule linking the declared fields can be derived from current
-//! regulation text. When the Art. 10(5) acts are published, implement the
-//! minimum values here keyed by battery category, and switch the battery plugin
-//! from `NOT_ASSESSED` to a real determination for the affected categories.
+//! Which parameter set a battery must report is decided by its category — see
+//! [`annex_vii_parameter_set_for`]. The *minimum values* those parameters must
+//! reach remain pending under Art. 10(5).
 
-// Placeholder — rules to be implemented once the Art. 10(5) delegated acts are adopted.
+/// Which Annex VII Part A parameter set applies to a battery.
+///
+/// Annex VII Part A splits into exactly two lists: one parameter for electric
+/// vehicle batteries, and a five-parameter list shared by stationary battery
+/// energy storage systems and LMT batteries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Annex7ParameterSet {
+    /// Electric-vehicle batteries — state of certified energy (SOCE), and
+    /// nothing else.
+    ElectricVehicle,
+    /// Stationary battery energy storage systems and LMT batteries — remaining
+    /// capacity and the evolution of self-discharging rates unconditionally,
+    /// plus remaining power capability, remaining round trip efficiency and
+    /// ohmic resistance "where possible".
+    StationaryOrLmt,
+}
+
+/// The Annex VII Part A parameter set a battery of `battery_type` must report,
+/// or `None` where Annex VII Part A does not reach it.
+///
+/// Matching is case-insensitive. Portable and SLI batteries return `None`:
+/// Art. 14(1) names only stationary battery energy storage systems, LMT
+/// batteries and electric vehicle batteries.
+///
+/// **Known imprecision.** Art. 3 defines a stationary battery energy storage
+/// system as a *subset* of industrial batteries, and the passport's
+/// `batteryType` cannot distinguish the two. `"industrial"` therefore maps to
+/// [`Annex7ParameterSet::StationaryOrLmt`], which is the conservative
+/// direction: an industrial battery that is not a stationary storage system is
+/// outside Annex VII Part A entirely, so the only cost is that declaring the
+/// parameters is treated as expected rather than as surplus.
+#[must_use]
+pub fn annex_vii_parameter_set_for(battery_type: &str) -> Option<Annex7ParameterSet> {
+    let t = battery_type.trim();
+    let eq = |s: &str| t.eq_ignore_ascii_case(s);
+    if eq("ev") {
+        Some(Annex7ParameterSet::ElectricVehicle)
+    } else if eq("lmt") || eq("industrial") {
+        Some(Annex7ParameterSet::StationaryOrLmt)
+    } else {
+        // portable, sli / starting-lighting-ignition, unknown.
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ev_batteries_report_soce_alone() {
+        assert_eq!(
+            annex_vii_parameter_set_for("ev"),
+            Some(Annex7ParameterSet::ElectricVehicle)
+        );
+        assert_eq!(
+            annex_vii_parameter_set_for("EV"),
+            Some(Annex7ParameterSet::ElectricVehicle)
+        );
+    }
+
+    #[test]
+    fn lmt_and_industrial_share_the_five_parameter_list() {
+        for t in ["lmt", "LMT", "industrial", " Industrial "] {
+            assert_eq!(
+                annex_vii_parameter_set_for(t),
+                Some(Annex7ParameterSet::StationaryOrLmt),
+                "{t} should use the stationary/LMT list"
+            );
+        }
+    }
+
+    #[test]
+    fn portable_and_sli_are_outside_annex_vii_part_a() {
+        // Art. 14(1) names stationary storage, LMT and EV batteries only.
+        for t in [
+            "portable",
+            "sli",
+            "starting-lighting-ignition",
+            "",
+            "mystery",
+        ] {
+            assert_eq!(
+                annex_vii_parameter_set_for(t),
+                None,
+                "{t} should be out of scope"
+            );
+        }
+    }
+
+    #[test]
+    fn the_two_parameter_sets_are_distinct() {
+        assert_ne!(
+            annex_vii_parameter_set_for("ev"),
+            annex_vii_parameter_set_for("lmt")
+        );
+    }
+}

@@ -19,7 +19,7 @@ pub mod tyre;
 pub mod unsold_goods;
 
 pub use aluminium::AluminiumData;
-pub use battery::{BatteryData, MaterialComposition};
+pub use battery::{BatteryData, MaterialComposition, StateOfHealth};
 pub use construction::ConstructionData;
 pub use detergent::{DetergentData, SurfactantEntry};
 pub use electronics::ElectronicsData;

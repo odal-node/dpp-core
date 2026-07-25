@@ -203,6 +203,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
         recycled_content_lithium_pct: Some(12.5),
         recycled_content_nickel_pct: None,
         state_of_health_pct: Some(95.0),
+        state_of_health: None,
         rated_capacity_kwh: Some(32.0),
         carbon_footprint_class: Some(CarbonFootprintClass::new("B").expect("valid label")),
         carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
