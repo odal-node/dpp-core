@@ -11,6 +11,8 @@
 //!
 //! **Usage:**
 //! ```rust
+//! use chrono::NaiveDate;
+//! use dpp_calc::clock::AssessmentClock;
 //! use dpp_calc::repairability::{
 //!     calculate, parameters::RepairabilityInputs,
 //!     thresholds::SimplifiedRepairabilityHeuristic,
@@ -24,7 +26,11 @@
 //!     software_updatability: 2,
 //!     customer_support: 1,
 //! };
-//! let result = calculate(&inputs, &SimplifiedRepairabilityHeuristic).unwrap();
+//! // The date the governing law attached to the product — from the product's
+//! // own record, never from the wall clock.
+//! let clock = AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+//!
+//! let result = calculate(&inputs, &SimplifiedRepairabilityHeuristic, clock).unwrap();
 //! println!("{:?}  ({:.2}/10)", result.class, result.numeric_score);
 //! ```
 //!

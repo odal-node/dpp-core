@@ -50,19 +50,25 @@ fn repairability_inputs() -> RepairabilityInputs {
 }
 
 fn calc_benchmarks(c: &mut Criterion) {
+    let clock = dpp_calc::clock::AssessmentClock::placed_on(
+        chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"),
+    );
+
     let small = small_co2e_inputs();
     c.bench_function("co2e_cradle_to_gate_small", |b| {
-        b.iter(|| co2e::calculate(&small, &CradleToGateRuleset).unwrap());
+        b.iter(|| co2e::calculate(&small, &CradleToGateRuleset, clock).unwrap());
     });
 
     let big = bill_of_materials(50);
     c.bench_function("co2e_cradle_to_gate_50_materials", |b| {
-        b.iter(|| co2e::calculate(&big, &CradleToGateRuleset).unwrap());
+        b.iter(|| co2e::calculate(&big, &CradleToGateRuleset, clock).unwrap());
     });
 
     let rep = repairability_inputs();
     c.bench_function("repairability_heuristic_smartphone", |b| {
-        b.iter(|| repairability::calculate(&rep, &SimplifiedRepairabilityHeuristic).unwrap());
+        b.iter(|| {
+            repairability::calculate(&rep, &SimplifiedRepairabilityHeuristic, clock).unwrap()
+        });
     });
 }
 

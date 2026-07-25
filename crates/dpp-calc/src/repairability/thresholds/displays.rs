@@ -2,15 +2,13 @@
 //!
 //! EU 2019/2021 covers ecodesign for electronic displays. An ESPR-era repairability
 //! delegated act is expected. Weights below are placeholder (uniform) pending the
-//! official annex. Effective-date sentinel: 2100-01-01 blocks runtime use.
-
-use chrono::NaiveDate;
+//! official annex. Effectivity is Pending, so this ruleset governs no date.
 
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
     RepairabilityWeights,
 };
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct DisplaysRuleset;
 
@@ -34,8 +32,10 @@ static DISPLAYS_BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static DISPLAYS_RULESET_ID: RulesetId = RulesetId("displays-repairability");
 static DISPLAYS_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
-static DISPLAYS_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
-    std::sync::OnceLock::new();
+static DISPLAYS_EFFECTIVITY: Effectivity = Effectivity::pending(
+    "ESPR (EU) 2024/1781 — electronic displays repairability delegated act, not yet adopted",
+    None,
+);
 
 impl Ruleset for DisplaysRuleset {
     fn id(&self) -> &RulesetId {
@@ -46,10 +46,8 @@ impl Ruleset for DisplaysRuleset {
         &DISPLAYS_RULESET_VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
-        DISPLAYS_EFFECTIVE_DATES.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2100, 1, 1).expect("valid date"))
-        })
+    fn effectivity(&self) -> &Effectivity {
+        &DISPLAYS_EFFECTIVITY
     }
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {

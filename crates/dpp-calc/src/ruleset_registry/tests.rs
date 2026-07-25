@@ -1,6 +1,14 @@
 //! Tests for ruleset resolution and the calculator status map.
 
 use super::*;
+use crate::assessability::Assessability;
+use crate::ruleset::Effectivity;
+
+/// The wall-clock date, used only where the question genuinely is "what can be
+/// computed today" — a readiness view, never a compliance determination.
+fn today() -> chrono::NaiveDate {
+    Utc::now().date_naive()
+}
 use chrono::{NaiveDate, Utc};
 
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
@@ -10,35 +18,59 @@ fn date(y: i32, m: u32, d: u32) -> NaiveDate {
 #[test]
 fn smartphone_heuristic_available_after_june_2025() {
     assert!(
-        resolve_repairability("smartphone-tablet", date(2025, 6, 20)).is_some(),
+        resolve_repairability("smartphone-tablet", date(2025, 6, 20)).is_assessed(),
         "heuristic should resolve on/after its availability date (20 Jun 2025)"
     );
     assert!(
-        resolve_repairability("smartphone-tablet", date(2026, 1, 1)).is_some(),
+        resolve_repairability("smartphone-tablet", date(2026, 1, 1)).is_assessed(),
         "heuristic should resolve the following year"
     );
 }
 
 #[test]
 fn smartphone_heuristic_unavailable_before_june_2025() {
+    // Not merely absent — the caller is told the date it starts.
+    let got = resolve_repairability("smartphone-tablet", date(2025, 5, 31));
+    let Assessability::NotYetInForce {
+        ruleset_id,
+        applies_from,
+    } = got
+    else {
+        panic!("expected NotYetInForce");
+    };
+    assert_eq!(ruleset_id, "repairability-heuristic-v1");
+    assert_eq!(applies_from, date(2025, 6, 20));
+}
+
+#[test]
+fn laptop_is_undetermined_not_merely_absent() {
+    // LaptopRuleset is Pending, so the answer names the instrument being waited
+    // on rather than returning a bare "nothing found".
+    let got = resolve_repairability("laptop", date(2026, 6, 9));
+    let Assessability::Undetermined {
+        ruleset_id,
+        empowerment,
+    } = got
+    else {
+        panic!("expected Undetermined");
+    };
+    assert_eq!(ruleset_id, "laptop-repairability");
     assert!(
-        resolve_repairability("smartphone-tablet", date(2025, 5, 31)).is_none(),
-        "heuristic must not resolve before its availability date"
+        empowerment.contains("2024/1781"),
+        "empowerment should cite the instrument: {empowerment}"
     );
 }
 
 #[test]
-fn laptop_not_active_today() {
-    // LaptopRuleset has from=2100 — no date today should resolve it.
-    assert!(
-        resolve_repairability("laptop", date(2026, 6, 9)).is_none(),
-        "laptop ruleset is a 2100 stub and must not resolve before then"
-    );
-}
-
-#[test]
-fn unknown_category_returns_none() {
-    assert!(resolve_repairability("washing-machine", date(2026, 1, 1)).is_none());
+fn unknown_category_is_out_of_scope() {
+    // A category with no row at all. An earlier version of this test passed
+    // "washing-machine" — a *known* category with a pending ruleset — so it
+    // asserted the right outcome for the wrong reason, and `Option` could not
+    // tell the two apart.
+    assert!(matches!(
+        resolve_repairability("kettle", date(2026, 1, 1)),
+        Assessability::OutOfScope
+    ));
 }
 
 /// CI invariant: any ruleset whose effective period has already ended must
@@ -51,8 +83,10 @@ fn unknown_category_returns_none() {
 fn expired_rulesets_have_superseded_by() {
     let today = Utc::now().date_naive();
     for r in all_rulesets() {
-        if let Some(until) = r.effective_dates().until
-            && until < today
+        if let Effectivity::InForce {
+            until: Some(until), ..
+        } = r.effectivity()
+            && *until < today
         {
             assert!(
                 r.regulatory_basis().superseded_by.is_some(),
@@ -66,7 +100,9 @@ fn expired_rulesets_have_superseded_by() {
 #[test]
 fn resolved_ruleset_carries_non_regulatory_basis() {
     // The repairability heuristic must NOT claim EU 2023/1669 conformance.
-    let r = resolve_repairability("smartphone-tablet", date(2026, 1, 1)).expect("should resolve");
+    let r = resolve_repairability("smartphone-tablet", date(2026, 1, 1))
+        .assessed()
+        .expect("should resolve");
     let basis = r.regulatory_basis();
     assert!(
         basis.regulation.contains("Non-regulatory")
@@ -83,16 +119,22 @@ fn resolved_ruleset_carries_non_regulatory_basis() {
 #[test]
 fn displays_not_active_today() {
     assert!(
-        resolve_repairability("displays", date(2026, 6, 16)).is_none(),
-        "displays ruleset is a stub and must not resolve before 2100"
+        matches!(
+            resolve_repairability("displays", date(2026, 6, 16)),
+            Assessability::Undetermined { .. }
+        ),
+        "displays ruleset awaits an unadopted act"
     );
 }
 
 #[test]
 fn washing_machine_not_active_today() {
     assert!(
-        resolve_repairability("washing-machine", date(2026, 6, 16)).is_none(),
-        "washing-machine ruleset is a stub and must not resolve before 2100"
+        matches!(
+            resolve_repairability("washing-machine", date(2026, 6, 16)),
+            Assessability::Undetermined { .. }
+        ),
+        "washing-machine ruleset awaits an unadopted act"
     );
 }
 
@@ -103,7 +145,7 @@ fn sector_calculator_map_has_at_least_one_active_entry() {
     let map = sector_calculator_map();
     assert!(
         map.iter()
-            .any(|e| matches!(e.status, CalculatorStatus::Active { .. })),
+            .any(|e| matches!(e.status_on(today()), CalculatorStatus::Active { .. })),
         "expected at least one Active entry in the calculator map"
     );
 }
@@ -117,13 +159,13 @@ fn smartphone_tablet_is_active_in_map() {
         .expect("smartphone-tablet must appear in the map");
     assert!(
         matches!(
-            &entry.status,
+            entry.status_on(today()),
             CalculatorStatus::Active {
                 ruleset_id: "repairability-heuristic-v1"
             }
         ),
         "expected Active, got {:?}",
-        entry.status
+        entry.status_on(today())
     );
 }
 
@@ -134,7 +176,10 @@ fn battery_pef_is_active_in_map() {
         .iter()
         .find(|e| e.sector_key == "battery" && e.methodology == "co2e-pef")
         .expect("battery co2e-pef must appear in the map");
-    assert!(matches!(entry.status, CalculatorStatus::Active { .. }));
+    assert!(matches!(
+        entry.status_on(today()),
+        CalculatorStatus::Active { .. }
+    ));
 }
 
 #[test]
@@ -162,21 +207,20 @@ fn status_map_agrees_with_resolve_repairability_today() {
         if entry.methodology != "repairability-heuristic" {
             continue;
         }
-        let resolves_today = resolve_repairability(entry.product_category, today).is_some();
-        match &entry.status {
+        let resolves_today = resolve_repairability(entry.product_category, today).is_assessed();
+        match entry.status_on(today) {
             CalculatorStatus::Active { .. } => assert!(
                 resolves_today,
-                "sector_calculator_map marks '{}' Active, but resolve_repairability finds \
-                 no ruleset for it today",
+                "sector_calculator_map derives Active for '{}', but resolve_repairability \
+                 finds no ruleset for it today",
                 entry.product_category
             ),
-            CalculatorStatus::PendingDelegatedAct { .. } => assert!(
+            other => assert!(
                 !resolves_today,
-                "sector_calculator_map marks '{}' PendingDelegatedAct, but \
-                 resolve_repairability already resolves a ruleset for it today",
+                "sector_calculator_map derives {other:?} for '{}', but resolve_repairability \
+                 already resolves a ruleset for it today",
                 entry.product_category
             ),
-            CalculatorStatus::ReportingOnly => {}
         }
     }
 }
@@ -189,7 +233,7 @@ fn status_map_agrees_with_resolve_repairability_today() {
 fn active_map_entries_reference_real_rulesets() {
     let known: std::collections::HashSet<&str> = all_rulesets().iter().map(|r| r.id().0).collect();
     for entry in sector_calculator_map() {
-        if let CalculatorStatus::Active { ruleset_id } = &entry.status {
+        if let CalculatorImpl::Ruleset(ruleset_id) = &entry.implementation {
             assert!(
                 known.contains(ruleset_id),
                 "map entry ({}/{}) references ruleset_id '{ruleset_id}' not present in all_rulesets()",

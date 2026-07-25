@@ -1,8 +1,15 @@
 //! Golden-vector regression tests for the cradle-to-gate CO₂e calculator.
 
 use super::*;
+use crate::clock::AssessmentClock;
 use crate::error::CalcError;
 use crate::ruleset::Ruleset; // for `.regulatory_basis()` on the concrete ruleset
+use chrono::NaiveDate;
+
+/// Governing-law date inside CradleToGateRuleset's effective period.
+fn in_force() -> AssessmentClock {
+    AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+}
 
 fn inputs() -> Co2eInputs {
     Co2eInputs {
@@ -23,7 +30,7 @@ fn inputs() -> Co2eInputs {
 
 #[test]
 fn sums_materials_and_energy() {
-    let r = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     // 0.5×8 + 0.2×3 = 4.6; 1.5×0.4 = 0.6
     assert!((r.material_co2e_kg - 4.6).abs() < 1e-9);
     assert!((r.energy_co2e_kg - 0.6).abs() < 1e-9);
@@ -32,7 +39,7 @@ fn sums_materials_and_energy() {
 
 #[test]
 fn material_breakdown_matches_total() {
-    let r = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     assert_eq!(r.material_breakdown.len(), 2);
     assert!((r.material_breakdown[0].co2e_kg - 4.0).abs() < 1e-9);
     assert!((r.material_breakdown[1].co2e_kg - 0.6).abs() < 1e-9);
@@ -42,7 +49,7 @@ fn material_breakdown_matches_total() {
 
 #[test]
 fn declared_stages_are_raw_materials_and_production() {
-    let r = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     assert_eq!(
         r.declared_stages,
         vec![LifecycleStage::RawMaterials, LifecycleStage::Production]
@@ -58,6 +65,7 @@ fn empty_bom_is_energy_only() {
             grid_factor_kg_co2e_per_kwh: 0.5,
         },
         &CradleToGateRuleset,
+        in_force(),
     )
     .unwrap();
     assert!((r.total_co2e_kg - 1.0).abs() < 1e-9);
@@ -76,6 +84,7 @@ fn negative_mass_is_rejected() {
             grid_factor_kg_co2e_per_kwh: 0.4,
         },
         &CradleToGateRuleset,
+        in_force(),
     );
     assert!(matches!(err, Err(CalcError::InvalidInput(_))));
 }
@@ -89,25 +98,26 @@ fn nan_energy_is_rejected() {
             grid_factor_kg_co2e_per_kwh: 0.4,
         },
         &CradleToGateRuleset,
+        in_force(),
     );
     assert!(matches!(err, Err(CalcError::InvalidInput(_))));
 }
 
 #[test]
 fn receipt_binds_to_inputs_and_outputs() {
-    let r = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     assert_eq!(r.receipt.ruleset_id, "co2e-cradle-to-gate");
     assert!(!r.receipt.input_hash.is_empty());
     assert!(!r.receipt.output_hash.is_empty());
     // Same inputs produce the same hashes.
-    let r2 = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r2 = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     assert_eq!(r.receipt.input_hash, r2.receipt.input_hash);
     assert_eq!(r.receipt.output_hash, r2.receipt.output_hash);
 }
 
 #[test]
 fn receipt_can_be_signed_externally() {
-    let r = calculate(&inputs(), &CradleToGateRuleset).unwrap();
+    let r = calculate(&inputs(), &CradleToGateRuleset, in_force()).unwrap();
     let bytes = r.receipt.canonical_bytes_for_signing().unwrap();
     assert!(!bytes.is_empty());
     // Seal it (simulating vault signing).
