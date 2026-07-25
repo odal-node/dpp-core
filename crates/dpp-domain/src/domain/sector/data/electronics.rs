@@ -1,4 +1,8 @@
-//! Electronics (EU Electronics DPP, adopted 18 March 2026, effective 1 April 2026).
+//! Electronics — EU Reg. 2023/1670 (ecodesign) + 2023/1669 (energy labelling).
+//!
+//! Applicability dates and regulatory status live in the sector manifest
+//! (`sectors/electronics.json`); see `docs/regulatory/REGULATORY.md` for what is
+//! implemented versus pending.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,10 +13,10 @@ use crate::domain::sector::metrics::RepairabilityScore;
 
 use super::shared::{CriticalRawMaterial, SvhcSubstance};
 
-/// Electronics sector data for EU Electronics DPP compliance.
+/// Electronics sector data.
 ///
-/// Mandatory for AI servers, high-end PCBs, and foldable phones immediately;
-/// broader consumer electronics (earphones, chargers) from 1 January 2027.
+/// Scope and applicability dates are held in the sector manifest
+/// (`sectors/electronics.json`), not restated here.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ElectronicsData {
