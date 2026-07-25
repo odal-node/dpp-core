@@ -16,9 +16,11 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::rules::batteries::recycled_content::{
-    RecycledContentInput, annex_x_shortfalls_2031, chemistry_regulated_metals,
+    Art8Category, Art8Phase, RecycledContentInput, art8_category_for, art8_phase_for,
+    art8_shortfalls_2031, art8_shortfalls_2036, chemistry_regulated_metals,
     recycled_content_chemistry_conflicts,
 };
+use dpp_plugin_sdk::rules::common::date::CalendarDate;
 use dpp_plugin_sdk::traits::{
     DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
     PluginError, PluginFinding, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
@@ -39,11 +41,11 @@ impl DppSectorPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 and v2.0.0 (Annex XIII fields).
+    // Battery schema ships as v1.0.0 through v2.4.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.0.0".into(),
+            max_version: "2.4.0".into(),
         }
     }
 
@@ -135,38 +137,109 @@ impl DppSectorPlugin for BatteryPlugin {
             ));
         }
 
-        // Recycled-content target check (EU 2023/1542 Art. 8 + Annex X). Phase-1
-        // (from 18 Aug 2031) covers EV, SLI, and industrial batteries > 2 kWh;
-        // portable and LMT batteries are out of Phase-1 scope (LMT joins Phase 2
-        // in 2036). Applying the Phase-1 minima to an out-of-scope battery would
-        // surface a factually wrong "below minimum" advisory. The minima are not
-        // binding yet, so in-scope shortfalls are advisory warnings, never
-        // blocking violations, and are scoped to the metals the declared
-        // chemistry actually contains (an LFP cell has no cobalt/nickel).
-        if phase1_in_scope(battery_type, capacity_kwh) {
+        // Recycled-content targets (EU 2023/1542 Art. 8(2)/(3)). Which phase
+        // binds is decided by the date the battery was placed on the EU market,
+        // never by today's date: Art. 8 attaches its duties at placing on the
+        // market, so a battery lawfully placed in 2030 never acquires the 2031
+        // minima. Shortfalls are scoped to the metals the declared chemistry
+        // actually contains (an LFP cell has no cobalt or nickel), and are always
+        // advisory — the overall status is NotAssessed.
+        let art8_category = art8_category_for(battery_type, capacity_kwh);
+
+        // Art. 8(1) requires the shares "for each battery model per year and per
+        // manufacturing plant". A percentage without both anchors is not that
+        // declaration — it is an unattributed number, and no reader can tell
+        // which production run it describes.
+        let declared_any_share =
+            [cobalt, lithium, nickel, lead].iter().any(Option::is_some);
+        if declared_any_share
+            && art8_category != Art8Category::NotCovered
+            && input.get("recycledContentReportingYear").is_none()
+        {
+            warnings.push(PluginFinding::new(
+                "battery.recycled_content.reporting_year_missing",
+                "/recycledContentReportingYear",
+                "Recycled-content shares are declared without a reporting year.                  EU 2023/1542 Art. 8(1) requires them per battery model, per year                  and per manufacturing plant, so a share without its year is not                  the Art. 8(1) declaration.",
+            ));
+        }
+
+        if art8_category != Art8Category::NotCovered {
             let scoped = RecycledContentInput {
                 cobalt_pct: if regulated.cobalt { cobalt } else { None },
                 lithium_pct: if regulated.lithium { lithium } else { None },
                 nickel_pct: if regulated.nickel { nickel } else { None },
                 lead_pct: if regulated.lead { lead } else { None },
             };
-            for sf in annex_x_shortfalls_2031(&scoped) {
-                let field = match sf.material {
-                    "cobalt" => "/recycledContentCobaltPct",
-                    "lithium" => "/recycledContentLithiumPct",
-                    "nickel" => "/recycledContentNickelPct",
-                    "lead" => "/recycledContentLeadPct",
-                    _ => "",
-                };
-                warnings.push(PluginFinding::new(
-                    format!("battery.recycled_content.{}_below_2031_target", sf.material),
-                    field,
-                    format!(
-                        "Declared {} recycled content {:.1}% is below the EU 2023/1542 \
-                         Annex X Phase-1 minimum of {:.0}% (binding from 18 Aug 2031).",
-                        sf.material, sf.declared_pct, sf.required_pct
-                    ),
-                ));
+            let placed_on_market = input
+                .get("placedOnMarketDate")
+                .and_then(Value::as_str)
+                .and_then(CalendarDate::parse_iso);
+
+            match placed_on_market {
+                // Declining to guess is the whole point. Defaulting to "today"
+                // is what produces retroactively wrong findings once a phase
+                // begins, so say what is missing instead.
+                None => warnings.push(PluginFinding::new(
+                    "battery.recycled_content.market_date_missing",
+                    "/placedOnMarketDate",
+                    "Cannot determine which EU 2023/1542 Art. 8 recycled-content phase \
+                     applies without a valid placedOnMarketDate (YYYY-MM-DD). The minimum \
+                     shares attach by the date the battery was placed on the EU market.",
+                )),
+                Some(date) => {
+                    let (shortfalls, year, standing) = match art8_phase_for(art8_category, date) {
+                        Art8Phase::Phase1 => (
+                            art8_shortfalls_2031(&scoped),
+                            "2031",
+                            "binding for this battery",
+                        ),
+                        Art8Phase::Phase2 => (
+                            art8_shortfalls_2036(&scoped),
+                            "2036",
+                            "binding for this battery",
+                        ),
+                        // In scope, but placed on the market before the phase
+                        // began. Reported as forward-looking guidance rather
+                        // than dropped: useful to know, but not a duty this
+                        // battery carries.
+                        Art8Phase::NotYetBinding => match art8_category {
+                            Art8Category::Lmt => (
+                                art8_shortfalls_2036(&scoped),
+                                "2036",
+                                "not binding for this battery — Art. 8(3) applies to LMT \
+                                 batteries placed on the market from 18 Aug 2036",
+                            ),
+                            _ => (
+                                art8_shortfalls_2031(&scoped),
+                                "2031",
+                                "not binding for this battery — Art. 8(2) applies to \
+                                 batteries placed on the market from 18 Aug 2031",
+                            ),
+                        },
+                        Art8Phase::NotCovered => (Vec::new(), "", ""),
+                    };
+                    for sf in shortfalls {
+                        let field = match sf.material {
+                            "cobalt" => "/recycledContentCobaltPct",
+                            "lithium" => "/recycledContentLithiumPct",
+                            "nickel" => "/recycledContentNickelPct",
+                            "lead" => "/recycledContentLeadPct",
+                            _ => "",
+                        };
+                        warnings.push(PluginFinding::new(
+                            format!(
+                                "battery.recycled_content.{}_below_{year}_target",
+                                sf.material
+                            ),
+                            field,
+                            format!(
+                                "Declared {} recycled content {:.1}% is below the EU 2023/1542 \
+                                 Art. 8 minimum of {:.0}% ({standing}).",
+                                sf.material, sf.declared_pct, sf.required_pct
+                            ),
+                        ));
+                    }
+                }
             }
         }
 
@@ -223,19 +296,6 @@ impl DppSectorPlugin for BatteryPlugin {
     }
 }
 
-/// Whether a battery is within EU 2023/1542 Annex X **Phase-1** scope (from
-/// 18 Aug 2031): EV, SLI, and industrial batteries with capacity > 2 kWh.
-/// Portable and LMT (light means of transport) batteries are excluded — LMT
-/// joins only in Phase 2 (2036). An unknown/absent `battery_type` is treated as
-/// in-scope, so a mislabelled in-scope battery is not silently skipped.
-fn phase1_in_scope(battery_type: &str, capacity_kwh: Option<f64>) -> bool {
-    match battery_type.to_ascii_lowercase().as_str() {
-        "portable" | "lmt" => false,
-        "industrial" => capacity_kwh.is_some_and(|k| k > 2.0),
-        _ => true,
-    }
-}
-
 export_plugin!(BatteryPlugin);
 
 // ─── Tests (host target) ──────────────────────────────────────────────────────
@@ -267,7 +327,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.0.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.4.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 
@@ -354,21 +414,27 @@ mod tests {
             "nominalCapacityAh": 100.0,
             "expectedLifetimeCycles": 3000,
             "co2ePerUnitKg": 85.4,
-            "recycledContentCobaltPct": 12.0, // < 16 Phase-1 target
-            "recycledContentNickelPct": 8.0,  // >= 6 ok
-            "recycledContentLithiumPct": 6.0  // >= 6 ok
+            "placedOnMarketDate": "2032-01-01", // Phase 1 binds
+            "recycledContentCobaltPct": 12.0,   // < 16 Phase-1 target
+            "recycledContentNickelPct": 8.0,    // >= 6 ok
+            "recycledContentLithiumPct": 6.0    // >= 6 ok
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
         assert_eq!(
             result.compliance_status,
             PluginComplianceStatus::NotAssessed
         );
-        // Not-in-force threshold ⇒ advisory only, never blocking.
+        // Advisory only, never blocking — the plugin does not gate on Art. 8.
         assert!(result.violations.is_empty());
+        let cobalt = result
+            .warnings
+            .iter()
+            .find(|w| w.code.contains("cobalt"))
+            .unwrap_or_else(|| panic!("expected cobalt advisory, got: {:?}", result.warnings));
         assert!(
-            result.warnings.iter().any(|w| w.code.contains("cobalt")),
-            "expected cobalt advisory, got: {:?}",
-            result.warnings
+            cobalt.message.contains("binding for this battery"),
+            "a battery placed on the market in 2032 is bound by Art. 8(2); got: {}",
+            cobalt.message
         );
         assert!(!result.warnings.iter().any(|w| w.code.contains("nickel")));
         assert!(!result.warnings.iter().any(|w| w.code.contains("lithium")));
@@ -384,6 +450,8 @@ mod tests {
             "nominalCapacityAh": 100.0,
             "expectedLifetimeCycles": 3000,
             "co2ePerUnitKg": 45.2,
+            "placedOnMarketDate": "2032-01-01",
+            "recycledContentReportingYear": 2032,
             "recycledContentCobaltPct": 0.0,
             "recycledContentLithiumPct": 12.5
         });
@@ -410,7 +478,7 @@ mod tests {
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
         assert!(
             result.warnings.is_empty(),
-            "portable batteries are out of Annex X Phase-1 scope; got: {:?}",
+            "portable batteries are out of Art. 8(2) Phase-1 scope; got: {:?}",
             result.warnings
         );
     }
@@ -447,6 +515,7 @@ mod tests {
             "nominalCapacityAh": 100.0,
             "expectedLifetimeCycles": 3000,
             "co2ePerUnitKg": 45.2,
+            "placedOnMarketDate": "2032-01-01",
             "ratedCapacityKwh": 4.8
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
@@ -465,7 +534,8 @@ mod tests {
             "nominalCapacityAh": 10.0,
             "expectedLifetimeCycles": 800,
             "co2ePerUnitKg": 12.0,
-            "recycledContentCobaltPct": 5.0 // < 16, but LMT is out of scope
+            "placedOnMarketDate": "2032-01-01",
+            "recycledContentCobaltPct": 5.0 // < 16, but LMT is out of Phase 1
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
         assert!(
@@ -475,6 +545,114 @@ mod tests {
                 .any(|w| w.code.contains("below_2031")),
             "LMT must not get a Phase-1 shortfall advisory; got: {:?}",
             result.warnings
+        );
+    }
+
+    #[test]
+    fn battery_placed_before_2031_gets_no_binding_shortfall() {
+        // The reason placedOnMarketDate exists. This battery declares 12 %
+        // cobalt — below the Art. 8(2) minimum of 16 % — but was placed on the
+        // EU market in 2030, so that minimum never attaches to it. Deriving the
+        // phase from "today" would report it as short from 18 Aug 2031 onwards.
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "placedOnMarketDate": "2030-06-01",
+            "recycledContentCobaltPct": 12.0
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        let cobalt = result
+            .warnings
+            .iter()
+            .find(|w| w.code.contains("cobalt"))
+            .unwrap_or_else(|| panic!("expected forward-looking advisory, got: {:?}", result.warnings));
+        assert!(
+            cobalt.message.contains("not binding for this battery"),
+            "a battery placed on the market in 2030 is outside Art. 8(2); got: {}",
+            cobalt.message
+        );
+        assert!(result.violations.is_empty());
+    }
+
+    #[test]
+    fn missing_market_date_is_reported_rather_than_guessed() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "recycledContentCobaltPct": 12.0
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.market_date_missing"),
+            "got: {:?}",
+            result.warnings
+        );
+        // No phase can be determined, so no shortfall may be asserted either way.
+        assert!(
+            !result.warnings.iter().any(|w| w.code.contains("below_")),
+            "no shortfall without a date; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn malformed_market_date_is_treated_as_missing() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "placedOnMarketDate": "01/06/2030",
+            "recycledContentCobaltPct": 12.0
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.market_date_missing"),
+            "an unparseable date must not silently become a determination; got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn lmt_placed_after_2036_is_bound_by_phase_two() {
+        let data = json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "batteryType": "lmt",
+            "nominalVoltageV": 36.0,
+            "nominalCapacityAh": 10.0,
+            "expectedLifetimeCycles": 800,
+            "co2ePerUnitKg": 12.0,
+            "placedOnMarketDate": "2037-01-01",
+            "recycledContentCobaltPct": 20.0 // clears 2031's 16 %, short of 2036's 26 %
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        let cobalt = result
+            .warnings
+            .iter()
+            .find(|w| w.code.contains("cobalt"))
+            .unwrap_or_else(|| panic!("expected a Phase-2 advisory, got: {:?}", result.warnings));
+        assert!(cobalt.code.contains("below_2036"), "got: {}", cobalt.code);
+        assert!(
+            cobalt.message.contains("binding for this battery"),
+            "got: {}",
+            cobalt.message
         );
     }
 
@@ -513,6 +691,7 @@ mod tests {
             "nominalCapacityAh": 100.0, // 4.8 kWh > 2 kWh
             "expectedLifetimeCycles": 3000,
             "co2ePerUnitKg": 85.4,
+            "placedOnMarketDate": "2032-01-01",
             "recycledContentCobaltPct": 5.0 // < 16
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
@@ -547,6 +726,70 @@ mod tests {
                 .iter()
                 .any(|w| w.code == "battery.recycled_content.cobalt_not_in_chemistry"),
             "cobalt-on-LFP must emit a chemistry-conflict advisory; got: {:?}",
+            result.warnings
+        );
+    }
+}
+
+#[cfg(test)]
+mod art8_declaration_tests {
+    use super::*;
+
+    fn shares_without_year() -> Value {
+        json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "placedOnMarketDate": "2032-01-01",
+            "recycledContentCobaltPct": 20.0
+        })
+    }
+
+    #[test]
+    fn shares_without_a_reporting_year_are_flagged() {
+        let result = BatteryPlugin.calculate_metrics(&shares_without_year()).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn shares_with_a_reporting_year_are_not_flagged() {
+        let mut data = shares_without_year();
+        data["recycledContentReportingYear"] = json!(2032);
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn no_shares_declared_means_no_reporting_year_finding() {
+        // The duty attaches to declaring a share, not to existing.
+        let mut data = shares_without_year();
+        data.as_object_mut()
+            .unwrap()
+            .remove("recycledContentCobaltPct");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
             result.warnings
         );
     }

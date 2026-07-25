@@ -1,6 +1,6 @@
 //! Resolution request and HTTP `Accept`-header media-type negotiation.
 
-use dpp_domain::AccessTier;
+use dpp_domain::Audience;
 
 use super::media_type::DppMediaType;
 use super::vocabulary::Gs1LinkType;
@@ -14,7 +14,7 @@ pub struct ResolutionRequest {
     pub media_type: Option<DppMediaType>,
     /// The access tier context (from authentication / credential).
     /// `None` means public access.
-    pub access_tier: Option<AccessTier>,
+    pub audience: Option<Audience>,
 }
 
 impl ResolutionRequest {
@@ -27,7 +27,7 @@ impl ResolutionRequest {
         Self {
             link_type: None,
             media_type: parse_best_media_type(accept),
-            access_tier: None,
+            audience: None,
         }
     }
 }

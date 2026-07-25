@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 /// Parameter weights for the index. Annex IV point 5:
 /// `R = SDD*0,25 + SF*0,15 + ST*0,15 + SSP*0,15 + SSU*0,15 + SRI*0,15`.
@@ -97,7 +97,7 @@ static BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static ID: RulesetId = RulesetId("eu-2023-1669-repairability-index");
 static VERSION: RulesetVersion = RulesetVersion("1.0.0");
-static EFFECTIVE: std::sync::OnceLock<EffectiveDateBound> = std::sync::OnceLock::new();
+static EFFECTIVE: std::sync::OnceLock<Effectivity> = std::sync::OnceLock::new();
 
 /// The enacted EU repairability index for smartphones and slate tablets,
 /// applicable from 2025-06-20.
@@ -117,9 +117,9 @@ impl Ruleset for Eu2023_1669Ruleset {
         &VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
+    fn effectivity(&self) -> &Effectivity {
         EFFECTIVE.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2025, 6, 20).expect("valid date"))
+            Effectivity::open(NaiveDate::from_ymd_opt(2025, 6, 20).expect("valid date"))
         })
     }
 

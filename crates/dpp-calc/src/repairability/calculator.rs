@@ -1,10 +1,10 @@
 //! The simplified repairability heuristic calculation: inputs → A–E band.
 
-use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::parameters::RepairabilityInputs;
 use super::thresholds::RepairabilityRuleset;
+use crate::clock::AssessmentClock;
 use crate::error::CalcError;
 use crate::receipt::{CalculationReceipt, jcs_hash};
 
@@ -81,31 +81,21 @@ pub struct RepairabilityResult {
 /// of today.
 ///
 /// The result is a non-regulatory heuristic, not the EU 2023/1669 class.
-/// Returns `Err` if any parameter value is outside `[0, 2]` or if the
-/// ruleset's effective period does not cover today's date.
+///
+/// There is no wall-clock overload. The governing ruleset is selected against
+/// `clock.law_in_force_on`, which the caller must supply — see
+/// [`AssessmentClock`]. Returns `Err` if any parameter value is outside
+/// `[0, 2]` or if the ruleset does not govern that date.
 pub fn calculate(
     inputs: &RepairabilityInputs,
     ruleset: &dyn RepairabilityRuleset,
-) -> Result<RepairabilityResult, CalcError> {
-    calculate_asof(inputs, ruleset, Utc::now().date_naive())
-}
-
-/// Calculate the simplified repairability heuristic band for one product, as
-/// of `on_date`.
-///
-/// Lets a caller check "was this ruleset legally in force on date X" without
-/// depending on the wall clock — e.g. testing the not-yet-effective/expired
-/// paths with a fixed date rather than a far-future fixture.
-pub fn calculate_asof(
-    inputs: &RepairabilityInputs,
-    ruleset: &dyn RepairabilityRuleset,
-    on_date: NaiveDate,
+    clock: AssessmentClock,
 ) -> Result<RepairabilityResult, CalcError> {
     validate_inputs(inputs)?;
     ruleset.validate_cross_fields(inputs)?;
     ruleset
-        .effective_dates()
-        .ensure_active_on(ruleset.id(), on_date)?;
+        .effectivity()
+        .ensure_active_on(ruleset.id(), clock.law_in_force_on)?;
 
     let w = ruleset.weights();
     let scale = 5.0; // scale 0–2 ordinals to 0–10
@@ -143,7 +133,7 @@ pub fn calculate_asof(
 
     let output_hash = jcs_hash(&(numeric_score, class.as_ordinal()))?;
 
-    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, clock, output_hash)?;
 
     Ok(RepairabilityResult {
         class,
@@ -175,6 +165,13 @@ fn validate_inputs(inputs: &RepairabilityInputs) -> Result<(), CalcError> {
 mod tests {
     use super::*;
     use crate::repairability::thresholds::SimplifiedRepairabilityHeuristic;
+    use chrono::NaiveDate;
+
+    /// A clock inside SimplifiedRepairabilityHeuristic's effective period
+    /// (open from 2025-06-20).
+    fn in_force() -> AssessmentClock {
+        AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+    }
 
     #[test]
     fn class_display_and_ordinal_for_all_grades() {
@@ -201,7 +198,7 @@ mod tests {
             customer_support: 1,
         };
         assert!(matches!(
-            calculate(&inputs, &SimplifiedRepairabilityHeuristic),
+            calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()),
             Err(CalcError::InvalidInput(_))
         ));
     }

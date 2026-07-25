@@ -2,18 +2,25 @@
   "key": "unsold-goods",
   "title": "Unsold Textiles (destruction ban)",
   "status": "in_force",
+  "regime": "espr",
   "legalBasis": [
     "Regulation (EU) 2024/1781 (ESPR) Article 25 / Annex VII",
     "Delegated Act + Implementing Act (adopted Feb 2026)"
   ],
   "dppAppliesFrom": "2026-07-19",
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0"],
+  "schemaVersions": [
+    "1.0.0"
+  ],
   "currentSchemaVersion": "1.0.0",
-  "productCategories": ["apparel", "footwear", "clothing_accessories"],
-  "accessTiers": {
-    "operatorName": "professional",
-    "destructionJustification": "professional"
+  "productCategories": [
+    "apparel",
+    "footwear",
+    "accessories"
+  ],
+  "disclosure": {
+    "operatorName": "restricted",
+    "destructionJustification": "restricted"
   },
   "plugin": "sector-textile",
   "notes": "Destruction ban on unsold apparel/footwear: large companies from 2026-07-19, medium-sized from 2030, micro/small exempt. Currently handled by the sector-textile plugin via in-payload dispatch; candidate to split into its own crate (see DATA-MODEL.md §3.5)."

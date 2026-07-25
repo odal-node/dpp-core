@@ -1,14 +1,17 @@
 //! Simplified repairability heuristic for smartphones/tablets (applied today).
 //!
 //! NON-REGULATORY. This is a transparent six-factor 0–2 indicator, NOT the
-//! enacted EU 2023/1669 Annex IV repairability index (which uses a different
-//! parameter set incl. Fasteners & Tools, a 1–5 per-class scale, a priority-part
-//! dimension, and its own class boundaries — see docs/audit H-1). The weights and
+//! enacted EU 2023/1669 repairability index — whose calculation method is in
+//! Annex IV point 5 and whose class boundaries are in Annex II Table 4. That
+//! index uses a different parameter set incl. Fasteners & Tools, a 1–5 per-class
+//! scale, a priority-part dimension, and its own class boundaries (R runs
+//! 1,00–5,00; this heuristic runs 0–10, so the two are not comparable). The weights and
 //! band thresholds below are heuristic design choices; they are deliberately
 //! NOT pinned to any OJ annex, and the output must not be presented as a
 //! regulatory repairability class.
 
 use chrono::NaiveDate;
+use std::sync::OnceLock;
 
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
@@ -16,7 +19,7 @@ use super::{
 };
 use crate::error::CalcError;
 use crate::repairability::parameters::RepairabilityInputs;
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 static SMARTPHONE_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     disassembly: 0.25,
@@ -39,8 +42,7 @@ static SMARTPHONE_BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static SMARTPHONE_RULESET_ID: RulesetId = RulesetId("repairability-heuristic-v1");
 static SMARTPHONE_RULESET_VERSION: RulesetVersion = RulesetVersion("1.0.0");
-static SMARTPHONE_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
-    std::sync::OnceLock::new();
+static SMARTPHONE_EFFECTIVITY: OnceLock<Effectivity> = OnceLock::new();
 
 /// Simplified, non-regulatory repairability heuristic — a transparent six-factor
 /// 0–2 indicator, applied to smartphones/tablets today. **Not** the enacted EU
@@ -57,9 +59,9 @@ impl Ruleset for SimplifiedRepairabilityHeuristic {
         &SMARTPHONE_RULESET_VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
-        SMARTPHONE_EFFECTIVE_DATES.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2025, 6, 20).expect("valid date"))
+    fn effectivity(&self) -> &Effectivity {
+        SMARTPHONE_EFFECTIVITY.get_or_init(|| {
+            Effectivity::open(NaiveDate::from_ymd_opt(2025, 6, 20).expect("valid date"))
         })
     }
 

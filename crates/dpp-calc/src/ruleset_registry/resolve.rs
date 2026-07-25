@@ -2,13 +2,14 @@
 
 use chrono::NaiveDate;
 
+use crate::assessability::Assessability;
 use crate::co2e::CradleToGateRuleset;
 use crate::repairability::thresholds::{
     DisplaysRuleset, LaptopRuleset, RepairabilityRuleset, SimplifiedRepairabilityHeuristic,
     WashingMachineRuleset,
 };
-use crate::repairability_index::Eu2023_1669Ruleset;
-use crate::ruleset::Ruleset;
+use crate::repairability_index::{Eu2023_1669Ruleset, RepairabilityIndexRuleset};
+use crate::ruleset::{Effectivity, Ruleset};
 
 /// Every concrete ruleset known to this build, as base-trait references.
 ///
@@ -26,27 +27,118 @@ pub fn all_rulesets() -> &'static [&'static dyn Ruleset] {
     ]
 }
 
-/// Return the repairability ruleset in force for `product_category` on `on_date`.
+/// Return the repairability ruleset governing `product_category` for a product
+/// whose law was fixed on `law_in_force_on`, or the reason there isn't one.
 ///
-/// Returns `None` when no ruleset covers the given category and date — either
-/// the delegated act is not yet in force (stub with `from = 2100`) or the
-/// category is not recognised.
+/// The date is the product's regulated triggering event, never today — see
+/// [`AssessmentClock`](crate::clock::AssessmentClock).
+///
+/// When nothing governs, the returned [`Assessability`] says which of the four
+/// reasons applies. Where several rows exist for one category and none is
+/// active, the reason is taken from the row closest to applying: a known future
+/// start date first, then a ruleset awaiting an unadopted act, then an expired
+/// one. A dated answer is more actionable than an undated one, and both beat
+/// pointing at a rule that has already been replaced.
 pub fn resolve_repairability(
     product_category: &str,
-    on_date: NaiveDate,
-) -> Option<&'static dyn RepairabilityRuleset> {
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static dyn RepairabilityRuleset> {
     // One row per product-category × ruleset-version.
     // Add new versions by appending rows; the filter handles date selection.
-    let all: &[(&str, &dyn RepairabilityRuleset)] = &[
+    let all: &[(&str, &'static dyn RepairabilityRuleset)] = &[
         ("smartphone-tablet", &SimplifiedRepairabilityHeuristic),
         ("laptop", &LaptopRuleset),
         ("displays", &DisplaysRuleset),
         ("washing-machine", &WashingMachineRuleset),
     ];
 
-    all.iter()
-        .filter(|(cat, _)| *cat == product_category)
-        .filter(|(_, r)| r.effective_dates().is_active_on(on_date))
-        .map(|(_, r)| *r)
-        .next()
+    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
+
+    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
+        return Assessability::Assessed(*r);
+    }
+
+    let mut not_yet: Option<(&'static str, NaiveDate)> = None;
+    let mut undetermined: Option<(&'static str, &'static str)> = None;
+    let mut expired: Option<(&'static str, NaiveDate, Option<&'static str>)> = None;
+
+    for (_, r) in rows() {
+        let id = r.id().0;
+        match r.effectivity() {
+            Effectivity::Pending { empowerment, .. } => {
+                undetermined.get_or_insert((id, empowerment));
+            }
+            Effectivity::InForce { from, until } => {
+                if law_in_force_on < *from {
+                    // Keep the soonest start date.
+                    match not_yet {
+                        Some((_, best)) if best <= *from => {}
+                        _ => not_yet = Some((id, *from)),
+                    }
+                } else if let Some(until) = until {
+                    // Keep the most recently ended.
+                    match expired {
+                        Some((_, best, _)) if best >= *until => {}
+                        _ => expired = Some((id, *until, r.regulatory_basis().superseded_by)),
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some((ruleset_id, applies_from)) = not_yet {
+        Assessability::NotYetInForce {
+            ruleset_id,
+            applies_from,
+        }
+    } else if let Some((ruleset_id, empowerment)) = undetermined {
+        Assessability::Undetermined {
+            ruleset_id,
+            empowerment,
+        }
+    } else if let Some((ruleset_id, until, superseded_by)) = expired {
+        Assessability::Expired {
+            ruleset_id,
+            until,
+            superseded_by,
+        }
+    } else {
+        Assessability::OutOfScope
+    }
+}
+
+/// Return the EU 2023/1669 repairability-index ruleset governing
+/// `product_category` for a product whose law was fixed on `law_in_force_on`,
+/// or the reason there isn't one.
+///
+/// The enacted index is a different methodology from the non-regulatory
+/// heuristic behind [`resolve_repairability`] — different parameters, a 1–5
+/// scale and its own class boundaries — so it gets its own resolver rather than
+/// overloading that one.
+pub fn resolve_repairability_index(
+    product_category: &str,
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static dyn RepairabilityIndexRuleset> {
+    // Reg. (EU) 2023/1669 covers smartphones and slate tablets.
+    let all: &[(&str, &'static dyn RepairabilityIndexRuleset)] =
+        &[("smartphone-tablet", &Eu2023_1669Ruleset)];
+
+    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
+
+    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
+        return Assessability::Assessed(*r);
+    }
+    match rows().next() {
+        None => Assessability::OutOfScope,
+        Some((_, r)) => match r.effectivity() {
+            Effectivity::Pending { empowerment, .. } => Assessability::Undetermined {
+                ruleset_id: r.id().0,
+                empowerment,
+            },
+            Effectivity::InForce { from, .. } => Assessability::NotYetInForce {
+                ruleset_id: r.id().0,
+                applies_from: *from,
+            },
+        },
+    }
 }

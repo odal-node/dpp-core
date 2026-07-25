@@ -1,67 +1,209 @@
-//! Battery recycled content validation — EU Regulation 2023/1542, Art. 8 + Annex X.
+//! Battery recycled content validation — EU Regulation 2023/1542, Art. 8.
 //!
-//! Art. 8 and Annex X set minimum recycled content targets for four metals.
+//! Art. 8(2) and 8(3) set minimum recycled content shares for four metals, in
+//! the regulation text itself. Both paragraphs require the **Annex VIII**
+//! technical documentation to demonstrate the share — Annex VIII is the only
+//! annex Art. 8 cross-references.
+//!
 //! Phase 1 (from 18 Aug 2031) covers **EV batteries, SLI batteries, and
 //! industrial batteries with a capacity > 2 kWh** (excluding those with
 //! exclusively external storage). **LMT batteries** join only in Phase 2 (from
 //! **18 Aug 2036**), at the higher targets. Portable batteries are out of scope.
 //!
 //! The targets are **finalized law** — they are in the regulation text itself,
-//! not in a pending delegated act. However, neither phase is yet in force.
-//! The battery plugin therefore returns `NOT_ASSESSED` today; these constants
-//! are the single source of truth that the plugin will check against once
-//! enforcement begins.
+//! not in a pending delegated act. However, neither phase is yet in force, so
+//! the battery plugin reports an overall status of `NotAssessed` and surfaces
+//! any shortfall as an advisory warning rather than a violation. These constants
+//! are the single source of truth it will check against once enforcement begins.
 //!
-//! ## Phase 1 — EV + SLI + industrial > 2 kWh, from **18 Aug 2031** (Art. 8)
-//! | Material | Minimum % |
-//! |----------|-----------|
-//! | Cobalt   |      16 % |
-//! | Lead     |      85 % |
-//! | Lithium  |       6 % |
-//! | Nickel   |       6 % |
+//! ## The measurement basis differs by metal
 //!
-//! ## Phase 2 — Phase 1 categories + **LMT**, from **18 Aug 2036** (Art. 8)
-//! | Material | Minimum % |
-//! |----------|-----------|
-//! | Cobalt   |      26 % |
-//! | Lead     |      85 % |
-//! | Lithium  |      12 % |
-//! | Nickel   |      15 % |
+//! Art. 8(2)/(3) measure cobalt, lithium and nickel as the share recovered from
+//! waste that is present **in active materials**; lead is measured as the share
+//! present **in the battery**. The percentages below therefore do not share a
+//! denominator, and a caller must not sum or average them across metals.
+//!
+//! ## Two duties, not one
+//!
+//! Art. 8(1) requires documentation of the *actual* shares, with no minimum,
+//! from **18 Aug 2028** (industrial > 2 kWh, EV, SLI) and **18 Aug 2033** (LMT)
+//! — or 24 months after the Art. 8(1) methodology delegated act enters into
+//! force, whichever is later. Annex XIII point 1(e) makes that documentation
+//! publicly accessible passport content. See [`art8_declaration_duty_for`].
+//!
+//! Art. 8(2) and 8(3) then impose *minimum* shares from 18 Aug 2031 and
+//! 18 Aug 2036 — fixed dates, unconditional. See [`art8_phase_for`].
+//!
+//! The two ladders are independent: a battery can owe the declaration without
+//! yet owing a minimum.
+//!
+//! ## Which phase binds is a function of the placing-on-market date
+//!
+//! [`art8_category_for`] maps a declared battery type and capacity onto an
+//! [`Art8Category`]; [`art8_phase_for`] then picks the governing phase from the
+//! date the battery was placed on the EU market. Assessment date is never an
+//! input — Art. 8 attaches its duties at placing on the market, so deriving the
+//! phase from "today" would report batteries lawfully placed before a phase
+//! began as short of it from the moment that phase starts.
+//!
+//! The battery plugin calls both, and reports a missing or unparseable
+//! `placedOnMarketDate` as its own finding rather than assuming one.
+//!
+//! ## Phase 1 — EV + SLI + industrial > 2 kWh, from **18 Aug 2031** (Art. 8(2))
+//! | Material | Minimum % | Basis |
+//! |----------|-----------|-------|
+//! | Cobalt   |      16 % | active materials |
+//! | Lead     |      85 % | the battery |
+//! | Lithium  |       6 % | active materials |
+//! | Nickel   |       6 % | active materials |
+//!
+//! ## Phase 2 — Phase 1 categories + **LMT**, from **18 Aug 2036** (Art. 8(3))
+//! | Material | Minimum % | Basis |
+//! |----------|-----------|-------|
+//! | Cobalt   |      26 % | active materials |
+//! | Lead     |      85 % | the battery |
+//! | Lithium  |      12 % | active materials |
+//! | Nickel   |      15 % | active materials |
 
 use alloc::vec::Vec;
 
-// ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 8 + Annex X (OJ L 2023/1542, 28 Jul 2023)
-// Percentages: verified correct per Annex X.
+use crate::common::date::CalendarDate;
+
+// ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 8(2) and 8(3) (OJ L 191, 28.7.2023, p. 33)
+// Verified verbatim against the Official Journal text on 2026-07-25. Percentages,
+// dates and category scope were read directly from Art. 8(2) and 8(3); the prior
+// 🟠 residual (verbatim OJ confirmation) is now closed.
 // Phase-1 date: 18 Aug 2031. Phase-2 date: 18 Aug 2036.
-// Category scope (corrected 2026-06-22, audit H-2): Phase 1 = EV + SLI + industrial
-// > 2 kWh (excl. exclusively-external-storage); LMT batteries join only in Phase 2
-// (LMT minimum content from 18 Aug 2036). SLI is **in** Phase-1 scope — a prior note
-// here wrongly excluded it. Reconciled against multiple authoritative secondary
-// sources (White & Case, EUR-Lex summary, GLEIF-independent battery guidance); the
-// 🟠 residual is verbatim OJ Art. 8(2)/(3) confirmation, blocked here by EUR-Lex
-// JavaScript rendering. Numeric percentages/dates are not in dispute.
+// Category scope: Phase 1 = industrial > 2 kWh (excl. exclusively-external-storage)
+// + EV + SLI. Phase 2 adds LMT. SLI is **in** Phase-1 scope.
+// Cross-reference is **Annex VIII** (technical documentation), named explicitly by
+// both paragraphs. A prior pin here cited "Annex X"; that annex is "LIST OF RAW
+// MATERIALS AND RISK CATEGORIES" (due diligence, Arts. 48–53) and is unrelated to
+// recycled content. Corrected 2026-07-25.
 
-// ── Phase 1 constants — EV + industrial ≥ 2 kWh from 18 Aug 2031 ─────────────
+// ── Phase 1 constants — industrial > 2 kWh + EV + SLI, from 18 Aug 2031 ──────
 
-/// Minimum cobalt recycled content — Art. 8 + Annex X Phase 1, from 18 Aug 2031.
+/// Minimum cobalt recycled content — Art. 8(2), from 18 Aug 2031.
 pub const COBALT_RECYCLED_PCT_2031: f64 = 16.0;
-/// Minimum lead recycled content — Art. 8 + Annex X Phase 1, from 18 Aug 2031.
+/// Minimum lead recycled content — Art. 8(2), from 18 Aug 2031.
 pub const LEAD_RECYCLED_PCT_2031: f64 = 85.0;
-/// Minimum lithium recycled content — Art. 8 + Annex X Phase 1, from 18 Aug 2031.
+/// Minimum lithium recycled content — Art. 8(2), from 18 Aug 2031.
 pub const LITHIUM_RECYCLED_PCT_2031: f64 = 6.0;
-/// Minimum nickel recycled content — Art. 8 + Annex X Phase 1, from 18 Aug 2031.
+/// Minimum nickel recycled content — Art. 8(2), from 18 Aug 2031.
 pub const NICKEL_RECYCLED_PCT_2031: f64 = 6.0;
 
-// ── Phase 2 constants — EV + industrial ≥ 2 kWh + LMT from 18 Aug 2036 ───────
+// ── Phase 2 constants — Phase 1 categories + LMT, from 18 Aug 2036 ───────────
 
-/// Minimum cobalt recycled content — Art. 8 + Annex X Phase 2, from 18 Aug 2036.
+/// Minimum cobalt recycled content — Art. 8(3), from 18 Aug 2036.
 pub const COBALT_RECYCLED_PCT_2036: f64 = 26.0;
-/// Minimum lead recycled content — Art. 8 + Annex X Phase 2, from 18 Aug 2036.
+/// Minimum lead recycled content — Art. 8(3), from 18 Aug 2036.
 pub const LEAD_RECYCLED_PCT_2036: f64 = 85.0;
-/// Minimum lithium recycled content — Art. 8 + Annex X Phase 2, from 18 Aug 2036.
+/// Minimum lithium recycled content — Art. 8(3), from 18 Aug 2036.
 pub const LITHIUM_RECYCLED_PCT_2036: f64 = 12.0;
-/// Minimum nickel recycled content — Art. 8 + Annex X Phase 2, from 18 Aug 2036.
+/// Minimum nickel recycled content — Art. 8(3), from 18 Aug 2036.
 pub const NICKEL_RECYCLED_PCT_2036: f64 = 15.0;
+
+// ── Which phase binds ─────────────────────────────────────────────────────────
+
+/// First day on which the Art. 8(2) minimum shares bind a battery placed on the
+/// EU market — 18 August 2031.
+pub const ART8_PHASE1_FROM: CalendarDate = CalendarDate::new(2031, 8, 18);
+
+/// First day on which the Art. 8(3) minimum shares bind a battery placed on the
+/// EU market — 18 August 2036.
+pub const ART8_PHASE2_FROM: CalendarDate = CalendarDate::new(2036, 8, 18);
+
+/// The battery categories Art. 8(2) and 8(3) treat differently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art8Category {
+    /// Industrial batteries > 2 kWh (excluding those with exclusively external
+    /// storage), electric-vehicle batteries, and SLI batteries. Named by both
+    /// Art. 8(2) and Art. 8(3).
+    IndustrialEvSli,
+    /// LMT batteries. Named only by Art. 8(3) — outside Phase 1 entirely.
+    Lmt,
+    /// Portable batteries, and anything else Art. 8 does not reach.
+    NotCovered,
+}
+
+/// Which Art. 8 minimum-share phase binds a battery.
+///
+/// Four outcomes, deliberately not collapsed into `Option`: "Art. 8 does not
+/// reach this battery" and "Art. 8 does not reach this battery *yet*" are
+/// different answers, and reporting either as a shortfall misstates an
+/// operator's legal position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art8Phase {
+    /// The minimum shares never bind this category.
+    NotCovered,
+    /// In scope, but placed on the market before the phase began.
+    NotYetBinding,
+    /// Art. 8(2) minimums apply — the `*_2031` constants.
+    Phase1,
+    /// Art. 8(3) minimums apply — the `*_2036` constants.
+    Phase2,
+}
+
+/// Select the governing Art. 8 phase from the date the battery was **placed on
+/// the EU market** — not the date of assessment.
+///
+/// Art. 8(2) and 8(3) attach their obligations to batteries placed on the market
+/// from their respective dates. A battery lawfully placed on the market in 2030
+/// does not acquire the 2031 minimums by being assessed in 2033. Passing
+/// "today" here instead of the placing-on-market date produces retroactive
+/// non-compliance findings from 18 Aug 2031 onwards.
+#[must_use]
+pub fn art8_phase_for(category: Art8Category, placed_on_market: CalendarDate) -> Art8Phase {
+    match category {
+        Art8Category::NotCovered => Art8Phase::NotCovered,
+        // Art. 8(2) does not name LMT; only Art. 8(3) does.
+        Art8Category::Lmt => {
+            if placed_on_market >= ART8_PHASE2_FROM {
+                Art8Phase::Phase2
+            } else {
+                Art8Phase::NotYetBinding
+            }
+        }
+        Art8Category::IndustrialEvSli => {
+            if placed_on_market >= ART8_PHASE2_FROM {
+                Art8Phase::Phase2
+            } else if placed_on_market >= ART8_PHASE1_FROM {
+                Art8Phase::Phase1
+            } else {
+                Art8Phase::NotYetBinding
+            }
+        }
+    }
+}
+
+/// Map a declared battery type and energy capacity onto the Art. 8 category.
+///
+/// Matching is case-insensitive. Art. 8(2)/(3) reach industrial batteries only
+/// above 2 kWh, so an industrial battery at or below that threshold — or with an
+/// undeclared capacity — is [`Art8Category::NotCovered`].
+///
+/// An unrecognised or absent `battery_type` maps to
+/// [`Art8Category::IndustrialEvSli`]. That is the conservative direction: a
+/// mislabelled in-scope battery is still assessed rather than silently skipped.
+#[must_use]
+pub fn art8_category_for(battery_type: &str, capacity_kwh: Option<f64>) -> Art8Category {
+    let t = battery_type.trim();
+    let eq = |s: &str| t.eq_ignore_ascii_case(s);
+    if eq("portable") {
+        Art8Category::NotCovered
+    } else if eq("lmt") {
+        Art8Category::Lmt
+    } else if eq("industrial") {
+        if capacity_kwh.is_some_and(|k| k.is_finite() && k > 2.0) {
+            Art8Category::IndustrialEvSli
+        } else {
+            Art8Category::NotCovered
+        }
+    } else {
+        // ev, sli / starting-lighting-ignition, and anything unrecognised.
+        Art8Category::IndustrialEvSli
+    }
+}
 
 // ── Input type ────────────────────────────────────────────────────────────────
 
@@ -87,14 +229,14 @@ pub struct RecycledContentShortfall {
 
 // ── Phase-check functions ─────────────────────────────────────────────────────
 
-/// Check declared recycled content against Annex X Phase 1 targets (from 2031).
+/// Check declared recycled content against Art. 8(2) Phase 1 targets (from 2031).
 ///
 /// Returns every material whose declared percentage falls below the Phase 1
 /// minimum. An empty `Vec` means all declared metals pass. Undeclared metals
 /// are not checked — battery-type scoping (Phase 1: EV / SLI / industrial
 /// > 2 kWh; LMT only from Phase 2) is the caller's responsibility.
 #[must_use]
-pub fn annex_x_shortfalls_2031(input: &RecycledContentInput) -> Vec<RecycledContentShortfall> {
+pub fn art8_shortfalls_2031(input: &RecycledContentInput) -> Vec<RecycledContentShortfall> {
     check_targets(
         input,
         COBALT_RECYCLED_PCT_2031,
@@ -104,9 +246,9 @@ pub fn annex_x_shortfalls_2031(input: &RecycledContentInput) -> Vec<RecycledCont
     )
 }
 
-/// Check declared recycled content against Annex X Phase 2 targets (from 2036).
+/// Check declared recycled content against Art. 8(3) Phase 2 targets (from 2036).
 #[must_use]
-pub fn annex_x_shortfalls_2036(input: &RecycledContentInput) -> Vec<RecycledContentShortfall> {
+pub fn art8_shortfalls_2036(input: &RecycledContentInput) -> Vec<RecycledContentShortfall> {
     check_targets(
         input,
         COBALT_RECYCLED_PCT_2036,
@@ -166,7 +308,7 @@ fn check_targets(
 
 // ── Chemistry → regulated-metal applicability ──────────────────────────────────
 
-/// The Annex X regulated metals (cobalt, lithium, nickel, lead) that are
+/// The Art. 8 regulated metals (cobalt, lithium, nickel, lead) that are
 /// *meaningfully present* for a given battery chemistry.
 ///
 /// Used to scope recycled-content checks so a chemistry that does not contain a
@@ -182,7 +324,7 @@ pub struct RegulatedMetals {
 }
 
 /// Map a battery chemistry code (e.g. `"LFP"`, `"NMC"`, `"lead-acid"`) to the
-/// Annex X regulated metals it contains.
+/// Art. 8 regulated metals it contains.
 ///
 /// Matching is case-insensitive. Unknown chemistries return **all `true`**
 /// (conservative: every declared value is checked, since we cannot rule a metal
@@ -290,22 +432,257 @@ mod tests {
         }
     }
 
+    // ── Art. 8 phase selection — golden vectors ──────────────────────────────
+
+    #[test]
+    fn battery_placed_before_phase1_stays_unbound_however_late_it_is_assessed() {
+        // A battery lawfully placed on the EU market on 1 Jun 2030, assessed in
+        // 2033. Art. 8(2) attaches at placing on the market, so the 2031 minimums
+        // never reach it. Deriving the phase from the assessment date instead
+        // would report this battery as non-compliant from 18 Aug 2031 onwards.
+        let placed = CalendarDate::new(2030, 6, 1);
+        assert_eq!(
+            art8_phase_for(Art8Category::IndustrialEvSli, placed),
+            Art8Phase::NotYetBinding
+        );
+    }
+
+    #[test]
+    fn phase1_boundary_is_inclusive_of_18_august_2031() {
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2031, 8, 17)
+            ),
+            Art8Phase::NotYetBinding
+        );
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2031, 8, 18)
+            ),
+            Art8Phase::Phase1
+        );
+    }
+
+    #[test]
+    fn phase2_boundary_is_inclusive_of_18_august_2036() {
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2036, 8, 17)
+            ),
+            Art8Phase::Phase1
+        );
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2036, 8, 18)
+            ),
+            Art8Phase::Phase2
+        );
+    }
+
+    #[test]
+    fn lmt_is_outside_phase1_entirely() {
+        // Art. 8(2) does not name LMT batteries; Art. 8(3) does. An LMT battery
+        // placed on the market the very day Phase 1 begins is still unbound.
+        assert_eq!(
+            art8_phase_for(Art8Category::Lmt, CalendarDate::new(2031, 8, 18)),
+            Art8Phase::NotYetBinding
+        );
+        assert_eq!(
+            art8_phase_for(Art8Category::Lmt, CalendarDate::new(2036, 8, 18)),
+            Art8Phase::Phase2
+        );
+    }
+
+    #[test]
+    fn out_of_scope_categories_are_never_bound() {
+        // Portable batteries, at any date, including well past Phase 2.
+        assert_eq!(
+            art8_phase_for(Art8Category::NotCovered, CalendarDate::new(2040, 1, 1)),
+            Art8Phase::NotCovered
+        );
+    }
+
+    #[test]
+    fn not_covered_and_not_yet_binding_are_distinguishable() {
+        // The whole point of a four-outcome enum: an operator told "not covered"
+        // and one told "not yet" have different obligations, and neither has a
+        // shortfall.
+        let portable = art8_phase_for(Art8Category::NotCovered, CalendarDate::new(2033, 1, 1));
+        let early_ev = art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2030, 1, 1));
+        assert_ne!(portable, early_ev);
+    }
+
+    #[test]
+    fn selected_phase_agrees_with_the_target_constants() {
+        // 16 % cobalt clears Phase 1 and fails Phase 2. The phase selector and
+        // the constants it selects between must not disagree about which set
+        // is in force on a given placing-on-market date.
+        let input = all_metals(16.0, 85.0, 6.0, 6.0);
+
+        assert_eq!(
+            art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2032, 1, 1)),
+            Art8Phase::Phase1
+        );
+        assert!(art8_shortfalls_2031(&input).is_empty());
+
+        assert_eq!(
+            art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2037, 1, 1)),
+            Art8Phase::Phase2
+        );
+        assert!(
+            art8_shortfalls_2036(&input)
+                .iter()
+                .any(|s| s.material == "cobalt")
+        );
+    }
+
+    // ── Category mapping ─────────────────────────────────────────────────────
+
+    #[test]
+    fn portable_is_not_covered_and_lmt_is_its_own_category() {
+        assert_eq!(
+            art8_category_for("portable", None),
+            Art8Category::NotCovered
+        );
+        assert_eq!(
+            art8_category_for("PORTABLE", None),
+            Art8Category::NotCovered
+        );
+        assert_eq!(art8_category_for("lmt", None), Art8Category::Lmt);
+        assert_eq!(art8_category_for(" LMT ", None), Art8Category::Lmt);
+    }
+
+    #[test]
+    fn industrial_is_covered_only_above_two_kwh() {
+        assert_eq!(
+            art8_category_for("industrial", Some(2.5)),
+            Art8Category::IndustrialEvSli
+        );
+        // Art. 8 says "greater than 2 kWh" — exactly 2 kWh is out.
+        assert_eq!(
+            art8_category_for("industrial", Some(2.0)),
+            Art8Category::NotCovered
+        );
+        assert_eq!(
+            art8_category_for("industrial", None),
+            Art8Category::NotCovered
+        );
+        // A non-finite capacity cannot demonstrate the threshold is met.
+        assert_eq!(
+            art8_category_for("industrial", Some(f64::NAN)),
+            Art8Category::NotCovered
+        );
+    }
+
+    #[test]
+    fn ev_sli_and_unknown_types_are_assessed() {
+        for t in ["ev", "sli", "starting-lighting-ignition", "", "mystery"] {
+            assert_eq!(
+                art8_category_for(t, None),
+                Art8Category::IndustrialEvSli,
+                "type {t:?} should be assessed"
+            );
+        }
+    }
+
+    // ── Art. 8(1) declaration duty ───────────────────────────────────────────
+
+    #[test]
+    fn declaration_is_certainly_not_due_before_its_floor() {
+        // The one thing that *is* knowable while the delegated act is
+        // unadopted: the real date is never earlier than the floor, so anything
+        // placed on the market before it definitely owes nothing yet.
+        assert_eq!(
+            art8_declaration_duty_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2028, 8, 17)
+            ),
+            Art8DeclarationDuty::NotYetDue {
+                not_before: CalendarDate::new(2028, 8, 18)
+            }
+        );
+    }
+
+    #[test]
+    fn declaration_is_undetermined_on_and_after_the_floor() {
+        // Art. 8(1) applies from the floor "or 24 months after the date of entry
+        // into force of the delegated act, whichever is the latest". The act is
+        // unadopted, so on/after the floor the answer is genuinely unknown —
+        // reporting it as "due" would assert a date the regulation does not set.
+        let got =
+            art8_declaration_duty_for(Art8Category::IndustrialEvSli, CalendarDate::new(2029, 1, 1));
+        let Art8DeclarationDuty::Undetermined {
+            not_before,
+            empowerment,
+        } = got
+        else {
+            panic!("expected Undetermined, got {got:?}");
+        };
+        assert_eq!(not_before, CalendarDate::new(2028, 8, 18));
+        assert!(empowerment.contains("Art. 8(1)"));
+    }
+
+    #[test]
+    fn lmt_declaration_floor_is_five_years_later() {
+        // Art. 8(1) second subparagraph: LMT from 18 Aug 2033, not 2028.
+        assert_eq!(
+            art8_declaration_duty_for(Art8Category::Lmt, CalendarDate::new(2030, 1, 1)),
+            Art8DeclarationDuty::NotYetDue {
+                not_before: CalendarDate::new(2033, 8, 18)
+            }
+        );
+        assert!(matches!(
+            art8_declaration_duty_for(Art8Category::Lmt, CalendarDate::new(2034, 1, 1)),
+            Art8DeclarationDuty::Undetermined { .. }
+        ));
+    }
+
+    #[test]
+    fn out_of_scope_categories_owe_no_declaration() {
+        assert_eq!(
+            art8_declaration_duty_for(Art8Category::NotCovered, CalendarDate::new(2040, 1, 1)),
+            Art8DeclarationDuty::NotCovered
+        );
+    }
+
+    #[test]
+    fn the_declaration_and_minimum_ladders_are_independent() {
+        // A battery placed on the market in 2029 is past the declaration floor
+        // but years short of the Art. 8(2) minimums. Conflating the two would
+        // report a shortfall against a duty that does not yet exist.
+        let placed = CalendarDate::new(2029, 1, 1);
+        assert!(matches!(
+            art8_declaration_duty_for(Art8Category::IndustrialEvSli, placed),
+            Art8DeclarationDuty::Undetermined { .. }
+        ));
+        assert_eq!(
+            art8_phase_for(Art8Category::IndustrialEvSli, placed),
+            Art8Phase::NotYetBinding
+        );
+    }
+
+    // ── Target checks ────────────────────────────────────────────────────────
+
     #[test]
     fn exactly_at_2031_targets_passes() {
         let input = all_metals(16.0, 85.0, 6.0, 6.0);
-        assert!(annex_x_shortfalls_2031(&input).is_empty());
+        assert!(art8_shortfalls_2031(&input).is_empty());
     }
 
     #[test]
     fn above_2031_targets_passes() {
         let input = all_metals(20.0, 90.0, 10.0, 10.0);
-        assert!(annex_x_shortfalls_2031(&input).is_empty());
+        assert!(art8_shortfalls_2031(&input).is_empty());
     }
 
     #[test]
     fn below_2031_cobalt_flagged() {
         let input = all_metals(15.0, 85.0, 6.0, 6.0); // cobalt 15 < 16
-        let shortfalls = annex_x_shortfalls_2031(&input);
+        let shortfalls = art8_shortfalls_2031(&input);
         assert_eq!(shortfalls.len(), 1);
         assert_eq!(shortfalls[0].material, "cobalt");
         assert_eq!(shortfalls[0].required_pct, 16.0);
@@ -314,7 +691,7 @@ mod tests {
     #[test]
     fn multiple_shortfalls_all_returned() {
         let input = all_metals(10.0, 80.0, 3.0, 4.0); // all below
-        assert_eq!(annex_x_shortfalls_2031(&input).len(), 4);
+        assert_eq!(art8_shortfalls_2031(&input).len(), 4);
     }
 
     #[test]
@@ -325,15 +702,15 @@ mod tests {
             lithium_pct: None,
             nickel_pct: None,
         };
-        assert!(annex_x_shortfalls_2031(&input).is_empty());
+        assert!(art8_shortfalls_2031(&input).is_empty());
     }
 
     #[test]
     fn phase2_stricter_than_phase1() {
         // 16% cobalt passes 2031 but fails 2036 (target 26%)
         let input = all_metals(16.0, 85.0, 6.0, 6.0);
-        assert!(annex_x_shortfalls_2031(&input).is_empty());
-        let shortfalls = annex_x_shortfalls_2036(&input);
+        assert!(art8_shortfalls_2031(&input).is_empty());
+        let shortfalls = art8_shortfalls_2036(&input);
         assert!(shortfalls.iter().any(|s| s.material == "cobalt"));
     }
 
@@ -345,7 +722,7 @@ mod tests {
             lithium_pct: None,
             nickel_pct: None,
         };
-        let shortfalls = annex_x_shortfalls_2031(&input);
+        let shortfalls = art8_shortfalls_2031(&input);
         assert_eq!(shortfalls.len(), 1);
         assert_eq!(shortfalls[0].material, "cobalt");
     }
@@ -358,7 +735,7 @@ mod tests {
             lithium_pct: None,
             nickel_pct: None,
         };
-        let shortfalls = annex_x_shortfalls_2031(&input);
+        let shortfalls = art8_shortfalls_2031(&input);
         assert_eq!(shortfalls.len(), 1);
         assert_eq!(shortfalls[0].material, "cobalt");
     }
@@ -431,5 +808,66 @@ mod tests {
             Some(5.0),
         );
         assert!(c.is_empty());
+    }
+}
+
+// ── Art. 8(1) — the declaration duty ─────────────────────────────────────────
+
+/// Floor date for the Art. 8(1) documentation duty for industrial batteries
+/// > 2 kWh, EV and SLI — 18 August 2028.
+pub const ART8_DECLARATION_FLOOR_2028: CalendarDate = CalendarDate::new(2028, 8, 18);
+
+/// Floor date for the Art. 8(1) documentation duty for LMT batteries —
+/// 18 August 2033.
+pub const ART8_DECLARATION_FLOOR_2033: CalendarDate = CalendarDate::new(2033, 8, 18);
+
+/// The empowerment whose entry into force can push the Art. 8(1) duty later.
+pub const ART8_DECLARATION_EMPOWERMENT: &str = "EU 2023/1542 Art. 8(1), third subparagraph — recycled content calculation,      verification and documentation format";
+
+/// Whether the Art. 8(1) documentation duty has begun for a battery.
+///
+/// Unlike the Art. 8(2)/(3) minimums, whose dates are stated outright, Art. 8(1)
+/// applies from *"18 August 2028 or 24 months after the date of entry into force
+/// of the delegated act …, whichever is the latest"*. That act has not been
+/// adopted, so the real start date is unknown — but it is never **earlier** than
+/// the floor, which is enough to answer the question for anything placed on the
+/// market before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art8DeclarationDuty {
+    /// Art. 8(1) does not reach this category.
+    NotCovered,
+    /// Certainly not yet owed: placed on the market before the floor date, and
+    /// the real date can only be that floor or later.
+    NotYetDue { not_before: CalendarDate },
+    /// Cannot be determined. Placed on the market on or after the floor, but
+    /// whether the duty had begun depends on when the delegated act entered
+    /// into force — and it has not been adopted.
+    Undetermined {
+        not_before: CalendarDate,
+        empowerment: &'static str,
+    },
+}
+
+/// Whether a battery owes the Art. 8(1) recycled-content declaration.
+///
+/// Keyed on the date the battery was **placed on the EU market**, like every
+/// other Art. 8 duty — not on the date of assessment.
+#[must_use]
+pub fn art8_declaration_duty_for(
+    category: Art8Category,
+    placed_on_market: CalendarDate,
+) -> Art8DeclarationDuty {
+    let floor = match category {
+        Art8Category::NotCovered => return Art8DeclarationDuty::NotCovered,
+        Art8Category::IndustrialEvSli => ART8_DECLARATION_FLOOR_2028,
+        Art8Category::Lmt => ART8_DECLARATION_FLOOR_2033,
+    };
+    if placed_on_market < floor {
+        Art8DeclarationDuty::NotYetDue { not_before: floor }
+    } else {
+        Art8DeclarationDuty::Undetermined {
+            not_before: floor,
+            empowerment: ART8_DECLARATION_EMPOWERMENT,
+        }
     }
 }

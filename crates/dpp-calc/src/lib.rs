@@ -55,16 +55,29 @@
 //!    `all_rulesets()` (one-liner each).
 //! 3. Add golden vectors. Run `cargo test -p dpp-calc`.
 //!
+//! # Effective dates
+//!
+//! How a governing ruleset is selected, why `Pending` has no date, and the
+//! conditional `max(floor, entry-into-force + N months)` arithmetic that is
+//! deliberately not built yet:
+//! see `docs/architecture/EFFECTIVE-DATES.md`.
+//!
 //! ## Pending delegated act (stub)
 //!
-//! Use `EffectiveDateBound::open(NaiveDate(2100, 1, 1))` as the sentinel and
+//! Use `Effectivity::pending(empowerment, adoption_deadline)` and
 //! `regulatory_basis.regulation = "pending — {PEFCR title}"`.
-//! The effective-date guard blocks runtime use; `resolve_*` returns `None` for
-//! all real dates. Keeps the type compile-visible for future plugin wiring.
+//!
+//! There is **no date sentinel**. A pending ruleset has no application date, so
+//! it resolves for no date at all and `ensure_active_on` returns
+//! `CalcError::RulesetUndetermined` naming the instrument being waited on. The
+//! type stays compile-visible for future wiring. A far-future `from` date would
+//! assert something the regulation does not say — EU staged obligations are
+//! written as *"from &lt;date&gt; or N months after entry into force, whichever
+//! is the latest"*, so until the act lands the date is unknown, not distant.
 //!
 //! ## Superseded ruleset
 //!
-//! - Set `EffectiveDateBound.until` to the last valid day.
+//! - Set the ruleset's `Effectivity` to `closed(from, last_valid_day)`.
 //! - Set `regulatory_basis.superseded_by` to the new ruleset's ID string.
 //! - Keep the row in `ruleset_registry` — receipts reference rulesets by
 //!   ID + version, so removing a row makes old receipts unverifiable.
@@ -82,4 +95,4 @@ pub mod repairability_index;
 pub mod ruleset_registry;
 
 // ── Stable public paths for the spine ────────────────────────────────────────
-pub use kernel::{error, factor, receipt, ruleset};
+pub use kernel::{assessability, clock, error, factor, receipt, ruleset};

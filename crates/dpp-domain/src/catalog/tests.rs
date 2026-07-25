@@ -33,8 +33,14 @@ fn battery_descriptor_is_complete() {
     assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
     assert_eq!(battery.retention_years, 10);
     assert!(battery.schema_versions.contains(&"2.0.0".to_string()));
-    // Current version is v2.0.0 (Annex XIII), not the older v1.0.0.
-    assert_eq!(battery.current_schema_version, "2.0.0");
+    assert!(battery.schema_versions.contains(&"2.1.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.2.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.3.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.4.0".to_string()));
+    // Current version is v2.2.0, which adds the Annex VII Part A state-of-health
+    // parameter sets. Older versions stay registered so passports already
+    // validated against them remain verifiable.
+    assert_eq!(battery.current_schema_version, "2.4.0");
     assert_eq!(battery.plugin.as_deref(), Some("sector-battery"));
 }
 
@@ -44,7 +50,7 @@ fn resolve_schema_version_new_vs_existing() {
     // New passport (stored = None) → catalog current version.
     assert_eq!(
         catalog.resolve_schema_version("battery", None).as_deref(),
-        Some("2.0.0")
+        Some("2.4.0")
     );
     // Existing passport → its stored version is authoritative, even if old.
     assert_eq!(
@@ -80,13 +86,14 @@ fn register_runtime_sector() {
         key: "plastics".into(),
         title: "Plastics".into(),
         status: RegulatoryStatus::Provisional,
+        regime: Regime::Espr,
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
         schema_versions: vec!["1.0.0".into()],
         current_schema_version: "1.0.0".into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     };
@@ -103,13 +110,14 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
         key: "plastics".into(),
         title: "Plastics".into(),
         status: RegulatoryStatus::Provisional,
+        regime: Regime::Espr,
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
         schema_versions: versions,
         current_schema_version: current.into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     }
@@ -254,18 +262,18 @@ fn descriptor_round_trips_camel_case() {
     assert_eq!(back.key, "battery");
 }
 
-// Drift guard: every key in a sector's access_tiers manifest must correspond to
+// Drift guard: every key in a sector's disclosure manifest must correspond to
 // a real JSON field in that sector's current schema. A key that doesn't match any
 // schema property silently fails to gate any field — the redaction is a no-op.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn access_tiers_keys_match_schema_properties() {
+fn disclosure_keys_match_schema_properties() {
     use crate::schemas::VersionedSchemaRegistry;
     let catalog = SectorCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
     for descriptor in catalog.all() {
-        if descriptor.access_tiers.is_empty() {
+        if descriptor.disclosure.is_empty() {
             continue;
         }
         let version: semver::Version =
@@ -296,10 +304,10 @@ fn access_tiers_keys_match_schema_properties() {
                 )
             });
 
-        for key in descriptor.access_tiers.keys() {
+        for key in descriptor.disclosure.keys() {
             assert!(
                 properties.contains_key(key),
-                "access_tiers key '{}' in sector '{}' does not match any property in schema v{} \
+                "disclosure key '{}' in sector '{}' does not match any property in schema v{} \
                  (properties: {:?}). Either rename the key to match the serialised field name, \
                  or remove it — a mismatched key silently fails to gate the field.",
                 key,
@@ -359,5 +367,198 @@ fn catalog_agrees_with_schema_registry() {
             "in-force sector '{}' must declare a plugin binding",
             d.key
         );
+    }
+}
+
+// ── Regime axis ──────────────────────────────────────────────────────────────
+
+#[test]
+fn every_manifest_declares_a_regime() {
+    for d in SectorCatalog::new().all().iter() {
+        // `Regime::None` is documented as pairing with `RegulatoryStatus::Watch`
+        // — a sector tracked before any DPP instrument exists. Forbidding it
+        // outright contradicted the enum it was guarding, and would have blocked
+        // the first Watch sector from ever being added.
+        if d.status == RegulatoryStatus::Watch {
+            continue;
+        }
+        assert_ne!(
+            d.regime,
+            Regime::None,
+            "sector '{}' has status {:?} but no regime; Regime::None is reserved for              Watch sectors with no DPP instrument",
+            d.key,
+            d.status
+        );
+    }
+}
+
+#[test]
+fn a_watch_sector_may_declare_no_regime() {
+    // The pairing the guard above must allow. Asserted on a constructed
+    // descriptor rather than a shipped manifest, so it holds whether or not any
+    // sector is currently in Watch.
+    let watch = r#"{
+        "key": "w", "title": "W", "status": "watch", "regime": "none",
+        "legalBasis": [], "retentionYears": 10,
+        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
+    }"#;
+    let d: SectorDescriptor = serde_json::from_str(watch).expect("watch + none must parse");
+    assert_eq!(d.regime, Regime::None);
+    assert_eq!(d.status, RegulatoryStatus::Watch);
+}
+
+#[test]
+fn manifest_without_regime_is_rejected() {
+    // `regime` is required — a manifest omitting it must fail to deserialise
+    // rather than silently defaulting to some instrument.
+    let no_regime = r#"{
+        "key": "x", "title": "X", "status": "provisional",
+        "legalBasis": [], "retentionYears": 10,
+        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
+    }"#;
+    assert!(serde_json::from_str::<SectorDescriptor>(no_regime).is_err());
+}
+
+#[test]
+fn most_sectors_are_not_espr() {
+    // Guards the assumption that ESPR is the only source of a DPP obligation.
+    // Battery, toy, detergent, construction and electronics each derive from
+    // their own instrument; if this ever collapses to all-ESPR, something has
+    // been flattened wrongly.
+    let catalog = SectorCatalog::new();
+    let non_espr = catalog
+        .all()
+        .iter()
+        .filter(|d| d.regime != Regime::Espr)
+        .count();
+    assert_eq!(
+        non_espr, 5,
+        "expected 5 non-ESPR sectors (battery, toy, detergent, construction, electronics)"
+    );
+}
+
+#[test]
+fn regime_does_not_affect_determination_gating() {
+    // The two axes must be orthogonal: a Provisional sector gates identically
+    // whatever instrument it derives from. If this fails, regime has leaked
+    // into the determination path.
+    let catalog = SectorCatalog::new();
+    for d in catalog
+        .all()
+        .iter()
+        .filter(|d| d.status == RegulatoryStatus::Provisional)
+    {
+        assert!(
+            !d.status.allows_determination(),
+            "provisional sector '{}' (regime {:?}) must not allow determinations",
+            d.key,
+            d.regime
+        );
+    }
+}
+
+// ── Watch status ─────────────────────────────────────────────────────────────
+
+#[test]
+fn watch_never_allows_determination() {
+    assert!(!RegulatoryStatus::Watch.allows_determination());
+}
+
+#[test]
+fn in_force_with_future_passport_date_still_determines() {
+    // Regression guard. `dppAppliesFrom` is the passport-obligation date and is
+    // NOT the determination gate. Battery's passport is required from
+    // 2027-02-18, but its Art. 9 mercury/cadmium prohibitions have applied
+    // since 2008 and are determinable today. Gating determinations on
+    // `dppAppliesFrom` would suppress a legally valid non-compliance finding.
+    let catalog = SectorCatalog::new();
+    let battery = catalog.get("battery").expect("battery in catalog");
+    assert_eq!(battery.status, RegulatoryStatus::InForce);
+    assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
+    assert!(battery.status.allows_determination());
+}
+
+#[test]
+fn every_manifest_round_trips() {
+    for d in SectorCatalog::new().all().iter() {
+        let json = serde_json::to_string(d).expect("serialise");
+        let back: SectorDescriptor = serde_json::from_str(&json).expect("deserialise");
+        // SectorDescriptor is not PartialEq, and `accessTiers` is a HashMap whose
+        // serialised key order is not stable — compare as Value, which is
+        // order-insensitive for maps.
+        assert_eq!(
+            serde_json::to_value(&back).expect("re-serialise"),
+            serde_json::to_value(d).expect("serialise"),
+            "round-trip changed sector '{}'",
+            d.key
+        );
+    }
+}
+
+/// Sectors whose catalog `productCategories` mirror a schema enum, and the
+/// property that enumerates them.
+///
+/// The correspondence is **not derivable** from the data — depending on sector
+/// the categories live under `productCategory`, `productType`, `batteryType`,
+/// `productFamily`, `productionRoute` or `tyreClass` — so it is declared here.
+/// A sector absent from this table is simply not cross-checked; `textile`, for
+/// example, declares categories but its schema has no enum for them.
+const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
+    ("aluminium", "productionRoute"),
+    ("battery", "batteryType"),
+    ("construction", "productFamily"),
+    ("detergent", "productType"),
+    ("electronics", "productCategory"),
+    ("furniture", "productType"),
+    ("steel", "productCategory"),
+    ("tyre", "tyreClass"),
+    ("unsold-goods", "productCategory"),
+];
+
+/// Drift guard: a catalog product category that is not a legal value of the
+/// corresponding schema enum is a value nothing can ever validate against.
+///
+/// This existed as two spellings of one concept — the catalog said `sli` and
+/// `clothing_accessories` where the schemas said `starting-lighting-ignition`
+/// and `accessories`. Neither was load-bearing, because
+/// `SectorDescriptor::product_categories` has no reader in Rust today; both
+/// would have become load-bearing the moment one appeared.
+#[test]
+fn product_categories_are_legal_values_of_their_schema_enum() {
+    use crate::schemas::VersionedSchemaRegistry;
+
+    let catalog = SectorCatalog::new();
+    let registry = VersionedSchemaRegistry::new();
+
+    for (sector_key, property) in CATEGORY_ENUM_PROPERTY {
+        let descriptor = catalog
+            .get(sector_key)
+            .unwrap_or_else(|| panic!("sector '{sector_key}' is in the table but not the catalog"));
+        let version: semver::Version = descriptor
+            .current_schema_version
+            .parse()
+            .expect("currentSchemaVersion is valid semver");
+        let schema_json = registry
+            .get(sector_key, &version)
+            .unwrap_or_else(|| panic!("no schema for '{sector_key}' v{version}"));
+        let schema: serde_json::Value =
+            serde_json::from_str(schema_json).expect("schema is valid JSON");
+
+        let allowed: Vec<&str> = schema["properties"][property]["enum"]
+            .as_array()
+            .unwrap_or_else(|| {
+                panic!("'{sector_key}' schema property '{property}' has no enum — stale table row")
+            })
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect();
+
+        for category in &descriptor.product_categories {
+            assert!(
+                allowed.contains(&category.as_str()),
+                "sector '{sector_key}' lists product category '{category}', which is not a legal \
+                 value of schema property '{property}' ({allowed:?})"
+            );
+        }
     }
 }

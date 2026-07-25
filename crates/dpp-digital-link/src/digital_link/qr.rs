@@ -21,15 +21,27 @@ pub fn build_qr_url(resolver_base: &str, gtin: &str, serial: &str, batch: Option
 /// Derive a GS1-conformant AI 21 serial from a passport UUID.
 ///
 /// The GS1 General Specifications cap the AI 21 serial at 20 characters (a limit
-/// the `DigitalLink` parser enforces), so a canonical
-/// 36-character UUID cannot be carried directly. This encodes the first 10 bytes
-/// of the UUID as lowercase hex: exactly 20 characters, drawn only from
-/// `[0-9a-f]` (URL-safe and within the GS1 encodable character set). It is
-/// non-sequential — so a public carrier leaks no production volume — and unique
-/// per item at any realistic scale.
+/// the `DigitalLink` parser enforces), so a canonical 36-character UUID cannot be
+/// carried directly. This encodes the **last 10 bytes** of the UUID as lowercase
+/// hex: exactly 20 characters, drawn only from `[0-9a-f]` (URL-safe and within
+/// the GS1 encodable character set), and deterministic for a given passport.
+///
+/// # Why the last ten bytes, not the first
+///
+/// Passport IDs are UUIDv7, whose leading six bytes are a big-endian millisecond
+/// timestamp (RFC 9562 §5.7). Encoding the *first* ten bytes therefore produced a
+/// serial that was monotonically increasing over time and whose first twelve hex
+/// characters decoded directly to the passport's creation instant — so a QR code
+/// on a physical battery published its creation time to the millisecond, and any
+/// two codes revealed their production order and the rate between them. An
+/// earlier version of this function did exactly that while its documentation
+/// claimed the opposite.
+///
+/// Bytes 6..16 are the `rand_a` and `rand_b` fields: 74 random bits, with only
+/// the 4-bit version and 2-bit variant fixed. No timestamp, no ordering.
 pub fn short_serial(uuid_bytes: &[u8; 16]) -> String {
     let mut serial = String::with_capacity(20);
-    for &byte in &uuid_bytes[..10] {
+    for &byte in &uuid_bytes[6..] {
         serial.push_str(&format!("{byte:02x}"));
     }
     serial
@@ -47,7 +59,8 @@ mod tests {
             0xdc, 0xfe,
         ];
         let serial = short_serial(&uuid);
-        assert_eq!(serial, "0123456789abcdef1032");
+        // Bytes 6..16 — the UUIDv7 random tail, not the timestamp head.
+        assert_eq!(serial, "cdef1032547698badcfe");
         assert_eq!(serial.len(), 20);
         assert!(serial.bytes().all(|b| b.is_ascii_hexdigit()));
     }
@@ -83,5 +96,62 @@ mod tests {
             DigitalLink::parse(&url),
             Err(DigitalLinkError::ValueTooLong { code, max_len: 20, actual: 36 }) if code == "21"
         ));
+    }
+
+    /// Regression: the serial must not leak the passport's creation time.
+    ///
+    /// UUIDv7's leading six bytes are a big-endian millisecond timestamp. When
+    /// the serial was cut from the *front* of the UUID, its first twelve hex
+    /// characters were that timestamp verbatim.
+    #[test]
+    fn serial_does_not_embed_the_uuid_timestamp() {
+        // A UUIDv7 whose timestamp bytes are a recognisable pattern.
+        let mut uuid = [0u8; 16];
+        uuid[..6].copy_from_slice(&[0x01, 0x9f, 0x99, 0xa0, 0xde, 0xad]);
+        uuid[6] = 0x7a;
+        uuid[7..].copy_from_slice(&[0xbc, 0x8d, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab]);
+
+        let serial = short_serial(&uuid);
+        assert!(
+            !serial.contains("019f99a0dead"),
+            "serial must not carry the UUIDv7 timestamp: {serial}"
+        );
+        assert_eq!(serial.len(), 20);
+    }
+
+    /// Regression: serials must not sort in creation order.
+    ///
+    /// Two batteries produced minutes apart would otherwise reveal their
+    /// production order — and, across many codes, production volume — from the
+    /// QR code alone.
+    #[test]
+    fn serials_do_not_order_by_creation_time() {
+        // Two UUIDv7s with increasing timestamps but unrelated random tails.
+        let mut earlier = [0u8; 16];
+        earlier[..6].copy_from_slice(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x01]);
+        earlier[6..].copy_from_slice(&[0x7f, 0xff, 0xbf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+        let mut later = [0u8; 16];
+        later[..6].copy_from_slice(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x02]);
+        later[6..].copy_from_slice(&[0x70, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+        assert!(
+            short_serial(&later) < short_serial(&earlier),
+            "a later UUID must be free to sort before an earlier one"
+        );
+    }
+
+    #[test]
+    fn serial_uses_the_random_tail_not_the_timestamp_head() {
+        let mut a = [0u8; 16];
+        a[..6].copy_from_slice(&[0xaa; 6]);
+        a[6..].copy_from_slice(&[0x11; 10]);
+        let mut b = [0u8; 16];
+        b[..6].copy_from_slice(&[0xbb; 6]);
+        b[6..].copy_from_slice(&[0x11; 10]);
+
+        // Differing only in the timestamp head must not change the serial.
+        assert_eq!(short_serial(&a), short_serial(&b));
+        assert_eq!(short_serial(&a), "11".repeat(10));
     }
 }

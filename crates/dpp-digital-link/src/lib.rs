@@ -21,5 +21,5 @@ pub use digital_link::{
     short_serial, validate_gtin,
 };
 pub use linktype::{
-    AccessTier, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,
+    Audience, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,
 };

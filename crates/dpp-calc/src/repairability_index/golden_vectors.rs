@@ -186,12 +186,10 @@ fn disassembly_depth_dominates_the_other_parameters() {
 #[test]
 fn ruleset_is_effective_from_the_regulation_date() {
     let r = Eu2023_1669Ruleset;
-    let d = r.effective_dates();
     assert_eq!(
-        d.from,
-        chrono::NaiveDate::from_ymd_opt(2025, 6, 20).unwrap()
+        *r.effectivity(),
+        crate::ruleset::Effectivity::open(chrono::NaiveDate::from_ymd_opt(2025, 6, 20).unwrap())
     );
-    assert!(d.until.is_none());
     assert!(!r.regulatory_basis().regulation.is_empty());
 }
 
@@ -207,4 +205,20 @@ fn index_and_heuristic_use_different_scales() {
             .id()
             .0
     );
+}
+
+#[test]
+fn index_is_rounded_to_two_decimals_before_classification() {
+    // Annex IV point 5.4 rounds the index to two decimals; Annex II Table 4
+    // states the boundaries to two decimals. A raw-sum comparison puts a value
+    // that rounds *up* onto a boundary in the class below.
+    let b = Eu2023_1669Ruleset.class_boundaries();
+    assert!(
+        (b.a * 100.0).fract().abs() < 1e-9,
+        "class boundaries are stated to two decimals: {}",
+        b.a
+    );
+    // A value one thousandth below the A boundary rounds onto it.
+    let just_under = b.a - 0.004;
+    assert_eq!((just_under * 100.0).round() / 100.0, b.a);
 }

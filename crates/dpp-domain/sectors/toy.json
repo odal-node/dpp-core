@@ -2,12 +2,13 @@
   "key": "toy",
   "title": "Toys",
   "status": "provisional",
+  "regime": "toy-safety",
   "legalBasis": ["Regulation (EU) 2025/2509 (Toy Safety)"],
   "retentionYears": 10,
   "schemaVersions": ["1.0.0", "1.1.0"],
   "currentSchemaVersion": "1.1.0",
   "productCategories": [],
-  "accessTiers": { "svhcSubstances": "professional" },
+  "disclosure": { "svhcSubstances": "restricted" },
   "plugin": "sector-toy",
   "notes": "Toy Safety Regulation adopted; CE marking already required, but the DPP obligation is anticipated ~2030. Provisional until then."
 }

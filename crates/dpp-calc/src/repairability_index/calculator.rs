@@ -117,6 +117,11 @@ pub fn calculate(
         + f64::from(inputs.software_updates) * w.software_updates
         + f64::from(inputs.repair_information) * w.repair_information;
 
+    // Annex IV point 5.4 rounds the index to two decimal places, and the
+    // Annex II Table 4 boundaries are stated to two decimals. Classifying the
+    // raw sum instead puts 3.996 in class B when the regulation puts it in A.
+    let index = (index * 100.0).round() / 100.0;
+
     let b = ruleset.class_boundaries();
     let class = if index >= b.a {
         RepairabilityClass::A
