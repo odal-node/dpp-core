@@ -22,7 +22,7 @@ Pure Rust, no I/O, no network calls.
 ## Example
 
 ```rust
-use dpp_digital_link::{DigitalLink, AccessTier, negotiate, Gs1LinkType};
+use dpp_digital_link::{DigitalLink, Audience, negotiate, Gs1LinkType};
 
 // Parse a GS1 Digital Link URL
 let link = DigitalLink::parse(
@@ -33,14 +33,14 @@ println!("Serial: {}", link.serial.unwrap());
 
 // Negotiate the best link for a professional-tier consumer
 let descriptors = vec![/* LinkDescriptor items */];
-let best = negotiate(&descriptors, None, None, AccessTier::Professional);
+let best = negotiate(&descriptors, None, None, Audience::LegitimateInterest);
 ```
 
 ## Relationship to other crates
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `AccessTier` — required by this crate |
+| `dpp-domain` | Provides `Audience` and `Disclosure` — required by this crate |
 
 ## Minimum Rust version
 

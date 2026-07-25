@@ -42,7 +42,7 @@ src/
 ├── ruleset_registry.rs       date-based ruleset resolution; all_rulesets() CI iterator
 │
 ├── repairability/            Simplified, non-regulatory six-parameter A–E heuristic
-│   ├── mod.rs                calculate(inputs, ruleset) → RepairabilityResult
+│   ├── mod.rs                calculate(inputs, ruleset, clock) → RepairabilityResult
 │   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0–2)
 │   ├── thresholds.rs         RepairabilityRuleset: Ruleset trait + SmartphoneTabletRuleset
 │   │                         (in force June 2025) + LaptopRuleset (stub, ~2027)
@@ -50,7 +50,7 @@ src/
 │                             regulatory-basis non-empty CI check
 │
 └── co2e/
-    ├── mod.rs                calculate(inputs) → Co2eResult (cradle-to-gate, operator-supplied EFs)
+    ├── mod.rs                calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate, operator-supplied EFs)
     ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB (Phase 2)
     └── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6 — free)
 ```
@@ -75,7 +75,11 @@ use dpp_calc::{
     repairability::{calculate, parameters::RepairabilityInputs, SmartphoneTabletRuleset},
     ruleset_registry,
 };
-use chrono::Utc;
+use dpp_calc::clock::AssessmentClock;
+
+// The date the governing law attached to this product — from the product's own
+// record (e.g. `placedOnMarketDate`), never from the wall clock.
+let clock = AssessmentClock::placed_on(product.placed_on_market_date);
 
 // Option A: use the ruleset directly (when you know the product category at compile time)
 let result = calculate(
@@ -88,30 +92,38 @@ let result = calculate(
         customer_support:      1,
     },
     &SmartphoneTabletRuleset,
+    clock,
 )?;
 println!("{} ({:.1}/10)", result.class, result.numeric_score); // e.g. "B (8.00/10)"
 println!("receipt: {}", result.receipt.receipt_id);
 
-// Option B: date-based resolution (when the category comes from a passport field)
-let today = Utc::now().date_naive();
-let ruleset = ruleset_registry::resolve_repairability("smartphone-tablet", today)
-    .ok_or("no ruleset in force for this category today")?;
-let result = calculate(&inputs, ruleset)?;
+// Option B: resolution by governing-law date (when the category comes from a passport field)
+let ruleset = ruleset_registry::resolve_repairability("smartphone-tablet", clock.law_in_force_on)
+    .assessed()
+    .ok_or("no ruleset governs this category on that date")?;
+let result = calculate(&inputs, ruleset, clock)?;
 ```
 
 ### Cradle-to-gate CO₂e
 
 ```rust
-use dpp_calc::co2e::{calculate, Co2eInputs, MaterialFootprint};
+use dpp_calc::clock::AssessmentClock;
+use dpp_calc::co2e::{calculate, Co2eInputs, CradleToGateRuleset, MaterialFootprint};
 
-let result = calculate(&Co2eInputs {
-    materials: vec![
-        MaterialFootprint { mass_kg: 0.5, emission_factor_kg_co2e_per_kg: 8.0 },
-        MaterialFootprint { mass_kg: 0.2, emission_factor_kg_co2e_per_kg: 3.0 },
-    ],
-    energy_kwh: 1.5,
-    grid_factor_kg_co2e_per_kwh: 0.4,
-});
+let clock = AssessmentClock::placed_on(product.placed_on_market_date);
+
+let result = calculate(
+    &Co2eInputs {
+        materials: vec![
+            MaterialFootprint { mass_kg: 0.5, emission_factor_kg_co2e_per_kg: 8.0 },
+            MaterialFootprint { mass_kg: 0.2, emission_factor_kg_co2e_per_kg: 3.0 },
+        ],
+        energy_kwh: 1.5,
+        grid_factor_kg_co2e_per_kwh: 0.4,
+    },
+    &CradleToGateRuleset,
+    clock,
+)?;
 println!("{:.2} kg CO₂e", result.total_co2e_kg); // 5.20 kg CO₂e
 ```
 
@@ -130,6 +142,8 @@ pub struct CalculationReceipt {
     pub factor_dataset_id:      String,        // empty if no FactorProvider used
     pub factor_dataset_version: String,
     pub factor_set_hash:        Option<String>, // SHA-256 of full factor table
+    /// The date whose law the calculation was performed against.
+    pub assessed_as_of: NaiveDate,
     pub computed_at:            DateTime<Utc>,
 }
 ```

@@ -13,7 +13,7 @@ the ESPR Art. 10 access-tier policy engine.
 
 - You need to sign or verify DPP data with Ed25519.
 - You are issuing or verifying W3C Verifiable Credentials for supply-chain actors.
-- You need to enforce read-access tiers (Public / Professional / Confidential) on
+- You need to enforce read access by audience (Public / LegitimateInterest / Authority) on
   passport fields per ESPR Article 10.
 - You are building a `did:web` identity for a manufacturer or operator.
 
@@ -44,7 +44,7 @@ let credential = CredentialBuilder::new(
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `AccessTier` and `IdentityPort` — required by this crate |
+| `dpp-domain` | Provides `Audience`, `Disclosure` and `IdentityPort` — required by this crate |
 
 ## Minimum Rust version
 

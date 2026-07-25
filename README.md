@@ -71,18 +71,24 @@ dpp-core/
 
 ## Key Features
 
-### Three-Tier Access Control (ESPR Art. 9(2)(f), Art. 11(b))
+### Access Control — an Art. 77(2) lattice, not a ranking
 
-The three-tier split (Public/Professional/Confidential) is this project's own design — ESPR
-requires per-actor access rights to be specified in each product group's delegated act (Art.
-9(2), point (f)) and guarantees free, easy access based on those rights (Art. 11, point (b)); it
-does not itself mandate exactly three tiers.
+Regulation (EU) 2023/1542 Art. 77(2) assigns three audiences to four Annex XIII
+data sets. Crucially it is **not an ordering**: conformity test reports (point 3)
+go to authorities only, and individual-battery use data (point 4) goes to
+legitimate-interest holders only — so neither audience contains the other, and no
+integer "tier" comparison can express the assignment.
 
-The access tier system gates DPP data based on W3C Verifiable Credentials:
+| Audience | Annex XIII | Sees |
+|---|---|---|
+| **Public** | point 1 | Public battery-model information. No credential. |
+| **Legitimate interest** | points 2 and 4 | Detailed composition, dismantling and safety, **plus** individual-item data: state of health, use history, status. Requires a VC proving the interest (repairer, remanufacturer, second-life operator, recycler). |
+| **Authority** | points 2 and 3 | The same point-2 data, **plus** conformity test reports — but **not** point-4 individual data. Notified bodies, market surveillance, customs, the Commission. |
 
-- **Public** — Fibre composition, country of manufacturing, care instructions, environmental metrics. No credential required.
-- **Professional** — SVHC substances, disassembly instructions, spare parts availability. Requires a VC proving role (repairer, recycler, remanufacturer).
-- **Confidential** — Compliance reports, audit history, supply chain traceability. Requires an institutional DID (market surveillance authority, customs).
+`Audience::may_see(Disclosure)` is the whole assignment in one table. ESPR itself
+(Art. 9(2)(f), Art. 11(b)) requires per-actor access rights to be set by each
+product group's delegated act rather than mandating a fixed set, so non-battery
+sectors reuse the same vocabulary via each sector manifest's `disclosure` map.
 
 ### Transfer of Responsibility
 
@@ -103,8 +109,8 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{sector}/v{version}.json` (
 
 | Sector | Versions | Key Fields |
 |---|---|---|
-| textile | v1.0.0, v1.1.0 | Fibre composition, SVHC, durability, microplastics |
-| battery | v1.0.0, v2.0.0 | Chemistry, capacity, recycled content, state of health |
+| textile | v1.0.0 – v1.2.0 | Fibre composition, SVHC, durability, microplastics |
+| battery | v1.0.0 – v2.4.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
 | electronics | v1.0.0 | Repairability, spare parts, substances of concern |
 | steel | v1.0.0 | CO2 intensity, scrap content, production method |
 | unsold-goods | v1.0.0 | Art. 25 destruction ban compliance |
