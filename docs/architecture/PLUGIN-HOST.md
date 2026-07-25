@@ -40,7 +40,7 @@ ComplianceRegistry::compute(sector, data)
 
 A computed determination is passed through `gate_determination(catalog.is_in_force(sector), …)` (dpp-core) so a **provisional** sector can never surface a binding `Compliant`/`NonCompliant` — it is downgraded to `NotAssessed`.
 
-**Validation is independent of all of this.** `validate_sector_data` (JSON Schema via the registry + cross-field `dpp-rules`) runs in pure core with no Wasm host. A self-hoster who disables plugins still gets full structural and cross-field validation; they only forgo a *computed determination*. A no-Wasm determination path is intentionally not offered (it would re-introduce closed per-sector logic into core). See `SECTOR-MODEL-CONSOLIDATION.md` §3.1.
+**Validation is independent of all of this.** `validate_sector_data` (JSON Schema via the registry + cross-field `dpp-rules`) runs in pure core with no Wasm host. A self-hoster who disables plugins still gets full structural and cross-field validation; they only forgo a *computed determination*. A no-Wasm determination path is intentionally not offered (it would re-introduce closed per-sector logic into core).
 
 ### Emitting findings (ABI 1.1)
 

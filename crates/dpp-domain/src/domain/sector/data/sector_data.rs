@@ -1,4 +1,4 @@
-//! The [`SectorData`] discriminated union and its access-tier redaction.
+//! The [`SectorData`] discriminated union and its per-audience redaction.
 
 use serde::{Deserialize, Serialize};
 

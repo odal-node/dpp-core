@@ -10,7 +10,7 @@ use crate::access::status_list::StatusList;
 /// Result of verifying a DPP access credential.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationResult {
-    /// Credential is valid — the granted access tier is returned.
+    /// Credential is valid — the granted audience is returned.
     Valid {
         audience: Audience,
         role: CredentialRole,
@@ -27,7 +27,7 @@ pub enum VerificationResult {
     /// The credential's scope doesn't cover the requested resource.
     OutOfScope { reason: String },
     /// The credential's issuer DID is not in the operator's trust registry for
-    /// the tier it claims to grant (Gap 9: issuer trust anchor).
+    /// the audience it claims to grant.
     UntrustedIssuer { issuer_did: String },
 }
 

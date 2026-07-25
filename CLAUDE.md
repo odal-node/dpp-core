@@ -94,9 +94,9 @@ dpp-digital-link  — GS1 Digital Link parser (pure, no I/O)
 dpp-plugin-traits — Wasm plugin host/guest contract: DppSectorPlugin trait, capabilities, AbiResult
 dpp-plugin-sdk    — guest-side SDK: export_plugin! macro (generates the ABI incl. describe()) + Validator
 dpp-registry      — EU Central Registry interface types (wasm32-safe)
-dpp-rules         — pure no_std, zero-dep cross-field regulatory rules; shared by dpp-domain and the Wasm plugins (kept separate by design — target per-sector structure in docs/architecture/SECTOR-MODEL-CONSOLIDATION.md §7)
+dpp-rules         — pure no_std, zero-dep cross-field regulatory rules; shared by dpp-domain and the Wasm plugins (kept separate by design, so neither depends on the other)
 dpp-calc          — EU-methodology calculators (CO2e cradle-to-gate, EN 45554 repairability); pure, stateless; licensed LCI data injected via FactorProvider, never bundled
-dpp-tests         — cross-crate integration tests (textile E2E, transfer of responsibility, access tiers, schema conformity)
+dpp-tests         — cross-crate integration tests (textile E2E, transfer of responsibility, audience gatekeeping, schema conformity)
 ```
 
 Sector plugins (`plugins/sector-*`) are standalone Rust crates compiled to `wasm32-wasip1`, excluded from the workspace. Each implements `DppSectorPlugin` and calls `export_plugin!` once; **`sector-battery` is the reference implementation**. The host calls a plugin's `describe()` export and runs `check_compatibility` before dispatch. See `docs/architecture/PLUGIN-HOST.md`.

@@ -1,4 +1,4 @@
-//! Serde round-trip, state-machine, validation, and redaction tests for `Passport`.
+﻿//! Serde round-trip, state-machine, validation, and redaction tests for `Passport`.
 
 use super::*;
 use crate::domain::identity::Audience;
@@ -457,7 +457,7 @@ fn redact_unknown_sector_withholds_sector_data_below_confidential() {
     let catalog = crate::catalog::SectorCatalog::new();
     let mut p = make_passport();
     // `Other` maps to catalog key "other", which is absent from the embedded
-    // catalog — so there are no per-field access tiers to redact against.
+    // catalog — so there are no per-field disclosure classes to redact against.
     p.sector = Sector::Other;
     p.sector_data = Some(SectorData::Other(
         serde_json::json!({ "secretField": "leak-me" }),

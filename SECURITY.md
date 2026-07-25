@@ -30,7 +30,7 @@ This policy covers all crates in the dpp-core workspace:
 | Crate | Security-Relevant Surface |
 |-------|---------------------------|
 | **dpp-crypto** | Ed25519 key management, AES-256-GCM encryption, JWS signing/verification, Verifiable Credential issuance |
-| **dpp-domain** | Access tier policy enforcement, schema validation, transfer chain integrity |
+| **dpp-domain** | Disclosure classification and redaction, schema validation, transfer chain integrity |
 | **dpp-digital-link** | GS1 Digital Link URI parsing (input validation) |
 | **dpp-plugin-traits** | Wasm plugin ABI boundary |
 | **dpp-registry** | EU Registry interface types |
@@ -39,7 +39,9 @@ Issues in the following areas are particularly important:
 
 - Cryptographic key leakage or weak randomness
 - JWS signature bypass or forgery
-- Access tier escalation (e.g., public credentials accessing confidential data)
+- Audience escalation (e.g. a public caller reading `Restricted`, `Conformity`
+  or `Individual` data, or an authority credential reaching Annex XIII point 4
+  individual-item data it is not entitled to)
 - Schema validation bypass allowing non-compliant passports
 - Transfer chain integrity violations (skipping states, forging history)
 

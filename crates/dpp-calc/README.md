@@ -34,67 +34,147 @@ by the operator. That split is the licensing rationale for this crate.
 src/
 ├── lib.rs                    public API + sector-calculator scaling guide (read this first)
 │
-├── error.rs                  CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
-├── receipt.rs                CalculationReceipt — proof-of-calculation envelope
-├── ruleset.rs                RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
-│                             Ruleset trait — every methodology trait extends this
-├── factor.rs                 FactorProvider trait + SyntheticFactorProvider (test/CI only)
-├── ruleset_registry.rs       date-based ruleset resolution; all_rulesets() CI iterator
+├── kernel/                   machinery shared by every methodology
+│   ├── error.rs              CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
+│   ├── receipt.rs            CalculationReceipt — proof-of-calculation envelope
+│   ├── ruleset.rs            RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
+│   │                         Ruleset trait — every methodology trait extends this
+│   ├── clock.rs              AssessmentClock — the governing-law date; there is no now()
+│   ├── assessability.rs      Assessability<T>: Assessed | NotYetInForce | Undetermined
+│   │                         | Expired | OutOfScope — none of which is non-compliance
+│   ├── factor.rs             FactorProvider trait
+│   ├── synthetic_factor.rs   SyntheticFactorProvider (test/CI only)
+│   └── hashing.rs            canonical input hashing behind input_hash
+│
+├── ruleset_registry/         date-based ruleset resolution; all_rulesets() CI iterator
+│
+├── repairability_index/      The enacted EU 2023/1669 Annex IV index
+│   ├── calculator.rs         calculate(inputs, ruleset) → RepairabilityIndexResult
+│   ├── parameters.rs         RepairabilityIndexInputs — 3 part-level parameters over the
+│   │                         10 Annex IV priority parts + 3 product-level, each scored 1–5
+│   ├── thresholds.rs         RepairabilityIndexRuleset + Eu2023_1669Ruleset
+│   └── golden_vectors.rs     #[cfg(test)]
 │
 ├── repairability/            Simplified, non-regulatory six-parameter A–E heuristic
-│   ├── mod.rs                calculate(inputs, ruleset, clock) → RepairabilityResult
+│   ├── calculator.rs         calculate(inputs, ruleset, clock) → RepairabilityResult
 │   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0–2)
-│   ├── thresholds.rs         RepairabilityRuleset: Ruleset trait + SmartphoneTabletRuleset
-│   │                         (in force June 2025) + LaptopRuleset (stub, ~2027)
-│   └── golden_vectors.rs     #[cfg(test)] — JRC reference vectors, A–E coverage,
-│                             regulatory-basis non-empty CI check
+│   ├── thresholds/           RepairabilityRuleset trait + SimplifiedRepairabilityHeuristic,
+│   │                         LaptopRuleset, DisplaysRuleset, WashingMachineRuleset
+│   └── golden_vectors.rs     #[cfg(test)] — A–E coverage, regulatory-basis non-empty CI check
 │
 └── co2e/
-    ├── mod.rs                calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate, operator-supplied EFs)
+    ├── calculator.rs         calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate,
+    │                         operator-supplied emission factors)
+    ├── parameters.rs         Co2eInputs, MaterialFootprint
+    ├── thresholds.rs         Co2eRuleset trait + CradleToGateRuleset
     ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB (Phase 2)
-    └── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6 — free)
+    ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6 — free)
+    └── golden_vectors.rs     #[cfg(test)]
 ```
 
 **Phase status:**
 
 | Module | Status |
 |---|---|
-| `repairability` | ✅ In force — non-regulatory heuristic, available since June 2025 (**not** the EU 2023/1669 Annex IV index — see module-level note) |
+| `repairability_index` | ✅ Enacted — Reg. (EU) 2023/1669 Annex IV point 5, smartphones and slate tablets |
+| `repairability` | ✅ Available — non-regulatory six-parameter heuristic; **not** the enacted index |
 | `co2e::calculate` | ✅ Baseline — operator-supplied emission factors |
 | `co2e::cfb` | 🔒 Stub — gated on signed ecoinvent/EF sublicense (Phase 1 gate) |
 | `pef/` (future) | 📋 Not yet — awaits per-sector PEFCR finalisation (2026–2030) |
+
+### Which repairability module do I want?
+
+`repairability_index` implements the scoring a delegated act actually prescribes,
+and is what belongs in a passport field that claims to be *the* repairability
+index. `repairability` is an internal six-factor heuristic that predates it and
+covers product categories the regulation does not reach (laptops, displays,
+washing machines). They are separate modules, not versions of each other: the
+inputs, the scale and the legal standing all differ. Note that only the
+heuristic takes an `AssessmentClock` — the index has a single ruleset, so there
+is no date-dependent choice to make.
 
 ---
 
 ## Usage
 
+### Repairability index (enacted — EU 2023/1669 Annex IV)
+
+```rust
+use chrono::NaiveDate;
+use dpp_calc::repairability_index::{
+    Eu2023_1669Ruleset, PriorityPartScores, RepairabilityIndexInputs, calculate,
+};
+use dpp_calc::ruleset_registry;
+
+// Each of the three part-level parameters is scored 1–5 for all ten Annex IV
+// priority parts. `folding_mechanism` is None for a non-foldable product.
+let parts = |s: u8| PriorityPartScores {
+    battery: s,
+    display_assembly: s,
+    back_cover: s,
+    front_camera: s,
+    rear_camera: s,
+    charging_port: s,
+    mechanical_button: s,
+    microphone: s,
+    speaker: s,
+    folding_mechanism: None,
+};
+
+let inputs = RepairabilityIndexInputs {
+    disassembly_depth:  parts(4),
+    fasteners:          parts(5),
+    tools:              parts(4),
+    spare_parts:        4,
+    software_updates:   5,
+    repair_information: 3,
+};
+
+let result = calculate(&inputs, &Eu2023_1669Ruleset)?;
+println!("R = {:.2} → class {:?}", result.index, result.class);
+
+// Or resolve the governing ruleset by product category and law date:
+let law_date = NaiveDate::from_ymd_opt(2026, 7, 25).unwrap();
+if let Some(ruleset) =
+    ruleset_registry::resolve_repairability_index("smartphone-tablet", law_date).assessed()
+{
+    let result = calculate(&inputs, ruleset)?;
+    println!("R = {:.2}", result.index);
+}
+```
+
+`resolve_repairability_index` returns an `Assessability`, not an `Option`:
+`NotYetInForce`, `Undetermined`, `Expired` and `OutOfScope` are distinct answers,
+and **none of them means non-compliant**.
+
 ### Repairability (simplified non-regulatory heuristic, A–E)
 
 ```rust
-use dpp_calc::{
-    repairability::{calculate, parameters::RepairabilityInputs, SmartphoneTabletRuleset},
-    ruleset_registry,
-};
+use chrono::NaiveDate;
 use dpp_calc::clock::AssessmentClock;
+use dpp_calc::repairability::{
+    RepairabilityInputs, SimplifiedRepairabilityHeuristic, calculate,
+};
+use dpp_calc::ruleset_registry;
 
-// The date the governing law attached to this product — from the product's own
-// record (e.g. `placedOnMarketDate`), never from the wall clock.
-let clock = AssessmentClock::placed_on(product.placed_on_market_date);
+// The date the governing law attached to this product — read from the product's
+// own record (`placedOnMarketDate`), never from the wall clock. There is
+// deliberately no `AssessmentClock::now()`.
+let placed_on_market = NaiveDate::from_ymd_opt(2026, 3, 14).unwrap();
+let clock = AssessmentClock::placed_on(placed_on_market);
+
+let inputs = RepairabilityInputs {
+    disassembly:           2,
+    spare_parts:           2,
+    repair_info:           1,
+    diagnostic_tools:      1,
+    software_updatability: 2,
+    customer_support:      1,
+};
 
 // Option A: use the ruleset directly (when you know the product category at compile time)
-let result = calculate(
-    &RepairabilityInputs {
-        disassembly:           2,
-        spare_parts:           2,
-        repair_info:           1,
-        diagnostic_tools:      1,
-        software_updatability: 2,
-        customer_support:      1,
-    },
-    &SmartphoneTabletRuleset,
-    clock,
-)?;
-println!("{} ({:.1}/10)", result.class, result.numeric_score); // e.g. "B (8.00/10)"
+let result = calculate(&inputs, &SimplifiedRepairabilityHeuristic, clock)?;
+println!("{} ({:.2}/10)", result.class, result.numeric_score); // "B (7.75/10)"
 println!("receipt: {}", result.receipt.receipt_id);
 
 // Option B: resolution by governing-law date (when the category comes from a passport field)
@@ -107,10 +187,11 @@ let result = calculate(&inputs, ruleset, clock)?;
 ### Cradle-to-gate CO₂e
 
 ```rust
+use chrono::NaiveDate;
 use dpp_calc::clock::AssessmentClock;
-use dpp_calc::co2e::{calculate, Co2eInputs, CradleToGateRuleset, MaterialFootprint};
+use dpp_calc::co2e::{Co2eInputs, CradleToGateRuleset, MaterialFootprint, calculate};
 
-let clock = AssessmentClock::placed_on(product.placed_on_market_date);
+let clock = AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 3, 14).unwrap());
 
 let result = calculate(
     &Co2eInputs {
@@ -159,16 +240,20 @@ version + same factor dataset version → must produce the same output.
 Every concrete ruleset carries a machine-readable legal citation:
 
 ```rust
-SmartphoneTabletRuleset.regulatory_basis()
+Eu2023_1669Ruleset.regulatory_basis()
 // RegulatoryBasis {
-//   regulation:      "EU 2023/1669",
-//   article:         "Annex II, Annex III",
-//   standard:        Some("EN 45554:2021"),
-//   technical_study: Some("JRC128649"),
-//   source_url:      Some("https://eur-lex.europa.eu/…"),
-//   superseded_by:   None,
+//   regulation: "EU 2023/1669",
+//   article:    "Annex IV point 5 (calculation method); \
+//                Annex II Table 4 (class boundaries)",
+//   standard:   Some("EN 45554:2020"),
+//   …
 // }
 ```
+
+A non-regulatory ruleset says so in the same field rather than leaving it blank —
+`SimplifiedRepairabilityHeuristic` reports its `regulation` as
+`"Non-regulatory: simplified repairability heuristic (NOT EU 2023/1669 Annex IV)"`,
+so a receipt can never imply legal standing the calculation does not have.
 
 A CI test (`expired_rulesets_have_superseded_by`) asserts that any ruleset with
 `Effectivity::InForce.until < today` has a non-empty `superseded_by`. This keeps the audit chain intact as regulations evolve.
@@ -189,10 +274,13 @@ A CI test (`expired_rulesets_have_superseded_by`) asserts that any ruleset with
 See the `# Adding a new sector calculator` section in `src/lib.rs` for the full
 step-by-step guide. Short version:
 
-1. **New methodology** → add `src/{methodology}/` with `mod.rs`, `parameters.rs`,
-   `thresholds.rs` (trait extends `Ruleset`), `golden_vectors.rs`. Register in `ruleset_registry.rs`.
+1. **New methodology** → add `src/{methodology}/` with `mod.rs`, `calculator.rs`,
+   `parameters.rs`, `thresholds.rs` (trait extends `Ruleset`), `golden_vectors.rs`.
+   Register in `src/ruleset_registry/resolve.rs`.
 2. **New product category on an existing methodology** → add `impl Ruleset + impl {Methodology}Ruleset`
-   in `thresholds.rs`, add a row to the registry, add golden vectors.
+   in that methodology's `thresholds` module (a file, or a directory with one
+   file per category as in `repairability/thresholds/`), add a row to the
+   registry, add golden vectors.
 3. **Pending delegated act** → use `Effectivity::pending(empowerment, adoption_deadline)`. There is no date sentinel: a pending ruleset has no application date and resolves for no date at all.
 4. **Superseded ruleset** → set `until`, set `superseded_by`. Never delete rows.
 

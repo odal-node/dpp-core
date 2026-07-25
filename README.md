@@ -13,7 +13,7 @@ Anyone building DPP tooling can use this library as the foundation. It is the st
 
 > Note: This project is in active development.
 
-> *"We provide the pipe, not the truth."* Odal Node uses a **proof-bound architecture**: product data is validated locally, signed with your key, and published as a verifiable passport. The transient import files are discarded after signing; the signed passport itself — the full product data, every field bound to a proof and gated by access tier — is what the node retains and serves. What the world verifies is a cryptographic proof over real, tiered data, not a bare hash standing in for it.
+> *"We provide the pipe, not the truth."* Odal Node uses a **proof-bound architecture**: product data is validated locally, signed with your key, and published as a verifiable passport. The transient import files are discarded after signing; the signed passport itself — the full product data, every field bound to a proof and gated by its disclosure class — is what the node retains and serves. What the world verifies is a cryptographic proof over real, tiered data, not a bare hash standing in for it.
 
 ---
 
@@ -65,7 +65,7 @@ dpp-core/
 | **CEN/CLC JTC 24 system standards** | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | Conformance tracked clause-by-clause; identifiers, carriers, API and authentication semantics aligned |
 | **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
 | **IDTA AAS Metamodel** | Published | DPP-to-AAS SubmodelElement mapping |
-| **W3C VC Data Model v2.0** | Published | `DppAccessCredential` with role-based access tiers |
+| **W3C VC Data Model v2.0** | Published | `DppAccessCredential` mapping operator roles to an `Audience` |
 
 ---
 

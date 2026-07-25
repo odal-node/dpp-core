@@ -8,7 +8,9 @@ Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules.
 
 These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm sector plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.
 
-See `docs/architecture/SECTOR-MODEL-CONSOLIDATION.md` §7 for the design rationale.
+Keeping them in a standalone `no_std`, zero-dependency crate is what makes that
+possible: `dpp-domain` and the Wasm plugins can both depend on it without either
+depending on the other.
 
 ---
 

@@ -123,9 +123,9 @@ pub struct TextileData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prior_use_cycles: Option<u32>,
 
-    // ── Professional-tier data (gated by access control) ───────────────────
+    // ── Restricted data (gated by access control) ──────────────────────────
     /// Free-text or structured disassembly / deconstruction instructions.
-    /// Gated behind the Professional access tier (Verifiable Credential required).
+    /// Classified `Disclosure::Restricted` (Verifiable Credential required).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disassembly_instructions: Option<String>,
     /// Whether spare parts or replacement components are available from the manufacturer.
