@@ -8,6 +8,7 @@ use crate::repairability::thresholds::{
     DisplaysRuleset, LaptopRuleset, RepairabilityRuleset, SimplifiedRepairabilityHeuristic,
     WashingMachineRuleset,
 };
+use crate::repairability_index::{Eu2023_1669Ruleset, RepairabilityIndexRuleset};
 use crate::ruleset::{Effectivity, Ruleset};
 
 /// Every concrete ruleset known to this build, as base-trait references.
@@ -22,6 +23,7 @@ pub fn all_rulesets() -> &'static [&'static dyn Ruleset] {
         &DisplaysRuleset,
         &WashingMachineRuleset,
         &CradleToGateRuleset,
+        &Eu2023_1669Ruleset,
     ]
 }
 
@@ -102,5 +104,41 @@ pub fn resolve_repairability(
         }
     } else {
         Assessability::OutOfScope
+    }
+}
+
+/// Return the EU 2023/1669 repairability-index ruleset governing
+/// `product_category` for a product whose law was fixed on `law_in_force_on`,
+/// or the reason there isn't one.
+///
+/// The enacted index is a different methodology from the non-regulatory
+/// heuristic behind [`resolve_repairability`] — different parameters, a 1–5
+/// scale and its own class boundaries — so it gets its own resolver rather than
+/// overloading that one.
+pub fn resolve_repairability_index(
+    product_category: &str,
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static dyn RepairabilityIndexRuleset> {
+    // Reg. (EU) 2023/1669 covers smartphones and slate tablets.
+    let all: &[(&str, &'static dyn RepairabilityIndexRuleset)] =
+        &[("smartphone-tablet", &Eu2023_1669Ruleset)];
+
+    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
+
+    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
+        return Assessability::Assessed(*r);
+    }
+    match rows().next() {
+        None => Assessability::OutOfScope,
+        Some((_, r)) => match r.effectivity() {
+            Effectivity::Pending { empowerment, .. } => Assessability::Undetermined {
+                ruleset_id: r.id().0,
+                empowerment,
+            },
+            Effectivity::InForce { from, .. } => Assessability::NotYetInForce {
+                ruleset_id: r.id().0,
+                applies_from: *from,
+            },
+        },
     }
 }
