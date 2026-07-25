@@ -34,10 +34,11 @@ fn battery_descriptor_is_complete() {
     assert_eq!(battery.retention_years, 10);
     assert!(battery.schema_versions.contains(&"2.0.0".to_string()));
     assert!(battery.schema_versions.contains(&"2.1.0".to_string()));
-    // Current version is v2.1.0, which drops the unsourced A-E enumeration on
-    // carbonFootprintClass. Older versions stay registered so passports already
+    assert!(battery.schema_versions.contains(&"2.2.0".to_string()));
+    // Current version is v2.2.0, which adds the Annex VII Part A state-of-health
+    // parameter sets. Older versions stay registered so passports already
     // validated against them remain verifiable.
-    assert_eq!(battery.current_schema_version, "2.1.0");
+    assert_eq!(battery.current_schema_version, "2.2.0");
     assert_eq!(battery.plugin.as_deref(), Some("sector-battery"));
 }
 
@@ -47,7 +48,7 @@ fn resolve_schema_version_new_vs_existing() {
     // New passport (stored = None) → catalog current version.
     assert_eq!(
         catalog.resolve_schema_version("battery", None).as_deref(),
-        Some("2.1.0")
+        Some("2.2.0")
     );
     // Existing passport → its stored version is authoritative, even if old.
     assert_eq!(

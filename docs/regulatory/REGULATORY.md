@@ -74,7 +74,18 @@ Both application dates are conditional — Art. 10(2)/(3) read "or 18 months aft
 
 **Art. 10(4)** disapplies paragraphs 1–3 for batteries prepared for re-use, repurposed or remanufactured that were placed on the market before the obligations applied — so a determination keys on the original placing-on-market date.
 
-The schema carries `stateOfHealthPct` and `expectedLifetimeCycles`, range-checked by JSON Schema. That is narrower than Annex VII, which defines SOH as **SOCE** for EV batteries and a five-parameter set for stationary storage and LMT. No cross-field rule linking the declared fields exists in current regulation text.
+**Annex VII Part A is now modelled** (schema v2.2.0, `BatteryData::state_of_health`). It is two disjoint lists, so the type is a sum, not a struct of optionals:
+
+| Category | Parameters |
+|---|---|
+| Electric vehicle | state of certified energy (SOCE) — and nothing else |
+| Stationary storage + LMT | remaining capacity and evolution of self-discharging rates (unconditional); remaining power capability, remaining round trip efficiency, ohmic resistance (each "where possible") |
+
+`dpp_rules::batteries::degradation::annex_vii_parameter_set_for` maps a battery type onto the applicable list. Portable and SLI return `None` — Art. 14(1) names only stationary storage, LMT and EV batteries.
+
+Annex XIII point 4(b) puts state of health in the individual-battery set, so `stateOfHealth` and the deprecated `stateOfHealthPct` both carry the `individual` disclosure class: legitimate-interest holders see them, authorities do not. Before v2.2.0 neither field was classified, so both defaulted to public.
+
+The flat `stateOfHealthPct` is retained for schema versions up to v2.1.0 and cannot represent either list.
 
 **When to update:** When the Art. 10(5) delegated acts are published. At that point, implement the minimum values here keyed by battery category, and switch the battery plugin from `NOT_ASSESSED` to a real determination for the affected categories.
 

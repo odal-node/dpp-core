@@ -45,6 +45,7 @@ fn battery_passport() -> Passport {
                 recycled_content_lithium_pct: Some(6.0),
                 recycled_content_nickel_pct: Some(9.0),
                 state_of_health_pct: Some(100.0),
+                state_of_health: None,
                 rated_capacity_kwh: Some(0.32),
                 carbon_footprint_class: None,
                 carbon_footprint_class_ruleset_id: None,

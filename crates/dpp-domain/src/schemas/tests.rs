@@ -6,11 +6,11 @@ use semver::Version;
 #[test]
 fn registry_loads_all_embedded_schemas() {
     let reg = VersionedSchemaRegistry::new();
-    // battery 1.0 + 2.0 + 2.1, textile 1.0 + 1.1 + 1.2, unsold-goods 1.0,
+    // battery 1.0 + 2.0 + 2.1 + 2.2, textile 1.0 + 1.1 + 1.2, unsold-goods 1.0,
     // steel 1.0 + 1.1, electronics 1.0 + 1.1, construction 1.0 + 1.1,
     // tyre 1.0, toy 1.0 + 1.1, aluminium 1.0 + 1.1, furniture 1.0 + 1.1,
     // detergent 1.0 + 1.1
-    assert_eq!(reg.len(), 22);
+    assert_eq!(reg.len(), 23);
 }
 
 #[test]
@@ -24,10 +24,10 @@ fn get_battery_v1() {
 }
 
 #[test]
-fn latest_battery_returns_v2_1() {
+fn latest_battery_returns_v2_2() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("battery").expect("battery schema exists");
-    assert_eq!(*version, "2.1.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "2.2.0".parse::<Version>().unwrap());
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn register_new_schema_succeeds() {
     let mut reg = VersionedSchemaRegistry::new();
     let schema = r#"{"type": "object", "properties": {"gtin": {"type": "string"}}}"#;
     assert!(reg.register("plastics", "1.0.0", schema.to_owned()).is_ok());
-    assert_eq!(reg.len(), 23);
+    assert_eq!(reg.len(), 24);
 
     let entry = reg
         .get_entry("plastics", &"1.0.0".parse().unwrap())
@@ -156,7 +156,7 @@ fn register_or_replace_new_returns_false() {
         .register_or_replace("plastics", "1.0.0", schema.to_owned())
         .unwrap();
     assert!(!replaced);
-    assert_eq!(reg.len(), 23);
+    assert_eq!(reg.len(), 24);
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn register_or_replace_existing_returns_true() {
         .register_or_replace("battery", "1.0.0", new_schema.to_owned())
         .unwrap();
     assert!(replaced);
-    assert_eq!(reg.len(), 22); // count unchanged
+    assert_eq!(reg.len(), 23); // count unchanged
     assert!(
         reg.get("battery", &"1.0.0".parse().unwrap())
             .unwrap()
@@ -192,11 +192,11 @@ fn unregister_runtime_schema_succeeds() {
     let schema = r#"{"type": "object"}"#;
     reg.register("plastics", "1.0.0", schema.to_owned())
         .unwrap();
-    assert_eq!(reg.len(), 23);
+    assert_eq!(reg.len(), 24);
 
     let removed = reg.unregister("plastics", &"1.0.0".parse().unwrap());
     assert!(removed);
-    assert_eq!(reg.len(), 22);
+    assert_eq!(reg.len(), 23);
     assert!(reg.get("plastics", &"1.0.0".parse().unwrap()).is_none());
 }
 
@@ -205,7 +205,7 @@ fn unregister_embedded_schema_does_nothing() {
     let mut reg = VersionedSchemaRegistry::new();
     let removed = reg.unregister("battery", &"1.0.0".parse().unwrap());
     assert!(!removed);
-    assert_eq!(reg.len(), 22); // still there
+    assert_eq!(reg.len(), 23); // still there
 }
 
 #[test]
@@ -752,8 +752,8 @@ fn carbon_footprint_class_bound_matches_the_schema() {
 
     let reg = VersionedSchemaRegistry::new();
     let json = reg
-        .get("battery", &"2.1.0".parse::<Version>().unwrap())
-        .expect("battery v2.1.0 is embedded");
+        .get("battery", &"2.2.0".parse::<Version>().unwrap())
+        .expect("battery v2.2.0 is embedded");
     let schema: serde_json::Value = serde_json::from_str(json).unwrap();
     let max_length = schema["properties"]["carbonFootprintClass"]["maxLength"]
         .as_u64()
@@ -769,4 +769,42 @@ fn carbon_footprint_class_bound_matches_the_schema() {
             .is_none(),
         "carbonFootprintClass must not enumerate labels"
     );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn schema_rejects_a_state_of_health_mixing_both_annex_vii_lists() {
+    // Annex VII Part A gives EV batteries exactly one parameter. serde ignores
+    // unknown fields, so the guarantee that an EV payload cannot smuggle in a
+    // stationary parameter lives in the schema's `additionalProperties: false`
+    // — this asserts it at the layer that actually enforces it.
+    let reg = VersionedSchemaRegistry::new();
+    let v = "2.2.0".parse::<Version>().unwrap();
+
+    let base = serde_json::json!({
+        "gtin": "12345678901231",
+        "batteryChemistry": "LFP",
+        "nominalVoltageV": 48.0,
+        "nominalCapacityAh": 100.0,
+        "expectedLifetimeCycles": 3000,
+        "co2ePerUnitKg": 85.4,
+    });
+
+    let mut mixed = base.clone();
+    mixed["stateOfHealth"] = serde_json::json!({
+        "parameterSet": "electricVehicle",
+        "socePct": 90.0,
+        "ohmicResistanceMohm": 3.2,
+    });
+    assert!(
+        reg.validate("battery", &v, &mixed).is_err(),
+        "an EV parameter set must not carry stationary parameters"
+    );
+
+    let mut valid = base;
+    valid["stateOfHealth"] = serde_json::json!({
+        "parameterSet": "electricVehicle",
+        "socePct": 90.0,
+    });
+    assert!(reg.validate("battery", &v, &valid).is_ok());
 }
