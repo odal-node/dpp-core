@@ -30,7 +30,7 @@ pub use builder::CredentialBuilder;
 pub use revocation::{RevocationOutcome, check_revocation};
 pub use trust::{AllowAllIssuers, StaticTrustedIssuers, TrustedIssuerRegistry};
 pub use types::{
-    AccessTier, CredentialRole, CredentialStatus, DppAccessCredential, DppCredentialSubject,
+    Audience, CredentialRole, CredentialStatus, DppAccessCredential, DppCredentialSubject,
 };
 pub use verify::{
     VerificationResult, verify_credential_claims, verify_credential_claims_with_trust,

@@ -8,9 +8,10 @@
 
 use chrono::Utc;
 use dpp_digital_link::{
-    AasSubmodelElement, AccessTier, DigitalLink, DppMediaType, Gs1LinkType, LinkDescriptor,
-    ResolutionRequest, build_aas_from_passport, negotiate,
+    AasSubmodelElement, DigitalLink, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest,
+    build_aas_from_passport, negotiate,
 };
+use dpp_domain::Disclosure;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
@@ -47,7 +48,7 @@ fn main() {
         LinkDescriptor {
             link_type: Gs1LinkType::DigitalProductPassport,
             media_type: DppMediaType::Json,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             href: "https://api.odal-node.io/dpp/09506000134352/data".into(),
             title: Some("DPP JSON".into()),
             language: None,
@@ -55,7 +56,7 @@ fn main() {
         LinkDescriptor {
             link_type: Gs1LinkType::DigitalProductPassport,
             media_type: DppMediaType::JsonLd,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             href: "https://api.odal-node.io/dpp/09506000134352/data.jsonld".into(),
             title: Some("DPP JSON-LD".into()),
             language: None,
@@ -63,7 +64,7 @@ fn main() {
         LinkDescriptor {
             link_type: Gs1LinkType::ProductInformationPage,
             media_type: DppMediaType::Html,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             href: "https://passport.odal-node.io/09506000134352".into(),
             title: Some("Human-readable passport".into()),
             language: Some("en".into()),
@@ -73,7 +74,7 @@ fn main() {
     let request = ResolutionRequest {
         link_type: Some(Gs1LinkType::DigitalProductPassport),
         media_type: Some(DppMediaType::Json),
-        access_tier: None,
+        audience: None,
     };
 
     let resolved = negotiate(&descriptors, &request);

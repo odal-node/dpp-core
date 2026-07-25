@@ -12,10 +12,11 @@
 
 use chrono::Utc;
 use dpp_crypto::access::credential::{
-    AccessTier, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,
+    Audience, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,
     verify_credential_claims,
 };
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
+use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::Disclosure;
 use dpp_tests::fixtures::make_subject;
 use serde_json::json;
 
@@ -67,7 +68,7 @@ fn public_tier_sees_only_public_fields() {
     let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
         .expect("textile in catalog");
 
-    let decision = filter_by_access_tier(&data, &policy, AccessTier::Public);
+    let decision = filter_by_audience(&data, &policy, Audience::Public);
 
     // Public fields present
     assert!(decision.filtered_data.get("fibreComposition").is_some());
@@ -136,16 +137,16 @@ fn professional_tier_via_repairer_credential() {
     assert!(result.is_valid());
 
     if let VerificationResult::Valid {
-        access_tier,
+        audience,
         role,
         holder_did,
     } = &result
     {
-        assert_eq!(*access_tier, AccessTier::Professional);
+        assert_eq!(*audience, Audience::LegitimateInterest);
         assert_eq!(*role, CredentialRole::AuthorisedRepairer);
         assert_eq!(holder_did, "did:web:greenfix.example.com");
 
-        let decision = filter_by_access_tier(&data, &policy, *access_tier);
+        let decision = filter_by_audience(&data, &policy, *audience);
 
         // Professional sees public + professional fields
         assert!(decision.filtered_data.get("fibreComposition").is_some());
@@ -179,8 +180,8 @@ fn professional_tier_via_recycler_credential() {
 
     let result = verify_credential_claims(&credential, Some("textile"), Utc::now());
     assert!(result.is_valid());
-    if let VerificationResult::Valid { access_tier, .. } = result {
-        assert_eq!(access_tier, AccessTier::Professional);
+    if let VerificationResult::Valid { audience, .. } = result {
+        assert_eq!(audience, Audience::LegitimateInterest);
     }
 }
 
@@ -209,14 +210,11 @@ fn confidential_tier_via_market_surveillance_authority() {
     let result = verify_credential_claims(&credential, Some("textile"), Utc::now());
     assert!(result.is_valid());
 
-    if let VerificationResult::Valid {
-        access_tier, role, ..
-    } = &result
-    {
-        assert_eq!(*access_tier, AccessTier::Confidential);
+    if let VerificationResult::Valid { audience, role, .. } = &result {
+        assert_eq!(*audience, Audience::Authority);
         assert_eq!(*role, CredentialRole::MarketSurveillanceAuthority);
 
-        let decision = filter_by_access_tier(&data, &policy, *access_tier);
+        let decision = filter_by_audience(&data, &policy, *audience);
 
         // Confidential sees EVERYTHING
         assert!(decision.redacted_fields.is_empty());
@@ -240,8 +238,8 @@ fn customs_authority_gets_confidential_access() {
     let credential = CredentialBuilder::new("did:web:bafin.de".into(), subject).build();
 
     let result = verify_credential_claims(&credential, None, Utc::now());
-    if let VerificationResult::Valid { access_tier, .. } = result {
-        assert_eq!(access_tier, AccessTier::Confidential);
+    if let VerificationResult::Valid { audience, .. } = result {
+        assert_eq!(audience, Audience::Authority);
     } else {
         panic!("customs authority credential should be valid");
     }
@@ -291,10 +289,10 @@ fn custom_policy_restricts_additional_fields() {
 
     // Make durabilityScore professional-only (stricter than default)
     policy
-        .field_tiers
-        .insert("durabilityScore".into(), AccessTier::Professional);
+        .field_disclosure
+        .insert("durabilityScore".into(), Disclosure::Restricted);
 
-    let public_decision = filter_by_access_tier(&data, &policy, AccessTier::Public);
+    let public_decision = filter_by_audience(&data, &policy, Audience::Public);
     assert!(
         public_decision
             .filtered_data
@@ -309,7 +307,7 @@ fn custom_policy_restricts_additional_fields() {
     );
 
     // Professional should still see it
-    let pro_decision = filter_by_access_tier(&data, &policy, AccessTier::Professional);
+    let pro_decision = filter_by_audience(&data, &policy, Audience::LegitimateInterest);
     assert!(pro_decision.filtered_data.get("durabilityScore").is_some());
 }
 
@@ -326,8 +324,8 @@ fn all_credential_roles_map_to_correct_tiers() {
     ];
     for role in professional_roles {
         assert_eq!(
-            role.access_tier(),
-            AccessTier::Professional,
+            role.audience(),
+            Audience::LegitimateInterest,
             "{role:?} should map to Professional tier"
         );
     }
@@ -340,8 +338,8 @@ fn all_credential_roles_map_to_correct_tiers() {
     ];
     for role in confidential_roles {
         assert_eq!(
-            role.access_tier(),
-            AccessTier::Confidential,
+            role.audience(),
+            Audience::Authority,
             "{role:?} should map to Confidential tier"
         );
     }

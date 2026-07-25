@@ -1,25 +1,99 @@
-//! Identity and access-tier types: `AccessTier`, `SignedCredential`, and `PassportCredential`.
+//! Identity and access types: `Audience`, `Disclosure`, `SignedCredential`, and `PassportCredential`.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// ESPR access tier levels for DPP data gating.
+/// Who is asking for passport data.
 ///
-/// The EU ESPR mandates three tiers of data access:
-/// - **Public**: No credential required. Visible to any consumer.
-/// - **Professional**: Requires a W3C Verifiable Credential proving the
-///   holder's role (repairer, recycler, remanufacturer, etc.).
-/// - **Confidential**: Requires an institutional DID (market surveillance
-///   authority, customs, notified body).
+/// Regulation (EU) 2023/1542 Art. 77(2) names three audiences and assigns each
+/// a set of Annex XIII data points:
 ///
-/// This is the canonical definition used across all dpp-core crates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/// | Audience | Annex XIII |
+/// |---|---|
+/// | (a) general public | 1 |
+/// | (b) notified bodies, market surveillance authorities, the Commission | 2 and 3 |
+/// | (c) persons with a legitimate interest | 2 and 4 |
+///
+/// **This is a lattice, not a ranking.** Point 3 (conformity test reports) is
+/// authority-only; point 4 (individual-item use history) is
+/// legitimate-interest-only. Neither audience contains the other, so no integer
+/// ordering can express the assignment: any `>=` comparison necessarily either
+/// hands authorities the individual-item data Art. 77(2)(b) withholds, or hides
+/// point-2 data from someone entitled to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
-pub enum AccessTier {
-    Public = 0,
-    Professional = 1,
-    Confidential = 2,
+pub enum Audience {
+    /// Anyone, with no credential. Art. 77(2)(a).
+    Public,
+    /// A repairer, remanufacturer, second-life operator or recycler holding a
+    /// credential that proves the interest. Art. 77(2)(c).
+    LegitimateInterest,
+    /// Notified body, market surveillance authority, customs, or the
+    /// Commission. Art. 77(2)(b).
+    Authority,
+}
+
+/// How restricted a field is — the counterpart to [`Audience`].
+///
+/// Named for the Annex XIII point each class corresponds to, and kept
+/// sector-agnostic so non-battery sectors reuse the same vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Disclosure {
+    /// Publicly accessible. Annex XIII point 1.
+    Public,
+    /// Detailed composition, dismantling information, safety measures.
+    /// Annex XIII point 2 — visible to **both** non-public audiences.
+    Restricted,
+    /// Conformity evidence: results of test reports. Annex XIII point 3 —
+    /// authorities only.
+    Conformity,
+    /// Information and data relating to an **individual** item: use history,
+    /// cycle counts, negative events, state of health, status. Annex XIII
+    /// point 4 — legitimate interest only, and explicitly **not** authorities.
+    Individual,
+}
+
+/// Disclosure class of every top-level passport field that is not public.
+///
+/// **The single source for this fact.** `Passport::redact` and the crypto
+/// layer's `SectorAccessPolicy::passport_default()` both read it, because they
+/// previously each carried their own copy and drifted: the policy classified
+/// `lintResult` as restricted while `redact` never removed it, so a public view
+/// built through the domain path disclosed it.
+///
+/// Fields absent from this list are [`Disclosure::Public`].
+pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
+    ("batchId", Disclosure::Restricted),
+    // Advisory plausibility output, re-computable after publish and carrying
+    // free-text findings about our own data quality — operator- and
+    // auditor-facing, not consumer-facing.
+    ("lintResult", Disclosure::Restricted),
+    ("jwsSignature", Disclosure::Conformity),
+    ("retentionLocked", Disclosure::Conformity),
+];
+
+impl Audience {
+    /// Whether this audience may see a field of class `disclosure`.
+    ///
+    /// The whole Art. 77(2) assignment, in one table.
+    #[must_use]
+    pub const fn may_see(self, disclosure: Disclosure) -> bool {
+        matches!(
+            (self, disclosure),
+            (Self::Public, Disclosure::Public)
+                | (
+                    Self::LegitimateInterest,
+                    Disclosure::Public | Disclosure::Restricted | Disclosure::Individual
+                )
+                | (
+                    Self::Authority,
+                    Disclosure::Public | Disclosure::Restricted | Disclosure::Conformity
+                )
+        )
+    }
 }
 
 /// A W3C Verifiable Credential 2.0 envelope binding a DPP passport to its signed payload.
@@ -94,6 +168,68 @@ pub struct SignedCredential {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authorities_do_not_see_individual_item_data() {
+        // Art. 77(2)(b) assigns notified bodies, market surveillance and the
+        // Commission Annex XIII points 2 and 3 — not point 4. This is the case
+        // an ordinal tier cannot express, and the reason the model changed.
+        assert!(!Audience::Authority.may_see(Disclosure::Individual));
+        assert!(Audience::LegitimateInterest.may_see(Disclosure::Individual));
+    }
+
+    #[test]
+    fn legitimate_interest_does_not_see_conformity_evidence() {
+        // Point 3 (test reports) is authority-only under Art. 77(2)(b).
+        assert!(!Audience::LegitimateInterest.may_see(Disclosure::Conformity));
+        assert!(Audience::Authority.may_see(Disclosure::Conformity));
+    }
+
+    #[test]
+    fn neither_non_public_audience_contains_the_other() {
+        // The defining property of a lattice: if either audience were a superset
+        // of the other, an ordinal ranking would suffice and this type would be
+        // unnecessary. Each sees something the other does not.
+        let all = [
+            Disclosure::Public,
+            Disclosure::Restricted,
+            Disclosure::Conformity,
+            Disclosure::Individual,
+        ];
+        let authority_only = all
+            .iter()
+            .any(|d| Audience::Authority.may_see(*d) && !Audience::LegitimateInterest.may_see(*d));
+        let interest_only = all
+            .iter()
+            .any(|d| Audience::LegitimateInterest.may_see(*d) && !Audience::Authority.may_see(*d));
+        assert!(authority_only && interest_only);
+    }
+
+    #[test]
+    fn point_two_is_shared_and_public_is_universal() {
+        for audience in [
+            Audience::Public,
+            Audience::LegitimateInterest,
+            Audience::Authority,
+        ] {
+            assert!(audience.may_see(Disclosure::Public));
+        }
+        // Annex XIII point 2 goes to both non-public audiences.
+        assert!(Audience::LegitimateInterest.may_see(Disclosure::Restricted));
+        assert!(Audience::Authority.may_see(Disclosure::Restricted));
+        assert!(!Audience::Public.may_see(Disclosure::Restricted));
+    }
+
+    #[test]
+    fn public_sees_nothing_restricted() {
+        for class in [
+            Disclosure::Restricted,
+            Disclosure::Conformity,
+            Disclosure::Individual,
+        ] {
+            assert!(!Audience::Public.may_see(class));
+        }
+    }
 
     #[test]
     fn new_passport_credential_guarantees_vc_base_context_and_type() {

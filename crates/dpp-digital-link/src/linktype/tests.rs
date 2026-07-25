@@ -1,6 +1,7 @@
 //! Link-type/media-type parsing, `Accept`-header q-values, and negotiation tests.
 
 use super::*;
+use dpp_domain::Disclosure;
 
 fn sample_descriptors() -> Vec<LinkDescriptor> {
     vec![
@@ -8,7 +9,7 @@ fn sample_descriptors() -> Vec<LinkDescriptor> {
             href: "https://id.example.com/dpp/12345/pip".into(),
             link_type: Gs1LinkType::ProductInformationPage,
             media_type: DppMediaType::Html,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             title: Some("Product Page".into()),
             language: Some("en".into()),
         },
@@ -16,7 +17,7 @@ fn sample_descriptors() -> Vec<LinkDescriptor> {
             href: "https://id.example.com/dpp/12345/data.json".into(),
             link_type: Gs1LinkType::DigitalProductPassport,
             media_type: DppMediaType::Json,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             title: Some("DPP Data (JSON)".into()),
             language: None,
         },
@@ -24,7 +25,7 @@ fn sample_descriptors() -> Vec<LinkDescriptor> {
             href: "https://id.example.com/dpp/12345/data.jsonld".into(),
             link_type: Gs1LinkType::DigitalProductPassport,
             media_type: DppMediaType::JsonLd,
-            min_access_tier: AccessTier::Public,
+            disclosure: Disclosure::Public,
             title: Some("DPP Data (JSON-LD)".into()),
             language: None,
         },
@@ -32,7 +33,7 @@ fn sample_descriptors() -> Vec<LinkDescriptor> {
             href: "https://id.example.com/dpp/12345/safety".into(),
             link_type: Gs1LinkType::SafetyInfo,
             media_type: DppMediaType::Json,
-            min_access_tier: AccessTier::Professional,
+            disclosure: Disclosure::Restricted,
             title: Some("SVHC Substances".into()),
             language: None,
         },
@@ -40,7 +41,7 @@ fn sample_descriptors() -> Vec<LinkDescriptor> {
             href: "https://id.example.com/dpp/12345/compliance".into(),
             link_type: Gs1LinkType::CertificationInfo,
             media_type: DppMediaType::Json,
-            min_access_tier: AccessTier::Confidential,
+            disclosure: Disclosure::Conformity,
             title: Some("Full Compliance Report".into()),
             language: None,
         },
@@ -53,7 +54,7 @@ fn negotiate_default_returns_first_public() {
     let req = ResolutionRequest {
         link_type: None,
         media_type: None,
-        access_tier: None,
+        audience: None,
     };
     let result = negotiate(&descs, &req).unwrap();
     assert_eq!(result.link_type, Gs1LinkType::ProductInformationPage);
@@ -65,7 +66,7 @@ fn negotiate_by_link_type() {
     let req = ResolutionRequest {
         link_type: Some(Gs1LinkType::DigitalProductPassport),
         media_type: None,
-        access_tier: None,
+        audience: None,
     };
     let result = negotiate(&descs, &req).unwrap();
     assert_eq!(result.link_type, Gs1LinkType::DigitalProductPassport);
@@ -77,20 +78,20 @@ fn negotiate_by_link_type_and_media_type() {
     let req = ResolutionRequest {
         link_type: Some(Gs1LinkType::DigitalProductPassport),
         media_type: Some(DppMediaType::JsonLd),
-        access_tier: None,
+        audience: None,
     };
     let result = negotiate(&descs, &req).unwrap();
     assert_eq!(result.media_type, DppMediaType::JsonLd);
 }
 
 #[test]
-fn negotiate_filters_by_access_tier() {
+fn negotiate_filters_by_audience() {
     let descs = sample_descriptors();
     // Public caller cannot see Professional or Confidential resources
     let req = ResolutionRequest {
         link_type: Some(Gs1LinkType::SafetyInfo),
         media_type: None,
-        access_tier: Some(AccessTier::Public),
+        audience: Some(Audience::Public),
     };
     let result = negotiate(&descs, &req);
     assert!(result.is_none(), "public caller should not see safety info");
@@ -102,7 +103,7 @@ fn negotiate_professional_sees_safety_info() {
     let req = ResolutionRequest {
         link_type: Some(Gs1LinkType::SafetyInfo),
         media_type: None,
-        access_tier: Some(AccessTier::Professional),
+        audience: Some(Audience::LegitimateInterest),
     };
     let result = negotiate(&descs, &req).unwrap();
     assert_eq!(result.link_type, Gs1LinkType::SafetyInfo);
@@ -114,7 +115,7 @@ fn negotiate_confidential_sees_everything() {
     let req = ResolutionRequest {
         link_type: Some(Gs1LinkType::CertificationInfo),
         media_type: None,
-        access_tier: Some(AccessTier::Confidential),
+        audience: Some(Audience::Authority),
     };
     let result = negotiate(&descs, &req).unwrap();
     assert_eq!(result.link_type, Gs1LinkType::CertificationInfo);
@@ -235,7 +236,7 @@ fn empty_descriptors_returns_none() {
     let req = ResolutionRequest {
         link_type: None,
         media_type: None,
-        access_tier: None,
+        audience: None,
     };
     assert!(negotiate(&[], &req).is_none());
 }

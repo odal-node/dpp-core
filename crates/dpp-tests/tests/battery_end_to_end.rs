@@ -15,10 +15,10 @@
 
 use chrono::Utc;
 use dpp_crypto::access::credential::{
-    AccessTier, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
+    Audience, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
     verify_credential_claims,
 };
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_access_tier};
+use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
 use dpp_digital_link::aas::build_aas_from_passport;
 use dpp_domain::domain::sector::CriticalRawMaterial;
@@ -205,7 +205,7 @@ fn recycler_credential_unlocks_professional_battery_fields() {
         .expect("battery in catalog");
 
     // ── Public tier ─────────────────────────────────────────────────────────
-    let public = filter_by_access_tier(&battery_fields, &policy, AccessTier::Public);
+    let public = filter_by_audience(&battery_fields, &policy, Audience::Public);
     // Public sees the basics...
     assert!(public.filtered_data.get("gtin").is_some());
     assert!(public.filtered_data.get("batteryChemistry").is_some());
@@ -242,9 +242,9 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     let result = verify_credential_claims(&credential, Some("battery"), Utc::now());
     assert!(result.is_valid(), "recycler credential should be valid");
 
-    if let VerificationResult::Valid { access_tier, .. } = &result {
-        assert_eq!(*access_tier, AccessTier::Professional);
-        let pro = filter_by_access_tier(&battery_fields, &policy, *access_tier);
+    if let VerificationResult::Valid { audience, .. } = &result {
+        assert_eq!(*audience, Audience::LegitimateInterest);
+        let pro = filter_by_audience(&battery_fields, &policy, *audience);
         assert!(pro.filtered_data.get("dueDiligenceUrl").is_some());
         assert!(pro.filtered_data.get("criticalRawMaterials").is_some());
         assert!(pro.filtered_data.get("cathodeMaterial").is_some());
@@ -262,14 +262,14 @@ fn redact_sector_data_strips_professional_fields_at_public_tier() {
     let data = passport.sector_data.as_ref().unwrap();
 
     // Public viewer: professional fields stripped, public fields retained.
-    let public = redact_sector_data(data, AccessTier::Public, descriptor);
+    let public = redact_sector_data(data, Audience::Public, descriptor);
     let public_obj = public.as_object().expect("redacted data is an object");
     assert!(public_obj.contains_key("gtin"));
     assert!(!public_obj.contains_key("dueDiligenceUrl"));
     assert!(!public_obj.contains_key("criticalRawMaterials"));
 
     // Confidential viewer: nothing stripped (>= every required tier).
-    let confidential = redact_sector_data(data, AccessTier::Confidential, descriptor);
+    let confidential = redact_sector_data(data, Audience::Authority, descriptor);
     let conf_obj = confidential.as_object().unwrap();
     assert!(conf_obj.contains_key("dueDiligenceUrl"));
     assert!(conf_obj.contains_key("criticalRawMaterials"));
