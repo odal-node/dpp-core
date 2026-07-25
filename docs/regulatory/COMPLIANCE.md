@@ -11,7 +11,7 @@ Passports mandated by:
 
 | Regulation | Reference | Status | dpp-core Coverage |
 |---|---|---|---|
-| ESPR | Regulation (EU) 2024/1781 | In force | Core passport model, access tiers (Art. 10), schema validation |
+| ESPR | Regulation (EU) 2024/1781 | In force | Core passport model, per-audience field disclosure, schema validation |
 | Battery Regulation | Regulation (EU) 2023/1542 | In force, DPP deadline Feb 2027 | Battery schemas (v1.0.0, v2.0.0), sector plugin |
 | Textile (anticipated) | ESPR delegated act (draft) | See timeline note below | Textile schemas (v1.0.0, v1.1.0), sector plugin |
 | CBAM | Regulation (EU) 2023/956 | In force | Steel schema (v1.0.0), embedded emissions fields |
@@ -106,8 +106,8 @@ means:
 
 | Primitive | Algorithm | Library | Purpose | Regulatory Basis |
 |---|---|---|---|---|
-| Signing | Ed25519 | `ed25519-dalek` | Passport authenticity, JWS | ESPR Art. 10 (data integrity) |
-| Encryption | AES-256-GCM | `aes-gcm` | Confidential field protection | ESPR Art. 10(3) (access tiers) |
+| Signing | Ed25519 | `ed25519-dalek` | Passport authenticity, JWS | ESPR Art. 11(g) (data authentication, reliability and integrity) |
+| Encryption | AES-256-GCM | `aes-gcm` | Restricted-field protection at rest | Reg. (EU) 2023/1542 Art. 77(2) (audience/disclosure) |
 | Hashing | SHA-256 | `sha2` | Data fingerprinting | General integrity |
 | Entropy | OS CSPRNG | `rand` | Key generation | Cryptographic best practice |
 

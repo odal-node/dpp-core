@@ -1,4 +1,4 @@
-//! Redaction, validation, and serde round-trip tests for sector data.
+﻿//! Redaction, validation, and serde round-trip tests for sector data.
 
 use super::*;
 use crate::catalog::{Regime, RegulatoryStatus, SectorCatalog, SectorDescriptor};
@@ -92,7 +92,7 @@ fn empty_disclosure_retains_all_fields() {
         notes: None,
     };
     let json = redact_sector_data(&data, Audience::Public, &descriptor);
-    // No tiers = nothing gated = all fields visible
+    // No disclosure map = nothing gated = all fields visible
     assert!(json.get("dueDiligenceUrl").is_some());
     assert!(json.get("disassemblyInstructionsUrl").is_some());
     assert!(json.get("batteryChemistry").is_some());

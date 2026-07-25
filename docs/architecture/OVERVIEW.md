@@ -106,7 +106,7 @@ ComplianceRegistry
   +-- maintained-ruleset registry (Compliance Current) -> warranted, methodology-current rulesets
 ```
 
-`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every sector. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm sector plugins via a plugin-backed registry in the platform. A computed determination is passed through `gate_determination(catalog.is_in_force(sector), …)` so a provisional sector can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md` and `SECTOR-MODEL-CONSOLIDATION.md` §3.1.
+`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every sector. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm sector plugins via a plugin-backed registry in the platform. A computed determination is passed through `gate_determination(catalog.is_in_force(sector), …)` so a provisional sector can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
 
 This trait is the extension seam. Any implementation — open Wasm plugins, the platform's calculators, or third-party modules — can replace or extend it without touching any other code. It is a technical boundary, not a commercial one.
 

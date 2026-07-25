@@ -1,4 +1,4 @@
-//! End-to-end integration test: Battery DPP lifecycle.
+﻿//! End-to-end integration test: Battery DPP lifecycle.
 //!
 //! The battery passport is the highest-stakes sector — mandatory from
 //! 18 Feb 2027 under the EU Battery Regulation (2023/1542), Annex XIII. This
@@ -10,7 +10,7 @@
 //! 3. Map the passport to the AAS shell + submodels (dpp-digital-link::aas)
 //! 4. Parse a GS1 Digital Link for the battery (dpp-digital-link)
 //! 5. Issue a Verifiable Credential for a recycler (dpp-crypto)
-//! 6. Verify the credential and apply access-tier filtering (dpp-crypto)
+//! 6. Verify the credential and apply audience filtering (dpp-crypto)
 //! 7. Redact sector data through the catalog descriptor (dpp-domain)
 
 use chrono::Utc;
@@ -209,12 +209,12 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     let policy = SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "battery")
         .expect("battery in catalog");
 
-    // ── Public tier ─────────────────────────────────────────────────────────
+    // ── Public audience ─────────────────────────────────────────────────────
     let public = filter_by_audience(&battery_fields, &policy, Audience::Public);
     // Public sees the basics...
     assert!(public.filtered_data.get("gtin").is_some());
     assert!(public.filtered_data.get("batteryChemistry").is_some());
-    // ...but NOT the professional-tier fields.
+    // ...but NOT the restricted fields.
     assert!(
         public.filtered_data.get("dueDiligenceUrl").is_none(),
         "public must not see due-diligence url"
@@ -231,7 +231,7 @@ fn recycler_credential_unlocks_professional_battery_fields() {
             .contains(&"dueDiligenceUrl".to_string())
     );
 
-    // ── Professional tier (via recycler VC) ─────────────────────────────────
+    // ── Legitimate interest (via recycler VC) ──────────────────────────────
     let subject = DppCredentialSubject {
         id: "did:web:cellrecycle.example.com".into(),
         name: "CellRecycle B.V.".into(),
@@ -273,9 +273,11 @@ fn redact_sector_data_strips_professional_fields_at_public_tier() {
     assert!(!public_obj.contains_key("dueDiligenceUrl"));
     assert!(!public_obj.contains_key("criticalRawMaterials"));
 
-    // Confidential viewer: nothing stripped (>= every required tier).
-    let confidential = redact_sector_data(data, Audience::Authority, descriptor);
-    let conf_obj = confidential.as_object().unwrap();
+    // Authority sees Restricted and Conformity fields. It does *not* see
+    // `Individual` ones — Annex XIII point 4 is legitimate-interest-only, which
+    // is why this is a lattice and not a ranking.
+    let authority = redact_sector_data(data, Audience::Authority, descriptor);
+    let conf_obj = authority.as_object().unwrap();
     assert!(conf_obj.contains_key("dueDiligenceUrl"));
     assert!(conf_obj.contains_key("criticalRawMaterials"));
 }

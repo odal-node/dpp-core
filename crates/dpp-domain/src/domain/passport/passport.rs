@@ -1,4 +1,4 @@
-//! The [`Passport`] aggregate root.
+﻿//! The [`Passport`] aggregate root.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -63,10 +63,10 @@ pub struct Passport {
     /// The publicly accessible QR code URL for this passport.
     pub qr_code_url: Option<String>,
     /// Compact JWS signature over the **full** canonical passport payload
-    /// (Confidential tier — for authenticated, full-passport verification).
+    /// (`Disclosure::Conformity` — for authenticated, full-passport verification).
     pub jws_signature: Option<String>,
     /// Compact JWS signature over the **public (redacted) view** of this passport
-    /// (Public tier). Lets anyone verify the public passport independently — the
+    /// (`Disclosure::Public`). Lets anyone verify the public passport independently — the
     /// resolver checks this on the unauthenticated `/public/dpp/{id}` route.
     /// Set at publish time; `None` for drafts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -280,7 +280,7 @@ impl Passport {
         Ok(())
     }
 
-    /// Return a tier-filtered JSON view of this passport.
+    /// Return an audience-filtered JSON view of this passport.
     ///
     /// NOTE: this is a self-contained domain convenience, **not** the authoritative
     /// public view. The payload that is signed (`publicJwsSignature`) and served on
@@ -288,9 +288,14 @@ impl Passport {
     /// `public_view`), which fails closed on unknown sectors. Do not wire this into
     /// the public-serving path expecting byte-parity with the signed view.
     ///
-    /// Fields removed per tier:
-    /// - Below `Professional`: `batchId`
-    /// - Below `Confidential`: `jwsSignature`, `retentionLocked`
+    /// Top-level fields are removed according to
+    /// [`PASSPORT_FIELD_DISCLOSURE`]
+    /// — the single source for this fact, shared with the crypto layer's
+    /// `SectorAccessPolicy::passport_default()`. At present:
+    /// - `Restricted`: `batchId`, `lintResult`
+    /// - `Conformity`: `jwsSignature`, `retentionLocked`
+    ///
+    /// Anything absent from that table is `Public`.
     ///
     /// `sectorData`, when present, is independently redacted via
     /// [`crate::domain::sector::redact_sector_data`] against the sector descriptor

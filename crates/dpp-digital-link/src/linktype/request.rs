@@ -12,7 +12,7 @@ pub struct ResolutionRequest {
     pub link_type: Option<Gs1LinkType>,
     /// The requested media type (from `Accept` header).
     pub media_type: Option<DppMediaType>,
-    /// The access tier context (from authentication / credential).
+    /// The requesting audience (from authentication / credential).
     /// `None` means public access.
     pub audience: Option<Audience>,
 }

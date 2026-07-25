@@ -1,9 +1,8 @@
 //! Shared fixture builders for the integration tests in `tests/` (and the
 //! `dpp-benches` crate, which depends on this library as a dev-dependency).
 //!
-//! These are the sector-agnostic envelope / actor shapes hand-rolled at
-//! multiple call sites before this module existed — see
-//! `docs/audit/dpp-core/audit/redundancy-optimization-backlog-2026-07-20.md`.
+//! These are the sector-agnostic envelope / actor shapes that were hand-rolled
+//! at multiple call sites before this module existed.
 
 use chrono::Utc;
 use dpp_crypto::{CredentialRole, DppCredentialSubject};
@@ -77,7 +76,7 @@ pub fn make_operator(
     }
 }
 
-/// A [`DppCredentialSubject`] for access-tier / verifiable-credential tests.
+/// A [`DppCredentialSubject`] for audience / verifiable-credential tests.
 pub fn make_subject(
     did: &str,
     name: &str,

@@ -20,29 +20,61 @@ programme evaluators.
 | IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `aas` module maps DPP to AAS Submodel |
 | W3C VC Data Model v2.0 | CR | `DppAccessCredential` follows VC envelope structure |
 
-## Three-Tier Access Model (ESPR Art. 10)
+## Access Model — an Art. 77(2) lattice, not a ranking
 
-The ESPR mandates three levels of access to DPP data:
+Regulation (EU) 2023/1542 Art. 77(2) assigns three **audiences** to the four
+Annex XIII data sets. Read against the verbatim OJ text, the assignment is not
+an ordering:
 
-1. **Public** — No credential required. Includes fibre composition, country
-   of manufacturing, care instructions, environmental metrics.
+| Audience | Annex XIII points | Content |
+|---|---|---|
+| (a) General public | 1 | Public model-level information. No credential. |
+| (b) Notified bodies, market surveillance authorities, the Commission | 2 and 3 | Composition, dismantling and safety, **plus** conformity test reports. |
+| (c) Persons with a legitimate interest | 2 and 4 | The same point-2 data, **plus** individual-item data: state of health, use history, status. |
 
-2. **Professional** — Requires a Verifiable Credential proving the holder's
-   role (repairer, recycler, remanufacturer). Grants access to SVHC data,
-   disassembly instructions, spare parts availability.
+Point 3 is authority-only and point 4 is legitimate-interest-only, so **neither
+audience contains the other**. No integer "tier" comparison can express this: any
+`>=` test necessarily either discloses to authorities the individual-item data
+Art. 77(2)(b) withholds, or hides point-2 data from someone entitled to it. The
+implementation therefore models two independent types — `Audience` (who is
+asking) and `Disclosure` (how restricted a field is) — related by a single
+total function, `Audience::may_see(Disclosure)`.
 
-3. **Confidential** — Requires an institutional DID (market surveillance
-   authority, customs, notified body). Grants access to compliance reports,
-   audit history, supply chain traceability, JWS signatures.
+ESPR does not itself fix a set of access levels. Read against the verbatim OJ
+text of Regulation (EU) 2024/1781, three provisions carry the point:
+
+- **Art. 9(2)(f)** — the delegated act specifies "the actors that are to have
+  access to data in the digital product passport and to what data they are to
+  have access".
+- **Art. 10(1)(g)** — access "shall be regulated in accordance with the
+  essential requirements set out in this Article and Article 11 and with the
+  specific access rights at product group level as specified in the applicable
+  delegated act".
+- **Art. 11(b)** — the listed actors "shall have free of charge and easy access
+  to the digital product passport based on their respective access rights set
+  out in the applicable delegated act".
+
+So the access lattice is set per product group, not by ESPR itself. Non-battery
+sectors therefore reuse this same vocabulary through each sector manifest's
+`disclosure` map rather than inheriting a hardcoded ladder.
+
+> **Superseded.** Releases up to and including 0.10.0 implemented an ordered
+> three-tier model (`AccessTier::{Public, Professional, Confidential}`). It was
+> removed in 0.11.0 for the reason above. Assessments performed against the
+> earlier model should be re-read against this section.
 
 ### Implementation
 
-- `dpp-crypto::credential` — W3C VC issuance and verification with
-  role-based access tier mapping.
-- `dpp-crypto::access_policy` — Stateless policy engine that filters JSON
-  fields based on the caller's tier and a `SectorAccessPolicy`.
-- Integration test: `tests/access_tier_gatekeeping.rs` validates all three
-  tiers with realistic credentials.
+- `dpp_domain::domain::identity` — `Audience`, `Disclosure`, and
+  `PASSPORT_FIELD_DISCLOSURE`, the single source for the disclosure class of
+  every non-public top-level passport field.
+- `dpp_crypto::access::credential` — W3C VC issuance and verification, mapping
+  an operator role to an `Audience`.
+- `dpp_crypto::access::policy` / `access::filter` — stateless policy engine that
+  filters JSON fields against the caller's `Audience` and a
+  `SectorAccessPolicy`.
+- Integration test: `crates/dpp-tests/tests/access_gatekeeping.rs` exercises all
+  three audiences with realistic credentials.
 
 ## Transfer of Responsibility
 
@@ -59,7 +91,7 @@ reuse, the new economic operator assumes full DPP responsibility. The
 - `TransferChain` — Append-only provenance log with state machine validation.
 - `ResponsibleOperator` — DID-identified economic operator with role typing.
 - `TransferRecord` — Dual-signature transfer event (JWS from both parties).
-- Integration test: `tests/transfer_of_responsibility.rs` covers full
+- Integration test: `crates/dpp-tests/tests/transfer_of_responsibility.rs` covers full
   lifecycle, error cases, and serialisation round-trips.
 
 ## Schema Validation
@@ -96,7 +128,7 @@ And all anticipated environmental and professional fields:
 - `svhcSubstances` (CAS number, concentration, SCIP notification)
 - `disassemblyInstructions`, `sparePartsAvailable`
 
-Integration test: `tests/schema_conformity.rs` asserts field coverage.
+Integration test: `crates/dpp-tests/tests/schema_conformity.rs` asserts field coverage.
 
 ## GS1 Interoperability
 
@@ -203,10 +235,10 @@ Sector-specific compliance logic runs as sandboxed Wasm modules
 
 | Test Suite | Location | Coverage |
 |---|---|---|
-| Textile end-to-end | `tests/textile_end_to_end.rs` | Passport lifecycle, AAS, GS1, credentials |
-| Transfer of responsibility | `tests/transfer_of_responsibility.rs` | Transfer chain, provenance, error cases |
-| Access tier gatekeeping | `tests/access_tier_gatekeeping.rs` | All three tiers, edge cases, custom policies |
-| Schema conformity | `tests/schema_conformity.rs` | JTC 24 field coverage, structure validation |
+| Textile end-to-end | `crates/dpp-tests/tests/textile_end_to_end.rs` | Passport lifecycle, AAS, GS1, credentials |
+| Transfer of responsibility | `crates/dpp-tests/tests/transfer_of_responsibility.rs` | Transfer chain, provenance, error cases |
+| Audience gatekeeping | `crates/dpp-tests/tests/access_gatekeeping.rs` | All three audiences, edge cases, custom policies |
+| Schema conformity | `crates/dpp-tests/tests/schema_conformity.rs` | JTC 24 field coverage, structure validation |
 | Unit tests | Per-module `#[cfg(test)]` | All crates have inline unit tests |
 
 ## CI/CD Gate

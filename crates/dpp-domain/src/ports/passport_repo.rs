@@ -66,10 +66,13 @@ const PROTECTED_PATCH_FIELDS: [&str; 16] = [
 
 /// Port trait for all DPP persistence operations.
 ///
-/// **No physical delete method is defined by design.** EU ESPR Article 9 and
-/// sector delegated acts require published passports to remain publicly
-/// accessible for the product's expected lifetime plus a defined retention
-/// period (typically 10–15 years). Passports transition through statuses
+/// **No physical delete method is defined by design.** Read against the
+/// verbatim OJ text of Regulation (EU) 2024/1781: **Art. 9(2)(i)** requires the
+/// delegated act to specify the period a passport must remain available, which
+/// "shall correspond to at least the expected lifetime of a specific product",
+/// and **Art. 11(e)** makes that availability an essential requirement holding
+/// even after insolvency, liquidation or cessation of activity. In practice
+/// that is a retention period of typically 10–15 years. Passports transition through statuses
 /// (Draft → Published → Suspended → Archived) but are never physically removed.
 /// Any cleanup job or admin tooling MUST check `retention_locked` before
 /// removing a record from the database.

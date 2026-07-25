@@ -1,4 +1,4 @@
-//! Sector access policy types and disclosure-class lookup.
+﻿//! Sector access policy types and disclosure-class lookup.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -42,7 +42,7 @@ fn disclosure_public() -> Disclosure {
     Disclosure::Public
 }
 
-/// Whether `a` and `b` are equal for tier-matching purposes once both are
+/// Whether `a` and `b` are equal for field-matching purposes once both are
 /// normalized — non-alphanumerics (`_`, `-`) dropped, case-folded, so
 /// `disassemblyInstructions` == `disassembly_instructions` — without
 /// allocating a `String` for either side. [`SectorAccessPolicy::disclosure_for_field`]
@@ -73,9 +73,9 @@ const COMMON_CONFORMITY: &[&str] = &[
 
 impl SectorAccessPolicy {
     /// Build a sector's access policy from the catalog's declared per-field
-    /// tiers, folding in the universal confidential fields.
+    /// disclosure classes, folding in the universal conformity fields.
     ///
-    /// This works for **every** sector with no per-sector Rust code — the tiers
+    /// This works for **every** sector with no per-sector Rust code — the classes
     /// are data in the sector manifests (`disclosure`). Returns `None` if
     /// `sector_key` is not in the catalog.
     pub fn from_catalog(catalog: &SectorCatalog, sector_key: &str) -> Option<Self> {

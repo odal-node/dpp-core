@@ -8,8 +8,8 @@ pub use dpp_domain::Audience;
 
 /// The access role granted by a Verifiable Credential.
 ///
-/// Maps to the ESPR access tiers and the specific operator roles
-/// defined in the transfer-of-responsibility model.
+/// Maps an operator role to the [`Audience`] it may claim, alongside the
+/// specific operator roles defined in the transfer-of-responsibility model.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CredentialRole {
@@ -21,9 +21,10 @@ pub enum CredentialRole {
     Remanufacturer,
     /// Preparer for reuse — can access quality and safety data.
     PreparerForReuse,
-    /// Distributor with professional access.
+    /// Distributor holding a legitimate interest.
     Distributor,
-    /// Market surveillance authority — full access to all tiers.
+    /// Market surveillance authority — Annex XIII points 1, 2 and 3. Note this
+    /// does **not** include point 4 individual-item data.
     MarketSurveillanceAuthority,
     /// Customs authority — access for border control.
     CustomsAuthority,

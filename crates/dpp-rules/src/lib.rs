@@ -6,9 +6,9 @@
 //!
 //! Inputs are primitive borrowing views so each caller adapts its own
 //! representation — typed structs in core, `serde_json::Value` fields in
-//! plugins — without this crate depending on either.
-//!
-//! See `docs/architecture/SECTOR-MODEL-CONSOLIDATION.md` §7.
+//! plugins — without this crate depending on either. That is why this crate is
+//! kept separate from `dpp-domain`: a regulatory rule has exactly one
+//! implementation, shared by core and the Wasm plugins alike.
 //!
 //! The `bundle` feature (off by default) adds the ruleset-bundle format +
 //! verification seam (the `bundle` module — conditionally compiled, so not
