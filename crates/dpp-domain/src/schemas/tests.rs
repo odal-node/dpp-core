@@ -6,11 +6,11 @@ use semver::Version;
 #[test]
 fn registry_loads_all_embedded_schemas() {
     let reg = VersionedSchemaRegistry::new();
-    // battery 1.0 + 2.0 + 2.1 + 2.2, textile 1.0 + 1.1 + 1.2, unsold-goods 1.0,
+    // battery 1.0 + 2.0 + 2.1 + 2.2 + 2.3, textile 1.0 + 1.1 + 1.2, unsold-goods 1.0,
     // steel 1.0 + 1.1, electronics 1.0 + 1.1, construction 1.0 + 1.1,
     // tyre 1.0, toy 1.0 + 1.1, aluminium 1.0 + 1.1, furniture 1.0 + 1.1,
     // detergent 1.0 + 1.1
-    assert_eq!(reg.len(), 23);
+    assert_eq!(reg.len(), 24);
 }
 
 #[test]
@@ -24,10 +24,10 @@ fn get_battery_v1() {
 }
 
 #[test]
-fn latest_battery_returns_v2_2() {
+fn latest_battery_returns_v2_3() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("battery").expect("battery schema exists");
-    assert_eq!(*version, "2.2.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "2.3.0".parse::<Version>().unwrap());
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn register_new_schema_succeeds() {
     let mut reg = VersionedSchemaRegistry::new();
     let schema = r#"{"type": "object", "properties": {"gtin": {"type": "string"}}}"#;
     assert!(reg.register("plastics", "1.0.0", schema.to_owned()).is_ok());
-    assert_eq!(reg.len(), 24);
+    assert_eq!(reg.len(), 25);
 
     let entry = reg
         .get_entry("plastics", &"1.0.0".parse().unwrap())
@@ -156,7 +156,7 @@ fn register_or_replace_new_returns_false() {
         .register_or_replace("plastics", "1.0.0", schema.to_owned())
         .unwrap();
     assert!(!replaced);
-    assert_eq!(reg.len(), 24);
+    assert_eq!(reg.len(), 25);
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn register_or_replace_existing_returns_true() {
         .register_or_replace("battery", "1.0.0", new_schema.to_owned())
         .unwrap();
     assert!(replaced);
-    assert_eq!(reg.len(), 23); // count unchanged
+    assert_eq!(reg.len(), 24); // count unchanged
     assert!(
         reg.get("battery", &"1.0.0".parse().unwrap())
             .unwrap()
@@ -192,11 +192,11 @@ fn unregister_runtime_schema_succeeds() {
     let schema = r#"{"type": "object"}"#;
     reg.register("plastics", "1.0.0", schema.to_owned())
         .unwrap();
-    assert_eq!(reg.len(), 24);
+    assert_eq!(reg.len(), 25);
 
     let removed = reg.unregister("plastics", &"1.0.0".parse().unwrap());
     assert!(removed);
-    assert_eq!(reg.len(), 23);
+    assert_eq!(reg.len(), 24);
     assert!(reg.get("plastics", &"1.0.0".parse().unwrap()).is_none());
 }
 
@@ -205,7 +205,7 @@ fn unregister_embedded_schema_does_nothing() {
     let mut reg = VersionedSchemaRegistry::new();
     let removed = reg.unregister("battery", &"1.0.0".parse().unwrap());
     assert!(!removed);
-    assert_eq!(reg.len(), 23); // still there
+    assert_eq!(reg.len(), 24); // still there
 }
 
 #[test]

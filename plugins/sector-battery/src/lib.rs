@@ -41,11 +41,11 @@ impl DppSectorPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.2.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.3.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.2.0".into(),
+            max_version: "2.3.0".into(),
         }
     }
 
@@ -145,6 +145,24 @@ impl DppSectorPlugin for BatteryPlugin {
         // actually contains (an LFP cell has no cobalt or nickel), and are always
         // advisory — the overall status is NotAssessed.
         let art8_category = art8_category_for(battery_type, capacity_kwh);
+
+        // Art. 8(1) requires the shares "for each battery model per year and per
+        // manufacturing plant". A percentage without both anchors is not that
+        // declaration — it is an unattributed number, and no reader can tell
+        // which production run it describes.
+        let declared_any_share =
+            [cobalt, lithium, nickel, lead].iter().any(Option::is_some);
+        if declared_any_share
+            && art8_category != Art8Category::NotCovered
+            && input.get("recycledContentReportingYear").is_none()
+        {
+            warnings.push(PluginFinding::new(
+                "battery.recycled_content.reporting_year_missing",
+                "/recycledContentReportingYear",
+                "Recycled-content shares are declared without a reporting year.                  EU 2023/1542 Art. 8(1) requires them per battery model, per year                  and per manufacturing plant, so a share without its year is not                  the Art. 8(1) declaration.",
+            ));
+        }
+
         if art8_category != Art8Category::NotCovered {
             let scoped = RecycledContentInput {
                 cobalt_pct: if regulated.cobalt { cobalt } else { None },
@@ -309,7 +327,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.2.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.3.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 
@@ -433,6 +451,7 @@ mod tests {
             "expectedLifetimeCycles": 3000,
             "co2ePerUnitKg": 45.2,
             "placedOnMarketDate": "2032-01-01",
+            "recycledContentReportingYear": 2032,
             "recycledContentCobaltPct": 0.0,
             "recycledContentLithiumPct": 12.5
         });
@@ -707,6 +726,70 @@ mod tests {
                 .iter()
                 .any(|w| w.code == "battery.recycled_content.cobalt_not_in_chemistry"),
             "cobalt-on-LFP must emit a chemistry-conflict advisory; got: {:?}",
+            result.warnings
+        );
+    }
+}
+
+#[cfg(test)]
+mod art8_declaration_tests {
+    use super::*;
+
+    fn shares_without_year() -> Value {
+        json!({
+            "gtin": "12345678901231",
+            "batteryChemistry": "NMC",
+            "nominalVoltageV": 48.0,
+            "nominalCapacityAh": 100.0,
+            "expectedLifetimeCycles": 3000,
+            "co2ePerUnitKg": 85.4,
+            "placedOnMarketDate": "2032-01-01",
+            "recycledContentCobaltPct": 20.0
+        })
+    }
+
+    #[test]
+    fn shares_without_a_reporting_year_are_flagged() {
+        let result = BatteryPlugin.calculate_metrics(&shares_without_year()).unwrap();
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn shares_with_a_reporting_year_are_not_flagged() {
+        let mut data = shares_without_year();
+        data["recycledContentReportingYear"] = json!(2032);
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn no_shares_declared_means_no_reporting_year_finding() {
+        // The duty attaches to declaring a share, not to existing.
+        let mut data = shares_without_year();
+        data.as_object_mut()
+            .unwrap()
+            .remove("recycledContentCobaltPct");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.recycled_content.reporting_year_missing"),
+            "got: {:?}",
             result.warnings
         );
     }
