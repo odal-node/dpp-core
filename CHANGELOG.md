@@ -126,9 +126,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   not.
 - **`just test-plugins`, wired into `just check`.** The sector plugins are
   excluded from the workspace, so the gate never ran their tests; it caught two
-  real failures the first time it ran. Note that CI does not yet run this step —
-  its jobs are `fmt`, `clippy`, `nextest --workspace` and `audit`, so the plugin
-  suites are covered locally only.
+  real failures the first time it ran. Note that CI does not yet run this step:
+  `wasm-build.yml` compiles each plugin to `wasm32-wasip1` but never runs its
+  tests, and `ci.yml`'s `nextest --workspace` cannot reach them because the
+  plugins are excluded from the workspace. Their test suites are therefore
+  covered by `just check` locally only.
 - **Drift guard on product categories** — a catalog category that is not a legal
   value of its schema enum now fails the build.
 - A libFuzzer target round-tripping the plugin ABI envelope
