@@ -479,3 +479,50 @@ fn redact_unknown_sector_withholds_sector_data_below_confidential() {
     let conf = p.redact(Audience::Authority, &catalog).into_value();
     assert_eq!(conf["sectorData"]["secretField"], "leak-me");
 }
+
+#[test]
+fn public_view_omits_every_non_public_passport_field() {
+    // Regression: `redact` carried its own field list and omitted `lintResult`,
+    // which the crypto layer's policy classified as Restricted. A public view
+    // built through the domain path disclosed it. Both now read one table, and
+    // this asserts the property rather than the three fields that were listed.
+    use crate::domain::identity::PASSPORT_FIELD_DISCLOSURE;
+
+    let mut passport = make_passport();
+    // Populate every non-public field so absence in the view proves redaction,
+    // not that the field was simply unset.
+    passport.batch_id = Some("BATCH-42".into());
+    passport.jws_signature = Some("eyJhbGci.test.signature".into());
+    passport.retention_locked = true;
+    passport.lint_result = Some(crate::domain::lint::LintResult {
+        pack_version: "test".into(),
+        findings: Vec::new(),
+        assessed_at: chrono::Utc::now(),
+    });
+
+    let catalog = crate::catalog::SectorCatalog::new();
+    let value = passport.redact(Audience::Public, &catalog).into_value();
+    let obj = value.as_object().expect("view is an object");
+
+    for (field, class) in PASSPORT_FIELD_DISCLOSURE {
+        if !Audience::Public.may_see(*class) {
+            assert!(
+                !obj.contains_key(*field),
+                "public view must not contain '{field}'"
+            );
+        }
+    }
+
+    // Guard against a vacuous pass: each field must actually be present for an
+    // audience entitled to it, otherwise absence above proves nothing.
+    let authority = passport.redact(Audience::Authority, &catalog).into_value();
+    let authority = authority.as_object().expect("view is an object");
+    for (field, class) in PASSPORT_FIELD_DISCLOSURE {
+        if Audience::Authority.may_see(*class) {
+            assert!(
+                authority.contains_key(*field),
+                "'{field}' should be visible to an authority; absence above would be vacuous"
+            );
+        }
+    }
+}

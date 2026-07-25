@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use dpp_domain::{Disclosure, SectorCatalog};
+use dpp_domain::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
 
 /// Maps JSON field names to their disclosure class.
 ///
@@ -113,21 +113,9 @@ impl SectorAccessPolicy {
     /// this invariant exists to prevent, for these fields and any future one.
     pub fn passport_default() -> Self {
         let mut field_disclosure = HashMap::new();
-
-        // Restricted — Annex XIII point 2 equivalents.
-        field_disclosure.insert("batchId".into(), Disclosure::Restricted);
-        // `lintResult` is advisory plausibility output that is deliberately
-        // re-computable at any time (including after publish), and every re-run
-        // restamps `assessedAt`. Keeping it Public would put a guaranteed-to-
-        // change field inside the signed public view. It is also operator- and
-        // auditor-facing QA data — the findings carry free-text messages about
-        // *our own* data quality — which is not consumer-facing content.
-        field_disclosure.insert("lintResult".into(), Disclosure::Restricted);
-
-        // Conformity — signature / internal, authorities only.
-        field_disclosure.insert("jwsSignature".into(), Disclosure::Conformity);
-        field_disclosure.insert("retentionLocked".into(), Disclosure::Conformity);
-
+        for (field, class) in PASSPORT_FIELD_DISCLOSURE {
+            field_disclosure.insert((*field).to_owned(), *class);
+        }
         Self {
             name: "passport-v1.0".into(),
             sector: "passport".into(),

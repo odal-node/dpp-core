@@ -19,7 +19,8 @@ pub use domain::{
     error::DppError,
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
     identity::{
-        Audience, Disclosure, PassportCredential, PassportCredentialSubject, SignedCredential,
+        Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
+        PassportCredentialSubject, SignedCredential,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_sector_data},
     passport::{

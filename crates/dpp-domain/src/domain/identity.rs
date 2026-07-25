@@ -56,6 +56,25 @@ pub enum Disclosure {
     Individual,
 }
 
+/// Disclosure class of every top-level passport field that is not public.
+///
+/// **The single source for this fact.** `Passport::redact` and the crypto
+/// layer's `SectorAccessPolicy::passport_default()` both read it, because they
+/// previously each carried their own copy and drifted: the policy classified
+/// `lintResult` as restricted while `redact` never removed it, so a public view
+/// built through the domain path disclosed it.
+///
+/// Fields absent from this list are [`Disclosure::Public`].
+pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
+    ("batchId", Disclosure::Restricted),
+    // Advisory plausibility output, re-computable after publish and carrying
+    // free-text findings about our own data quality — operator- and
+    // auditor-facing, not consumer-facing.
+    ("lintResult", Disclosure::Restricted),
+    ("jwsSignature", Disclosure::Conformity),
+    ("retentionLocked", Disclosure::Conformity),
+];
+
 impl Audience {
     /// Whether this audience may see a field of class `disclosure`.
     ///

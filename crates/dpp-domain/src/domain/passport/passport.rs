@@ -9,7 +9,7 @@ use super::{
     ProductCategory,
 };
 use crate::domain::{
-    identity::{Audience, Disclosure},
+    identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     lint::LintResult,
     sector::{CarbonFootprint, RepairabilityScore, Sector, SectorData},
     status::PassportStatus,
@@ -309,12 +309,12 @@ impl Passport {
         };
 
         if let Some(obj) = value.as_object_mut() {
-            if !audience.may_see(Disclosure::Restricted) {
-                obj.remove("batchId");
-            }
-            if !audience.may_see(Disclosure::Conformity) {
-                obj.remove("jwsSignature");
-                obj.remove("retentionLocked");
+            // Driven by the shared table, not a second hand-written list —
+            // the two used to disagree about `lintResult`.
+            for (field, class) in PASSPORT_FIELD_DISCLOSURE {
+                if !audience.may_see(*class) {
+                    obj.remove(*field);
+                }
             }
             // Re-redact sectorData using the catalog's per-field disclosure map.
             if let Some(ref sd) = self.sector_data {
