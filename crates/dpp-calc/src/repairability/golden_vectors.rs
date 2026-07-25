@@ -13,8 +13,15 @@ use super::{
     DisplaysRuleset, RepairabilityClass, SimplifiedRepairabilityHeuristic, WashingMachineRuleset,
     calculate, parameters::RepairabilityInputs, thresholds::LaptopRuleset,
 };
+use crate::clock::AssessmentClock;
 use crate::error::CalcError;
 use crate::ruleset::Ruleset;
+use chrono::NaiveDate;
+
+/// Governing-law date inside SimplifiedRepairabilityHeuristic's effective period.
+fn in_force() -> AssessmentClock {
+    AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+}
 
 fn run(d: u8, sp: u8, ri: u8, dt: u8, su: u8, cs: u8) -> super::RepairabilityResult {
     let inputs = RepairabilityInputs {
@@ -25,7 +32,7 @@ fn run(d: u8, sp: u8, ri: u8, dt: u8, su: u8, cs: u8) -> super::RepairabilityRes
         software_updatability: su,
         customer_support: cs,
     };
-    calculate(&inputs, &SimplifiedRepairabilityHeuristic).expect("valid inputs")
+    calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()).expect("valid inputs")
 }
 
 const EPS: f64 = 1e-9;
@@ -114,7 +121,7 @@ fn out_of_range_parameter_is_rejected() {
         software_updatability: 0,
         customer_support: 0,
     };
-    assert!(calculate(&inputs, &SimplifiedRepairabilityHeuristic).is_err());
+    assert!(calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()).is_err());
 }
 
 #[test]
@@ -159,8 +166,8 @@ fn disassembly_zero_spare_parts_nonzero_is_cross_field_violation() {
         software_updatability: 0,
         customer_support: 0,
     };
-    let err =
-        calculate(&inputs, &SimplifiedRepairabilityHeuristic).expect_err("should fail cross-check");
+    let err = calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force())
+        .expect_err("should fail cross-check");
     assert!(
         matches!(err, CalcError::CrossFieldViolation(_)),
         "expected CrossFieldViolation, got {err:?}"
@@ -177,7 +184,7 @@ fn disassembly_zero_spare_parts_zero_is_valid() {
         software_updatability: 0,
         customer_support: 0,
     };
-    assert!(calculate(&inputs, &SimplifiedRepairabilityHeuristic).is_ok());
+    assert!(calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()).is_ok());
 }
 
 #[test]
@@ -192,7 +199,7 @@ fn disassembly_nonzero_allows_all_spare_parts_scores() {
             customer_support: 0,
         };
         assert!(
-            calculate(&inputs, &SimplifiedRepairabilityHeuristic).is_ok(),
+            calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()).is_ok(),
             "disassembly=1, spare_parts={sp} should be valid"
         );
     }
@@ -238,7 +245,7 @@ fn receipt_contains_correct_ruleset_id_and_output_hash() {
         software_updatability: 1,
         customer_support: 1,
     };
-    let r = calculate(&inputs, &SimplifiedRepairabilityHeuristic).unwrap();
+    let r = calculate(&inputs, &SimplifiedRepairabilityHeuristic, in_force()).unwrap();
     assert_eq!(r.receipt.ruleset_id, "repairability-heuristic-v1");
     assert!(!r.receipt.input_hash.is_empty());
     assert!(!r.receipt.output_hash.is_empty());

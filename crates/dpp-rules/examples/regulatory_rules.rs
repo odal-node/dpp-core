@@ -5,7 +5,7 @@
 //! Run with: `cargo run --example regulatory_rules -p dpp-rules`
 
 use dpp_rules::batteries::chemistry::mercury_content_prohibited;
-use dpp_rules::batteries::recycled_content::{RecycledContentInput, annex_x_shortfalls_2031};
+use dpp_rules::batteries::recycled_content::{RecycledContentInput, art8_shortfalls_2031};
 use dpp_rules::{
     FibreInput, SvhcInput, check_svhc_declarations, country_code_valid, fibre_sum_ok,
     validate_fibre_composition, validate_svhc_substances,
@@ -71,7 +71,7 @@ fn main() {
         );
     }
 
-    println!("\n=== Battery: Annex X recycled-content targets (from 2031) ===\n");
+    println!("\n=== Battery: Art. 8(2) recycled-content targets (from 2031) ===\n");
 
     let recycled = RecycledContentInput {
         cobalt_pct: Some(10.0), // below the 16% Phase-1 target
@@ -79,7 +79,7 @@ fn main() {
         nickel_pct: Some(6.0),
         lead_pct: Some(85.0),
     };
-    let shortfalls = annex_x_shortfalls_2031(&recycled);
+    let shortfalls = art8_shortfalls_2031(&recycled);
     if shortfalls.is_empty() {
         println!("  all declared metals meet Phase-1 targets");
     } else {

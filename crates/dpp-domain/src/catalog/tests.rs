@@ -33,8 +33,14 @@ fn battery_descriptor_is_complete() {
     assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
     assert_eq!(battery.retention_years, 10);
     assert!(battery.schema_versions.contains(&"2.0.0".to_string()));
-    // Current version is v2.0.0 (Annex XIII), not the older v1.0.0.
-    assert_eq!(battery.current_schema_version, "2.0.0");
+    assert!(battery.schema_versions.contains(&"2.1.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.2.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.3.0".to_string()));
+    assert!(battery.schema_versions.contains(&"2.4.0".to_string()));
+    // Current version is v2.2.0, which adds the Annex VII Part A state-of-health
+    // parameter sets. Older versions stay registered so passports already
+    // validated against them remain verifiable.
+    assert_eq!(battery.current_schema_version, "2.4.0");
     assert_eq!(battery.plugin.as_deref(), Some("sector-battery"));
 }
 
@@ -44,7 +50,7 @@ fn resolve_schema_version_new_vs_existing() {
     // New passport (stored = None) → catalog current version.
     assert_eq!(
         catalog.resolve_schema_version("battery", None).as_deref(),
-        Some("2.0.0")
+        Some("2.4.0")
     );
     // Existing passport → its stored version is authoritative, even if old.
     assert_eq!(
@@ -87,7 +93,7 @@ fn register_runtime_sector() {
         schema_versions: vec!["1.0.0".into()],
         current_schema_version: "1.0.0".into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     };
@@ -111,7 +117,7 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
         schema_versions: versions,
         current_schema_version: current.into(),
         product_categories: vec![],
-        access_tiers: std::collections::HashMap::new(),
+        disclosure: std::collections::HashMap::new(),
         plugin: None,
         notes: None,
     }
@@ -256,18 +262,18 @@ fn descriptor_round_trips_camel_case() {
     assert_eq!(back.key, "battery");
 }
 
-// Drift guard: every key in a sector's access_tiers manifest must correspond to
+// Drift guard: every key in a sector's disclosure manifest must correspond to
 // a real JSON field in that sector's current schema. A key that doesn't match any
 // schema property silently fails to gate any field — the redaction is a no-op.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn access_tiers_keys_match_schema_properties() {
+fn disclosure_keys_match_schema_properties() {
     use crate::schemas::VersionedSchemaRegistry;
     let catalog = SectorCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
     for descriptor in catalog.all() {
-        if descriptor.access_tiers.is_empty() {
+        if descriptor.disclosure.is_empty() {
             continue;
         }
         let version: semver::Version =
@@ -298,10 +304,10 @@ fn access_tiers_keys_match_schema_properties() {
                 )
             });
 
-        for key in descriptor.access_tiers.keys() {
+        for key in descriptor.disclosure.keys() {
             assert!(
                 properties.contains_key(key),
-                "access_tiers key '{}' in sector '{}' does not match any property in schema v{} \
+                "disclosure key '{}' in sector '{}' does not match any property in schema v{} \
                  (properties: {:?}). Either rename the key to match the serialised field name, \
                  or remove it — a mismatched key silently fails to gate the field.",
                 key,
@@ -369,14 +375,36 @@ fn catalog_agrees_with_schema_registry() {
 #[test]
 fn every_manifest_declares_a_regime() {
     for d in SectorCatalog::new().all().iter() {
+        // `Regime::None` is documented as pairing with `RegulatoryStatus::Watch`
+        // — a sector tracked before any DPP instrument exists. Forbidding it
+        // outright contradicted the enum it was guarding, and would have blocked
+        // the first Watch sector from ever being added.
+        if d.status == RegulatoryStatus::Watch {
+            continue;
+        }
         assert_ne!(
             d.regime,
             Regime::None,
-            "sector '{}' must declare a real regime; Regime::None is reserved for \
-             Watch sectors with no DPP instrument",
-            d.key
+            "sector '{}' has status {:?} but no regime; Regime::None is reserved for              Watch sectors with no DPP instrument",
+            d.key,
+            d.status
         );
     }
+}
+
+#[test]
+fn a_watch_sector_may_declare_no_regime() {
+    // The pairing the guard above must allow. Asserted on a constructed
+    // descriptor rather than a shipped manifest, so it holds whether or not any
+    // sector is currently in Watch.
+    let watch = r#"{
+        "key": "w", "title": "W", "status": "watch", "regime": "none",
+        "legalBasis": [], "retentionYears": 10,
+        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
+    }"#;
+    let d: SectorDescriptor = serde_json::from_str(watch).expect("watch + none must parse");
+    assert_eq!(d.regime, Regime::None);
+    assert_eq!(d.status, RegulatoryStatus::Watch);
 }
 
 #[test]
@@ -464,5 +492,73 @@ fn every_manifest_round_trips() {
             "round-trip changed sector '{}'",
             d.key
         );
+    }
+}
+
+/// Sectors whose catalog `productCategories` mirror a schema enum, and the
+/// property that enumerates them.
+///
+/// The correspondence is **not derivable** from the data — depending on sector
+/// the categories live under `productCategory`, `productType`, `batteryType`,
+/// `productFamily`, `productionRoute` or `tyreClass` — so it is declared here.
+/// A sector absent from this table is simply not cross-checked; `textile`, for
+/// example, declares categories but its schema has no enum for them.
+const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
+    ("aluminium", "productionRoute"),
+    ("battery", "batteryType"),
+    ("construction", "productFamily"),
+    ("detergent", "productType"),
+    ("electronics", "productCategory"),
+    ("furniture", "productType"),
+    ("steel", "productCategory"),
+    ("tyre", "tyreClass"),
+    ("unsold-goods", "productCategory"),
+];
+
+/// Drift guard: a catalog product category that is not a legal value of the
+/// corresponding schema enum is a value nothing can ever validate against.
+///
+/// This existed as two spellings of one concept — the catalog said `sli` and
+/// `clothing_accessories` where the schemas said `starting-lighting-ignition`
+/// and `accessories`. Neither was load-bearing, because
+/// `SectorDescriptor::product_categories` has no reader in Rust today; both
+/// would have become load-bearing the moment one appeared.
+#[test]
+fn product_categories_are_legal_values_of_their_schema_enum() {
+    use crate::schemas::VersionedSchemaRegistry;
+
+    let catalog = SectorCatalog::new();
+    let registry = VersionedSchemaRegistry::new();
+
+    for (sector_key, property) in CATEGORY_ENUM_PROPERTY {
+        let descriptor = catalog
+            .get(sector_key)
+            .unwrap_or_else(|| panic!("sector '{sector_key}' is in the table but not the catalog"));
+        let version: semver::Version = descriptor
+            .current_schema_version
+            .parse()
+            .expect("currentSchemaVersion is valid semver");
+        let schema_json = registry
+            .get(sector_key, &version)
+            .unwrap_or_else(|| panic!("no schema for '{sector_key}' v{version}"));
+        let schema: serde_json::Value =
+            serde_json::from_str(schema_json).expect("schema is valid JSON");
+
+        let allowed: Vec<&str> = schema["properties"][property]["enum"]
+            .as_array()
+            .unwrap_or_else(|| {
+                panic!("'{sector_key}' schema property '{property}' has no enum — stale table row")
+            })
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect();
+
+        for category in &descriptor.product_categories {
+            assert!(
+                allowed.contains(&category.as_str()),
+                "sector '{sector_key}' lists product category '{category}', which is not a legal \
+                 value of schema property '{property}' ({allowed:?})"
+            );
+        }
     }
 }

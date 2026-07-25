@@ -66,8 +66,9 @@ pub use chemicals::surfactants::{
     SURFACTANT_BANDS, SurfactantInput, surfactant_band_valid, validate_surfactants,
 };
 pub use chemicals::svhc::{
-    ECHA_CANDIDATE_LIST, SVHC_THRESHOLD_PCT, SvhcFinding, SvhcFindingKind, SvhcInput,
-    check_svhc_declarations, validate_svhc_substances,
+    CandidateListProvenance, ECHA_CANDIDATE_LIST, ECHA_CANDIDATE_LIST_AS_OF,
+    ECHA_CANDIDATE_LIST_OFFICIAL_COUNT, SVHC_THRESHOLD_PCT, SvhcFinding, SvhcFindingKind,
+    SvhcInput, candidate_list_provenance, check_svhc_declarations, validate_svhc_substances,
 };
 pub use common::country::country_code_valid;
 pub use textiles::fibre::{

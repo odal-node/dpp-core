@@ -34,39 +34,78 @@ The operating temperature cross-field check has no regulatory threshold — it i
 
 ### `batteries/recycled_content.rs` — Constants implemented, determination pending ⏳
 
-The Annex X recycled content targets are **finalized law** — they appear in the regulation text itself, not in a delegated act. However, neither phase is yet in force.
+The Art. 8(2)/(3) recycled content targets are **finalized law** — they appear in the regulation text itself, not in a delegated act. However, neither phase is yet in force. Art. 8(2) and 8(3) both point to **Annex VIII** (technical documentation) as the place the share must be demonstrated.
 
-| Metal | Phase 1 (from 1 Jan 2031) | Phase 2 (from 1 Jan 2036) | Applies to |
+| Metal | Phase 1 (from 18 Aug 2031) | Phase 2 (from 18 Aug 2036) | Measured in |
 |---|---|---|---|
-| Cobalt | 16 % | 26 % | EV, industrial (≥ 2 kWh), LMT |
-| Lead | 85 % | 85 % | EV, industrial, LMT |
-| Lithium | 6 % | 12 % | EV, industrial (≥ 2 kWh), LMT |
-| Nickel | 6 % | 15 % | EV, industrial (≥ 2 kWh), LMT |
+| Cobalt | 16 % | 26 % | active materials |
+| Lead | 85 % | 85 % | the battery |
+| Lithium | 6 % | 12 % | active materials |
+| Nickel | 6 % | 15 % | active materials |
 
-Portable and SLI batteries are excluded from the per-metal targets.
+**Scope.** Phase 1 covers industrial batteries > 2 kWh (excluding those with exclusively external storage), EV batteries and **SLI batteries**. Phase 2 adds **LMT batteries**. Portable batteries are out of scope throughout. SLI is *in* Phase-1 scope — an earlier version of this table wrongly excluded it and wrongly placed LMT in Phase 1.
 
-The module exposes `annex_x_shortfalls_2031` and `annex_x_shortfalls_2036` today. The battery plugin returns `NOT_ASSESSED` because neither phase is in force yet. When 2031 arrives, the plugin switches from `NOT_ASSESSED` to a real determination by calling these functions — **no change to `dpp-rules` is needed at that point**.
+**Dates.** 18 August, not 1 January — an earlier version of this table had both phase dates wrong by seven and a half months.
 
-**When to update:** Only if Annex X is amended by a subsequent regulation.
+The module exposes `art8_shortfalls_2031` and `art8_shortfalls_2036` (renamed from `annex_x_shortfalls_*` on 2026-07-25, when the citation was corrected). The battery plugin returns `NOT_ASSESSED` because neither phase is in force yet. When 2031 arrives, the plugin switches from `NOT_ASSESSED` to a real determination by calling these functions — **no change to `dpp-rules` is needed at that point**.
+
+**Art. 8(1) — the declaration duty, now modelled.** Separate from the minimums above: it requires documentation of the *actual* shares, with no minimum, from 18 Aug 2028 (industrial > 2 kWh / EV / SLI) and 18 Aug 2033 (LMT) — "or 24 months after the date of entry into force of the delegated act …, whichever is the latest". Annex XIII point 1(e) makes that documentation publicly accessible passport content.
+
+Because that date is conditional and the act is unadopted, `art8_declaration_duty_for` returns one of three answers rather than a yes/no: `NotYetDue` below the floor (certain, since the real date can only be the floor or later), `Undetermined` on or after it, and `NotCovered` outside scope.
+
+Art. 8(1) also requires the shares "for each battery model **per year and per manufacturing plant**". A percentage without both anchors is not the Art. 8(1) declaration, so schema v2.3.0 adds `recycledContentReportingYear` to pair with the existing `manufacturingPlace`, and the battery plugin flags shares declared without it.
+
+**When to update:** Only if Art. 8 is amended by a subsequent regulation, or when the Art. 8(1) methodology delegated act (due 18 Aug 2026) is adopted.
 
 ---
 
 ### `batteries/degradation.rs` — Pending delegated act ⏳
 
-| Rule | What's needed | Legal basis | Expected |
-|---|---|---|---|
-| SOH minimum thresholds | Minimum state-of-health % at point of sale | Art. 10(6) delegated act | ~2027–2028 |
-| Capacity fade limits | Maximum allowable capacity loss over N cycles | Art. 10(6) delegated act | ~2027–2028 |
+Two regimes on two timelines — only the second is pending.
 
-The schema already carries `stateOfHealthPct` and `expectedLifetimeCycles`. The individual ranges are enforced by JSON Schema. No cross-field rule linking the two exists in current regulation text.
+**Already in force.** Art. 10(1) (since 18 Aug 2024) requires industrial batteries > 2 kWh, LMT and EV batteries to be accompanied by a document carrying the Annex IV Part A parameters. Art. 14(1) (since 18 Aug 2024) requires the Annex VII parameters to be held in the battery management system. Both are declaration duties, not thresholds.
 
-**When to update:** When the Art. 10(6) delegated act is published. At that point, implement the minimum SOH thresholds here, keyed by `batteryType` (EV / industrial / LMT). Update the battery plugin to call these functions and switch from `NOT_ASSESSED` to a real determination for the affected types.
+**Pending — minimum values, Art. 10(5).**
+
+| Scope | Delegated act due | Minimum values apply from |
+|---|---|---|
+| Industrial > 2 kWh (excl. exclusively external storage) | 18 Feb 2026 | 18 Aug 2027 |
+| LMT batteries | 18 Feb 2027 | 18 Aug 2028 |
+
+Both application dates are conditional — Art. 10(2)/(3) read "or 18 months after the date of entry into force of the delegated act, whichever is the latest".
+
+**Art. 10(6) is not the empowerment.** It lets the Commission amend the Annex IV *parameter list*. An earlier version of this document cited it for the minimum values; corrected 2026-07-25.
+
+**Art. 10(4)** disapplies paragraphs 1–3 for batteries prepared for re-use, repurposed or remanufactured that were placed on the market before the obligations applied — so a determination keys on the original placing-on-market date.
+
+**Annex VII Part A is now modelled** (schema v2.2.0, `BatteryData::state_of_health`). It is two disjoint lists, so the type is a sum, not a struct of optionals:
+
+| Category | Parameters |
+|---|---|
+| Electric vehicle | state of certified energy (SOCE) — and nothing else |
+| Stationary storage + LMT | remaining capacity and evolution of self-discharging rates (unconditional); remaining power capability, remaining round trip efficiency, ohmic resistance (each "where possible") |
+
+**Annex VII Part B (expected lifetime) is now modelled too** (schema v2.4.0, `BatteryData::expected_lifetime`): date of putting into service ("where appropriate"), energy throughput, capacity throughput, tracking of harmful events, and the number of full equivalent charge-discharge cycles.
+
+**Part B is narrower than Part A.** Part A names *"electric vehicle batteries, stationary battery energy storage systems and LMT batteries"*; Part B names only the latter two. An EV battery reports a state of health but **no** expected-lifetime parameter set — see `annex_vii_part_b_applies_to`.
+
+Part B item 4 lists its harmful events *"such as"*, so that set is illustrative and every member is optional; an implementation tracking a further event type is conforming, not extending.
+
+`expectedLifetime` (measured, per item) is `individual` under Annex XIII point 4(d). It is deliberately distinct from `expectedLifetimeCycles`, the model-level design figure Annex XIII point 1(j) makes **public**.
+
+`dpp_rules::batteries::degradation::annex_vii_parameter_set_for` maps a battery type onto the applicable Part A list. Portable and SLI return `None` — Art. 14(1) names only stationary storage, LMT and EV batteries.
+
+Annex XIII point 4(b) puts state of health in the individual-battery set, so `stateOfHealth` and the deprecated `stateOfHealthPct` both carry the `individual` disclosure class: legitimate-interest holders see them, authorities do not. Before v2.2.0 neither field was classified, so both defaulted to public.
+
+The flat `stateOfHealthPct` is retained for schema versions up to v2.1.0 and cannot represent either list.
+
+**When to update:** When the Art. 10(5) delegated acts are published. At that point, implement the minimum values here keyed by battery category, and switch the battery plugin from `NOT_ASSESSED` to a real determination for the affected categories.
 
 ---
 
 ### Battery CO₂e carbon footprint class — Pending delegated act ⏳
 
-The battery schema carries `carbonFootprintClass` (A–E per Art. 7(2)). The methodology for assigning a class from a declared `co2ePerUnitKg` value is defined in a **Commission Delegated Regulation under Art. 7(2)** that has not yet been adopted.
+The battery schema carries `carbonFootprintClass`. Art. 7(2) defines **no class labels** — it defers both the classes and the methodology to a **Commission Delegated Regulation under Art. 7(2)** that has not been adopted, and requires the Commission to "review the number of performance classes and the thresholds between them, every three years". The schema's `A–E` enumeration was therefore never sourced from the regulation; it is pending removal. Treat the class label as an opaque string carried with the ruleset id and version that produced it.
 
 **Not in `dpp-rules` scope.** The class assignment is a calculation, not a cross-field validation rule. When the delegated act is published, implement the class-boundary thresholds in `dpp-calc` (the calculator crate), not here.
 
@@ -99,7 +138,7 @@ ISO 3758:2012 is a published standard — the symbols themselves are well-define
 
 ---
 
-## Electronics — EU Electronics DPP (adopted 18 March 2026)
+## Electronics — EU Reg. 2023/1670 (ecodesign) + 2023/1669 (energy labelling)
 
 ### `electronics/spare_parts.rs` — Schema change needed 🔧
 
@@ -195,7 +234,7 @@ The CE marking check (one hard rule that is available today) lives in the `secto
 |---|---|---|
 | `batteries/chemistry.rs` | ✅ Implemented | — |
 | `batteries/recycled_content.rs` | ✅ Constants + functions ready | Determination switches at 2031 (no code change needed) |
-| `batteries/degradation.rs` | ⏳ Pending | Art. 10(6) delegated act (~2027–2028) |
+| `batteries/degradation.rs` | ⏳ Pending | Art. 10(5) delegated acts (due 18 Feb 2026 / 18 Feb 2027) |
 | `batteries` CO₂e class | ⏳ Pending (→ dpp-calc) | Art. 7(2) delegated act |
 | `textiles/fibre.rs` | ✅ Implemented | — |
 | `textiles/care.rs` | 🔧 Schema change needed | Structured `careSymbols` field in textile schema |

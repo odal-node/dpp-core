@@ -3,21 +3,40 @@
   "title": "Batteries",
   "status": "in_force",
   "regime": "battery-regulation",
-  "legalBasis": ["Regulation (EU) 2023/1542"],
+  "legalBasis": [
+    "Regulation (EU) 2023/1542",
+    "Regulation (EU) 2025/1561"
+  ],
   "dppAppliesFrom": "2027-02-18",
   "retentionYears": 10,
-  "schemaVersions": ["1.0.0", "2.0.0"],
-  "currentSchemaVersion": "2.0.0",
-  "productCategories": ["portable", "industrial", "ev", "lmt", "sli"],
-  "accessTiers": {
-    "dueDiligenceUrl": "professional",
-    "criticalRawMaterials": "professional",
-    "disassemblyInstructionsUrl": "professional",
-    "cathodeMaterial": "professional",
-    "anodeMaterial": "professional",
-    "electrolyteMaterial": "professional",
-    "sohMethodology": "professional"
+  "schemaVersions": [
+    "1.0.0",
+    "2.0.0",
+    "2.1.0",
+    "2.2.0",
+    "2.3.0",
+    "2.4.0"
+  ],
+  "currentSchemaVersion": "2.4.0",
+  "productCategories": [
+    "portable",
+    "industrial",
+    "ev",
+    "lmt",
+    "starting-lighting-ignition"
+  ],
+  "disclosure": {
+    "dueDiligenceUrl": "restricted",
+    "criticalRawMaterials": "restricted",
+    "disassemblyInstructionsUrl": "restricted",
+    "cathodeMaterial": "restricted",
+    "anodeMaterial": "restricted",
+    "electrolyteMaterial": "restricted",
+    "sohMethodology": "restricted",
+    "stateOfHealth": "individual",
+    "stateOfHealthPct": "individual",
+    "expectedLifetime": "individual"
   },
   "plugin": "sector-battery",
-  "notes": "Battery passport mandatory for EV, LMT and industrial batteries >2 kWh from 2027-02-18. Regulation in full enforcement since Jan 2026."
+  "notes": "Battery passport mandatory for EV, LMT and industrial batteries >2 kWh from 2027-02-18 (Art. 77(1)). Reg. (EU) 2025/1561 moved the Art. 48(1) due-diligence trigger to 2027-08-18 and the Art. 48(5) Commission guidelines deadline to 2026-07-26. Major obligations remain future-dated: Art. 8(1) recycled-content declaration from 2028-08-18, Art. 8(2) minimum shares from 2031-08-18, Art. 10(2) minimum performance values from 2027-08-18."
 }

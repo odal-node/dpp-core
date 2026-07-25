@@ -20,6 +20,26 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/battery/v2.0.0.json"),
     },
     EmbeddedSchema {
+        sector: "battery",
+        version: "2.1.0",
+        json: include_str!("../../schemas/battery/v2.1.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "battery",
+        version: "2.2.0",
+        json: include_str!("../../schemas/battery/v2.2.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "battery",
+        version: "2.3.0",
+        json: include_str!("../../schemas/battery/v2.3.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "battery",
+        version: "2.4.0",
+        json: include_str!("../../schemas/battery/v2.4.0.json"),
+    },
+    EmbeddedSchema {
         sector: "textile",
         version: "1.0.0",
         json: include_str!("../../schemas/textile/v1.0.0.json"),

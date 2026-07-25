@@ -28,13 +28,14 @@ mod tests;
 
 pub use data::{
     AluminiumData, BatteryData, ConstructionData, CriticalRawMaterial, DetergentData,
-    ElectronicsData, FibreEntry, FurnitureData, MaterialComposition, SectorData, SteelData,
-    SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
-    UnsoldGoodsReason, UnsoldGoodsReport, redact_sector_data,
+    ElectronicsData, ExpectedLifetime, FibreEntry, FurnitureData, HarmfulEvents,
+    MaterialComposition, SectorData, StateOfHealth, SteelData, SurfactantEntry, SvhcSubstance,
+    TextileData, ToyData, TyreData, UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
+    redact_sector_data,
 };
 pub use enums::{
-    BatteryChemistry, BatteryType, CarbonFootprintClass, EnergyEfficiencyClass, LifecycleStage,
-    ProductionRoute, SystemBoundary,
+    BatteryChemistry, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
+    EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
 };
 pub use metrics::{CarbonFootprint, RepairCriterion, RepairabilityScore};
 pub use sector::Sector;

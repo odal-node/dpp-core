@@ -25,8 +25,8 @@ mod request;
 mod tests;
 mod vocabulary;
 
-/// Re-export the canonical `AccessTier` from dpp-domain.
-pub use dpp_domain::AccessTier;
+/// Re-export the canonical access vocabulary from dpp-domain.
+pub use dpp_domain::{Audience, Disclosure};
 pub use media_type::DppMediaType;
 pub use negotiate::{LinkDescriptor, negotiate};
 pub use request::ResolutionRequest;

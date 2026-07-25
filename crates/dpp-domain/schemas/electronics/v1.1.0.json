@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/electronics-v1.1.0.json",
   "title": "Odal Node — Electronics Sector Data (v1.1.0)",
-  "description": "ICT and electronics fields per EU Electronics DPP (adopted 18 March 2026, effective 1 April 2026). Mandatory immediately for AI servers, high-end PCBs, and foldable phones; from 1 January 2027 for low-end consumer electronics. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape (v1.0.0 incorrectly declared it as a bare number, which the Rust type never actually produced).",
+  "description": "ICT and electronics fields. Regulatory basis: Regulation (EU) 2023/1670 (ecodesign, smartphones & slate tablets) and Regulation (EU) 2023/1669 (energy labelling), in force since 2025-06-20. Applicability dates and regulatory status are held in the sector manifest, not here. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 declared it as a bare number, which the Rust type never produced.",
   "type": "object",
   "required": [
     "gtin",

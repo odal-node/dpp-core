@@ -1,39 +1,45 @@
-//! Access tier filter engine — applies a `SectorAccessPolicy` to a JSON document.
+//! Access filter engine — applies a `SectorAccessPolicy` to a JSON document.
 
-use dpp_domain::AccessTier;
+use dpp_domain::Audience;
 
 use super::policy::SectorAccessPolicy;
 
 /// The result of a policy evaluation.
 #[derive(Debug, Clone)]
 pub struct PolicyDecision {
-    /// The caller's effective access tier.
-    pub granted_tier: AccessTier,
+    /// The audience the document was filtered for.
+    pub audience: Audience,
     /// Fields that were redacted (not visible to this caller).
     pub redacted_fields: Vec<String>,
     /// The filtered JSON document.
     pub filtered_data: serde_json::Value,
 }
 
-/// Filter a JSON document according to the sector access policy and caller's tier.
+/// Filter a JSON document according to the sector access policy and the
+/// caller's audience.
 ///
 /// **Path-aware and recursive:** every key — at every nesting depth, including
-/// inside arrays of objects — is classified by [`SectorAccessPolicy::tier_for_field`]
-/// and removed when its tier exceeds the caller's. A field kept at one level is
-/// still descended into, so a Confidential field nested inside an otherwise-public
-/// object cannot leak. Redacted keys are reported as dotted paths
+/// inside arrays of objects — is classified by [`SectorAccessPolicy::disclosure_for_field`]
+/// and removed when [`Audience::may_see`] says that audience may not see its
+/// class. A field kept at one level is still descended into, so a restricted
+/// field nested inside an otherwise-public object cannot leak.
+///
+/// Visibility is a lattice, not a threshold: an `Authority` is not a superset of
+/// a `LegitimateInterest` holder. Individual-item data (Annex XIII point 4) is
+/// withheld from authorities, and conformity evidence (point 3) is withheld from
+/// legitimate-interest holders. Redacted keys are reported as dotted paths
 /// (e.g. `sectorData.svhcSubstances`, `criticalRawMaterials[0].casNumber`).
 ///
 /// Non-object/array inputs are returned unchanged.
-pub fn filter_by_access_tier(
+pub fn filter_by_audience(
     data: &serde_json::Value,
     policy: &SectorAccessPolicy,
-    caller_tier: AccessTier,
+    audience: Audience,
 ) -> PolicyDecision {
     let mut redacted_fields = Vec::new();
-    let filtered_data = filter_value(data, policy, caller_tier, "", &mut redacted_fields);
+    let filtered_data = filter_value(data, policy, audience, "", &mut redacted_fields);
     PolicyDecision {
-        granted_tier: caller_tier,
+        audience,
         redacted_fields,
         filtered_data,
     }
@@ -42,7 +48,7 @@ pub fn filter_by_access_tier(
 fn filter_value(
     data: &serde_json::Value,
     policy: &SectorAccessPolicy,
-    caller_tier: AccessTier,
+    audience: Audience,
     prefix: &str,
     redacted: &mut Vec<String>,
 ) -> serde_json::Value {
@@ -55,10 +61,10 @@ fn filter_value(
                 } else {
                     format!("{prefix}.{key}")
                 };
-                if caller_tier >= policy.tier_for_field(key) {
+                if audience.may_see(policy.disclosure_for_field(key)) {
                     filtered.insert(
                         key.clone(),
-                        filter_value(value, policy, caller_tier, &path, redacted),
+                        filter_value(value, policy, audience, &path, redacted),
                     );
                 } else {
                     redacted.push(path);
@@ -71,7 +77,7 @@ fn filter_value(
                 .iter()
                 .enumerate()
                 .map(|(i, v)| {
-                    filter_value(v, policy, caller_tier, &format!("{prefix}[{i}]"), redacted)
+                    filter_value(v, policy, audience, &format!("{prefix}[{i}]"), redacted)
                 })
                 .collect(),
         ),
