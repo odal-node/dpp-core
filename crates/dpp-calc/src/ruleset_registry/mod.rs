@@ -13,27 +13,35 @@
 //! ## Caller pattern
 //!
 //! ```rust,ignore
-//! use chrono::Utc;
-//! use dpp_calc::ruleset_registry;
-//! use dpp_calc::repairability;
+//! use dpp_calc::clock::AssessmentClock;
+//! use dpp_calc::{repairability, ruleset_registry};
 //!
-//! let today = Utc::now().date_naive();
-//! let ruleset = ruleset_registry::resolve_repairability("smartphone-tablet", today)
-//!     .expect("no repairability ruleset in force for this category today");
+//! // The date the law attached to this product — from its own record, never today.
+//! let clock = AssessmentClock::placed_on(product.placed_on_market_date);
 //!
-//! let result = repairability::calculate(&inputs, ruleset)?;
+//! match ruleset_registry::resolve_repairability("smartphone-tablet", clock.law_in_force_on) {
+//!     Assessability::Assessed(ruleset) => {
+//!         let result = repairability::calculate(&inputs, ruleset, clock)?;
+//!     }
+//!     // Each of these is a different thing to tell an operator, and none of
+//!     // them is "non-compliant".
+//!     Assessability::NotYetInForce { applies_from, .. } => { /* applies from … */ }
+//!     Assessability::Undetermined { empowerment, .. } => { /* awaiting … */ }
+//!     Assessability::Expired { superseded_by, .. } => { /* see successor … */ }
+//!     Assessability::OutOfScope => { /* category not covered */ }
+//! }
 //! ```
 //!
 //! ## Adding a new version
 //!
 //! When `SimplifiedRepairabilityHeuristicV2` is introduced (e.g. from 2027-01-01):
-//! 1. Set `SimplifiedRepairabilityHeuristic::effective_dates().until = Some(2026-12-31)`.
+//! 1. Close the current one: `Effectivity::closed(from, 2026-12-31)`.
 //! 2. Add `SimplifiedRepairabilityHeuristicV2` with `from = 2027-01-01`.
 //! 3. Add a second `"smartphone-tablet"` row to the table — no caller changes.
 //!
 //! ## Sunset policy
 //!
-//! Old rulesets stay in the table indefinitely. Their `EffectiveDateBound.until`
+//! Old rulesets stay in the table indefinitely. Their `Effectivity::InForce.until`
 //! gates them from new calculations. Receipts reference rulesets by ID+version,
 //! so removing a ruleset would make old receipts unverifiable. Never delete rows.
 
@@ -44,4 +52,4 @@ mod status;
 mod tests;
 
 pub use resolve::{all_rulesets, resolve_repairability};
-pub use status::{CalculatorStatus, SectorCalculatorEntry, sector_calculator_map};
+pub use status::{CalculatorImpl, CalculatorStatus, SectorCalculatorEntry, sector_calculator_map};

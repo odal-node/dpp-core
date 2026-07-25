@@ -2,12 +2,18 @@
 //!
 //! Run with: `cargo run --example calculate_metrics -p dpp-calc`
 
+use chrono::NaiveDate;
+use dpp_calc::clock::AssessmentClock;
 use dpp_calc::co2e::{self, Co2eInputs, CradleToGateRuleset, MaterialFootprint};
 use dpp_calc::repairability::{
     self, SimplifiedRepairabilityHeuristic, parameters::RepairabilityInputs,
 };
 
 fn main() {
+    // The date the governing law attached to this product. In a real caller this
+    // comes from the passport's placing-on-market date, never from the clock.
+    let clock = AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+
     // Cradle-to-gate CO₂e for a small battery (materials + manufacturing energy).
     let footprint = co2e::calculate(
         &Co2eInputs {
@@ -25,6 +31,7 @@ fn main() {
             grid_factor_kg_co2e_per_kwh: 0.4,
         },
         &CradleToGateRuleset,
+        clock,
     )
     .expect("valid inputs");
 
@@ -55,6 +62,7 @@ fn main() {
             customer_support: 1,
         },
         &SimplifiedRepairabilityHeuristic,
+        clock,
     )
     .expect("valid inputs");
 

@@ -168,9 +168,9 @@ Source: EU Battery Regulation (EU) 2023/1542, Annex XIII. Battery DPP mandatory 
 
 | Field | Rust Type | JSON name | Reg. Source |
 |---|---|---|---|
-| `recycled_content_cobalt_pct` | `Option<f64>` | `"recycledContentCobaltPct"` | Art. 8(1), Annex X |
-| `recycled_content_lithium_pct` | `Option<f64>` | `"recycledContentLithiumPct"` | Art. 8(1), Annex X |
-| `recycled_content_nickel_pct` | `Option<f64>` | `"recycledContentNickelPct"` | Art. 8(1), Annex X |
+| `recycled_content_cobalt_pct` | `Option<f64>` | `"recycledContentCobaltPct"` | Art. 8 |
+| `recycled_content_lithium_pct` | `Option<f64>` | `"recycledContentLithiumPct"` | Art. 8 |
+| `recycled_content_nickel_pct` | `Option<f64>` | `"recycledContentNickelPct"` | Art. 8 |
 | `recycled_content_lead_pct` | `Option<f64>` | `"recycledContentLeadPct"` | Art. 8 (lead-acid) |
 | `state_of_health_pct` | `Option<f64>` | `"stateOfHealthPct"` | Art. 14 |
 | `rated_capacity_kwh` | `Option<f64>` | `"ratedCapacityKwh"` | Art. 13(1)(d) |

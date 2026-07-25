@@ -1,9 +1,10 @@
 //! Proof-of-calculation receipt — auditable envelope for every calculator result.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::clock::AssessmentClock;
 use super::error::CalcError;
 use super::ruleset::Ruleset;
 
@@ -46,6 +47,14 @@ pub struct CalculationReceipt {
     /// SHA-256 of the full factor table at calculation time.
     /// `None` when the calculation did not use a `FactorProvider`.
     pub factor_set_hash: Option<String>,
+    /// The date whose law this calculation was performed against — the
+    /// product's regulated triggering event, not the day it was computed.
+    ///
+    /// Without this an auditor can see *which* ruleset was cited but not
+    /// whether it was the right one to cite, because ruleset selection is a
+    /// function of this date. It is the difference between a receipt that can
+    /// be re-verified and one that can only be re-read.
+    pub assessed_as_of: NaiveDate,
     /// UTC timestamp when the calculation ran.
     pub computed_at: DateTime<Utc>,
     /// JWS signature produced by the vault/engine after calculation.
@@ -54,10 +63,14 @@ pub struct CalculationReceipt {
 }
 
 impl CalculationReceipt {
+    /// Both timestamps come from `clock` — the receipt never reads the wall
+    /// clock itself, so replaying a stored calculation reproduces its dates
+    /// exactly rather than stamping today's.
     pub fn new(
         input_hash: impl Into<String>,
         ruleset_id: impl Into<String>,
         ruleset_version: impl Into<String>,
+        clock: AssessmentClock,
     ) -> Self {
         Self {
             receipt_id: Uuid::now_v7(),
@@ -69,7 +82,8 @@ impl CalculationReceipt {
             factor_dataset_id: String::new(),
             factor_dataset_version: String::new(),
             factor_set_hash: None,
-            computed_at: Utc::now(),
+            assessed_as_of: clock.law_in_force_on,
+            computed_at: clock.computed_at,
             jws: None,
         }
     }
@@ -82,12 +96,16 @@ impl CalculationReceipt {
     pub fn for_ruleset<T: Serialize>(
         inputs: &T,
         ruleset: &dyn Ruleset,
+        clock: AssessmentClock,
         output_hash: impl Into<String>,
     ) -> Result<Self, CalcError> {
-        Ok(
-            Self::new(input_hash(inputs)?, ruleset.id().0, ruleset.version().0)
-                .with_output_hash(output_hash),
+        Ok(Self::new(
+            input_hash(inputs)?,
+            ruleset.id().0,
+            ruleset.version().0,
+            clock,
         )
+        .with_output_hash(output_hash))
     }
 
     /// Bind the numeric output values to this receipt.
@@ -137,6 +155,11 @@ impl CalculationReceipt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
+
+    fn test_clock() -> AssessmentClock {
+        AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+    }
     use crate::factor::FactorProvider;
 
     struct DummyProvider;
@@ -157,7 +180,7 @@ mod tests {
 
     #[test]
     fn builder_records_output_factor_and_jws() {
-        let receipt = CalculationReceipt::new("in-hash", "ruleset-x", "1.0.0")
+        let receipt = CalculationReceipt::new("in-hash", "ruleset-x", "1.0.0", test_clock())
             .with_output_hash("out-hash")
             .with_factor_provider(&DummyProvider)
             .seal_with_jws("jws-token".to_owned());
@@ -174,7 +197,7 @@ mod tests {
 
     #[test]
     fn bundle_version_defaults_to_none_and_round_trips() {
-        let receipt = CalculationReceipt::new("in", "r", "1.0.0");
+        let receipt = CalculationReceipt::new("in", "r", "1.0.0", test_clock());
         assert_eq!(receipt.bundle_version, None);
 
         let json = serde_json::to_value(&receipt).unwrap();
@@ -186,7 +209,8 @@ mod tests {
 
     #[test]
     fn canonical_bytes_exclude_the_jws_field() {
-        let sealed = CalculationReceipt::new("in", "r", "1.0.0").seal_with_jws("secret".to_owned());
+        let sealed = CalculationReceipt::new("in", "r", "1.0.0", test_clock())
+            .seal_with_jws("secret".to_owned());
         let bytes = sealed.canonical_bytes_for_signing().unwrap();
         let text = String::from_utf8(bytes).unwrap();
         assert!(

@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use std::sync::OnceLock;
 
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 use super::LifecycleStage;
 
@@ -28,7 +28,7 @@ static CTG_BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static CTG_ID: RulesetId = RulesetId("co2e-cradle-to-gate");
 static CTG_VERSION: RulesetVersion = RulesetVersion("1.0.0");
-static CTG_DATES: OnceLock<EffectiveDateBound> = OnceLock::new();
+static CTG_EFFECTIVITY: OnceLock<Effectivity> = OnceLock::new();
 static CTG_STAGES: [LifecycleStage; 2] = [LifecycleStage::RawMaterials, LifecycleStage::Production];
 
 /// Generic cradle-to-gate CO₂e ruleset (raw materials + production stages).
@@ -46,9 +46,9 @@ impl Ruleset for CradleToGateRuleset {
         &CTG_VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
-        CTG_DATES.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2021, 1, 1).expect("valid date"))
+    fn effectivity(&self) -> &Effectivity {
+        CTG_EFFECTIVITY.get_or_init(|| {
+            Effectivity::open(NaiveDate::from_ymd_opt(2021, 1, 1).expect("valid date"))
         })
     }
 

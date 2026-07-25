@@ -1,6 +1,6 @@
 //! Battery (EU Battery Regulation 2023/1542).
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
@@ -112,6 +112,18 @@ pub struct BatteryData {
     /// Internal resistance in milliohms (mΩ) at 50% SoC.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub internal_resistance_mohm: Option<f64>,
+
+    // ── v2.1.0 ───────────────────────────────────────────────────────────
+    /// Date the battery was placed on the EU market or put into service.
+    ///
+    /// Staged obligations attach by this date, never by the date of
+    /// assessment: Art. 8(2) recycled-content minimums bind batteries placed
+    /// on the market from 18 Aug 2031, Art. 8(3) from 18 Aug 2036, and
+    /// Art. 10(4) disapplies the performance duties to batteries placed on the
+    /// market before those duties applied. Without it, no phase determination
+    /// is possible and none should be assumed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub placed_on_market_date: Option<NaiveDate>,
 
     // ── v2.0.0 — Annex XIII identity & origin fields (Battery Reg. 2023/1542) ─
     /// Date and time of manufacture (Annex XIII §2 — "date of manufacture").
