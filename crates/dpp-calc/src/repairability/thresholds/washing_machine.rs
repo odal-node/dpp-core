@@ -4,13 +4,11 @@
 //! ESPR-era repairability index delegated act is expected ~2026. Weights and
 //! thresholds below are placeholder pending the official annex.
 
-use chrono::NaiveDate;
-
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
     RepairabilityWeights,
 };
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 pub struct WashingMachineRuleset;
 
@@ -34,8 +32,10 @@ static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static WASHING_RULESET_ID: RulesetId = RulesetId("washing-machine-repairability");
 static WASHING_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
-static WASHING_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> =
-    std::sync::OnceLock::new();
+static WASHING_EFFECTIVITY: Effectivity = Effectivity::pending(
+    "ESPR (EU) 2024/1781 — washing machine repairability delegated act, not yet adopted",
+    None,
+);
 
 impl Ruleset for WashingMachineRuleset {
     fn id(&self) -> &RulesetId {
@@ -46,10 +46,8 @@ impl Ruleset for WashingMachineRuleset {
         &WASHING_RULESET_VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
-        WASHING_EFFECTIVE_DATES.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2100, 1, 1).expect("valid date"))
-        })
+    fn effectivity(&self) -> &Effectivity {
+        &WASHING_EFFECTIVITY
     }
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {

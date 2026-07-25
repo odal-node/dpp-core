@@ -1,18 +1,16 @@
 //! Laptops — reserved; product-specific delegated act expected ~2027.
 
-use chrono::NaiveDate;
-
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
     RepairabilityWeights,
 };
-use crate::ruleset::{EffectiveDateBound, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 /// EN 45554 ruleset for laptops. **Not yet in force.**
 ///
-/// Exists as a named stub so code can reference it at compile time, gated
-/// behind a `RegulatoryStatus::Provisional` check or the registry (which
-/// returns `None` for dates before 2100).
+/// Exists as a named stub so code can reference it at compile time. Its
+/// effectivity is [`Effectivity::Pending`], so it governs no date at all and
+/// the registry never resolves it.
 pub struct LaptopRuleset;
 
 static LAPTOP_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
@@ -35,7 +33,10 @@ static LAPTOP_BASIS: RegulatoryBasis = RegulatoryBasis {
 
 static LAPTOP_RULESET_ID: RulesetId = RulesetId("laptop-repairability");
 static LAPTOP_RULESET_VERSION: RulesetVersion = RulesetVersion("0.0.0-stub");
-static LAPTOP_EFFECTIVE_DATES: std::sync::OnceLock<EffectiveDateBound> = std::sync::OnceLock::new();
+static LAPTOP_EFFECTIVITY: Effectivity = Effectivity::pending(
+    "ESPR (EU) 2024/1781 — laptop ecodesign delegated act, not yet adopted",
+    None,
+);
 
 impl Ruleset for LaptopRuleset {
     fn id(&self) -> &RulesetId {
@@ -46,12 +47,8 @@ impl Ruleset for LaptopRuleset {
         &LAPTOP_RULESET_VERSION
     }
 
-    fn effective_dates(&self) -> &EffectiveDateBound {
-        // Year 2100 sentinel: effective-date guard blocks runtime use while
-        // keeping the type compile-visible for future wiring.
-        LAPTOP_EFFECTIVE_DATES.get_or_init(|| {
-            EffectiveDateBound::open(NaiveDate::from_ymd_opt(2100, 1, 1).expect("valid date"))
-        })
+    fn effectivity(&self) -> &Effectivity {
+        &LAPTOP_EFFECTIVITY
     }
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {

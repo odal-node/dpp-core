@@ -36,7 +36,7 @@ src/
 │
 ├── error.rs                  CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
 ├── receipt.rs                CalculationReceipt — proof-of-calculation envelope
-├── ruleset.rs                RulesetId, RulesetVersion, EffectiveDateBound, RegulatoryBasis
+├── ruleset.rs                RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
 │                             Ruleset trait — every methodology trait extends this
 ├── factor.rs                 FactorProvider trait + SyntheticFactorProvider (test/CI only)
 ├── ruleset_registry.rs       date-based ruleset resolution; all_rulesets() CI iterator
@@ -157,7 +157,7 @@ SmartphoneTabletRuleset.regulatory_basis()
 ```
 
 A CI test (`expired_rulesets_have_superseded_by`) asserts that any ruleset with
-`effective_dates.until < today` has a non-empty `superseded_by`. This keeps the audit chain intact as regulations evolve.
+`Effectivity::InForce.until < today` has a non-empty `superseded_by`. This keeps the audit chain intact as regulations evolve.
 
 ---
 
@@ -179,7 +179,7 @@ step-by-step guide. Short version:
    `thresholds.rs` (trait extends `Ruleset`), `golden_vectors.rs`. Register in `ruleset_registry.rs`.
 2. **New product category on an existing methodology** → add `impl Ruleset + impl {Methodology}Ruleset`
    in `thresholds.rs`, add a row to the registry, add golden vectors.
-3. **Pending delegated act** → use `effective_dates.from = NaiveDate(2100, 1, 1)` as a sentinel.
+3. **Pending delegated act** → use `Effectivity::pending(empowerment, adoption_deadline)`. There is no date sentinel: a pending ruleset has no application date and resolves for no date at all.
 4. **Superseded ruleset** → set `until`, set `superseded_by`. Never delete rows.
 
 ---

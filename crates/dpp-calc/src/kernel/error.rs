@@ -9,10 +9,17 @@ pub enum CalcError {
     #[error("ruleset '{id}' expired on {until}")]
     RulesetExpired { id: String, until: String },
 
-    /// The ruleset's effective period has not started yet (e.g. a pending
-    /// delegated act using the `2100-01-01` sentinel).
+    /// The ruleset's effective period has a known start date that has not
+    /// arrived yet.
     #[error("ruleset '{id}' is not yet effective (in force from {from})")]
     RulesetNotYetEffective { id: String, from: String },
+
+    /// The ruleset has no application date at all, because the instrument that
+    /// would date it has not entered into force. Distinct from
+    /// [`RulesetNotYetEffective`](Self::RulesetNotYetEffective): that one knows
+    /// the date and is waiting for it, this one cannot know it yet.
+    #[error("ruleset '{id}' has no application date yet — awaiting {empowerment}")]
+    RulesetUndetermined { id: String, empowerment: String },
 
     /// A computation overflowed to a non-finite value despite finite, in-range
     /// inputs — a legally cited figure must never silently become Infinity.

@@ -18,11 +18,11 @@
 //! country-specific grid factors, allocation rules) refines those factors and is
 //! gated on a signed data license (`real-factors` feature).
 
-use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::parameters::Co2eInputs;
 use super::thresholds::Co2eRuleset;
+use crate::clock::AssessmentClock;
 use crate::error::CalcError;
 use crate::receipt::{CalculationReceipt, jcs_hash};
 
@@ -74,28 +74,23 @@ pub struct Co2eResult {
     pub receipt: CalculationReceipt,
 }
 
-/// Calculate the cradle-to-gate CO₂e footprint for one unit, as of today.
+/// Calculate the cradle-to-gate CO₂e footprint for one unit, under the law in
+/// force on `clock.law_in_force_on`.
 ///
-/// Returns `Err(CalcError::InvalidInput)` for negative or non-finite inputs —
-/// silent clamping is not appropriate for a legally cited compliance figure.
-pub fn calculate(inputs: &Co2eInputs, ruleset: &dyn Co2eRuleset) -> Result<Co2eResult, CalcError> {
-    calculate_asof(inputs, ruleset, Utc::now().date_naive())
-}
-
-/// Calculate the cradle-to-gate CO₂e footprint for one unit, as of `on_date`.
-///
-/// Lets a caller check "was this ruleset legally in force on date X" without
-/// depending on the wall clock — e.g. testing the not-yet-effective/expired
-/// paths with a fixed date rather than a far-future fixture.
-pub fn calculate_asof(
+/// There is no wall-clock overload. The governing ruleset is selected against
+/// the date the law attached to the product, which the caller must supply — see
+/// [`AssessmentClock`]. Returns `Err(CalcError::InvalidInput)` for negative or
+/// non-finite inputs; silent clamping is not appropriate for a legally cited
+/// compliance figure.
+pub fn calculate(
     inputs: &Co2eInputs,
     ruleset: &dyn Co2eRuleset,
-    on_date: NaiveDate,
+    clock: AssessmentClock,
 ) -> Result<Co2eResult, CalcError> {
     validate_inputs(inputs)?;
     ruleset
-        .effective_dates()
-        .ensure_active_on(ruleset.id(), on_date)?;
+        .effectivity()
+        .ensure_active_on(ruleset.id(), clock.law_in_force_on)?;
 
     let material_breakdown: Vec<MaterialLineResult> = inputs
         .materials
@@ -124,7 +119,7 @@ pub fn calculate_asof(
     // Hash outputs before building the result (avoids chicken-and-egg with receipt).
     let output_hash = jcs_hash(&(total_co2e_kg, material_co2e_kg, energy_co2e_kg))?;
 
-    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, output_hash)?;
+    let receipt = CalculationReceipt::for_ruleset(inputs, ruleset, clock, output_hash)?;
 
     Ok(Co2eResult {
         material_co2e_kg,
@@ -171,6 +166,13 @@ mod tests {
     use super::*;
     use crate::co2e::parameters::MaterialFootprint;
     use crate::co2e::thresholds::CradleToGateRuleset;
+    use chrono::NaiveDate;
+
+    /// A clock whose governing-law date sits inside CradleToGateRuleset's
+    /// effective period (open from 2021-01-01).
+    fn in_force() -> AssessmentClock {
+        AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
+    }
 
     fn material(mass: f64, factor: f64) -> MaterialFootprint {
         MaterialFootprint {
@@ -189,9 +191,10 @@ mod tests {
             energy_kwh: 1.0,
             grid_factor_kg_co2e_per_kwh: 0.4,
         };
-        let before_effective = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        let before_effective =
+            AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2020, 1, 1).unwrap());
         assert!(matches!(
-            calculate_asof(&inputs, &CradleToGateRuleset, before_effective),
+            calculate(&inputs, &CradleToGateRuleset, before_effective),
             Err(CalcError::RulesetNotYetEffective { .. })
         ));
     }
@@ -205,7 +208,7 @@ mod tests {
             grid_factor_kg_co2e_per_kwh: 0.0,
         };
         assert!(matches!(
-            calculate(&inputs, &CradleToGateRuleset),
+            calculate(&inputs, &CradleToGateRuleset, in_force()),
             Err(CalcError::Overflow(_))
         ));
     }
@@ -218,7 +221,7 @@ mod tests {
             grid_factor_kg_co2e_per_kwh: 0.4,
         };
         assert!(matches!(
-            calculate(&inputs, &CradleToGateRuleset),
+            calculate(&inputs, &CradleToGateRuleset, in_force()),
             Err(CalcError::InvalidInput(_))
         ));
     }
@@ -231,7 +234,7 @@ mod tests {
             grid_factor_kg_co2e_per_kwh: f64::NAN,
         };
         assert!(matches!(
-            calculate(&inputs, &CradleToGateRuleset),
+            calculate(&inputs, &CradleToGateRuleset, in_force()),
             Err(CalcError::InvalidInput(_))
         ));
     }
@@ -244,7 +247,7 @@ mod tests {
             grid_factor_kg_co2e_per_kwh: 0.4,
         };
         assert!(matches!(
-            calculate(&inputs, &CradleToGateRuleset),
+            calculate(&inputs, &CradleToGateRuleset, in_force()),
             Err(CalcError::InvalidInput(_))
         ));
     }
@@ -257,7 +260,7 @@ mod tests {
             grid_factor_kg_co2e_per_kwh: 0.4,
         };
         assert!(matches!(
-            calculate(&inputs, &CradleToGateRuleset),
+            calculate(&inputs, &CradleToGateRuleset, in_force()),
             Err(CalcError::InvalidInput(_))
         ));
     }
@@ -269,7 +272,7 @@ mod tests {
             energy_kwh: 10.0,
             grid_factor_kg_co2e_per_kwh: 0.5,
         };
-        let result = calculate(&inputs, &CradleToGateRuleset).unwrap();
+        let result = calculate(&inputs, &CradleToGateRuleset, in_force()).unwrap();
         // materials: 2*3 + 1*4 = 10; energy: 10*0.5 = 5; total = 15
         assert!((result.material_co2e_kg - 10.0).abs() < 1e-9);
         assert!((result.energy_co2e_kg - 5.0).abs() < 1e-9);

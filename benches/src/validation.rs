@@ -34,6 +34,7 @@ fn valid_battery() -> SectorData {
         battery_type: None,
         round_trip_efficiency_pct: None,
         internal_resistance_mohm: None,
+        placed_on_market_date: None,
         manufacturing_date: None,
         manufacturing_place: None,
         battery_model_id: None,
