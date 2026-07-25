@@ -13,7 +13,116 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-07-22
+## [0.11.0] - 2026-07-25
+
+### Breaking
+
+- **`AccessTier` is replaced by `Audience` + `Disclosure`.** Reg. (EU) 2023/1542
+  Art. 77(2) assigns three audiences to four Annex XIII data sets, and it is not
+  an ordering: conformity test reports (point 3) go to authorities only, and
+  individual-battery data (point 4) to legitimate-interest holders only, so
+  neither audience contains the other. Any `>=` comparison necessarily either
+  hands authorities data the regulation withholds or hides point-2 data from
+  someone entitled to it. *Migration:* `filter_by_access_tier` →
+  `filter_by_audience`; `SectorAccessPolicy::{field_tiers, default_tier,
+  tier_for_field}` → `{field_disclosure, default_disclosure,
+  disclosure_for_field}`; `SectorDescriptor::access_tiers` → `disclosure`, and
+  the manifest key `accessTiers` → `disclosure` with values `professional` →
+  `restricted`, `confidential` → `conformity`; `CredentialRole::access_tier()` →
+  `audience()`; `TrustedIssuerRegistry::is_trusted_for_tier` →
+  `is_trusted_for_audience`; `Passport::redact` and `redact_sector_data` take an
+  `Audience`.
+- **Calculators select their ruleset by governing-law date.** `co2e::calculate`
+  and `repairability::calculate` take an `AssessmentClock { law_in_force_on,
+  computed_at }`; the wall-clock overloads and `calculate_asof` are removed, as
+  is `Ruleset::ensure_active_today`. Staged EU obligations attach at a regulated
+  triggering event, so a battery placed on the market in 2030 must not acquire
+  the 18 Aug 2031 minimums by being audited in 2033. *Migration:* build a clock
+  with `AssessmentClock::placed_on(date)` from the product's own record — there
+  is deliberately no `now()`.
+- **`EffectiveDateBound` is replaced by `Effectivity`**, which can state
+  `Pending { empowerment, adoption_deadline }`. The `2100-01-01` sentinel is
+  gone: it asserted a calendar date for an act that does not exist.
+  `Ruleset::effective_dates()` → `effectivity()`.
+- **`resolve_repairability` returns `Assessability<T>`** instead of `Option`,
+  separating `NotYetInForce` / `Undetermined` / `Expired` / `OutOfScope`. None of
+  those is non-compliance, and `Option` could not tell them apart.
+- **`CalculationReceipt::new` / `for_ruleset` take an `AssessmentClock`** and the
+  receipt gains `assessed_as_of`. Without it a receipt names the ruleset it cited
+  but not whether that was the right one to cite.
+- **`CarbonFootprintClass` is a validated newtype, not an `A`–`E` enum.**
+  Art. 7(2) defines no class labels and requires the Commission to review the
+  number of classes every three years; the previous `#[serde(other)]` variant
+  silently flattened any unrecognised label to `Other`, losing it on round trip
+  under a qualified seal. *Migration:* `CarbonFootprintClass::new(label)?`.
+- **`annex_x_shortfalls_{2031,2036}` → `art8_shortfalls_{2031,2036}`.** Annex X
+  is the due-diligence raw-materials list; the recycled-content shares are in
+  Art. 8(2)/(3), which cross-reference Annex VIII.
+- **`BatteryData` gains fields and boxes two.** New: `placed_on_market_date`,
+  `carbon_footprint_class_ruleset_id` / `_version`,
+  `recycled_content_reporting_year`, `state_of_health`, `expected_lifetime`. The
+  two Annex VII measurement blocks are boxed — they are large, optional and
+  rarely populated, and inline they pushed `SectorData` past clippy's
+  `large_enum_variant` threshold.
+
+### Added
+
+- **Annex VII state of health and expected lifetime** (battery schema v2.2.0 and
+  v2.4.0). Both parts are modelled as sum types because each is two disjoint
+  lists, and the optionality follows the annex's own wording — items qualified
+  "where possible" are `Option`, the rest are required. Part B deliberately
+  excludes EV batteries: Part A names them, Part B does not.
+- **Art. 8(1) declaration duty** (`art8_declaration_duty_for`), separate from the
+  Art. 8(2)/(3) minimums. Its date is conditional on an unadopted delegated act,
+  so it answers `NotYetDue` below the floor (certain — the real date can only be
+  the floor or later), `Undetermined` on or after it. Schema v2.3.0 adds
+  `recycledContentReportingYear`: Art. 8(1) requires the shares per model, per
+  year and per plant, so a bare percentage is not the declaration.
+- **`docs/architecture/EFFECTIVE-DATES.md`** — the date model, and a
+  specification for the deferred `max(floor, entry-into-force + N months)`
+  arithmetic, including the rule that entry into force is read from the Official
+  Journal and never inferred.
+- **Art. 77(3) and Art. 78(d) conformance positions** in
+  `docs/regulatory/CONFORMITY.md`, both marked with what is verified and what is
+  not.
+- **`just test-plugins`, wired into `just check`.** The sector plugins are
+  excluded from the workspace, so the gate never ran their tests; it caught two
+  real failures the first time it ran.
+- **Drift guard on product categories** — a catalog category that is not a legal
+  value of its schema enum now fails the build.
+
+### Fixed
+
+- **`lintResult` leaked into the public passport view.** `Passport::redact` and
+  `SectorAccessPolicy::passport_default()` each carried their own copy of the
+  field classification and had drifted: the policy classified `lintResult` as
+  restricted, `redact` never removed it. Both now read
+  `PASSPORT_FIELD_DISCLOSURE`.
+- **The QR serial disclosed the passport's creation time.** `short_serial` cut
+  the GS1 AI 21 serial from the first ten bytes of a UUIDv7 — a millisecond
+  timestamp — so serials sorted in creation order and their first twelve hex
+  characters decoded to the creation instant. Now derived from the random tail.
+  **This changes the QR URL for a given passport;** the resolver is GTIN-keyed,
+  so the serial is not a resolution key.
+- **Three wrong legal citations**, verified against the Official Journal text:
+  Annex X → Art. 8(2)/(3) for recycled content, Art. 10(6) → Art. 10(5) for the
+  minimum-values empowerment, and `REGULATORY.md` had both recycled-content phase
+  dates as 1 January rather than 18 August, excluded SLI from Phase 1, and placed
+  LMT in Phase 1 instead of Phase 2.
+- **`Regime::Other` was unreachable.** An externally-tagged `Other(String)`
+  rendered as `{"other": "…"}` and an unrecognised value failed the whole
+  deserialise, so a manifest naming a new instrument broke catalog loading.
+- **State of health was served publicly.** It was unclassified and fell through
+  to the public default; Annex XIII point 4(b) restricts it to persons with a
+  legitimate interest.
+- **Repairability index classified an unrounded value.** Annex IV point 5.4
+  rounds to two decimals before classification against the Annex II Table 4
+  boundaries.
+- **Reg. (EU) 2025/1561 recorded** in the battery `legalBasis`, read from the OJ:
+  it amends Art. 48 only, moving the due-diligence trigger to 18 Aug 2027 and the
+  guidelines deadline to 26 Jul 2026. The widely-reported "reduced scope" is not
+  in the instrument.
+
 
 ### Breaking
 
