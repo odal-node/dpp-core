@@ -1,6 +1,6 @@
 //! Port trait for EU Central DPP Registry synchronisation.
 //!
-//! ESPR Article 13 mandates a central EU registry that stores at minimum
+//! ESPR Article 13 establishes a central EU registry that stores at minimum
 //! the unique identifiers for every product placed on the market. The registry
 //! is scheduled to go live on 19 July 2026.
 //!
@@ -16,7 +16,9 @@ use crate::domain::{error::DppError, passport::PassportId};
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-/// The four persistent identifiers mandated by ESPR Article 13.
+/// The persistent identifiers a registration carries. Specified by ESPR
+/// **Annex III** (product (b), operator (g)/(h), facility (i)); Art. 13 is the
+/// registry that stores them, not their definition.
 ///
 /// Every product registered in the EU Central Registry receives four
 /// identifiers that persist throughout its lifecycle, even across
