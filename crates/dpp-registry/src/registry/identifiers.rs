@@ -1,5 +1,21 @@
-//! The four ESPR Article 13 persistent identifiers: product, product item,
-//! facility, and economic operator.
+//! The persistent identifiers a DPP carries: product, product item, facility,
+//! and economic operator.
+//!
+//! **Where these come from.** ESPR (EU) 2024/1781 **Annex III** ("Digital
+//! product Passport", referred to in Articles 9 to 12) is what specifies the
+//! data elements, including the unique product identifier (point (b)), the
+//! GTIN (point (c)), unique operator identifiers (points (g) and (h)) and
+//! unique facility identifiers (point (i)). **Art. 12** imposes standards
+//! conformity on the operator and facility identifiers; **Art. 13** sets up the
+//! registry that *stores* them. Annex III names three identifier *types* —
+//! product, operator, facility — so "the four Article 13 identifiers" was wrong
+//! on both the count and the article, and is corrected here.
+//!
+//! [`ProductItemIdentifier`] is not a fourth Annex III class: it is the product
+//! identifier at item granularity, which Annex III point (b) leaves to "the
+//! level indicated in the applicable delegated act". It is modelled separately
+//! because serialised products need a distinct shape (batch/lot alongside the
+//! serial), not because the Regulation lists it apart.
 //!
 //! Grouped in one file rather than split per-type: they are one vocabulary
 //! with symmetric shape (scheme + value + metadata), and share the
