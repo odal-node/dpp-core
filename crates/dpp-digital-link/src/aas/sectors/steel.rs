@@ -11,7 +11,7 @@ pub(super) fn build_steel_submodel(d: &SteelData, passport_id: &str) -> AasSubmo
         double_property(
             "co2ePerTonneSteel",
             d.co2e_per_tonne_steel,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("tCO2e/t"),
         ),
         double_property(

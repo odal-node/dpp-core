@@ -13,7 +13,7 @@ pub(super) fn build_aluminium_submodel(d: &AluminiumData, passport_id: &str) -> 
         double_property(
             "co2ePerTonneKg",
             d.co2e_per_tonne_kg,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e/t"),
         ),
         double_property(

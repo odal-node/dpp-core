@@ -265,12 +265,12 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     assert!(has_co2e, "co2ePerUnitKg with unit kgCO2e missing");
 
     let has_due_diligence_ref = battery_sub.submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Reference(r) => r.id_short == "dueDigiligenceUrl",
+        AasSubmodelElement::Reference(r) => r.id_short == "dueDiligenceUrl",
         _ => false,
     });
     assert!(
         has_due_diligence_ref,
-        "dueDigiligenceUrl Reference element missing"
+        "dueDiligenceUrl Reference element missing"
     );
 }
 
