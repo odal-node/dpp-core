@@ -1,0 +1,45 @@
+{
+  "$comment": [
+    "Third-party semanticIds this crate is permitted to emit.",
+    "",
+    "An entry here asserts, to a machine, that one of our fields means what a",
+    "standards body says its identifier means. That is a claim about someone",
+    "else's vocabulary, so it is only allowlisted once a human has read the",
+    "authority's own published source and recorded what they read.",
+    "",
+    "Identifiers in the urn:odal-node: namespace need no entry — they are our",
+    "own concepts, honestly named, and the gate accepts them by prefix.",
+    "",
+    "An entry missing verifiedOn or verifiedBy is refused by the gate. That is",
+    "deliberate: an unverified allowlist entry is worse than no allowlist,",
+    "because it converts a visible open question into an invisible blessing.",
+    "",
+    "Five identifiers claiming IDTA and ECLASS authority were removed on",
+    "2026-07-29 rather than allowlisted — they were malformed, not merely",
+    "stale. See dpp-docs work/interop-expansion-2026-07/02-*.md."
+  ],
+  "allowlist": {
+    "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass": {
+      "authority": "Catena-X / Eclipse Tractus-X",
+      "release": "io.catenax.battery.battery_pass 6.0.0",
+      "source": "https://github.com/eclipse-tractusx/sldt-semantic-models",
+      "verifiedOn": "2026-07-29",
+      "verifiedBy": "assisted web verification, pending founder sign-off",
+      "meaning": "Battery Pass aspect model, referenced by identifier only",
+      "usedFor": "battery sector submodel template",
+      "licence": "not reproduced — identifier and citation only, see note",
+      "note": [
+        "Confirmed present as a released aspect model at the source above, in",
+        "correct SAMM URN form, with 6.0.0 current (3.0.0 and 3.0.1 also exist).",
+        "",
+        "verifiedBy is PROVISIONAL. Replace it with a name once a trusted",
+        "principal has read the source directly. The gate cannot tell the",
+        "difference — that is what this note is for.",
+        "",
+        "The authority's own wording for the concept is deliberately NOT copied",
+        "here pending a licence check on redistribution, per the plan's licence",
+        "care step. Identifier plus citation only."
+      ]
+    }
+  }
+}
