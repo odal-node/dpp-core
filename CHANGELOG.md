@@ -13,6 +13,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-29
+
+### Breaking
+
+- **`Passport` gains `disclosure_signatures: BTreeMap<String, String>`.**
+  Previously a passport carried only `jwsSignature` (the full payload) and
+  `publicJwsSignature` (the public view), so a non-public reader —
+  `LegitimateInterest` or `Authority` — received a body that neither proof
+  covers: to anyone actually verifying it, that is indistinguishable from
+  tampering. The new field carries one JWS per non-public disclosure set,
+  keyed by `disclosure_key` (e.g. `public+restricted+individual`) rather than
+  by audience name, since ESPR's ~14-class actor vocabulary is not battery
+  Art. 77(2)'s three audiences and the delegated act mapping actors to data
+  does not exist yet. *Migration:* `Passport` has no `Default` impl or
+  builder, so this is breaking for every struct-literal construction site —
+  add the field (empty `BTreeMap` for drafts).
+
+### Changed
+
+- **CI now runs the sector plugin test suite and builds all ten to Wasm.**
+  0.11.0 added `just test-plugins` to the local gate but noted CI did not run
+  it, and `wasm-build.yml` compiled only three of the ten plugins. Both gaps
+  are closed: `ci.yml` runs `just test-plugins`, and `wasm-build.yml`'s build
+  matrix now covers all ten.
+
+### Documentation
+
+- **Corrected the registry identifier citation.** The persistent identifiers
+  were attributed to "ESPR Article 13" (which establishes the *registry*, not
+  the identifiers) and miscounted as four. They are specified by **Annex
+  III** — product (b), operator (g)/(h), facility (i) — three classes;
+  `ProductItemIdentifier` is the product identifier at item granularity
+  (Annex III point (b)), not a fourth class.
+
 ## [0.11.0] - 2026-07-25
 
 ### Breaking
