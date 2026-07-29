@@ -64,3 +64,31 @@ jobs:
       - name: Build sector-battery
         working-directory: plugins/sector-battery
         run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-electronics
+        working-directory: plugins/sector-electronics
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-construction
+        working-directory: plugins/sector-construction
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-tyre
+        working-directory: plugins/sector-tyre
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-toy
+        working-directory: plugins/sector-toy
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-aluminium
+        working-directory: plugins/sector-aluminium
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-furniture
+        working-directory: plugins/sector-furniture
+        run: cargo build --target wasm32-wasip1 --release
+
+      - name: Build sector-detergent
+        working-directory: plugins/sector-detergent
+        run: cargo build --target wasm32-wasip1 --release
