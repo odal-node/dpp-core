@@ -1,5 +1,6 @@
-//! Example: the four persistent identifiers the EU Central Registry requires
-//! under ESPR Article 13, and their structural validation.
+//! Example: the persistent identifiers a DPP carries, and their structural
+//! validation. Specified by ESPR Annex III — product (b), operator (g)/(h),
+//! facility (i); Art. 13 is the registry that stores them.
 //!
 //! `dpp-registry` is wasm32-safe — pure types, no I/O. The platform repo
 //! provides the HTTP transport that submits these to the registry.

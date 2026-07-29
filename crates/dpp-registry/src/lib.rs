@@ -21,7 +21,7 @@
 //!
 //! # Key concepts
 //!
-//! - **Four persistent identifiers** (Article 13): every DPP must register a
+//! - **Persistent identifiers** (Annex III; Art. 13 stores them): every DPP registers a
 //!   unique product identifier, product item identifier, facility identifier,
 //!   and economic operator identifier.
 //! - **Registration envelope**: the data payload sent to the EU registry when
