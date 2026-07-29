@@ -12,7 +12,8 @@
 
 use chrono::Utc;
 use dpp_digital_link::aas::{
-    build_aas_from_passport, placeholder_templates, sector_submodel_template,
+    build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
+    sector_submodel_template,
 };
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
@@ -438,6 +439,207 @@ fn no_catalog_sector_falls_back_to_the_generic_submodel() {
         assert!(
             !submodels.iter().any(|s| s.id_short == "SectorData"),
             "sector '{key}' fell back to the generic submodel builder — it needs              a dedicated builder in aas::sectors and a dispatch arm"
+        );
+    }
+}
+
+// ─── semanticId provenance gate ──────────────────────────────────────────────
+//
+// A semanticId asserts, to a machine, that one of our fields means what a
+// standards body says its identifier means — and nothing re-reads that claim
+// once it is written. So it is enforced here rather than trusted to a comment.
+//
+// The rule: every identifier we emit is either in our own `urn:odal-node:`
+// namespace, or carries a provenance record in `semantic-ids-allowlist.json`
+// naming who verified it against the authority's own source, and when.
+
+const OWN_NAMESPACE: &str = "urn:odal-node:";
+
+/// The allowlist, minus any entry whose provenance is incomplete.
+///
+/// An entry missing `verifiedOn` or `verifiedBy` is dropped rather than
+/// honoured, so a half-filled record fails the gate exactly like an absent one.
+fn allowlisted_identifiers() -> Vec<String> {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../dpp-digital-link/semantic-ids-allowlist.json"
+    );
+    let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
+    let doc: serde_json::Value = serde_json::from_str(&raw).expect("the allowlist is valid JSON");
+    let entries = doc["allowlist"]
+        .as_object()
+        .expect("the allowlist has an `allowlist` object");
+
+    entries
+        .iter()
+        .filter(|(_, record)| {
+            let filled = |field: &str| {
+                record[field]
+                    .as_str()
+                    .is_some_and(|value| !value.trim().is_empty())
+            };
+            filled("verifiedOn") && filled("verifiedBy")
+        })
+        .map(|(identifier, _)| identifier.clone())
+        .collect()
+}
+
+fn is_permitted(identifier: &str, allowlist: &[String]) -> bool {
+    identifier.starts_with(OWN_NAMESPACE) || allowlist.iter().any(|a| a == identifier)
+}
+
+/// Collect every `semanticId` in a serialised AAS document, with its path.
+///
+/// Walks the JSON rather than the Rust types deliberately: it reaches every
+/// nesting depth, survives the element enum gaining a variant, and sees exactly
+/// what a consumer parsing our output would see.
+fn collect_semantic_ids(node: &serde_json::Value, path: &str, found: &mut Vec<(String, String)>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                let child = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                if key == "semanticId" {
+                    for entry in value["keys"].as_array().into_iter().flatten() {
+                        if let Some(id) = entry["value"].as_str() {
+                            found.push((child.clone(), id.to_owned()));
+                        }
+                    }
+                }
+                collect_semantic_ids(value, &child, found);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (i, item) in items.iter().enumerate() {
+                collect_semantic_ids(item, &format!("{path}[{i}]"), found);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Nothing we emit may claim a third party's vocabulary without provenance.
+#[test]
+fn every_emitted_semantic_id_is_ours_or_provenanced() {
+    let allowlist = allowlisted_identifiers();
+    let mut checked = 0usize;
+
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key();
+        let passport = base(sector, data, version);
+        let (shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+
+        let document = serde_json::json!({
+            "shell": serde_json::to_value(&shell).unwrap(),
+            "submodels": serde_json::to_value(&submodels).unwrap(),
+        });
+        let mut found = Vec::new();
+        collect_semantic_ids(&document, "", &mut found);
+
+        assert!(
+            !found.is_empty(),
+            "sector '{key}' emitted no semanticIds at all — the walker is broken, \
+             not the output"
+        );
+
+        for (path, id) in &found {
+            assert!(
+                is_permitted(id, &allowlist),
+                "sector '{key}' emits unprovenanced semanticId '{id}' at '{path}'. \
+                 Either move it into the urn:odal-node: namespace, or add a \
+                 verified entry to semantic-ids-allowlist.json."
+            );
+        }
+        checked += found.len();
+    }
+
+    // The generic escape hatch is walked too. It is a separate code path with
+    // its own hardcoded semanticId, and a gate that only walked `sectors/` is
+    // precisely how a coined `urn:idta:` identifier survived there unnoticed.
+    let generic = map_dpp_to_aas_submodel(
+        "urn:odal-node:dpp:test:generic",
+        &serde_json::json!({ "productName": "Widget", "massKg": 2.5 }),
+    );
+    let mut found = Vec::new();
+    collect_semantic_ids(&serde_json::to_value(&generic).unwrap(), "", &mut found);
+    assert!(
+        !found.is_empty(),
+        "the generic mapper emitted no semanticIds — the walker missed its path"
+    );
+    for (path, id) in &found {
+        assert!(
+            is_permitted(id, &allowlist),
+            "the generic mapper emits unprovenanced semanticId '{id}' at '{path}'"
+        );
+    }
+    checked += found.len();
+
+    assert!(checked > 0, "the gate asserted nothing");
+}
+
+/// Every sector's submodel template identifier, including the ones no passport
+/// fixture in this file exercises.
+///
+/// Battery is covered elsewhere for its mapping, so the walk above never builds
+/// one — and battery carries the single allowlisted third-party identifier.
+/// Without this the one entry the allowlist exists for would go unchecked.
+#[test]
+fn every_sector_template_semantic_id_is_ours_or_provenanced() {
+    let allowlist = allowlisted_identifiers();
+    let catalog = dpp_domain::catalog::SectorCatalog::new();
+
+    for descriptor in catalog.all().iter() {
+        let key = descriptor.key.as_str();
+        let Some(template) = sector_submodel_template(key) else {
+            continue;
+        };
+        assert!(
+            is_permitted(template.semantic_id, &allowlist),
+            "sector template '{key}' carries unprovenanced semanticId \
+             '{}'",
+            template.semantic_id
+        );
+    }
+}
+
+/// A record without a reader is not provenance.
+#[test]
+fn an_allowlist_entry_missing_provenance_is_refused() {
+    let live = allowlisted_identifiers();
+    assert!(
+        live.iter()
+            .any(|id| id.starts_with("urn:samm:io.catenax.battery")),
+        "the Catena-X entry should be allowlisted while its provenance is complete"
+    );
+
+    // The same identifier, with the reader's name removed, must stop counting.
+    let stripped: Vec<String> = Vec::new();
+    assert!(
+        !is_permitted(
+            "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass",
+            &stripped
+        ),
+        "an identifier whose provenance was dropped must fail the gate"
+    );
+}
+
+/// A plausible-looking identifier is exactly the thing this gate exists to
+/// catch — it must not pass on the strength of looking official.
+#[test]
+fn a_fabricated_third_party_identifier_is_refused() {
+    let allowlist = allowlisted_identifiers();
+    for fake in [
+        "urn:eclass:0173-1#01-XXXXXX#001",
+        "urn:idta:aas:submodel:digital-product-passport:1.0",
+        "https://admin-shell.io/IDTA/02023/0/9",
+    ] {
+        assert!(
+            !is_permitted(fake, &allowlist),
+            "'{fake}' passed the gate — a coined identifier in a standards-body \
+             namespace is the defect this test exists for"
         );
     }
 }
