@@ -67,3 +67,18 @@ jobs:
         run: cargo install cargo-audit --locked
       - name: cargo audit
         run: cargo audit
+
+  plugins:
+    name: Sector plugin tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@just
+      # Plugins are excluded from the workspace, so `cargo nextest run
+      # --workspace` above never reaches them. This mirrors `just
+      # test-plugins` so a plugin regression fails CI, not only a local
+      # `just check`.
+      - name: Sector plugin tests
+        run: just test-plugins
