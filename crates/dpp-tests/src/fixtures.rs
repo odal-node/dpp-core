@@ -43,6 +43,7 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
         qr_code_url: None,
         jws_signature: None,
         public_jws_signature: None,
+        disclosure_signatures: Default::default(),
         created_at: now,
         updated_at: now,
         published_at: None,

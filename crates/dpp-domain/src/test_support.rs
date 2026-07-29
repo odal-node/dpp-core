@@ -37,6 +37,7 @@ pub(crate) fn sample_passport() -> Passport {
         qr_code_url: None,
         jws_signature: None,
         public_jws_signature: None,
+        disclosure_signatures: Default::default(),
         created_at: now,
         updated_at: now,
         published_at: None,
