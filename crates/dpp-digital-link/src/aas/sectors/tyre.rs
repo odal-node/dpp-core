@@ -35,7 +35,7 @@ pub(super) fn build_tyre_submodel(d: &TyreData, passport_id: &str) -> AasSubmode
         elements.push(double_property(
             "co2ePerTyreKg",
             v,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ));
     }

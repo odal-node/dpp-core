@@ -37,7 +37,7 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
         string_property(
             "productName",
             &passport.product_name,
-            Some(semantic_ids::PRODUCT_IDENTIFICATION),
+            Some(semantic_ids::PRODUCT_NAME),
             None,
         ),
         string_property("sector", passport.sector.catalog_key(), None, None),
@@ -63,7 +63,7 @@ pub(super) fn build_manufacturer_submodel(passport: &Passport) -> AasSubmodel {
         string_property(
             "name",
             &mfr.name,
-            Some(semantic_ids::MANUFACTURER_INFORMATION),
+            Some(semantic_ids::MANUFACTURER_NAME),
             None,
         ),
         string_property("address", &mfr.address, None, None),
@@ -91,7 +91,7 @@ pub(super) fn build_environmental_impact_submodel(passport: &Passport) -> AasSub
         elements.push(double_property(
             "co2ePerUnit",
             cf.value_kg,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ));
     }
@@ -144,7 +144,7 @@ pub(super) fn build_repairability_submodel(passport: &Passport) -> AasSubmodel {
         elements.push(double_property(
             "repairabilityScore",
             rs.overall,
-            Some(semantic_ids::REPAIRABILITY),
+            Some(semantic_ids::REPAIRABILITY_SCORE),
             Some("index 0-10"),
         ));
     }

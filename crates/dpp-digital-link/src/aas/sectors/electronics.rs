@@ -19,7 +19,7 @@ pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str)
         double_property(
             "co2ePerUnitKg",
             e.co2e_per_unit_kg,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ),
     ];
@@ -28,7 +28,7 @@ pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str)
         elements.push(double_property(
             "repairabilityScore",
             rs.overall,
-            Some(semantic_ids::REPAIRABILITY),
+            Some(semantic_ids::REPAIRABILITY_SCORE),
             Some("index 0-10"),
         ));
     }
