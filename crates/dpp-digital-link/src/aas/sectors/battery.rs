@@ -24,7 +24,7 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
         double_property(
             "co2ePerUnitKg",
             b.co2e_per_unit_kg,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ),
     ];
@@ -90,7 +90,7 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
 
     if let Some(ref url) = b.due_diligence_url {
         elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "dueDigiligenceUrl".into(),
+            id_short: "dueDiligenceUrl".into(),
             value: url.clone(),
             semantic_id: None,
         }));

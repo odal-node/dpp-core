@@ -23,7 +23,7 @@ pub fn map_dpp_to_aas_submodel(submodel_id: &str, dpp_data: &serde_json::Value) 
         model_type: "Submodel".into(),
         kind: "Instance".into(),
         semantic_id: Some(AasSemId::external(
-            "urn:idta:aas:submodel:digital-product-passport:1.0",
+            super::semantic_ids::DIGITAL_PRODUCT_PASSPORT,
         )),
         submodel_elements: elements,
     }

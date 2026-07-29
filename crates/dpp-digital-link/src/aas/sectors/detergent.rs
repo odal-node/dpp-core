@@ -44,7 +44,7 @@ pub(super) fn build_detergent_submodel(d: &DetergentData, passport_id: &str) -> 
         elements.push(double_property(
             "co2ePerUnitKg",
             v,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ));
     }

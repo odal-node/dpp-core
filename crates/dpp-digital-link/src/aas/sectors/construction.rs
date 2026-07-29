@@ -12,7 +12,7 @@ pub(super) fn build_construction_submodel(d: &ConstructionData, passport_id: &st
         double_property(
             "co2ePerFunctionalUnitKg",
             d.co2e_per_functional_unit_kg,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ),
         string_property("functionalUnit", &d.functional_unit, None, None),

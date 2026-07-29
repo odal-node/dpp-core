@@ -15,7 +15,7 @@ pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> 
         elements.push(double_property(
             "co2ePerUnitKg",
             v,
-            Some(semantic_ids::CARBON_FOOTPRINT),
+            Some(semantic_ids::CO2E_PER_UNIT),
             Some("kgCO2e"),
         ));
     }
@@ -26,7 +26,7 @@ pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> 
         elements.push(double_property(
             "repairabilityScore",
             v,
-            Some(semantic_ids::REPAIRABILITY),
+            Some(semantic_ids::REPAIRABILITY_SCORE),
             Some("index 0-10"),
         ));
     }
