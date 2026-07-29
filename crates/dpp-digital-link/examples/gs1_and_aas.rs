@@ -156,6 +156,7 @@ fn main() {
         qr_code_url: None,
         jws_signature: None,
         public_jws_signature: None,
+        disclosure_signatures: Default::default(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
         published_at: None,

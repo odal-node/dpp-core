@@ -1,5 +1,7 @@
 ﻿//! The [`Passport`] aggregate root.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -71,6 +73,28 @@ pub struct Passport {
     /// Set at publish time; `None` for drafts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub public_jws_signature: Option<String>,
+    /// Compact JWS signatures over the **non-public** redacted views, keyed by
+    /// [`disclosure_key`](crate::domain::identity::disclosure_key) — e.g.
+    /// `public+restricted+individual`.
+    ///
+    /// Every audience that receives more than the public view needs a proof over
+    /// *its* view: `public_jws_signature` covers only the public payload and
+    /// `jws_signature` only the full one, so a reader given a filtered body and
+    /// either of those holds a signature that cannot verify against the bytes it
+    /// received. A repairer or recycler making a safety or resale call on the
+    /// data is precisely the caller who must be able to check it.
+    ///
+    /// **Keyed by disclosure set, never by audience name.** ESPR's actor
+    /// vocabulary is not battery Art. 77(2)'s three audiences, and the delegated
+    /// act mapping actors to data is unadopted. An artefact named for the data it
+    /// covers survives that mapping arriving; one named `"legitimateInterest"`
+    /// would need every passport re-signed.
+    ///
+    /// A `BTreeMap` so serialisation is key-ordered and the signed bytes are
+    /// reproducible. Frozen at publish alongside its two siblings, and empty for
+    /// drafts.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub disclosure_signatures: BTreeMap<String, String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
