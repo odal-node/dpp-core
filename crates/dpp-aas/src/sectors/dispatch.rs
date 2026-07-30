@@ -47,7 +47,7 @@ pub(crate) fn build_sector_submodel(sector_data: &SectorData, passport_id: &str)
         SectorData::UnsoldGoods(r) => {
             super::unsold_goods::build_unsold_goods_submodel(r, passport_id)
         }
-        SectorData::Other(v) => generic_sector_submodel(passport_id, v),
+        SectorData::Other { data: v, .. } => generic_sector_submodel(passport_id, v),
         // Forward-compat: an unmodelled sector variant is rendered as a generic
         // submodel from its serialised fields (same shape as `Other`).
         other => {

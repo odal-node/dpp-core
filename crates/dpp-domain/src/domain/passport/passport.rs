@@ -347,7 +347,8 @@ impl Passport {
             }
             // Re-redact sectorData using the catalog's per-field disclosure map.
             if let Some(ref sd) = self.sector_data {
-                let key = sd.sector().catalog_key();
+                let sector = sd.sector();
+                let key = sector.catalog_key();
                 let redacted = if let Some(descriptor) = catalog.get(key) {
                     crate::domain::sector::redact_sector_data(sd, audience, descriptor)
                 } else if audience.may_see(Disclosure::Conformity) {

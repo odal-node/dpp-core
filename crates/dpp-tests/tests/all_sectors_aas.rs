@@ -281,7 +281,7 @@ fn all_sector_cases() -> Vec<(Sector, SectorData, &'static str, &'static str)> {
 #[test]
 fn every_sector_produces_a_valid_aas_shell() {
     for (sector, data, version, _id_short) in all_sector_cases() {
-        let key = sector.catalog_key();
+        let key = sector.catalog_key().to_owned();
         // SectorData::sector() must report the variant's own discriminant.
         assert_eq!(
             data.sector().catalog_key(),
@@ -338,14 +338,14 @@ fn every_sector_produces_a_valid_aas_shell() {
 
 #[test]
 fn unknown_sector_uses_generic_fallback_submodel() {
-    // SectorData::Other(...) drives the generic JSON→AAS fallback path.
-    let other = SectorData::Other(serde_json::json!({
+    // SectorData::other(...) drives the generic JSON→AAS fallback path.
+    let other = SectorData::other(serde_json::json!({
         "sector": "spacecraft",
         "thrustKn": 500.0,
         "reusable": true,
         "stageCount": 2
     }));
-    let passport = base(Sector::Other, other, "1.0.0");
+    let passport = base(Sector::Other("spacecraft".into()), other, "1.0.0");
     let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
 
     assert_eq!(submodels.len(), 6);
@@ -403,15 +403,15 @@ fn every_catalog_sector_has_an_aas_case() {
     const COVERED_ELSEWHERE: &[&str] = &["battery"];
 
     let catalog = dpp_domain::catalog::SectorCatalog::new();
-    let covered: Vec<&str> = all_sector_cases()
+    let covered: Vec<String> = all_sector_cases()
         .iter()
-        .map(|(s, _, _, _)| s.catalog_key())
+        .map(|(s, _, _, _)| s.catalog_key().to_owned())
         .collect();
 
     for d in catalog.all().iter() {
         let key = d.key.as_str();
         assert!(
-            covered.contains(&key) || COVERED_ELSEWHERE.contains(&key),
+            covered.iter().any(|c| c == key) || COVERED_ELSEWHERE.contains(&key),
             "catalog sector '{key}' has no case in all_sector_cases() — its AAS              mapping is untested"
         );
     }
@@ -432,7 +432,7 @@ fn every_catalog_sector_has_an_aas_case() {
 #[test]
 fn no_catalog_sector_falls_back_to_the_generic_submodel() {
     for (sector, data, version, _) in all_sector_cases() {
-        let key = sector.catalog_key();
+        let key = sector.catalog_key().to_owned();
         let passport = base(sector, data, version);
         let (_, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
 
@@ -528,7 +528,7 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
     let mut checked = 0usize;
 
     for (sector, data, version, _) in all_sector_cases() {
-        let key = sector.catalog_key();
+        let key = sector.catalog_key().to_owned();
         let passport = base(sector, data, version);
         let (shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
 

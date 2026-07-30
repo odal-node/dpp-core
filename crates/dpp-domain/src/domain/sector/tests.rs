@@ -420,7 +420,7 @@ fn every_sector_declares_retention_and_catalog_key() {
         (Sector::Aluminium, "aluminium"),
         (Sector::Furniture, "furniture"),
         (Sector::Detergent, "detergent"),
-        (Sector::Other, "other"),
+        (Sector::Other("other".into()), "other"),
     ];
     for (sector, key) in all {
         assert_eq!(sector.catalog_key(), key);
@@ -619,7 +619,8 @@ fn every_sector_with_an_embedded_schema_round_trips_through_its_current_schema()
     );
 
     for sample in samples {
-        let key = sample.sector().catalog_key();
+        let sector = sample.sector();
+        let key = sector.catalog_key();
         let Some(version) = catalog.resolve_schema_version(key, None) else {
             panic!("sector '{key}' has no catalog entry — add one or exclude it here");
         };
