@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use dpp_domain::{Audience, Disclosure, SectorCatalog};
+use crate::{Audience, Disclosure, SectorCatalog};
 use serde_json::json;
 
 use super::filter::filter_by_audience;

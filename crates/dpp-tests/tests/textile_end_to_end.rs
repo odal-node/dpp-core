@@ -13,8 +13,8 @@
 
 use chrono::Utc;
 use dpp_aas::map_dpp_to_aas_submodel;
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport,
     RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,

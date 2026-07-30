@@ -1,6 +1,6 @@
 //! Access filter engine — applies a `SectorAccessPolicy` to a JSON document.
 
-use dpp_domain::Audience;
+use crate::Audience;
 
 use super::policy::SectorAccessPolicy;
 

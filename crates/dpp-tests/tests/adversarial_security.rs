@@ -15,7 +15,7 @@
 //!   `validate_sector_data()`, catching cross-field errors (e.g. fibre sum ≠ 100).
 
 use chrono::Utc;
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{
     Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData,
     TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,

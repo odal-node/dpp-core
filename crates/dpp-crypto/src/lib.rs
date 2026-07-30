@@ -4,14 +4,15 @@
 //! All modules are pure (no I/O, no network). The crate compiles to `std` for
 //! the node and to `wasm32` (where conditional) for plugin guests.
 //!
-//! Verifiable Credentials, `did:web` documents and status lists moved to
-//! [`dpp-vc`]: signing bytes is a different job from deciding whose signature
-//! means what. `access` remains here pending the `dpp-domain` analysis — see
-//! that module's own note.
+//! Verifiable Credentials, `did:web` documents and status lists are
+//! [`dpp-vc`]; the per-field disclosure contract is `dpp_domain::access`.
+//! Signing bytes is a different job from deciding whose signature means what,
+//! and a different job again from deciding which fields a role may see.
+//!
+//! With those gone this crate has **no workspace dependencies** — it is a leaf.
 //!
 //! [`dpp-vc`]: https://docs.rs/dpp-vc
 
-pub mod access;
 pub mod jws;
 pub mod keystore;
 
@@ -27,5 +28,3 @@ pub(crate) fn os_rng() -> rand::rand_core::UnwrapErr<rand::rngs::SysRng> {
 }
 
 // ── Flat re-exports — maintain stable paths for external callers ─────────────
-
-pub use access::{PolicyDecision, SectorAccessPolicy, filter_by_audience};
