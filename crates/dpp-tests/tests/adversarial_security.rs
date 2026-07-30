@@ -1,4 +1,4 @@
-﻿//! Integration tests: adversarial security scenarios (Phase 3.0a).
+//! Integration tests: adversarial security scenarios (Phase 3.0a).
 //!
 //! Each test targets a specific Phase-1 security fix, turning the audit
 //! finding into a cross-crate verifiable assertion. Scenarios covered:
@@ -15,17 +15,17 @@
 //!   `validate_sector_data()`, catching cross-field errors (e.g. fibre sum ≠ 100).
 
 use chrono::Utc;
-use dpp_crypto::access::{Audience, SectorAccessPolicy, filter_by_audience};
-use dpp_crypto::{
-    AllowAllIssuers, CredentialBuilder, CredentialRole, CredentialStatus, StaticTrustedIssuers,
-    StatusList, VerificationResult, verify_credential_claims_with_trust,
-    verify_credential_with_revocation,
-};
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{
     Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData,
     TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
 };
 use dpp_tests::fixtures::{base_passport, make_operator, make_subject};
+use dpp_vc::{
+    AllowAllIssuers, Audience, CredentialBuilder, CredentialRole, CredentialStatus,
+    StaticTrustedIssuers, StatusList, VerificationResult, verify_credential_claims_with_trust,
+    verify_credential_with_revocation,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -42,7 +42,7 @@ fn status_list_all_clear() -> StatusList {
     StatusList::from_bitstring(vec![0b0000_0000, 0b0000_0000])
 }
 
-fn credential_with_status_at_index(index: &str) -> dpp_crypto::DppAccessCredential {
+fn credential_with_status_at_index(index: &str) -> dpp_vc::DppAccessCredential {
     let subject = make_subject(
         "did:web:holder.example.com",
         "Test Holder",

@@ -1,6 +1,7 @@
 //! Core DPP domain types: passport, GTIN, identity, status, sector, validation,
 //! and transfer of responsibility.
 
+pub mod compliance;
 pub mod eol;
 pub mod error;
 pub mod field_error;
@@ -10,6 +11,7 @@ pub mod identity;
 pub mod lint;
 pub mod passport;
 pub mod product_identity;
+pub mod seal;
 pub mod sector;
 pub mod status;
 pub mod transfer;

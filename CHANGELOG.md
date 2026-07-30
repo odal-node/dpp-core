@@ -13,6 +13,195 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-30
+
+### Breaking
+
+- **The sector axis is open on the wire.** `Sector` and `SectorData` were plain
+  derives — `SectorData` internally tagged on `sector` — so a passport whose
+  sector was not one of the twelve variants **failed to deserialize**, and
+  `SectorData::Other` matched only the literal tag `"other"`, discarding the
+  real key. The catalog, the schema registry, the per-field disclosure map and
+  the plugin manifests were all string-keyed data; the wire was the one closed
+  part, so adding a product group meant releasing this crate.
+
+  `Sector::Other` now carries the wire tag (`Other(String)`), `SectorData::Other`
+  carries both tag and payload (`Other { sector, data }`), and both types have
+  hand-written `Serialize`/`Deserialize` that fall through to those variants
+  instead of failing. An unknown sector round-trips **byte-identically** — the
+  test compares serialised bytes rather than `Value`s, since a signature is
+  computed over bytes and `Value` equality would not catch a renormalisation.
+
+  Adding a product group is now a catalog manifest plus a schema file.
+
+  *Migration:* `Sector::Other` → `Sector::Other(key)`; construct untyped payloads
+  with `SectorData::other(value)` — which reads the tag from the object and
+  returns `Option`, see below — and match them as
+  `SectorData::Other { sector, data }`. `Sector::catalog_key` and
+  `wire_str` return `&str` rather than `&'static str`, and `Sector` is no longer
+  `Copy`. `validate_sector_data_with_registry` now looks up a validator by the
+  sector's **own key** rather than by a literal `"other"`.
+
+  Deliberately **not** included: the ADR's companion change deleting typed lanes
+  for provisional sectors. Eight of eleven catalog sectors are provisional —
+  including textile, which is the pilot — so that is a capability decision, and
+  unlike the wire format it is not clamped to first issuance.
+
+- **`dpp-digital-link` is reduced to GS1; AAS moves to the new `dpp-aas`.**
+  The crate had come to carry four unrelated capabilities — GS1 Digital Link
+  parsing, AAS mapping, JSON-LD and link-type negotiation — three of which were
+  not in its name. The AAS module was 56% of the crate and had no consumer at
+  all, so every dependent that wanted a GS1 parser compiled an AAS mapper to
+  get one.
+
+  The crate **keeps its name**: what remains is GS1 Digital Link parsing and
+  GS1 link-type negotiation, which is what the name says.
+
+  *Migration:* `dpp_digital_link::{DigitalLink, validate_gtin, short_serial,
+  build_qr_url, Gs1LinkType, DppMediaType, ResolutionRequest, negotiate, …}`
+  are unchanged and stay put. `dpp_digital_link::aas::*` moves to `dpp_aas::*`.
+  `dpp_digital_link::jsonld::*` moves to `dpp_vc::jsonld::*`. No types,
+  signatures or serialised output changed — only the crate a symbol lives in.
+
+- **`dpp-crypto` is reduced to cryptographic primitives; Verifiable
+  Credentials, `did:web` and status lists move to the new `dpp-vc`.** Signing
+  bytes is a different job from deciding whose signature means what, and the
+  two have different audit surfaces and rates of change. `dpp-crypto` keeps
+  `jws/` and `keystore/`; `dpp-vc` takes `credential/`, `status_list`,
+  `did_builder`, `passport_credential` and `local_service`.
+
+  `LocalIdentityService` moves too, and not by preference: it depends on both
+  `jws`/`keystore` and `did_builder`/`passport_credential`, so leaving it
+  behind would have made `dpp-crypto` depend on `dpp-vc` and closed a cycle.
+  The dependency direction is `dpp-vc → dpp-crypto → dpp-domain`.
+
+  *Migration:* `dpp_crypto::{AllowAllIssuers, CredentialBuilder, CredentialRole,
+  CredentialStatus, DppAccessCredential, DppCredentialSubject, RevocationOutcome,
+  StaticTrustedIssuers, StatusList, TrustedIssuerRegistry, VerificationResult,
+  check_revocation, verify_credential_*, LocalIdentityService, PassportCredential,
+  PassportCredentialSubject}` → `dpp_vc::`. `dpp_crypto::identity::did_builder`
+  → `dpp_vc::did_builder`.
+
+- **The disclosure contract moves from `dpp-crypto` to `dpp-domain`.** Which
+  fields a role may see describes what a passport *is* — the classes are
+  declared as data in the sector manifests — so it belongs with the passport,
+  not with the primitives that sign it. `dpp-crypto`'s re-exports are removed.
+
+  A consequence worth stating: `access/` was the only module in `dpp-crypto`
+  referencing `dpp_domain`, so **`dpp-crypto` now has no workspace dependencies
+  at all.**
+
+  *Migration:* `dpp_crypto::access::{SectorAccessPolicy, filter_by_audience,
+  PolicyDecision}` and the flat `dpp_crypto::{…}` re-exports of the same three
+  → `dpp_domain::access::`.
+
+- **Persisted value objects move out of `dpp-domain::ports` into
+  `dpp-domain::domain`.** `ports/` held types the `Passport` aggregate imports
+  back — `ComplianceResult` and `SealedEnvelope` and their field types — so the
+  seam was not a seam. `ports/{compliance,seal}` now contain only traits.
+
+  *Migration:* none required. Every moved type is re-exported from its former
+  path, so existing imports continue to resolve. Prefer
+  `dpp_domain::domain::{compliance,seal}` in new code.
+
+### Changed
+
+- `KeyStore::public_key` and `PublicKeyInfo` (with its fields) are now `pub`
+  rather than `pub(crate)`. The `did:web` document builder lives in `dpp-vc`
+  and needs exactly this — public key material and revocation state, never the
+  private key.
+
+- **Six third-party AAS `semanticId` values are replaced with `urn:odal-node:`
+  identifiers.** The removed values claimed IDTA and ECLASS authority and were
+  malformed rather than merely stale: four used an
+  `admin-shell.io/IDTA/<document-number>/<v>/<v>` form that IDTA does not use
+  (its identifiers are name-based, e.g.
+  `https://admin-shell.io/idta/nameplate/3/0/Nameplate`); the ECLASS IRDI
+  carried Code Space Identifier `01` — Classification Class — while being used
+  as a Property semanticId, where `02` is the Property space; and
+  `urn:idta:aas:submodel:digital-product-passport:1.0` was coined rather than
+  looked up (IDTA's is `https://admin-shell.io/idta/cds/dppMetadata/1`).
+
+  `urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass` was **also
+  withdrawn**, on different grounds. The identifier is real, correctly formed,
+  current, and CC-BY-4.0 with no membership gate — but whether the Catena-X
+  aspect model describes the field set our `BatteryTechnicalData` submodel
+  carries was never checked. A malformed identifier fails closed; a well-formed
+  one naming the wrong concept fails **open**, because a consumer resolves it
+  and maps our fields onto it confidently and wrongly. It becomes
+  `urn:odal-node:aas:submodel-template:battery-technical-data:1.0`.
+
+  **`dpp-aas` therefore emits no third-party semanticIds at all.** All seven
+  tracked identifiers, with findings and the correct value where known, are
+  recorded in `dpp-aas/src/semantic_ids/allowlist.json` under `tracked`; a test asserts
+  none of them is permitted.
+
+  Adopting the correct IDTA identifiers is deliberately **not** part of this
+  change: it requires reading the specifications, and substituting one
+  unverified identifier for another would repeat the defect. An honestly
+  namespaced own identifier states that a concept is ours; a wrong IRDI states
+  that it is IDTA's, to a machine.
+
+  *Migration:* consumers matching on the previous constants must re-map. The
+  affected submodels are `ProductIdentification`, `ManufacturerInformation`,
+  `EnvironmentalImpact`, `MaterialComposition`, `Repairability` and the generic
+  passport submodel.
+
+- **Submodel and Property `semanticId`s are now distinct.** Four identifiers
+  previously served as both the semanticId of a Submodel and of a Property
+  inside it. `PRODUCT_NAME`, `MANUFACTURER_NAME`, `CO2E_PER_UNIT` and
+  `REPAIRABILITY_SCORE` are new and carry the property role.
+
+- **`SectorData::other` returns `Option<Self>`.** It previously took the tag
+  verbatim, so `SectorData::other(payload_tagged_battery)` produced
+  `Other { sector: "battery" }` — a second representation of a typed sector that
+  does not compare equal to `Sector::Battery`, misses every typed match arm, and
+  is refused by `validate_sector_data` even though the same bytes deserialize
+  into a valid `Battery`. It now returns `None` for any tag this build types.
+
+  *Migration:* handle the `Option`. Payloads with an unknown tag, or with no
+  tag, are unaffected.
+
+### Fixed
+
+- **The JSON-LD context no longer references URLs that 404.** The context was
+  defined twice — `dpp_vc::jsonld` referenced
+  `https://ref.gs1.org/standards/digital-link/context/`, and `dpp-engine`'s
+  resolver hand-rolled its own referencing `https://odal-node.io/schemas/dpp/v1`.
+  **Both return 404.** A string entry in an `@context` array is fetched at
+  expansion time, so a dead one fails a conforming processor outright and makes
+  a lenient one drop every term it cannot define; with bare keys in the payload,
+  the `ld+json` door conveyed no linked data at all.
+
+  The vocabulary is now **inlined**. Hosting a context document is a commitment
+  to keep a URL resolving for as long as any passport references it — years,
+  under ESPR retention — and that is an operational obligation rather than a
+  library decision. An inline term map cannot 404, and hosting one later does
+  not invalidate passports issued now. `https://www.w3.org/ns/did/v1` is the
+  only remote context retained, verified to resolve.
+
+  `REMOTE_CONTEXTS` and `context_value()` are new: the second exists so the
+  resolver consumes this definition instead of building a second one.
+
+### Added
+
+- **README examples are compiled in the gate.** Each publishable crate pulls its
+  README in as a doctest, and `just check` runs `test-doc` — `cargo nextest`
+  does not execute doctests, so these examples were previously never compiled.
+
+### Fixed
+
+- The battery AAS submodel emitted `dueDigiligenceUrl`; it now emits
+  `dueDiligenceUrl`. A test had been asserting the misspelling.
+
+### Added
+
+- `dpp-aas/src/semantic_ids/allowlist.json`, plus a CI gate asserting that
+  every emitted semanticId is either `urn:odal-node:*` or carries a provenance
+  record naming who verified it against the authority's source and when. An
+  entry missing `verifiedOn` or `verifiedBy` is refused. The previous mechanism
+  was a comment, and a comment cannot fail a build.
+
 ## [0.12.0] - 2026-07-29
 
 ### Breaking

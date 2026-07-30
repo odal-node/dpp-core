@@ -33,7 +33,7 @@ No HTTP framework. No database. No async runtime (except where port traits requi
                       ^
                       | re-exported by
 +------------------+  |  +------------------+   +---------------------+
-| dpp-plugin-traits|  +--|  dpp-plugin-sdk  |   | dpp-digital-link    |
+| dpp-plugin-traits|  +--|  dpp-plugin-sdk  |   | dpp-digital-link / dpp-aas   |
 |     Wasm ABI     |-----| export_plugin!   |   | GS1 Digital Link    |
 +------------------+     +------------------+   +---------------------+
 
@@ -138,7 +138,7 @@ The port trait (`RegistrySyncPort`) and its ghost implementation (`GhostRegistry
 
 ---
 
-## dpp-digital-link — GS1 Digital Link, AAS, JSON-LD, Link-Type Negotiation
+## dpp-digital-link, dpp-aas, dpp-jsonld — GS1 Digital Link, AAS, JSON-LD
 
 Pure, stateless crate — no I/O or network dependencies. Compiles to both `std` and `wasm32`. Four submodules:
 
@@ -179,7 +179,7 @@ Two wasm32 targets are supported:
 
 | Target | Crates | Purpose |
 |---|---|---|
-| `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link | Browser/Cloudflare Workers (JS-hosted) |
+| `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas, dpp-jsonld | Browser/Cloudflare Workers (JS-hosted) |
 | `wasm32-wasip1` | sector plugins | wasmtime sandbox (WASI P1 syscall interface) |
 
 `getrandom` uses the JS backend for `wasm32-unknown-unknown` (configured in `.cargo/config.toml`).

@@ -458,10 +458,11 @@ fn redact_unknown_sector_withholds_sector_data_below_confidential() {
     let mut p = make_passport();
     // `Other` maps to catalog key "other", which is absent from the embedded
     // catalog — so there are no per-field disclosure classes to redact against.
-    p.sector = Sector::Other;
-    p.sector_data = Some(SectorData::Other(
-        serde_json::json!({ "secretField": "leak-me" }),
-    ));
+    p.sector = Sector::Other("other".into());
+    p.sector_data = Some(
+        SectorData::other(serde_json::json!({ "secretField": "leak-me" }))
+            .expect("an untagged payload has no typed variant"),
+    );
 
     // Public: no descriptor → withhold sector data entirely (fail closed).
     let public = p.redact(Audience::Public, &catalog).into_value();

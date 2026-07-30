@@ -124,6 +124,21 @@ impl SectorCatalog {
             .is_some_and(|d| d.status.allows_determination())
     }
 
+    /// Statutory minimum retention for a sector, in years.
+    ///
+    /// **This is the only source of retention.** It was previously duplicated
+    /// on the `Sector` enum as a hardcoded match, which is what production
+    /// actually applied while two doc comments claimed the catalog was
+    /// authoritative — a retention period is a legal obligation that varies by
+    /// instrument, so it belongs in the manifests with the act that imposes it.
+    ///
+    /// `None` for a sector with no catalog entry. Callers must fail closed:
+    /// there is no safe default for an obligation whose length is unknown.
+    #[must_use]
+    pub fn retention_years(&self, key: &str) -> Option<u32> {
+        self.get(key).map(|d| d.retention_years)
+    }
+
     /// The schema version applicable to *new* passports in `key`.
     #[must_use]
     pub fn current_schema_version(&self, key: &str) -> Option<&str> {

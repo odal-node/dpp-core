@@ -1,0 +1,113 @@
+{
+  "$comment": [
+    "Third-party semanticIds this crate may emit, and those it has evaluated.",
+    "",
+    "An `allowlist` entry asserts to a machine that one of our elements means",
+    "what a standards body says its identifier means. That is a claim about",
+    "another organisation's vocabulary, so it is recorded only once a person has",
+    "read the authority's published source.",
+    "",
+    "Identifiers in the urn:odal-node: namespace need no entry — they name our",
+    "own concepts, and the gate accepts them by prefix.",
+    "",
+    "`tracked` holds identifiers that were evaluated and not adopted, with the",
+    "correct value where it is known. Nothing there is permitted: the gate reads",
+    "`allowlist` only, and a test asserts every tracked identifier is refused.",
+    "",
+    "Both sections have a fixed key set, enforced by a test. Every entry carries",
+    "every key of its section; null means not established.",
+    "",
+    "  allowlist: authority, source, release, meaning, usedFor, licence,",
+    "             verifiedOn, verifiedBy",
+    "  tracked:   authority, source, usedFor, status, checkedOn, finding,",
+    "             correctIdentifier, licence, nextStep"
+  ],
+
+  "allowlist": {},
+
+  "tracked": {
+    "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass": {
+      "authority": "Catena-X / Eclipse Tractus-X",
+      "source": "https://github.com/eclipse-tractusx/sldt-semantic-models",
+      "usedFor": "battery sector submodel template",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-30",
+      "finding": "Identifier is well-formed, released, and current at 6.0.0. Correspondence between the aspect model's field set and this crate's battery submodel was not established, so the semantic claim is unsupported.",
+      "correctIdentifier": "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass",
+      "licence": "CC-BY-4.0. Eclipse Foundation governance; no membership required to use the models. Attribution applies to reuse of model content, not to referencing the identifier.",
+      "nextStep": "Compare the aspect model's field set against BatteryTechnicalData. If they correspond, restore the constant and add an allowlist entry with a named reader."
+    },
+
+    "https://admin-shell.io/IDTA/02006/2/0": {
+      "authority": "IDTA",
+      "source": "https://github.com/admin-shell-io/submodel-templates",
+      "usedFor": "ProductIdentification submodel and productName property",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "Form does not match the scheme IDTA publishes: their semanticIds are name-based, and this is the specification's document number expressed as a URI. The referenced version is also superseded — Digital Nameplate v3.0.1 is current.",
+      "correctIdentifier": "https://admin-shell.io/idta/nameplate/3/0/Nameplate",
+      "licence": null,
+      "nextStep": "Read IDTA 02006 v3.0.1 for its declared semanticId and confirm the Nameplate template matches what this submodel carries."
+    },
+
+    "https://admin-shell.io/IDTA/02004/1/2/Manufacturer": {
+      "authority": "IDTA",
+      "source": "https://github.com/admin-shell-io/submodel-templates",
+      "usedFor": "ManufacturerInformation submodel and manufacturer name property",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "Document-number form, with a '/Manufacturer' path segment that is not part of any published identifier. IDTA 02004 Handover Documentation v2.0.1 is current.",
+      "correctIdentifier": null,
+      "licence": null,
+      "nextStep": "Read IDTA 02004 v2.0.1 for its declared semanticId, and confirm Handover Documentation is the right template for manufacturer information."
+    },
+
+    "https://admin-shell.io/IDTA/02023/0/9": {
+      "authority": "IDTA",
+      "source": "https://industrialdigitaltwin.org/wp-content/uploads/2025/03/IDTA-02023_Submodel_CarbonFootprint.pdf",
+      "usedFor": "EnvironmentalImpact submodel and co2ePerUnit property",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "Document-number form. The 0.9 release is superseded by Carbon Footprint v1.0 (March 2025) and v1.0.1.",
+      "correctIdentifier": "https://admin-shell.io/idta/CarbonFootprint/CarbonFootprint/0/9",
+      "licence": null,
+      "nextStep": "Adopt the current release rather than the 0/9 identifier recorded here; read v1.0.1 for its declared semanticId."
+    },
+
+    "https://admin-shell.io/IDTA/02011/1/0": {
+      "authority": "IDTA",
+      "source": "https://github.com/admin-shell-io/submodel-templates",
+      "usedFor": "MaterialComposition submodel",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "Document-number form, and the template was misidentified: IDTA 02011 is 'Generic Frame for Technical Data for Industrial Equipment in Manufacturing', not a physical-properties template.",
+      "correctIdentifier": "https://admin-shell.io/ZVEI/TechnicalData/Submodel/1/2",
+      "licence": null,
+      "nextStep": "Establish whether Technical Data is the right template for material composition before adopting its identifier."
+    },
+
+    "urn:eclass:0173-1#01-AKJ975#001": {
+      "authority": "ECLASS",
+      "source": "https://eclass.eu/support/technical-specification/structure-and-elements/irdi",
+      "usedFor": "Repairability submodel and repairabilityScore property (EN 45554 index)",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "'urn:eclass:' is not a scheme ECLASS publishes. The Code Space Identifier is also wrong for the use: in 0173-1#0X-…, 01 denotes a Classification Class and 02 denotes a Property, and this was attached to a Property.",
+      "correctIdentifier": null,
+      "licence": null,
+      "nextStep": "With ECLASS Advanced access, locate the Property (02-space) IRDI for the EN 45554 repairability index specifically."
+    },
+
+    "urn:idta:aas:submodel:digital-product-passport:1.0": {
+      "authority": "IDTA",
+      "source": "https://industrialdigitaltwin.io/aas-specifications/IDTA-01002/v3.2/annex/dpp.html",
+      "usedFor": "the generic JSON-to-submodel mapper",
+      "status": "not-adopted",
+      "checkedOn": "2026-07-29",
+      "finding": "No 'urn:idta:' scheme is published; IDTA uses https://admin-shell.io/ URLs. IDTA-02099-1 'Digital Product Passport – Part 1: Metadata' declares the identifier recorded below and implements the EN 18223:2026 header fields.",
+      "correctIdentifier": "https://admin-shell.io/idta/cds/dppMetadata/1",
+      "licence": null,
+      "nextStep": "Evaluate IDTA-02099-1 for the generic passport submodel; its scope is DPP metadata rather than arbitrary sector payloads, so confirm the fit first."
+    }
+  }
+}

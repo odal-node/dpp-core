@@ -1,4 +1,4 @@
-﻿//! Integration test: audience gatekeeping.
+//! Integration test: audience gatekeeping.
 //!
 //! Exercises the full credential → policy → data-filtering pipeline
 //! that protects DPP data behind the Art. 77(2) audience model.
@@ -11,13 +11,13 @@
 //!    custom policies, and authority access.
 
 use chrono::Utc;
-use dpp_crypto::access::credential::{
+use dpp_domain::Disclosure;
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_tests::fixtures::make_subject;
+use dpp_vc::credential::{
     Audience, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,
     verify_credential_claims,
 };
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
-use dpp_domain::Disclosure;
-use dpp_tests::fixtures::make_subject;
 use serde_json::json;
 
 /// Build a realistic textile JSON payload spanning all disclosure classes.

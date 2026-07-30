@@ -31,7 +31,7 @@ When you're ready to push, structure the history into clean logical commits:
 4. feat(dpp-domain): versioned schema registry with hot-reload
 5. feat(dpp-crypto): Ed25519 key management, JWS, did:web builder
 6. feat(dpp-crypto): verifiable credentials and access policy engine
-7. feat(dpp-digital-link): digital link parser, link-type negotiation, AAS mapping
+7. feat(dpp-digital-link): digital link parser, link-type negotiation
 8. feat(dpp-registry): EU Central Registry interface types
 9. feat(dpp-plugin-traits): wasm plugin ABI with capability negotiation
 10. test: integration tests (textile e2e, transfer, access tier, schema conformity)
@@ -57,7 +57,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 <type>(<scope>): <description>
 
 Types: feat, fix, test, docs, chore, refactor, ci
-Scopes: dpp-domain, dpp-crypto, dpp-digital-link, dpp-rules, dpp-calc, dpp-plugin-traits, dpp-plugin-sdk, dpp-registry, dpp-tests
+Scopes: dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas, dpp-jsonld, dpp-rules, dpp-calc, dpp-plugin-traits, dpp-plugin-sdk, dpp-registry, dpp-tests
 ```
 
 Examples:
@@ -178,7 +178,9 @@ cargo publish -p dpp-rules          # no internal deps
 cargo publish -p dpp-plugin-traits  # no internal deps
 cargo publish -p dpp-domain         # depends on dpp-rules
 cargo publish -p dpp-crypto         # depends on dpp-domain
-cargo publish -p dpp-digital-link   # depends on dpp-domain
+cargo publish -p dpp-digital-link            # depends on dpp-domain
+cargo publish -p dpp-aas            # depends on dpp-domain
+cargo publish -p dpp-jsonld         # no workspace deps
 cargo publish -p dpp-registry       # depends on dpp-domain
 cargo publish -p dpp-calc           # depends on dpp-domain
 cargo publish -p dpp-plugin-sdk     # depends on dpp-plugin-traits + dpp-rules

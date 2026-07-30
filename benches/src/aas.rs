@@ -4,7 +4,7 @@
 
 use chrono::Utc;
 use criterion::{Criterion, criterion_group, criterion_main};
-use dpp_digital_link::aas::build_aas_from_passport;
+use dpp_aas::build_aas_from_passport;
 use dpp_domain::domain::gtin::Gtin;
 use dpp_domain::domain::sector::{BatteryChemistry, BatteryData, SectorData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, Sector};

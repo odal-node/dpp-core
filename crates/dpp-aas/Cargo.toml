@@ -1,0 +1,25 @@
+[package]
+name        = "dpp-aas"
+description = "Asset Administration Shell (AAS) projection of an Odal Node passport"
+keywords    = ["aas", "industry-4-0", "digital-twin", "idta", "submodel"]
+categories  = ["encoding", "data-structures"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+rust-version.workspace = true
+
+[lib]
+name = "dpp_aas"
+path = "src/lib.rs"
+
+[dependencies]
+dpp-domain = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+uuid   = { workspace = true }

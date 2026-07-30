@@ -3,7 +3,6 @@ use ed25519_dalek::{Signer, SigningKey};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
-use crate::keystore::KeyStore;
 use crate::test_support::temp_store;
 
 // ── signer tests ─────────────────────────────────────────────────────────────
@@ -276,51 +275,6 @@ fn extract_key_by_fingerprint_finds_archived_key() {
     assert!(found_wrong.is_none(), "unknown fingerprint returns None");
 }
 
-/// Regression (W-2): sign with key A, rotate to key B, verify old JWS against
-/// a DID document that contains both keys.
-#[test]
-fn rotation_does_not_break_old_jws_verification() {
-    let path = std::env::temp_dir().join(format!("test-w2-rotation-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "rotation-test").expect("open store");
-    store.generate_key("issuer").expect("generate key A");
-
-    let payload = json!({"product": "battery", "status": "draft"});
-    let jws_a = super::signer::sign(&store, "issuer", &payload).expect("sign with A");
-
-    store.archive_key("issuer").expect("archive A");
-    store.generate_key("issuer").expect("generate key B");
-
-    let did_doc = crate::identity::did_builder::build_did_document(
-        &store,
-        "https://id.example.com",
-        "issuer",
-    )
-    .expect("build DID doc");
-
-    assert_eq!(
-        did_doc["verificationMethod"].as_array().unwrap().len(),
-        2,
-        "DID doc must list both keys after rotation"
-    );
-
-    let kid = super::verifier::extract_kid_from_jws(&jws_a).expect("kid must be present");
-    let pub_key = super::verifier::extract_key_by_fingerprint(&did_doc, &kid)
-        .expect("archived key must be found by fingerprint");
-
-    let ok = super::verifier::verify_jws(&jws_a, &pub_key).expect("verify must not error");
-    assert!(
-        ok,
-        "old JWS must verify against archived key after rotation"
-    );
-
-    let jws_b = super::signer::sign(&store, "issuer", &payload).expect("sign with B");
-    let kid_b = super::verifier::extract_kid_from_jws(&jws_b).expect("kid must be present");
-    let pub_key_b = super::verifier::extract_key_by_fingerprint(&did_doc, &kid_b)
-        .expect("current key must be found by fingerprint");
-    let ok_b = super::verifier::verify_jws(&jws_b, &pub_key_b).expect("verify must not error");
-    assert!(ok_b, "new JWS must verify against current key");
-}
-
 // ── G-4: Cross-library JWS golden vector ──────────────────────────────────────
 
 /// G-4: Cross-library JWS golden vector.
@@ -409,37 +363,4 @@ fn jws_golden_vector_independent_ring_verification() {
             .is_err(),
         "ring must reject a tampered signature"
     );
-}
-
-/// Gap 7 end-to-end: after a key is **revoked**, a JWS it produced must no
-/// longer be verifiable — the revoked key is absent from the DID document.
-#[test]
-fn revoked_key_signature_no_longer_verifies() {
-    let path =
-        std::env::temp_dir().join(format!("test-revoke-verify-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "rev-verify").expect("open store");
-    store.generate_key("issuer").expect("generate key A");
-
-    let payload = json!({"product": "battery", "status": "draft"});
-    let jws_a = super::signer::sign(&store, "issuer", &payload).expect("sign with A");
-
-    store.revoke_and_rotate("issuer").expect("revoke+rotate");
-    let did_doc = crate::identity::did_builder::build_did_document(
-        &store,
-        "https://id.example.com",
-        "issuer",
-    )
-    .expect("build DID doc");
-
-    let kid = super::verifier::extract_kid_from_jws(&jws_a).expect("kid present");
-    assert!(
-        super::verifier::extract_key_by_fingerprint(&did_doc, &kid).is_none(),
-        "a revoked key must not be selectable for verification"
-    );
-
-    let jws_b = super::signer::sign(&store, "issuer", &payload).expect("sign with B");
-    let kid_b = super::verifier::extract_kid_from_jws(&jws_b).expect("kid present");
-    let pub_b = super::verifier::extract_key_by_fingerprint(&did_doc, &kid_b)
-        .expect("current key resolves");
-    assert!(super::verifier::verify_jws(&jws_b, &pub_b).expect("verify"));
 }

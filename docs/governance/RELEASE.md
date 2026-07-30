@@ -45,7 +45,7 @@ order:
 2. `dpp-plugin-traits` (no workspace dependencies)
 3. `dpp-domain` (depends on dpp-rules)
 4. `dpp-registry` (depends on dpp-domain)
-5. `dpp-digital-link` (depends on dpp-domain)
+5. `dpp-digital-link`, `dpp-aas` (depend on dpp-domain); `dpp-jsonld` (no workspace deps)
 6. `dpp-crypto` (depends on dpp-domain)
 7. `dpp-calc` (depends on dpp-domain)
 8. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)

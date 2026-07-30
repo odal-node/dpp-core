@@ -1,8 +1,10 @@
 # dpp-tests
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
+
 Cross-crate integration tests for Odal Node core. This crate contains
 integration tests in `tests/` that exercise multiple core crates together
-(`dpp-domain`, `dpp-crypto`, `dpp-digital-link`) and is intentionally not
+(`dpp-domain`, `dpp-crypto`, `dpp-digital-link`, `dpp-aas`, `dpp-vc`) and is intentionally not
 published to crates.io (`publish = false`). Moving integration tests into a
 real workspace member ensures they run as part of `cargo test --workspace` and
 CI.
@@ -34,6 +36,8 @@ cargo test --workspace
 | `dpp-domain` | Provides domain objects used by the integration tests |
 | `dpp-crypto` | Provides crypto primitives used in tests |
 | `dpp-digital-link` | Used by tests that exercise GS1 / digital link interactions |
+| `dpp-aas` | Used by tests that exercise AAS submodel mapping |
+| `dpp-vc` | Used by tests that exercise credentials and access gatekeeping |
 
 ## Minimum Rust version
 

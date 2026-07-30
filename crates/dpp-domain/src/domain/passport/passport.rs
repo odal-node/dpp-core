@@ -137,7 +137,8 @@ pub struct Passport {
     /// liquidation or a cessation of activity" of the responsible operator. The
     /// separate back-up-copy obligation (via a DPP service provider) is **Art.
     /// 10(4)**, not the retention period itself.
-    /// Computed at publish time from the catalog `retention_years` for the sector.
+    /// Computed at publish time from `SectorCatalog::retention_years` for the
+    /// sector — the single source of the retention obligation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention_until: Option<DateTime<Utc>>,
     /// Opaque link to an internal product-template record. Not a legal identifier.
@@ -347,7 +348,8 @@ impl Passport {
             }
             // Re-redact sectorData using the catalog's per-field disclosure map.
             if let Some(ref sd) = self.sector_data {
-                let key = sd.sector().catalog_key();
+                let sector = sd.sector();
+                let key = sector.catalog_key();
                 let redacted = if let Some(descriptor) = catalog.get(key) {
                     crate::domain::sector::redact_sector_data(sd, audience, descriptor)
                 } else if audience.may_see(Disclosure::Conformity) {

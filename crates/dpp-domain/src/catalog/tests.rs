@@ -194,42 +194,34 @@ fn sector_enum_and_catalog_agree() {
     }
 }
 
-/// Drift guard: [`crate::domain::sector::Sector::minimum_retention_years`] is
-/// a compile-time constant kept on the domain enum for wasm32/no-catalog
-/// callers; the catalog's own `retention_years` is the value production code
-/// actually applies at publish time (see `Passport.retention_until`'s doc
-/// comment). Nothing else ties the two together — this is what stops them
-/// from silently diverging if a future delegated act sets a sector-specific
-/// retention floor.
+/// Every catalog entry declares a retention period.
+///
+/// Retention used to have two homes — this field and a hardcoded match on the
+/// `Sector` enum — kept in step by a drift-guard test. The enum method was what
+/// production actually applied, while this field was documented as
+/// authoritative. The enum method is gone and this is the only source, so what
+/// needs guarding is no longer agreement between two values but that the one
+/// remaining value is always present: a sector that reaches publish without a
+/// retention period has no obligation the code can enforce.
 #[test]
-fn retention_years_matches_sector_enum() {
-    use crate::domain::sector::Sector;
-
+fn every_sector_declares_a_retention_period() {
     let catalog = SectorCatalog::new();
-    let typed = [
-        Sector::Battery,
-        Sector::Textile,
-        Sector::UnsoldGoods,
-        Sector::Steel,
-        Sector::Electronics,
-        Sector::Construction,
-        Sector::Tyre,
-        Sector::Toy,
-        Sector::Aluminium,
-        Sector::Furniture,
-        Sector::Detergent,
-    ];
-    for sector in &typed {
-        let key = sector.catalog_key();
-        let descriptor = catalog
-            .get(key)
-            .unwrap_or_else(|| panic!("Sector::{sector:?} (key '{key}') has no catalog entry"));
+    for descriptor in catalog.all() {
+        let key = descriptor.key.as_str();
         assert_eq!(
-            sector.minimum_retention_years(),
-            descriptor.retention_years,
-            "Sector::{sector:?}.minimum_retention_years() disagrees with catalog '{key}'.retention_years"
+            catalog.retention_years(key),
+            Some(descriptor.retention_years),
+            "retention_years() disagrees with the descriptor for '{key}'"
+        );
+        assert!(
+            descriptor.retention_years > 0,
+            "sector '{key}' declares no retention period"
         );
     }
+
+    // A sector with no catalog entry yields None, so callers must fail closed
+    // rather than substitute a default for an unknown legal obligation.
+    assert_eq!(catalog.retention_years("packaging"), None);
 }
 
 /// Compliance citation (domain Gap / watchlist 🔴): the ESPR unsold-goods

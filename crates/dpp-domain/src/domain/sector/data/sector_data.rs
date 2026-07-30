@@ -1,6 +1,6 @@
 //! The [`SectorData`] discriminated union and its per-audience redaction.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::aluminium::AluminiumData;
 use super::battery::BatteryData;
@@ -25,8 +25,10 @@ use crate::domain::sector::Sector;
 /// ```json
 /// { "sector": "textile", "fibreComposition": [...], "countryOfManufacturing": "BD" }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "sector", rename_all = "camelCase")]
+/// An unknown `sector` tag deserialises to [`SectorData::Other`], which keeps
+/// both the tag and the payload verbatim — see the hand-written `Deserialize`
+/// below for why the derive cannot do this.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum SectorData {
     Battery(BatteryData),
@@ -40,10 +42,134 @@ pub enum SectorData {
     Aluminium(AluminiumData),
     Furniture(FurnitureData),
     Detergent(DetergentData),
-    Other(serde_json::Value),
+    /// A product group this build has no typed variant for.
+    ///
+    /// `sector` is the wire tag verbatim and `data` is the whole object. A
+    /// passport for a sector added to the catalog after this crate was
+    /// released survives a round trip unchanged — which is the property that
+    /// makes adding a product group a data change rather than a release.
+    Other {
+        /// The wire tag exactly as received.
+        sector: String,
+        /// The full object, including its `sector` key.
+        data: serde_json::Value,
+    },
+}
+
+// ─── Wire format ─────────────────────────────────────────────────────────────
+//
+// Hand-written because the sector tag is open. `#[serde(tag = "sector")]`
+// enumerates its variants at compile time and rejects anything else, which
+// would make the wire the one closed part of an otherwise data-driven sector
+// model: the catalog, the schema registry and the plugin manifests are all
+// keyed by string, so a product group added to the catalog would still fail to
+// deserialize until this crate was released.
+//
+// The shape is unchanged — an internally-tagged object with `sector` as the
+// discriminant. Only the unknown-tag behaviour differs: fall through to
+// `Other`, keeping tag and payload, instead of failing.
+
+impl Serialize for SectorData {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Serialise the payload, then stamp the tag onto it. Going through
+        // `Value` keeps one definition of the tag rather than repeating the
+        // struct field list per variant.
+        let mut value = match self {
+            Self::Battery(d) => serde_json::to_value(d),
+            Self::Textile(d) => serde_json::to_value(d),
+            Self::UnsoldGoods(d) => serde_json::to_value(d),
+            Self::Steel(d) => serde_json::to_value(d),
+            Self::Electronics(d) => serde_json::to_value(d),
+            Self::Construction(d) => serde_json::to_value(d),
+            Self::Tyre(d) => serde_json::to_value(d),
+            Self::Toy(d) => serde_json::to_value(d),
+            Self::Aluminium(d) => serde_json::to_value(d),
+            Self::Furniture(d) => serde_json::to_value(d),
+            Self::Detergent(d) => serde_json::to_value(d),
+            Self::Other { data, .. } => Ok(data.clone()),
+        }
+        .map_err(serde::ser::Error::custom)?;
+
+        let tag = self.sector();
+        if let serde_json::Value::Object(ref mut map) = value {
+            map.insert(
+                "sector".to_owned(),
+                serde_json::Value::String(tag.wire_str().to_owned()),
+            );
+        }
+        value.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SectorData {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let tag = value
+            .get("sector")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| D::Error::missing_field("sector"))?
+            .to_owned();
+
+        // A typed variant ignores the `sector` key it does not declare, so the
+        // whole object can be handed to it unchanged.
+        macro_rules! typed {
+            ($variant:ident) => {
+                serde_json::from_value(value.clone())
+                    .map(Self::$variant)
+                    .map_err(D::Error::custom)
+            };
+        }
+
+        match Sector::from_wire_tag(&tag) {
+            Sector::Battery => typed!(Battery),
+            Sector::Textile => typed!(Textile),
+            Sector::UnsoldGoods => typed!(UnsoldGoods),
+            Sector::Steel => typed!(Steel),
+            Sector::Electronics => typed!(Electronics),
+            Sector::Construction => typed!(Construction),
+            Sector::Tyre => typed!(Tyre),
+            Sector::Toy => typed!(Toy),
+            Sector::Aluminium => typed!(Aluminium),
+            Sector::Furniture => typed!(Furniture),
+            Sector::Detergent => typed!(Detergent),
+            Sector::Other(sector) => Ok(Self::Other {
+                sector,
+                data: value,
+            }),
+        }
+    }
 }
 
 impl SectorData {
+    /// Build an untyped payload, reading the tag from the object's own
+    /// `sector` field. Falls back to `"other"` when the object carries none.
+    ///
+    /// Returns `None` if the tag names a sector this build *does* type.
+    ///
+    /// # Why this can fail
+    ///
+    /// `Other` holding a typed sector's tag would be a second representation of
+    /// that sector which does not compare equal to the first: `Other("battery")`
+    /// is not `Sector::Battery` under `Eq` or `Hash`, would miss every typed
+    /// match arm, and would be refused by `validate_sector_data` even though the
+    /// same bytes deserialize into a valid `Battery`. Deserialization already
+    /// routes known tags to their variants; this constructor must not offer a
+    /// way around it.
+    #[must_use]
+    pub fn other(data: serde_json::Value) -> Option<Self> {
+        let sector = data
+            .get("sector")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("other")
+            .to_owned();
+        match Sector::from_wire_tag(&sector) {
+            Sector::Other(_) => Some(Self::Other { sector, data }),
+            _ => None,
+        }
+    }
+
     /// Returns the `Sector` discriminant for this data.
     pub fn sector(&self) -> Sector {
         match self {
@@ -58,7 +184,7 @@ impl SectorData {
             SectorData::Aluminium(_) => Sector::Aluminium,
             SectorData::Furniture(_) => Sector::Furniture,
             SectorData::Detergent(_) => Sector::Detergent,
-            SectorData::Other(_) => Sector::Other,
+            SectorData::Other { sector, .. } => Sector::Other(sector.clone()),
         }
     }
 
@@ -79,7 +205,7 @@ impl SectorData {
             SectorData::Aluminium(d) => Some(d.gtin.as_str()),
             SectorData::Furniture(d) => Some(d.gtin.as_str()),
             SectorData::Detergent(d) => Some(d.gtin.as_str()),
-            SectorData::UnsoldGoods(_) | SectorData::Other(_) => None,
+            SectorData::UnsoldGoods(_) | SectorData::Other { .. } => None,
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿//! End-to-end integration test: Textile DPP lifecycle.
+//! End-to-end integration test: Textile DPP lifecycle.
 //!
 //! This test exercises the full lifecycle of a textile Digital Product Passport
 //! across multiple dpp-core crates:
@@ -12,18 +12,16 @@
 //! 7. Serialise / deserialise the full passport round-trip
 
 use chrono::Utc;
-use dpp_crypto::access::credential::verify_credential_claims;
-use dpp_crypto::access::credential::{
-    Audience, CredentialBuilder, CredentialRole, DppCredentialSubject,
-};
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_aas::map_dpp_to_aas_submodel;
 use dpp_digital_link::DigitalLink;
-use dpp_digital_link::aas::map_dpp_to_aas_submodel;
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport,
     RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,
 };
 use dpp_tests::fixtures::base_passport;
+use dpp_vc::credential::verify_credential_claims;
+use dpp_vc::credential::{Audience, CredentialBuilder, CredentialRole, DppCredentialSubject};
 
 /// Build a realistic textile passport for testing.
 fn make_textile_passport() -> Passport {
@@ -221,7 +219,7 @@ fn credential_issuance_and_audience_filtering() {
     assert!(result.is_valid(), "credential should be valid");
 
     // The credential grants Audience::LegitimateInterest
-    if let dpp_crypto::access::credential::VerificationResult::Valid { audience, .. } = &result {
+    if let dpp_vc::credential::VerificationResult::Valid { audience, .. } = &result {
         assert_eq!(*audience, Audience::LegitimateInterest);
 
         let pro_decision = filter_by_audience(&textile_fields, &policy, *audience);
@@ -261,7 +259,7 @@ fn expired_credential_denied_access() {
     assert!(
         matches!(
             result,
-            dpp_crypto::access::credential::VerificationResult::Expired { .. }
+            dpp_vc::credential::VerificationResult::Expired { .. }
         ),
         "expired credential must be rejected"
     );
@@ -285,7 +283,7 @@ fn wrong_sector_credential_out_of_scope() {
     assert!(
         matches!(
             result,
-            dpp_crypto::access::credential::VerificationResult::OutOfScope { .. }
+            dpp_vc::credential::VerificationResult::OutOfScope { .. }
         ),
         "battery credential must not grant textile access"
     );

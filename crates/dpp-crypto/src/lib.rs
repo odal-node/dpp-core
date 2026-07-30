@@ -1,11 +1,18 @@
-//! `dpp-crypto` — Ed25519 signing, JWS compact serialisation, DID documents,
-//! and audience-scoped Verifiable Credentials.
+//! `dpp-crypto` — cryptographic primitives: Ed25519 signing, JWS compact
+//! serialisation, and the encrypted keystore.
 //!
 //! All modules are pure (no I/O, no network). The crate compiles to `std` for
 //! the node and to `wasm32` (where conditional) for plugin guests.
+//!
+//! Verifiable Credentials, `did:web` documents and status lists are
+//! [`dpp-vc`]; the per-field disclosure contract is `dpp_domain::access`.
+//! Signing bytes is a different job from deciding whose signature means what,
+//! and a different job again from deciding which fields a role may see.
+//!
+//! With those gone this crate has **no workspace dependencies** — it is a leaf.
+//!
+//! [`dpp-vc`]: https://docs.rs/dpp-vc
 
-pub mod access;
-pub mod identity;
 pub mod jws;
 pub mod keystore;
 
@@ -22,12 +29,11 @@ pub(crate) fn os_rng() -> rand::rand_core::UnwrapErr<rand::rngs::SysRng> {
 
 // ── Flat re-exports — maintain stable paths for external callers ─────────────
 
-pub use access::{
-    AllowAllIssuers, Audience, CredentialBuilder, CredentialRole, CredentialStatus,
-    DppAccessCredential, DppCredentialSubject, PolicyDecision, RevocationOutcome,
-    SectorAccessPolicy, StaticTrustedIssuers, StatusList, TrustedIssuerRegistry,
-    VerificationResult, check_revocation, filter_by_audience, verify_credential_claims,
-    verify_credential_claims_with_trust, verify_credential_with_revocation,
-    verify_credential_with_revocation_and_trust,
-};
-pub use identity::{LocalIdentityService, PassportCredential, PassportCredentialSubject};
+/// Compile-checks this crate's README examples.
+///
+/// A README example is a public claim about the API, and nothing else in the
+/// build compiles one. Without this, a README can advertise a function that
+/// does not exist — which is exactly what happened before this harness landed.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

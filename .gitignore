@@ -53,3 +53,7 @@ desktop.ini
 *.bak
 coverage/
 .nyc_output/
+# Keystores — `KeyStore::open` creates the file if absent, so never let one
+# land in the tree.
+keys.json
+*.keystore.json

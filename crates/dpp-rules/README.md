@@ -4,13 +4,41 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-rules)](https://docs.rs/dpp-rules)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules.
+Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules for the [Odal Node](https://odal-node.io) Digital Product Passport system.
 
 These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm sector plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.
 
 Keeping them in a standalone `no_std`, zero-dependency crate is what makes that
 possible: `dpp-domain` and the Wasm plugins can both depend on it without either
 depending on the other.
+
+---
+
+## When to use this crate
+
+- You need a cross-field regulatory check that JSON Schema cannot express — a
+  sum constraint, a conditional disclosure trigger, an enumerated band.
+- You are writing a Wasm sector plugin and need the same rule the host applies,
+  compiled into the guest.
+- You are adding a rule and need it to exist exactly once, reachable from both
+  `dpp-domain` and the plugins.
+
+## Example
+
+```rust
+use dpp_rules::{FibreInput, fibre_sum_ok, validate_fibre_composition};
+
+// Fibre percentages must sum to ~100% (± FIBRE_SUM_TOLERANCE)
+assert!(fibre_sum_ok(&[70.0, 30.0]));
+assert!(!fibre_sum_ok(&[70.0, 20.0]));
+
+// The full cross-field rule also checks ranges and ISO 3166-1 alpha-2 origins
+let fibres = [
+    FibreInput { fibre: "organic cotton", pct: 70.0, country_of_origin: Some("IN") },
+    FibreInput { fibre: "recycled polyester", pct: 30.0, country_of_origin: None },
+];
+assert!(validate_fibre_composition(&fibres).is_ok());
+```
 
 ---
 
@@ -24,7 +52,7 @@ The CI `cargo check` target verifies this. Do not break it.
 
 ## Module structure
 
-```
+```text
 src/
 ├── lib.rs                    re-exports everything at the crate root (backward compat)
 │
@@ -84,3 +112,21 @@ Active sectors are batteries, textiles, and electronics. All others have placeho
 | Repairability scoring → `dpp-calc` | EN 45554 A–E grade calculation belongs to the calculator crate; only field-level validations live here |
 | SVHC → `chemicals/` | REACH Art. 33 is cross-sector; it must never be placed under a single sector module |
 | `common/` threshold | A helper belongs in `common/` only if it is used by ≥ 2 sector modules and has no sector-specific meaning |
+
+---
+
+## Relationship to other crates
+
+| Crate | Role |
+|---|---|
+| `dpp-domain` | Consumes these rules for standalone validation; this crate does **not** depend on it |
+| `dpp-plugin-sdk` | Re-exports these rules to Wasm sector plugins via `dpp_plugin_sdk::rules` |
+| `dpp-calc` | Holds scoring and calculation; field-level validation belongs here, not there |
+
+## Minimum Rust version
+
+1.96 (MSRV is enforced in CI)
+
+## License
+
+Apache-2.0 — see [LICENSE](../../LICENSE)

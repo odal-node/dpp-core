@@ -1,7 +1,7 @@
 [package]
 name        = "dpp-digital-link"
-description = "GS1 Digital Link parser/builder and JSON-LD helpers for Odal Node"
-keywords    = ["gs1", "digital-link", "gtin", "aas", "industry-4-0"]
+description = "GS1 Digital Link parser/builder and GS1 link-type negotiation for Odal Node"
+keywords    = ["gs1", "digital-link", "gtin", "barcode", "resolver"]
 categories  = ["parser-implementations", "encoding"]
 version.workspace     = true
 edition.workspace     = true
@@ -22,6 +22,4 @@ serde      = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-chrono   = { workspace = true }
-uuid     = { workspace = true }
 proptest = { workspace = true }

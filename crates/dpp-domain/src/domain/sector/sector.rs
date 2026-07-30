@@ -1,13 +1,22 @@
 //! [`Sector`] — the EU ESPR dispatch discriminant.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// EU ESPR product sector — determines which delegated act schema applies.
+/// The regulated product group a passport belongs to.
 ///
-/// Used by the compliance infrastructure to dispatch to the correct
-/// `ComplianceStrategy` implementation.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// # The enum is an optimisation, not the source of truth
+///
+/// Sector identity is **data**: the [`SectorCatalog`](crate::catalog::SectorCatalog)
+/// manifests, the schema registry and the plugin manifests are all keyed by
+/// string. These variants exist so code that genuinely branches per product
+/// group — an in-force act with its own typed data — can do so without a
+/// string match.
+///
+/// A sector this build does not know is therefore **not an error**: it
+/// deserialises to [`Sector::Other`], which carries the wire tag verbatim so
+/// the identity survives a round trip. Adding a product group is a catalog
+/// manifest plus a schema, not a release of this crate.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Sector {
     Battery,
@@ -21,36 +30,19 @@ pub enum Sector {
     Aluminium,
     Furniture,
     Detergent,
-    Other,
+    /// A product group this build has no typed variant for, holding its wire
+    /// tag verbatim. Never a placeholder: the key is preserved, so the
+    /// catalog, schema registry and plugin host can all still resolve it.
+    Other(String),
 }
 
 impl Sector {
-    /// Minimum data retention period in years as required by the applicable
-    /// EU delegated act.  The Battery Regulation (2023/1542) mandates ≥ 10
-    /// years after end-of-life.  Other sectors default to 10 years pending
-    /// their respective delegated acts.
-    pub const fn minimum_retention_years(&self) -> u32 {
-        match self {
-            Self::Battery => 10,
-            Self::Textile | Self::UnsoldGoods => 10,
-            Self::Steel => 10,
-            Self::Electronics => 10,
-            Self::Construction => 10,
-            Self::Tyre => 10,
-            Self::Toy => 10,
-            Self::Aluminium => 10,
-            Self::Furniture => 10,
-            Self::Detergent => 10,
-            Self::Other => 10,
-        }
-    }
-
     /// Canonical sector key used by the schema registry and the `SectorCatalog`.
     ///
     /// This is the one true spelling (kebab-case where needed), distinct from
     /// the enum's camelCase serde tag — e.g. `UnsoldGoods` serialises as
     /// `"unsoldGoods"` but its catalog/registry key is `"unsold-goods"`.
-    pub const fn catalog_key(&self) -> &'static str {
+    pub fn catalog_key(&self) -> &str {
         match self {
             Self::Battery => "battery",
             Self::Textile => "textile",
@@ -63,7 +55,30 @@ impl Sector {
             Self::Aluminium => "aluminium",
             Self::Furniture => "furniture",
             Self::Detergent => "detergent",
-            Self::Other => "other",
+            Self::Other(key) => key,
+        }
+    }
+
+    /// The typed variant for a wire tag, or [`Sector::Other`] carrying the tag.
+    ///
+    /// Accepts the catalog's kebab-case spelling as well as the camelCase wire
+    /// tag, because both are in circulation — `unsold-goods` and `unsoldGoods`
+    /// name the same product group.
+    #[must_use]
+    pub fn from_wire_tag(tag: &str) -> Self {
+        match tag {
+            "battery" => Self::Battery,
+            "textile" => Self::Textile,
+            "unsoldGoods" | "unsold-goods" => Self::UnsoldGoods,
+            "steel" => Self::Steel,
+            "electronics" => Self::Electronics,
+            "construction" => Self::Construction,
+            "tyre" => Self::Tyre,
+            "toy" => Self::Toy,
+            "aluminium" => Self::Aluminium,
+            "furniture" => Self::Furniture,
+            "detergent" => Self::Detergent,
+            other => Self::Other(other.to_owned()),
         }
     }
 
@@ -73,7 +88,7 @@ impl Sector {
     ///
     /// Equivalent to `serde_json::to_value(self)` but without the allocation
     /// and `Value` round trip.
-    pub const fn wire_str(&self) -> &'static str {
+    pub fn wire_str(&self) -> &str {
         match self {
             Self::Battery => "battery",
             Self::Textile => "textile",
@@ -86,8 +101,30 @@ impl Sector {
             Self::Aluminium => "aluminium",
             Self::Furniture => "furniture",
             Self::Detergent => "detergent",
-            Self::Other => "other",
+            Self::Other(tag) => tag,
         }
+    }
+}
+
+/// Serialises to the wire tag — including an unknown sector's own tag, so a
+/// passport this build cannot type still round-trips byte-identically.
+impl Serialize for Sector {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.wire_str())
+    }
+}
+
+/// Deserialises a known wire tag to its typed variant and **anything else to
+/// [`Sector::Other`] carrying that tag**.
+///
+/// This is the seam that makes the sector axis open. A derived impl would
+/// reject an unrecognised tag, which would mean a product group could not
+/// exist until this crate was released — the catalog, schemas and plugins are
+/// all data, and this is what stops the wire from being the one closed part.
+impl<'de> Deserialize<'de> for Sector {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let tag = String::deserialize(deserializer)?;
+        Ok(Self::from_wire_tag(&tag))
     }
 }
 
@@ -109,7 +146,7 @@ mod tests {
             Sector::Aluminium,
             Sector::Furniture,
             Sector::Detergent,
-            Sector::Other,
+            Sector::Other("packaging".into()),
         ] {
             let serialized = serde_json::to_value(&sector).unwrap();
             assert_eq!(

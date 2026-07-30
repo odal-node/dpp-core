@@ -12,7 +12,7 @@ use crate::keystore::KeyStore;
 /// Signing over the canonical bytes (rather than incidental serde output) is
 /// the content-binding contract: a verifier recomputes the canonical form of
 /// the payload it holds and compares — see [`super::canonical`] and
-/// [`crate::identity::local_service`].
+/// `dpp_vc::local_service`.
 ///
 /// The protected header includes a `kid` field set to the SHA-256 fingerprint
 /// (hex) of the signing key's public bytes.  The verifier uses this `kid` to
