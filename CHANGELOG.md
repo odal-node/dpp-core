@@ -31,6 +31,45 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `dpp_digital_link::jsonld::*` moves to `dpp_vc::jsonld::*`. No types,
   signatures or serialised output changed — only the crate a symbol lives in.
 
+- **`dpp-crypto` is reduced to cryptographic primitives; Verifiable
+  Credentials, `did:web` and status lists move to the new `dpp-vc`.** Signing
+  bytes is a different job from deciding whose signature means what, and the
+  two have different audit surfaces and rates of change. `dpp-crypto` keeps
+  `jws/` and `keystore/`; `dpp-vc` takes `credential/`, `status_list`,
+  `did_builder`, `passport_credential` and `local_service`.
+
+  `LocalIdentityService` moves too, and not by preference: it depends on both
+  `jws`/`keystore` and `did_builder`/`passport_credential`, so leaving it
+  behind would have made `dpp-crypto` depend on `dpp-vc` and closed a cycle.
+  The dependency direction is `dpp-vc → dpp-crypto → dpp-domain`.
+
+  `access/{filter,policy}` **stay in `dpp-crypto` for now.** Their settled home
+  is `dpp-domain` — which fields a role may see describes what a passport is,
+  not who is asking — but `dpp-domain` has not been analysed yet, and routing
+  them via `dpp-vc` would mean moving them twice. See
+  `dpp-docs/decisions/ADR-010-crate-architecture.md`.
+
+  *Migration:* `dpp_crypto::{AllowAllIssuers, CredentialBuilder, CredentialRole,
+  CredentialStatus, DppAccessCredential, DppCredentialSubject, RevocationOutcome,
+  StaticTrustedIssuers, StatusList, TrustedIssuerRegistry, VerificationResult,
+  check_revocation, verify_credential_*, LocalIdentityService, PassportCredential,
+  PassportCredentialSubject}` → `dpp_vc::`. `dpp_crypto::identity::did_builder`
+  → `dpp_vc::did_builder`. `dpp_crypto::{PolicyDecision, SectorAccessPolicy,
+  filter_by_audience}` are unchanged.
+
+- **`dpp-jsonld` is abolished before it was ever published.** It was created
+  during this release cycle, had zero consumers, and at 123 LOC was an order of
+  magnitude smaller than any other crate. Its contents are now `dpp_vc::jsonld`:
+  W3C Verifiable Credentials *are* JSON-LD documents, and the two `@context`
+  sets overlap, so holding them apart guaranteed a second hand-rolled context.
+
+### Changed
+
+- `KeyStore::public_key` and `PublicKeyInfo` (with its fields) are now `pub`
+  rather than `pub(crate)`. The `did:web` document builder lives in `dpp-vc`
+  and needs exactly this — public key material and revocation state, never the
+  private key.
+
 - **Six third-party AAS `semanticId` values are replaced with `urn:odal-node:`
   identifiers.** The removed values claimed IDTA and ECLASS authority and were
   malformed rather than merely stale: four used an
