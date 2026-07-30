@@ -4,10 +4,35 @@ use std::sync::OnceLock;
 
 use serde_json::{Value, json};
 
-/// Build a minimal JSON-LD context for an Odal Node passport.
+/// Remote contexts this passport context references.
 ///
-/// Suitable for embedding in or linking from a DPP payload to assert
-/// semantic interoperability with GS1, Schema.org, and EU ESPR vocabularies.
+/// **A string entry in an `@context` array is fetched by the consumer at
+/// expansion time.** One that does not resolve is not cosmetic: a conforming
+/// processor fails the whole document with a remote-context load error, and a
+/// lenient one drops every term it cannot define. Since our payload uses bare
+/// keys, that means the `ld+json` door would convey no linked data at all —
+/// worse than serving plain JSON, because the `@context` is itself a claim that
+/// the document is semantically resolvable.
+///
+/// So this list is deliberately short and deliberately explicit: adding to it
+/// means editing this constant *and* the test that pins it, which is the point
+/// at which someone checks the URL. Two entries were removed on 2026-07-30 for
+/// returning 404 — `https://ref.gs1.org/standards/digital-link/context/`, which
+/// this crate referenced, and `https://odal-node.io/schemas/dpp/v1`, which the
+/// resolver hand-rolled.
+///
+/// Term-to-IRI mappings are a different matter and are inlined below: a prefix
+/// IRI names a vocabulary and is never dereferenced during expansion, so it
+/// carries no such obligation.
+pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
+
+/// Build the JSON-LD context for an Odal Node passport.
+///
+/// The vocabulary is **inlined** rather than hosted. Hosting a context document
+/// is a commitment to keep a URL resolving for as long as any passport
+/// referencing it exists — years, under ESPR retention — and that is an
+/// operational obligation, not a library decision. An inline term map cannot
+/// 404, and it can be adopted later without invalidating passports issued now.
 ///
 /// The literal is built once and cloned per call — callers extend the
 /// returned value (e.g. [`frame_passport`] merges passport fields into it),
@@ -18,8 +43,7 @@ pub fn passport_context() -> Value {
         .get_or_init(|| {
             json!({
                 "@context": [
-                    "https://www.w3.org/ns/did/v1",
-                    "https://ref.gs1.org/standards/digital-link/context/",
+                    REMOTE_CONTEXTS[0],
                     {
                         "dpp": "https://schema.odal-node.io/dpp#",
                         "gs1": "https://ref.gs1.org/voc/",
@@ -38,6 +62,16 @@ pub fn passport_context() -> Value {
             })
         })
         .clone()
+}
+
+/// The `@context` value alone, for a caller that already has a passport object
+/// and needs to stamp the context onto it.
+///
+/// Exists so the resolver stops constructing its own: two definitions of one
+/// context is how the served one came to reference a URL that 404s while this
+/// one referenced a different URL that also 404s.
+pub fn context_value() -> Value {
+    passport_context()["@context"].clone()
 }
 
 /// Wrap a passport JSON value in a JSON-LD envelope.

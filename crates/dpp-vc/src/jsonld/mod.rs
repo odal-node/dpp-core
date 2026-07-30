@@ -9,4 +9,6 @@ mod context;
 #[cfg(test)]
 mod tests;
 
-pub use context::{frame_passport, passport_context, strip_context};
+pub use context::{
+    REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context,
+};

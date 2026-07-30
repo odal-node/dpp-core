@@ -160,6 +160,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   *Migration:* handle the `Option`. Payloads with an unknown tag, or with no
   tag, are unaffected.
 
+### Fixed
+
+- **The JSON-LD context no longer references URLs that 404.** The context was
+  defined twice — `dpp_vc::jsonld` referenced
+  `https://ref.gs1.org/standards/digital-link/context/`, and `dpp-engine`'s
+  resolver hand-rolled its own referencing `https://odal-node.io/schemas/dpp/v1`.
+  **Both return 404.** A string entry in an `@context` array is fetched at
+  expansion time, so a dead one fails a conforming processor outright and makes
+  a lenient one drop every term it cannot define; with bare keys in the payload,
+  the `ld+json` door conveyed no linked data at all.
+
+  The vocabulary is now **inlined**. Hosting a context document is a commitment
+  to keep a URL resolving for as long as any passport references it — years,
+  under ESPR retention — and that is an operational obligation rather than a
+  library decision. An inline term map cannot 404, and hosting one later does
+  not invalidate passports issued now. `https://www.w3.org/ns/did/v1` is the
+  only remote context retained, verified to resolve.
+
+  `REMOTE_CONTEXTS` and `context_value()` are new: the second exists so the
+  resolver consumes this definition instead of building a second one.
+
 ### Added
 
 - **README examples are compiled in the gate.** Each publishable crate pulls its
