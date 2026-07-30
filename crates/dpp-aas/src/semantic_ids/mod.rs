@@ -2,13 +2,10 @@
 // a third-party identifier that was verified against its authority's own
 // published source. There is deliberately no third category.
 //
-// As of 2026-07-31 there are **no third-party identifiers here at all**. Seven
-// were tracked; six were wrong and one was withdrawn for an unverified semantic
-// match. Each is recorded in `semantic-ids-allowlist.json` under `tracked`,
-// with the correct identifier where it is known — so restoring one starts from
-// that record rather than from a search. Nothing there is permitted: the gate
-// reads `allowlist` only, and a test asserts every tracked identifier is
-// refused.
+// This crate currently emits none. Identifiers that were evaluated and not
+// adopted are recorded in `allowlist.json` under `tracked`, with the correct
+// value where it is known, so adopting one starts from that record. Nothing
+// there is permitted: the gate reads `allowlist` only.
 //
 // Five identifiers claiming IDTA and ECLASS authority were removed on
 // 2026-07-29 because they were wrong — not stale, wrong. IDTA semanticIds are
@@ -69,14 +66,9 @@ pub const CO2E_PER_UNIT: &str = "urn:odal-node:aas:property:co2e-per-unit:1.0";
 /// Overall repairability index property (EN 45554 scale).
 pub const REPAIRABILITY_SCORE: &str = "urn:odal-node:aas:property:repairability-score:1.0";
 
-// Was `urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass`, withdrawn
-// 2026-07-31. The identifier is real, correctly formed, current and CC-BY-4.0 —
-// what was never checked is whether the Catena-X aspect model actually
-// describes the field set this submodel carries. A well-formed identifier
-// naming the wrong concept fails *open*: a consumer resolves it and maps our
-// fields onto it confidently and wrongly. Full record, including the licence
-// finding and what to check before restoring it, in
-// `semantic-ids-allowlist.json` under `tracked`.
+// The Catena-X Battery Pass aspect model is a candidate here; its
+// correspondence to this submodel's field set is not yet established. See
+// `allowlist.json` under `tracked`.
 /// Odal Node battery technical data template.
 pub const BATTERY_TECHNICAL_DATA: &str =
     "urn:odal-node:aas:submodel-template:battery-technical-data:1.0";

@@ -35,20 +35,24 @@ use dpp_crypto::jws::{signer, verifier};
 use dpp_crypto::keystore::KeyStore;
 use serde_json::json;
 
-// `open` creates the keystore file if it is absent, so the path matters: this
-// example is compiled and run as a doctest, and a relative path would write a
-// real keystore into the source tree. A deployment passes a configured path
-// outside the repository.
-let path = std::env::temp_dir().join("odal-keystore-example.json");
-let store = KeyStore::open(&path, "correct-horse-battery-staple").unwrap();
-store.generate_key("issuer").unwrap();
+fn sign_a_payload(store: &KeyStore) {
+    let payload = json!({ "product": "battery", "status": "published" });
+    let jws = signer::sign(store, "issuer", &payload).expect("sign");
 
-let payload = json!({ "product": "battery", "status": "published" });
-let jws = signer::sign(&store, "issuer", &payload).unwrap();
+    // The kid travels in the JWS header, so a verifier can select the right key
+    // from a DID document that may list several, including rotated ones.
+    let kid = verifier::extract_kid_from_jws(&jws).expect("kid present");
+    assert!(!kid.is_empty());
+}
+```
 
-// The kid travels in the JWS header, so a verifier can select the right key
-let kid = verifier::extract_kid_from_jws(&jws).unwrap();
-assert!(!kid.is_empty());
+`KeyStore::open` **creates the file if it is absent**, so the path is a real
+decision — pass a configured location outside the source tree. A complete,
+runnable version including keystore setup is in
+[`examples/sign_and_verify.rs`](examples/sign_and_verify.rs):
+
+```bash
+cargo run -p dpp-crypto --example sign_and_verify
 ```
 
 ## Security notes

@@ -450,7 +450,7 @@ fn no_catalog_sector_falls_back_to_the_generic_submodel() {
 // once it is written. So it is enforced here rather than trusted to a comment.
 //
 // The rule: every identifier we emit is either in our own `urn:odal-node:`
-// namespace, or carries a provenance record in `semantic-ids-allowlist.json`
+// namespace, or carries a provenance record in `semantic_ids/allowlist.json`
 // naming who verified it against the authority's own source, and when.
 
 const OWN_NAMESPACE: &str = "urn:odal-node:";
@@ -466,7 +466,7 @@ fn allowlisted_identifiers() -> Vec<String> {
 fn allowlist_document() -> serde_json::Value {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../dpp-aas/semantic-ids-allowlist.json"
+        "/../dpp-aas/src/semantic_ids/allowlist.json"
     );
     let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
     serde_json::from_str(&raw).expect("the allowlist is valid JSON")
@@ -560,7 +560,7 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
                 is_permitted(id, &allowlist),
                 "sector '{key}' emits unprovenanced semanticId '{id}' at '{path}'. \
                  Either move it into the urn:odal-node: namespace, or add a \
-                 verified entry to semantic-ids-allowlist.json."
+                 verified entry to semantic_ids/allowlist.json."
             );
         }
         checked += found.len();
@@ -683,6 +683,60 @@ fn a_fabricated_third_party_identifier_is_refused() {
     }
 }
 
+/// Both sections carry a fixed key set.
+///
+/// Entries accreted per-entry keys once already — some carrying `finding`,
+/// others `whyWithdrawn`, others neither — which makes the file unreadable as
+/// data and lets a required field go missing without anything noticing. The
+/// shape is documented in the file's own `$comment` and enforced here.
+#[test]
+fn every_entry_carries_its_section_key_set() {
+    const ALLOWLIST_KEYS: &[&str] = &[
+        "authority",
+        "source",
+        "release",
+        "meaning",
+        "usedFor",
+        "licence",
+        "verifiedOn",
+        "verifiedBy",
+    ];
+    const TRACKED_KEYS: &[&str] = &[
+        "authority",
+        "source",
+        "usedFor",
+        "status",
+        "checkedOn",
+        "finding",
+        "correctIdentifier",
+        "licence",
+        "nextStep",
+    ];
+
+    let doc = allowlist_document();
+    for (section, required) in [("allowlist", ALLOWLIST_KEYS), ("tracked", TRACKED_KEYS)] {
+        let entries = doc[section]
+            .as_object()
+            .unwrap_or_else(|| panic!("`{section}` is an object"));
+
+        for (identifier, record) in entries {
+            let record = record
+                .as_object()
+                .unwrap_or_else(|| panic!("{section}['{identifier}'] is an object"));
+
+            let mut actual: Vec<&str> = record.keys().map(String::as_str).collect();
+            actual.sort_unstable();
+            let mut expected = required.to_vec();
+            expected.sort_unstable();
+
+            assert_eq!(
+                actual, expected,
+                "{section}['{identifier}'] has the wrong key set — every entry                  carries every key of its section, with null for anything not                  established"
+            );
+        }
+    }
+}
+
 /// Every identifier in the research record stays refused.
 ///
 /// `tracked` documents identifiers we investigated and did not adopt, with the
@@ -695,7 +749,7 @@ fn nothing_in_the_research_record_is_permitted() {
     let allowlist = allowlisted_identifiers();
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../dpp-aas/semantic-ids-allowlist.json"
+        "/../dpp-aas/src/semantic_ids/allowlist.json"
     );
     let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
     let doc: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");

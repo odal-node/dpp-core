@@ -42,7 +42,7 @@
 //!
 //! Every `semanticId` emitted is either in the `urn:odal-node:` namespace — our
 //! own concept, honestly named — or carries a provenance record in
-//! `semantic-ids-allowlist.json` naming who verified it against the authority's
+//! `semantic_ids/allowlist.json` naming who verified it against the authority's
 //! own published source, and when. That rule is enforced by a test, not by a
 //! comment, because six identifiers claiming IDTA and ECLASS authority once sat
 //! here behind comments asking someone to check them.

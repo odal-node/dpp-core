@@ -49,31 +49,31 @@ A runnable version is in [`examples/passport_to_aas.rs`](examples/passport_to_aa
 
 ## Semantic identifiers
 
-Every `semanticId` this crate emits is either in the `urn:odal-node:` namespace —
-our own concept, honestly named — or carries a provenance record in
-[`semantic-ids-allowlist.json`](semantic-ids-allowlist.json) naming who verified
-it against the authority's own published source, and when.
+A `semanticId` tells an integrator's toolchain that one of our elements is
+semantically identical to a published concept. It is a claim about another
+organisation's vocabulary, made in the format most likely to be consumed
+without a human ever reading it — so this crate holds one rule:
 
-That rule is **enforced by a test**, not by a comment. Six identifiers claiming
-IDTA and ECLASS authority once sat here behind comments asking someone to check
-them; a comment cannot fail a build. An allowlist entry missing `verifiedOn` or
-`verifiedBy` is refused.
+> Every emitted `semanticId` is either in the `urn:odal-node:` namespace, or it
+> carries a provenance record naming who verified it against the authority's own
+> published source, and when.
 
-**As of 2026-07-31 this crate emits no third-party identifiers at all.** Seven
-were tracked; six were malformed and one was withdrawn because its *semantic*
-correspondence to our submodel had never been checked. Each is recorded in that
-file under `tracked`, with the correct identifier where it is known, so
-restoring one starts from research rather than from a search engine — and a
-test asserts nothing in that record is permitted.
+**The rule is enforced by a test, not by a comment.** An entry missing
+`verifiedOn` or `verifiedBy` is refused, and CI fails on any identifier that
+satisfies neither branch.
 
-That makes the interop claim narrower and true: this crate produces AAS-shaped
-output carrying **our own** semantics. It is not IDTA-aligned, and saying so
-would be the defect the gate exists to prevent.
+The record is [`src/semantic_ids/allowlist.json`](src/semantic_ids/allowlist.json).
+It has two sections with fixed key sets, also test-enforced:
 
-Presenting an own-coined concept under a standards-body identifier tells an
-integrator's toolchain that our field is semantically identical to a published
-concept. If it is not, that is a false claim made in the format most likely to
-be consumed automatically.
+- **`allowlist`** — identifiers this crate may emit. Currently empty: **it emits
+  none.** The claim is therefore the narrow, accurate one — AAS-shaped output
+  carrying our own semantics, not IDTA conformance.
+- **`tracked`** — identifiers evaluated and not adopted, each with the reason,
+  the correct value where established, and what to check before adopting it.
+  Nothing here is permitted; a test asserts it.
+
+Adopting a third-party identifier means moving it between those sections and
+naming a reader — never editing a status field.
 
 ## Relationship to other crates
 
