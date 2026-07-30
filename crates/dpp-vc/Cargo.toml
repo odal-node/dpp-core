@@ -1,7 +1,7 @@
 [package]
 name        = "dpp-vc"
 description = "W3C Verifiable Credentials, did:web documents and status lists for Odal Node"
-keywords    = ["verifiable-credentials", "did", "did-web", "json-ld", "status-list"]
+keywords    = ["credentials", "did", "did-web", "json-ld", "status-list"]
 categories  = ["cryptography", "encoding"]
 version.workspace     = true
 edition.workspace     = true
