@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn other_sector_produces_no_findings() {
-        let data = SectorData::Other(serde_json::json!({"sector": "toy"}));
+        let data = SectorData::other(serde_json::json!({"sector": "toy"}));
         assert!(lint_sector_data(&data, Utc::now()).is_empty());
     }
 

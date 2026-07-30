@@ -15,6 +15,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The sector axis is open on the wire.** `Sector` and `SectorData` were plain
+  derives — `SectorData` internally tagged on `sector` — so a passport whose
+  sector was not one of the twelve variants **failed to deserialize**, and
+  `SectorData::Other` matched only the literal tag `"other"`, discarding the
+  real key. The catalog, the schema registry, the per-field disclosure map and
+  the plugin manifests were all string-keyed data; the wire was the one closed
+  part, so adding a product group meant releasing this crate.
+
+  `Sector::Other` now carries the wire tag (`Other(String)`), `SectorData::Other`
+  carries both tag and payload (`Other { sector, data }`), and both types have
+  hand-written `Serialize`/`Deserialize` that fall through to those variants
+  instead of failing. An unknown sector round-trips **byte-identically**, which
+  matters because a signature is computed over those bytes.
+
+  Adding a product group is now a catalog manifest plus a schema file.
+
+  *Migration:* `Sector::Other` → `Sector::Other(key)`; construct untyped payloads
+  with `SectorData::other(value)`, which reads the tag from the object, and match
+  them as `SectorData::Other { sector, data }`. `Sector::catalog_key` and
+  `wire_str` return `&str` rather than `&'static str`, and `Sector` is no longer
+  `Copy`. `validate_sector_data_with_registry` now looks up a validator by the
+  sector's **own key** rather than by a literal `"other"`.
+
+  Deliberately **not** included: the ADR's companion change deleting typed lanes
+  for provisional sectors. Eight of eleven catalog sectors are provisional —
+  including textile, which is the pilot — so that is a capability decision, and
+  unlike the wire format it is not clamped to first issuance.
+
 - **`dpp-digital-link` is reduced to GS1; AAS moves to the new `dpp-aas`.**
   The crate had come to carry four unrelated capabilities — GS1 Digital Link
   parsing, AAS mapping, JSON-LD and link-type negotiation — three of which were

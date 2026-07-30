@@ -36,9 +36,9 @@ fn default_catalog() -> &'static SectorCatalog {
 /// validate those through that registry directly (its fail-closed
 /// `validate_strict`).
 ///
-/// `SectorData::Other` is a **hard error** here — pass a
-/// [`SectorValidatorRegistry`] via [`validate_sector_data_with_registry`] to
-/// handle runtime-registered sectors.
+/// A sector with no typed variant in this build is a **hard error** here — pass
+/// a [`SectorValidatorRegistry`] via [`validate_sector_data_with_registry`] to
+/// handle sectors added to the catalog after this crate was released.
 ///
 /// # Errors
 ///
@@ -50,16 +50,20 @@ pub fn validate_sector_data(sector_data: &SectorData) -> Result<(), ValidationEr
 
 /// Like [`validate_sector_data`] but accepts a runtime validator registry.
 ///
-/// For `SectorData::Other(v)`, dispatches to the validator registered under
-/// key `"other"` in `registry`. Returns a hard error if no validator is
-/// registered for that key.
+/// For an untyped sector, dispatches to the validator registered under **that
+/// sector's own key** in `registry` — the key is preserved through
+/// deserialization, so dispatch is by name rather than by a literal `"other"`.
+/// Returns a hard error if no validator is registered for it.
 pub fn validate_sector_data_with_registry(
     sector_data: &SectorData,
     registry: &SectorValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
-    if let SectorData::Other(_) = sector_data {
-        match registry.get("other") {
+    if let SectorData::Other { sector, .. } = sector_data {
+        // Look the validator up by the sector's own key, not by a literal
+        // "other": the key survives deserialization precisely so a sector with
+        // no typed variant in this build can still be dispatched by name.
+        match registry.get(sector) {
             Some(v) => {
                 if let Err(field_errors) = v.validate(&sector_data_instance(sector_data)) {
                     errors.extend(field_errors);
@@ -67,9 +71,10 @@ pub fn validate_sector_data_with_registry(
             }
             None => errors.push(FieldError {
                 field: "/sector".to_owned(),
-                message: "SectorData::Other cannot be validated without a registered validator; \
-                          pass a SectorValidatorRegistry with an \"other\" entry"
-                    .to_owned(),
+                message: format!(
+                    "sector '{sector}' has no typed variant in this build and no validator \
+                     registered for it; pass a SectorValidatorRegistry with a '{sector}' entry"
+                ),
             }),
         }
     } else {
@@ -150,7 +155,8 @@ pub fn validate_raw_sector_data(
 
 /// Schema validation via the registry at the catalog-resolved current version.
 fn schema_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
-    let key = sector_data.sector().catalog_key();
+    let sector = sector_data.sector();
+    let key = sector.catalog_key();
     // No catalog entry (e.g. `Other`) → no schema to validate against.
     let Some(version_str) = default_catalog().current_schema_version(key) else {
         return;
