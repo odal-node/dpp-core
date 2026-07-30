@@ -1,6 +1,6 @@
 //! Cross-crate integration test: AAS mapping across every sector.
 //!
-//! `build_aas_from_passport` (dpp-digital-link::aas) is the primary AAS entry
+//! `build_aas_from_passport` (dpp-aas) is the primary AAS entry
 //! point — it dispatches each sector's `SectorData` to a dedicated submodel
 //! mapper. This test feeds a fully-populated passport for **every** sector
 //! through that path (so each mapper's optional-field branches execute) and
@@ -11,7 +11,7 @@
 //! template registry stays in sync with the sectors.
 
 use chrono::Utc;
-use dpp_digital_link::aas::{
+use dpp_aas::{
     build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
     sector_submodel_template,
 };
@@ -462,7 +462,7 @@ const OWN_NAMESPACE: &str = "urn:odal-node:";
 fn allowlisted_identifiers() -> Vec<String> {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../dpp-digital-link/semantic-ids-allowlist.json"
+        "/../dpp-aas/semantic-ids-allowlist.json"
     );
     let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
     let doc: serde_json::Value = serde_json::from_str(&raw).expect("the allowlist is valid JSON");

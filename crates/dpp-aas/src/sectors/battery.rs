@@ -1,8 +1,8 @@
 use dpp_domain::BatteryData;
 
-use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{double_property, integer_property, opt_enum_wire_str, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{double_property, integer_property, opt_enum_wire_str, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

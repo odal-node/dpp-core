@@ -43,7 +43,9 @@ dpp-core/
     dpp-domain .......... Domain types, port traits, VersionedSchemaRegistry, JSON Schema validation
       schemas/ .......... Versioned JSON Schemas for 11 sectors (battery, textile, electronics, …), embedded via include_str!
     dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify, did:web DID builder, VCs, access policy engine
-    dpp-digital-link .... GS1 Digital Link parser, link-type negotiation, AAS submodel mapping
+    dpp-digital-link ............. GS1 Digital Link parser and link-type negotiation
+    dpp-aas ............. Asset Administration Shell (IDTA) submodel mapping
+    dpp-jsonld .......... JSON-LD context for passport payloads
     dpp-plugin-traits ... Wasm sector plugin ABI (no_std compatible, capability negotiation)
     dpp-plugin-sdk ...... Guest-side plugin SDK: export_plugin! macro + Validator
     dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
@@ -175,7 +177,8 @@ No Docker, no database, no env vars.
 ```bash
 cargo run -p dpp-domain --example create_passport                # Create & validate a textile DPP
 cargo run -p dpp-crypto --example credential_and_transfer        # Issue a VC, transfer responsibility
-cargo run -p dpp-digital-link --example gs1_and_aas              # Parse GS1 links, map to AAS submodel
+cargo run -p dpp-digital-link --example parse_and_negotiate               # Parse GS1 links, negotiate a link type
+cargo run -p dpp-aas --example passport_to_aas                   # Map a passport to an AAS shell
 ```
 
 ---

@@ -66,7 +66,9 @@ dpp-core/
                           #   unsold-goods, toy, tyre  — 11 sectors
     dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
     dpp-crypto/           # Ed25519, AES-GCM, JWS, DID builder, LocalIdentityService
-    dpp-digital-link/     # GS1 Digital Link parser, link-type negotiation, AAS mapping
+    dpp-digital-link/              # GS1 Digital Link parser, link-type negotiation
+    dpp-aas/              # Asset Administration Shell (IDTA) submodel mapping
+    dpp-jsonld/           # JSON-LD context
     dpp-calc/             # EU-methodology calculators (CO2e, repairability)
     dpp-plugin-traits/    # Wasm plugin ABI (no_std)
     dpp-plugin-sdk/       # Guest-side SDK: export_plugin! macro + Validator
@@ -89,11 +91,13 @@ dpp-rules         -> (standalone, no internal deps; no_std, zero-dep)
 dpp-plugin-traits -> (standalone, no internal deps)
 dpp-domain        -> dpp-rules
 dpp-crypto        -> dpp-domain
-dpp-digital-link  -> dpp-domain
+dpp-digital-link           -> dpp-domain
+dpp-aas           -> dpp-domain
+dpp-jsonld        -> (none)
 dpp-registry      -> dpp-domain
 dpp-calc          -> dpp-domain
 dpp-plugin-sdk    -> dpp-plugin-traits + dpp-rules
-dpp-tests         -> dpp-domain, dpp-crypto, dpp-digital-link (dev only)
+dpp-tests         -> dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas (dev only)
 ```
 
 **No crate in this workspace may depend on**: axum, tokio, tower, sqlx, redis, reqwest, or any other HTTP/database/infrastructure crate. If a dependency pulls in async runtime or network I/O, it does not belong here.

@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::TyreData;
 
-use crate::aas::model::{AasSemId, AasSubmodel};
-use crate::aas::property::{double_property, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasSemId, AasSubmodel};
+use crate::property::{double_property, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_tyre_submodel(d: &TyreData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

@@ -46,7 +46,8 @@ passport.validate().unwrap();
 | Crate | Role |
 |---|---|
 | `dpp-crypto` | Cryptographic signing, VCs, audience/disclosure access policy — depends on this crate |
-| `dpp-digital-link` | GS1 Digital Link parsing, AAS mapping — depends on this crate |
+| `dpp-digital-link` | GS1 Digital Link parsing — depends on this crate |
+| `dpp-aas` | AAS submodel mapping — depends on this crate |
 | `dpp-registry` | EU Central Registry connector — depends on this crate |
 | `dpp-plugin-traits` | Wasm plugin ABI — standalone, no dependency on this crate |
 

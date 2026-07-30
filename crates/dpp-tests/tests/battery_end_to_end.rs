@@ -1,4 +1,4 @@
-﻿//! End-to-end integration test: Battery DPP lifecycle.
+//! End-to-end integration test: Battery DPP lifecycle.
 //!
 //! The battery passport is the highest-stakes sector — mandatory from
 //! 18 Feb 2027 under the EU Battery Regulation (2023/1542), Annex XIII. This
@@ -14,13 +14,13 @@
 //! 7. Redact sector data through the catalog descriptor (dpp-domain)
 
 use chrono::Utc;
+use dpp_aas::build_aas_from_passport;
 use dpp_crypto::access::credential::{
     Audience, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
     verify_credential_claims,
 };
 use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
-use dpp_digital_link::aas::build_aas_from_passport;
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,

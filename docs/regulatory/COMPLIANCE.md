@@ -26,7 +26,7 @@ registry connectivity). Those belong in the platform layer.
 | Standard | Body | Version Tracked | Where Used |
 |---|---|---|---|
 | GS1 Digital Link | GS1 | v1.2 | `dpp-digital-link` — URL parsing and link-type negotiation |
-| AAS (Asset Administration Shell) | IDTA | v3.0 | `dpp-digital-link` — submodel mapping |
+| AAS (Asset Administration Shell) | IDTA | v3.0 | `dpp-aas` — submodel mapping |
 | W3C Verifiable Credentials | W3C | Data Model v2.0 | `dpp-crypto` — VC issuance and verification |
 | DID:web | W3C | did:web Method Spec | `dpp-crypto` — DID document builder |
 | JSON Schema | IETF | Draft 2020-12 | `dpp-domain` — passport data validation |

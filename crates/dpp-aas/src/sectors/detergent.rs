@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::DetergentData;
 
-use crate::aas::model::{AasCollection, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{boolean_property, double_property, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasCollection, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{boolean_property, double_property, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_detergent_submodel(d: &DetergentData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
