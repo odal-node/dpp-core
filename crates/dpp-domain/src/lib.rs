@@ -5,6 +5,7 @@
 //!
 //! No I/O, no async, no HTTP, no database drivers — pure domain logic only.
 
+pub mod access;
 pub mod catalog;
 pub mod compliance;
 pub mod domain;

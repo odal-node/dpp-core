@@ -11,8 +11,8 @@
 //!    custom policies, and authority access.
 
 use chrono::Utc;
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::Disclosure;
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::{
     Audience, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,

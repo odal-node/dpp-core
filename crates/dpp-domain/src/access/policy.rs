@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use dpp_domain::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
+use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
 
 /// Maps JSON field names to their disclosure class.
 ///

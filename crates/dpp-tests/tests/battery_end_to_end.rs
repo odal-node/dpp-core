@@ -15,8 +15,8 @@
 
 use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
-use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
