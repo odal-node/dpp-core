@@ -22,8 +22,15 @@ No HTTP framework. No database. No async runtime (except where port traits requi
 +-------------------+ |   +---------------------+
 |    dpp-crypto     | |   |     dpp-registry    |
 |  Ed25519, JWS,    | |   |  EU registry types  |
-|  DID builder,     | |   |    (wasm32-safe)    |
-| LocalIdentitySvc  | |   +---------------------+
+|  keystore         | |   |    (wasm32-safe)    |
+| (no workspace dep)| |   +---------------------+
++-------------------+ |
+        ^             |
+        | depends on  |
++-------------------+ |
+|      dpp-vc       | |  W3C VCs, did:web,
+|  credentials,     | |  status lists,
+|  LocalIdentitySvc | |  JSON-LD context
 +-------------------+ |
                       v
             +-------------------+
@@ -33,9 +40,13 @@ No HTTP framework. No database. No async runtime (except where port traits requi
                       ^
                       | re-exported by
 +------------------+  |  +------------------+   +---------------------+
-| dpp-plugin-traits|  +--|  dpp-plugin-sdk  |   | dpp-digital-link / dpp-aas   |
+| dpp-plugin-traits|  +--|  dpp-plugin-sdk  |   | dpp-digital-link    |
 |     Wasm ABI     |-----| export_plugin!   |   | GS1 Digital Link    |
 +------------------+     +------------------+   +---------------------+
+                                                +---------------------+
+                                                |      dpp-aas        |
+                                                | AAS shells/submodels|
+                                                +---------------------+
 
 +---------------------+
 |      dpp-calc       |  EU-methodology calculators (CO2e,
@@ -72,7 +83,7 @@ Trait definitions that downstream projects implement against their own infrastru
 
 The async traits use `async-trait`. The sync traits are plain Rust traits — compatible with `no_std` and `wasm32`.
 
-`dpp-crypto` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by the local `KeyStore`.
+`dpp-vc` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by `dpp-crypto`'s local `KeyStore`.
 
 ### VersionedSchemaRegistry
 
@@ -89,7 +100,12 @@ Schema validation is gated behind `#[cfg(not(target_arch = "wasm32"))]` because 
 
 ## dpp-crypto — Cryptographic Primitives
 
-Pure signing and key management. No HTTP, no database.
+Pure signing and key management. No HTTP, no database, and **no workspace
+dependencies** — the credential and DID layer that used to sit here is
+[`dpp-vc`](#dpp-vc--trust), and the per-field disclosure policy is
+`dpp_domain::access`. Signing bytes, deciding whose signature means what, and
+deciding which fields a role may see are three jobs, and this crate does the
+first.
 
 ### KeyStore
 
@@ -108,27 +124,12 @@ JWS compact signing (EdDSA with Ed25519):
 - `sign(store, key_id, payload)` — produce a JWS compact serialisation
 - `verify(jws, public_key)` — verify a JWS signature
 
-### DID Builder
-
-Constructs `did:web` DID documents from the KeyStore state:
-
-- `build_did_document(store, base_url, key_id)` — builds the full DID document with the current primary key as `#key-1` (authentication) and archived keys as `#key-2`, `#key-3`, etc. (assertionMethod)
-
 ### JWS Verifier
 
 Single source of truth for JWS verification:
 
 - `verify_jws(jws, public_key_b64)` — verify a JWS against a base64-encoded public key
 - `extract_primary_public_key(did_document)` — extract the primary Ed25519 public key from a DID document
-
-### LocalIdentityService
-
-Concrete implementation of `dpp-domain::ports::IdentityPort` backed by the local `KeyStore`. Wires together the signer, DID builder, and JWS verifier into the port trait interface:
-
-- `sign_passport(passport_id, payload)` — signs the payload with the issuer's Ed25519 key, builds the DID document, and returns a `SignedCredential`
-- `verify_signature(jws, payload)` — resolves the issuer's DID document from the `KeyStore` and verifies the JWS
-
----
 
 ## dpp-registry — EU Registry Interface
 
@@ -138,14 +139,57 @@ The port trait (`RegistrySyncPort`) and its ghost implementation (`GhostRegistry
 
 ---
 
-## dpp-digital-link, dpp-aas, dpp-jsonld — GS1 Digital Link, AAS, JSON-LD
+<a id="dpp-vc--trust"></a>
+## dpp-vc — Trust
 
-Pure, stateless crate — no I/O or network dependencies. Compiles to both `std` and `wasm32`. Four submodules:
+Who may read a passport, and how that is proven. W3C Verifiable Credentials,
+`did:web` documents, Bitstring Status List revocation, `LocalIdentityService`
+(the `IdentityPort` implementation), and the JSON-LD context those are expressed
+in. Depends on `dpp-crypto` for JWS and the keystore.
+
+A credential establishes *which* `Audience` a caller holds; `dpp_domain::access`
+maps that audience to fields. Two questions, two crates.
+
+Not a `wasm32-unknown-unknown` target — it inherits `dpp-crypto`'s need for a
+platform entropy source.
+
+### DID Builder
+
+Constructs `did:web` DID documents from the KeyStore state:
+
+- `build_did_document(store, base_url, key_id)` — builds the full DID document with the current primary key as `#key-1` (authentication) and archived keys as `#key-2`, `#key-3`, etc. (assertionMethod)
+
+### LocalIdentityService
+
+Concrete implementation of `dpp-domain::ports::IdentityPort` backed by the local `KeyStore`. Wires together the signer, DID builder, and JWS verifier into the port trait interface:
+
+- `sign_passport(passport_id, payload)` — signs the payload with the issuer's Ed25519 key, builds the DID document, and returns a `SignedCredential`
+- `verify_signature(jws, payload)` — resolves the issuer's DID document from the `KeyStore` and verifies the JWS
+
+
+---
+
+## dpp-digital-link — GS1
+
+Pure, stateless — no I/O or network dependencies. Compiles to `std` and
+`wasm32`. Two submodules:
 
 - `digital_link` — GS1 Digital Link URI parsing and building (`DigitalLink::parse`/`build`), the GTIN/serial/batch application-identifier table, and QR URL construction.
-- `aas` — maps a `Passport` to IDTA Asset Administration Shell shells and submodels (`build_aas_from_passport`), with a dedicated submodel builder per sector plus the sector-agnostic core submodels (identification, manufacturer, environmental, materials, repairability).
-- `jsonld` — wraps/strips a passport payload in a minimal JSON-LD `@context` envelope for GS1/Schema.org/EU ESPR semantic interoperability.
 - `linktype` — GS1 link-type vocabulary and content-negotiation (`negotiate`) between a client's `Accept` header and a passport's available link descriptors.
+
+---
+
+## dpp-aas — Asset Administration Shell
+
+Maps a `Passport` to AAS shells and submodels (`build_aas_from_passport`), with
+a dedicated submodel builder per product group plus the sector-agnostic core
+submodels (identification, manufacturer, environmental, materials,
+repairability).
+
+**AAS-shaped output carrying our own semantics.** Every emitted `semanticId` is
+either `urn:odal-node:*` or carries a provenance record naming who verified it
+against the authority's published source — enforced by a test. The crate
+currently emits no third-party identifiers, so no IDTA conformance is claimed.
 
 ---
 
@@ -179,7 +223,7 @@ Two wasm32 targets are supported:
 
 | Target | Crates | Purpose |
 |---|---|---|
-| `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas, dpp-jsonld | Browser/Cloudflare Workers (JS-hosted) |
+| `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas | Browser/Cloudflare Workers (JS-hosted). Not `dpp-crypto`/`dpp-vc` — the RNG needs a platform entropy source |
 | `wasm32-wasip1` | sector plugins | wasmtime sandbox (WASI P1 syscall interface) |
 
 `getrandom` uses the JS backend for `wasm32-unknown-unknown` (configured in `.cargo/config.toml`).

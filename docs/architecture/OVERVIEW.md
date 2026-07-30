@@ -163,4 +163,4 @@ trait SealPort              // eIDAS qualified electronic seal (ESPR Art. 13)
 
 `PassportRepository`, `IdentityPort`, `ArchivePort`, `RegistrySyncPort`, and `SealPort` are `async`. The compliance and plugin traits are sync — they must work in `no_std` and `wasm32` contexts.
 
-`dpp-crypto` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by the local `KeyStore`. Anyone who implements the remaining traits against their own infrastructure has a complete, standard-compliant DPP system.
+`dpp-vc` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by `dpp-crypto`'s local `KeyStore`. Anyone who implements the remaining traits against their own infrastructure has a complete, standard-compliant DPP system.

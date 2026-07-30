@@ -237,7 +237,7 @@ Audit logging (who changed what, when, and why) is a platform concern — it is 
 
 ## 6. Verifiable Credential Payload
 
-When a DPP transitions to `Published`, it is wrapped in a W3C Verifiable Credential and signed with the operator's Ed25519 key via `dpp-crypto`. The resulting JWS is stored in `jws_signature`.
+When a DPP transitions to `Published`, it is wrapped in a W3C Verifiable Credential by `dpp-vc` and signed with the operator's Ed25519 key via `dpp-crypto`. The resulting JWS is stored in `jws_signature`.
 
 ```json
 {

@@ -29,13 +29,14 @@ When you're ready to push, structure the history into clean logical commits:
 2. feat(dpp-domain): domain types, passport, sector data, port traits
 3. feat(dpp-domain): transfer of responsibility model
 4. feat(dpp-domain): versioned schema registry with hot-reload
-5. feat(dpp-crypto): Ed25519 key management, JWS, did:web builder
-6. feat(dpp-crypto): verifiable credentials and access policy engine
-7. feat(dpp-digital-link): digital link parser, link-type negotiation
-8. feat(dpp-registry): EU Central Registry interface types
-9. feat(dpp-plugin-traits): wasm plugin ABI with capability negotiation
-10. test: integration tests (textile e2e, transfer, access tier, schema conformity)
-11. docs: architecture docs, conformity statement, README
+5. feat(dpp-crypto): Ed25519 key management, JWS, encrypted keystore
+6. feat(dpp-vc): verifiable credentials, did:web builder, status lists
+7. feat(dpp-domain): per-field disclosure policy and audience filter
+8. feat(dpp-digital-link): digital link parser, link-type negotiation
+9. feat(dpp-registry): EU Central Registry interface types
+10. feat(dpp-plugin-traits): wasm plugin ABI with capability negotiation
+11. test: integration tests (textile e2e, transfer, audience access, schema conformity)
+12. docs: architecture docs, conformity statement, README
 ```
 
 Or if you prefer fewer commits:
@@ -57,7 +58,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 <type>(<scope>): <description>
 
 Types: feat, fix, test, docs, chore, refactor, ci
-Scopes: dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas, dpp-jsonld, dpp-rules, dpp-calc, dpp-plugin-traits, dpp-plugin-sdk, dpp-registry, dpp-tests
+Scopes: dpp-domain, dpp-crypto, dpp-vc, dpp-digital-link, dpp-aas, dpp-rules, dpp-calc, dpp-plugin-traits, dpp-plugin-sdk, dpp-registry, dpp-tests
 ```
 
 Examples:
@@ -180,7 +181,7 @@ cargo publish -p dpp-domain         # depends on dpp-rules
 cargo publish -p dpp-crypto         # depends on dpp-domain
 cargo publish -p dpp-digital-link            # depends on dpp-domain
 cargo publish -p dpp-aas            # depends on dpp-domain
-cargo publish -p dpp-jsonld         # no workspace deps
+cargo publish -p dpp-vc             # depends on dpp-domain + dpp-crypto
 cargo publish -p dpp-registry       # depends on dpp-domain
 cargo publish -p dpp-calc           # depends on dpp-domain
 cargo publish -p dpp-plugin-sdk     # depends on dpp-plugin-traits + dpp-rules

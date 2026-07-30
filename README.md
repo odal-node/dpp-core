@@ -42,16 +42,16 @@ dpp-core/
   crates/
     dpp-domain .......... Domain types, port traits, VersionedSchemaRegistry, JSON Schema validation
       schemas/ .......... Versioned JSON Schemas for 11 sectors (battery, textile, electronics, …), embedded via include_str!
-    dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify, did:web DID builder, VCs, access policy engine
-    dpp-digital-link ............. GS1 Digital Link parser and link-type negotiation
-    dpp-aas ............. Asset Administration Shell (IDTA) submodel mapping
-    dpp-jsonld .......... JSON-LD context for passport payloads
+    dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify
+    dpp-digital-link .... GS1 Digital Link parser and link-type negotiation
+    dpp-aas ............. Asset Administration Shell (AAS) shells and submodels
+    dpp-vc .............. W3C Verifiable Credentials, did:web, JSON-LD context
     dpp-plugin-traits ... Wasm sector plugin ABI (no_std compatible, capability negotiation)
     dpp-plugin-sdk ...... Guest-side plugin SDK: export_plugin! macro + Validator
     dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
     dpp-registry ........ EU Central Registry interface types (wasm32-safe)
     dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
-    dpp-tests ........... Cross-crate integration tests (domain + crypto + gs1)
+    dpp-tests ........... Cross-crate integration tests (domain, crypto, digital-link, aas, vc)
   plugins/ .............. 10 Wasm sector plugins (wasm32-wasip1, excluded from workspace)
 ```
 
@@ -64,9 +64,9 @@ dpp-core/
 | **ESPR** (EU 2024/1781) | In force; unsold-goods rules (Art. 24/25) apply since Jul 2026 | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), unsold-goods sector, transfer-of-responsibility design (not a distinct ESPR article — see below) |
 | **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, sector schema |
 | **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
-| **CEN/CLC JTC 24 system standards** | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | Conformance tracked clause-by-clause; identifiers, carriers, API and authentication semantics aligned |
+| **CEN/CLC JTC 24 system standards** | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | **No conformance claimed.** The standard texts have not been purchased, so no clause-by-clause assessment exists. Without an OJEU citation there is also no presumption of conformity to claim |
 | **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
-| **IDTA AAS Metamodel** | Published | DPP-to-AAS SubmodelElement mapping |
+| **IDTA AAS Metamodel** | Published | Passport-to-AAS shell and submodel mapping. AAS-shaped output carrying **our own** semantics — every emitted `semanticId` is `urn:odal-node:*`; no IDTA conformance is claimed |
 | **W3C VC Data Model v2.0** | Published | `DppAccessCredential` mapping operator roles to an `Audience` |
 
 ---
@@ -103,7 +103,7 @@ When a product undergoes remanufacturing, repurposing, or preparation for reuse,
 
 ### Evidence Dossiers
 
-A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a `dpp-engine` feature: dossiers are generated and persisted by the node, and checked via its API or the `odal verify` CLI command. Core contributes the primitives this depends on — `dpp-crypto`'s Ed25519/JWS and the domain types the dossier snapshots.
+A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a `dpp-engine` feature: dossiers are generated and persisted by the node, and checked via its API or the `odal verify` CLI command. Core contributes the primitives this depends on — `dpp-crypto`'s Ed25519/JWS, `dpp-vc`'s credentials and DID documents, and the domain types the dossier snapshots.
 
 ### Schema Validation
 
@@ -124,7 +124,7 @@ The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtim
 
 - **Digital Link** — Full AI 01/21/10 parsing and building (GS1 URI Syntax v1.2)
 - **Link-type Negotiation** — Content negotiation returning JSON, JSON-LD, HTML, or AAS representations
-- **AAS Submodel Mapping** — Automatic conversion of DPP JSON to IDTA AAS SubmodelElement structures for Catena-X / Industry 4.0
+- **AAS Submodel Mapping** — Passport-to-AAS shells and submodels for Industry 4.0 data spaces, carrying `urn:odal-node:*` semantics rather than a standards body's
 
 ### Wasm Sector Plugins
 
@@ -167,7 +167,7 @@ cd dpp-core
 
 cargo build --workspace          # zero infrastructure needed
 cargo nextest run --workspace    # full unit + integration suite
-just check                       # fmt + clippy + test + audit
+just check                       # fmt + clippy + test + doctests + plugins + doc + audit
 ```
 
 No Docker, no database, no env vars.
@@ -176,8 +176,9 @@ No Docker, no database, no env vars.
 
 ```bash
 cargo run -p dpp-domain --example create_passport                # Create & validate a textile DPP
-cargo run -p dpp-crypto --example credential_and_transfer        # Issue a VC, transfer responsibility
-cargo run -p dpp-digital-link --example parse_and_negotiate               # Parse GS1 links, negotiate a link type
+cargo run -p dpp-crypto --example sign_and_verify                # Keystore, Ed25519 key, JWS sign
+cargo run -p dpp-vc --example credential_and_transfer            # Issue a VC, transfer responsibility
+cargo run -p dpp-digital-link --example parse_and_negotiate      # Parse GS1 links, negotiate a link type
 cargo run -p dpp-aas --example passport_to_aas                   # Map a passport to an AAS shell
 ```
 

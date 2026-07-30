@@ -1,6 +1,12 @@
 # Identity Layer — `did:web`, JWS, and Key Management
 
-This document covers the cryptographic identity primitives in `dpp-crypto`: key management, JWS signing, DID document construction, and the trust model that binds a physical product to a verifiable digital passport.
+This document covers identity across two crates: the cryptographic primitives in
+`dpp-crypto` (key management, JWS signing) and the trust layer in `dpp-vc`
+(`did:web` documents, Verifiable Credentials, status lists), plus the trust model
+that binds a physical product to a verifiable digital passport.
+
+The split is deliberate: signing bytes is a different job from deciding whose
+signature means what. `dpp-vc` depends on `dpp-crypto`, never the reverse.
 
 ---
 
@@ -34,7 +40,7 @@ did:web:manufacturer.example.com:path:subpath
 
 ## 3. DID Document Structure
 
-Every issuer has one DID Document. `dpp-crypto::did_builder` constructs it from the KeyStore state.
+Every issuer has one DID Document. `dpp_vc::did_builder` constructs it from the `dpp-crypto` KeyStore state.
 
 ```json
 {
@@ -93,7 +99,7 @@ Key rotation does not invalidate existing signatures:
 
 ### Signing
 
-`dpp-crypto::signer::sign()` produces a JWS compact serialisation (EdDSA with Ed25519):
+`dpp_crypto::jws::signer::sign()` produces a JWS compact serialisation (EdDSA with Ed25519):
 
 1. Serialize the VC payload deterministically (sorted keys, no extra whitespace)
 2. Build the JWS Protected Header: `{"alg": "EdDSA", "b64": false, "crit": ["b64"], "kid": "{did}#key-1"}`
@@ -103,7 +109,7 @@ Key rotation does not invalidate existing signatures:
 
 ### Verification
 
-`dpp-crypto::jws_verifier` provides the single source of truth for JWS verification:
+`dpp_crypto::jws::verifier` provides the single source of truth for JWS verification:
 
 ```rust
 verify_jws(jws_compact, public_key_b64)?;

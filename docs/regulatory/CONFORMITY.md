@@ -13,7 +13,7 @@ programme evaluators.
 | Reference | Status | dpp-core Alignment |
 |---|---|---|
 | ESPR (EU) 2024/1781 | In force | Core data model follows Art. 8–13 requirements |
-| CEN/CLC JTC 24 system standards | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | Schema fields and API/authentication semantics tracked clause-by-clause against the published ENs |
+| CEN/CLC JTC 24 system standards | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | **No conformance assessed or claimed.** The standard texts have not been purchased, so no clause-by-clause mapping exists. Absent an OJEU citation there is also no presumption of conformity available to claim |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Pending — an ESPR working-plan priority | `TextileData` struct held provisional; validated structurally until the act finalises |
 | GS1 Digital Link v1.2 | Published | `DigitalLink` parser covers AI 01, 21, 10 |
@@ -68,11 +68,14 @@ sectors therefore reuse this same vocabulary through each sector manifest's
 - `dpp_domain::domain::identity` — `Audience`, `Disclosure`, and
   `PASSPORT_FIELD_DISCLOSURE`, the single source for the disclosure class of
   every non-public top-level passport field.
-- `dpp_crypto::access::credential` — W3C VC issuance and verification, mapping
-  an operator role to an `Audience`.
-- `dpp_crypto::access::policy` / `access::filter` — stateless policy engine that
-  filters JSON fields against the caller's `Audience` and a
-  `SectorAccessPolicy`.
+- `dpp_vc::credential` — W3C VC issuance and verification, mapping an operator
+  role to an `Audience`. A credential establishes *which* audience a caller
+  holds.
+- `dpp_domain::access::{policy, filter}` — stateless policy engine that filters
+  JSON fields against the caller's `Audience` and a `SectorAccessPolicy`. This
+  maps an audience to fields, which is a separate question from proving the
+  audience, and lives with the passport because the disclosure classes are
+  declared as data in the sector manifests.
 - Integration test: `crates/dpp-tests/tests/access_gatekeeping.rs` exercises all
   three audiences with realistic credentials.
 

@@ -65,10 +65,10 @@ dpp-core/
                           #   electronics, furniture, steel, textile (v1+v2),
                           #   unsold-goods, toy, tyre  — 11 sectors
     dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
-    dpp-crypto/           # Ed25519, AES-GCM, JWS, DID builder, LocalIdentityService
-    dpp-digital-link/              # GS1 Digital Link parser, link-type negotiation
-    dpp-aas/              # Asset Administration Shell (IDTA) submodel mapping
-    dpp-jsonld/           # JSON-LD context
+    dpp-crypto/           # Ed25519, AES-GCM, JWS, encrypted keystore
+    dpp-vc/               # W3C VCs, did:web, status lists, LocalIdentityService, JSON-LD
+    dpp-digital-link/     # GS1 Digital Link parser, link-type negotiation
+    dpp-aas/              # Asset Administration Shell shells and submodels
     dpp-calc/             # EU-methodology calculators (CO2e, repairability)
     dpp-plugin-traits/    # Wasm plugin ABI (no_std)
     dpp-plugin-sdk/       # Guest-side SDK: export_plugin! macro + Validator
@@ -90,10 +90,10 @@ The dependency graph is strictly acyclic:
 dpp-rules         -> (standalone, no internal deps; no_std, zero-dep)
 dpp-plugin-traits -> (standalone, no internal deps)
 dpp-domain        -> dpp-rules
-dpp-crypto        -> dpp-domain
-dpp-digital-link           -> dpp-domain
+dpp-crypto        -> (none)
+dpp-vc            -> dpp-domain, dpp-crypto
+dpp-digital-link  -> dpp-domain
 dpp-aas           -> dpp-domain
-dpp-jsonld        -> (none)
 dpp-registry      -> dpp-domain
 dpp-calc          -> dpp-domain
 dpp-plugin-sdk    -> dpp-plugin-traits + dpp-rules
