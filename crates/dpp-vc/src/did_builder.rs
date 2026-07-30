@@ -7,7 +7,7 @@
 use base64::Engine;
 use serde_json::{Value, json};
 
-use crate::keystore::KeyStore;
+use dpp_crypto::keystore::KeyStore;
 
 /// Build a `did:web` DID document for an issuer.
 ///
@@ -47,7 +47,7 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
         "controller": did,
         "publicKeyJwk": {
             "kty": "OKP",
-            "crv": crate::jws::algorithm::ED25519_CRV,
+            "crv": dpp_crypto::jws::algorithm::ED25519_CRV,
             "x": primary_pub_b64
         }
     })];
@@ -68,7 +68,7 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
             "controller": did,
             "publicKeyJwk": {
                 "kty": "OKP",
-                "crv": crate::jws::algorithm::ED25519_CRV,
+                "crv": dpp_crypto::jws::algorithm::ED25519_CRV,
                 "x": pub_b64
             }
         }));

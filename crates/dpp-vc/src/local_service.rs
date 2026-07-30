@@ -9,14 +9,14 @@ use sha2::{Digest, Sha256};
 use dpp_domain::ports::identity_port::IdentityPort;
 use dpp_domain::{DppError, PassportId, SignedCredential};
 
-use crate::jws::signer;
-use crate::jws::verifier::{
+use dpp_crypto::jws::signer;
+use dpp_crypto::jws::verifier::{
     extract_key_by_fingerprint, extract_kid_from_jws, extract_primary_public_key, verify_jws,
 };
-use crate::keystore::KeyStore;
+use dpp_crypto::keystore::KeyStore;
 
-use super::did_builder::build_did_document;
-use super::passport_credential::build_passport_credential;
+use crate::did_builder::build_did_document;
+use crate::passport_credential::build_passport_credential;
 
 /// Concrete `IdentityPort` backed by a local `KeyStore`.
 ///
@@ -48,7 +48,7 @@ impl IdentityPort for LocalIdentityService {
         passport_id: PassportId,
         payload: &serde_json::Value,
     ) -> Result<SignedCredential, DppError> {
-        let canonical = crate::jws::canonical::canonicalize(payload)
+        let canonical = dpp_crypto::jws::canonical::canonicalize(payload)
             .map_err(|e| DppError::Signing(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&canonical));
 
@@ -91,7 +91,7 @@ impl IdentityPort for LocalIdentityService {
             Some(bytes) => bytes,
             None => return Ok(false),
         };
-        let expected = crate::jws::canonical::canonicalize(payload)
+        let expected = dpp_crypto::jws::canonical::canonicalize(payload)
             .map_err(|e| DppError::Signing(e.to_string()))?;
         Ok(signed_payload == expected)
     }
@@ -105,7 +105,7 @@ impl IdentityPort for LocalIdentityService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keystore::KeyStore;
+    use dpp_crypto::keystore::KeyStore;
     use dpp_domain::PassportId;
     use std::sync::Arc;
 

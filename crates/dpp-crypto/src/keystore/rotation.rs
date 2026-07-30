@@ -56,7 +56,7 @@ impl KeyStore {
     }
 
     /// Atomically **revoke** the current key and install a fresh one. The old key
-    /// is archived but marked revoked, so [`crate::identity::did_builder`] drops it from
+    /// is archived but marked revoked, so `dpp_vc::did_builder` drops it from
     /// the published DID document and signatures it produced no longer verify.
     /// Use this on key **compromise** (vs. hygiene rotation, where the old key
     /// stays valid — see [`rotate_key`](Self::rotate_key)).

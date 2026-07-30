@@ -66,14 +66,14 @@ pub(crate) fn default_algorithm() -> String {
     crate::jws::algorithm::EDDSA_ALG.to_owned()
 }
 
-/// A key's public half plus its revocation state, read directly from a
-/// [`KeyRecord`]'s plaintext `verifying_key_hex`/`revoked` fields — no
-/// private-key decryption involved. For callers (like the DID document
-/// builder) that only ever need the public key, this avoids an AES-GCM
-/// decrypt per key on every call.
-pub(crate) struct PublicKeyInfo {
-    pub(crate) verifying_key_hex: String,
-    pub(crate) revoked: bool,
+/// A key's public half plus its revocation state, read directly from the
+/// stored record's plaintext `verifying_key_hex`/`revoked` fields — no
+/// private-key decryption involved. For callers (like the `did:web` document
+/// builder in `dpp-vc`) that only ever need the public key, this avoids an
+/// AES-GCM decrypt per key on every call.
+pub struct PublicKeyInfo {
+    pub verifying_key_hex: String,
+    pub revoked: bool,
 }
 
 impl From<&KeyRecord> for PublicKeyInfo {
@@ -310,7 +310,11 @@ impl KeyStore {
 
     /// The public key and revocation state of the current key under `key_id`,
     /// without decrypting the private key. Returns `None` if no such key exists.
-    pub(crate) fn public_key(&self, key_id: &str) -> Option<PublicKeyInfo> {
+    ///
+    /// `pub` rather than `pub(crate)` because the `did:web` document builder
+    /// lives in `dpp-vc` and needs exactly this: public key material and
+    /// revocation state, never the private key.
+    pub fn public_key(&self, key_id: &str) -> Option<PublicKeyInfo> {
         let map = self.records.read().expect("key store read lock poisoned");
         map.get(key_id).map(PublicKeyInfo::from)
     }
@@ -318,7 +322,7 @@ impl KeyStore {
     /// Public keys of all archived records for `key_id`, in the same ascending
     /// timestamp order as [`Self::load_archived_keys`], without decrypting any
     /// private key material.
-    pub(crate) fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
+    pub fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
         let prefix = format!("{key_id}#archived-");
         let map = self.records.read().expect("key store read lock poisoned");
 

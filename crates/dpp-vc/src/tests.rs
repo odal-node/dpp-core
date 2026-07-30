@@ -5,10 +5,10 @@ use serde_json::json;
 
 use sha2::Digest;
 
-use super::did_builder::build_did_document;
-use super::local_service::LocalIdentityService;
-use crate::keystore::KeyStore;
+use crate::did_builder::build_did_document;
+use crate::local_service::LocalIdentityService;
 use crate::test_support::temp_store;
+use dpp_crypto::keystore::KeyStore;
 
 use dpp_domain::{PassportId, ports::identity_port::IdentityPort};
 
@@ -399,7 +399,89 @@ async fn sign_passport_credential_is_typed_vc() {
     let payload_hash = vc.credential_subject.payload_hash.as_str();
     assert_eq!(payload_hash.len(), 64, "SHA-256 hex is 64 chars");
 
-    let canonical = crate::jws::canonical::canonicalize(&payload).unwrap();
+    let canonical = dpp_crypto::jws::canonical::canonicalize(&payload).unwrap();
     let expected_hash = hex::encode(sha2::Sha256::digest(&canonical));
     assert_eq!(payload_hash, expected_hash, "payload_hash must match");
+}
+
+// ── Key rotation across the DID document ─────────────────────────────────────
+//
+// These moved from `dpp-crypto`'s JWS suite when the `did:web` builder moved
+// here: they assert a property that spans both crates — a JWS signed before a
+// rotation still verifies against the DID document afterwards, and a revoked
+// key's signature does not. `dpp-vc` is where they can see both halves.
+
+/// Regression (W-2): sign with key A, rotate to key B, verify old JWS against
+/// a DID document that contains both keys.
+#[test]
+fn rotation_does_not_break_old_jws_verification() {
+    let path = std::env::temp_dir().join(format!("test-w2-rotation-{}.json", uuid::Uuid::now_v7()));
+    let store = KeyStore::open(&path, "rotation-test").expect("open store");
+    store.generate_key("issuer").expect("generate key A");
+
+    let payload = json!({"product": "battery", "status": "draft"});
+    let jws_a = dpp_crypto::jws::signer::sign(&store, "issuer", &payload).expect("sign with A");
+
+    store.archive_key("issuer").expect("archive A");
+    store.generate_key("issuer").expect("generate key B");
+
+    let did_doc =
+        crate::did_builder::build_did_document(&store, "https://id.example.com", "issuer")
+            .expect("build DID doc");
+
+    assert_eq!(
+        did_doc["verificationMethod"].as_array().unwrap().len(),
+        2,
+        "DID doc must list both keys after rotation"
+    );
+
+    let kid = dpp_crypto::jws::verifier::extract_kid_from_jws(&jws_a).expect("kid must be present");
+    let pub_key = dpp_crypto::jws::verifier::extract_key_by_fingerprint(&did_doc, &kid)
+        .expect("archived key must be found by fingerprint");
+
+    let ok =
+        dpp_crypto::jws::verifier::verify_jws(&jws_a, &pub_key).expect("verify must not error");
+    assert!(
+        ok,
+        "old JWS must verify against archived key after rotation"
+    );
+
+    let jws_b = dpp_crypto::jws::signer::sign(&store, "issuer", &payload).expect("sign with B");
+    let kid_b =
+        dpp_crypto::jws::verifier::extract_kid_from_jws(&jws_b).expect("kid must be present");
+    let pub_key_b = dpp_crypto::jws::verifier::extract_key_by_fingerprint(&did_doc, &kid_b)
+        .expect("current key must be found by fingerprint");
+    let ok_b =
+        dpp_crypto::jws::verifier::verify_jws(&jws_b, &pub_key_b).expect("verify must not error");
+    assert!(ok_b, "new JWS must verify against current key");
+}
+
+/// Gap 7 end-to-end: after a key is **revoked**, a JWS it produced must no
+/// longer be verifiable — the revoked key is absent from the DID document.
+#[test]
+fn revoked_key_signature_no_longer_verifies() {
+    let path =
+        std::env::temp_dir().join(format!("test-revoke-verify-{}.json", uuid::Uuid::now_v7()));
+    let store = KeyStore::open(&path, "rev-verify").expect("open store");
+    store.generate_key("issuer").expect("generate key A");
+
+    let payload = json!({"product": "battery", "status": "draft"});
+    let jws_a = dpp_crypto::jws::signer::sign(&store, "issuer", &payload).expect("sign with A");
+
+    store.revoke_and_rotate("issuer").expect("revoke+rotate");
+    let did_doc =
+        crate::did_builder::build_did_document(&store, "https://id.example.com", "issuer")
+            .expect("build DID doc");
+
+    let kid = dpp_crypto::jws::verifier::extract_kid_from_jws(&jws_a).expect("kid present");
+    assert!(
+        dpp_crypto::jws::verifier::extract_key_by_fingerprint(&did_doc, &kid).is_none(),
+        "a revoked key must not be selectable for verification"
+    );
+
+    let jws_b = dpp_crypto::jws::signer::sign(&store, "issuer", &payload).expect("sign with B");
+    let kid_b = dpp_crypto::jws::verifier::extract_kid_from_jws(&jws_b).expect("kid present");
+    let pub_b = dpp_crypto::jws::verifier::extract_key_by_fingerprint(&did_doc, &kid_b)
+        .expect("current key resolves");
+    assert!(dpp_crypto::jws::verifier::verify_jws(&jws_b, &pub_b).expect("verify"));
 }

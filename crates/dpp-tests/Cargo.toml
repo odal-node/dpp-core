@@ -19,6 +19,7 @@ path = "src/lib.rs"
 [dependencies]
 dpp-domain = { workspace = true }
 dpp-crypto = { workspace = true }
+dpp-vc     = { workspace = true }
 chrono     = { workspace = true }
 
 # Integration tests in `tests/` exercise multiple core crates together
