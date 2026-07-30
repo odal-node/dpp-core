@@ -52,7 +52,7 @@ The CI `cargo check` target verifies this. Do not break it.
 
 ## Module structure
 
-```
+```text
 src/
 ├── lib.rs                    re-exports everything at the crate root (backward compat)
 │

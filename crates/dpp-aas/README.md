@@ -25,17 +25,23 @@ specification, and nothing here should be described as IDTA-conformant.
 ## Example
 
 ```rust
-use dpp_aas::{build_aas_from_passport, AasSubmodelElement};
+use dpp_aas::build_aas_from_passport;
+use dpp_domain::Passport;
 
-// `passport` is a fully-populated dpp_domain::Passport
-let (shell, submodels) = build_aas_from_passport(&passport, "09506000134352");
+fn render_aas(passport: &Passport, gtin: &str) {
+    let (shell, submodels) = build_aas_from_passport(passport, gtin);
 
-assert_eq!(shell.id_short, "DigitalProductPassport");
-assert!(shell.asset_information.global_asset_id.contains("09506000134352"));
+    assert_eq!(shell.id_short, "DigitalProductPassport");
+    assert!(shell.asset_information.global_asset_id.contains(gtin));
 
-// Five core submodels, plus one per-sector submodel when sector_data is present
-for submodel in &submodels {
-    println!("{} ({} elements)", submodel.id_short, submodel.submodel_elements.len());
+    // Five core submodels, plus one per-sector submodel when sector_data is set
+    for submodel in &submodels {
+        println!(
+            "{} ({} elements)",
+            submodel.id_short,
+            submodel.submodel_elements.len()
+        );
+    }
 }
 ```
 

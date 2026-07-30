@@ -22,3 +22,12 @@ pub use digital_link::{
 pub use linktype::{
     Audience, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,
 };
+
+/// Compile-checks this crate's README examples.
+///
+/// A README example is a public claim about the API, and nothing else in the
+/// build compiles one. Without this, a README can advertise a function that
+/// does not exist — which is exactly what happened before this harness landed.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

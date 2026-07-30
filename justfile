@@ -15,6 +15,15 @@
 test:
     cargo nextest run --workspace --all-features
 
+# Run doctests, including each crate's README.
+#
+# Separate from `test` because `cargo nextest` does not run doctests at all —
+# which is how every README example in this workspace went years without being
+# compiled, several of them advertising functions that do not exist. Each
+# publishable crate pulls its README in via a `ReadmeDoctests` item.
+test-doc:
+    cargo test --doc --workspace --all-features
+
 # Run clippy (all warnings are errors). --all-features for the reason above.
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -56,7 +65,7 @@ test-plugins:
     echo "All plugin tests passed."
 
 # Run all gate checks (fmt → lint → test → plugin tests → doc → audit)
-check: fmt-check lint test test-plugins doc audit
+check: fmt-check lint test test-doc test-plugins doc audit
 
 # ---------------------------------------------------------------------------
 # Build

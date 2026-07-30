@@ -74,3 +74,12 @@ pub use common::country::country_code_valid;
 pub use textiles::fibre::{
     FIBRE_SUM_TOLERANCE, FibreInput, fibre_sum_ok, validate_fibre_composition,
 };
+
+/// Compile-checks this crate's README examples.
+///
+/// A README example is a public claim about the API, and nothing else in the
+/// build compiles one. Without this, a README can advertise a function that
+/// does not exist — which is exactly what happened before this harness landed.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

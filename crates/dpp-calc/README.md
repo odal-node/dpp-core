@@ -30,7 +30,7 @@ by the operator. That split is the licensing rationale for this crate.
 
 ## Module structure
 
-```
+```text
 src/
 ├── lib.rs                    public API + sector-calculator scaling guide (read this first)
 │
@@ -106,6 +106,7 @@ use dpp_calc::repairability_index::{
 };
 use dpp_calc::ruleset_registry;
 
+fn assess() -> Result<(), Box<dyn std::error::Error>> {
 // Each of the three part-level parameters is scored 1–5 for all ten Annex IV
 // priority parts. `folding_mechanism` is None for a non-foldable product.
 let parts = |s: u8| PriorityPartScores {
@@ -141,6 +142,8 @@ if let Some(ruleset) =
     let result = calculate(&inputs, ruleset)?;
     println!("R = {:.2}", result.index);
 }
+Ok(())
+}
 ```
 
 `resolve_repairability_index` returns an `Assessability`, not an `Option`:
@@ -157,6 +160,7 @@ use dpp_calc::repairability::{
 };
 use dpp_calc::ruleset_registry;
 
+fn assess() -> Result<(), Box<dyn std::error::Error>> {
 // The date the governing law attached to this product — read from the product's
 // own record (`placedOnMarketDate`), never from the wall clock. There is
 // deliberately no `AssessmentClock::now()`.
@@ -182,6 +186,8 @@ let ruleset = ruleset_registry::resolve_repairability("smartphone-tablet", clock
     .assessed()
     .ok_or("no ruleset governs this category on that date")?;
 let result = calculate(&inputs, ruleset, clock)?;
+Ok(())
+}
 ```
 
 ### Cradle-to-gate CO₂e
@@ -191,6 +197,7 @@ use chrono::NaiveDate;
 use dpp_calc::clock::AssessmentClock;
 use dpp_calc::co2e::{Co2eInputs, CradleToGateRuleset, MaterialFootprint, calculate};
 
+fn assess() -> Result<(), Box<dyn std::error::Error>> {
 let clock = AssessmentClock::placed_on(NaiveDate::from_ymd_opt(2026, 3, 14).unwrap());
 
 let result = calculate(
@@ -206,15 +213,18 @@ let result = calculate(
     clock,
 )?;
 println!("{:.2} kg CO₂e", result.total_co2e_kg); // 5.20 kg CO₂e
+Ok(())
+}
 ```
 
 ---
 
 ## CalculationReceipt
 
-Every calculator returns a `CalculationReceipt` alongside the computed value:
+Every calculator returns a `CalculationReceipt` alongside the computed value.
+Shape shown for orientation; the definition is in `kernel::receipt`:
 
-```rust
+```rust,ignore
 pub struct CalculationReceipt {
     pub receipt_id:             Uuid,          // UUIDv7 — time-sortable
     pub input_hash:             String,        // SHA-256 of canonical JSON inputs
@@ -240,7 +250,10 @@ version + same factor dataset version → must produce the same output.
 Every concrete ruleset carries a machine-readable legal citation:
 
 ```rust
-Eu2023_1669Ruleset.regulatory_basis()
+use dpp_calc::ruleset::Ruleset;
+use dpp_calc::repairability_index::Eu2023_1669Ruleset;
+
+let _basis = Eu2023_1669Ruleset.regulatory_basis();
 // RegulatoryBasis {
 //   regulation: "EU 2023/1669",
 //   article:    "Annex IV point 5 (calculation method); \

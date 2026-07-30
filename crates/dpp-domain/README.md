@@ -20,25 +20,27 @@ It contains everything that changes when EU regulations change — and nothing e
 ## Example
 
 ```rust
-use dpp_domain::{Passport, PassportId, Sector, SectorData, TextileData, FibreEntry};
+use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::catalog::SectorCatalog;
+use dpp_domain::Audience;
+use serde_json::json;
 
-let passport = Passport::new(
-    PassportId::new(),
-    "did:web:manufacturer.example.com".into(),
-    Sector::Textile,
-    SectorData::Textile(TextileData {
-        fibre_composition: vec![FibreEntry {
-            fibre_type: "Organic Cotton".into(),
-            percentage: 100.0,
-            country_of_origin: Some("TR".into()),
-        }],
-        care_instructions: "Machine wash 30°C".into(),
-        country_of_manufacture: "TR".into(),
-        ..Default::default()
-    }),
-);
+// Sector metadata is data, not code: regime, status, retention and per-field
+// disclosure all come from the catalog manifests.
+let catalog = SectorCatalog::new();
+let battery = catalog.get("battery").expect("battery is in the catalog");
+assert_eq!(battery.key, "battery");
 
-passport.validate().unwrap();
+// The disclosure classes declared in that manifest are what the filter applies.
+let policy = SectorAccessPolicy::from_catalog(&catalog, "battery")
+    .expect("battery declares a disclosure policy");
+
+let full = json!({ "productName": "EcoCell", "stateOfHealthPct": 87.5 });
+let public = filter_by_audience(&full, &policy, Audience::Public);
+
+// State of health is per-item data — withheld from the public audience.
+assert_eq!(public.filtered_data["productName"], "EcoCell");
+assert!(public.filtered_data.get("stateOfHealthPct").is_none());
 ```
 
 ## Relationship to other crates

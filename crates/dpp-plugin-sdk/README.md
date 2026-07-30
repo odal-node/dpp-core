@@ -21,17 +21,38 @@ ABI (`alloc`/`dealloc`) and the standard exports (`metadata`, `describe`,
 ## Example
 
 ```rust
-use dpp_plugin_sdk::{export_plugin, traits::*};
+use dpp_plugin_sdk::traits::*;
 
 #[derive(Default)]
 struct BatteryPlugin;
 
 impl DppSectorPlugin for BatteryPlugin {
-    // implement `meta`, `capabilities`, `validate_input`, `calculate_metrics`, `generate_passport`
+    fn plugin_identity(&self) -> PluginIdentity {
+        todo!("sector key, plugin name and semantic version")
+    }
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        todo!("the schema versions this plugin accepts")
+    }
+    fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
+        todo!("cross-field rules from dpp-rules")
+    }
+    fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
+        todo!("compliance determination")
+    }
+    fn generate_passport(&self, input: PluginInput) -> Result<serde_json::Value, PluginError> {
+        todo!("the sector payload")
+    }
 }
 
-export_plugin!(BatteryPlugin);
+// `meta` and `capabilities` have default implementations — override them only
+// if the defaults are wrong for your sector.
+//
+// Then call the macro exactly once at the crate root to generate the ABI:
+//
+//     dpp_plugin_sdk::export_plugin!(BatteryPlugin);
 ```
+
+`plugins/sector-battery` is the reference implementation — read it before writing a new one.
 
 ## Relationship to other crates
 
