@@ -35,7 +35,12 @@ use dpp_crypto::jws::{signer, verifier};
 use dpp_crypto::keystore::KeyStore;
 use serde_json::json;
 
-let store = KeyStore::open("keys.json", "correct-horse-battery-staple").unwrap();
+// `open` creates the keystore file if it is absent, so the path matters: this
+// example is compiled and run as a doctest, and a relative path would write a
+// real keystore into the source tree. A deployment passes a configured path
+// outside the repository.
+let path = std::env::temp_dir().join("odal-keystore-example.json");
+let store = KeyStore::open(&path, "correct-horse-battery-staple").unwrap();
 store.generate_key("issuer").unwrap();
 
 let payload = json!({ "product": "battery", "status": "published" });

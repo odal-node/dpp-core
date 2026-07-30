@@ -53,3 +53,9 @@ desktop.ini
 *.bak
 coverage/
 .nyc_output/
+# Keystores. `KeyStore::open` creates the file if absent, so an example or a
+# test given a relative path writes real key material into the tree — which is
+# how `crates/dpp-crypto/keys.json` was once committed. Belt and braces: the
+# examples now use temp paths, and this stops the next one being committed.
+keys.json
+*.keystore.json
