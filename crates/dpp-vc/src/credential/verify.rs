@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use super::revocation::{RevocationOutcome, check_revocation};
 use super::trust::TrustedIssuerRegistry;
 use super::types::{Audience, CredentialRole, DppAccessCredential};
-use crate::access::status_list::StatusList;
+use crate::status_list::StatusList;
 
 // ─── Verification result ────────────────────────────────────────────────────
 

@@ -21,4 +21,4 @@ mod store;
 mod tests;
 
 pub use entry::KeyEntry;
-pub use store::KeyStore;
+pub use store::{KeyStore, PublicKeyInfo};

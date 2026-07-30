@@ -5,11 +5,11 @@
 //! at multiple call sites before this module existed.
 
 use chrono::Utc;
-use dpp_crypto::{CredentialRole, DppCredentialSubject};
 use dpp_domain::{
     CarbonFootprint, ManufacturerInfo, MaterialEntry, OperatorRole, Passport, PassportId,
     PassportStatus, RepairabilityScore, ResponsibleOperator, Sector, SectorData,
 };
+use dpp_vc::{CredentialRole, DppCredentialSubject};
 
 /// A base passport with the sector-agnostic fields populated so the five core
 /// AAS submodels (identification, manufacturer, environmental, materials,

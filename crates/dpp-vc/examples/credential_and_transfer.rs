@@ -6,11 +6,11 @@
 //! Run with: `cargo run --example credential_and_transfer`
 
 use chrono::Utc;
-use dpp_crypto::access::credential::{
-    CredentialBuilder, CredentialRole, DppCredentialSubject, verify_credential_claims,
-};
 use dpp_domain::{
     OperatorRole, PassportId, ResponsibleOperator, TransferChain, TransferReason, TransferRecord,
+};
+use dpp_vc::credential::{
+    CredentialBuilder, CredentialRole, DppCredentialSubject, verify_credential_claims,
 };
 use uuid::Uuid;
 

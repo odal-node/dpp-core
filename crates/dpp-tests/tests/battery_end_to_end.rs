@@ -15,10 +15,6 @@
 
 use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
-use dpp_crypto::access::credential::{
-    Audience, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
-    verify_credential_claims,
-};
 use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
 use dpp_domain::domain::sector::CriticalRawMaterial;
@@ -28,6 +24,10 @@ use dpp_domain::{
     SectorCatalog, SectorData, redact_sector_data,
 };
 use dpp_tests::fixtures::base_passport;
+use dpp_vc::credential::{
+    Audience, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
+    verify_credential_claims,
+};
 
 /// The canonical valid GTIN-14 used throughout the test suite.
 const VALID_GTIN: &str = "09506000134352";

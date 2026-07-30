@@ -2,7 +2,7 @@
 //!
 //! Defines the **one** canonical byte form of a JSON value. This is the signing
 //! contract: [`crate::jws::signer`] signs over these bytes, and every content-binding
-//! verifier ([`crate::identity::local_service`]) recomputes them and compares.
+//! verifier (`dpp_vc::local_service`) recomputes them and compares.
 //! Signature equivalence therefore rests on a defined canonical form — not on
 //! incidental serde behaviour (object key order, number formatting, unicode
 //! escaping) that can differ between serializers and silently break

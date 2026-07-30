@@ -1,11 +1,17 @@
-//! `dpp-crypto` — Ed25519 signing, JWS compact serialisation, DID documents,
-//! and audience-scoped Verifiable Credentials.
+//! `dpp-crypto` — cryptographic primitives: Ed25519 signing, JWS compact
+//! serialisation, and the encrypted keystore.
 //!
 //! All modules are pure (no I/O, no network). The crate compiles to `std` for
 //! the node and to `wasm32` (where conditional) for plugin guests.
+//!
+//! Verifiable Credentials, `did:web` documents and status lists moved to
+//! [`dpp-vc`]: signing bytes is a different job from deciding whose signature
+//! means what. `access` remains here pending the `dpp-domain` analysis — see
+//! that module's own note.
+//!
+//! [`dpp-vc`]: https://docs.rs/dpp-vc
 
 pub mod access;
-pub mod identity;
 pub mod jws;
 pub mod keystore;
 
@@ -22,12 +28,4 @@ pub(crate) fn os_rng() -> rand::rand_core::UnwrapErr<rand::rngs::SysRng> {
 
 // ── Flat re-exports — maintain stable paths for external callers ─────────────
 
-pub use access::{
-    AllowAllIssuers, Audience, CredentialBuilder, CredentialRole, CredentialStatus,
-    DppAccessCredential, DppCredentialSubject, PolicyDecision, RevocationOutcome,
-    SectorAccessPolicy, StaticTrustedIssuers, StatusList, TrustedIssuerRegistry,
-    VerificationResult, check_revocation, filter_by_audience, verify_credential_claims,
-    verify_credential_claims_with_trust, verify_credential_with_revocation,
-    verify_credential_with_revocation_and_trust,
-};
-pub use identity::{LocalIdentityService, PassportCredential, PassportCredentialSubject};
+pub use access::{PolicyDecision, SectorAccessPolicy, filter_by_audience};
