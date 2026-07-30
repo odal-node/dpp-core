@@ -95,7 +95,7 @@ is no date-dependent choice to make.
 
 ---
 
-## Usage
+## Example
 
 ### Repairability index (enacted — EU 2023/1669 Annex IV)
 
@@ -309,6 +309,10 @@ step-by-step guide. Short version:
 | `dpp-engine` (BSL-1.1) | Stores `CalculationReceipt`, serves the verification endpoint, manages `FactorProvider` lifecycle |
 
 ---
+
+## Minimum Rust version
+
+1.96 (MSRV is enforced in CI)
 
 ## License
 

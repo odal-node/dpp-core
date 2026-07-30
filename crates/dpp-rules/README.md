@@ -14,6 +14,34 @@ depending on the other.
 
 ---
 
+## When to use this crate
+
+- You need a cross-field regulatory check that JSON Schema cannot express — a
+  sum constraint, a conditional disclosure trigger, an enumerated band.
+- You are writing a Wasm sector plugin and need the same rule the host applies,
+  compiled into the guest.
+- You are adding a rule and need it to exist exactly once, reachable from both
+  `dpp-domain` and the plugins.
+
+## Example
+
+```rust
+use dpp_rules::{FibreInput, fibre_sum_ok, validate_fibre_composition};
+
+// Fibre percentages must sum to ~100% (± FIBRE_SUM_TOLERANCE)
+assert!(fibre_sum_ok(&[70.0, 30.0]));
+assert!(!fibre_sum_ok(&[70.0, 20.0]));
+
+// The full cross-field rule also checks ranges and ISO 3166-1 alpha-2 origins
+let fibres = [
+    FibreInput { fibre: "organic cotton", pct: 70.0, country_of_origin: Some("IN") },
+    FibreInput { fibre: "recycled polyester", pct: 30.0, country_of_origin: None },
+];
+assert!(validate_fibre_composition(&fibres).is_ok());
+```
+
+---
+
 ## No-std constraint
 
 This crate **must remain `#![no_std]` + `alloc` with zero dependencies.** That is the whole reason C1 extracted it from `dpp-domain`: sector plugins compile to `wasm32-wasip1` and cannot pull in the heavier domain crate. If a rule needs `std` or an external crate, the rule is in the wrong place.
@@ -84,3 +112,21 @@ Active sectors are batteries, textiles, and electronics. All others have placeho
 | Repairability scoring → `dpp-calc` | EN 45554 A–E grade calculation belongs to the calculator crate; only field-level validations live here |
 | SVHC → `chemicals/` | REACH Art. 33 is cross-sector; it must never be placed under a single sector module |
 | `common/` threshold | A helper belongs in `common/` only if it is used by ≥ 2 sector modules and has no sector-specific meaning |
+
+---
+
+## Relationship to other crates
+
+| Crate | Role |
+|---|---|
+| `dpp-domain` | Consumes these rules for standalone validation; this crate does **not** depend on it |
+| `dpp-plugin-sdk` | Re-exports these rules to Wasm sector plugins via `dpp_plugin_sdk::rules` |
+| `dpp-calc` | Holds scoring and calculation; field-level validation belongs here, not there |
+
+## Minimum Rust version
+
+1.96 (MSRV is enforced in CI)
+
+## License
+
+Apache-2.0 — see [LICENSE](../../LICENSE)
