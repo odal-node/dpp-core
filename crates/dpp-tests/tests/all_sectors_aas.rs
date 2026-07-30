@@ -344,7 +344,8 @@ fn unknown_sector_uses_generic_fallback_submodel() {
         "thrustKn": 500.0,
         "reusable": true,
         "stageCount": 2
-    }));
+    }))
+    .expect("spacecraft has no typed variant");
     let passport = base(Sector::Other("spacecraft".into()), other, "1.0.0");
     let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
 
@@ -594,8 +595,7 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
 /// fixture in this file exercises.
 ///
 /// Battery is covered elsewhere for its mapping, so the walk above never builds
-/// one — and battery carries the single allowlisted third-party identifier.
-/// Without this the one entry the allowlist exists for would go unchecked.
+/// one. Its template identifier would otherwise go unchecked entirely.
 #[test]
 fn every_sector_template_semantic_id_is_ours_or_provenanced() {
     let allowlist = allowlisted_identifiers();

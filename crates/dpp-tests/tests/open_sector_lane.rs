@@ -42,13 +42,14 @@ fn an_unknown_sector_keeps_its_identity_through_a_round_trip() {
     });
 
     let data: SectorData = serde_json::from_value(wire.clone()).expect("deserializes");
-    let back = serde_json::to_value(&data).expect("serializes");
 
-    // Byte-identical, not merely "an object with the right tag": a passport
-    // issued for a sector this build cannot type must survive storage and
-    // retrieval unchanged, or the signature over it stops verifying.
+    // Compare serialised bytes, not `Value`s: `Value` equality is
+    // order-insensitive, so it would pass even if the round trip reordered or
+    // renormalised the object. A signature is computed over bytes, so bytes are
+    // what has to survive.
     assert_eq!(
-        back, wire,
+        serde_json::to_string(&data).expect("serializes"),
+        serde_json::to_string(&wire).expect("serializes"),
         "an untyped sector payload was altered by a round trip"
     );
 }
@@ -125,4 +126,22 @@ fn a_payload_with_no_sector_tag_is_still_an_error() {
         result.is_err(),
         "a payload with no sector tag must be refused"
     );
+}
+
+#[test]
+fn the_untyped_variant_cannot_alias_a_typed_sector() {
+    // `Other` holding a typed sector's tag would be a second representation of
+    // that sector which does not compare equal to the first: it would miss
+    // every typed match arm and be refused by validation, while the same bytes
+    // deserialized normally produce a valid typed value.
+    for typed in ["battery", "textile", "unsoldGoods", "unsold-goods", "toy"] {
+        assert!(
+            SectorData::other(json!({ "sector": typed })).is_none(),
+            "SectorData::other accepted '{typed}', which has a typed variant"
+        );
+    }
+
+    // Unknown tags, and payloads carrying none, are still constructible.
+    assert!(SectorData::other(json!({ "sector": UNKNOWN })).is_some());
+    assert!(SectorData::other(json!({ "someField": 1 })).is_some());
 }

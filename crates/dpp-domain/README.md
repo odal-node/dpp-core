@@ -47,7 +47,8 @@ assert!(public.filtered_data.get("stateOfHealthPct").is_none());
 
 | Crate | Role |
 |---|---|
-| `dpp-crypto` | Cryptographic signing, VCs, audience/disclosure access policy — depends on this crate |
+| `dpp-crypto` | JWS signing and the keystore — no dependency in either direction |
+| `dpp-vc` | Credentials, `did:web` and status lists — depends on this crate |
 | `dpp-digital-link` | GS1 Digital Link parsing — depends on this crate |
 | `dpp-aas` | AAS submodel mapping — depends on this crate |
 | `dpp-registry` | EU Central Registry connector — depends on this crate |

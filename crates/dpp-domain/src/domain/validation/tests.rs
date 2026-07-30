@@ -187,7 +187,7 @@ fn textile_fibre_sum_not_100_fails() {
 
 #[test]
 fn other_sector_data_fails_without_registry() {
-    let data = SectorData::other(serde_json::json!({"field": "value"}));
+    let data = SectorData::other(serde_json::json!({"field": "value"})).expect("untyped");
     let err = validate_sector_data(&data).unwrap_err();
     assert!(
         err.errors.iter().any(|e| e.field == "/sector"),
@@ -209,7 +209,7 @@ fn other_sector_data_passes_with_registered_validator() {
     let mut registry = SectorValidatorRegistry::new();
     registry.register("other", Arc::new(AlwaysOkValidator));
 
-    let data = SectorData::other(serde_json::json!({"field": "value"}));
+    let data = SectorData::other(serde_json::json!({"field": "value"})).expect("untyped");
     assert!(
         validate_sector_data_with_registry(&data, &registry).is_ok(),
         "registered AlwaysOkValidator must allow Other sector"
@@ -233,7 +233,7 @@ fn other_sector_data_validator_errors_propagate() {
     let mut registry = SectorValidatorRegistry::new();
     registry.register("other", Arc::new(AlwaysFailValidator));
 
-    let data = SectorData::other(serde_json::json!({"field": "bad"}));
+    let data = SectorData::other(serde_json::json!({"field": "bad"})).expect("untyped");
     let err = validate_sector_data_with_registry(&data, &registry).unwrap_err();
     assert!(
         err.errors

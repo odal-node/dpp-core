@@ -31,7 +31,7 @@
       "source": "https://github.com/eclipse-tractusx/sldt-semantic-models",
       "usedFor": "battery sector submodel template",
       "status": "not-adopted",
-      "checkedOn": "2026-07-31",
+      "checkedOn": "2026-07-30",
       "finding": "Identifier is well-formed, released, and current at 6.0.0. Correspondence between the aspect model's field set and this crate's battery submodel was not established, so the semantic claim is unsupported.",
       "correctIdentifier": "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass",
       "licence": "CC-BY-4.0. Eclipse Foundation governance; no membership required to use the models. Attribution applies to reuse of model content, not to referencing the identifier.",

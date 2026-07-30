@@ -144,18 +144,30 @@ impl<'de> Deserialize<'de> for SectorData {
 
 impl SectorData {
     /// Build an untyped payload, reading the tag from the object's own
-    /// `sector` field.
+    /// `sector` field. Falls back to `"other"` when the object carries none.
     ///
-    /// Falls back to `"other"` only when the object does not carry one — a
-    /// payload with no tag has no identity to preserve.
+    /// Returns `None` if the tag names a sector this build *does* type.
+    ///
+    /// # Why this can fail
+    ///
+    /// `Other` holding a typed sector's tag would be a second representation of
+    /// that sector which does not compare equal to the first: `Other("battery")`
+    /// is not `Sector::Battery` under `Eq` or `Hash`, would miss every typed
+    /// match arm, and would be refused by `validate_sector_data` even though the
+    /// same bytes deserialize into a valid `Battery`. Deserialization already
+    /// routes known tags to their variants; this constructor must not offer a
+    /// way around it.
     #[must_use]
-    pub fn other(data: serde_json::Value) -> Self {
+    pub fn other(data: serde_json::Value) -> Option<Self> {
         let sector = data
             .get("sector")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("other")
             .to_owned();
-        Self::Other { sector, data }
+        match Sector::from_wire_tag(&sector) {
+            Sector::Other(_) => Some(Self::Other { sector, data }),
+            _ => None,
+        }
     }
 
     /// Returns the `Sector` discriminant for this data.

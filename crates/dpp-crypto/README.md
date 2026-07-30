@@ -12,11 +12,10 @@ derivation and rotation.
 Pure Rust, no I/O beyond the keystore file. Not a `wasm32-unknown-unknown`
 target — the RNG requires a platform entropy source.
 
-> **Scope note.** Verifiable Credentials, `did:web` documents and status lists
-> moved to [`dpp-vc`](../dpp-vc): signing bytes is a different job from deciding
-> whose signature means what. The `access` module — the per-field disclosure
-> policy and its filter — remains here pending analysis of `dpp-domain`, which
-> is its settled home. See `dpp-docs/decisions/ADR-010-crate-architecture.md`.
+**This crate has no workspace dependencies.** Verifiable Credentials, `did:web`
+documents and status lists are [`dpp-vc`](../dpp-vc); the per-field disclosure
+policy is `dpp_domain::access`. What remains is primitives, and nothing here
+needs a domain type to do its job.
 
 ## When to use this crate
 
@@ -25,8 +24,6 @@ target — the RNG requires a platform entropy source.
   before signing.
 - You are managing signing keys at rest — generation, rotation, revocation,
   archival — with encryption and integrity protection.
-- You need to apply a sector's disclosure policy to a passport payload for a
-  given audience (`access`, pending its move to `dpp-domain`).
 
 ## Example
 
@@ -68,8 +65,9 @@ cargo run -p dpp-crypto --example sign_and_verify
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `Audience`, `Disclosure`, `SectorCatalog` and `IdentityPort` — required by this crate |
-| `dpp-vc` | Depends on this crate for JWS and the keystore; holds the credential and DID layer |
+| — | This crate depends on no other workspace crate |
+| `dpp-vc` | Depends on this crate for JWS and the keystore; holds credentials, `did:web` and status lists |
+| `dpp-domain` | Holds `Audience`, `Disclosure` and the disclosure filter — no dependency in either direction |
 
 ## Minimum Rust version
 

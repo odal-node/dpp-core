@@ -26,14 +26,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `Sector::Other` now carries the wire tag (`Other(String)`), `SectorData::Other`
   carries both tag and payload (`Other { sector, data }`), and both types have
   hand-written `Serialize`/`Deserialize` that fall through to those variants
-  instead of failing. An unknown sector round-trips **byte-identically**, which
-  matters because a signature is computed over those bytes.
+  instead of failing. An unknown sector round-trips **byte-identically** — the
+  test compares serialised bytes rather than `Value`s, since a signature is
+  computed over bytes and `Value` equality would not catch a renormalisation.
 
   Adding a product group is now a catalog manifest plus a schema file.
 
   *Migration:* `Sector::Other` → `Sector::Other(key)`; construct untyped payloads
-  with `SectorData::other(value)`, which reads the tag from the object, and match
-  them as `SectorData::Other { sector, data }`. `Sector::catalog_key` and
+  with `SectorData::other(value)` — which reads the tag from the object and
+  returns `Option`, see below — and match them as
+  `SectorData::Other { sector, data }`. `Sector::catalog_key` and
   `wire_str` return `&str` rather than `&'static str`, and `Sector` is no longer
   `Copy`. `validate_sector_data_with_registry` now looks up a validator by the
   sector's **own key** rather than by a literal `"other"`.
@@ -71,19 +73,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   behind would have made `dpp-crypto` depend on `dpp-vc` and closed a cycle.
   The dependency direction is `dpp-vc → dpp-crypto → dpp-domain`.
 
-  `access/{filter,policy}` **stay in `dpp-crypto` for now.** Their settled home
-  is `dpp-domain` — which fields a role may see describes what a passport is,
-  not who is asking — but `dpp-domain` has not been analysed yet, and routing
-  them via `dpp-vc` would mean moving them twice. See
-  `dpp-docs/decisions/ADR-010-crate-architecture.md`.
-
   *Migration:* `dpp_crypto::{AllowAllIssuers, CredentialBuilder, CredentialRole,
   CredentialStatus, DppAccessCredential, DppCredentialSubject, RevocationOutcome,
   StaticTrustedIssuers, StatusList, TrustedIssuerRegistry, VerificationResult,
   check_revocation, verify_credential_*, LocalIdentityService, PassportCredential,
   PassportCredentialSubject}` → `dpp_vc::`. `dpp_crypto::identity::did_builder`
-  → `dpp_vc::did_builder`. `dpp_crypto::{PolicyDecision, SectorAccessPolicy,
-  filter_by_audience}` are unchanged.
+  → `dpp_vc::did_builder`.
+
+- **The disclosure contract moves from `dpp-crypto` to `dpp-domain`.** Which
+  fields a role may see describes what a passport *is* — the classes are
+  declared as data in the sector manifests — so it belongs with the passport,
+  not with the primitives that sign it. `dpp-crypto`'s re-exports are removed.
+
+  A consequence worth stating: `access/` was the only module in `dpp-crypto`
+  referencing `dpp_domain`, so **`dpp-crypto` now has no workspace dependencies
+  at all.**
+
+  *Migration:* `dpp_crypto::access::{SectorAccessPolicy, filter_by_audience,
+  PolicyDecision}` and the flat `dpp_crypto::{…}` re-exports of the same three
+  → `dpp_domain::access::`.
+
+- **Persisted value objects move out of `dpp-domain::ports` into
+  `dpp-domain::domain`.** `ports/` held types the `Passport` aggregate imports
+  back — `ComplianceResult` and `SealedEnvelope` and their field types — so the
+  seam was not a seam. `ports/{compliance,seal}` now contain only traits.
+
+  *Migration:* none required. Every moved type is re-exported from its former
+  path, so existing imports continue to resolve. Prefer
+  `dpp_domain::domain::{compliance,seal}` in new code.
 
 ### Changed
 
@@ -114,7 +131,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   **`dpp-aas` therefore emits no third-party semanticIds at all.** All seven
   tracked identifiers, with findings and the correct value where known, are
-  recorded in `semantic-ids-allowlist.json` under `tracked`; a test asserts
+  recorded in `dpp-aas/src/semantic_ids/allowlist.json` under `tracked`; a test asserts
   none of them is permitted.
 
   Adopting the correct IDTA identifiers is deliberately **not** part of this
@@ -133,6 +150,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   inside it. `PRODUCT_NAME`, `MANUFACTURER_NAME`, `CO2E_PER_UNIT` and
   `REPAIRABILITY_SCORE` are new and carry the property role.
 
+- **`SectorData::other` returns `Option<Self>`.** It previously took the tag
+  verbatim, so `SectorData::other(payload_tagged_battery)` produced
+  `Other { sector: "battery" }` — a second representation of a typed sector that
+  does not compare equal to `Sector::Battery`, misses every typed match arm, and
+  is refused by `validate_sector_data` even though the same bytes deserialize
+  into a valid `Battery`. It now returns `None` for any tag this build types.
+
+  *Migration:* handle the `Option`. Payloads with an unknown tag, or with no
+  tag, are unaffected.
+
+### Added
+
+- **README examples are compiled in the gate.** Each publishable crate pulls its
+  README in as a doctest, and `just check` runs `test-doc` — `cargo nextest`
+  does not execute doctests, so these examples were previously never compiled.
+
 ### Fixed
 
 - The battery AAS submodel emitted `dueDigiligenceUrl`; it now emits
@@ -140,7 +173,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
-- `semantic-ids-allowlist.json` in `dpp-aas`, plus a CI gate asserting that
+- `dpp-aas/src/semantic_ids/allowlist.json`, plus a CI gate asserting that
   every emitted semanticId is either `urn:odal-node:*` or carries a provenance
   record naming who verified it against the authority's source and when. An
   entry missing `verifiedOn` or `verifiedBy` is refused. The previous mechanism

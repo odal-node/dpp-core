@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-aas"
-description = "Asset Administration Shell (IDTA) projection of an Odal Node passport"
+description = "Asset Administration Shell (AAS) projection of an Odal Node passport"
 keywords    = ["aas", "industry-4-0", "digital-twin", "idta", "submodel"]
 categories  = ["encoding", "data-structures"]
 version.workspace     = true
