@@ -1,8 +1,8 @@
 [package]
-name        = "dpp-digital-link"
-description = "GS1 Digital Link parser/builder and GS1 link-type negotiation for Odal Node"
-keywords    = ["gs1", "digital-link", "gtin", "barcode", "resolver"]
-categories  = ["parser-implementations", "encoding"]
+name        = "dpp-aas"
+description = "Asset Administration Shell (IDTA) projection of an Odal Node passport"
+keywords    = ["aas", "industry-4-0", "digital-twin", "idta", "submodel"]
+categories  = ["encoding", "data-structures"]
 version.workspace     = true
 edition.workspace     = true
 authors.workspace     = true
@@ -12,14 +12,14 @@ homepage.workspace    = true
 rust-version.workspace = true
 
 [lib]
-name = "dpp_digital_link"
+name = "dpp_aas"
 path = "src/lib.rs"
 
 [dependencies]
 dpp-domain = { workspace = true }
-thiserror  = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-proptest = { workspace = true }
+chrono = { workspace = true }
+uuid   = { workspace = true }

@@ -11,6 +11,7 @@ dpp-calc    = { workspace = true }
 dpp-crypto  = { workspace = true }
 dpp-domain  = { workspace = true }
 dpp-digital-link     = { workspace = true }
+dpp-aas              = { workspace = true }
 dpp-tests   = { workspace = true }
 chrono      = { workspace = true }
 serde_json  = { workspace = true }

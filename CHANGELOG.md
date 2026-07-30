@@ -13,6 +13,67 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`dpp-digital-link` is reduced to GS1; AAS moves to the new `dpp-aas`.**
+  The crate had come to carry four unrelated capabilities — GS1 Digital Link
+  parsing, AAS mapping, JSON-LD and link-type negotiation — three of which were
+  not in its name. The AAS module was 56% of the crate and had no consumer at
+  all, so every dependent that wanted a GS1 parser compiled an AAS mapper to
+  get one.
+
+  The crate **keeps its name**: what remains is GS1 Digital Link parsing and
+  GS1 link-type negotiation, which is what the name says.
+
+  *Migration:* `dpp_digital_link::{DigitalLink, validate_gtin, short_serial,
+  build_qr_url, Gs1LinkType, DppMediaType, ResolutionRequest, negotiate, …}`
+  are unchanged and stay put. `dpp_digital_link::aas::*` moves to `dpp_aas::*`.
+  `dpp_digital_link::jsonld::*` moves to `dpp_vc::jsonld::*`. No types,
+  signatures or serialised output changed — only the crate a symbol lives in.
+
+- **Six third-party AAS `semanticId` values are replaced with `urn:odal-node:`
+  identifiers.** The removed values claimed IDTA and ECLASS authority and were
+  malformed rather than merely stale: four used an
+  `admin-shell.io/IDTA/<document-number>/<v>/<v>` form that IDTA does not use
+  (its identifiers are name-based, e.g.
+  `https://admin-shell.io/idta/nameplate/3/0/Nameplate`); the ECLASS IRDI
+  carried Code Space Identifier `01` — Classification Class — while being used
+  as a Property semanticId, where `02` is the Property space; and
+  `urn:idta:aas:submodel:digital-product-passport:1.0` was coined rather than
+  looked up (IDTA's is `https://admin-shell.io/idta/cds/dppMetadata/1`).
+
+  `urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass` was verified
+  against the Eclipse Tractus-X semantic-models repository and is retained.
+
+  Adopting the correct IDTA identifiers is deliberately **not** part of this
+  change: it requires reading the specifications, and substituting one
+  unverified identifier for another would repeat the defect. An honestly
+  namespaced own identifier states that a concept is ours; a wrong IRDI states
+  that it is IDTA's, to a machine.
+
+  *Migration:* consumers matching on the previous constants must re-map. The
+  affected submodels are `ProductIdentification`, `ManufacturerInformation`,
+  `EnvironmentalImpact`, `MaterialComposition`, `Repairability` and the generic
+  passport submodel.
+
+- **Submodel and Property `semanticId`s are now distinct.** Four identifiers
+  previously served as both the semanticId of a Submodel and of a Property
+  inside it. `PRODUCT_NAME`, `MANUFACTURER_NAME`, `CO2E_PER_UNIT` and
+  `REPAIRABILITY_SCORE` are new and carry the property role.
+
+### Fixed
+
+- The battery AAS submodel emitted `dueDigiligenceUrl`; it now emits
+  `dueDiligenceUrl`. A test had been asserting the misspelling.
+
+### Added
+
+- `semantic-ids-allowlist.json` in `dpp-aas`, plus a CI gate asserting that
+  every emitted semanticId is either `urn:odal-node:*` or carries a provenance
+  record naming who verified it against the authority's source and when. An
+  entry missing `verifiedOn` or `verifiedBy` is refused. The previous mechanism
+  was a comment, and a comment cannot fail a build.
+
 ## [0.12.0] - 2026-07-29
 
 ### Breaking

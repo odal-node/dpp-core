@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::SteelData;
 
-use crate::aas::model::{AasSemId, AasSubmodel};
-use crate::aas::property::{double_property, enum_wire_str, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasSemId, AasSubmodel};
+use crate::property::{double_property, enum_wire_str, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_steel_submodel(d: &SteelData, passport_id: &str) -> AasSubmodel {
     let route_str = enum_wire_str(&d.production_route);

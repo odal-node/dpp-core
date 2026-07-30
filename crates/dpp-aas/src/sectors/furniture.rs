@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::FurnitureData;
 
-use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{double_property, string_property, svhc_substance_element};
-use crate::aas::semantic_ids;
+use crate::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{double_property, string_property, svhc_substance_element};
+use crate::semantic_ids;
 
 pub(super) fn build_furniture_submodel(d: &FurnitureData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

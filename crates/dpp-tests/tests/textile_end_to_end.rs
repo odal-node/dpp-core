@@ -1,4 +1,4 @@
-﻿//! End-to-end integration test: Textile DPP lifecycle.
+//! End-to-end integration test: Textile DPP lifecycle.
 //!
 //! This test exercises the full lifecycle of a textile Digital Product Passport
 //! across multiple dpp-core crates:
@@ -12,13 +12,13 @@
 //! 7. Serialise / deserialise the full passport round-trip
 
 use chrono::Utc;
+use dpp_aas::map_dpp_to_aas_submodel;
 use dpp_crypto::access::credential::verify_credential_claims;
 use dpp_crypto::access::credential::{
     Audience, CredentialBuilder, CredentialRole, DppCredentialSubject,
 };
 use dpp_crypto::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_digital_link::DigitalLink;
-use dpp_digital_link::aas::map_dpp_to_aas_submodel;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport,
     RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,

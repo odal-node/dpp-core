@@ -1,10 +1,10 @@
 use dpp_domain::domain::sector::ElectronicsData;
 
-use crate::aas::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{
+use crate::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{
     boolean_property, double_property, enum_wire_str, integer_property, string_property,
 };
-use crate::aas::semantic_ids;
+use crate::semantic_ids;
 
 pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

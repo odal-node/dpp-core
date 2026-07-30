@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::UnsoldGoodsReport;
 
-use crate::aas::model::{AasSemId, AasSubmodel};
-use crate::aas::property::{double_property, enum_wire_str, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasSemId, AasSubmodel};
+use crate::property::{double_property, enum_wire_str, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &str) -> AasSubmodel {
     let reason_str = enum_wire_str(&r.reason);

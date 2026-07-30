@@ -1,89 +1,16 @@
-//! Example: Parse a GS1 Digital Link and map a typed Passport to a full AAS shell.
+//! Example: map a typed Passport to a full AAS shell and submodels.
 //!
-//! Demonstrates the interoperability layer — GS1 URI parsing and automatic
-//! conversion to IDTA Asset Administration Shell structures for Industry 4.0 /
-//! Catena-X integration.
-//!
-//! Run with: `cargo run --example gs1_and_aas`
+//! Run with: `cargo run --example passport_to_aas`
 
 use chrono::Utc;
-use dpp_digital_link::{
-    AasSubmodelElement, DigitalLink, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest,
-    build_aas_from_passport, negotiate,
-};
-use dpp_domain::Disclosure;
+use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
 };
 
 fn main() {
-    println!("=== GS1 Digital Link Parsing ===\n");
-
-    let uri = "https://id.odal-node.io/01/09506000134352/21/SN-2026-001";
-    let link = DigitalLink::parse(uri).unwrap();
-
-    println!("Parsed: {uri}");
-    println!("  Resolver: {}", link.resolver_base);
-    println!("  GTIN (AI 01): {}", link.gtin);
-    println!(
-        "  Serial (AI 21): {}",
-        link.serial.as_deref().unwrap_or("—")
-    );
-    println!("  Batch (AI 10): {}", link.batch.as_deref().unwrap_or("—"));
-
-    let uri_batch = "https://id.odal-node.io/01/09506000134352/10/LOT-Q2-2026/21/UNIT-042";
-    let link_batch = DigitalLink::parse(uri_batch).unwrap();
-    println!("\nParsed: {uri_batch}");
-    println!("  GTIN: {}", link_batch.gtin);
-    println!("  Batch: {}", link_batch.batch.as_deref().unwrap_or("—"));
-    println!("  Serial: {}", link_batch.serial.as_deref().unwrap_or("—"));
-
-    let built = link.build();
-    println!("\nRebuilt URI: {built}");
-
-    println!("\n=== Link-Type Negotiation ===\n");
-
-    let descriptors = vec![
-        LinkDescriptor {
-            link_type: Gs1LinkType::DigitalProductPassport,
-            media_type: DppMediaType::Json,
-            disclosure: Disclosure::Public,
-            href: "https://api.odal-node.io/dpp/09506000134352/data".into(),
-            title: Some("DPP JSON".into()),
-            language: None,
-        },
-        LinkDescriptor {
-            link_type: Gs1LinkType::DigitalProductPassport,
-            media_type: DppMediaType::JsonLd,
-            disclosure: Disclosure::Public,
-            href: "https://api.odal-node.io/dpp/09506000134352/data.jsonld".into(),
-            title: Some("DPP JSON-LD".into()),
-            language: None,
-        },
-        LinkDescriptor {
-            link_type: Gs1LinkType::ProductInformationPage,
-            media_type: DppMediaType::Html,
-            disclosure: Disclosure::Public,
-            href: "https://passport.odal-node.io/09506000134352".into(),
-            title: Some("Human-readable passport".into()),
-            language: Some("en".into()),
-        },
-    ];
-
-    let request = ResolutionRequest {
-        link_type: Some(Gs1LinkType::DigitalProductPassport),
-        media_type: Some(DppMediaType::Json),
-        audience: None,
-    };
-
-    let resolved = negotiate(&descriptors, &request);
-    println!("Negotiation request: JSON Digital Product Passport");
-    println!("  Resolved: {}", resolved.unwrap().href);
-
-    println!("\n=== AAS Shell + Submodel Mapping ===\n");
-
-    // Build a typed Passport for a textile product
+    // A typed Passport for a textile product.
     let passport = Passport {
         id: PassportId::new(),
         batch_id: Some("LOT-Q2-2026".into()),

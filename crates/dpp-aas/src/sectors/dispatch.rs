@@ -2,8 +2,8 @@
 
 use dpp_domain::SectorData;
 
-use crate::aas::mapper::json_value_to_element;
-use crate::aas::model::AasSubmodel;
+use crate::mapper::json_value_to_element;
+use crate::model::AasSubmodel;
 
 /// Build a generic "unmodelled sector" submodel from a JSON object's fields
 /// (minus the `sector` discriminant key) — the fallback shape shared by both

@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::ConstructionData;
 
-use crate::aas::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{boolean_property, double_property, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{boolean_property, double_property, string_property};
+use crate::semantic_ids;
 
 pub(super) fn build_construction_submodel(d: &ConstructionData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

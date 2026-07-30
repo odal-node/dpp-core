@@ -1,8 +1,8 @@
 use dpp_domain::domain::sector::ToyData;
 
-use crate::aas::model::{AasCollection, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{boolean_property, string_property, svhc_substance_element};
-use crate::aas::semantic_ids;
+use crate::model::{AasCollection, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{boolean_property, string_property, svhc_substance_element};
+use crate::semantic_ids;
 
 pub(super) fn build_toy_submodel(d: &ToyData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![

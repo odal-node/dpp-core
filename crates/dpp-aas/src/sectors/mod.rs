@@ -26,9 +26,9 @@ mod unsold_goods;
 
 use dpp_domain::Passport;
 
-use crate::aas::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::aas::property::{double_property, string_property};
-use crate::aas::semantic_ids;
+use crate::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
+use crate::property::{double_property, string_property};
+use crate::semantic_ids;
 
 pub(super) use dispatch::build_sector_submodel;
 
