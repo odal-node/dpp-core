@@ -405,9 +405,11 @@ fn textile_v1_data_deserializes_with_defaults() {
 // ── Sector enum metadata ──────────────────────────────────────────────
 
 #[test]
-fn every_sector_declares_retention_and_catalog_key() {
-    // All 12 variants: minimum_retention_years() and catalog_key() must be
-    // total (every match arm exercised) and consistent with the catalog.
+fn every_sector_declares_a_catalog_key() {
+    // Every variant's catalog_key() must be total — every match arm exercised.
+    // Retention is deliberately absent here: it lives in the catalog manifests
+    // alongside the act that imposes it, and `SectorCatalog::retention_years`
+    // is its only accessor.
     let all = [
         (Sector::Battery, "battery"),
         (Sector::Textile, "textile"),
@@ -424,8 +426,6 @@ fn every_sector_declares_retention_and_catalog_key() {
     ];
     for (sector, key) in all {
         assert_eq!(sector.catalog_key(), key);
-        // ESPR delegated acts mandate ≥ 10 years retention across the board.
-        assert!(sector.minimum_retention_years() >= 10);
     }
 }
 

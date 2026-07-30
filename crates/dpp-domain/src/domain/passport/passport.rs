@@ -137,7 +137,8 @@ pub struct Passport {
     /// liquidation or a cessation of activity" of the responsible operator. The
     /// separate back-up-copy obligation (via a DPP service provider) is **Art.
     /// 10(4)**, not the retention period itself.
-    /// Computed at publish time from the catalog `retention_years` for the sector.
+    /// Computed at publish time from `SectorCatalog::retention_years` for the
+    /// sector — the single source of the retention obligation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention_until: Option<DateTime<Utc>>,
     /// Opaque link to an internal product-template record. Not a legal identifier.

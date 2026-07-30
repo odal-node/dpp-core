@@ -37,26 +37,6 @@ pub enum Sector {
 }
 
 impl Sector {
-    /// Minimum data retention period in years as required by the applicable
-    /// EU delegated act.  The Battery Regulation (2023/1542) mandates ≥ 10
-    /// years after end-of-life.  Other sectors default to 10 years pending
-    /// their respective delegated acts.
-    pub const fn minimum_retention_years(&self) -> u32 {
-        match self {
-            Self::Battery => 10,
-            Self::Textile | Self::UnsoldGoods => 10,
-            Self::Steel => 10,
-            Self::Electronics => 10,
-            Self::Construction => 10,
-            Self::Tyre => 10,
-            Self::Toy => 10,
-            Self::Aluminium => 10,
-            Self::Furniture => 10,
-            Self::Detergent => 10,
-            Self::Other(_) => 10,
-        }
-    }
-
     /// Canonical sector key used by the schema registry and the `SectorCatalog`.
     ///
     /// This is the one true spelling (kebab-case where needed), distinct from
