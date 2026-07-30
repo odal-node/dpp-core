@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-30
+
 ### Breaking
 
 - **The sector axis is open on the wire.** `Sector` and `SectorData` were plain
