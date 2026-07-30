@@ -30,19 +30,31 @@ these as an implementation target.
 
 ## Example
 
+Identifiers validate structurally before any network call, so a bad GTIN check
+digit is caught here rather than by the EU endpoint:
+
 ```rust
-use dpp_registry::registry::{RegistrationPayload, RegistryEnvelope, RegistryStatus};
+use dpp_registry::ProductIdentifier;
 
-let payload = RegistrationPayload {
-    passport_id: "urn:dpp:passport:abc123".into(),
-    issuer_did: "did:web:manufacturer.example.com".into(),
-    sector: "textile".into(),
-    schema_version: "1.1.0".into(),
+let product = ProductIdentifier {
+    scheme: "gtin".into(),
+    value: "09506000134352".into(),
+    label: Some("EcoCell 18650".into()),
 };
+assert!(product.validate().is_ok());
 
-// Wrap in the standard envelope before sending to the EU endpoint
-let envelope = RegistryEnvelope::new(payload);
+// Same GTIN with a corrupted check digit
+let corrupted = ProductIdentifier {
+    scheme: "gtin".into(),
+    value: "09506000134353".into(),
+    label: None,
+};
+assert!(corrupted.validate().is_err());
 ```
+
+`RegistrationPayload` carries the four Annex III identifier classes — product,
+item, facility and operator — and `RegistrationPayload::validate` checks all of
+them together before a round-trip.
 
 ## Relationship to other crates
 

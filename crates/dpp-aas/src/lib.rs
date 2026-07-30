@@ -71,3 +71,12 @@ pub use model::{
 };
 pub use property::{boolean_property, double_property, integer_property, string_property};
 pub use templates::{SubmodelTemplate, placeholder_templates, sector_submodel_template};
+
+/// Compile-checks this crate's README examples.
+///
+/// A README example is a public claim about the API, and nothing else in the
+/// build compiles one. Without this, a README can advertise a function that
+/// does not exist — which is exactly what happened before this harness landed.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
