@@ -460,12 +460,22 @@ const OWN_NAMESPACE: &str = "urn:odal-node:";
 /// An entry missing `verifiedOn` or `verifiedBy` is dropped rather than
 /// honoured, so a half-filled record fails the gate exactly like an absent one.
 fn allowlisted_identifiers() -> Vec<String> {
+    allowlisted_from(&allowlist_document())
+}
+
+fn allowlist_document() -> serde_json::Value {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../dpp-aas/semantic-ids-allowlist.json"
     );
     let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
-    let doc: serde_json::Value = serde_json::from_str(&raw).expect("the allowlist is valid JSON");
+    serde_json::from_str(&raw).expect("the allowlist is valid JSON")
+}
+
+/// Split out from the loader so the provenance rule can be tested against
+/// synthetic entries. With the live allowlist deliberately empty, testing it
+/// through the real file would assert nothing.
+fn allowlisted_from(doc: &serde_json::Value) -> Vec<String> {
     let entries = doc["allowlist"]
         .as_object()
         .expect("the allowlist has an `allowlist` object");
@@ -608,21 +618,50 @@ fn every_sector_template_semantic_id_is_ours_or_provenanced() {
 /// A record without a reader is not provenance.
 #[test]
 fn an_allowlist_entry_missing_provenance_is_refused() {
-    let live = allowlisted_identifiers();
-    assert!(
-        live.iter()
-            .any(|id| id.starts_with("urn:samm:io.catenax.battery")),
-        "the Catena-X entry should be allowlisted while its provenance is complete"
+    let complete = serde_json::json!({
+        "allowlist": {
+            "urn:example:concept": { "verifiedOn": "2026-01-01", "verifiedBy": "A. Reader" }
+        }
+    });
+    assert_eq!(
+        allowlisted_from(&complete),
+        vec!["urn:example:concept".to_owned()],
+        "a complete record should be honoured"
     );
 
-    // The same identifier, with the reader's name removed, must stop counting.
-    let stripped: Vec<String> = Vec::new();
-    assert!(
-        !is_permitted(
-            "urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass",
-            &stripped
+    for (missing, doc) in [
+        (
+            "no reader",
+            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedOn": "2026-01-01"}}}),
         ),
-        "an identifier whose provenance was dropped must fail the gate"
+        (
+            "no date",
+            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedBy": "A. Reader"}}}),
+        ),
+        (
+            "blank reader",
+            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedOn": "2026-01-01", "verifiedBy": "   "}}}),
+        ),
+    ] {
+        assert!(
+            allowlisted_from(&doc).is_empty(),
+            "an entry with {missing} was honoured — a half-filled record must fail \
+             the gate exactly like an absent one"
+        );
+    }
+}
+
+/// The live allowlist is empty, and that is a decision.
+///
+/// This crate emits no third-party semanticIds. The test exists so that adding
+/// one is a deliberate act with a visible diff here, rather than something that
+/// slips in — and so an empty allowlist is never mistaken for a broken loader.
+#[test]
+fn no_third_party_identifier_is_currently_permitted() {
+    assert!(
+        allowlisted_identifiers().is_empty(),
+        "a third-party identifier was allowlisted; confirm a named reader checked \
+         it against the authority's own source, then update this test"
     );
 }
 
@@ -640,6 +679,40 @@ fn a_fabricated_third_party_identifier_is_refused() {
             !is_permitted(fake, &allowlist),
             "'{fake}' passed the gate — a coined identifier in a standards-body \
              namespace is the defect this test exists for"
+        );
+    }
+}
+
+/// Every identifier in the research record stays refused.
+///
+/// `tracked` documents identifiers we investigated and did not adopt, with the
+/// correct value where it is known. It is a note to a future reader, and this
+/// test is what stops it becoming a second, softer allowlist: promoting one
+/// means moving it into `allowlist` **and** naming who read the source, not
+/// editing a status string.
+#[test]
+fn nothing_in_the_research_record_is_permitted() {
+    let allowlist = allowlisted_identifiers();
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../dpp-aas/semantic-ids-allowlist.json"
+    );
+    let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
+    let doc: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
+
+    let tracked = doc["tracked"]
+        .as_object()
+        .expect("the file carries a `tracked` record");
+    assert!(
+        !tracked.is_empty(),
+        "the research record should not be empty"
+    );
+
+    for identifier in tracked.keys() {
+        assert!(
+            !is_permitted(identifier, &allowlist),
+            "'{identifier}' is in `tracked` but the gate permits it — a tracked \
+             identifier must never also be allowlisted"
         );
     }
 }

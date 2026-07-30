@@ -59,6 +59,17 @@ IDTA and ECLASS authority once sat here behind comments asking someone to check
 them; a comment cannot fail a build. An allowlist entry missing `verifiedOn` or
 `verifiedBy` is refused.
 
+**As of 2026-07-31 this crate emits no third-party identifiers at all.** Seven
+were tracked; six were malformed and one was withdrawn because its *semantic*
+correspondence to our submodel had never been checked. Each is recorded in that
+file under `tracked`, with the correct identifier where it is known, so
+restoring one starts from research rather than from a search engine — and a
+test asserts nothing in that record is permitted.
+
+That makes the interop claim narrower and true: this crate produces AAS-shaped
+output carrying **our own** semantics. It is not IDTA-aligned, and saying so
+would be the defect the gate exists to prevent.
+
 Presenting an own-coined concept under a standards-body identifier tells an
 integrator's toolchain that our field is semantically identical to a published
 concept. If it is not, that is a false claim made in the format most likely to

@@ -85,12 +85,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   → `dpp_vc::did_builder`. `dpp_crypto::{PolicyDecision, SectorAccessPolicy,
   filter_by_audience}` are unchanged.
 
-- **`dpp-jsonld` is abolished before it was ever published.** It was created
-  during this release cycle, had zero consumers, and at 123 LOC was an order of
-  magnitude smaller than any other crate. Its contents are now `dpp_vc::jsonld`:
-  W3C Verifiable Credentials *are* JSON-LD documents, and the two `@context`
-  sets overlap, so holding them apart guaranteed a second hand-rolled context.
-
 ### Changed
 
 - `KeyStore::public_key` and `PublicKeyInfo` (with its fields) are now `pub`
@@ -109,8 +103,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `urn:idta:aas:submodel:digital-product-passport:1.0` was coined rather than
   looked up (IDTA's is `https://admin-shell.io/idta/cds/dppMetadata/1`).
 
-  `urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass` was verified
-  against the Eclipse Tractus-X semantic-models repository and is retained.
+  `urn:samm:io.catenax.battery.battery_pass:6.0.0#BatteryPass` was **also
+  withdrawn**, on different grounds. The identifier is real, correctly formed,
+  current, and CC-BY-4.0 with no membership gate — but whether the Catena-X
+  aspect model describes the field set our `BatteryTechnicalData` submodel
+  carries was never checked. A malformed identifier fails closed; a well-formed
+  one naming the wrong concept fails **open**, because a consumer resolves it
+  and maps our fields onto it confidently and wrongly. It becomes
+  `urn:odal-node:aas:submodel-template:battery-technical-data:1.0`.
+
+  **`dpp-aas` therefore emits no third-party semanticIds at all.** All seven
+  tracked identifiers, with findings and the correct value where known, are
+  recorded in `semantic-ids-allowlist.json` under `tracked`; a test asserts
+  none of them is permitted.
 
   Adopting the correct IDTA identifiers is deliberately **not** part of this
   change: it requires reading the specifications, and substituting one
