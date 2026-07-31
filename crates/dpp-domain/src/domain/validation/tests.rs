@@ -299,3 +299,72 @@ fn batch_validation_mixed_results() {
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].index, 2);
 }
+
+// ── untyped sectors keep their embedded schema ────────────────────────────────
+
+/// A valid aluminium payload, as it would arrive from a build with no
+/// `SectorData::Aluminium` variant.
+fn untyped_aluminium(recycled: serde_json::Value) -> SectorData {
+    SectorData::Other {
+        sector: "aluminium".to_owned(),
+        data: serde_json::json!({
+            "gtin": "09506000134352",
+            "alloyGrade": "6061",
+            "productionRoute": "secondary-recycled",
+            "co2ePerTonneKg": 4200.0,
+            "recycledContentPct": recycled,
+            "countryOfOrigin": "DE",
+        }),
+    }
+}
+
+/// A sector carried as `Other` is validated against the schema this crate
+/// embeds for it, with an empty registry.
+///
+/// This is what makes removing a typed lane safe: the schema ships as a data
+/// file and the typed variant is Rust code, so losing the second must not lose
+/// the first. Before this, an untyped sector was rejected outright however good
+/// its data was.
+///
+/// Constructed directly rather than deserialised, because every catalog sector
+/// still has a typed variant today — which is exactly why the gap was latent.
+#[test]
+fn untyped_sector_validates_against_its_embedded_schema() {
+    let result = validate_sector_data_with_registry(
+        &untyped_aluminium(serde_json::json!(42.0)),
+        &SectorValidatorRegistry::default(),
+    );
+    assert!(
+        result.is_ok(),
+        "an untyped sector with an embedded schema must validate, got {:?}",
+        result.err()
+    );
+}
+
+/// The fallback is not a pass-through: the embedded schema still rejects data
+/// that violates it.
+#[test]
+fn untyped_sector_schema_still_rejects_bad_data() {
+    assert!(
+        validate_sector_data_with_registry(
+            &untyped_aluminium(serde_json::json!("not a number")),
+            &SectorValidatorRegistry::default(),
+        )
+        .is_err(),
+        "the embedded schema must still reject a type violation"
+    );
+}
+
+/// A sector in neither the catalog nor the registry remains a hard error —
+/// silent pass-through is still not safe.
+#[test]
+fn sector_unknown_to_catalog_and_registry_is_still_refused() {
+    let data = SectorData::Other {
+        sector: "spacecraft".to_owned(),
+        data: serde_json::json!({ "thrustKn": 12.0 }),
+    };
+    assert!(
+        validate_sector_data_with_registry(&data, &SectorValidatorRegistry::default()).is_err(),
+        "a sector with neither a schema nor a validator must fail closed"
+    );
+}
