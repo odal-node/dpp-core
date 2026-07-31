@@ -12,7 +12,7 @@
 //! are domain values, not ports, and live in [`crate::domain::compliance`].
 //! They are re-exported here so existing paths keep resolving.
 
-use crate::domain::sector::{Sector, SectorData};
+use crate::domain::sector::SectorData;
 
 pub use crate::domain::compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
@@ -26,8 +26,12 @@ pub use crate::domain::compliance::{
 /// The OSS binary ships `PassthroughBatteryStrategy` and `PassthroughTextileStrategy`.
 /// Proprietary tiers implement `PremiumBatteryStrategy`, etc.
 pub trait ComplianceStrategy: Send + Sync {
-    /// The sector this strategy handles.
-    fn sector(&self) -> Sector;
+    /// The catalog key of the sector this strategy handles.
+    ///
+    /// A key rather than the `Sector` enum: sector identity is catalog data,
+    /// and a strategy for a sector this build has no variant for is exactly the
+    /// case the open sector axis exists to allow.
+    fn sector_key(&self) -> &str;
 
     /// Compute a `ComplianceResult` from raw sector data.
     ///
@@ -50,7 +54,7 @@ pub trait ComplianceRegistry: Send + Sync {
     /// for the requested sector.
     fn compute(
         &self,
-        sector: Sector,
+        sector_key: &str,
         data: &SectorData,
     ) -> Result<ComplianceResult, ComplianceError>;
 }

@@ -10,7 +10,7 @@
 //! into.
 
 use crate::{
-    domain::sector::{Sector, SectorData},
+    domain::sector::SectorData,
     ports::compliance::{ComplianceError, ComplianceRegistry, ComplianceResult},
 };
 
@@ -37,7 +37,7 @@ impl Default for PassthroughRegistry {
 impl ComplianceRegistry for PassthroughRegistry {
     fn compute(
         &self,
-        _sector: Sector,
+        _sector_key: &str,
         _data: &SectorData,
     ) -> Result<ComplianceResult, ComplianceError> {
         Ok(ComplianceResult::passthrough())
@@ -49,7 +49,7 @@ impl ComplianceRegistry for PassthroughRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sector::{BatteryData, FibreEntry, SectorData, TextileData};
+    use crate::domain::sector::{BatteryData, FibreEntry, Sector, SectorData, TextileData};
     use crate::ports::compliance::ComplianceStatus;
 
     fn battery_data() -> SectorData {
@@ -87,7 +87,7 @@ mod tests {
             // now it is handled uniformly.
             (Sector::Electronics, battery_data()),
         ] {
-            let result = registry.compute(sector, &data).unwrap();
+            let result = registry.compute(sector.catalog_key(), &data).unwrap();
             assert_eq!(
                 result.compliance_status,
                 ComplianceStatus::PassthroughNoValidation
