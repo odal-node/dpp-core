@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-31
+
 ### Breaking
 
 - **Key handling carries its own algorithm.** Signing and verification read the
@@ -29,9 +31,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   verification path. A header disagreeing with the key record is rejected.
 
   `is_allowed_alg` still returns true for exactly one algorithm — **no second
-  curve is added here.** This is the shape only, landed before first issuance
-  because it is breaking; adding a curve later is additive. See
-  ADR-011.
+  curve is added here.** This is the shape only, landed while it is still cheap
+  to break the API; adding a curve later is additive rather than breaking, which
+  is the whole point of doing it in this order.
 
   *Migration:* `KeyEntry` is `#[non_exhaustive]`, so downstream struct-literal
   construction no longer compiles — build it through the keystore. Anything
@@ -62,8 +64,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   sector projection instead.
 
   **Kept:** `battery`, `electronics` and `unsold_goods` — the three sectors the
-  catalog marks `in_force` — plus `textile`, ADR-010's explicitly named
-  carve-out.
+  catalog marks `in_force` — plus `textile`, which is carried deliberately as a
+  single recorded exception rather than by rule.
 
   The CI gate in `dpp-tests/tests/all_sectors_aas.rs` **inverts**: it used to
   require a typed, non-generic submodel for every catalog sector; it now asserts
@@ -111,6 +113,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the file alone could not previously tell. A **bidirectional CI gate** ties the
   marker to the catalog status, so promoting a sector is a deliberate two-part
   edit — `dpp-tests/tests/provisional_schema_marker.rs`.
+
+### Changed
+
+- **Crate descriptions and keywords corrected.** The 0.13.0 reshuffle moved the
+  `did:web` builder and the credential stack out of `dpp-crypto` without moving
+  its metadata, so it advertised a capability it no longer had and pointed
+  crates.io searches for `did-web` at the wrong crate. `dpp-aas` kept an `idta`
+  keyword that its description had deliberately dropped, and `dpp-domain` did
+  not mention the per-field disclosure policy it gained. This metadata is
+  **immutable once a version is published**, so it can only be corrected in a
+  new release.
 
 ### Fixed
 
