@@ -1,6 +1,6 @@
 //! Sector-specific AAS submodel builders, dispatched by [`dispatch::build_sector_submodel`].
 //!
-//! One file per sector (`battery`, `textile`, `electronics`, …) plus the five
+//! One file per sector with a **typed** mapper plus the five
 //! cross-sector builders below (`build_product_identification_submodel` and
 //! siblings), which every sector shares regardless of `passport.sector` and
 //! so are not sector files themselves.
@@ -11,17 +11,10 @@
 //! were left as they are not the dispatch logic that finding named. Revisit
 //! if this file grows past the sector-file count.
 
-mod aluminium;
 mod battery;
-mod construction;
-mod detergent;
 mod dispatch;
 mod electronics;
-mod furniture;
-mod steel;
 mod textile;
-mod toy;
-mod tyre;
 mod unsold_goods;
 
 use dpp_domain::Passport;

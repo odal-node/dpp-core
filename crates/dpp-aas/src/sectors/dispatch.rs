@@ -35,21 +35,14 @@ pub(crate) fn build_sector_submodel(sector_data: &SectorData, passport_id: &str)
         SectorData::Electronics(e) => {
             super::electronics::build_electronics_submodel(e, passport_id)
         }
-        SectorData::Steel(d) => super::steel::build_steel_submodel(d, passport_id),
-        SectorData::Construction(d) => {
-            super::construction::build_construction_submodel(d, passport_id)
-        }
-        SectorData::Tyre(d) => super::tyre::build_tyre_submodel(d, passport_id),
-        SectorData::Toy(d) => super::toy::build_toy_submodel(d, passport_id),
-        SectorData::Aluminium(d) => super::aluminium::build_aluminium_submodel(d, passport_id),
-        SectorData::Furniture(d) => super::furniture::build_furniture_submodel(d, passport_id),
-        SectorData::Detergent(d) => super::detergent::build_detergent_submodel(d, passport_id),
         SectorData::UnsoldGoods(r) => {
             super::unsold_goods::build_unsold_goods_submodel(r, passport_id)
         }
         SectorData::Other { data: v, .. } => generic_sector_submodel(passport_id, v),
-        // Forward-compat: an unmodelled sector variant is rendered as a generic
-        // submodel from its serialised fields (same shape as `Other`).
+        // Every sector without a typed mapper — which is every sector whose
+        // act is not in force — renders as a generic submodel from its
+        // serialised fields, the same shape as `Other`. A generic projection is
+        // the honest one for a sector whose ratified template does not exist.
         other => {
             let value = serde_json::to_value(other).unwrap_or(serde_json::Value::Null);
             generic_sector_submodel(passport_id, &value)

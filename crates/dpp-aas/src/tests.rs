@@ -1,11 +1,10 @@
 use super::*;
 use chrono::Utc;
 use dpp_domain::{
-    AluminiumData, BatteryChemistry, BatteryData, BatteryType, CarbonFootprint,
-    CarbonFootprintClass, ConstructionData, DetergentData, FibreEntry, FurnitureData, Gtin,
-    ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportStatus, ProductionRoute,
-    RepairabilityScore, Sector, SectorData, SteelData, SurfactantEntry, TextileData, ToyData,
-    TyreData, UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
+    BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
+    Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportStatus,
+    RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination, UnsoldGoodsReason,
+    UnsoldGoodsReport,
 };
 use serde_json::json;
 
@@ -482,164 +481,6 @@ fn non_object_input_produces_empty_submodel() {
 // ── New sector builder tests ──────────────────────────────────────────────
 
 #[test]
-fn build_aas_steel_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Steel);
-    passport.sector_data = Some(SectorData::Steel(SteelData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        co2e_per_tonne_steel: 1.8,
-        recycled_scrap_content_pct: 30.0,
-        product_category: "flat".into(),
-        country_of_origin: "DE".into(),
-        production_route: ProductionRoute::ElectricArc,
-        annual_production_tonnes: Some(50000.0),
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels.iter().find(|s| s.id_short == "SteelProductData");
-    assert!(sub.is_some(), "SteelProductData submodel missing");
-    let sub = sub.unwrap();
-    assert!(sub.semantic_id.is_some());
-    let has_route = sub.submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Property(p) => p.id_short == "productionRoute",
-        _ => false,
-    });
-    assert!(has_route, "productionRoute property missing");
-}
-
-#[test]
-fn build_aas_construction_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Construction);
-    passport.sector_data = Some(SectorData::Construction(ConstructionData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        product_family: "cement".into(),
-        country_of_origin: "DE".into(),
-        co2e_per_functional_unit_kg: 0.83,
-        functional_unit: "per tonne".into(),
-        recycled_content_pct: None,
-        epd_url: Some("https://example.com/epd.pdf".into()),
-        ce_marking: Some(true),
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels
-        .iter()
-        .find(|s| s.id_short == "ConstructionProductData");
-    assert!(sub.is_some(), "ConstructionProductData submodel missing");
-    let has_epd_ref = sub.unwrap().submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Reference(r) => r.id_short == "epdUrl",
-        _ => false,
-    });
-    assert!(has_epd_ref, "epdUrl Reference missing");
-}
-
-#[test]
-fn build_aas_tyre_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Tyre);
-    passport.sector_data = Some(SectorData::Tyre(TyreData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        tyre_class: "C1".into(),
-        fuel_efficiency_class: "B".into(),
-        wet_grip_class: "A".into(),
-        external_rolling_noise_db: 68.0,
-        noise_performance_class: Some("A".into()),
-        rolling_resistance_n_per_kn: Some(6.5),
-        recycled_rubber_pct: None,
-        co2e_per_tyre_kg: Some(12.0),
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels.iter().find(|s| s.id_short == "TyreProductData");
-    assert!(sub.is_some(), "TyreProductData submodel missing");
-}
-
-#[test]
-fn build_aas_toy_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Toy);
-    passport.sector_data = Some(SectorData::Toy(ToyData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        age_group: "3-6".into(),
-        primary_material: "plastic".into(),
-        ce_marking: true,
-        country_of_origin: "CN".into(),
-        svhc_substances: None,
-        contains_battery: Some(false),
-        repairability_info: None,
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels.iter().find(|s| s.id_short == "ToyProductData");
-    assert!(sub.is_some(), "ToyProductData submodel missing");
-}
-
-#[test]
-fn build_aas_aluminium_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Aluminium);
-    passport.sector_data = Some(SectorData::Aluminium(AluminiumData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        alloy_grade: "6xxx".into(),
-        production_route: ProductionRoute::SecondaryRecycled,
-        co2e_per_tonne_kg: 2.1,
-        recycled_content_pct: 75.0,
-        country_of_origin: "NO".into(),
-        annual_production_tonnes: None,
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels
-        .iter()
-        .find(|s| s.id_short == "AluminiumProductData");
-    assert!(sub.is_some(), "AluminiumProductData submodel missing");
-}
-
-#[test]
-fn build_aas_furniture_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::Furniture);
-    passport.sector_data = Some(SectorData::Furniture(FurnitureData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        product_type: "chair".into(),
-        primary_material: "solid-wood".into(),
-        country_of_origin: "PT".into(),
-        co2e_per_unit_kg: Some(18.5),
-        recycled_content_pct: Some(20.0),
-        repairability_score: Some(7.5),
-        svhc_substances: None,
-        disassembly_instructions_url: None,
-        end_of_life_instructions: Some("Separate wood from metal. Recycle metal.".into()),
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels
-        .iter()
-        .find(|s| s.id_short == "FurnitureProductData");
-    assert!(sub.is_some(), "FurnitureProductData submodel missing");
-}
-
-#[test]
-fn build_aas_detergent_produces_surfactant_collection() {
-    let mut passport = minimal_passport(Sector::Detergent);
-    passport.sector_data = Some(SectorData::Detergent(DetergentData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
-        product_type: "laundry".into(),
-        format: "liquid".into(),
-        surfactants: vec![SurfactantEntry {
-            name: "Linear Alkylbenzene Sulfonate".into(),
-            biodegradable: true,
-            concentration_band: "15-30%".into(),
-            cas_number: Some("68411-30-3".into()),
-        }],
-        country_of_origin: "DE".into(),
-        co2e_per_unit_kg: Some(0.35),
-        packaging_recyclable: Some(true),
-        recommended_dosage_ml: Some(55.0),
-        biodegradable: Some(true),
-    }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
-    let sub = submodels
-        .iter()
-        .find(|s| s.id_short == "DetergentProductData");
-    assert!(sub.is_some(), "DetergentProductData submodel missing");
-    let has_surfactants = sub.unwrap().submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::SubmodelElementCollection(c) => c.id_short == "surfactants",
-        _ => false,
-    });
-    assert!(has_surfactants, "surfactants collection missing");
-}
-
-#[test]
 fn build_aas_unsold_goods_produces_sector_submodel() {
     let mut passport = minimal_passport(Sector::UnsoldGoods);
     passport.sector_data = Some(SectorData::UnsoldGoods(UnsoldGoodsReport {
@@ -660,4 +501,42 @@ fn build_aas_unsold_goods_produces_sector_submodel() {
         _ => false,
     });
     assert!(has_volume, "volumeKg property missing");
+}
+
+/// A sector whose typed mapper was removed still ships its data — the
+/// projection loses its *shape*, not its *content*.
+///
+/// This is the property that makes removing a typed lane safe rather than
+/// lossy: the generic builder renders the variant's serialised fields, minus
+/// the `sector` discriminant, so a consumer still receives every value. What it
+/// no longer receives is a submodel named for a template that no standards body
+/// has ratified, which was never a claim we could support.
+#[test]
+fn a_sector_without_a_typed_mapper_still_carries_its_data() {
+    let mut passport = minimal_passport(Sector::Steel);
+    passport.sector_data = Some(SectorData::Steel(dpp_domain::SteelData {
+        gtin: dpp_domain::Gtin::parse("09506000134352").expect("valid gtin"),
+        co2e_per_tonne_steel: 1.8,
+        recycled_scrap_content_pct: 62.0,
+        product_category: "flat".into(),
+        country_of_origin: "DE".into(),
+        production_route: dpp_domain::ProductionRoute::ElectricArc,
+        annual_production_tonnes: None,
+    }));
+
+    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let sector_submodel = submodels
+        .iter()
+        .find(|s| s.id_short == "SectorData")
+        .expect("a provisional sector renders through the generic builder");
+
+    assert!(
+        !sector_submodel.submodel_elements.is_empty(),
+        "the generic projection must carry the sector's fields, not drop them"
+    );
+    assert!(
+        sector_submodel.semantic_id.is_none(),
+        "a generic projection asserts no semanticId — there is no ratified \
+         template for it to name"
+    );
 }

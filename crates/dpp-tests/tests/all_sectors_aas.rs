@@ -418,32 +418,6 @@ fn every_catalog_sector_has_an_aas_case() {
     }
 }
 
-/// No catalog sector may fall through to the generic submodel builder.
-///
-/// `dispatch::build_sector_submodel` ends in a deliberate catch-all that renders
-/// an unmodelled `SectorData` variant as a generic key-value submodel with
-/// `idShort = "SectorData"` and no semantic IDs. That fallback is correct for
-/// forward compatibility — it keeps a new variant from breaking the build in
-/// this crate — but it means a newly added sector would ship with a silently
-/// degraded AAS mapping: no build error, no test failure, just lower-fidelity
-/// interop output.
-///
-/// This closes that gap without removing the fallback: the compiler stays
-/// permissive, and CI catches the omission instead.
-#[test]
-fn no_catalog_sector_falls_back_to_the_generic_submodel() {
-    for (sector, data, version, _) in all_sector_cases() {
-        let key = sector.catalog_key().to_owned();
-        let passport = base(sector, data, version);
-        let (_, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
-
-        assert!(
-            !submodels.iter().any(|s| s.id_short == "SectorData"),
-            "sector '{key}' fell back to the generic submodel builder — it needs              a dedicated builder in aas::sectors and a dispatch arm"
-        );
-    }
-}
-
 // ─── semanticId provenance gate ──────────────────────────────────────────────
 //
 // A semanticId asserts, to a machine, that one of our fields means what a
@@ -767,6 +741,62 @@ fn nothing_in_the_research_record_is_permitted() {
             !is_permitted(identifier, &allowlist),
             "'{identifier}' is in `tracked` but the gate permits it — a tracked \
              identifier must never also be allowlisted"
+        );
+    }
+}
+
+/// The one sector permitted a typed mapper while still `provisional` in the
+/// catalog: it carries the active pilot's branching code, and deleting that to
+/// satisfy a rule would be the rule stretching the work rather than governing
+/// it. Recorded here, deliberately, rather than assumed — one sector at a time.
+const PILOT_CARVE_OUT: &str = "textile";
+
+/// A typed mapper exists **only** for a sector whose act is in force, plus the
+/// recorded pilot carve-out. Everything else renders through the generic
+/// key-value projection.
+///
+/// This is the inverse of what this file used to assert. The old shape required
+/// a dedicated submodel for *every* catalog sector, which meant a newly
+/// announced sector could not be added as catalog data alone — it needed Rust
+/// code for an act that binds nobody yet, and a hand-written AAS template for a
+/// submodel template that does not exist. A generic projection is the honest
+/// rendering of a sector whose ratified template has not been published.
+///
+/// Driven by the catalog rather than a hardcoded list, so a sector coming into
+/// force flips this expectation by changing its manifest — and this test then
+/// demands the typed mapper that its new status has earned.
+#[test]
+fn only_in_force_sectors_carry_a_typed_mapper() {
+    let catalog = dpp_domain::SectorCatalog::new();
+
+    for (sector, data, version, _id_short) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let passport = base(sector, data, version);
+        let (_, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+
+        let sector_submodel = submodels
+            .iter()
+            .find(|s| {
+                !matches!(
+                    s.id_short.as_str(),
+                    "ProductIdentification"
+                        | "ManufacturerInformation"
+                        | "EnvironmentalImpact"
+                        | "MaterialComposition"
+                        | "Repairability"
+                )
+            })
+            .expect("a sector submodel is always present");
+
+        // The generic projection is the one named for the field it renders;
+        // a typed mapper names its own submodel template.
+        let is_typed = sector_submodel.id_short != "SectorData";
+        let may_be_typed = catalog.is_in_force(&key) || key == PILOT_CARVE_OUT;
+
+        assert_eq!(
+            is_typed, may_be_typed,
+            "sector '{key}': typed mapper present = {is_typed}, but permitted = {may_be_typed}. \
+             A provisional sector must render generically; an in-force one must not."
         );
     }
 }
