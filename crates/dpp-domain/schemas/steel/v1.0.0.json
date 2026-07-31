@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/steel-v1.0.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Iron & Steel Sector Data (v1.0.0)",
   "description": "Iron and Steel sector fields for EU ESPR carbon intensity and recycled content reporting.",
   "type": "object",
@@ -31,7 +32,13 @@
     },
     "productCategory": {
       "type": "string",
-      "enum": ["flat", "long", "tube", "specialty", "other"],
+      "enum": [
+        "flat",
+        "long",
+        "tube",
+        "specialty",
+        "other"
+      ],
       "description": "Steel product category."
     },
     "countryOfProduction": {
@@ -41,11 +48,18 @@
     },
     "productionRoute": {
       "type": "string",
-      "enum": ["blast-furnace", "electric-arc", "direct-reduction"],
+      "enum": [
+        "blast-furnace",
+        "electric-arc",
+        "direct-reduction"
+      ],
       "description": "Primary production route."
     },
     "annualProductionTonnes": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "description": "Annual production volume in tonnes (optional)."
     }
