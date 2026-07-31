@@ -1,5 +1,6 @@
 use super::*;
 use chrono::Utc;
+use dpp_domain::Audience;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportStatus,
@@ -134,7 +135,8 @@ fn reference_element_round_trip() {
 #[test]
 fn build_aas_produces_five_core_submodels() {
     let passport = minimal_passport(Sector::Electronics);
-    let (shell, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert_eq!(submodels.len(), 5);
     let id_shorts: Vec<&str> = submodels.iter().map(|s| s.id_short.as_str()).collect();
     assert!(id_shorts.contains(&"ProductIdentification"));
@@ -148,7 +150,8 @@ fn build_aas_produces_five_core_submodels() {
 #[test]
 fn shell_submodel_refs_match_submodel_ids() {
     let passport = minimal_passport(Sector::Battery);
-    let (shell, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let submodel_ids: Vec<&str> = submodels.iter().map(|s| s.id.as_str()).collect();
     for submodel_ref in &shell.submodels {
         assert!(
@@ -162,7 +165,8 @@ fn shell_submodel_refs_match_submodel_ids() {
 #[test]
 fn shell_has_correct_asset_information() {
     let passport = minimal_passport(Sector::Textile);
-    let (shell, _) = build_aas_from_passport(&passport, "09506000134352");
+    let (shell, _) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert_eq!(
         shell.asset_information.global_asset_id,
         "urn:odal-node:product:09506000134352"
@@ -185,14 +189,13 @@ fn shell_has_correct_asset_information() {
 fn shell_id_contains_passport_id() {
     let passport = minimal_passport(Sector::Battery);
     let id_str = passport.id.to_string();
-    let (shell, _) = build_aas_from_passport(&passport, "09506000134352");
+    let (shell, _) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert!(shell.id.contains(&id_str));
 }
 
-#[test]
-fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(BatteryData {
+fn battery_data_with_due_diligence() -> BatteryData {
+    BatteryData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 3.2,
@@ -230,9 +233,16 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
         manufacturing_place: None,
         battery_model_id: None,
         battery_passport_number: None,
-    }));
+    }
+}
 
-    let (shell, submodels) = build_aas_from_passport(&passport, "09506000134352");
+#[test]
+fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert_eq!(
         submodels.len(),
         6,
@@ -263,13 +273,45 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     });
     assert!(has_co2e, "co2ePerUnitKg with unit kgCO2e missing");
 
+    // `dueDiligenceUrl` is `restricted` in the battery catalog, so it must NOT
+    // reach a public projection. This assertion used to be its inverse — the
+    // mappers emitted it to everyone, and the test locked that in. It is kept
+    // pointing the other way as the regression marker for that defect.
     let has_due_diligence_ref = battery_sub.submodel_elements.iter().any(|e| match e {
         AasSubmodelElement::Reference(r) => r.id_short == "dueDiligenceUrl",
         _ => false,
     });
     assert!(
-        has_due_diligence_ref,
-        "dueDiligenceUrl Reference element missing"
+        !has_due_diligence_ref,
+        "restricted field dueDiligenceUrl leaked into a public AAS projection"
+    );
+}
+
+/// The same field is present for a caller entitled to it — proof the masking is
+/// per-audience rather than a blanket strip of everything non-public.
+#[test]
+fn restricted_audience_receives_the_restricted_battery_field() {
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+
+    let (_, submodels) = build_aas_from_passport(
+        &passport,
+        "09506000134352",
+        dpp_domain::Audience::LegitimateInterest,
+    )
+    .expect("buildable");
+
+    let battery_sub = submodels
+        .iter()
+        .find(|s| s.id_short == "BatteryTechnicalData")
+        .expect("battery submodel present");
+
+    assert!(
+        battery_sub.submodel_elements.iter().any(|e| match e {
+            AasSubmodelElement::Reference(r) => r.id_short == "dueDiligenceUrl",
+            _ => false,
+        }),
+        "a legitimate-interest caller must still receive dueDiligenceUrl"
     );
 }
 
@@ -316,7 +358,8 @@ fn build_aas_textile_has_fibre_composition_collection() {
         pef_score: None,
     }));
 
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let textile_sub = submodels
         .iter()
         .find(|s| s.id_short == "TextileMaterialDeclaration")
@@ -344,7 +387,8 @@ fn build_aas_textile_has_fibre_composition_collection() {
 #[test]
 fn material_composition_entries_have_unit() {
     let passport = minimal_passport(Sector::Electronics);
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let mat_sub = submodels
         .iter()
         .find(|s| s.id_short == "MaterialComposition")
@@ -365,7 +409,8 @@ fn material_composition_entries_have_unit() {
 #[test]
 fn environmental_impact_co2e_has_unit() {
     let passport = minimal_passport(Sector::Battery);
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let env_sub = submodels
         .iter()
         .find(|s| s.id_short == "EnvironmentalImpact")
@@ -381,7 +426,8 @@ fn environmental_impact_co2e_has_unit() {
 #[test]
 fn manufacturer_submodel_has_did_reference() {
     let passport = minimal_passport(Sector::Battery);
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let mfr_sub = submodels
         .iter()
         .find(|s| s.id_short == "ManufacturerInformation")
@@ -493,7 +539,8 @@ fn build_aas_unsold_goods_produces_sector_submodel() {
         country_of_disposal: "DE".into(),
         operator_name: Some("GoodWill e.V.".into()),
     }));
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let sub = submodels.iter().find(|s| s.id_short == "UnsoldGoods");
     assert!(sub.is_some(), "UnsoldGoods submodel missing");
     let has_volume = sub.unwrap().submodel_elements.iter().any(|e| match e {
@@ -524,7 +571,8 @@ fn a_sector_without_a_typed_mapper_still_carries_its_data() {
         annual_production_tonnes: None,
     }));
 
-    let (_, submodels) = build_aas_from_passport(&passport, "09506000134352");
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let sector_submodel = submodels
         .iter()
         .find(|s| s.id_short == "SectorData")

@@ -4,6 +4,7 @@
 
 use chrono::Utc;
 use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
+use dpp_domain::Audience;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
@@ -101,7 +102,8 @@ fn main() {
     };
 
     let gtin = "09506000134352";
-    let (shell, submodels) = build_aas_from_passport(&passport, gtin);
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, gtin, Audience::Public).expect("masking");
 
     println!("AAS Shell");
     println!("  ID:             {}", shell.id);

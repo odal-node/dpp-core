@@ -15,6 +15,7 @@ use dpp_aas::{
     build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
     sector_submodel_template,
 };
+use dpp_domain::Audience;
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, ElectronicsData, EnergyEfficiencyClass,
@@ -289,7 +290,8 @@ fn every_sector_produces_a_valid_aas_shell() {
             "SectorData::sector() must match its variant"
         );
         let passport = base(sector, data, version);
-        let (shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+        let (shell, submodels) =
+            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
         // Five core submodels + one sector submodel.
         assert_eq!(submodels.len(), 6, "sector {key} should yield 6 submodels");
@@ -347,7 +349,8 @@ fn unknown_sector_uses_generic_fallback_submodel() {
     }))
     .expect("spacecraft has no typed variant");
     let passport = base(Sector::Other("spacecraft".into()), other, "1.0.0");
-    let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+    let (_shell, submodels) =
+        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
     assert_eq!(submodels.len(), 6);
     let generic = submodels
@@ -366,7 +369,8 @@ fn passport_without_sector_data_has_five_core_submodels() {
         "1.0.0",
     );
     passport.sector_data = None;
-    let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+    let (_shell, submodels) =
+        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
     assert_eq!(submodels.len(), 5);
 }
 
@@ -515,7 +519,8 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
     for (sector, data, version, _) in all_sector_cases() {
         let key = sector.catalog_key().to_owned();
         let passport = base(sector, data, version);
-        let (shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+        let (shell, submodels) =
+            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
         let document = serde_json::json!({
             "shell": serde_json::to_value(&shell).unwrap(),
@@ -772,7 +777,8 @@ fn only_in_force_sectors_carry_a_typed_mapper() {
     for (sector, data, version, _id_short) in all_sector_cases() {
         let key = sector.catalog_key().to_owned();
         let passport = base(sector, data, version);
-        let (_, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+        let (_, submodels) =
+            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
         let sector_submodel = submodels
             .iter()
@@ -797,6 +803,100 @@ fn only_in_force_sectors_carry_a_typed_mapper() {
             is_typed, may_be_typed,
             "sector '{key}': typed mapper present = {is_typed}, but permitted = {may_be_typed}. \
              A provisional sector must render generically; an in-force one must not."
+        );
+    }
+}
+
+// ─── disclosure masking gate ─────────────────────────────────────────────────
+
+/// Every `idShort` in the projection, at any nesting depth.
+fn emitted_id_shorts(submodels: &[dpp_aas::AasSubmodel]) -> Vec<String> {
+    fn walk(value: &serde_json::Value, out: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                if let Some(s) = map.get("idShort").and_then(|v| v.as_str()) {
+                    out.push(s.to_owned());
+                }
+                map.values().for_each(|v| walk(v, out));
+            }
+            serde_json::Value::Array(items) => items.iter().for_each(|v| walk(v, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    walk(
+        &serde_json::to_value(submodels).expect("serialises"),
+        &mut out,
+    );
+    out
+}
+
+/// No field a sector's catalog entry classifies non-public appears in a public
+/// AAS projection — asserted field-by-field from the catalog, for every sector
+/// with a case here, not from a list written by hand.
+///
+/// The mappers pre-date the disclosure seam and, handed a whole passport,
+/// emitted every field they knew of — eight of battery's ten non-public ones
+/// among them, including the one that leaked publicly in 0.10.0. Nothing served
+/// the projection over HTTP, so it was never a live leak. This is the gate that
+/// stops it becoming one, and it is driven from the sector manifests so that
+/// reclassifying a field is covered the day it changes.
+#[test]
+fn public_aas_projection_emits_no_non_public_field() {
+    let catalog = dpp_domain::SectorCatalog::new();
+    let mut checked_any_non_public = false;
+
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let non_public: Vec<String> = catalog
+            .get(&key)
+            .map(|d| {
+                d.disclosure
+                    .iter()
+                    .filter(|(_, class)| **class != dpp_domain::Disclosure::Public)
+                    .map(|(field, _)| field.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if non_public.is_empty() {
+            continue;
+        }
+        checked_any_non_public = true;
+
+        let passport = base(sector, data, version);
+        let (_, submodels) =
+            build_aas_from_passport(&passport, VALID_GTIN, dpp_domain::Audience::Public)
+                .expect("a public projection is buildable");
+        let emitted = emitted_id_shorts(&submodels);
+
+        for field in &non_public {
+            assert!(
+                !emitted.contains(field),
+                "non-public field '{field}' of sector '{key}' appears in the PUBLIC AAS projection"
+            );
+        }
+    }
+
+    assert!(
+        checked_any_non_public,
+        "guard: at least one sector must declare non-public fields, or this gate proves nothing"
+    );
+}
+
+/// The gate above is not satisfied by emitting nothing: a public projection
+/// still carries its public fields. One that leaked nothing because it
+/// contained nothing would pass and be worthless.
+#[test]
+fn public_aas_projection_still_carries_public_fields() {
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let passport = base(sector, data, version);
+        let (_, submodels) =
+            build_aas_from_passport(&passport, VALID_GTIN, dpp_domain::Audience::Public)
+                .expect("buildable");
+        assert!(
+            !emitted_id_shorts(&submodels).is_empty(),
+            "sector '{key}': the public projection carries no fields at all"
         );
     }
 }

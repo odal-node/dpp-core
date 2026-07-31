@@ -19,17 +19,24 @@ specification, and nothing here should be described as IDTA-conformant.
 - You need to render a typed `Passport` as an AAS shell plus submodels for an
   industrial data space.
 - You are submitting to a registry that speaks AAS rather than raw DPP JSON.
-- You want per-product-group submodels (battery, textile, electronics and eight
-  more) rather than a flat key-value dump.
+- You want per-product-group submodels rather than a flat key-value dump.
+  Typed submodels exist for the product groups whose act is in force; every
+  other catalogued group is projected generically, because naming a submodel
+  template that no standards body has ratified would be a claim we cannot
+  support.
 
 ## Example
 
 ```rust
 use dpp_aas::build_aas_from_passport;
-use dpp_domain::Passport;
+use dpp_domain::{Audience, Passport};
 
+// The projection is always built for an audience: the passport is filtered
+// through the disclosure seam before any mapper sees it, so a public shell
+// cannot carry a restricted field. There is no unmasked entry point.
 fn render_aas(passport: &Passport, gtin: &str) {
-    let (shell, submodels) = build_aas_from_passport(passport, gtin);
+    let (shell, submodels) =
+        build_aas_from_passport(passport, gtin, Audience::Public).expect("masking");
 
     assert_eq!(shell.id_short, "DigitalProductPassport");
     assert!(shell.asset_information.global_asset_id.contains(gtin));

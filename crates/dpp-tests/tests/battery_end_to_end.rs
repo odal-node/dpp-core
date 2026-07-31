@@ -153,7 +153,8 @@ fn battery_passport_serialisation_round_trip() {
 #[test]
 fn battery_passport_maps_to_aas_shell() {
     let passport = make_battery_passport();
-    let (shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN);
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
     // Shell wiring: GTIN becomes the global asset id; passport + batch are
     // specific asset ids.
