@@ -4,6 +4,8 @@ use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 
+use super::algorithm::KeyAlgorithm;
+
 /// Verify an EdDSA compact JWS given a base64url-encoded public key.
 ///
 /// Returns `Ok(true)` when the signature is valid, `Ok(false)` when it is not.
@@ -16,9 +18,10 @@ pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
         return Ok(false);
     }
 
-    // Pin the algorithm: only EdDSA is accepted. Reject `alg:none` and any other
-    // algorithm in the header to prevent algorithm-substitution downgrade.
-    if !header_alg_is_eddsa(&b64, parts[0]) {
+    // No key record here — the caller supplies raw Ed25519 key bytes — so the
+    // algorithm is pinned rather than bound. Rejects `alg:none` and every
+    // substitution downgrade.
+    if !header_alg_matches(&b64, parts[0], KeyAlgorithm::Ed25519) {
         return Ok(false);
     }
 
@@ -85,17 +88,31 @@ fn vm_is_assertion_authorized(vm: &serde_json::Value, authorized: &[String]) -> 
         .is_some_and(|id| authorized.iter().any(|a| a == id))
 }
 
-/// Decode the JWS protected header and confirm `alg == "EdDSA"`.
-pub(crate) fn header_alg_is_eddsa(
+/// Decode the JWS protected header and read its `alg`, if it names an
+/// algorithm this crate allows at all. `None` for a malformed header, a
+/// missing `alg`, `alg:none`, or anything outside the allowlist.
+fn header_alg(
     b64: &base64::engine::general_purpose::GeneralPurpose,
     header_b64: &str,
+) -> Option<KeyAlgorithm> {
+    let bytes = b64.decode(header_b64).ok()?;
+    let header: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    KeyAlgorithm::from_jose_alg(header.get("alg")?.as_str()?)
+}
+
+/// Whether the JWS protected header's `alg` is exactly the algorithm the
+/// signing key is recorded as using.
+///
+/// The header does not get a vote in which algorithm is used — it is checked
+/// *against* the key. With one algorithm in the allowlist this is equivalent to
+/// pinning; with two it is the difference between a verifier and an algorithm-
+/// confusion oracle, which is why it is written this way now rather than later.
+pub(crate) fn header_alg_matches(
+    b64: &base64::engine::general_purpose::GeneralPurpose,
+    header_b64: &str,
+    expected: KeyAlgorithm,
 ) -> bool {
-    b64.decode(header_b64)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-        .and_then(|h| h.get("alg").and_then(|v| v.as_str()).map(str::to_owned))
-        .map(|alg| super::algorithm::is_allowed_alg(&alg))
-        .unwrap_or(false)
+    header_alg(b64, header_b64) == Some(expected)
 }
 
 /// Extract the base64url-encoded primary Ed25519 public key (`x`) from a DID document.

@@ -115,6 +115,7 @@ impl KeyStore {
             verifying_key,
             fingerprint,
             revoked: false,
+            algorithm: super::store::default_algorithm(),
         })
     }
 }

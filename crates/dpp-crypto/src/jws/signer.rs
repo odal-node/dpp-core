@@ -26,7 +26,7 @@ pub fn sign(store: &KeyStore, key_id: &str, payload: &Value) -> anyhow::Result<S
     let key = store.load_key(key_id)?;
     let header_json = format!(
         r#"{{"alg":"{}","kid":"{}"}}"#,
-        super::algorithm::EDDSA_ALG,
+        key.algorithm.jose_alg(),
         key.fingerprint
     );
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -50,14 +50,16 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
 
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
-    // Pin the algorithm on the verify path too: reject `alg:none` and any
-    // non-EdDSA header before touching the signature. Defence-in-depth for any
-    // future multi-algorithm key store (today `verify_strict` is Ed25519-only).
-    if !super::verifier::header_alg_is_eddsa(&b64, parts[0]) {
+    let key = store.load_key(key_id)?;
+
+    // Bind `alg` to the key record, never the other way round. The header is
+    // attacker-supplied, so it may only *confirm* what the key already says —
+    // it must never select the verification path. Rejects `alg:none` and every
+    // substitution by the same check.
+    if !super::verifier::header_alg_matches(&b64, parts[0], key.algorithm) {
         return Ok(false);
     }
 
-    let key = store.load_key(key_id)?;
     let signing_input = format!("{}.{}", parts[0], parts[1]);
 
     let sig_bytes = b64

@@ -4,7 +4,6 @@
 //! hygiene-archived keys as secondary verification methods, revoked keys excluded
 //! so their signatures stop verifying.
 
-use base64::Engine;
 use serde_json::{Value, json};
 
 use dpp_crypto::keystore::KeyStore;
@@ -36,20 +35,18 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
     // Port colon must be %-encoded (RFC 3986 §3.3 path segment rule).
     let did = format!("did:web:{}", hostname.replace(':', "%3A"));
 
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-
     let primary_vm_id = format!("{did}#key-1");
-    let primary_pub_b64 = b64.encode(hex::decode(&current.verifying_key_hex)?);
 
     let mut verification_methods = vec![json!({
         "id": primary_vm_id,
         "type": "JsonWebKey2020",
         "controller": did,
-        "publicKeyJwk": {
-            "kty": "OKP",
-            "crv": dpp_crypto::jws::algorithm::ED25519_CRV,
-            "x": primary_pub_b64
-        }
+        // The JWK shape comes from the algorithm recorded on the key, not from
+        // an assumption here — `kty` and the parameter set differ per
+        // algorithm, and `dpp-crypto` is the crate that knows which is which.
+        "publicKeyJwk": current
+            .algorithm
+            .public_key_jwk(&hex::decode(&current.verifying_key_hex)?)
     })];
 
     // Revoked keys are excluded entirely — neither a verification method nor an
@@ -61,16 +58,15 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
         .collect();
     for (idx, archived_key) in archived.iter().enumerate() {
         let vm_id = format!("{did}#key-{}", idx + 2);
-        let pub_b64 = b64.encode(hex::decode(&archived_key.verifying_key_hex)?);
         verification_methods.push(json!({
             "id": vm_id,
             "type": "JsonWebKey2020",
             "controller": did,
-            "publicKeyJwk": {
-                "kty": "OKP",
-                "crv": dpp_crypto::jws::algorithm::ED25519_CRV,
-                "x": pub_b64
-            }
+            // Per archived key, so a rotation across algorithms produces a
+            // document carrying both shapes rather than one mislabelled.
+            "publicKeyJwk": archived_key
+                .algorithm
+                .public_key_jwk(&hex::decode(&archived_key.verifying_key_hex)?)
         }));
     }
 
