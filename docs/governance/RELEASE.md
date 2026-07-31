@@ -35,6 +35,19 @@ Before running `cargo release`:
    reflect the current API and feature set.
 7. **Dependency review** — check that no new dependencies introduce
    problematic licenses. All dependencies must be compatible with Apache-2.0.
+8. **Reconcile the planning docs to what actually shipped.** In `dpp-docs`:
+   close the issue for every plan this release carried, and update any ADR
+   staging table that scheduled work into this version. A plan that shipped
+   and a plan that was dropped from the release both need saying so — the
+   second more than the first.
+
+   This step exists because omitting it has a track record. `0.12.0` was cut
+   without the crate split that had been sequenced to ride it; `0.13.0` was
+   cut without plan 01's mapper conversion that `CORE-0-13-0-SCOPE.md` listed
+   as item 3; and ADR-010's staging table drifted three times in one week.
+   Each was found later by someone reading a document that had gone stale,
+   which is not a process. **Doc truth is reconciled at an event that
+   actually happens, or it is not reconciled.**
 
 ## Publishing Order
 
