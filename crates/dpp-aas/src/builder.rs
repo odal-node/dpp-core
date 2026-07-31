@@ -4,7 +4,9 @@
 use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{Audience, Passport, SectorCatalog};
 
-use super::model::{AasShell, AasSubmodel, AasSubmodelRef, AssetInformation, SpecificAssetId};
+use super::model::{
+    AasEnvironment, AasShell, AasSubmodel, AasSubmodelRef, AssetInformation, SpecificAssetId,
+};
 use super::sectors;
 
 /// Why an AAS projection could not be built.
@@ -124,6 +126,31 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
 
     serde_json::from_value(decision.filtered_data)
         .map_err(|e| AasError::Masking(format!("redacted document no longer valid: {e}")))
+}
+
+/// Build a complete [`AasEnvironment`] — the self-contained document form,
+/// shells and submodels in one payload.
+///
+/// Delegates to [`build_aas_from_passport`], so the passport is masked for
+/// `audience` before any mapper sees it and there is no envelope-shaped route
+/// around the disclosure seam. Every consumer that needs a whole-document AAS —
+/// an HTTP door serving `application/aas+json`, an AASX package, a conformance
+/// check — builds it here, so the encodings cannot disagree about content.
+///
+/// # Errors
+///
+/// Propagates [`AasError::Masking`] unchanged.
+pub fn build_aas_environment(
+    passport: &Passport,
+    gtin: &str,
+    audience: Audience,
+) -> Result<AasEnvironment, AasError> {
+    let (shell, submodels) = build_aas_from_passport(passport, gtin, audience)?;
+    Ok(AasEnvironment {
+        asset_administration_shells: vec![shell],
+        submodels,
+        concept_descriptions: Vec::new(),
+    })
 }
 
 /// The embedded sector catalog, built once.

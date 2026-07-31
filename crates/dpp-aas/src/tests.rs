@@ -588,3 +588,75 @@ fn a_sector_without_a_typed_mapper_still_carries_its_data() {
          template for it to name"
     );
 }
+
+// ─── Environment ──────────────────────────────────────────────────────────────
+
+#[test]
+fn environment_carries_the_shell_and_every_submodel() {
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+
+    let env = build_aas_environment(&passport, "09506000134352", Audience::Public)
+        .expect("environment is buildable");
+
+    assert_eq!(env.asset_administration_shells.len(), 1);
+    assert_eq!(env.submodels.len(), 6);
+    assert!(
+        env.concept_descriptions.is_empty(),
+        "this crate coins no concept descriptions"
+    );
+
+    // The envelope must carry exactly what the pair form carries — the whole
+    // point of one builder is that the two cannot disagree.
+    let (shell, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("pair form");
+    assert_eq!(env.asset_administration_shells[0], shell);
+    assert_eq!(env.submodels, submodels);
+}
+
+#[test]
+fn environment_is_masked_for_its_audience() {
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+
+    let public = build_aas_environment(&passport, "09506000134352", Audience::Public)
+        .expect("public environment");
+    let serialised = serde_json::to_string(&public).expect("serialises");
+
+    // `dueDiligenceUrl` is `restricted` in the battery catalog. The envelope
+    // delegates to the masked builder, so it must not appear at any depth —
+    // an envelope that assembled its own content could reintroduce it.
+    assert!(
+        !serialised.contains("dueDiligenceUrl"),
+        "restricted field leaked into a public AAS Environment"
+    );
+
+    let restricted =
+        build_aas_environment(&passport, "09506000134352", Audience::LegitimateInterest)
+            .expect("restricted environment");
+    assert!(
+        serde_json::to_string(&restricted)
+            .expect("serialises")
+            .contains("dueDiligenceUrl"),
+        "a legitimate-interest caller must still receive it"
+    );
+}
+
+#[test]
+fn environment_serialises_with_idta_field_names() {
+    let passport = minimal_passport(Sector::Battery);
+    let env =
+        build_aas_environment(&passport, "09506000134352", Audience::Public).expect("buildable");
+    let value = serde_json::to_value(&env).expect("serialises");
+
+    for key in [
+        "assetAdministrationShells",
+        "submodels",
+        "conceptDescriptions",
+    ] {
+        assert!(
+            value.get(key).is_some(),
+            "Environment must carry '{key}' at the top level"
+        );
+    }
+}
