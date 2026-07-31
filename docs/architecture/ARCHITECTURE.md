@@ -181,10 +181,22 @@ Pure, stateless — no I/O or network dependencies. Compiles to `std` and
 
 ## dpp-aas — Asset Administration Shell
 
-Maps a `Passport` to AAS shells and submodels (`build_aas_from_passport`), with
-a dedicated submodel builder per product group plus the sector-agnostic core
-submodels (identification, manufacturer, environmental, materials,
-repairability).
+Maps a `Passport` to AAS shells and submodels (`build_aas_from_passport`) —
+the sector-agnostic core submodels (identification, manufacturer,
+environmental, materials, repairability) plus one sector submodel.
+
+**Masked before mapping.** The builder takes an `Audience` and filters the
+passport through the same disclosure seam the public view uses, at the entry
+point, before any mapper runs. There is deliberately no unmasked entry point: a
+filter applied *after* mapping would match on `idShort`, so a mapper that
+misspelled one would emit a restricted field the filter could not recognise.
+
+**Typed mappers only where an act is in force** — `battery`, `electronics`,
+`unsold_goods`, plus `textile` as a named carve-out. Every other product group
+renders through the generic sector projection, because a hand-written mapper
+asserts an AAS submodel template that no standards body has ratified. A CI gate
+asserts this directly: a provisional sector gaining a typed mapper fails the
+build.
 
 **AAS-shaped output carrying our own semantics.** Every emitted `semanticId` is
 either `urn:odal-node:*` or carries a provenance record naming who verified it

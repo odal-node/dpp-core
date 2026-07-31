@@ -3,7 +3,7 @@
 use alloc::string::String;
 
 /// How strongly a lint finding should be read. Never blocking either way —
-/// the distinction is tone, not gating (ADR-002: informative only).
+/// the distinction is tone, not gating. Lints are informative only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LintSeverity {
     /// A data point that is very likely a mistake (e.g. a unit-conversion

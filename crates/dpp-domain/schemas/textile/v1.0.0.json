@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/textile-v1.0.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Textile Sector Data (v1.0.0)",
   "description": "Textile-specific fields for EU textile DPP compliance (anticipated 2025-2026 delegated act).",
   "type": "object",
@@ -23,7 +24,10 @@
       "description": "List of fibres and their percentage composition. Must sum to ~100%.",
       "items": {
         "type": "object",
-        "required": ["fibre", "pct"],
+        "required": [
+          "fibre",
+          "pct"
+        ],
         "properties": {
           "fibre": {
             "type": "string",
@@ -56,25 +60,40 @@
       "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS."
     },
     "recycledContentPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 100
     },
     "repairScore": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 10
     },
     "carbonFootprintKgCo2e": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0
     },
     "waterUseLitres": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0
     },
     "countryOfRawMaterialOrigin": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[A-Z]{2}$"
     }
   },

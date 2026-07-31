@@ -3,9 +3,9 @@
 How `dpp-calc` decides which law governs a product, and the one piece that is
 deliberately not built yet.
 
-**Status:** current as of 2026-07-25. Verified regulatory research and citations
-live in `dpp-docs/reference/regulatory/BATTERY-2023-1542-CITATION-MAP-2026-07.md`;
-this document covers the *model*, not the facts it encodes.
+**Status:** current as of 2026-07-25. The verified regulatory research and
+citations behind these dates are held separately; this document covers the
+*model*, not the facts it encodes.
 
 ---
 

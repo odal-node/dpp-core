@@ -19,6 +19,7 @@ use super::crypto::{
     verify_envelope_hmac,
 };
 use super::entry::KeyEntry;
+use crate::jws::algorithm::KeyAlgorithm;
 
 /// Type alias for the key-ID → record map stored in the key store.
 pub(crate) type KeyRecordMap = HashMap<String, KeyRecord>;
@@ -37,10 +38,13 @@ pub(crate) struct KeyRecord {
     /// longer verify. Defaults to false (back-compat with pre-revocation stores).
     #[serde(default)]
     pub(crate) revoked: bool,
-    /// JOSE algorithm identifier for this key pair (e.g. `"EdDSA"`).
-    /// Defaults to `"EdDSA"` for back-compat with pre-algorithm-agility stores.
+    /// The signature algorithm this key pair uses. Serialises as its JOSE
+    /// identifier (`"EdDSA"`), so the on-disk shape is unchanged. Defaults for
+    /// back-compat with pre-algorithm-agility stores; an *unrecognised*
+    /// algorithm fails to deserialise rather than loading a key nothing can
+    /// safely use.
     #[serde(default = "default_algorithm")]
-    pub(crate) algorithm: String,
+    pub(crate) algorithm: KeyAlgorithm,
 }
 
 impl KeyRecord {
@@ -62,8 +66,8 @@ impl KeyRecord {
     }
 }
 
-pub(crate) fn default_algorithm() -> String {
-    crate::jws::algorithm::EDDSA_ALG.to_owned()
+pub(crate) fn default_algorithm() -> KeyAlgorithm {
+    KeyAlgorithm::Ed25519
 }
 
 /// A key's public half plus its revocation state, read directly from the
@@ -71,9 +75,15 @@ pub(crate) fn default_algorithm() -> String {
 /// private-key decryption involved. For callers (like the `did:web` document
 /// builder in `dpp-vc`) that only ever need the public key, this avoids an
 /// AES-GCM decrypt per key on every call.
+///
+/// `algorithm` travels with the key because a reader cannot otherwise know how
+/// to represent it: the DID-document builder needs it to choose the JWK shape,
+/// and guessing is how a key ends up published under the wrong `kty`.
+#[non_exhaustive]
 pub struct PublicKeyInfo {
     pub verifying_key_hex: String,
     pub revoked: bool,
+    pub algorithm: KeyAlgorithm,
 }
 
 impl From<&KeyRecord> for PublicKeyInfo {
@@ -81,6 +91,7 @@ impl From<&KeyRecord> for PublicKeyInfo {
         Self {
             verifying_key_hex: record.verifying_key_hex.clone(),
             revoked: record.revoked,
+            algorithm: record.algorithm,
         }
     }
 }
@@ -292,6 +303,7 @@ impl KeyStore {
             verifying_key,
             fingerprint,
             revoked: false,
+            algorithm: default_algorithm(),
         })
     }
 
@@ -389,6 +401,7 @@ impl KeyStore {
             signing_key,
             verifying_key,
             revoked: record.revoked,
+            algorithm: record.algorithm,
         })
     }
 

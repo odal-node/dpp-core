@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/aluminium-v1.1.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Aluminium Sector Data (v1.1.0)",
   "description": "Aluminium sector fields for EU ESPR carbon intensity reporting, aligned with CBAM benchmarks. DPP mandate expected ~2030. v1.1.0 renames countryOfProduction to countryOfOrigin for cross-sector naming consistency.",
   "type": "object",
@@ -25,7 +26,11 @@
     },
     "productionRoute": {
       "type": "string",
-      "enum": ["primary", "secondary-recycled", "mixed"],
+      "enum": [
+        "primary",
+        "secondary-recycled",
+        "mixed"
+      ],
       "description": "Production route: primary (Hall-Heroult electrolysis), secondary-recycled (scrap remelting), or mixed."
     },
     "co2ePerTonneKg": {
@@ -45,7 +50,10 @@
       "description": "ISO 3166-1 alpha-2 country of origin (primary production)."
     },
     "annualProductionTonnes": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "description": "Annual production volume in tonnes (optional)."
     }

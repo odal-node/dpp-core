@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Copied **by value** onto the passport so the published, signed record remains
 /// complete for its full retention period even if the operator later retires the
 /// source facility from their registry. Field shape matches
-/// `dpp_registry::FacilityIdentifier`. See DATA-MODEL §3.3 / ADR-006.
+/// `dpp_registry::FacilityIdentifier`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FacilitySnapshot {

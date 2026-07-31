@@ -186,8 +186,9 @@ pub trait PassportRepository: Send + Sync {
     ) -> Result<Passport, DppError>;
 
     /// `facility_id` filters to passports stamped with that exact facility
-    /// identifier (ESPR Annex III; ADR-006 grouping, not isolation — see
-    /// `Passport::facility`). `None` returns passports for every facility.
+    /// identifier (ESPR Annex III). It is a grouping filter, not an isolation
+    /// boundary — see `Passport::facility`. `None` returns passports for every
+    /// facility.
     async fn list(
         &self,
         status: Option<PassportStatus>,

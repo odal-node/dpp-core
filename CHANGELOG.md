@@ -13,6 +13,125 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-31
+
+### Breaking
+
+- **Key handling carries its own algorithm.** Signing and verification read the
+  algorithm from the key record instead of a global constant. `KeyEntry` gains
+  an `algorithm` field and is now `#[non_exhaustive]`; `PublicKeyInfo` carries
+  the algorithm alongside `verifying_key_hex`. `dpp-vc`'s `did:web` builder no
+  longer hardcodes `kty: "OKP"` — the JWK shape comes from
+  `KeyAlgorithm::public_key_jwk`, which also makes a **mixed-curve key history**
+  representable, so an operator who ever rotates across curves gets a DID
+  document with both kinds of archived key.
+
+  Verification now binds `alg` to `KeyRecord::algorithm`. A JWS header can only
+  ever *confirm* what the key already says; it can no longer select the
+  verification path. A header disagreeing with the key record is rejected.
+
+  `is_allowed_alg` still returns true for exactly one algorithm — **no second
+  curve is added here.** This is the shape only, landed while it is still cheap
+  to break the API; adding a curve later is additive rather than breaking, which
+  is the whole point of doing it in this order.
+
+  *Migration:* `KeyEntry` is `#[non_exhaustive]`, so downstream struct-literal
+  construction no longer compiles — build it through the keystore. Anything
+  reading `PublicKeyInfo` positionally must account for the new field.
+
+- **Port traits dispatch on the catalog key, not the `Sector` enum.**
+  `ComplianceStrategy::sector() -> Sector` becomes `sector_key() -> &str`;
+  `ComplianceRegistry::compute` and both `PluginHost` methods take `&str` in
+  place of `Sector`/`&Sector`.
+
+  Taking the enum meant a plugin could only be loaded for a sector this build
+  already had a variant for — the opposite of what 0.13.0's open sector axis is
+  for. Plugin manifests are string-keyed and the catalog is the source of
+  sector identity.
+
+  **`SectorData` is unaffected** and still appears in these signatures: it is
+  the payload, not the dispatch key, and it has been key-preserving since
+  0.13.0.
+
+  *Migration:* call `Sector::catalog_key()` at the call site. Implementors
+  rename `sector()` to `sector_key()` and return a `&str`.
+
+- **Typed AAS mappers now exist only for sectors whose acts are in force.**
+  Seven hand-written mappers are removed — `aluminium`, `construction`,
+  `detergent`, `furniture`, `steel`, `toy`, `tyre`. Each named an AAS submodel
+  template that no standards body has ratified, which is a claim about a third
+  party's data model that we could not support. They render through the generic
+  sector projection instead.
+
+  **Kept:** `battery`, `electronics` and `unsold_goods` — the three sectors the
+  catalog marks `in_force` — plus `textile`, which is carried deliberately as a
+  single recorded exception rather than by rule.
+
+  The CI gate in `dpp-tests/tests/all_sectors_aas.rs` **inverts**: it used to
+  require a typed, non-generic submodel for every catalog sector; it now asserts
+  that only in-force sectors and the named carve-out carry one, so a provisional
+  sector gaining a typed mapper fails the build.
+
+  *Migration:* consumers of the seven removed groups receive the generic
+  submodel shape. No `SectorData` variant was removed — the schema stays either
+  way, so deleting the Rust struct would relocate the guess rather than retire
+  it.
+
+- **`build_aas_from_passport` masks the passport before any mapper sees it.**
+  The signature gains an `audience` parameter and returns
+  `Result<_, AasError>`. Filtering runs at the entry point through the same
+  `filter_by_audience` seam the public view uses — not afterwards, and never
+  inside the mappers. **There is deliberately no unmasked entry point.**
+
+  This closes a real exposure: the mappers previously emitted every field they
+  knew of, including **eight of battery's ten non-public fields** — among them
+  `stateOfHealthPct`, the individual-tier field that was served publicly in
+  0.10.0. The projection is not reachable over HTTP today, so nothing leaked
+  through this path; the fix lands before the door opens.
+
+  A post-hoc filter over the assembled AAS tree would not have worked: it
+  matches on `idShort`, and a mapper that misspells one (as `battery.rs` did)
+  produces a field the filter cannot recognise as restricted.
+
+  *Migration:* pass the caller's `Audience`. `AasError::Masking` is returned if
+  the filtered document no longer deserialises into a `Passport` — that is a
+  disclosure-policy defect (a required field classified non-public), not a
+  caller error.
+
+### Added
+
+- **`dpp_domain::VERSION`** — the `dpp-core` version a consumer was compiled
+  against. A downstream crate cannot discover this on its own, since
+  `CARGO_PKG_VERSION` resolves to the calling crate. Platforms embedding this
+  library record it alongside their own version so a compliance determination
+  can be traced to the code that computed it. All core crates share one version
+  under lockstep, so `dpp-domain`'s is the workspace's.
+
+- **Every schema for a sector not in force carries a draft marker** stating that
+  validating against it is not evidence of compliance. A provisional sector's
+  schema is our reading of an instrument nobody has ratified, and a reader of
+  the file alone could not previously tell. A **bidirectional CI gate** ties the
+  marker to the catalog status, so promoting a sector is a deliberate two-part
+  edit — `dpp-tests/tests/provisional_schema_marker.rs`.
+
+### Changed
+
+- **Crate descriptions and keywords corrected.** The 0.13.0 reshuffle moved the
+  `did:web` builder and the credential stack out of `dpp-crypto` without moving
+  its metadata, so it advertised a capability it no longer had and pointed
+  crates.io searches for `did-web` at the wrong crate. `dpp-aas` kept an `idta`
+  keyword that its description had deliberately dropped, and `dpp-domain` did
+  not mention the per-field disclosure policy it gained. This metadata is
+  **immutable once a version is published**, so it can only be corrected in a
+  new release.
+
+### Fixed
+
+- **Untyped sectors validate against their embedded schema** instead of being
+  rejected outright unless the caller supplied a validator. The crate already
+  embeds schemas for these sectors; without this, removing a typed lane would
+  have turned into a hard regression for anyone sending that sector's data.
+
 ## [0.13.0] - 2026-07-30
 
 ### Breaking

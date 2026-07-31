@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/construction-v1.0.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Construction Products Sector Data (v1.0.0)",
   "description": "Construction products fields per EU CPR 2024/3110. Mandate is phased by product family (~2028-2032). This schema is provisional pending final delegated acts.",
   "type": "object",
@@ -47,17 +48,26 @@
       "description": "Description of the functional unit, e.g. 'per tonne', 'per m2', 'per m3'."
     },
     "recycledContentPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 100,
       "description": "Recycled content as a percentage of total input material."
     },
     "epdUrl": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "URL to the Environmental Product Declaration (EPD)."
     },
     "ceMarking": {
-      "type": ["boolean", "null"],
+      "type": [
+        "boolean",
+        "null"
+      ],
       "description": "Whether the product carries CE marking under EU CPR."
     }
   },

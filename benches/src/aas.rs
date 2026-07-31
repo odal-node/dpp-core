@@ -5,6 +5,7 @@
 use chrono::Utc;
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_aas::build_aas_from_passport;
+use dpp_domain::Audience;
 use dpp_domain::domain::gtin::Gtin;
 use dpp_domain::domain::sector::{BatteryChemistry, BatteryData, SectorData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, Sector};
@@ -82,12 +83,13 @@ fn aas_benchmarks(c: &mut Criterion) {
     let passport = battery_passport();
 
     c.bench_function("aas_build_from_battery_passport", |b| {
-        b.iter(|| build_aas_from_passport(&passport, GTIN));
+        b.iter(|| build_aas_from_passport(&passport, GTIN, Audience::Public).expect("masking"));
     });
 
     c.bench_function("aas_build_and_serialise", |b| {
         b.iter(|| {
-            let (shell, submodels) = build_aas_from_passport(&passport, GTIN);
+            let (shell, submodels) =
+                build_aas_from_passport(&passport, GTIN, Audience::Public).expect("masking");
             (
                 serde_json::to_string(&shell).unwrap(),
                 serde_json::to_string(&submodels).unwrap(),

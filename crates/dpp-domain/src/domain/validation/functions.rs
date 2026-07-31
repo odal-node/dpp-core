@@ -36,9 +36,11 @@ fn default_catalog() -> &'static SectorCatalog {
 /// validate those through that registry directly (its fail-closed
 /// `validate_strict`).
 ///
-/// A sector with no typed variant in this build is a **hard error** here — pass
-/// a [`SectorValidatorRegistry`] via [`validate_sector_data_with_registry`] to
-/// handle sectors added to the catalog after this crate was released.
+/// A sector with no typed variant in this build is still validated against its
+/// embedded schema if the catalog has one. It is a **hard error** only when the
+/// sector is unknown to the catalog too — pass a [`SectorValidatorRegistry`]
+/// via [`validate_sector_data_with_registry`] to handle sectors added after
+/// this crate was released.
 ///
 /// # Errors
 ///
@@ -50,32 +52,36 @@ pub fn validate_sector_data(sector_data: &SectorData) -> Result<(), ValidationEr
 
 /// Like [`validate_sector_data`] but accepts a runtime validator registry.
 ///
-/// For an untyped sector, dispatches to the validator registered under **that
-/// sector's own key** in `registry` — the key is preserved through
-/// deserialization, so dispatch is by name rather than by a literal `"other"`.
-/// Returns a hard error if no validator is registered for it.
+/// For an untyped sector, validates against the embedded schema for **that
+/// sector's own key** when the catalog has one, and additionally against any
+/// validator registered under the same key in `registry`. The key is preserved
+/// through deserialization, so dispatch is by name rather than by a literal
+/// `"other"`.
+///
+/// A hard error only when there is **neither** — a sector this build has never
+/// heard of, with nothing to check it against.
 pub fn validate_sector_data_with_registry(
     sector_data: &SectorData,
     registry: &SectorValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
     if let SectorData::Other { sector, .. } = sector_data {
-        // Look the validator up by the sector's own key, not by a literal
-        // "other": the key survives deserialization precisely so a sector with
-        // no typed variant in this build can still be dispatched by name.
-        match registry.get(sector) {
-            Some(v) => {
-                if let Err(field_errors) = v.validate(&sector_data_instance(sector_data)) {
-                    errors.extend(field_errors);
-                }
-            }
-            None => errors.push(FieldError {
-                field: "/sector".to_owned(),
-                message: format!(
-                    "sector '{sector}' has no typed variant in this build and no validator \
-                     registered for it; pass a SectorValidatorRegistry with a '{sector}' entry"
-                ),
-            }),
+        // Dispatch by the sector's own key, not by a literal "other": the key
+        // survives deserialization precisely so a sector with no typed variant
+        // in this build can still be handled by name.
+        //
+        // Delegated to `validate_raw_sector_data` rather than going straight to
+        // `registry`, so an untyped sector still gets the **embedded** schema
+        // when the catalog has one. Those two facts are independent: a schema
+        // ships as a data file, a typed variant is Rust code, and a sector can
+        // have the first without the second. Checking only `registry` rejected
+        // every such sector outright — which is the opposite of what the open
+        // sector lane is for, and would have turned removing a typed lane into
+        // a hard regression for any sector whose schema we already ship.
+        if let Err(ve) =
+            validate_raw_sector_data(sector, &sector_data_instance(sector_data), registry)
+        {
+            errors.extend(ve.errors);
         }
     } else {
         schema_errors(sector_data, &mut errors);

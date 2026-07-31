@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/toy-v1.1.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Toy Sector Data (v1.1.0)",
   "description": "Toy fields per EU Delegated Regulation 2025/2509. DPP mandate 2030. v1.1.0 renames countryOfManufacture to countryOfOrigin for cross-sector naming consistency.",
   "type": "object",
@@ -19,12 +20,24 @@
     },
     "ageGroup": {
       "type": "string",
-      "enum": ["0-3", "3-6", "6-12", "12+"],
+      "enum": [
+        "0-3",
+        "3-6",
+        "6-12",
+        "12+"
+      ],
       "description": "Intended age group per EU Toy Safety Directive."
     },
     "primaryMaterial": {
       "type": "string",
-      "enum": ["plastic", "wood", "metal", "textile", "mixed", "other"],
+      "enum": [
+        "plastic",
+        "wood",
+        "metal",
+        "textile",
+        "mixed",
+        "other"
+      ],
       "description": "Primary construction material."
     },
     "ceMarking": {
@@ -37,29 +50,64 @@
       "description": "ISO 3166-1 alpha-2 country of origin (manufacture)."
     },
     "svhcSubstances": {
-      "type": ["array", "null"],
-      "items": { "$ref": "#/definitions/svhcSubstance" },
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/svhcSubstance"
+      },
       "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
     },
     "containsBattery": {
-      "type": ["boolean", "null"],
+      "type": [
+        "boolean",
+        "null"
+      ],
       "description": "Whether the toy contains a battery."
     },
     "repairabilityInfo": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Free-text or URL pointing to repairability or spare parts information."
     }
   },
   "definitions": {
     "svhcSubstance": {
       "type": "object",
-      "required": ["casNumber", "substanceName", "concentrationPct"],
+      "required": [
+        "casNumber",
+        "substanceName",
+        "concentrationPct"
+      ],
       "properties": {
-        "casNumber": { "type": "string", "minLength": 1 },
-        "substanceName": { "type": "string", "minLength": 1 },
-        "concentrationPct": { "type": "number", "minimum": 0, "maximum": 100 },
-        "locationInProduct": { "type": ["string", "null"] },
-        "scipNotificationId": { "type": ["string", "null"] }
+        "casNumber": {
+          "type": "string",
+          "minLength": 1
+        },
+        "substanceName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "concentrationPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "locationInProduct": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scipNotificationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       },
       "additionalProperties": false
     }

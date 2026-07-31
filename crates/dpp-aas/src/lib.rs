@@ -63,7 +63,7 @@ mod templates;
 #[cfg(test)]
 mod tests;
 
-pub use builder::build_aas_from_passport;
+pub use builder::{AasError, build_aas_from_passport};
 pub use mapper::map_dpp_to_aas_submodel;
 pub use model::{
     AasCollection, AasDataType, AasProperty, AasReference, AasSemId, AasSemIdKey, AasShell,

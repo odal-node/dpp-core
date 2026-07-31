@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-domain"
-description = "EU Digital Product Passport domain types, port traits, and open-core boundary"
+description = "EU Digital Product Passport domain types, port traits, and per-field disclosure policy"
 keywords    = ["dpp", "espr", "eu-regulation", "ecodesign", "sustainability"]
 categories  = ["data-structures"]
 version.workspace     = true

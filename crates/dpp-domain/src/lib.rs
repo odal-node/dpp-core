@@ -5,6 +5,15 @@
 //!
 //! No I/O, no async, no HTTP, no database drivers — pure domain logic only.
 
+/// The version of `dpp-core` this build was compiled against.
+///
+/// All core crates share one version (lockstep), so this crate's version is the
+/// workspace's. A consumer cannot otherwise discover it: `CARGO_PKG_VERSION`
+/// resolves to the *calling* crate. Platforms embedding this library record it
+/// alongside their own version so a compliance determination can be traced to
+/// the code that computed it.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod access;
 pub mod catalog;
 pub mod compliance;
