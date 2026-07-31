@@ -13,6 +13,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-07-31
+
+### Added
+
+- **`AasEnvironment` and `build_aas_environment`** — the self-contained AAS
+  document form, carrying shells and submodels in one payload. This is the
+  *file* shape rather than the API shape: an AAS server serves shells and
+  submodels from separate endpoints, while an Environment is what you return
+  when a caller wants the whole twin in one response, and what an AASX package
+  contains.
+
+  It belongs here rather than in a consumer because there must be exactly one
+  serialisation of it. An HTTP door and an AASX package that each assembled
+  their own envelope would drift, and the drift would stay invisible until a
+  partner's tooling disagreed with ours. The builder delegates to
+  `build_aas_from_passport`, so the passport is masked for its audience before
+  any mapper runs and there is no envelope-shaped route around the disclosure
+  seam — asserted by a test that a `restricted` battery field is absent from a
+  public Environment and present for a legitimate-interest caller.
+
+  **No conformance is claimed.** The field names follow the IDTA JSON
+  serialisation, but nothing here has been checked against the published schema
+  or a reference implementation; that is separate, deliberate work.
+
 ## [0.14.0] - 2026-07-31
 
 ### Breaking

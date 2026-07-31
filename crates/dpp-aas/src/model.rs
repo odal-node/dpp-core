@@ -167,3 +167,34 @@ pub struct AasShell {
     pub asset_information: AssetInformation,
     pub submodels: Vec<AasSubmodelRef>,
 }
+
+// ─── Environment ──────────────────────────────────────────────────────────────
+
+/// IDTA AAS `Environment` — the self-contained document form, carrying shells
+/// and submodels together in one payload.
+///
+/// This is the *file* shape, not the API shape. A running AAS server serves
+/// [`AasShell`] and [`AasSubmodel`] from separate endpoints
+/// (`/shells/{aasId}`, `/submodels/{submodelId}`); an `Environment` is what you
+/// serve when a caller wants the whole twin in one response, and it is what an
+/// AASX package contains.
+///
+/// It lives here rather than in a consumer because there must be exactly one
+/// serialisation of it: an HTTP door and an AASX package that each built their
+/// own would drift, and the drift would be invisible until a partner's tooling
+/// disagreed with ours.
+///
+/// **No conformance is claimed.** These field names follow the IDTA JSON
+/// serialisation, but nothing here has been checked against the published
+/// schema or a reference implementation. Validating against a vendored AAS
+/// schema and IDTA's own test engine is separate, deliberate work.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AasEnvironment {
+    pub asset_administration_shells: Vec<AasShell>,
+    pub submodels: Vec<AasSubmodel>,
+    /// Always empty: this crate coins no concept descriptions. Emitted rather
+    /// than omitted so the document shape is stable for a consumer that
+    /// iterates it, and so adding them later is not a shape change.
+    pub concept_descriptions: Vec<serde_json::Value>,
+}
