@@ -1,0 +1,6 @@
+# The vendored AAS metamodel schema is third-party bytes whose integrity is
+# recorded as a SHA-256 in its NOTICE.md. Line-ending translation would change
+# those bytes on disk without changing the blob, so the recorded hash would fail
+# to verify on any checkout that normalises — which is the default on Windows.
+# Keep it byte-exact so the provenance record stays checkable.
+crates/dpp-tests/fixtures/aas/aas.json -text

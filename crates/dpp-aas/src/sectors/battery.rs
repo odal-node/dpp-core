@@ -89,18 +89,14 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
     push_opt_str!(b.soh_methodology, "sohMethodology");
 
     if let Some(ref url) = b.due_diligence_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "dueDiligenceUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("dueDiligenceUrl", url),
+        ));
     }
     if let Some(ref url) = b.disassembly_instructions_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "disassemblyInstructionsUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("disassemblyInstructionsUrl", url),
+        ));
     }
 
     for (label, opt_comps) in [

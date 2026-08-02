@@ -5,7 +5,7 @@ use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
 use dpp_domain::{Audience, Passport, SectorCatalog};
 
 use super::model::{
-    AasEnvironment, AasShell, AasSubmodel, AasSubmodelRef, AssetInformation, SpecificAssetId,
+    AasEnvironment, AasSemId, AasShell, AasSubmodel, AssetInformation, SpecificAssetId,
 };
 use super::sectors;
 
@@ -50,6 +50,16 @@ impl std::error::Error for AasError {}
 /// The round-trip works because every non-public field in the catalog is
 /// optional on its typed struct, so a redacted document still deserialises with
 /// those fields absent and the mappers simply do not emit them.
+///
+/// A sector the catalog does not describe has **no** field classified, so the
+/// filter alone would pass its whole payload through. Such a sector is reduced
+/// to its `sector` discriminant instead, before any mapper runs, for **every**
+/// audience — an unmodelled sector has no field policy for any of them, so a
+/// credentialed reader must not receive more of it than an anonymous one. The
+/// sector stays identified: `ProductIdentification` carries the tag.
+///
+/// That is a property of this function, not of any particular caller: handing it
+/// a complete, unredacted passport is safe.
 ///
 /// # Errors
 ///
@@ -98,12 +108,13 @@ pub fn build_aas_from_passport(
         model_type: "AssetAdministrationShell".into(),
         kind: "Instance".into(),
         asset_information: AssetInformation {
+            asset_kind: "Instance".into(),
             global_asset_id: format!("urn:odal-node:product:{gtin}"),
             specific_asset_ids,
         },
         submodels: submodels
             .iter()
-            .map(|s| AasSubmodelRef { id: s.id.clone() })
+            .map(|s| AasSemId::submodel(&s.id))
             .collect(),
     };
 
@@ -117,15 +128,63 @@ pub fn build_aas_from_passport(
 /// sector this build has never seen is masked by the conservative default
 /// rather than passed through unfiltered.
 fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
-    let policy = SectorAccessPolicy::from_catalog(catalog(), passport.sector.catalog_key())
-        .unwrap_or_else(SectorAccessPolicy::passport_default);
+    // `from_catalog` returns `None` exactly when the catalog has no descriptor
+    // for this key, so it doubles as the unknown-sector test below.
+    let sector_policy = SectorAccessPolicy::from_catalog(catalog(), passport.sector.catalog_key());
+    let sector_is_unknown = sector_policy.is_none();
+    let policy = sector_policy.unwrap_or_else(SectorAccessPolicy::passport_default);
 
     let document =
         serde_json::to_value(passport).map_err(|e| AasError::Masking(format!("serialise: {e}")))?;
-    let decision = filter_by_audience(&document, &policy, audience);
+    let mut filtered = filter_by_audience(&document, &policy, audience).filtered_data;
 
-    serde_json::from_value(decision.filtered_data)
+    if sector_is_unknown {
+        redact_unknown_sector_data(&mut filtered);
+    }
+
+    serde_json::from_value(filtered)
         .map_err(|e| AasError::Masking(format!("redacted document no longer valid: {e}")))
+}
+
+/// Reduce an unrecognised sector's `sectorData` to its `sector` tag alone.
+///
+/// The filter above cannot help here. Both policies it can choose from carry
+/// `default_disclosure: Public`, which is safe only because a *listed* sector's
+/// non-public fields are listed — and an unlisted sector has nothing listed, so
+/// every field it carries is unlisted, and every unlisted field is Public. The
+/// filter therefore passes the whole payload through, and the more unusual the
+/// sector, the more certain it is that nobody has classified its fields.
+///
+/// So the backstop is structural rather than policy-driven: with no field
+/// policy, keep only the discriminant. Nothing is lost by dropping the tag from
+/// the sector submodel itself — `ProductIdentification` carries `sector`
+/// independently — but it is kept here so the redacted document still
+/// round-trips through [`SectorData::Other`](dpp_domain::SectorData::Other),
+/// which reads its variant from that key.
+///
+/// **Applied for every audience, not just `Public`.** An unrecognised sector has
+/// no field policy for *any* audience, so a credentialed reader must not receive
+/// more of it than an anonymous one. This mirrors, deliberately and for the same
+/// stated reason, the backstop the platform applies when it renders a public
+/// view — the two must not disagree about what an unmodelled sector discloses.
+fn redact_unknown_sector_data(document: &mut serde_json::Value) {
+    let Some(object) = document.as_object_mut() else {
+        return;
+    };
+    let Some(sector_data) = object.get("sectorData") else {
+        return;
+    };
+    // An untagged payload is a legacy record rather than an unknown sector, and
+    // is left to the filter — matching how the platform draws the same line.
+    let Some(tag) = sector_data
+        .get("sector")
+        .and_then(serde_json::Value::as_str)
+        .filter(|tag| !tag.is_empty())
+        .map(str::to_owned)
+    else {
+        return;
+    };
+    object.insert("sectorData".into(), serde_json::json!({ "sector": tag }));
 }
 
 /// Build a complete [`AasEnvironment`] — the self-contained document form,

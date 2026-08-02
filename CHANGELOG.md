@@ -13,6 +13,116 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **Every AAS Environment is validated against IDTA's published JSON Schema.**
+  The `IDTA-01001-3-0-1` schema (metamodel **3.0**) is vendored under
+  `dpp-tests/fixtures/aas/`, with its tag, retrieval date, size, hash and
+  licence recorded alongside it, and every sector's Environment — plus the
+  generic fallback and a deliberately sparse passport — is checked against it.
+
+  Until now nothing checked this crate's output against anything but its own
+  expectations, and the output was invalid in four separate ways (below). An
+  external oracle is the only kind of test that could have caught that.
+
+  3.0 rather than 3.1 or 3.2 because 3.0 is the revision deployed AAS tooling
+  implements, and because our Environment uses a small, stable corner of the
+  metamodel where 3.0 is the strictest of the three. The reasoning and the
+  update procedure are in `dpp-tests/fixtures/aas/NOTICE.md`.
+
+  **Schema-valid is not IDTA-conformant.** This establishes metamodel validity
+  and nothing else — not conformance, which needs IDTA's own test engine, and
+  not submodel-template conformance, which needs the templates.
+
+- **One AAS `Environment` per product group is committed** under
+  `dpp-tests/fixtures/aas/environments/`, regenerated with
+  `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests`.
+
+  A mapper change now arrives as a reviewable JSON diff rather than a green test
+  run; the files are an artefact a partner can open in their own AAS tooling;
+  and they let a human read what we actually emit, which is how four metamodel
+  defects survived several releases. They are themselves validated against the
+  vendored schema and checked field-by-field against each sector's disclosure
+  map, so the bytes a reviewer reads are bytes the gate has also inspected.
+
+### Fixed
+
+- **An unrecognised sector's fields no longer reach the AAS projection.**
+  `build_aas_from_passport` resolves its disclosure policy from the catalog and
+  falls back to the passport-level defaults when the sector has no entry. Both
+  policies classify unlisted fields as `Public` — which is safe only because a
+  *listed* sector's non-public fields are listed. An unlisted sector has nothing
+  listed, so every field it carried was unlisted, therefore `Public`, therefore
+  emitted. The less this build knew about a sector, the more of it was published.
+
+  Such a sector is now reduced to its discriminant before any mapper sees it,
+  **for every audience** — an unmodelled sector has no field policy for any of
+  them, so a credentialed reader must not receive more of it than an anonymous
+  one. The sector remains identified: `ProductIdentification` carries the tag.
+
+  This closes a gap between the library and its callers rather than a live leak.
+  Both of the platform's public doors already applied this backstop, and its AAS
+  door additionally rejects any passport without a GTIN, which an unmodelled
+  sector never has. The exposure was to third parties: this is public API of a
+  published crate, and a consumer calling it directly — as AASX packaging will —
+  got everything.
+
+  *Behaviour change:* the AAS output for an unmodelled sector no longer carries
+  its fields. Anything depending on them was depending on the leak.
+
+### Breaking
+
+- **`SubmodelTemplate::is_placeholder` is a method, derived from the
+  identifier, not a stored field.** It answers "does this template still name
+  our own concept rather than a ratified third-party one", which is decided
+  entirely by whether the semanticId sits under `urn:odal-node:` — now exported
+  as `semantic_ids::OWN_NAMESPACE`, so the provenance gate and this rule cannot
+  disagree about where our namespace ends.
+
+  It was a hand-maintained `bool`, and it had already gone wrong. When battery's
+  identifier was reverted out of the Catena-X namespace into ours on 2026-07-29,
+  the flag stayed `false` and `version` stayed `"6.0.0"` — the Catena-X aspect
+  model's version, against an identifier ending `:1.0`. The single template
+  exempted from the conformance gate was exempt on the strength of an identifier
+  it no longer carried. Battery's `version` is corrected to `"1.0"`, and a test
+  now asserts every declared version matches the version its identifier ends
+  with.
+
+  **Every sector template is a placeholder today**, and a test states that as an
+  explicit inventory rather than a loop over the derived flag — which would
+  agree with itself whatever the data said. Adopting a real third-party
+  identifier is now a visible diff in that list.
+
+  *Migration:* read `t.is_placeholder()` instead of `t.is_placeholder`.
+
+- **The AAS projection now emits a valid AAS document.** Four defects, each of
+  which produced output no AAS parser would accept:
+
+  - `AssetInformation` omitted `assetKind`, the class's **only** required
+    member. It is now `"Instance"` — a passport describes a manufactured item,
+    never a type definition.
+  - `AssetAdministrationShell.submodels` held bare `{"id": …}` objects. The
+    metamodel types them as `Reference`; they are now `ModelReference`s with a
+    single `Submodel` key. `AasSubmodelRef` is replaced by `AasSemId::submodel`.
+  - The `AasSubmodelElement::Reference` variant serialised
+    `modelType: "Reference"`. `Reference` is not a submodel element at all — it
+    is the pointer type carried *inside* one. The variant is now
+    `ReferenceElement`, and `AasReference::value` is an `AasSemId` rather than a
+    bare `String`, since that is how the metamodel types it. Build one with
+    `AasReference::external`.
+  - Empty arrays reached the wire. `conceptDescriptions`, `submodelElements`,
+    `SubmodelElementCollection.value` and `submodels` are all `minItems: 1`, so
+    `[]` is invalid where an absent member is fine. All four are now omitted
+    when empty — which is exactly what masking produces whenever a sector's
+    public tier is thin, so this was reachable in normal operation, not only in
+    edge cases.
+
+  *Migration:* consumers matching on `AasSubmodelElement::Reference` rename the
+  arm to `ReferenceElement` and read the target from `value.keys`; consumers
+  reading `shell.submodels[..].id` read `keys[0].value` instead. Nothing that
+  consumed the previous output was consuming valid AAS, so there is no
+  correct-before/incorrect-after case to migrate.
+
 ## [0.14.1] - 2026-07-31
 
 ### Added

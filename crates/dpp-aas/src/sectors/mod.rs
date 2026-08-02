@@ -62,11 +62,9 @@ pub(super) fn build_manufacturer_submodel(passport: &Passport) -> AasSubmodel {
         string_property("address", &mfr.address, None, None),
     ];
     if let Some(url) = &mfr.did_web_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "didWebUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("didWebUrl", url),
+        ));
     }
     AasSubmodel {
         id: format!("urn:odal-node:dpp:{}:manufacturer-information", passport.id),

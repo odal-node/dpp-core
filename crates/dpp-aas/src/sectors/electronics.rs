@@ -61,18 +61,14 @@ pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str)
         ));
     }
     if let Some(ref url) = e.repair_manual_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "repairManualUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("repairManualUrl", url),
+        ));
     }
     if let Some(ref url) = e.disassembly_instructions_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "disassemblyInstructionsUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("disassemblyInstructionsUrl", url),
+        ));
     }
 
     AasSubmodel {

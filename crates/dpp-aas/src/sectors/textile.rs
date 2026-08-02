@@ -68,11 +68,9 @@ pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasS
     push_opt_double!(t.pef_score, "pefScore", None);
 
     if let Some(ref url) = t.repair_history_url {
-        elements.push(AasSubmodelElement::Reference(AasReference {
-            id_short: "repairHistoryUrl".into(),
-            value: url.clone(),
-            semantic_id: None,
-        }));
+        elements.push(AasSubmodelElement::ReferenceElement(
+            AasReference::external("repairHistoryUrl", url),
+        ));
     }
 
     if let Some(ref svhcs) = t.svhc_substances {

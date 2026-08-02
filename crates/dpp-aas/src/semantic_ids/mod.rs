@@ -21,6 +21,15 @@
 // is not a lesser option: it says "this is our concept" truthfully, where a
 // wrong IRDI says "this is IDTA's concept" falsely, to a machine.
 
+/// The namespace this crate coins its own identifiers in.
+///
+/// An identifier under this prefix names *our* concept and needs no provenance
+/// record; anything outside it claims another organisation's vocabulary and is
+/// permitted only by a verified `allowlist.json` entry. One definition, because
+/// the provenance gate and the placeholder rule must not be able to disagree
+/// about where the boundary is.
+pub const OWN_NAMESPACE: &str = "urn:odal-node:";
+
 // ── Submodel templates ───────────────────────────────────────────────────────
 // The semanticId of a Submodel. Distinct from the properties inside it: an AAS
 // Submodel and an AAS Property are different concepts, and one URI cannot

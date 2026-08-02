@@ -67,7 +67,7 @@ pub use builder::{AasError, build_aas_environment, build_aas_from_passport};
 pub use mapper::map_dpp_to_aas_submodel;
 pub use model::{
     AasCollection, AasDataType, AasEnvironment, AasProperty, AasReference, AasSemId, AasSemIdKey,
-    AasShell, AasSubmodel, AasSubmodelElement, AasSubmodelRef, AssetInformation, SpecificAssetId,
+    AasShell, AasSubmodel, AasSubmodelElement, AssetInformation, SpecificAssetId,
 };
 pub use property::{boolean_property, double_property, integer_property, string_property};
 pub use templates::{SubmodelTemplate, placeholder_templates, sector_submodel_template};
