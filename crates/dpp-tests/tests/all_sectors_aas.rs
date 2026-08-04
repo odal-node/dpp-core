@@ -1657,6 +1657,13 @@ fn committed_environments_match_what_the_mappers_produce() {
             continue;
         }
 
+        // Compared on content, not encoding. `.gitattributes` normalises these
+        // files to LF in the working tree, which makes this replace a no-op on
+        // any fresh checkout — but the attribute only applies at checkout time,
+        // so a working tree predating it still holds CRLF. Dropping the
+        // normalisation would turn that into "the committed Environments are
+        // stale, regenerate them", which is both false and the most expensive
+        // possible way to say "your line endings differ".
         match std::fs::read_to_string(&path) {
             Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
             Ok(_) => stale.push(key),
