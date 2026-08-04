@@ -8,19 +8,17 @@ use crate::semantic_ids;
 
 pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", e.gtin.as_str(), None, None),
-        string_property("productCategory", &e.product_category, None, None),
+        string_property("gtin", e.gtin.as_str(), None),
+        string_property("productCategory", &e.product_category, None),
         string_property(
             "energyEfficiencyClass",
             &enum_wire_str(&e.energy_efficiency_class),
-            None,
             None,
         ),
         double_property(
             "co2ePerUnitKg",
             e.co2e_per_unit_kg,
             Some(semantic_ids::CO2E_PER_UNIT),
-            Some("kgCO2e"),
         ),
     ];
 
@@ -29,34 +27,27 @@ pub(super) fn build_electronics_submodel(e: &ElectronicsData, passport_id: &str)
             "repairabilityScore",
             rs.overall,
             Some(semantic_ids::REPAIRABILITY_SCORE),
-            Some("index 0-10"),
         ));
     }
     if let Some(v) = e.spare_parts_available {
-        elements.push(boolean_property("sparePartsAvailable", v, None, None));
+        elements.push(boolean_property("sparePartsAvailable", v, None));
     }
     if let Some(v) = e.rohs_compliant {
-        elements.push(boolean_property("rohsCompliant", v, None, None));
+        elements.push(boolean_property("rohsCompliant", v, None));
     }
     if let Some(v) = e.recycled_content_pct {
-        elements.push(double_property("recycledContentPct", v, None, Some("%")));
+        elements.push(double_property("recycledContentPct", v, None));
     }
     if let Some(v) = e.standby_power_w {
-        elements.push(double_property("standbyPowerW", v, None, Some("W")));
+        elements.push(double_property("standbyPowerW", v, None));
     }
     if let Some(v) = e.expected_lifetime_years {
-        elements.push(integer_property(
-            "expectedLifetimeYears",
-            v as i64,
-            None,
-            Some("years"),
-        ));
+        elements.push(integer_property("expectedLifetimeYears", v as i64, None));
     }
     if let Some(ref dt) = e.firmware_update_until {
         elements.push(string_property(
             "firmwareUpdateUntil",
             &dt.to_rfc3339(),
-            None,
             None,
         ));
     }

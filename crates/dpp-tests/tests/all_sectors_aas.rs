@@ -1391,8 +1391,16 @@ fn members_common_to_every_revision(class: &str) -> std::collections::BTreeSet<S
 ///
 /// Written over the whole member set rather than as "`kind` is absent", because
 /// the next one will not be called `kind`.
+///
+/// **Every class, not just the shell.** The first cut of this gate walked the
+/// shell alone, and a second defect of exactly this kind was sitting one level
+/// down the whole time: `unit` on `Property`, which is a member of
+/// `DataSpecificationIec61360`, not of `Property`. It passed all three schemas
+/// and made every Environment unloadable by aas-core-works' reference
+/// implementation. A gate scoped to where the last bug was found is a gate
+/// scoped to the wrong place.
 #[test]
-fn the_shell_carries_no_member_outside_the_metamodel() {
+fn no_element_carries_a_member_outside_the_metamodel() {
     let allowed = members_common_to_every_revision("AssetAdministrationShell");
 
     // 3.0, 3.1 and 3.2 currently define this class identically. Recorded as an
@@ -1431,32 +1439,82 @@ fn the_shell_carries_no_member_outside_the_metamodel() {
          should not, so this gate permits too much"
     );
 
+    // Walk every object that names its own class and check its members against
+    // that class. `modelType` is what makes this possible: the metamodel makes
+    // each element say what it is, so the document tells us which member set to
+    // hold it to.
+    fn check_object(
+        node: &serde_json::Value,
+        path: &str,
+        key: &str,
+        checked: &mut usize,
+        unknown: &mut Vec<String>,
+    ) {
+        match node {
+            serde_json::Value::Object(map) => {
+                if let Some(class) = map.get("modelType").and_then(serde_json::Value::as_str) {
+                    let allowed = members_common_to_every_revision(class);
+                    // An unrecognised `modelType` means the document names a
+                    // class the vendored schemas do not define — itself a
+                    // defect, and not one to pass over silently.
+                    if allowed.is_empty() {
+                        unknown.push(format!(
+                            "sector '{key}': `{path}` declares modelType '{class}', which no \
+                             vendored revision defines"
+                        ));
+                    } else {
+                        for member in map.keys() {
+                            if !allowed.contains(member.as_str()) {
+                                unknown.push(format!(
+                                    "sector '{key}': `{path}` is a {class} carrying '{member}', \
+                                     which {class} does not define"
+                                ));
+                            }
+                        }
+                        *checked += 1;
+                    }
+                }
+                for (name, child) in map {
+                    check_object(child, &format!("{path}.{name}"), key, checked, unknown);
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    check_object(item, &format!("{path}[{i}]"), key, checked, unknown);
+                }
+            }
+            _ => {}
+        }
+    }
+
     let mut checked = 0usize;
+    let mut unknown = Vec::new();
     for (sector, data, version, _) in all_sector_cases() {
         let key = sector.catalog_key().to_owned();
         let passport = base(sector, data, version);
         let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
             .expect("a public projection is buildable");
         let document = serde_json::to_value(&environment).expect("serialises");
-
-        for shell in document["assetAdministrationShells"]
-            .as_array()
-            .into_iter()
-            .flatten()
-        {
-            for member in shell.as_object().expect("a shell is an object").keys() {
-                assert!(
-                    allowed.contains(member.as_str()),
-                    "sector '{key}': the shell carries '{member}', which \
-                     `AssetAdministrationShell` does not define. The schema gate will \
-                     never catch this — IDTA sets `additionalProperties` nowhere — but \
-                     a strict AAS loader rejects the document."
-                );
-            }
-            checked += 1;
-        }
+        check_object(&document, "", &key, &mut checked, &mut unknown);
     }
-    assert!(checked > 0, "the gate asserted nothing");
+
+    assert!(
+        unknown.is_empty(),
+        "{} member(s) outside the metamodel. No JSON Schema catches these — IDTA \
+         sets `additionalProperties` nowhere in 3.0, 3.1 or 3.2 — but a strict AAS \
+         loader rejects the document outright:\n  {}",
+        unknown.len(),
+        unknown.join("\n  ")
+    );
+
+    // Guard against the walk silently covering nothing: every sector emits a
+    // shell and six submodels, each with elements, so the count is in the
+    // hundreds. A gate that inspected two objects would pass and mean nothing.
+    assert!(
+        checked > 100,
+        "only {checked} typed objects were inspected; the walk is not reaching \
+         the submodel elements, which is where the last defect of this kind was"
+    );
 }
 
 /// Every sector's public Environment validates against IDTA's own schema.

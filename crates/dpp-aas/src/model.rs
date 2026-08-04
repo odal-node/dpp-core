@@ -71,6 +71,30 @@ pub enum AasDataType {
 }
 
 /// An AAS Property — a single leaf-level value.
+///
+/// **No `unit` here.** `Property` is `modelType`, `value`, `valueId`,
+/// `valueType` plus what it inherits; `unit` belongs to
+/// `DataSpecificationIec61360`, reachable through `embeddedDataSpecifications`.
+/// We carried a bare `unit` for several releases and it made every document
+/// unloadable by aas-core-works' reference implementation — while passing every
+/// JSON Schema, because none of 3.0/3.1/3.2 sets `additionalProperties`.
+///
+/// The units themselves are not lost so much as unstated: the field names carry
+/// them (`co2ePerUnitKg`, `nominalVoltageV`, `expectedLifetimeYears`). Restoring
+/// them properly means an embedded `DataSpecificationIec61360`, which requires
+/// referencing IDTA's data-specification template IRI — and that needs a
+/// provenance record under the rule in `semantic_ids/`, not a self-certified
+/// constant.
+///
+/// **No `description` either.** It carried `Option<String>`, where `Referable`
+/// types `description` as a non-empty array of `LangStringTextType`
+/// (`{language, text}`). Nothing ever set it, so nothing broke — but the first
+/// caller to populate it would have emitted a document all three schemas reject,
+/// which is a different failure from `unit`: a wrong *type* on a real member is
+/// caught by the schema gate, where an unknown member name is not. It is removed
+/// rather than retyped because a correctly-typed field nothing writes is
+/// speculative; add it back as `Vec<LangStringTextType>` when something needs to
+/// describe an element.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AasProperty {
@@ -78,14 +102,9 @@ pub struct AasProperty {
     pub value_type: AasDataType,
     /// Value serialised as a string (AAS convention for all types).
     pub value: String,
-    /// Physical unit of the value, e.g. `"kgCO2e"`, `"kg"`, `"V"`, `"%"`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unit: Option<String>,
     /// Semantic identifier per IDTA AAS Part 1 §5.3.11 Reference type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub semantic_id: Option<AasSemId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
 }
 
 /// An AAS SubmodelElementCollection — a named group of elements.

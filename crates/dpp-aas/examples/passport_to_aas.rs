@@ -129,12 +129,7 @@ fn main() {
         for elem in &submodel.submodel_elements {
             match elem {
                 AasSubmodelElement::Property(p) => {
-                    let unit = p
-                        .unit
-                        .as_deref()
-                        .map(|u| format!(" [{u}]"))
-                        .unwrap_or_default();
-                    println!("    Property  {} = {}{}", p.id_short, p.value, unit);
+                    println!("    Property  {} = {}", p.id_short, p.value);
                 }
                 AasSubmodelElement::SubmodelElementCollection(c) => {
                     println!("    Collection {} ({} children)", c.id_short, c.value.len());
