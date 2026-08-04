@@ -13,6 +13,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **A CI job loads every Environment through an external AAS implementation.**
+  `aas-core3.0` 1.1.4 (aas-core-works, Python), pinned exactly, in its own
+  workflow so the main gate never acquires a Python dependency and
+  `cargo build --workspace` keeps needing no infrastructure.
+
+  It deserialises, runs the specification's own constraint verification, and
+  round-trips. That is the only check here that can catch a member no schema
+  sees — IDTA sets `additionalProperties` nowhere in 3.0, 3.1 or 3.2 — which is
+  how `kind` and `unit` both shipped.
+
+  **It covers metamodel 3.0 only**, while the schema gate covers 3.0, 3.1 and
+  3.2. The pin, that scope, and the reason a lenient implementation is useless
+  as an oracle are recorded in `dpp-tests/fixtures/aas/NOTICE.md`.
+
+  Passing it is not IDTA conformance. Public wording is "passes aas-core3.0
+  1.1.4 for metamodel 3.0", never "IDTA-conformant".
+
 ### Breaking
 
 - **`AasProperty` loses `unit` and `description`; neither was a member of

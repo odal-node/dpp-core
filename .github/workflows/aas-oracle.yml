@@ -1,0 +1,43 @@
+# Runs the committed AAS Environments through an external AAS implementation.
+#
+# Deliberately its own workflow rather than a job in `ci.yml`. It is the only
+# check in this repository that needs Python, and `cargo build --workspace`
+# succeeding with zero infrastructure — no Python, no native toolchain, no
+# services — is a property this project states publicly. Keeping the dependency
+# here means the main gate never acquires it, and this job is free to be slow
+# without ever being a reason to skip the fast one.
+name: AAS loader oracle
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Environments load in an AAS implementation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Pinned exactly. This is somebody else's judgement about what the
+      # metamodel permits, and an unpinned upgrade would turn their tightening
+      # into our red build on code that did not change. Moving the pin is a
+      # deliberate edit with a visible diff, recorded alongside the vendored
+      # schemas in crates/dpp-tests/fixtures/aas/NOTICE.md.
+      - name: Install the AAS reference implementation
+        run: pip install --no-input "aas-core3.0==1.1.4"
+
+      - name: Record what is actually being run
+        run: python -c "import importlib.metadata as m; print('aas-core3.0', m.version('aas-core3.0'))"
+
+      - name: Load every Environment
+        run: python .github/scripts/aas_loader_oracle.py
