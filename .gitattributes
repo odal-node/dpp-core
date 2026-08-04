@@ -1,10 +1,34 @@
-# The vendored AAS metamodel schemas are third-party bytes whose integrity is
-# recorded as a SHA-256 in their NOTICE.md. Line-ending translation would change
-# those bytes on disk without changing the blob, so the recorded hash would fail
-# to verify on any checkout that normalises — which is the default on Windows.
-# Keep them byte-exact so the provenance record stays checkable.
+# Line endings are normalised to LF in the index *and* the working tree, on
+# every platform. Without `eol=lf`, a Windows checkout gets CRLF working-tree
+# files — and `cargo publish` packages the working tree, not the index, so the
+# published .crate carries whatever line endings the publisher's OS produced.
+#
+# That already happened. Measured from crates.io: dpp-domain 0.13.0 shipped 27
+# of its 37 embedded JSON schemas with CRLF, and 0.14.0 and 0.14.1 shipped 34.
+# The same commit therefore published different bytes depending on who ran the
+# release, and the count drifted between releases. Nothing broke — JSON is
+# whitespace-insensitive, and content binding goes through RFC 8785 JCS, which
+# canonicalises before hashing — but "the same commit yields different published
+# bytes" is the wrong property for a crate whose provenance is meant to be
+# checkable against the commit recorded in its own .cargo_vcs_info.json.
+* text=auto eol=lf
+
+# Third-party bytes whose SHA-256 is recorded in the NOTICE.md beside them.
+# Translation would change the bytes on disk without changing the blob, so the
+# recorded hash would fail to verify on a normalising checkout. `-text` disables
+# translation outright, overriding the rule above.
 #
 # A glob rather than one line per revision: a schema added without its pin is
 # exactly the case where the omission goes unnoticed, because the hash only
-# fails on someone else's machine.
+# fails on somebody else's machine.
 crates/dpp-tests/fixtures/aas/aas-*.json -text
+
+# Someone else's schemas, carried verbatim. Collapsed in review by default and
+# excluded from language stats: they are evidence, not code we maintain.
+crates/dpp-tests/fixtures/aas/aas-*.json linguist-vendored
+
+# Generated, not authored — regenerate with
+# `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests` rather than editing by hand.
+# Collapsed in review because a mapper change is meant to arrive as a readable
+# diff, and it cannot be read when buried in several thousand generated lines.
+crates/dpp-tests/fixtures/aas/environments/*.json linguist-generated
