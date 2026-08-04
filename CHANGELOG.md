@@ -17,28 +17,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
-- **Every AAS Environment is validated against IDTA's published JSON Schema.**
-  The `IDTA-01001-3-0-1` schema (metamodel **3.0**) is vendored under
-  `dpp-tests/fixtures/aas/`, with its tag, retrieval date, size, hash and
-  licence recorded alongside it, and every sector's Environment — plus the
-  generic fallback and a deliberately sparse passport — is checked against it.
+- **Every AAS Environment is validated against IDTA's published JSON Schemas
+  for metamodel 3.0, 3.1 and 3.2, and must satisfy all three.** The schemas are
+  vendored under `dpp-tests/fixtures/aas/`, each with its tag, commit date,
+  retrieval date, size, hash and licence recorded alongside it, and every
+  sector's Environment — plus the generic fallback and a deliberately sparse
+  passport — is checked against every one of them.
 
   Until now nothing checked this crate's output against anything but its own
   expectations, and the output was invalid in four separate ways (below). An
   external oracle is the only kind of test that could have caught that.
 
-  3.0 rather than 3.1 or 3.2 because 3.0 is the revision deployed AAS tooling
-  implements, and because our Environment uses a small, stable corner of the
-  metamodel where 3.0 is the strictest of the three. The reasoning and the
-  update procedure are in `dpp-tests/fixtures/aas/NOTICE.md`.
+  **All three rather than the newest, because no revision is uniformly the
+  strictest.** The `idShort` name rule moved in both directions: 3.1 relaxed
+  3.0's `^[a-zA-Z][a-zA-Z0-9_]*$` to permit interior hyphens, and tightened it
+  to require two or more characters. So `state-of-health-pct` is legal under 3.1
+  and 3.2 but not 3.0, while a one-character `a` is legal under 3.0 but not 3.1
+  or 3.2 — and validating against any single revision leaves the others' rule
+  unenforced.
+
+  That is not academic here: `idShort` is the one constraint whose satisfaction
+  depends on a passport's *contents* rather than on our code, because the
+  generic sector mapper builds names from operator-supplied JSON keys. Targeting
+  the intersection is what "loadable by an integrator's toolchain, whichever
+  revision it implements" actually requires. The divergence is asserted by a
+  test rather than only described, so a future revision that converges the rules
+  reports itself. Reasoning and update procedure: `dpp-tests/fixtures/aas/NOTICE.md`.
 
   **Schema-valid is not IDTA-conformant.** This establishes metamodel validity
   and nothing else — not conformance, which needs IDTA's own test engine, and
   not submodel-template conformance, which needs the templates.
 
-  It also has one blind spot worth naming, because it caught us: the schema sets
-  `additionalProperties` nowhere, so a member that is not part of a class
-  validates in silence. That is a separate gate — see the `kind` defect below.
+  It also has one blind spot worth naming, because it caught us: **none** of the
+  three revisions sets `additionalProperties` anywhere, so a member that is not
+  part of a class validates in silence in all of them. Upgrading revisions would
+  not have helped. That is a separate gate — see the `kind` defect below.
 
 - **One AAS `Environment` per product group is committed** under
   `dpp-tests/fixtures/aas/environments/`, regenerated with

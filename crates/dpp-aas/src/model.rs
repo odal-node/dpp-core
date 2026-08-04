@@ -234,11 +234,16 @@ pub struct AasShell {
 /// disagreed with ours.
 ///
 /// **Schema-valid, not conformance-certified.** Every Environment this crate
-/// builds is validated in CI against the vendored `IDTA-01001-3-0-1` JSON
-/// Schema (see `dpp-tests/fixtures/aas/`). That establishes metamodel validity
-/// and nothing more: it is not a claim of IDTA conformance, which would need
-/// IDTA's own test engine, and it says nothing about whether a submodel matches
-/// a published submodel template.
+/// builds is validated in CI against the vendored IDTA JSON Schemas for
+/// metamodel **3.0, 3.1 and 3.2**, and must satisfy all three (see
+/// `dpp-tests/fixtures/aas/NOTICE.md`). All three rather than the newest,
+/// because no revision is uniformly the strictest — the `idShort` name rule
+/// moved in both directions — so the intersection is the only target that means
+/// "loadable by an integrator's toolchain whichever revision it implements".
+///
+/// That establishes metamodel validity and nothing more: it is not a claim of
+/// IDTA conformance, which would need IDTA's own test engine, and it says
+/// nothing about whether a submodel matches a published submodel template.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AasEnvironment {
