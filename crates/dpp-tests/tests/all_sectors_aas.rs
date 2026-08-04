@@ -947,17 +947,49 @@ fn only_in_force_sectors_carry_a_typed_mapper() {
 // ─── metamodel validity gate ─────────────────────────────────────────────────
 //
 // Everything else in this file asserts our output against our own expectations.
-// This section asserts it against IDTA's, using their published schema as an
+// This section asserts it against IDTA's, using their published schemas as an
 // external oracle — the only check here that can tell us the document is
 // ingestible by somebody else's AAS toolchain rather than merely self-consistent.
 //
+// **Every revision, not one.** An Environment is validated against 3.0, 3.1 and
+// 3.2 together, because no single revision is the strictest and picking one
+// means choosing which half of a rule to stop enforcing. The `idShort` rule is
+// the case in point, and it is the rule that matters most here — the generic
+// mapper builds `idShort`s from operator-supplied JSON keys, so it is the one
+// place where a passport's *contents* decide whether our output is legal:
+//
+//   idShort             3.0      3.1/3.2
+//   state-of-health     reject   accept    (3.1 permits interior hyphens)
+//   a                   accept   reject    (3.1 requires two or more chars)
+//
+// Validating against the intersection is what "an integrator's toolchain,
+// whichever revision it implements" actually means.
+//
 // Schema-valid is not IDTA-conformant. See `fixtures/aas/NOTICE.md`.
 
-/// How many `pattern` constraints the XML-character rule accounts for.
+/// The vendored revisions, with the number of UTF-16-only `pattern` constraints
+/// each one carries (see [`strip_utf16_only_patterns`]).
 ///
-/// Pinned so that a schema update which changes the count fails here and is
-/// looked at, rather than quietly dropping more constraints than intended.
-const XML_CHAR_PATTERN_COUNT: usize = 28;
+/// Counts are pinned per revision so a schema update that changes one fails here
+/// and gets looked at, rather than quietly dropping more constraints than
+/// intended.
+const VENDORED_SCHEMAS: &[(&str, &str, usize)] = &[
+    (
+        "3.0",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas-3.0.json"),
+        28,
+    ),
+    (
+        "3.1",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas-3.1.json"),
+        33,
+    ),
+    (
+        "3.2",
+        concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas-3.2.json"),
+        38,
+    ),
+];
 
 /// Strip the one `pattern` a Rust regex engine cannot compile, returning how
 /// many were removed.
@@ -973,8 +1005,9 @@ const XML_CHAR_PATTERN_COUNT: usize = 28;
 /// control characters and unpaired surrogates — neither of which Rust's `String`
 /// can represent in the unpaired case, nor our mappers emit in the other. Every
 /// constraint that carries meaning for this crate survives, including the
-/// `idShort` rule `^[a-zA-Z][a-zA-Z0-9_]*$`, which is the one that actually
-/// governs whether our generated names are legal.
+/// `idShort` name rule, which is the one that actually governs whether our
+/// generated names are legal — and which differs between revisions, so it is
+/// enforced against all of them rather than one.
 fn strip_utf16_only_patterns(node: &mut serde_json::Value) -> usize {
     match node {
         serde_json::Value::Object(map) => {
@@ -996,43 +1029,76 @@ fn strip_utf16_only_patterns(node: &mut serde_json::Value) -> usize {
     }
 }
 
-const AAS_SCHEMA_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas.json");
+/// Every vendored revision, compiled once, in the order declared above.
+fn aas_validators() -> &'static [(&'static str, jsonschema::Validator)] {
+    static VALIDATORS: std::sync::OnceLock<Vec<(&'static str, jsonschema::Validator)>> =
+        std::sync::OnceLock::new();
+    VALIDATORS.get_or_init(|| {
+        VENDORED_SCHEMAS
+            .iter()
+            .map(|(revision, path, expected_patterns)| {
+                let raw = std::fs::read_to_string(path).unwrap_or_else(|e| {
+                    panic!("the vendored AAS {revision} schema is present: {e}")
+                });
+                let mut schema: serde_json::Value =
+                    serde_json::from_str(&raw).expect("the schema is JSON");
 
-/// The vendored `IDTA-01001-3-0-1` schema, compiled once.
-fn aas_validator() -> &'static jsonschema::Validator {
-    static VALIDATOR: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
-    VALIDATOR.get_or_init(|| {
-        let raw =
-            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
-        let mut schema: serde_json::Value = serde_json::from_str(&raw).expect("the schema is JSON");
+                let removed = strip_utf16_only_patterns(&mut schema);
+                assert_eq!(
+                    removed, *expected_patterns,
+                    "AAS {revision}: expected to drop exactly {expected_patterns} UTF-16-only \
+                     `pattern` constraints, dropped {removed}. The vendored schema changed: \
+                     re-check what is being removed before updating this count — see \
+                     fixtures/aas/NOTICE.md"
+                );
 
-        let removed = strip_utf16_only_patterns(&mut schema);
-        assert_eq!(
-            removed, XML_CHAR_PATTERN_COUNT,
-            "expected to drop exactly {XML_CHAR_PATTERN_COUNT} UTF-16-only `pattern` \
-             constraints, dropped {removed}. The vendored schema changed: re-check what \
-             is being removed before updating this count — see fixtures/aas/NOTICE.md"
-        );
-
-        jsonschema::validator_for(&schema).expect("the vendored schema compiles")
+                let validator = jsonschema::validator_for(&schema)
+                    .unwrap_or_else(|e| panic!("the vendored AAS {revision} schema compiles: {e}"));
+                (*revision, validator)
+            })
+            .collect()
     })
 }
 
-/// Validate `document`, reporting **every** violation with its instance path.
+/// Validate `document` against **every** vendored revision, reporting each
+/// violation with the revision that raised it and its instance path.
 ///
-/// One error at a time would mean one fix per run; a mapper that is wrong is
-/// usually wrong in several places at once.
+/// All revisions rather than the first failure: a document rejected by 3.2 and
+/// accepted by 3.0 is exactly the case worth seeing in full, and reporting one
+/// error at a time would mean one fix per run when a wrong mapper is usually
+/// wrong in several places at once.
 fn assert_valid_aas(document: &serde_json::Value, what: &str) {
-    let errors: Vec<String> = aas_validator()
-        .iter_errors(document)
-        .map(|e| format!("  at `{}`: {e}", e.instance_path()))
+    let errors: Vec<String> = aas_validators()
+        .iter()
+        .flat_map(|(revision, validator)| {
+            validator
+                .iter_errors(document)
+                .map(move |e| format!("  [{revision}] at `{}`: {e}", e.instance_path()))
+        })
         .collect();
     assert!(
         errors.is_empty(),
-        "{what} is not a valid AAS 3.0 document — {} violation(s):\n{}",
+        "{what} is not valid against every vendored AAS revision — {} violation(s):\n{}",
         errors.len(),
         errors.join("\n")
     );
+}
+
+/// Whether **any** vendored revision rejects `document`.
+fn rejected_by_any(document: &serde_json::Value) -> bool {
+    aas_validators()
+        .iter()
+        .any(|(_, v)| v.iter_errors(document).next().is_some())
+}
+
+/// The revisions that reject `document`, for assertions about where the
+/// revisions disagree.
+fn rejecting_revisions(document: &serde_json::Value) -> Vec<&'static str> {
+    aas_validators()
+        .iter()
+        .filter(|(_, v)| v.iter_errors(document).next().is_some())
+        .map(|(revision, _)| *revision)
+        .collect()
 }
 
 /// Guard: the validator must actually reject something.
@@ -1050,10 +1116,21 @@ fn the_aas_validator_rejects_an_invalid_document() {
             { "id": "urn:x", "modelType": "AssetAdministrationShell" }
         ]
     });
-    assert!(
-        aas_validator().iter_errors(&bogus).next().is_some(),
-        "the validator accepted a shell with no assetInformation — it is not \
-         enforcing the schema, so every other validity assertion here is vacuous"
+    // Asserted per revision, not "some revision rejects it": one compiled
+    // validator silently accepting everything would still leave the others
+    // failing the document, and the gate would look healthy.
+    for (revision, validator) in aas_validators() {
+        assert!(
+            validator.iter_errors(&bogus).next().is_some(),
+            "AAS {revision} accepted a shell with no assetInformation — that \
+             validator is not enforcing its schema, so every validity assertion \
+             resting on it is vacuous"
+        );
+    }
+    assert_eq!(
+        aas_validators().len(),
+        VENDORED_SCHEMAS.len(),
+        "a vendored revision failed to compile and was dropped silently"
     );
 }
 
@@ -1134,20 +1211,75 @@ fn the_previously_emitted_invalid_shapes_are_rejected() {
                 "submodelElements": []
             }]}),
         ),
-        (
-            "an idShort that is not a legal name",
-            serde_json::json!({"submodels": [{
-                "id": "urn:odal-node:dpp:x:sector-data",
-                "idShort": "state-of-health-pct",
-                "modelType": "Submodel"
-            }]}),
-        ),
     ] {
+        // Every revision, not merely one: these are metamodel defects rather
+        // than revision-specific rules, so a revision that started accepting one
+        // would mean the vendored bytes are not what we think they are.
+        let accepting: Vec<&str> = aas_validators()
+            .iter()
+            .filter(|(_, v)| v.iter_errors(&document).next().is_none())
+            .map(|(revision, _)| *revision)
+            .collect();
         assert!(
-            aas_validator().iter_errors(&document).next().is_some(),
-            "the schema accepted {what} — this gate no longer protects against it"
+            accepting.is_empty(),
+            "AAS {accepting:?} accepted {what} — this gate no longer protects against it"
         );
     }
+}
+
+/// The `idShort` name rule differs between revisions, in **both** directions.
+///
+/// This is the whole reason every Environment is validated against all three
+/// rather than a chosen one. `idShort` is also the rule that matters most here:
+/// the generic mapper builds names from operator-supplied JSON keys, so it is
+/// the one place where a passport's *contents*, not our code, decide whether the
+/// output is legal.
+///
+///   3.0      `^[a-zA-Z][a-zA-Z0-9_]*$`
+///   3.1/3.2  `^[a-zA-Z][a-zA-Z0-9_-]*[a-zA-Z0-9_]+$`
+///
+/// So 3.1 permits interior hyphens that 3.0 forbids, and requires two or more
+/// characters where 3.0 accepts one. Neither is the stricter revision, and
+/// validating against either alone leaves the other's rule unenforced.
+///
+/// Asserted rather than described, because this is the claim `NOTICE.md` rests
+/// on: if a future revision converges the two rules, this test says so.
+#[test]
+fn the_idshort_rule_diverges_between_revisions() {
+    let submodel_named = |name: &str| {
+        serde_json::json!({"submodels": [{
+            "id": "urn:odal-node:dpp:x:sector-data",
+            "idShort": name,
+            "modelType": "Submodel"
+        }]})
+    };
+
+    assert_eq!(
+        rejecting_revisions(&submodel_named("state-of-health-pct")),
+        vec!["3.0"],
+        "only 3.0 should reject an interior hyphen"
+    );
+    assert_eq!(
+        rejecting_revisions(&submodel_named("a")),
+        vec!["3.1", "3.2"],
+        "only 3.1 and 3.2 should reject a single-character name"
+    );
+
+    // Both ends stay illegal everywhere, so the divergence is genuinely about
+    // the middle of the rule rather than the rule having been abandoned.
+    for always_illegal in ["trailing-", "-leading", "9numeric"] {
+        assert_eq!(
+            rejecting_revisions(&submodel_named(always_illegal)).len(),
+            VENDORED_SCHEMAS.len(),
+            "'{always_illegal}' must be rejected by every revision"
+        );
+    }
+
+    // And a name we actually emit is legal under all of them.
+    assert!(
+        !rejected_by_any(&submodel_named("StateOfHealthPct")),
+        "the naming style this crate emits must satisfy every revision"
+    );
 }
 
 // ─── the defect the schema cannot see ────────────────────────────────────────
@@ -1157,14 +1289,25 @@ fn the_previously_emitted_invalid_shapes_are_rejected() {
 // arbitrary extra members on every object. A strict AAS loader would not, and it
 // is the loader that decides whether a partner can open our output.
 
-/// The vendored schema document, unmodified — the validator above strips a
-/// pattern from its own copy, which is the wrong thing to read class members from.
-fn aas_schema_document() -> &'static serde_json::Value {
-    static DOCUMENT: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
-    DOCUMENT.get_or_init(|| {
-        let raw =
-            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
-        serde_json::from_str(&raw).expect("the schema is JSON")
+/// The vendored schema documents, unmodified — the validators above strip a
+/// pattern from their own copies, which is the wrong thing to read class members
+/// from.
+fn aas_schema_documents() -> &'static [(&'static str, serde_json::Value)] {
+    static DOCUMENTS: std::sync::OnceLock<Vec<(&'static str, serde_json::Value)>> =
+        std::sync::OnceLock::new();
+    DOCUMENTS.get_or_init(|| {
+        VENDORED_SCHEMAS
+            .iter()
+            .map(|(revision, path, _)| {
+                let raw = std::fs::read_to_string(path).unwrap_or_else(|e| {
+                    panic!("the vendored AAS {revision} schema is present: {e}")
+                });
+                (
+                    *revision,
+                    serde_json::from_str(&raw).expect("the schema is JSON"),
+                )
+            })
+            .collect()
     })
 }
 
@@ -1179,7 +1322,10 @@ fn aas_schema_document() -> &'static serde_json::Value {
 /// Descends into `allOf` branches and `$ref` targets — the inheritance chain —
 /// but never into a property's own value, which would pull in the members of
 /// whatever class that property happens to be typed as.
-fn members_of(class: &str) -> std::collections::BTreeSet<String> {
+///
+/// Read from one revision. Use [`members_common_to_every_revision`] for the
+/// gate itself.
+fn members_of_in(document: &serde_json::Value, class: &str) -> std::collections::BTreeSet<String> {
     fn walk(
         document: &serde_json::Value,
         node: &serde_json::Value,
@@ -1213,10 +1359,26 @@ fn members_of(class: &str) -> std::collections::BTreeSet<String> {
         }
     }
 
-    let document = aas_schema_document();
     let mut out = std::collections::BTreeSet::new();
     walk(document, &document["definitions"][class], &mut out, 0);
     out
+}
+
+/// The members every vendored revision recognises for `class` — their
+/// intersection.
+///
+/// The intersection rather than any one revision's set, for the same reason the
+/// validators run as a set: a member only some revisions know is a member that
+/// some toolchain will refuse. If the revisions ever disagree about a class we
+/// emit, the gate should tighten to what they share, not pick a winner.
+fn members_common_to_every_revision(class: &str) -> std::collections::BTreeSet<String> {
+    let mut revisions = aas_schema_documents()
+        .iter()
+        .map(|(_, document)| members_of_in(document, class));
+    let first = revisions.next().expect("at least one vendored revision");
+    revisions.fold(first, |acc, next| {
+        acc.intersection(&next).cloned().collect()
+    })
 }
 
 /// The shell carries no member the metamodel does not define.
@@ -1231,7 +1393,21 @@ fn members_of(class: &str) -> std::collections::BTreeSet<String> {
 /// the next one will not be called `kind`.
 #[test]
 fn the_shell_carries_no_member_outside_the_metamodel() {
-    let allowed = members_of("AssetAdministrationShell");
+    let allowed = members_common_to_every_revision("AssetAdministrationShell");
+
+    // 3.0, 3.1 and 3.2 currently define this class identically. Recorded as an
+    // assertion rather than assumed, because the intersection above would
+    // silently narrow if a future revision dropped a member, and a gate that
+    // quietly tightens is one that fails for a reason nobody can read.
+    for (revision, document) in aas_schema_documents() {
+        assert_eq!(
+            members_of_in(document, "AssetAdministrationShell"),
+            allowed,
+            "AAS {revision} defines AssetAdministrationShell differently from the \
+             other vendored revisions. The gate below has narrowed to what they \
+             share — confirm that is what you want before updating this assertion"
+        );
+    }
 
     // Guards on the derivation itself: one that returned everything, or nothing,
     // would make the loop below pass while proving the opposite of what it says.
