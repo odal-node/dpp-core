@@ -10,9 +10,9 @@
 //! no sector mapper silently regresses or panics, and that the AAS submodel
 //! template registry stays in sync with the sectors.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dpp_aas::{
-    build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
+    build_aas_environment, build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
     sector_submodel_template,
 };
 use dpp_domain::Audience;
@@ -62,7 +62,14 @@ fn electronics_data() -> ElectronicsData {
         recycled_content_pct: Some(35.0),
         standby_power_w: Some(0.4),
         expected_lifetime_years: Some(7),
-        firmware_update_until: Some(Utc::now()),
+        // Fixed rather than `Utc::now()`: this value reaches the committed
+        // Environment fixtures, and a clock reading there would make them differ
+        // on every run.
+        firmware_update_until: Some(
+            "2031-06-30T00:00:00Z"
+                .parse::<DateTime<Utc>>()
+                .expect("a date"),
+        ),
     }
 }
 
@@ -338,27 +345,97 @@ fn every_sector_produces_a_valid_aas_shell() {
     }
 }
 
+/// An unrecognised sector's fields never reach the AAS output, for any audience.
+///
+/// The catalog has no descriptor for such a sector, so no field of it is
+/// classified, so every field of it is unclassified — and both policies the
+/// masking seam can pick default unclassified fields to `Public`. Left to the
+/// filter alone, the whole payload passes through. The builder therefore applies
+/// a structural backstop: with no field policy, keep only the discriminant.
+///
+/// This test used to assert the opposite — that all three `spacecraft` fields
+/// reached the output. That was the library faithfully reporting a leak nobody
+/// had noticed, because the platform's two public doors each carry this backstop
+/// and the library, which is what a third party actually depends on, did not.
 #[test]
-fn unknown_sector_uses_generic_fallback_submodel() {
-    // SectorData::other(...) drives the generic JSON→AAS fallback path.
-    let other = SectorData::other(serde_json::json!({
-        "sector": "spacecraft",
-        "thrustKn": 500.0,
-        "reusable": true,
-        "stageCount": 2
-    }))
-    .expect("spacecraft has no typed variant");
-    let passport = base(Sector::Other("spacecraft".into()), other, "1.0.0");
+fn unknown_sector_fields_never_reach_the_aas_output() {
+    let spacecraft = || {
+        SectorData::other(serde_json::json!({
+            "sector": "spacecraft",
+            "thrustKn": 500.0,
+            "reusable": true,
+            "stageCount": 2
+        }))
+        .expect("spacecraft has no typed variant")
+    };
+
+    // Every audience, not just Public: an unmodelled sector has no field policy
+    // for any of them, so a credentialed reader must not receive more.
+    for audience in [
+        Audience::Public,
+        Audience::LegitimateInterest,
+        Audience::Authority,
+    ] {
+        let passport = base(Sector::Other("spacecraft".into()), spacecraft(), "1.0.0");
+        let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN, audience)
+            .expect("the redacted document still round-trips");
+
+        assert_eq!(
+            submodels.len(),
+            6,
+            "{audience:?}: the sector submodel is still present"
+        );
+        let generic = submodels
+            .iter()
+            .find(|s| s.id_short == "SectorData")
+            .expect("generic SectorData submodel present");
+
+        assert!(
+            generic.submodel_elements.is_empty(),
+            "{audience:?}: an unmodelled sector's fields reached the AAS output: {:?}",
+            generic.submodel_elements
+        );
+
+        // Asserted over the serialised document too, so a field surfacing under
+        // some other submodel or nesting depth is caught rather than missed by
+        // looking only where it is expected not to be.
+        let rendered = serde_json::to_string(&submodels).expect("serialises");
+        for leaked in ["thrustKn", "reusable", "stageCount"] {
+            assert!(
+                !rendered.contains(leaked),
+                "{audience:?}: '{leaked}' appears somewhere in the AAS output"
+            );
+        }
+        // Not vacuous: the sector is still identified, via ProductIdentification.
+        assert!(
+            rendered.contains("spacecraft"),
+            "{audience:?}: the sector is no longer identified at all"
+        );
+    }
+}
+
+/// A *known* sector is filtered by its policy, not blanket-redacted.
+///
+/// The backstop keys on "the catalog has no descriptor", so a bug that widened
+/// that condition would empty every sector submodel and every masking assertion
+/// above would still pass. This is the guard against that.
+#[test]
+fn a_known_sector_is_not_caught_by_the_unknown_sector_backstop() {
+    let passport = base(
+        Sector::Electronics,
+        SectorData::Electronics(electronics_data()),
+        "1.0.0",
+    );
     let (_shell, submodels) =
         build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
-
-    assert_eq!(submodels.len(), 6);
-    let generic = submodels
+    let sector_submodel = submodels
         .iter()
-        .find(|s| s.id_short == "SectorData")
-        .expect("generic SectorData submodel present");
-    // The discriminant `sector` key is dropped; the three data fields remain.
-    assert_eq!(generic.submodel_elements.len(), 3);
+        .find(|s| s.id_short == "ElectronicsProductData")
+        .expect("the typed electronics submodel is present");
+    assert!(
+        !sector_submodel.submodel_elements.is_empty(),
+        "a catalogued sector was blanket-redacted by the unknown-sector backstop"
+    );
 }
 
 #[test]
@@ -376,24 +453,81 @@ fn passport_without_sector_data_has_five_core_submodels() {
 
 #[test]
 fn aas_submodel_templates_resolve_for_known_sectors() {
-    // Battery is the only ratified (non-placeholder) template today.
     let battery = sector_submodel_template("battery").expect("battery template exists");
-    assert!(!battery.is_placeholder);
     assert_eq!(battery.sector_key, "battery");
 
-    // Textile is a placeholder pending an IDTA standard.
     let textile = sector_submodel_template("textile").expect("textile template exists");
-    assert!(textile.is_placeholder);
+    assert!(textile.is_placeholder());
 
     // Unknown sector → no template.
     assert!(sector_submodel_template("spacecraft").is_none());
 
-    // Every placeholder is flagged as such.
     let placeholders: Vec<_> = placeholder_templates().collect();
     assert!(!placeholders.is_empty());
-    assert!(placeholders.iter().all(|t| t.is_placeholder));
-    // Battery (ratified) must NOT appear among placeholders.
-    assert!(!placeholders.iter().any(|t| t.sector_key == "battery"));
+    assert!(placeholders.iter().all(|t| t.is_placeholder()));
+}
+
+/// **Every** template is a placeholder today, and that is the honest state.
+///
+/// This test used to record the opposite for battery. It was wrong: battery's
+/// identifier was reverted out of the Catena-X namespace into ours on
+/// 2026-07-29 without the flag following, so the one template exempted from the
+/// conformance gate was exempted on the strength of an identifier it no longer
+/// carried.
+///
+/// Written as an explicit inventory rather than a loop over the derived flag,
+/// because the derived flag would agree with itself no matter what the data
+/// said. Adopting a genuine third-party identifier is what flips an entry here,
+/// and that must be a visible diff in this list, not a silent change of state.
+#[test]
+fn no_sector_template_yet_names_a_ratified_third_party_standard() {
+    let ratified: Vec<&str> = dpp_domain::SectorCatalog::new()
+        .all()
+        .iter()
+        .filter_map(|d| sector_submodel_template(d.key.as_str()))
+        .filter(|t| !t.is_placeholder())
+        .map(|t| t.sector_key)
+        .collect();
+
+    assert!(
+        ratified.is_empty(),
+        "these templates claim a ratified third-party template: {ratified:?}. \
+         Confirm a named reader verified each identifier against the authority's \
+         own source and recorded it in semantic_ids/allowlist.json, then update \
+         this test."
+    );
+}
+
+/// A template's declared `version` must match the version its identifier ends
+/// with.
+///
+/// The two are the same fact written twice, and they had already drifted: the
+/// battery entry declared `"6.0.0"` — the Catena-X aspect model's version —
+/// against an identifier ending `:1.0`, left behind when the identifier was
+/// reverted. Duplication that nothing checks is how a stale value outlives the
+/// thing it was copied from.
+#[test]
+fn a_template_version_matches_its_identifier() {
+    for template in dpp_domain::SectorCatalog::new()
+        .all()
+        .iter()
+        .filter_map(|d| sector_submodel_template(d.key.as_str()))
+    {
+        // Only our own identifiers carry the version as a trailing segment; a
+        // third party's scheme is theirs to choose.
+        if !template.is_placeholder() {
+            continue;
+        }
+        assert!(
+            template
+                .semantic_id
+                .ends_with(&format!(":{}", template.version)),
+            "template '{}' declares version '{}' but its identifier is '{}'",
+            template.sector_key,
+            template.version,
+            template.semantic_id
+        );
+    }
 }
 
 /// Every catalog sector must be exercised through the AAS path somewhere.
@@ -432,7 +566,10 @@ fn every_catalog_sector_has_an_aas_case() {
 // namespace, or carries a provenance record in `semantic_ids/allowlist.json`
 // naming who verified it against the authority's own source, and when.
 
-const OWN_NAMESPACE: &str = "urn:odal-node:";
+// Taken from the crate rather than restated, so the provenance gate and
+// `SubmodelTemplate::is_placeholder` cannot disagree about where our namespace
+// ends. A second copy here would be a third place for the boundary to drift.
+use dpp_aas::semantic_ids::OWN_NAMESPACE;
 
 /// The allowlist, minus any entry whose provenance is incomplete.
 ///
@@ -805,6 +942,608 @@ fn only_in_force_sectors_carry_a_typed_mapper() {
              A provisional sector must render generically; an in-force one must not."
         );
     }
+}
+
+// ─── metamodel validity gate ─────────────────────────────────────────────────
+//
+// Everything else in this file asserts our output against our own expectations.
+// This section asserts it against IDTA's, using their published schema as an
+// external oracle — the only check here that can tell us the document is
+// ingestible by somebody else's AAS toolchain rather than merely self-consistent.
+//
+// Schema-valid is not IDTA-conformant. See `fixtures/aas/NOTICE.md`.
+
+/// How many `pattern` constraints the XML-character rule accounts for.
+///
+/// Pinned so that a schema update which changes the count fails here and is
+/// looked at, rather than quietly dropping more constraints than intended.
+const XML_CHAR_PATTERN_COUNT: usize = 28;
+
+/// Strip the one `pattern` a Rust regex engine cannot compile, returning how
+/// many were removed.
+///
+/// IDTA writes the "valid XML character" rule with UTF-16 surrogate-pair
+/// alternations (`\ud800[\udc00-\udfff]`, …). That is well-formed for a
+/// JavaScript regex engine, which matches over UTF-16 code units; Rust's
+/// `regex` matches over Unicode scalar values, where a lone surrogate is not a
+/// character at all, so the pattern is rejected outright and the whole schema
+/// fails to compile.
+///
+/// Dropping it costs nothing we care about. It constrains strings to exclude
+/// control characters and unpaired surrogates — neither of which Rust's `String`
+/// can represent in the unpaired case, nor our mappers emit in the other. Every
+/// constraint that carries meaning for this crate survives, including the
+/// `idShort` rule `^[a-zA-Z][a-zA-Z0-9_]*$`, which is the one that actually
+/// governs whether our generated names are legal.
+fn strip_utf16_only_patterns(node: &mut serde_json::Value) -> usize {
+    match node {
+        serde_json::Value::Object(map) => {
+            let hit = map
+                .get("pattern")
+                .and_then(|p| p.as_str())
+                .is_some_and(|p| p.contains("\\ud800"));
+            let mut removed = usize::from(hit);
+            if hit {
+                map.remove("pattern");
+            }
+            for value in map.values_mut() {
+                removed += strip_utf16_only_patterns(value);
+            }
+            removed
+        }
+        serde_json::Value::Array(items) => items.iter_mut().map(strip_utf16_only_patterns).sum(),
+        _ => 0,
+    }
+}
+
+const AAS_SCHEMA_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas.json");
+
+/// The vendored `IDTA-01001-3-0-1` schema, compiled once.
+fn aas_validator() -> &'static jsonschema::Validator {
+    static VALIDATOR: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
+    VALIDATOR.get_or_init(|| {
+        let raw =
+            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
+        let mut schema: serde_json::Value = serde_json::from_str(&raw).expect("the schema is JSON");
+
+        let removed = strip_utf16_only_patterns(&mut schema);
+        assert_eq!(
+            removed, XML_CHAR_PATTERN_COUNT,
+            "expected to drop exactly {XML_CHAR_PATTERN_COUNT} UTF-16-only `pattern` \
+             constraints, dropped {removed}. The vendored schema changed: re-check what \
+             is being removed before updating this count — see fixtures/aas/NOTICE.md"
+        );
+
+        jsonschema::validator_for(&schema).expect("the vendored schema compiles")
+    })
+}
+
+/// Validate `document`, reporting **every** violation with its instance path.
+///
+/// One error at a time would mean one fix per run; a mapper that is wrong is
+/// usually wrong in several places at once.
+fn assert_valid_aas(document: &serde_json::Value, what: &str) {
+    let errors: Vec<String> = aas_validator()
+        .iter_errors(document)
+        .map(|e| format!("  at `{}`: {e}", e.instance_path()))
+        .collect();
+    assert!(
+        errors.is_empty(),
+        "{what} is not a valid AAS 3.0 document — {} violation(s):\n{}",
+        errors.len(),
+        errors.join("\n")
+    );
+}
+
+/// Guard: the validator must actually reject something.
+///
+/// A schema that failed to compile its constraints, or a validator wired up to
+/// accept anything, would make every assertion below pass while proving
+/// nothing. `Environment`'s own members are all optional, so an empty document
+/// is legitimately valid and proves nothing either way; this uses a document
+/// that is positively wrong instead — a shell missing its required
+/// `assetInformation`.
+#[test]
+fn the_aas_validator_rejects_an_invalid_document() {
+    let bogus = serde_json::json!({
+        "assetAdministrationShells": [
+            { "id": "urn:x", "modelType": "AssetAdministrationShell" }
+        ]
+    });
+    assert!(
+        aas_validator().iter_errors(&bogus).next().is_some(),
+        "the validator accepted a shell with no assetInformation — it is not \
+         enforcing the schema, so every other validity assertion here is vacuous"
+    );
+}
+
+/// The shapes this crate used to emit are rejected, one by one.
+///
+/// Each of these produced a document no AAS parser would accept, and each was
+/// invisible for as long as nothing validated the output. Asserting the
+/// *rejections* — not just that today's output passes — is what makes the four
+/// fixes durable: a refactor that reintroduces any one of them fails here with
+/// the reason named, rather than somewhere downstream in a partner's toolchain.
+#[test]
+fn the_previously_emitted_invalid_shapes_are_rejected() {
+    let valid_shell = |extra: serde_json::Value| {
+        let mut shell = serde_json::json!({
+            "id": "urn:odal-node:aas:x",
+            "idShort": "DigitalProductPassport",
+            "modelType": "AssetAdministrationShell",
+            "assetInformation": {
+                "assetKind": "Instance",
+                "globalAssetId": "urn:odal-node:product:09506000134352"
+            }
+        });
+        let (obj, extra) = (shell.as_object_mut().unwrap(), extra);
+        for (k, v) in extra.as_object().unwrap() {
+            obj.insert(k.clone(), v.clone());
+        }
+        serde_json::json!({ "assetAdministrationShells": [shell] })
+    };
+
+    for (what, document) in [
+        (
+            "AssetInformation without the required assetKind",
+            serde_json::json!({"assetAdministrationShells": [{
+                "id": "urn:odal-node:aas:x",
+                "modelType": "AssetAdministrationShell",
+                "assetInformation": { "globalAssetId": "urn:odal-node:product:09506000134352" }
+            }]}),
+        ),
+        (
+            "a shell whose submodels are bare {id} objects rather than References",
+            valid_shell(
+                serde_json::json!({ "submodels": [{ "id": "urn:odal-node:dpp:x:manufacturer-information" }] }),
+            ),
+        ),
+        (
+            "a submodel element typed modelType: Reference",
+            serde_json::json!({"submodels": [{
+                "id": "urn:odal-node:dpp:x:manufacturer-information",
+                "modelType": "Submodel",
+                "submodelElements": [{
+                    "modelType": "Reference",
+                    "idShort": "didWebUrl",
+                    "value": "https://example.com/.well-known/did.json"
+                }]
+            }]}),
+        ),
+        (
+            "a ReferenceElement whose value is a bare string",
+            serde_json::json!({"submodels": [{
+                "id": "urn:odal-node:dpp:x:manufacturer-information",
+                "modelType": "Submodel",
+                "submodelElements": [{
+                    "modelType": "ReferenceElement",
+                    "idShort": "didWebUrl",
+                    "value": "https://example.com/.well-known/did.json"
+                }]
+            }]}),
+        ),
+        (
+            "an empty conceptDescriptions array",
+            serde_json::json!({ "conceptDescriptions": [] }),
+        ),
+        (
+            "a submodel with an empty submodelElements array",
+            serde_json::json!({"submodels": [{
+                "id": "urn:odal-node:dpp:x:repairability",
+                "modelType": "Submodel",
+                "submodelElements": []
+            }]}),
+        ),
+        (
+            "an idShort that is not a legal name",
+            serde_json::json!({"submodels": [{
+                "id": "urn:odal-node:dpp:x:sector-data",
+                "idShort": "state-of-health-pct",
+                "modelType": "Submodel"
+            }]}),
+        ),
+    ] {
+        assert!(
+            aas_validator().iter_errors(&document).next().is_some(),
+            "the schema accepted {what} — this gate no longer protects against it"
+        );
+    }
+}
+
+// ─── the defect the schema cannot see ────────────────────────────────────────
+//
+// IDTA sets `additionalProperties` nowhere in the whole schema, so a member that
+// is not part of a class validates in silence. Everything above would pass with
+// arbitrary extra members on every object. A strict AAS loader would not, and it
+// is the loader that decides whether a partner can open our output.
+
+/// The vendored schema document, unmodified — the validator above strips a
+/// pattern from its own copy, which is the wrong thing to read class members from.
+fn aas_schema_document() -> &'static serde_json::Value {
+    static DOCUMENT: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        let raw =
+            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
+        serde_json::from_str(&raw).expect("the schema is JSON")
+    })
+}
+
+/// Every member name a metamodel class defines, following `allOf` and `$ref`.
+///
+/// Derived from the schema rather than restated here. A hand-written member list
+/// would be a second copy of the metamodel in this repo, and the argument
+/// against that is the one this crate already makes for `is_placeholder`: a
+/// value that can be derived from another must be, or the two will eventually
+/// disagree and the wrong one will be the one somebody trusts.
+///
+/// Descends into `allOf` branches and `$ref` targets — the inheritance chain —
+/// but never into a property's own value, which would pull in the members of
+/// whatever class that property happens to be typed as.
+fn members_of(class: &str) -> std::collections::BTreeSet<String> {
+    fn walk(
+        document: &serde_json::Value,
+        node: &serde_json::Value,
+        out: &mut std::collections::BTreeSet<String>,
+        depth: usize,
+    ) {
+        assert!(depth < 16, "the schema's $ref chain does not terminate");
+        if let Some(reference) = node.get("$ref").and_then(serde_json::Value::as_str) {
+            let name = reference
+                .rsplit('/')
+                .next()
+                .expect("a $ref names a definition");
+            if let Some(target) = document["definitions"].get(name) {
+                walk(document, target, out, depth + 1);
+            }
+            return;
+        }
+        if let Some(properties) = node
+            .get("properties")
+            .and_then(serde_json::Value::as_object)
+        {
+            out.extend(properties.keys().cloned());
+        }
+        for branch in node
+            .get("allOf")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            walk(document, branch, out, depth + 1);
+        }
+    }
+
+    let document = aas_schema_document();
+    let mut out = std::collections::BTreeSet::new();
+    walk(document, &document["definitions"][class], &mut out, 0);
+    out
+}
+
+/// The shell carries no member the metamodel does not define.
+///
+/// We emitted `kind` on `AssetAdministrationShell` for several releases. It is
+/// not a member of that class — `kind` comes from `HasKind`, which `Submodel`
+/// composes and the shell does not — and every gate above accepted it, because
+/// a JSON Schema without `additionalProperties` has no opinion about members it
+/// has never heard of.
+///
+/// Written over the whole member set rather than as "`kind` is absent", because
+/// the next one will not be called `kind`.
+#[test]
+fn the_shell_carries_no_member_outside_the_metamodel() {
+    let allowed = members_of("AssetAdministrationShell");
+
+    // Guards on the derivation itself: one that returned everything, or nothing,
+    // would make the loop below pass while proving the opposite of what it says.
+    for expected in [
+        "id",
+        "idShort",
+        "modelType",
+        "assetInformation",
+        "submodels",
+    ] {
+        assert!(
+            allowed.contains(expected),
+            "the member derivation missed '{expected}' — it is not reading the \
+             inheritance chain, so this gate permits too little"
+        );
+    }
+    assert!(
+        !allowed.contains("kind"),
+        "the derivation admitted 'kind', which reaches the shell only through \
+         `HasKind` — a class it does not compose. It is following something it \
+         should not, so this gate permits too much"
+    );
+
+    let mut checked = 0usize;
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let passport = base(sector, data, version);
+        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
+            .expect("a public projection is buildable");
+        let document = serde_json::to_value(&environment).expect("serialises");
+
+        for shell in document["assetAdministrationShells"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            for member in shell.as_object().expect("a shell is an object").keys() {
+                assert!(
+                    allowed.contains(member.as_str()),
+                    "sector '{key}': the shell carries '{member}', which \
+                     `AssetAdministrationShell` does not define. The schema gate will \
+                     never catch this — IDTA sets `additionalProperties` nowhere — but \
+                     a strict AAS loader rejects the document."
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "the gate asserted nothing");
+}
+
+/// Every sector's public Environment validates against IDTA's own schema.
+#[test]
+fn every_sector_environment_is_schema_valid() {
+    let mut checked = 0usize;
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let passport = base(sector, data, version);
+        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
+            .expect("a public projection is buildable");
+        let document = serde_json::to_value(&environment).expect("serialises");
+        assert_valid_aas(
+            &document,
+            &format!("the public Environment for sector '{key}'"),
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "the gate asserted nothing");
+}
+
+/// The generic fallback path is validated too.
+///
+/// It builds `idShort`s from arbitrary operator-supplied JSON keys, and
+/// `idShort` carries a `^[a-zA-Z][a-zA-Z0-9_]*$` pattern — so it is the one
+/// path where a passport's *contents*, not our code, decide whether the output
+/// is valid. Covered here so that stays true by test rather than by luck.
+#[test]
+fn the_generic_sector_environment_is_schema_valid() {
+    let other = SectorData::other(serde_json::json!({
+        "sector": "spacecraft",
+        "thrustKn": 500.0,
+        "reusable": true,
+        "stageCount": 2
+    }))
+    .expect("spacecraft has no typed variant");
+    let passport = base(Sector::Other("spacecraft".into()), other, "1.0.0");
+    let environment =
+        build_aas_environment(&passport, VALID_GTIN, Audience::Public).expect("buildable");
+    assert_valid_aas(
+        &serde_json::to_value(&environment).expect("serialises"),
+        "the generic-fallback Environment",
+    );
+}
+
+/// A passport stripped to almost nothing still produces a valid document.
+///
+/// This is the case the `minItems: 1` constraints punish: submodels whose every
+/// field is absent serialise to an empty `submodelElements`, and an empty array
+/// is invalid where an absent one is fine. Masking produces exactly this shape
+/// whenever a sector's public tier is thin, so it is not a hypothetical.
+#[test]
+fn a_sparse_passport_environment_is_schema_valid() {
+    let mut passport = base(
+        Sector::Electronics,
+        SectorData::Electronics(electronics_data()),
+        "1.0.0",
+    );
+    passport.sector_data = None;
+    passport.materials = Vec::new();
+    passport.co2e_per_unit = None;
+    passport.repairability_score = None;
+
+    let environment =
+        build_aas_environment(&passport, VALID_GTIN, Audience::Public).expect("buildable");
+    let document = serde_json::to_value(&environment).expect("serialises");
+    assert_valid_aas(&document, "a sparse passport's Environment");
+
+    // And specifically: no empty array reached the wire anywhere in it.
+    fn no_empty_arrays(node: &serde_json::Value, path: &str) {
+        match node {
+            serde_json::Value::Array(items) => {
+                assert!(!items.is_empty(), "empty array emitted at `{path}`");
+                for (i, item) in items.iter().enumerate() {
+                    no_empty_arrays(item, &format!("{path}[{i}]"));
+                }
+            }
+            serde_json::Value::Object(map) => {
+                for (k, v) in map {
+                    no_empty_arrays(v, &format!("{path}.{k}"));
+                }
+            }
+            _ => {}
+        }
+    }
+    no_empty_arrays(&document, "");
+}
+
+// ─── committed Environments ──────────────────────────────────────────────────
+//
+// One AAS Environment per product group, checked in under
+// `fixtures/aas/environments/`. They do three jobs a passing assertion cannot:
+//
+//   - a mapper change arrives as a reviewable JSON diff rather than a green run,
+//   - they are an artefact a partner can open in their own AAS tooling, and
+//   - they let a human read what we actually emit, which is how the four
+//     metamodel defects went unnoticed for several releases.
+//
+// Regenerate with `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests`, and **read
+// the diff** — that is the point of the exercise, not a step to get past.
+
+/// A passport with every clock- and randomness-derived field pinned.
+///
+/// `base_passport` uses `PassportId::new()` and `Utc::now()`, so its output
+/// differs on every call. That is right for the assertions elsewhere in this
+/// file and fatal for a committed fixture, which must be byte-stable or its
+/// diff is noise.
+fn pinned(sector: Sector, data: SectorData, version: &str) -> dpp_domain::Passport {
+    let fixed = "2026-01-01T00:00:00Z"
+        .parse::<DateTime<Utc>>()
+        .expect("a date");
+    let mut passport = base(sector, data, version);
+    passport.id = dpp_domain::PassportId(uuid::uuid!("01234567-89ab-7cde-8f01-23456789abcd"));
+    passport.created_at = fixed;
+    passport.updated_at = fixed;
+    passport
+}
+
+/// Battery, built from its wire form.
+///
+/// It is absent from `all_sector_cases` (its mapping is exercised by the
+/// end-to-end battery test), but it is the reference product group and carries
+/// more non-public fields than any other, so a committed Environment that
+/// omitted it would omit the one worth reading. Restricted and individual-tier
+/// fields are present deliberately: their absence from the committed output is
+/// what a reviewer should be checking.
+fn battery_case() -> (Sector, SectorData, &'static str) {
+    let data = serde_json::from_value(serde_json::json!({
+        "sector": "battery",
+        "gtin": VALID_GTIN,
+        "batteryChemistry": "LFP",
+        "nominalVoltageV": 3.7,
+        "nominalCapacityAh": 50.0,
+        "expectedLifetimeCycles": 1000,
+        "co2ePerUnitKg": 85.0,
+        "anodeMaterial": [{ "name": "graphite", "weightPct": 45.0 }],
+        "cathodeMaterial": [{ "name": "lithium-iron-phosphate", "weightPct": 30.0 }],
+        "electrolyteMaterial": [{ "name": "LiPF6", "weightPct": 12.0 }],
+        "dueDiligenceUrl": "https://acme.example.com/due-diligence",
+        "disassemblyInstructionsUrl": "https://acme.example.com/disassembly",
+        "sohMethodology": "IEC 62660-1 capacity fade",
+        "stateOfHealthPct": 97.5
+    }))
+    .expect("the battery wire form is valid");
+    (Sector::Battery, data, "1.0.0")
+}
+
+/// Collect every `idShort` in a serialised AAS document, at any depth.
+fn walk_id_shorts(node: &serde_json::Value, out: &mut std::collections::BTreeSet<String>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            if let Some(name) = map.get("idShort").and_then(|v| v.as_str()) {
+                out.insert(name.to_owned());
+            }
+            map.values().for_each(|child| walk_id_shorts(child, out));
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().for_each(|item| walk_id_shorts(item, out));
+        }
+        _ => {}
+    }
+}
+
+fn environment_fixture_path(sector_key: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/aas/environments")
+        .join(format!("{sector_key}.json"))
+}
+
+/// Every product group's public Environment matches its committed fixture.
+#[test]
+fn committed_environments_match_what_the_mappers_produce() {
+    let updating = std::env::var_os("UPDATE_AAS_FIXTURES").is_some();
+    let mut cases: Vec<(Sector, SectorData, &str)> = all_sector_cases()
+        .into_iter()
+        .map(|(s, d, v, _)| (s, d, v))
+        .collect();
+    cases.push(battery_case());
+
+    let mut stale = Vec::new();
+    for (sector, data, version) in cases {
+        let key = sector.catalog_key().to_owned();
+        let passport = pinned(sector, data, version);
+        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
+            .expect("a public projection is buildable");
+        // Pretty-printed, with a trailing newline: these are read by people and
+        // diffed by git, not parsed by us.
+        let rendered = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&environment).expect("serialises")
+        );
+
+        let path = environment_fixture_path(&key);
+        if updating {
+            std::fs::create_dir_all(path.parent().expect("has a parent"))
+                .expect("fixture directory is writable");
+            std::fs::write(&path, &rendered).expect("fixture is writable");
+            continue;
+        }
+
+        match std::fs::read_to_string(&path) {
+            Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
+            Ok(_) => stale.push(key),
+            Err(_) => stale.push(format!("{key} (missing)")),
+        }
+    }
+
+    assert!(
+        updating || stale.is_empty(),
+        "the committed Environments for {stale:?} no longer match what the mappers \
+         produce. Regenerate with `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests` \
+         and read the diff before committing it — an unexplained change to this \
+         output is a change to what every AAS consumer receives."
+    );
+}
+
+/// The committed fixtures are themselves valid AAS, and carry no non-public field.
+///
+/// Without this they are only a record of what we emit. With it they are a
+/// second, independent check on the same properties, run against bytes a human
+/// can read — so a reviewer looking at the diff is looking at something the
+/// gate has also inspected.
+#[test]
+fn committed_environments_are_valid_and_carry_nothing_non_public() {
+    let catalog = dpp_domain::SectorCatalog::new();
+    let mut checked = 0usize;
+
+    for descriptor in catalog.all().iter() {
+        let key = descriptor.key.as_str();
+        let path = environment_fixture_path(key);
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let document: serde_json::Value = serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("committed Environment for '{key}' is not JSON: {e}"));
+
+        assert_valid_aas(&document, &format!("the committed Environment for '{key}'"));
+
+        // Matched as whole `idShort`s, not as substrings of the rendered text.
+        // A substring test reports `expectedLifetime` (individual) inside
+        // `expectedLifetimeCycles` (public) — it fails on a field that is
+        // supposed to be there, which is how a gate teaches people to ignore it.
+        let mut emitted = std::collections::BTreeSet::new();
+        walk_id_shorts(&document, &mut emitted);
+
+        for (field, class) in &descriptor.disclosure {
+            if *class == dpp_domain::Disclosure::Public {
+                continue;
+            }
+            assert!(
+                !emitted.contains(field),
+                "the committed Environment for '{key}' carries '{field}', which \
+                 that sector classifies as {class:?}"
+            );
+        }
+        checked += 1;
+    }
+
+    assert!(
+        checked >= 11,
+        "only {checked} committed Environments were found; the fixtures are \
+         missing. Generate them with `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests`"
+    );
 }
 
 // ─── disclosure masking gate ─────────────────────────────────────────────────

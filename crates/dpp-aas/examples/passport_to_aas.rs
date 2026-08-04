@@ -139,8 +139,9 @@ fn main() {
                 AasSubmodelElement::SubmodelElementCollection(c) => {
                     println!("    Collection {} ({} children)", c.id_short, c.value.len());
                 }
-                AasSubmodelElement::Reference(r) => {
-                    println!("    Reference  {} -> {}", r.id_short, r.value);
+                AasSubmodelElement::ReferenceElement(r) => {
+                    let target = r.value.keys.first().map_or("", |k| k.value.as_str());
+                    println!("    Reference  {} -> {}", r.id_short, target);
                 }
             }
         }

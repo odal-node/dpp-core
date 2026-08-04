@@ -117,15 +117,21 @@ fn property_without_unit_omits_field() {
 
 #[test]
 fn reference_element_round_trip() {
-    let elem = AasSubmodelElement::Reference(AasReference {
-        id_short: "repairManualUrl".into(),
-        value: "https://example.com/repair.pdf".into(),
-        semantic_id: None,
-    });
+    let elem = AasSubmodelElement::ReferenceElement(AasReference::external(
+        "repairManualUrl",
+        "https://example.com/repair.pdf",
+    ));
     let json = serde_json::to_value(&elem).unwrap();
-    assert_eq!(json["modelType"], "Reference");
+    // `ReferenceElement` is the metamodel class name, and `value` is a
+    // `Reference`, not a bare string.
+    assert_eq!(json["modelType"], "ReferenceElement");
     assert_eq!(json["idShort"], "repairManualUrl");
-    assert_eq!(json["value"], "https://example.com/repair.pdf");
+    assert_eq!(json["value"]["type"], "ExternalReference");
+    assert_eq!(json["value"]["keys"][0]["type"], "GlobalReference");
+    assert_eq!(
+        json["value"]["keys"][0]["value"],
+        "https://example.com/repair.pdf"
+    );
     let back: AasSubmodelElement = serde_json::from_value(json).unwrap();
     assert_eq!(elem, back);
 }
@@ -154,10 +160,15 @@ fn shell_submodel_refs_match_submodel_ids() {
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let submodel_ids: Vec<&str> = submodels.iter().map(|s| s.id.as_str()).collect();
     for submodel_ref in &shell.submodels {
+        // A shell's submodel list holds `ModelReference`s whose single key
+        // names the target Submodel by id.
+        assert_eq!(submodel_ref.ref_type, "ModelReference");
+        let key = submodel_ref.keys.first().expect("a reference has one key");
+        assert_eq!(key.key_type, "Submodel");
         assert!(
-            submodel_ids.contains(&submodel_ref.id.as_str()),
+            submodel_ids.contains(&key.value.as_str()),
             "shell ref {} not found in submodels",
-            submodel_ref.id
+            key.value
         );
     }
 }
@@ -278,7 +289,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     // mappers emitted it to everyone, and the test locked that in. It is kept
     // pointing the other way as the regression marker for that defect.
     let has_due_diligence_ref = battery_sub.submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Reference(r) => r.id_short == "dueDiligenceUrl",
+        AasSubmodelElement::ReferenceElement(r) => r.id_short == "dueDiligenceUrl",
         _ => false,
     });
     assert!(
@@ -308,7 +319,7 @@ fn restricted_audience_receives_the_restricted_battery_field() {
 
     assert!(
         battery_sub.submodel_elements.iter().any(|e| match e {
-            AasSubmodelElement::Reference(r) => r.id_short == "dueDiligenceUrl",
+            AasSubmodelElement::ReferenceElement(r) => r.id_short == "dueDiligenceUrl",
             _ => false,
         }),
         "a legitimate-interest caller must still receive dueDiligenceUrl"
@@ -433,7 +444,7 @@ fn manufacturer_submodel_has_did_reference() {
         .find(|s| s.id_short == "ManufacturerInformation")
         .unwrap();
     let has_did_ref = mfr_sub.submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Reference(r) => r.id_short == "didWebUrl",
+        AasSubmodelElement::ReferenceElement(r) => r.id_short == "didWebUrl",
         _ => false,
     });
     assert!(
@@ -649,14 +660,19 @@ fn environment_serialises_with_idta_field_names() {
         build_aas_environment(&passport, "09506000134352", Audience::Public).expect("buildable");
     let value = serde_json::to_value(&env).expect("serialises");
 
-    for key in [
-        "assetAdministrationShells",
-        "submodels",
-        "conceptDescriptions",
-    ] {
+    for key in ["assetAdministrationShells", "submodels"] {
         assert!(
             value.get(key).is_some(),
             "Environment must carry '{key}' at the top level"
         );
     }
+
+    // `conceptDescriptions` is absent rather than `[]`. The schema constrains
+    // it to `minItems: 1`, so emitting the empty array — which this crate
+    // always would, coining no concept descriptions — makes the whole document
+    // invalid. Absent is both valid and the honest encoding of "none".
+    assert!(
+        value.get("conceptDescriptions").is_none(),
+        "an empty conceptDescriptions array must not reach the wire"
+    );
 }

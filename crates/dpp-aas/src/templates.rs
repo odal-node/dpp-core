@@ -9,86 +9,90 @@ pub struct SubmodelTemplate {
     pub semantic_id: &'static str,
     /// Human-readable version string (from the source template / standard).
     pub version: &'static str,
-    /// `true` when the semantic ID is a placeholder (`urn:odal-node:…`) waiting for
-    /// an official IDTA or other standard template. Gate these from claiming
-    /// conformance with the AAS Interoperability Specification.
-    pub is_placeholder: bool,
+}
+
+impl SubmodelTemplate {
+    /// Whether this binding still names *our* concept rather than a ratified
+    /// third-party template. Gate conformance claims on this.
+    ///
+    /// Derived from the identifier rather than stored beside it, and that is the
+    /// point. It was a hand-maintained `bool`, and when battery's constant was
+    /// reverted from the Catena-X aspect model back into our own namespace on
+    /// 2026-07-29, the flag stayed `false` and the `version` stayed `"6.0.0"` —
+    /// the aspect model's version, on an identifier ending `:1.0`. So a template
+    /// carrying a placeholder identifier described itself as ratified, which is
+    /// the one thing this field exists to prevent.
+    ///
+    /// A value that can be derived from another must be, or the two will
+    /// eventually disagree and the wrong one will be the one somebody trusts.
+    pub fn is_placeholder(&self) -> bool {
+        self.semantic_id.starts_with(semantic_ids::OWN_NAMESPACE)
+    }
 }
 
 static SUBMODEL_TEMPLATES: &[SubmodelTemplate] = &[
     SubmodelTemplate {
         sector_key: "battery",
         semantic_id: semantic_ids::BATTERY_TECHNICAL_DATA,
-        version: "6.0.0",
-        is_placeholder: false,
+        version: "1.0",
     },
     SubmodelTemplate {
         sector_key: "textile",
         semantic_id: semantic_ids::TEXTILE_MATERIAL,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "electronics",
         semantic_id: semantic_ids::ELECTRONICS_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "steel",
         semantic_id: semantic_ids::STEEL_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "construction",
         semantic_id: semantic_ids::CONSTRUCTION_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "tyre",
         semantic_id: semantic_ids::TYRE_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "toy",
         semantic_id: semantic_ids::TOY_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "aluminium",
         semantic_id: semantic_ids::ALUMINIUM_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "furniture",
         semantic_id: semantic_ids::FURNITURE_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "detergent",
         semantic_id: semantic_ids::DETERGENT_PRODUCT_DATA,
         version: "1.0",
-        is_placeholder: true,
     },
     SubmodelTemplate {
         sector_key: "unsold-goods",
         semantic_id: semantic_ids::UNSOLD_GOODS_REPORT,
         version: "1.0",
-        is_placeholder: true,
     },
 ];
 
 /// Look up the AAS submodel template binding for a catalog sector key.
 ///
 /// Returns `None` for sectors that don't yet have a dedicated AAS template.
-/// Returns `Some(t)` where `t.is_placeholder == true` when the semantic ID is
-/// a draft Odal Node placeholder, not a ratified IDTA standard.
+/// Returns `Some(t)` where `t.is_placeholder()` is `true` when the semantic ID
+/// is a draft Odal Node placeholder, not a ratified IDTA standard.
 pub fn sector_submodel_template(sector_key: &str) -> Option<&'static SubmodelTemplate> {
     SUBMODEL_TEMPLATES
         .iter()
@@ -99,5 +103,5 @@ pub fn sector_submodel_template(sector_key: &str) -> Option<&'static SubmodelTem
 ///
 /// Use this in CI to gate placeholder IDs from being promoted as conformant.
 pub fn placeholder_templates() -> impl Iterator<Item = &'static SubmodelTemplate> {
-    SUBMODEL_TEMPLATES.iter().filter(|t| t.is_placeholder)
+    SUBMODEL_TEMPLATES.iter().filter(|t| t.is_placeholder())
 }

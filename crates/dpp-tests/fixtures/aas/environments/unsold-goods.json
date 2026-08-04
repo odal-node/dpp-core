@@ -1,0 +1,361 @@
+{
+  "assetAdministrationShells": [
+    {
+      "id": "urn:odal-node:aas:01234567-89ab-7cde-8f01-23456789abcd",
+      "idShort": "DigitalProductPassport",
+      "modelType": "AssetAdministrationShell",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:odal-node:product:09506000134352",
+        "specificAssetIds": [
+          {
+            "name": "gtin",
+            "value": "09506000134352"
+          },
+          {
+            "name": "serialId",
+            "value": "01234567-89ab-7cde-8f01-23456789abcd"
+          },
+          {
+            "name": "batchId",
+            "value": "LOT-X-0001"
+          }
+        ]
+      },
+      "submodels": [
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:product-identification"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:manufacturer-information"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:environmental-impact"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:material-composition"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:repairability"
+            }
+          ]
+        },
+        {
+          "type": "ModelReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:unsold-goods"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:product-identification",
+      "idShort": "ProductIdentification",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:product-identification:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "productName",
+          "valueType": "xs:string",
+          "value": "unsold-goods reference product",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "urn:odal-node:aas:property:product-name:1.0"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "sector",
+          "valueType": "xs:string",
+          "value": "unsold-goods"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "passportId",
+          "valueType": "xs:string",
+          "value": "01234567-89ab-7cde-8f01-23456789abcd"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "schemaVersion",
+          "valueType": "xs:string",
+          "value": "1.0.0"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "batchId",
+          "valueType": "xs:string",
+          "value": "LOT-X-0001"
+        }
+      ]
+    },
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:manufacturer-information",
+      "idShort": "ManufacturerInformation",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:manufacturer-information:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "name",
+          "valueType": "xs:string",
+          "value": "Acme Manufacturing GmbH",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "urn:odal-node:aas:property:manufacturer-name:1.0"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "address",
+          "valueType": "xs:string",
+          "value": "Hauptstraße 1, 10115 Berlin, DE"
+        },
+        {
+          "modelType": "ReferenceElement",
+          "idShort": "didWebUrl",
+          "value": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "https://acme.example.com/.well-known/did.json"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:environmental-impact",
+      "idShort": "EnvironmentalImpact",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:carbon-footprint:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "co2ePerUnit",
+          "valueType": "xs:double",
+          "value": "12",
+          "unit": "kgCO2e",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "urn:odal-node:aas:property:co2e-per-unit:1.0"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:material-composition",
+      "idShort": "MaterialComposition",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:material-composition:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "SubmodelElementCollection",
+          "idShort": "material_0",
+          "value": [
+            {
+              "modelType": "Property",
+              "idShort": "name",
+              "valueType": "xs:string",
+              "value": "Primary material"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "weightKg",
+              "valueType": "xs:double",
+              "value": "1.5",
+              "unit": "kg"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "recycledPct",
+              "valueType": "xs:double",
+              "value": "20",
+              "unit": "%"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "countryOfOrigin",
+              "valueType": "xs:string",
+              "value": "DE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:repairability",
+      "idShort": "Repairability",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:repairability:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "repairabilityScore",
+          "valueType": "xs:double",
+          "value": "6",
+          "unit": "index 0-10",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "urn:odal-node:aas:property:repairability-score:1.0"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:unsold-goods",
+      "idShort": "UnsoldGoods",
+      "modelType": "Submodel",
+      "kind": "Instance",
+      "semanticId": {
+        "type": "ExternalReference",
+        "keys": [
+          {
+            "type": "GlobalReference",
+            "value": "urn:odal-node:aas:submodel-template:unsold-goods:1.0"
+          }
+        ]
+      },
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "reportingPeriod",
+          "valueType": "xs:string",
+          "value": "2026-Q3"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "volumeKg",
+          "valueType": "xs:double",
+          "value": "420",
+          "unit": "kg"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "productCategory",
+          "valueType": "xs:string",
+          "value": "apparel"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "reason",
+          "valueType": "xs:string",
+          "value": "end_of_season"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "destination",
+          "valueType": "xs:string",
+          "value": "donation"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "countryOfDisposal",
+          "valueType": "xs:string",
+          "value": "DE"
+        }
+      ]
+    }
+  ]
+}
