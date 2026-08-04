@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-04
+
 ### Added
 
 - **Every AAS Environment is validated against IDTA's published JSON Schema.**
