@@ -106,7 +106,6 @@ pub fn build_aas_from_passport(
         id: format!("urn:odal-node:aas:{passport_id}"),
         id_short: "DigitalProductPassport".into(),
         model_type: "AssetAdministrationShell".into(),
-        kind: "Instance".into(),
         asset_information: AssetInformation {
             asset_kind: "Instance".into(),
             global_asset_id: format!("urn:odal-node:product:{gtin}"),

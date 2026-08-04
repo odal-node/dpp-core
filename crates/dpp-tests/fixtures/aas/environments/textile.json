@@ -4,7 +4,6 @@
       "id": "urn:odal-node:aas:01234567-89ab-7cde-8f01-23456789abcd",
       "idShort": "DigitalProductPassport",
       "modelType": "AssetAdministrationShell",
-      "kind": "Instance",
       "assetInformation": {
         "assetKind": "Instance",
         "globalAssetId": "urn:odal-node:product:09506000134352",

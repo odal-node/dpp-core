@@ -194,6 +194,15 @@ pub struct AssetInformation {
 /// served alongside the shell as `Vec<AasSubmodel>` from [`build_aas_from_passport`](super::build_aas_from_passport)
 /// and would be exposed from separate API endpoints in a running AAS server
 /// (`/shells/{aasId}` vs. `/submodels/{submodelId}`).
+///
+/// **No `kind` here.** `kind` comes from `HasKind`, which `Submodel` composes
+/// and `AssetAdministrationShell` does not — the shell is
+/// `Identifiable` + `HasDataSpecification` + `derivedFrom`, `assetInformation`,
+/// `submodels`. We emitted one anyway for several releases, and no gate could
+/// have told us: IDTA's schema sets `additionalProperties` nowhere, so a member
+/// that is not part of a class validates in silence. A strict loader is the
+/// thing that would have rejected it, which is why it does not belong here even
+/// though the schema never complained.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AasShell {
@@ -201,8 +210,6 @@ pub struct AasShell {
     pub id_short: String,
     /// IDTA AAS Part 2 §5.2.4: always `"AssetAdministrationShell"`.
     pub model_type: String,
-    /// IDTA AAS Part 2 §5.2.4: `"Instance"` for runtime data (not templates).
-    pub kind: String,
     pub asset_information: AssetInformation,
     /// `ModelReference`s to this shell's submodels, per
     /// [`AasSemId::submodel`]. Omitted when empty (`minItems: 1`).

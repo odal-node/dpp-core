@@ -34,6 +34,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and nothing else — not conformance, which needs IDTA's own test engine, and
   not submodel-template conformance, which needs the templates.
 
+  It also has one blind spot worth naming, because it caught us: the schema sets
+  `additionalProperties` nowhere, so a member that is not part of a class
+  validates in silence. That is a separate gate — see the `kind` defect below.
+
 - **One AAS `Environment` per product group is committed** under
   `dpp-tests/fixtures/aas/environments/`, regenerated with
   `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests`.
@@ -95,7 +99,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   *Migration:* read `t.is_placeholder()` instead of `t.is_placeholder`.
 
-- **The AAS projection now emits a valid AAS document.** Four defects, each of
+- **The AAS projection now emits a valid AAS document.** Five defects, four of
   which produced output no AAS parser would accept:
 
   - `AssetInformation` omitted `assetKind`, the class's **only** required
@@ -117,11 +121,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     public tier is thin, so this was reachable in normal operation, not only in
     edge cases.
 
+  The fifth is the one the schema could not see: `AssetAdministrationShell`
+  carried a `kind` member. `kind` reaches a class through `HasKind`, which
+  `Submodel` composes and the shell does not — so it was never a member of that
+  class, and `AasShell::kind` is gone. It validated for as long as it existed,
+  because IDTA sets `additionalProperties` nowhere in the schema: a member that
+  is not part of a class passes in silence. A strict AAS loader is what rejects
+  it, and the loader is what decides whether a partner can open our output.
+
+  A gate now checks the shell's members against the class's own member set,
+  derived from the vendored schema by following its `allOf`/`$ref` inheritance
+  chain rather than restated as a list here. It is written over the whole member
+  set rather than as "`kind` is absent", because the next one will not be called
+  `kind`.
+
   *Migration:* consumers matching on `AasSubmodelElement::Reference` rename the
   arm to `ReferenceElement` and read the target from `value.keys`; consumers
-  reading `shell.submodels[..].id` read `keys[0].value` instead. Nothing that
-  consumed the previous output was consuming valid AAS, so there is no
-  correct-before/incorrect-after case to migrate.
+  reading `shell.submodels[..].id` read `keys[0].value` instead; consumers
+  reading `shell.kind` drop it — the value was always `"Instance"` and was never
+  a member of the class. Nothing that consumed the previous output was consuming
+  valid AAS, so there is no correct-before/incorrect-after case to migrate.
 
 ## [0.14.1] - 2026-07-31
 

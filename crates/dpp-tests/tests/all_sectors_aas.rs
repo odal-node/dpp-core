@@ -996,12 +996,14 @@ fn strip_utf16_only_patterns(node: &mut serde_json::Value) -> usize {
     }
 }
 
+const AAS_SCHEMA_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas.json");
+
 /// The vendored `IDTA-01001-3-0-1` schema, compiled once.
 fn aas_validator() -> &'static jsonschema::Validator {
     static VALIDATOR: std::sync::OnceLock<jsonschema::Validator> = std::sync::OnceLock::new();
     VALIDATOR.get_or_init(|| {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/aas/aas.json");
-        let raw = std::fs::read_to_string(path).expect("the vendored AAS schema is present");
+        let raw =
+            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
         let mut schema: serde_json::Value = serde_json::from_str(&raw).expect("the schema is JSON");
 
         let removed = strip_utf16_only_patterns(&mut schema);
@@ -1146,6 +1148,139 @@ fn the_previously_emitted_invalid_shapes_are_rejected() {
             "the schema accepted {what} — this gate no longer protects against it"
         );
     }
+}
+
+// ─── the defect the schema cannot see ────────────────────────────────────────
+//
+// IDTA sets `additionalProperties` nowhere in the whole schema, so a member that
+// is not part of a class validates in silence. Everything above would pass with
+// arbitrary extra members on every object. A strict AAS loader would not, and it
+// is the loader that decides whether a partner can open our output.
+
+/// The vendored schema document, unmodified — the validator above strips a
+/// pattern from its own copy, which is the wrong thing to read class members from.
+fn aas_schema_document() -> &'static serde_json::Value {
+    static DOCUMENT: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    DOCUMENT.get_or_init(|| {
+        let raw =
+            std::fs::read_to_string(AAS_SCHEMA_PATH).expect("the vendored AAS schema is present");
+        serde_json::from_str(&raw).expect("the schema is JSON")
+    })
+}
+
+/// Every member name a metamodel class defines, following `allOf` and `$ref`.
+///
+/// Derived from the schema rather than restated here. A hand-written member list
+/// would be a second copy of the metamodel in this repo, and the argument
+/// against that is the one this crate already makes for `is_placeholder`: a
+/// value that can be derived from another must be, or the two will eventually
+/// disagree and the wrong one will be the one somebody trusts.
+///
+/// Descends into `allOf` branches and `$ref` targets — the inheritance chain —
+/// but never into a property's own value, which would pull in the members of
+/// whatever class that property happens to be typed as.
+fn members_of(class: &str) -> std::collections::BTreeSet<String> {
+    fn walk(
+        document: &serde_json::Value,
+        node: &serde_json::Value,
+        out: &mut std::collections::BTreeSet<String>,
+        depth: usize,
+    ) {
+        assert!(depth < 16, "the schema's $ref chain does not terminate");
+        if let Some(reference) = node.get("$ref").and_then(serde_json::Value::as_str) {
+            let name = reference
+                .rsplit('/')
+                .next()
+                .expect("a $ref names a definition");
+            if let Some(target) = document["definitions"].get(name) {
+                walk(document, target, out, depth + 1);
+            }
+            return;
+        }
+        if let Some(properties) = node
+            .get("properties")
+            .and_then(serde_json::Value::as_object)
+        {
+            out.extend(properties.keys().cloned());
+        }
+        for branch in node
+            .get("allOf")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            walk(document, branch, out, depth + 1);
+        }
+    }
+
+    let document = aas_schema_document();
+    let mut out = std::collections::BTreeSet::new();
+    walk(document, &document["definitions"][class], &mut out, 0);
+    out
+}
+
+/// The shell carries no member the metamodel does not define.
+///
+/// We emitted `kind` on `AssetAdministrationShell` for several releases. It is
+/// not a member of that class — `kind` comes from `HasKind`, which `Submodel`
+/// composes and the shell does not — and every gate above accepted it, because
+/// a JSON Schema without `additionalProperties` has no opinion about members it
+/// has never heard of.
+///
+/// Written over the whole member set rather than as "`kind` is absent", because
+/// the next one will not be called `kind`.
+#[test]
+fn the_shell_carries_no_member_outside_the_metamodel() {
+    let allowed = members_of("AssetAdministrationShell");
+
+    // Guards on the derivation itself: one that returned everything, or nothing,
+    // would make the loop below pass while proving the opposite of what it says.
+    for expected in [
+        "id",
+        "idShort",
+        "modelType",
+        "assetInformation",
+        "submodels",
+    ] {
+        assert!(
+            allowed.contains(expected),
+            "the member derivation missed '{expected}' — it is not reading the \
+             inheritance chain, so this gate permits too little"
+        );
+    }
+    assert!(
+        !allowed.contains("kind"),
+        "the derivation admitted 'kind', which reaches the shell only through \
+         `HasKind` — a class it does not compose. It is following something it \
+         should not, so this gate permits too much"
+    );
+
+    let mut checked = 0usize;
+    for (sector, data, version, _) in all_sector_cases() {
+        let key = sector.catalog_key().to_owned();
+        let passport = base(sector, data, version);
+        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
+            .expect("a public projection is buildable");
+        let document = serde_json::to_value(&environment).expect("serialises");
+
+        for shell in document["assetAdministrationShells"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            for member in shell.as_object().expect("a shell is an object").keys() {
+                assert!(
+                    allowed.contains(member.as_str()),
+                    "sector '{key}': the shell carries '{member}', which \
+                     `AssetAdministrationShell` does not define. The schema gate will \
+                     never catch this — IDTA sets `additionalProperties` nowhere — but \
+                     a strict AAS loader rejects the document."
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "the gate asserted nothing");
 }
 
 /// Every sector's public Environment validates against IDTA's own schema.
