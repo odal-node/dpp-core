@@ -44,7 +44,10 @@ fn sample_payload() -> RegistrationPayload {
     RegistrationPayload {
         passport_id: Uuid::nil(),
         product_id: sample_product_id(),
-        item_id: sample_item_id(),
+        // Item level: the only level the registry currently accepts, and the
+        // one the battery product group is defined at.
+        level: RegistrationLevel::new(Granularity::Item).with_model("MODEL-1"),
+        item_id: Some(sample_item_id()),
         facility_id: sample_facility_id(),
         operator_id: sample_operator_id(),
         sector: "textile".into(),
@@ -368,11 +371,11 @@ fn payload_with_invalid_gtin_fails() {
 #[test]
 fn empty_item_id_rejected() {
     let mut payload = sample_payload();
-    payload.item_id = ProductItemIdentifier {
+    payload.item_id = Some(ProductItemIdentifier {
         scheme: String::new(),
         value: String::new(),
         batch_id: None,
-    };
+    });
     assert!(matches!(
         payload.validate(),
         Err(RegistryValidationError::MissingRequiredField(_))
@@ -428,4 +431,77 @@ fn validation_error_display_messages() {
     // Error trait object is usable (covers the std::error::Error impl).
     let boxed: Box<dyn std::error::Error> = Box::new(gtin);
     assert!(!boxed.to_string().is_empty());
+}
+
+// ── Registration level (IR (EU) 2026/1778 Art. 8) ───────────────────────────
+
+/// Art. 8(1): an item-level registration must identify the unit it covers.
+#[test]
+fn item_level_payload_without_an_item_id_rejected() {
+    let mut payload = sample_payload();
+    payload.item_id = None;
+    assert!(matches!(
+        payload.validate(),
+        Err(RegistryValidationError::MissingRequiredField(f)) if f == "itemId"
+    ));
+}
+
+/// Above item level the registration covers a group, so naming a single unit
+/// contradicts the Art. 8(1) level the registry checks under Art. 8(7)(c).
+#[test]
+fn model_and_batch_level_payloads_must_not_carry_an_item_id() {
+    for granularity in [Granularity::Model, Granularity::Batch] {
+        let mut payload = sample_payload();
+        payload.level = RegistrationLevel::new(granularity);
+        assert!(
+            matches!(
+                payload.validate(),
+                Err(RegistryValidationError::GranularityMismatch {
+                    identifier: "itemId",
+                    ..
+                })
+            ),
+            "a {granularity} registration must not carry an item identifier"
+        );
+    }
+}
+
+/// A model- or batch-level registration is valid without an item identifier —
+/// the levels the registry will accept once further product groups land.
+#[test]
+fn model_and_batch_level_payloads_validate_without_an_item_id() {
+    for granularity in [Granularity::Model, Granularity::Batch] {
+        let mut payload = sample_payload();
+        payload.level = RegistrationLevel::new(granularity);
+        payload.item_id = None;
+        assert!(
+            payload.validate().is_ok(),
+            "a {granularity}-level registration needs no item identifier"
+        );
+    }
+}
+
+/// The level travels on the wire — the registry validates it on submission.
+#[test]
+fn registration_level_serialises_into_the_payload() {
+    let payload = sample_payload();
+    let json = serde_json::to_value(&payload).unwrap();
+    assert_eq!(json["level"]["granularity"], "item");
+    assert_eq!(json["level"]["modelId"], "MODEL-1");
+    assert!(
+        json["level"].get("batchId").is_none(),
+        "an unlinked batch must be absent, not null"
+    );
+}
+
+#[test]
+fn granularity_mismatch_display_message() {
+    let err = RegistryValidationError::GranularityMismatch {
+        granularity: "model",
+        identifier: "batchId",
+    };
+    assert_eq!(
+        err.to_string(),
+        "a 'model'-level registration must not carry a 'batchId'"
+    );
 }

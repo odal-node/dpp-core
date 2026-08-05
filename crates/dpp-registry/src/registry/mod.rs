@@ -8,6 +8,9 @@
 //!
 //! - [`identifiers`] — the four Article 13 persistent identifiers (product,
 //!   product item, facility, economic operator) — one vocabulary, one file.
+//! - [`granularity`] — [`Granularity`] and [`RegistrationLevel`]: the model /
+//!   batch / item level a registration declares and the higher-level
+//!   identifiers it must link.
 //! - [`payload`] — [`RegistrationPayload`] and its [`EuRegistryEnvelope`].
 //! - [`response`] — [`response::EuRegistryResponse`], [`response::StatusResponse`],
 //!   [`response::RegistryStatusCode`].
@@ -19,6 +22,7 @@
 
 pub mod endpoint;
 pub mod error;
+pub mod granularity;
 pub mod identifiers;
 pub mod payload;
 pub mod response;
@@ -28,6 +32,7 @@ pub mod transfer;
 
 pub use endpoint::{RegistryAuthority, RegistryEndpoint};
 pub use error::{EuRegistryError, EuRegistryErrorKind, RegistryValidationError};
+pub use granularity::{Granularity, RegistrationLevel};
 pub use identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
 };

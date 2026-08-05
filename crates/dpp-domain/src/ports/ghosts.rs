@@ -182,6 +182,7 @@ impl SealPort for GhostSeal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ports::registry_sync::RegistrationGranularity;
 
     #[tokio::test]
     async fn ghost_register_returns_pending() {
@@ -189,6 +190,7 @@ mod tests {
         let request = RegistrationRequest {
             passport_id: PassportId::new(),
             operator_identifier: "did:web:acme.example.com".into(),
+            operator_name: "Acme GmbH".into(),
             facility_identifier: "FAC-001".into(),
             facility: None,
             product_category: "textile".into(),
@@ -197,6 +199,8 @@ mod tests {
             jws_signature: None,
             published_at: None,
             country_code: String::new(),
+            granularity: RegistrationGranularity::Item,
+            model_id: None,
         };
         let record = sync.register(request).await.unwrap();
         assert_eq!(record.status, RegistryStatus::Pending);

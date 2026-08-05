@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::RegistryValidationError;
+use super::granularity::{Granularity, RegistrationLevel};
 use super::identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
 };
@@ -19,8 +20,16 @@ pub struct RegistrationPayload {
     pub passport_id: Uuid,
     /// The product identifier (GTIN, etc.).
     pub product_id: ProductIdentifier,
+    /// The level this passport is registered at, and the higher-level model and
+    /// batch identifiers it links — IR (EU) 2026/1778 Art. 8(1), 8(4), 8(5).
+    pub level: RegistrationLevel,
     /// The individual item identifier (serial, batch+serial, etc.).
-    pub item_id: ProductItemIdentifier,
+    ///
+    /// Required at item level and meaningless above it: a model- or batch-level
+    /// registration covers every unit it groups, so naming one contradicts the
+    /// Art. 8(1) level the registry checks on submission (Art. 8(7)(c)).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<ProductItemIdentifier>,
     /// The manufacturing facility identifier.
     pub facility_id: FacilityIdentifier,
     /// The responsible economic operator identifier.
@@ -45,7 +54,25 @@ impl RegistrationPayload {
     /// (GTIN checksum, invalid country codes) before a network round-trip.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
         self.product_id.validate()?;
-        self.item_id.validate()?;
+        self.level.validate()?;
+        match (&self.item_id, self.level.granularity) {
+            // Art. 8(1): an item-level registration identifies the unit it covers.
+            (None, Granularity::Item) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "itemId".into(),
+                ));
+            }
+            // Above item level the registration covers a group, so an item
+            // identifier contradicts the level the registry validates.
+            (Some(_), granularity @ (Granularity::Model | Granularity::Batch)) => {
+                return Err(RegistryValidationError::GranularityMismatch {
+                    granularity: granularity.wire_str(),
+                    identifier: "itemId",
+                });
+            }
+            (Some(item_id), Granularity::Item) => item_id.validate()?,
+            (None, Granularity::Model | Granularity::Batch) => {}
+        }
         self.facility_id.validate()?;
         self.operator_id.validate()?;
         for (name, value) in [

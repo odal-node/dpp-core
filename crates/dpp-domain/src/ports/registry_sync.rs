@@ -44,6 +44,15 @@ pub struct RegistrationRequest {
     pub passport_id: PassportId,
     /// Economic operator's DID or EU-assigned identifier.
     pub operator_identifier: String,
+    /// Legal name of the responsible economic operator.
+    ///
+    /// Sourced from the operator's own configuration, not from the passport —
+    /// the passport records the *manufacturer*, which is frequently a different
+    /// legal person from the operator placing the product on the EU market.
+    /// The registry requires a legal-entity name on the operator identifier, so
+    /// a registration without one cannot be built.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub operator_name: String,
     /// Facility identifier value (EU-assigned or self-declared) — the flat
     /// convenience form of [`Self::facility`]`.value`, kept for registries/clients
     /// that only consume the bare identifier.
@@ -71,22 +80,68 @@ pub struct RegistrationRequest {
     /// Empty when operator config has no country set.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub country_code: String,
+    /// The model / batch / item level this passport is registered at.
+    ///
+    /// Set by the applicable delegated act for the product group, not by the
+    /// passport — which is why it is supplied by the caller rather than
+    /// derived here. Defaults to item level, the only level the registry
+    /// currently accepts.
+    #[serde(default)]
+    pub granularity: RegistrationGranularity,
+    /// Identifier of the model this product belongs to, where a model design
+    /// exists for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+}
+
+/// The level a passport is registered at, mirrored in the domain so the port
+/// does not depend on the registry wire crate.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RegistrationGranularity {
+    /// One registration covering every item sharing a product's specifications.
+    Model,
+    /// One registration covering every item made in one production run.
+    Batch,
+    /// One registration per physical unit.
+    #[default]
+    Item,
+}
+
+/// The registering operator's own details, which the passport does not carry.
+///
+/// A struct rather than loose arguments because `legal_name` and `country` are
+/// both plain strings: passed positionally they can be swapped without the
+/// compiler noticing, and the result is a registration filed under the wrong
+/// legal entity.
+#[derive(Debug, Clone, Copy)]
+pub struct RegisteringOperator<'a> {
+    /// Legal name of the economic operator (`OperatorConfig.legal_name`).
+    pub legal_name: &'a str,
+    /// ISO 3166-1 alpha-2 country of registration (`OperatorConfig.country`).
+    pub country: &'a str,
 }
 
 impl RegistrationRequest {
     /// Build a registration request from a published passport.
     ///
-    /// All fields are sourced directly from the passport. `country_code` must
-    /// be supplied separately (from `OperatorConfig.country`) since the passport
-    /// does not store operator country.
+    /// Product fields are sourced from the passport. The operator's legal name
+    /// and country come from `operator` — the passport records the manufacturer,
+    /// which is frequently not the operator placing the product on the market.
+    ///
+    /// `granularity` is set by the applicable delegated act for the product
+    /// group; `model_id` is left unset here and linked by the caller where a
+    /// model design exists for the product.
     pub fn from_published_passport(
         passport: &crate::domain::passport::Passport,
-        country_code: &str,
+        operator: RegisteringOperator<'_>,
+        granularity: RegistrationGranularity,
     ) -> Self {
         let product_category = passport.sector.wire_str().to_owned();
         Self {
             passport_id: passport.id,
             operator_identifier: passport.operator_identifier.clone().unwrap_or_default(),
+            operator_name: operator.legal_name.to_owned(),
             facility_identifier: passport
                 .facility
                 .as_ref()
@@ -98,7 +153,9 @@ impl RegistrationRequest {
             schema_version: passport.schema_version.clone(),
             jws_signature: passport.jws_signature.clone(),
             published_at: passport.published_at,
-            country_code: country_code.to_owned(),
+            country_code: operator.country.to_owned(),
+            granularity,
+            model_id: None,
         }
     }
 }
@@ -211,10 +268,22 @@ mod tests {
         }
     }
 
+    /// The operator identity a test registration is filed under.
+    fn acme() -> RegisteringOperator<'static> {
+        RegisteringOperator {
+            legal_name: "Acme GmbH",
+            country: "DE",
+        }
+    }
+
     #[test]
     fn from_published_passport_maps_all_fields() {
         let passport = make_published_passport();
-        let req = RegistrationRequest::from_published_passport(&passport, "DE");
+        let req = RegistrationRequest::from_published_passport(
+            &passport,
+            acme(),
+            RegistrationGranularity::Item,
+        );
 
         assert_eq!(req.passport_id, passport.id);
         assert_eq!(req.operator_identifier, "did:web:acme.example.com");
@@ -237,6 +306,14 @@ mod tests {
         assert!(req.jws_signature.is_some());
         assert!(req.published_at.is_some());
         assert_eq!(req.country_code, "DE");
+        // The operator's legal name comes from operator config, never from the
+        // passport's manufacturer block.
+        assert_eq!(req.operator_name, "Acme GmbH");
+        assert_ne!(
+            req.operator_name, passport.manufacturer.name,
+            "operator and manufacturer are distinct legal persons"
+        );
+        assert_eq!(req.granularity, RegistrationGranularity::Item);
     }
 
     #[test]
@@ -245,7 +322,14 @@ mod tests {
         passport.operator_identifier = None;
         passport.facility = None;
         passport.qr_code_url = None;
-        let req = RegistrationRequest::from_published_passport(&passport, "");
+        let req = RegistrationRequest::from_published_passport(
+            &passport,
+            RegisteringOperator {
+                legal_name: "",
+                country: "",
+            },
+            RegistrationGranularity::Item,
+        );
 
         assert!(req.operator_identifier.is_empty());
         assert!(req.facility_identifier.is_empty());

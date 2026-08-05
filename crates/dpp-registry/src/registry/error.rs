@@ -16,6 +16,12 @@ pub enum RegistryValidationError {
     InvalidCountryCode { code: String },
     /// A required payload field is empty.
     MissingRequiredField(String),
+    /// An identifier finer than the declared registration level travels with
+    /// the payload — e.g. a batch identifier on a model-level registration.
+    GranularityMismatch {
+        granularity: &'static str,
+        identifier: &'static str,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -38,6 +44,15 @@ impl std::fmt::Display for RegistryValidationError {
             }
             Self::MissingRequiredField(field) => {
                 write!(f, "required field '{field}' is empty")
+            }
+            Self::GranularityMismatch {
+                granularity,
+                identifier,
+            } => {
+                write!(
+                    f,
+                    "a '{granularity}'-level registration must not carry a '{identifier}'"
+                )
             }
         }
     }
