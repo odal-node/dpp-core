@@ -196,7 +196,14 @@ impl RegistrationRequest {
             published_at: passport.published_at,
             country_code: operator.country.to_owned(),
             granularity,
-            model_id: None,
+            // Linked where the product group carries one — Art. 8(4)/(5). An
+            // absent model identifier is the lawful "no model design exists",
+            // so it is read from the sector data rather than assumed.
+            model_id: passport
+                .sector_data
+                .as_ref()
+                .and_then(|d| d.model_identifier())
+                .map(ToOwned::to_owned),
             commodity_code: passport.commodity_code.as_ref().map(ToString::to_string),
             // Set by the caller: whether a published back-up exists is a
             // deployment fact, not something the passport records.
@@ -423,5 +430,43 @@ mod tests {
             let back: RegistryStatus = serde_json::from_str(&json).unwrap();
             assert_eq!(status, back);
         }
+    }
+
+    /// Art. 8(4): an item-level registration links the model identifier where a
+    /// model design exists. It exists for batteries, and the registration must
+    /// carry it rather than claiming the product has none.
+    #[test]
+    fn the_model_identifier_reaches_the_registration() {
+        use crate::domain::sector::SectorData;
+
+        let mut passport = make_published_passport();
+        passport.sector_data = Some(SectorData::Battery(crate::domain::sector::BatteryData {
+            battery_model_id: Some("BM-4815".into()),
+            ..crate::test_support::sample_battery_data()
+        }));
+
+        let req = RegistrationRequest::from_published_passport(
+            &passport,
+            acme(),
+            RegistrationGranularity::Item,
+        );
+        assert_eq!(req.model_id.as_deref(), Some("BM-4815"));
+    }
+
+    /// Absent is a substantive answer — the lawful "no model design exists" —
+    /// and must not be confused with a lookup that was never wired.
+    #[test]
+    fn a_product_group_without_a_model_identifier_reports_none() {
+        let mut passport = make_published_passport();
+        passport.sector_data = None;
+        assert!(
+            RegistrationRequest::from_published_passport(
+                &passport,
+                acme(),
+                RegistrationGranularity::Item,
+            )
+            .model_id
+            .is_none()
+        );
     }
 }

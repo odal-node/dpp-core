@@ -188,6 +188,47 @@ impl SectorData {
         }
     }
 
+    /// The product **model** identifier this sector's data carries, if any.
+    ///
+    /// A registry registration made at item level must link the model
+    /// identifier where a model design exists for the product, and a batch-level
+    /// one must do the same — so a caller building a registration needs to know
+    /// which field, for this product group, *is* the model identifier. That is
+    /// domain knowledge about the product group, which is why it lives here
+    /// rather than in whatever assembles the registration.
+    ///
+    /// `None` is a substantive answer, not a fallback: it says this product
+    /// group models no model identifier, which is the lawful state for products
+    /// that have no model design. It must never be returned merely because a
+    /// sector was overlooked — hence the exhaustive match.
+    ///
+    /// [`SectorData::Other`] always returns `None`: the payload is an untyped
+    /// object for a product group this build has no variant for, so nothing here
+    /// can say which of its keys is a model identifier.
+    #[must_use]
+    pub fn model_identifier(&self) -> Option<&str> {
+        match self {
+            // Annex XIII §1 — the manufacturer's battery model identifier, as it
+            // appears on the label or in the technical documentation.
+            SectorData::Battery(d) => d.battery_model_id.as_deref(),
+            // No other product group models a model identifier yet. Listed
+            // rather than wildcarded so adding a sector that does is a compile
+            // error here, not a silent "no model design exists" told to a
+            // registry.
+            SectorData::Textile(_)
+            | SectorData::UnsoldGoods(_)
+            | SectorData::Steel(_)
+            | SectorData::Electronics(_)
+            | SectorData::Construction(_)
+            | SectorData::Tyre(_)
+            | SectorData::Toy(_)
+            | SectorData::Aluminium(_)
+            | SectorData::Furniture(_)
+            | SectorData::Detergent(_)
+            | SectorData::Other { .. } => None,
+        }
+    }
+
     /// The GTIN carried by this sector's typed data, if any.
     ///
     /// `UnsoldGoods` and `Other` carry no GTIN field — a discard-event report
