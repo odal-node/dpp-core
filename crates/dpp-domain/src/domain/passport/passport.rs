@@ -162,6 +162,15 @@ pub struct Passport {
     /// **Art. 12**. (**Art. 13** governs uploading identifiers to the EU registry —
     /// a related but distinct obligation, not the field's basis.) Populated by the
     /// engine from `operator_config`.
+    ///
+    /// **This is the operator that published the passport, frozen at publish —
+    /// not necessarily the operator responsible for it now.** A transfer of
+    /// responsibility moves the current operator, and the authoritative record
+    /// of that is the passport's [`TransferChain`](crate::domain::transfer::TransferChain)
+    /// via `current_operator()`. This field is not rewritten by a transfer and
+    /// cannot be: a published passport's content is immutable and this value is
+    /// covered by the signature over it. Reading it as "who is responsible
+    /// today" is wrong for any passport that has changed hands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_identifier: Option<String>,
     /// Snapshot of the Annex III facility where this product was manufactured or

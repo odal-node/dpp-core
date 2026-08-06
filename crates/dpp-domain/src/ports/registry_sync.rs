@@ -216,8 +216,11 @@ pub enum RegistryStatus {
     Registered,
     /// Registration rejected (e.g. missing fields, invalid operator).
     Rejected,
-    /// Record updated after a transfer of responsibility.
-    Transferred,
+    // No `Transferred`: the registry has no such status. A transfer notification
+    // amends an existing record, which stays `Registered` — whether the handover
+    // was notified is the notification's own state, not the registration's, and
+    // belongs on the transfer queue. The variant existed and was unreachable,
+    // promising a status the registry never reports.
     /// Record suspended by a market surveillance authority.
     SuspendedByAuthority,
     /// Record withdrawn from service in the registry.
@@ -412,8 +415,8 @@ mod tests {
             RegistryStatus::Pending,
             RegistryStatus::Registered,
             RegistryStatus::Rejected,
-            RegistryStatus::Transferred,
             RegistryStatus::SuspendedByAuthority,
+            RegistryStatus::Deactivated,
         ];
         for status in statuses {
             let json = serde_json::to_string(&status).unwrap();
