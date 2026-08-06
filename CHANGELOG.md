@@ -107,6 +107,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`SectorData::model_identifier`** — which field of a product group's data is
+  the *model* identifier, so a registration can link it as Art. 8(4) and 8(5)
+  require. Only the battery group carries one today (Annex XIII §1); the match
+  is exhaustive rather than wildcarded, so adding a product group that has one
+  is a compile error rather than a silent "no model design exists" told to a
+  registry. `RegistrationRequest::from_published_passport` now populates
+  `model_id` from it.
 - **`CommodityCode`** — customs tariff classification (HS-6, CN-8, TARIC-10),
   validated structurally. Separators are refused rather than stripped:
   compacting `"8507 60 00"` would turn a mistyped code into a different, valid
