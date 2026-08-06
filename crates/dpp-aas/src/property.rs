@@ -34,12 +34,12 @@ pub fn svhc_substance_element(
     location_in_product: Option<&str>,
 ) -> AasCollection {
     let mut elems = vec![
-        string_property("casNumber", cas_number, None, None),
-        string_property("substanceName", substance_name, None, None),
-        double_property("concentrationPct", concentration_pct, None, Some("%")),
+        string_property("casNumber", cas_number, None),
+        string_property("substanceName", substance_name, None),
+        double_property("concentrationPct", concentration_pct, None),
     ];
     if let Some(loc) = location_in_product {
-        elems.push(string_property("locationInProduct", loc, None, None));
+        elems.push(string_property("locationInProduct", loc, None));
     }
     AasCollection {
         id_short: format!("svhc_{index}"),
@@ -53,15 +53,12 @@ pub fn string_property(
     id_short: &str,
     value: &str,
     semantic_id: Option<&str>,
-    unit: Option<&str>,
 ) -> AasSubmodelElement {
     AasSubmodelElement::Property(AasProperty {
         id_short: id_short.into(),
         value_type: AasDataType::String,
         value: value.into(),
-        unit: unit.map(Into::into),
         semantic_id: semantic_id.map(AasSemId::external),
-        description: None,
     })
 }
 
@@ -70,15 +67,12 @@ pub fn double_property(
     id_short: &str,
     value: f64,
     semantic_id: Option<&str>,
-    unit: Option<&str>,
 ) -> AasSubmodelElement {
     AasSubmodelElement::Property(AasProperty {
         id_short: id_short.into(),
         value_type: AasDataType::Double,
         value: value.to_string(),
-        unit: unit.map(Into::into),
         semantic_id: semantic_id.map(AasSemId::external),
-        description: None,
     })
 }
 
@@ -87,15 +81,12 @@ pub fn integer_property(
     id_short: &str,
     value: i64,
     semantic_id: Option<&str>,
-    unit: Option<&str>,
 ) -> AasSubmodelElement {
     AasSubmodelElement::Property(AasProperty {
         id_short: id_short.into(),
         value_type: AasDataType::Integer,
         value: value.to_string(),
-        unit: unit.map(Into::into),
         semantic_id: semantic_id.map(AasSemId::external),
-        description: None,
     })
 }
 
@@ -104,14 +95,11 @@ pub fn boolean_property(
     id_short: &str,
     value: bool,
     semantic_id: Option<&str>,
-    unit: Option<&str>,
 ) -> AasSubmodelElement {
     AasSubmodelElement::Property(AasProperty {
         id_short: id_short.into(),
         value_type: AasDataType::Boolean,
         value: value.to_string(),
-        unit: unit.map(Into::into),
         semantic_id: semantic_id.map(AasSemId::external),
-        description: None,
     })
 }

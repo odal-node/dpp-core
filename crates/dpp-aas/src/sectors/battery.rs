@@ -6,85 +6,54 @@ use crate::semantic_ids;
 
 pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", b.gtin.as_str(), None, None),
-        string_property(
-            "batteryChemistry",
-            b.battery_chemistry.wire_str(),
-            None,
-            None,
-        ),
-        double_property("nominalVoltageV", b.nominal_voltage_v, None, Some("V")),
-        double_property("nominalCapacityAh", b.nominal_capacity_ah, None, Some("Ah")),
+        string_property("gtin", b.gtin.as_str(), None),
+        string_property("batteryChemistry", b.battery_chemistry.wire_str(), None),
+        double_property("nominalVoltageV", b.nominal_voltage_v, None),
+        double_property("nominalCapacityAh", b.nominal_capacity_ah, None),
         integer_property(
             "expectedLifetimeCycles",
             b.expected_lifetime_cycles as i64,
-            None,
             None,
         ),
         double_property(
             "co2ePerUnitKg",
             b.co2e_per_unit_kg,
             Some(semantic_ids::CO2E_PER_UNIT),
-            Some("kgCO2e"),
         ),
     ];
 
     macro_rules! push_opt_double {
-        ($opt:expr, $id:literal, $unit:expr) => {
+        ($opt:expr, $id:literal) => {
             if let Some(v) = $opt {
-                elements.push(double_property($id, v, None, $unit));
+                elements.push(double_property($id, v, None));
             }
         };
     }
     macro_rules! push_opt_str {
         ($opt:expr, $id:literal) => {
             if let Some(ref v) = $opt {
-                elements.push(string_property($id, v, None, None));
+                elements.push(string_property($id, v, None));
             }
         };
     }
 
-    push_opt_double!(
-        b.recycled_content_cobalt_pct,
-        "recycledContentCobaltPct",
-        Some("%")
-    );
-    push_opt_double!(
-        b.recycled_content_lithium_pct,
-        "recycledContentLithiumPct",
-        Some("%")
-    );
-    push_opt_double!(
-        b.recycled_content_nickel_pct,
-        "recycledContentNickelPct",
-        Some("%")
-    );
-    push_opt_double!(b.state_of_health_pct, "stateOfHealthPct", Some("%"));
-    push_opt_double!(b.rated_capacity_kwh, "ratedCapacityKwh", Some("kWh"));
-    push_opt_double!(b.rated_energy_wh, "ratedEnergyWh", Some("Wh"));
-    push_opt_double!(b.battery_weight_kg, "batteryWeightKg", Some("kg"));
-    push_opt_double!(
-        b.round_trip_efficiency_pct,
-        "roundTripEfficiencyPct",
-        Some("%")
-    );
-    push_opt_double!(
-        b.internal_resistance_mohm,
-        "internalResistanceMohm",
-        Some("mΩ")
-    );
-    push_opt_double!(b.operating_temp_min_c, "operatingTempMinC", Some("°C"));
-    push_opt_double!(b.operating_temp_max_c, "operatingTempMaxC", Some("°C"));
-    push_opt_double!(
-        b.recycled_content_lead_pct,
-        "recycledContentLeadPct",
-        Some("%")
-    );
+    push_opt_double!(b.recycled_content_cobalt_pct, "recycledContentCobaltPct");
+    push_opt_double!(b.recycled_content_lithium_pct, "recycledContentLithiumPct");
+    push_opt_double!(b.recycled_content_nickel_pct, "recycledContentNickelPct");
+    push_opt_double!(b.state_of_health_pct, "stateOfHealthPct");
+    push_opt_double!(b.rated_capacity_kwh, "ratedCapacityKwh");
+    push_opt_double!(b.rated_energy_wh, "ratedEnergyWh");
+    push_opt_double!(b.battery_weight_kg, "batteryWeightKg");
+    push_opt_double!(b.round_trip_efficiency_pct, "roundTripEfficiencyPct");
+    push_opt_double!(b.internal_resistance_mohm, "internalResistanceMohm");
+    push_opt_double!(b.operating_temp_min_c, "operatingTempMinC");
+    push_opt_double!(b.operating_temp_max_c, "operatingTempMaxC");
+    push_opt_double!(b.recycled_content_lead_pct, "recycledContentLeadPct");
     if let Some(s) = opt_enum_wire_str(&b.carbon_footprint_class) {
-        elements.push(string_property("carbonFootprintClass", &s, None, None));
+        elements.push(string_property("carbonFootprintClass", &s, None));
     }
     if let Some(s) = opt_enum_wire_str(&b.battery_type) {
-        elements.push(string_property("batteryType", &s, None, None));
+        elements.push(string_property("batteryType", &s, None));
     }
     push_opt_str!(b.soh_methodology, "sohMethodology");
 
@@ -110,11 +79,11 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
                 .enumerate()
                 .map(|(i, mc)| {
                     let mut mc_elems = vec![
-                        string_property("name", &mc.name, None, None),
-                        double_property("weightPct", mc.weight_pct, None, Some("%")),
+                        string_property("name", &mc.name, None),
+                        double_property("weightPct", mc.weight_pct, None),
                     ];
                     if let Some(ref cas) = mc.cas_number {
-                        mc_elems.push(string_property("casNumber", cas, None, None));
+                        mc_elems.push(string_property("casNumber", cas, None));
                     }
                     AasSubmodelElement::SubmodelElementCollection(AasCollection {
                         id_short: format!("{label}_{i}"),
@@ -138,15 +107,15 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
             .iter()
             .enumerate()
             .map(|(i, crm)| {
-                let mut crm_elems = vec![string_property("name", &crm.name, None, None)];
+                let mut crm_elems = vec![string_property("name", &crm.name, None)];
                 if let Some(ref cas) = crm.cas_number {
-                    crm_elems.push(string_property("casNumber", cas, None, None));
+                    crm_elems.push(string_property("casNumber", cas, None));
                 }
                 if let Some(wg) = crm.weight_grams {
-                    crm_elems.push(double_property("weightGrams", wg, None, Some("g")));
+                    crm_elems.push(double_property("weightGrams", wg, None));
                 }
                 if let Some(ref country) = crm.country_of_origin {
-                    crm_elems.push(string_property("countryOfOrigin", country, None, None));
+                    crm_elems.push(string_property("countryOfOrigin", country, None));
                 }
                 AasSubmodelElement::SubmodelElementCollection(AasCollection {
                     id_short: format!("criticalRawMaterial_{i}"),

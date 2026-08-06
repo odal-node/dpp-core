@@ -32,18 +32,18 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &s
     let reason_str = enum_wire_str(&r.reason);
     let destination_str = enum_wire_str(&r.destination);
     let mut elements = vec![
-        string_property("reportingPeriod", &r.reporting_period, None, None),
-        double_property("volumeKg", r.volume_kg, None, Some("kg")),
-        string_property("productCategory", &r.product_category, None, None),
-        string_property("reason", &reason_str, None, None),
-        string_property("destination", &destination_str, None, None),
-        string_property("countryOfDisposal", &r.country_of_disposal, None, None),
+        string_property("reportingPeriod", &r.reporting_period, None),
+        double_property("volumeKg", r.volume_kg, None),
+        string_property("productCategory", &r.product_category, None),
+        string_property("reason", &reason_str, None),
+        string_property("destination", &destination_str, None),
+        string_property("countryOfDisposal", &r.country_of_disposal, None),
     ];
     if let Some(ref v) = r.destruction_justification {
-        elements.push(string_property("destructionJustification", v, None, None));
+        elements.push(string_property("destructionJustification", v, None));
     }
     if let Some(ref v) = r.operator_name {
-        elements.push(string_property("operatorName", v, None, None));
+        elements.push(string_property("operatorName", v, None));
     }
     AasSubmodel {
         id: format!("urn:odal-node:dpp:{passport_id}:unsold-goods"),

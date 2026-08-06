@@ -31,14 +31,13 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
             "productName",
             &passport.product_name,
             Some(semantic_ids::PRODUCT_NAME),
-            None,
         ),
-        string_property("sector", passport.sector.catalog_key(), None, None),
-        string_property("passportId", &passport.id.to_string(), None, None),
-        string_property("schemaVersion", &passport.schema_version, None, None),
+        string_property("sector", passport.sector.catalog_key(), None),
+        string_property("passportId", &passport.id.to_string(), None),
+        string_property("schemaVersion", &passport.schema_version, None),
     ];
     if let Some(batch) = &passport.batch_id {
-        elements.push(string_property("batchId", batch, None, None));
+        elements.push(string_property("batchId", batch, None));
     }
     AasSubmodel {
         id: format!("urn:odal-node:dpp:{}:product-identification", passport.id),
@@ -53,13 +52,8 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
 pub(super) fn build_manufacturer_submodel(passport: &Passport) -> AasSubmodel {
     let mfr = &passport.manufacturer;
     let mut elements = vec![
-        string_property(
-            "name",
-            &mfr.name,
-            Some(semantic_ids::MANUFACTURER_NAME),
-            None,
-        ),
-        string_property("address", &mfr.address, None, None),
+        string_property("name", &mfr.name, Some(semantic_ids::MANUFACTURER_NAME)),
+        string_property("address", &mfr.address, None),
     ];
     if let Some(url) = &mfr.did_web_url {
         elements.push(AasSubmodelElement::ReferenceElement(
@@ -83,7 +77,6 @@ pub(super) fn build_environmental_impact_submodel(passport: &Passport) -> AasSub
             "co2ePerUnit",
             cf.value_kg,
             Some(semantic_ids::CO2E_PER_UNIT),
-            Some("kgCO2e"),
         ));
     }
     AasSubmodel {
@@ -103,14 +96,14 @@ pub(super) fn build_material_composition_submodel(passport: &Passport) -> AasSub
         .enumerate()
         .map(|(i, mat)| {
             let mut mat_elems = vec![
-                string_property("name", &mat.name, None, None),
-                double_property("weightKg", mat.weight_kg, None, Some("kg")),
+                string_property("name", &mat.name, None),
+                double_property("weightKg", mat.weight_kg, None),
             ];
             if let Some(pct) = mat.recycled_pct {
-                mat_elems.push(double_property("recycledPct", pct, None, Some("%")));
+                mat_elems.push(double_property("recycledPct", pct, None));
             }
             if let Some(ref country) = mat.country_of_origin {
-                mat_elems.push(string_property("countryOfOrigin", country, None, None));
+                mat_elems.push(string_property("countryOfOrigin", country, None));
             }
             AasSubmodelElement::SubmodelElementCollection(AasCollection {
                 id_short: format!("material_{i}"),
@@ -136,7 +129,6 @@ pub(super) fn build_repairability_submodel(passport: &Passport) -> AasSubmodel {
             "repairabilityScore",
             rs.overall,
             Some(semantic_ids::REPAIRABILITY_SCORE),
-            Some("index 0-10"),
         ));
     }
     AasSubmodel {

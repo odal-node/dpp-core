@@ -208,7 +208,6 @@
           "idShort": "co2ePerUnit",
           "valueType": "xs:double",
           "value": "12",
-          "unit": "kgCO2e",
           "semanticId": {
             "type": "ExternalReference",
             "keys": [
@@ -250,15 +249,13 @@
               "modelType": "Property",
               "idShort": "weightKg",
               "valueType": "xs:double",
-              "value": "1.5",
-              "unit": "kg"
+              "value": "1.5"
             },
             {
               "modelType": "Property",
               "idShort": "recycledPct",
               "valueType": "xs:double",
-              "value": "20",
-              "unit": "%"
+              "value": "20"
             },
             {
               "modelType": "Property",
@@ -290,7 +287,6 @@
           "idShort": "repairabilityScore",
           "valueType": "xs:double",
           "value": "6",
-          "unit": "index 0-10",
           "semanticId": {
             "type": "ExternalReference",
             "keys": [
@@ -354,8 +350,7 @@
                   "modelType": "Property",
                   "idShort": "pct",
                   "valueType": "xs:double",
-                  "value": "100",
-                  "unit": "%"
+                  "value": "100"
                 },
                 {
                   "modelType": "Property",
@@ -371,43 +366,37 @@
           "modelType": "Property",
           "idShort": "recycledContentPct",
           "valueType": "xs:double",
-          "value": "10",
-          "unit": "%"
+          "value": "10"
         },
         {
           "modelType": "Property",
           "idShort": "carbonFootprintKgCo2e",
           "valueType": "xs:double",
-          "value": "8.5",
-          "unit": "kgCO2e"
+          "value": "8.5"
         },
         {
           "modelType": "Property",
           "idShort": "waterUseLitres",
           "valueType": "xs:double",
-          "value": "2700",
-          "unit": "L"
+          "value": "2700"
         },
         {
           "modelType": "Property",
           "idShort": "microplasticSheddingMgPerWash",
           "valueType": "xs:double",
-          "value": "11",
-          "unit": "mg/wash"
+          "value": "11"
         },
         {
           "modelType": "Property",
           "idShort": "repairScore",
           "valueType": "xs:double",
-          "value": "6",
-          "unit": "index 0-10"
+          "value": "6"
         },
         {
           "modelType": "Property",
           "idShort": "durabilityScore",
           "valueType": "xs:double",
-          "value": "7",
-          "unit": "index 0-10"
+          "value": "7"
         }
       ]
     }

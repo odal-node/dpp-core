@@ -208,7 +208,6 @@
           "idShort": "co2ePerUnit",
           "valueType": "xs:double",
           "value": "12",
-          "unit": "kgCO2e",
           "semanticId": {
             "type": "ExternalReference",
             "keys": [
@@ -250,15 +249,13 @@
               "modelType": "Property",
               "idShort": "weightKg",
               "valueType": "xs:double",
-              "value": "1.5",
-              "unit": "kg"
+              "value": "1.5"
             },
             {
               "modelType": "Property",
               "idShort": "recycledPct",
               "valueType": "xs:double",
-              "value": "20",
-              "unit": "%"
+              "value": "20"
             },
             {
               "modelType": "Property",
@@ -290,7 +287,6 @@
           "idShort": "repairabilityScore",
           "valueType": "xs:double",
           "value": "6",
-          "unit": "index 0-10",
           "semanticId": {
             "type": "ExternalReference",
             "keys": [
@@ -334,15 +330,13 @@
           "modelType": "Property",
           "idShort": "nominalVoltageV",
           "valueType": "xs:double",
-          "value": "3.7",
-          "unit": "V"
+          "value": "3.7"
         },
         {
           "modelType": "Property",
           "idShort": "nominalCapacityAh",
           "valueType": "xs:double",
-          "value": "50",
-          "unit": "Ah"
+          "value": "50"
         },
         {
           "modelType": "Property",
@@ -355,7 +349,6 @@
           "idShort": "co2ePerUnitKg",
           "valueType": "xs:double",
           "value": "85",
-          "unit": "kgCO2e",
           "semanticId": {
             "type": "ExternalReference",
             "keys": [
