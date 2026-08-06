@@ -67,6 +67,48 @@ test-plugins:
 # Run all gate checks (fmt → lint → test → plugin tests → doc → audit)
 check: fmt-check lint test test-doc test-plugins doc audit
 
+# `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
+# the orphaned-tests guard can fail in CI on a change that passed locally. That
+# is not hypothetical — a crate published as wasm32-safe can acquire a host-only
+# dependency through an ordinary-looking call, and nothing in `check` notices.
+#
+# Deliberately a superset, not a mirror: `doc` and `test-doc` run here and not in
+# CI, because a broken intra-doc link is cheaper to catch now than after a
+# release. Keep in step with `.github/workflows/` when jobs change.
+
+# Everything CI runs, plus docs. Run before pushing; `check` is the inner loop.
+ci: check wasm-build build-plugins test-count
+
+# `dpp-registry` and `dpp-domain` are consumed from WebAssembly, so neither may
+# reach for a host-only facility (platform entropy, filesystem, threads). Built
+# per-crate, not workspace-wide, because most of the workspace is *not*
+# wasm32-safe by design and never needs to be.
+
+# Cross-compile the crates that must stay wasm32-safe.
+wasm-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for crate in dpp-registry dpp-domain; do
+        echo "Building $crate (wasm32-unknown-unknown)..."
+        (cd "crates/$crate" && cargo build --target wasm32-unknown-unknown --release)
+    done
+    echo "wasm32 builds passed."
+
+# `dpp-tests` exists for cross-crate integration coverage; if it stops being
+# built, every one of those tests disappears and the suite still reports green.
+# Counting them is the only signal that they are still there at all.
+
+# Guard against `dpp-tests` silently detaching from the workspace.
+test-count:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    COUNT=$(cargo test -p dpp-tests --all-features --tests -- --list 2>&1 | grep -c ': test' || echo 0)
+    echo "dpp-tests integration tests found: $COUNT"
+    if [ "$COUNT" -eq 0 ]; then
+        echo "ERROR: zero integration tests — dpp-tests may be orphaned from the workspace"
+        exit 1
+    fi
+
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
