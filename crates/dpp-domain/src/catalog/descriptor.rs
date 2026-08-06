@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::regime::Regime;
+use super::retention::RetentionBasis;
 use super::status::RegulatoryStatus;
 
 /// A single sector's catalog entry — the canonical record every component
@@ -37,6 +38,9 @@ pub struct SectorDescriptor {
     pub dpp_applies_from: Option<String>,
     /// Minimum data retention in years required by the applicable act.
     pub retention_years: u32,
+    /// Whether [`Self::retention_years`] is sourced from an adopted legal
+    /// text or carried as an assumption — see [`RetentionBasis`].
+    pub retention_years_basis: RetentionBasis,
     /// Schema versions available for this sector (semver strings).
     pub schema_versions: Vec<String>,
     /// The schema version applicable to *new* passports in this sector right

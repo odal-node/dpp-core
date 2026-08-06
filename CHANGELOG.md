@@ -40,6 +40,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   provenance record, not a self-certified constant. The four `*_property`
   helpers drop their trailing `unit` argument.
 
+- **`SectorDescriptor` gains a required `retentionYearsBasis` field, marking
+  whether `retentionYears` is sourced from an adopted legal text or carried as
+  an assumption.** `retentionYears: 10` shipped identically for every sector,
+  but checked against the OJ texts it is sourced for three (toy, detergent,
+  construction — each regulation states 10 years after placing on the
+  market), a documentation-retention figure for a different obligation for
+  battery (Reg. (EU) 2023/1542's 10-year figures are technical documentation
+  and conformity records, not passport availability, which sits with the
+  unadopted Art. 77(9) act), and unsourced for the rest: ESPR Art. 9(2)(i)
+  ties retention to a product group's expected lifetime, delegated per group,
+  and no ESPR product-group delegated act has been adopted.
+
+  A plausible number with no traceable basis is the same defect class the
+  claim-provenance work exists to prevent. Rather than silently changing the
+  figures — which nobody can currently source better — the new
+  `RetentionBasis` marker makes the distinction explicit on every manifest,
+  with the citation or caveat in that sector's `notes`.
+
+  *Migration:* any manifest or `SectorDescriptor` literal must add
+  `retentionYearsBasis` / `retention_years_basis`; there is no default.
+
 ### Fixed
 
 - **The member gate now walks every class, not just the shell.** It was added
