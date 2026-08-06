@@ -189,6 +189,7 @@ mod tests {
     async fn ghost_register_returns_pending() {
         let sync = GhostRegistrySync;
         let request = RegistrationRequest {
+            request_id: Uuid::now_v7(),
             passport_id: PassportId::new(),
             operator_identifier: "did:web:acme.example.com".into(),
             operator_identifier_scheme: "did".into(),

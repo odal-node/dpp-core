@@ -40,6 +40,15 @@ pub struct RegistryIdentifiers {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistrationRequest {
+    /// Idempotency key for this registration, minted **once** when the
+    /// registration is first built and replayed unchanged on every retry.
+    ///
+    /// Delivery is at-least-once: a submission the registry commits but whose
+    /// response is lost will be retried. A key minted per attempt would make
+    /// each retry look like a fresh registration; carried on the request, it is
+    /// frozen into the queued payload and survives restarts.
+    #[serde(default = "uuid::Uuid::now_v7")]
+    pub request_id: uuid::Uuid,
     /// The DPP passport ID (internal to our system).
     pub passport_id: PassportId,
     /// Economic operator's DID or EU-assigned identifier.
@@ -154,6 +163,9 @@ impl RegistrationRequest {
     ) -> Self {
         let product_category = passport.sector.wire_str().to_owned();
         Self {
+            // Minted here, at the one moment a registration comes into
+            // existence, and never again — see the field's docs.
+            request_id: uuid::Uuid::now_v7(),
             passport_id: passport.id,
             operator_identifier: passport.operator_identifier.clone().unwrap_or_default(),
             operator_identifier_scheme: operator.identifier_scheme.to_owned(),
@@ -191,6 +203,14 @@ pub enum RegistryStatus {
     Transferred,
     /// Record suspended by a market surveillance authority.
     SuspendedByAuthority,
+    /// Record withdrawn from service in the registry.
+    ///
+    /// Distinct from [`Self::Rejected`], which it used to be collapsed into.
+    /// A rejection says our submission was defective and can be corrected; a
+    /// deactivation says the record is no longer in service, which is not
+    /// something resubmitting fixes. Reporting one as the other sends an
+    /// operator after the wrong remedy.
+    Deactivated,
 }
 
 /// A confirmed registration record returned by the EU Central Registry.

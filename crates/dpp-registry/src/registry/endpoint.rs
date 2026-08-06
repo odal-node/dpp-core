@@ -36,26 +36,36 @@ impl RegistryEndpoint {
     pub fn sandbox() -> Self {
         Self {
             authority: RegistryAuthority::EuSandbox,
-            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): sandbox URL is an educated guess
-            // based on the EC's EUDPP work programme. Confirm against the published sandbox
-            // spec before enabling live calls. Track: ESPR implementing acts / DG GROW.
-            base_url: "https://sandbox.eudpp-registry.europa.eu/api/v1".into(),
+            // ✅ Host confirmed: the Commission publishes the registry's test
+            // environment at this address (its "acc" sibling of the production
+            // host). The earlier `sandbox.eudpp-registry.europa.eu` was invented
+            // and resolves to nothing.
+            //
+            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): the `/api/v1` prefix is
+            // observed on the registry's own web client, not read from a
+            // published specification, and the resource paths beneath it
+            // (`/registrations`, …) remain guesses.
+            base_url: "https://registry.acc.product-passport.ec.europa.eu/api/v1".into(),
             // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): api_version "1.0" is provisional.
             // Update once the registry API specification is obtained — whether it is
             // publicly available is itself unconfirmed.
             api_version: "1.0".into(),
             mtls_required: false,
-            token_endpoint: Some("https://sandbox.eudpp-registry.europa.eu/oauth2/token".into()),
+            // ⚠️ Structurally wrong, kept only so the adapter compiles: registry
+            // identity is eIDAS-based (qualified seal or qualified electronic
+            // attestation of attributes), not an OAuth2 token exchange.
+            token_endpoint: Some(
+                "https://registry.acc.product-passport.ec.europa.eu/oauth2/token".into(),
+            ),
         }
     }
 
     /// Create a production endpoint.
     ///
-    /// ⚠️ **PROVISIONAL, and now known to be partly wrong.** The registry became
+    /// ⚠️ **PARTLY CONFIRMED, partly still provisional.** The registry became
     /// operational on 20 July 2026 under Commission Implementing Regulation (EU)
-    /// 2026/1778, but these constants predate it: all URLs, `api_version` and auth
-    /// flows were guessed from the ESPR implementing acts and the DG GROW work
-    /// programme.
+    /// 2026/1778. The **host** is now the Commission's published one; the API
+    /// path, `api_version` and auth flow are still inherited guesses.
     ///
     /// The **auth flow in particular rests on a wrong assumption** —
     /// `token_endpoint` models a bearer-token exchange, whereas registration
@@ -70,12 +80,21 @@ impl RegistryEndpoint {
     pub fn production() -> Self {
         Self {
             authority: RegistryAuthority::EuCentral,
-            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): placeholder URL — confirm
-            // the real production endpoint from the published EU registry API spec.
-            base_url: "https://eudpp-registry.europa.eu/api/v1".into(),
+            // ✅ Host confirmed: the Commission publishes the operational
+            // registry at this address. The earlier `eudpp-registry.europa.eu`
+            // was invented and resolves to nothing.
+            //
+            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): as for the sandbox, the
+            // `/api/v1` prefix is observed rather than specified, and the
+            // resource paths beneath it remain guesses.
+            base_url: "https://registry.product-passport.ec.europa.eu/api/v1".into(),
             api_version: "1.0".into(),
             mtls_required: true,
-            token_endpoint: Some("https://eudpp-registry.europa.eu/oauth2/token".into()),
+            // ⚠️ See the sandbox note: an OAuth2 token exchange is the wrong
+            // model for eIDAS-based registry identity.
+            token_endpoint: Some(
+                "https://registry.product-passport.ec.europa.eu/oauth2/token".into(),
+            ),
         }
     }
 }

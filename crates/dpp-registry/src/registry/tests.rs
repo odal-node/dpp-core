@@ -146,7 +146,33 @@ fn sandbox_endpoint() {
     let ep = RegistryEndpoint::sandbox();
     assert_eq!(ep.authority, RegistryAuthority::EuSandbox);
     assert!(!ep.mtls_required);
-    assert!(ep.base_url.contains("sandbox"));
+    // The Commission's test environment is the `acc` sibling of the production
+    // host, not a "sandbox"-named one. This asserted `contains("sandbox")` while
+    // the URL was invented, which is precisely the shape of test that agrees
+    // with our own guess instead of an outside fact.
+    assert_eq!(
+        ep.base_url,
+        "https://registry.acc.product-passport.ec.europa.eu/api/v1"
+    );
+}
+
+/// The two environments must never collapse onto one host — submitting test
+/// data to the operational registry is not a recoverable mistake.
+#[test]
+fn sandbox_and_production_are_different_hosts() {
+    let sandbox = RegistryEndpoint::sandbox();
+    let production = RegistryEndpoint::production();
+    assert_ne!(sandbox.base_url, production.base_url);
+    assert!(
+        sandbox.base_url.contains(".acc."),
+        "the test environment is the `acc` host: {}",
+        sandbox.base_url
+    );
+    assert!(
+        !production.base_url.contains(".acc."),
+        "production must not point at the test environment: {}",
+        production.base_url
+    );
 }
 
 #[test]
