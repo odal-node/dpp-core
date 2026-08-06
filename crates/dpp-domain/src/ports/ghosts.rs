@@ -204,6 +204,8 @@ mod tests {
             country_code: String::new(),
             granularity: RegistrationGranularity::Item,
             model_id: None,
+            commodity_code: None,
+            backup_url: None,
         };
         let record = sync.register(request).await.unwrap();
         assert_eq!(record.status, RegistryStatus::Pending);

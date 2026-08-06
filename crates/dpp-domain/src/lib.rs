@@ -26,6 +26,7 @@ mod test_support;
 pub use catalog::{CatalogError, RegulatoryStatus, SectorCatalog, SectorDescriptor};
 
 pub use domain::{
+    commodity_code::{CommodityCode, CommodityCodeError},
     error::DppError,
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
     identity::{

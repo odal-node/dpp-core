@@ -22,6 +22,10 @@ pub enum RegistryValidationError {
         granularity: &'static str,
         identifier: &'static str,
     },
+    /// The commodity code is not structurally a tariff code (HS-6/CN-8/TARIC-10).
+    InvalidCommodityCode { value: String },
+    /// A declared back-up URL is not `https://`.
+    InsecureBackupUrl { value: String },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -53,6 +57,15 @@ impl std::fmt::Display for RegistryValidationError {
                     f,
                     "a '{granularity}'-level registration must not carry a '{identifier}'"
                 )
+            }
+            Self::InvalidCommodityCode { value } => {
+                write!(
+                    f,
+                    "invalid commodity code '{value}': expected 6 (HS), 8 (CN) or 10 (TARIC) digits"
+                )
+            }
+            Self::InsecureBackupUrl { value } => {
+                write!(f, "back-up URL '{value}' must be https://")
             }
         }
     }

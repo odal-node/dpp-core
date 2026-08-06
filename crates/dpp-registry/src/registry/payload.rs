@@ -45,6 +45,18 @@ pub struct RegistrationPayload {
     /// JWS signature of the DPP data (for integrity verification by the registry).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws_signature: Option<String>,
+    /// Customs tariff classification (HS-6, CN-8 or TARIC-10).
+    ///
+    /// Registration data the registry stores, and verifies "where relevant"
+    /// against the ranges its product group permits — a check this crate cannot
+    /// perform, because the ranges live in the applicable delegated act. What is
+    /// checkable here is that the code is structurally a tariff code at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commodity_code: Option<String>,
+    /// Public URL of a back-up of this passport, hosted independently of the
+    /// issuing node. Verified by the registry where one is declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup_url: Option<String>,
 }
 
 impl RegistrationPayload {
@@ -75,6 +87,22 @@ impl RegistrationPayload {
         }
         self.facility_id.validate()?;
         self.operator_id.validate()?;
+        // Structural only: 6/8/10 digits. Whether the code is the *right* one
+        // for this product group is the registry's check, against ranges we do
+        // not hold. Absent is lawful ("where relevant"); malformed is not.
+        if let Some(code) = &self.commodity_code
+            && dpp_domain::CommodityCode::parse(code).is_err()
+        {
+            return Err(RegistryValidationError::InvalidCommodityCode {
+                value: code.clone(),
+            });
+        }
+        // A back-up the registry cannot fetch is worse than none declared.
+        if let Some(url) = &self.backup_url
+            && !url.starts_with("https://")
+        {
+            return Err(RegistryValidationError::InsecureBackupUrl { value: url.clone() });
+        }
         for (name, value) in [
             ("sector", &self.sector),
             ("schemaVersion", &self.schema_version),

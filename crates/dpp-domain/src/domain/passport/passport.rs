@@ -144,6 +144,15 @@ pub struct Passport {
     /// Opaque link to an internal product-template record. Not a legal identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub product_id: Option<Uuid>,
+    /// Customs tariff classification (HS-6, CN-8 or TARIC-10).
+    ///
+    /// Registration data the EU registry stores and verifies against the ranges
+    /// its product group permits. `None` where the product group does not call
+    /// for one — the regulation qualifies it "where relevant" — and a registry
+    /// that requires it will refuse the registration rather than this node
+    /// inventing a classification it cannot derive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commodity_code: Option<crate::domain::commodity_code::CommodityCode>,
     /// EORI or national economic-operator identifier for the responsible party.
     /// Confirmed against the verbatim OJ text (Regulation (EU) 2024/1781):
     /// **Annex III, point (k)** is the data-content basis — "the name, contact

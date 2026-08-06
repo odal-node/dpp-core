@@ -111,6 +111,19 @@ pub struct RegistrationRequest {
     /// exists for it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
+    /// Customs tariff classification, copied from the passport.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commodity_code: Option<String>,
+    /// Public URL of the passport's back-up, hosted independently of the live
+    /// node, where the deployment maintains one.
+    ///
+    /// The registry verifies "the link to the back-up hosted by a digital
+    /// product passport service provider" as part of registration. `None` when
+    /// no back-up is *published* — storing snapshots is not the same as serving
+    /// them, and declaring a URL nobody can fetch would be worse than declaring
+    /// none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup_url: Option<String>,
 }
 
 /// The level a passport is registered at, mirrored in the domain so the port
@@ -184,6 +197,10 @@ impl RegistrationRequest {
             country_code: operator.country.to_owned(),
             granularity,
             model_id: None,
+            commodity_code: passport.commodity_code.as_ref().map(ToString::to_string),
+            // Set by the caller: whether a published back-up exists is a
+            // deployment fact, not something the passport records.
+            backup_url: None,
         }
     }
 }
