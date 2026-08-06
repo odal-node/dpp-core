@@ -73,6 +73,7 @@ pub fn make_operator(
         name: name.into(),
         role,
         eu_operator_id: None,
+        eu_operator_id_scheme: None,
         country: country.into(),
     }
 }

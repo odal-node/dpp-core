@@ -588,3 +588,23 @@ fn a_pending_transfer_still_validates() {
     notif.to_signature = None;
     assert!(notif.validate().is_ok());
 }
+
+/// An identifier with no scheme is not identifiable: the value alone does not
+/// say whether it is a VAT number, an LEI or a DID. This is the check that
+/// stops an unscheme'd identifier being submitted as if it were well-formed —
+/// the per-scheme check accepts any unrecognised scheme, including the empty
+/// one, so without this it would pass.
+#[test]
+fn operator_identifier_without_a_scheme_is_refused() {
+    for scheme in ["", "   "] {
+        let mut oid = sample_operator_id();
+        oid.scheme = scheme.into();
+        assert!(
+            matches!(
+                oid.validate(),
+                Err(RegistryValidationError::MissingRequiredField(f)) if f == "operatorId.scheme"
+            ),
+            "an identifier with scheme {scheme:?} must be refused"
+        );
+    }
+}

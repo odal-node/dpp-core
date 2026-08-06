@@ -56,7 +56,8 @@ fn main() {
         did: "did:web:greenthread.example.com".into(),
         name: "GreenThread GmbH".into(),
         role: OperatorRole::Manufacturer,
-        eu_operator_id: Some("EU-OP-DE-2024-00142".into()),
+        eu_operator_id: Some("DE811234567".into()),
+        eu_operator_id_scheme: Some("vat".into()),
         country: "DE".into(),
     };
 
@@ -72,7 +73,8 @@ fn main() {
         did: "did:web:circular-tex.example.nl".into(),
         name: "CircularTex BV".into(),
         role: OperatorRole::Remanufacturer,
-        eu_operator_id: Some("EU-OP-NL-2025-00087".into()),
+        eu_operator_id: Some("NL123456789B01".into()),
+        eu_operator_id_scheme: Some("vat".into()),
         country: "NL".into(),
     };
 

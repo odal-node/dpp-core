@@ -18,6 +18,14 @@ pub struct ResponsibleOperator {
     pub role: OperatorRole,
     /// EU-assigned economic operator identifier, if available.
     pub eu_operator_id: Option<String>,
+    /// The scheme [`Self::eu_operator_id`] is expressed in — `"vat"`, `"lei"`,
+    /// `"eori"`, `"duns"`. `None` when no EU identifier is held.
+    ///
+    /// Paired with the value because an identifier without its scheme cannot be
+    /// stated truthfully to a registry: the value alone does not say what it is,
+    /// and guessing produces a false claim rather than a missing one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eu_operator_id_scheme: Option<String>,
     /// ISO 3166-1 alpha-2 country code of the operator's establishment.
     pub country: String,
 }

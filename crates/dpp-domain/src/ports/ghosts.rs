@@ -133,6 +133,7 @@ impl RegistrySyncPort for GhostRegistrySync {
     async fn notify_transfer(
         &self,
         record: &crate::domain::transfer::TransferRecord,
+        _registry_id: &str,
     ) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(
             "ghost registry has no record for {}",
@@ -190,6 +191,7 @@ mod tests {
         let request = RegistrationRequest {
             passport_id: PassportId::new(),
             operator_identifier: "did:web:acme.example.com".into(),
+            operator_identifier_scheme: "did".into(),
             operator_name: "Acme GmbH".into(),
             facility_identifier: "FAC-001".into(),
             facility: None,
@@ -225,6 +227,7 @@ mod tests {
             name: name.to_owned(),
             role: OperatorRole::Manufacturer,
             eu_operator_id: None,
+            eu_operator_id_scheme: None,
             country: "DE".to_owned(),
         };
         let record = TransferRecord {
@@ -243,7 +246,7 @@ mod tests {
         };
 
         let sync = GhostRegistrySync;
-        let result = sync.notify_transfer(&record).await;
+        let result = sync.notify_transfer(&record, "EU-REG-1").await;
         assert!(result.is_err());
     }
 

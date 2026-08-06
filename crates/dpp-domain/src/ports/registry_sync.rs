@@ -44,6 +44,16 @@ pub struct RegistrationRequest {
     pub passport_id: PassportId,
     /// Economic operator's DID or EU-assigned identifier.
     pub operator_identifier: String,
+    /// The scheme [`Self::operator_identifier`] is expressed in — `"vat"`,
+    /// `"lei"`, `"eori"`, `"duns"`, `"did"`, …
+    ///
+    /// Carried explicitly because the passport stamps only the identifier's
+    /// *value*, and a value alone does not say what it is. Submitting a VAT
+    /// number under the wrong scheme is a false statement to the registry that
+    /// no structural check can catch — `"did"` in particular is accepted without
+    /// verification, so a mis-scheme there is silent.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub operator_identifier_scheme: String,
     /// Legal name of the responsible economic operator.
     ///
     /// Sourced from the operator's own configuration, not from the passport —
@@ -120,6 +130,11 @@ pub struct RegisteringOperator<'a> {
     pub legal_name: &'a str,
     /// ISO 3166-1 alpha-2 country of registration (`OperatorConfig.country`).
     pub country: &'a str,
+    /// Scheme of the operator's primary identifier — the `scheme` column beside
+    /// the value the passport was stamped with. Belongs here rather than on the
+    /// passport for the same reason the other two do: it is a fact about the
+    /// operator, not about the product.
+    pub identifier_scheme: &'a str,
 }
 
 impl RegistrationRequest {
@@ -141,6 +156,7 @@ impl RegistrationRequest {
         Self {
             passport_id: passport.id,
             operator_identifier: passport.operator_identifier.clone().unwrap_or_default(),
+            operator_identifier_scheme: operator.identifier_scheme.to_owned(),
             operator_name: operator.legal_name.to_owned(),
             facility_identifier: passport
                 .facility
@@ -219,6 +235,11 @@ pub trait RegistrySyncPort: Send + Sync {
     /// Called when a product's responsible economic operator changes
     /// (e.g. remanufacturing, repurposing, import into a new market).
     ///
+    /// `registry_id` is the registry's own record identifier for this passport,
+    /// returned when it was registered. Without it the registry has no way to
+    /// know which record the handover refers to, so a caller that does not yet
+    /// have one must wait rather than send an unattached notification.
+    ///
     /// Takes the whole [`TransferRecord`](crate::domain::transfer::TransferRecord)
     /// rather than just the incoming
     /// operator's identifier. A registry notification names **both** legal
@@ -229,6 +250,7 @@ pub trait RegistrySyncPort: Send + Sync {
     async fn notify_transfer(
         &self,
         record: &crate::domain::transfer::TransferRecord,
+        registry_id: &str,
     ) -> Result<RegistryRecord, DppError>;
 }
 
@@ -280,6 +302,7 @@ mod tests {
         RegisteringOperator {
             legal_name: "Acme GmbH",
             country: "DE",
+            identifier_scheme: "did",
         }
     }
 
@@ -334,6 +357,7 @@ mod tests {
             RegisteringOperator {
                 legal_name: "",
                 country: "",
+                identifier_scheme: "",
             },
             RegistrationGranularity::Item,
         );

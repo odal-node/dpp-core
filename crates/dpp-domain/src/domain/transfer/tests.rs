@@ -11,6 +11,7 @@ fn make_operator(did: &str, name: &str, role: OperatorRole) -> ResponsibleOperat
         name: name.into(),
         role,
         eu_operator_id: None,
+        eu_operator_id_scheme: None,
         country: "DE".into(),
     }
 }
