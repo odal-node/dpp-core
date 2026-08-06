@@ -30,6 +30,24 @@ pub enum TransferReason {
     InsolvencySuccession,
 }
 
+impl TransferReason {
+    /// The stable wire form, for payloads that carry the reason as a string.
+    ///
+    /// Spelled out rather than derived from `Serialize` so that renaming a
+    /// variant cannot silently change what a registry receives.
+    pub fn wire_str(&self) -> &'static str {
+        match self {
+            Self::Sale => "sale",
+            Self::Return => "return",
+            Self::Remanufacturing => "remanufacturing",
+            Self::Repurposing => "repurposing",
+            Self::PreparationForReuse => "preparationForReuse",
+            Self::Import => "import",
+            Self::InsolvencySuccession => "insolvencySuccession",
+        }
+    }
+}
+
 /// A single transfer-of-responsibility event in the DPP lifecycle.
 ///
 /// Each transfer is cryptographically signed by both the outgoing and

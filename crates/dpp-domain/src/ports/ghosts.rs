@@ -132,11 +132,11 @@ impl RegistrySyncPort for GhostRegistrySync {
 
     async fn notify_transfer(
         &self,
-        passport_id: PassportId,
-        _new_operator_identifier: String,
+        record: &crate::domain::transfer::TransferRecord,
     ) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(
-            "ghost registry has no record for {passport_id}"
+            "ghost registry has no record for {}",
+            record.passport_id
         )))
     }
 }
@@ -216,10 +216,34 @@ mod tests {
 
     #[tokio::test]
     async fn ghost_notify_transfer_returns_not_found() {
+        use crate::domain::transfer::{
+            OperatorRole, ResponsibleOperator, TransferReason, TransferRecord,
+        };
+
+        let operator = |did: &str, name: &str| ResponsibleOperator {
+            did: did.to_owned(),
+            name: name.to_owned(),
+            role: OperatorRole::Manufacturer,
+            eu_operator_id: None,
+            country: "DE".to_owned(),
+        };
+        let record = TransferRecord {
+            transfer_id: Uuid::now_v7(),
+            passport_id: PassportId::new(),
+            from_operator: operator("did:web:old.example.com", "Old Operator GmbH"),
+            to_operator: operator("did:web:new.example.com", "New Operator GmbH"),
+            reason: TransferReason::Sale,
+            from_signature: None,
+            to_signature: None,
+            initiated_at: Utc::now(),
+            completed_at: None,
+            rejected_at: None,
+            cancelled_at: None,
+            notes: None,
+        };
+
         let sync = GhostRegistrySync;
-        let result = sync
-            .notify_transfer(PassportId::new(), "did:web:new-operator.example.com".into())
-            .await;
+        let result = sync.notify_transfer(&record).await;
         assert!(result.is_err());
     }
 

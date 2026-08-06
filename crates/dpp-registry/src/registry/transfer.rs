@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::error::RegistryValidationError;
 use super::identifiers::OperatorIdentifier;
 
 /// Notification sent to the EU registry when a transfer of responsibility occurs.
@@ -38,4 +39,29 @@ pub struct TransferNotification {
     /// JWS signature from the incoming operator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to_signature: Option<String>,
+}
+
+impl TransferNotification {
+    /// Validate both operator identifiers and the reason.
+    ///
+    /// A transfer notification names the two legal persons on either side of a
+    /// change of responsibility, so both must satisfy the same rules a
+    /// registration's operator does — a legal name, a valid country, and a
+    /// structurally sound identifier for the scheme.
+    ///
+    /// The two signatures are deliberately **not** required here: a transfer is
+    /// initiated by the outgoing operator and only countersigned when the
+    /// incoming one accepts, so a notification can legitimately be built before
+    /// `to_signature` exists. Whether an unaccepted transfer should be notified
+    /// at all is a caller's decision, not a structural one.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        self.from_operator.validate()?;
+        self.to_operator.validate()?;
+        if self.reason.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "reason".into(),
+            ));
+        }
+        Ok(())
+    }
 }

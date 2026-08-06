@@ -218,10 +218,17 @@ pub trait RegistrySyncPort: Send + Sync {
     ///
     /// Called when a product's responsible economic operator changes
     /// (e.g. remanufacturing, repurposing, import into a new market).
+    ///
+    /// Takes the whole [`TransferRecord`](crate::domain::transfer::TransferRecord)
+    /// rather than just the incoming
+    /// operator's identifier. A registry notification names **both** legal
+    /// persons and carries the dual signatures that authorise the handover;
+    /// passing only the new identifier left an adapter no way to express the
+    /// outgoing operator or either signature, so it could only send empty
+    /// strings for data the system had already collected.
     async fn notify_transfer(
         &self,
-        passport_id: PassportId,
-        new_operator_identifier: String,
+        record: &crate::domain::transfer::TransferRecord,
     ) -> Result<RegistryRecord, DppError>;
 }
 
