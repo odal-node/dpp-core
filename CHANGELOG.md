@@ -40,6 +40,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   provenance record, not a self-certified constant. The four `*_property`
   helpers drop their trailing `unit` argument.
 
+- **`PassportCredential` and `DppAccessCredential` no longer reference
+  `schema.odal-node.io`, which has no DNS record.** Both hard-coded a second
+  `@context` entry pointing at a `/credentials/...` path on that host — a
+  string entry in `@context` is fetched by a conforming processor at
+  expansion time, so a dead one fails the whole document, and a lenient
+  processor drops every term it cannot define. Neither type went through the
+  `dpp_vc::jsonld::REMOTE_CONTEXTS` seam that a prior release added for
+  exactly this reason, which is how each independently grew its own dead
+  entry.
+
+  Both now inline their term map instead, following that same precedent:
+  `context` becomes `Vec<serde_json::Value>` (was `Vec<String>`) so the
+  second entry can be an object rather than a URL. A cross-crate test now
+  enumerates every `@context` array the workspace can emit — not just the
+  passport envelope — against one verified-resolvable list, so a third type
+  cannot repeat this unnoticed.
+
+  *Migration:* callers building either credential type unchanged still get a
+  valid, resolvable `@context`. Anyone matching the second `@context` entry
+  as a specific string must instead match on the inline term map object.
+
 ### Fixed
 
 - **The member gate now walks every class, not just the shell.** It was added
