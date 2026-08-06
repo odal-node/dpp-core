@@ -31,17 +31,17 @@ pub fn map_dpp_to_aas_submodel(submodel_id: &str, dpp_data: &serde_json::Value) 
 
 pub(crate) fn json_value_to_element(key: &str, value: &serde_json::Value) -> AasSubmodelElement {
     match value {
-        serde_json::Value::String(s) => string_property(key, s, None, None),
+        serde_json::Value::String(s) => string_property(key, s, None),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                integer_property(key, i, None, None)
+                integer_property(key, i, None)
             } else if let Some(f) = n.as_f64() {
-                double_property(key, f, None, None)
+                double_property(key, f, None)
             } else {
-                string_property(key, &n.to_string(), None, None)
+                string_property(key, &n.to_string(), None)
             }
         }
-        serde_json::Value::Bool(b) => boolean_property(key, *b, None, None),
+        serde_json::Value::Bool(b) => boolean_property(key, *b, None),
         serde_json::Value::Object(map) => {
             let children: Vec<AasSubmodelElement> = map
                 .iter()
@@ -65,6 +65,6 @@ pub(crate) fn json_value_to_element(key: &str, value: &serde_json::Value) -> Aas
                 semantic_id: None,
             })
         }
-        serde_json::Value::Null => string_property(key, "", None, None),
+        serde_json::Value::Null => string_property(key, "", None),
     }
 }

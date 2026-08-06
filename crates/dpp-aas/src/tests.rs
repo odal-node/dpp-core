@@ -59,12 +59,7 @@ fn minimal_passport(sector: Sector) -> Passport {
 
 #[test]
 fn property_helpers() {
-    let s = string_property(
-        "name",
-        "cotton",
-        Some("urn:eclass:0173-1#01-AAA000#001"),
-        None,
-    );
+    let s = string_property("name", "cotton", Some("urn:eclass:0173-1#01-AAA000#001"));
     if let AasSubmodelElement::Property(p) = s {
         assert_eq!(p.id_short, "name");
         assert_eq!(p.value, "cotton");
@@ -72,46 +67,57 @@ fn property_helpers() {
             p.semantic_id.unwrap().keys[0].value,
             "urn:eclass:0173-1#01-AAA000#001"
         );
-        assert!(p.unit.is_none());
     }
 
-    let d = double_property("co2e", 8.5, None, Some("kgCO2e"));
+    let d = double_property("co2e", 8.5, None);
     if let AasSubmodelElement::Property(p) = d {
         assert_eq!(p.value, "8.5");
         assert_eq!(p.value_type, AasDataType::Double);
-        assert_eq!(p.unit.as_deref(), Some("kgCO2e"));
     }
 
-    let b = boolean_property("available", true, None, None);
+    let b = boolean_property("available", true, None);
     if let AasSubmodelElement::Property(p) = b {
         assert_eq!(p.value, "true");
         assert_eq!(p.value_type, AasDataType::Boolean);
-        assert!(p.unit.is_none());
     }
 
-    let i = integer_property("cycles", 3000, None, None);
+    let i = integer_property("cycles", 3000, None);
     if let AasSubmodelElement::Property(p) = i {
         assert_eq!(p.value, "3000");
         assert_eq!(p.value_type, AasDataType::Integer);
     }
 }
 
+/// A `Property` never carries a `unit` member.
+///
+/// It is not part of the class — `unit` belongs to
+/// `DataSpecificationIec61360`, reached through `embeddedDataSpecifications`.
+/// These two tests previously asserted the opposite, which is how the defect
+/// survived: the suite agreed with the code instead of with the metamodel.
+///
+/// Every JSON Schema accepted the bare member (none of 3.0/3.1/3.2 sets
+/// `additionalProperties`), and aas-core-works' reference implementation
+/// refused the whole document over it.
 #[test]
-fn property_with_unit_serialises() {
-    let prop = double_property("weight", 1.5, None, Some("kg"));
-    let json = serde_json::to_value(&prop).unwrap();
-    assert_eq!(json["unit"], "kg");
-    assert_eq!(json["value"], "1.5");
-}
+fn a_property_carries_no_unit_member() {
+    for prop in [
+        double_property("weight", 1.5, None),
+        string_property("name", "test", None),
+        integer_property("cycles", 3000, None),
+        boolean_property("available", true, None),
+    ] {
+        let json = serde_json::to_value(&prop).unwrap();
+        assert!(
+            json.get("unit").is_none(),
+            "a Property must not serialise a `unit` member: {json}"
+        );
+    }
 
-#[test]
-fn property_without_unit_omits_field() {
-    let prop = string_property("name", "test", None, None);
-    let json = serde_json::to_value(&prop).unwrap();
-    assert!(
-        json.get("unit").is_none(),
-        "unit should be absent when None"
-    );
+    // Not vacuous — the members that *are* part of the class still ship.
+    let json = serde_json::to_value(double_property("weight", 1.5, None)).unwrap();
+    assert_eq!(json["value"], "1.5");
+    assert_eq!(json["valueType"], "xs:double");
+    assert_eq!(json["modelType"], "Property");
 }
 
 // ── Reference element tests ───────────────────────────────────────────
@@ -278,12 +284,10 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     assert!(has_chemistry, "batteryChemistry property missing");
 
     let has_co2e = battery_sub.submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Property(p) => {
-            p.id_short == "co2ePerUnitKg" && p.unit.as_deref() == Some("kgCO2e")
-        }
+        AasSubmodelElement::Property(p) => p.id_short == "co2ePerUnitKg",
         _ => false,
     });
-    assert!(has_co2e, "co2ePerUnitKg with unit kgCO2e missing");
+    assert!(has_co2e, "co2ePerUnitKg property missing");
 
     // `dueDiligenceUrl` is `restricted` in the battery catalog, so it must NOT
     // reach a public projection. This assertion used to be its inverse — the
@@ -412,7 +416,7 @@ fn material_composition_entries_have_unit() {
             _ => None,
         });
         assert!(weight_prop.is_some());
-        assert_eq!(weight_prop.unwrap().unit.as_deref(), Some("kg"));
+        assert_eq!(weight_prop.unwrap().value, "0.3");
     } else {
         panic!("expected material_0 collection");
     }
@@ -432,7 +436,7 @@ fn environmental_impact_co2e_has_unit() {
         _ => None,
     });
     assert!(co2e_prop.is_some());
-    assert_eq!(co2e_prop.unwrap().unit.as_deref(), Some("kgCO2e"));
+    assert_eq!(co2e_prop.unwrap().value_type, AasDataType::Double);
 }
 
 #[test]

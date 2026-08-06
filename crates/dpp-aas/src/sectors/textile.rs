@@ -6,12 +6,11 @@ use crate::semantic_ids;
 
 pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("countryOfOrigin", &t.country_of_origin, None, None),
-        string_property("careInstructions", &t.care_instructions, None, None),
+        string_property("countryOfOrigin", &t.country_of_origin, None),
+        string_property("careInstructions", &t.care_instructions, None),
         string_property(
             "chemicalComplianceStandard",
             &t.chemical_compliance_standard,
-            None,
             None,
         ),
     ];
@@ -22,11 +21,11 @@ pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasS
         .enumerate()
         .map(|(i, fe)| {
             let mut fe_elems = vec![
-                string_property("fibre", &fe.fibre, None, None),
-                double_property("pct", fe.pct, None, Some("%")),
+                string_property("fibre", &fe.fibre, None),
+                double_property("pct", fe.pct, None),
             ];
             if let Some(ref country) = fe.country_of_origin {
-                fe_elems.push(string_property("countryOfOrigin", country, None, None));
+                fe_elems.push(string_property("countryOfOrigin", country, None));
             }
             AasSubmodelElement::SubmodelElementCollection(AasCollection {
                 id_short: format!("fibre_{i}"),
@@ -44,28 +43,23 @@ pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasS
     ));
 
     macro_rules! push_opt_double {
-        ($opt:expr, $id:literal, $unit:expr) => {
+        ($opt:expr, $id:literal) => {
             if let Some(v) = $opt {
-                elements.push(double_property($id, v, None, $unit));
+                elements.push(double_property($id, v, None));
             }
         };
     }
 
-    push_opt_double!(t.recycled_content_pct, "recycledContentPct", Some("%"));
-    push_opt_double!(
-        t.carbon_footprint_kg_co2e,
-        "carbonFootprintKgCo2e",
-        Some("kgCO2e")
-    );
-    push_opt_double!(t.water_use_litres, "waterUseLitres", Some("L"));
+    push_opt_double!(t.recycled_content_pct, "recycledContentPct");
+    push_opt_double!(t.carbon_footprint_kg_co2e, "carbonFootprintKgCo2e");
+    push_opt_double!(t.water_use_litres, "waterUseLitres");
     push_opt_double!(
         t.microplastic_shedding_mg_per_wash,
-        "microplasticSheddingMgPerWash",
-        Some("mg/wash")
+        "microplasticSheddingMgPerWash"
     );
-    push_opt_double!(t.repair_score, "repairScore", Some("index 0-10"));
-    push_opt_double!(t.durability_score, "durabilityScore", Some("index 0-10"));
-    push_opt_double!(t.pef_score, "pefScore", None);
+    push_opt_double!(t.repair_score, "repairScore");
+    push_opt_double!(t.durability_score, "durabilityScore");
+    push_opt_double!(t.pef_score, "pefScore");
 
     if let Some(ref url) = t.repair_history_url {
         elements.push(AasSubmodelElement::ReferenceElement(
@@ -88,7 +82,7 @@ pub(super) fn build_textile_submodel(t: &TextileData, passport_id: &str) -> AasS
                 if let Some(ref scip) = s.scip_notification_id {
                     collection
                         .value
-                        .push(string_property("scipNotificationId", scip, None, None));
+                        .push(string_property("scipNotificationId", scip, None));
                 }
                 AasSubmodelElement::SubmodelElementCollection(collection)
             })

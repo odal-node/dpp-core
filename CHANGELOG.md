@@ -15,6 +15,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`AasProperty` loses `unit` and `description`; neither was a member of
+  `Property`.** Found by running the committed Environments through
+  aas-core-works' `aas-core3.0` reference implementation, which **rejected all
+  eleven** — `DeserializationException: Unexpected property: unit`.
+
+  `unit` belongs to `DataSpecificationIec61360`, reached through
+  `embeddedDataSpecifications`; `description` belongs to `Referable` and is a
+  non-empty array of `LangStringTextType`, not the `Option<String>` this carried.
+  With both removed, all eleven load, pass the spec's own constraint
+  verification with zero violations, and round-trip byte-identically.
+
+  The two failed differently, and the difference is the useful part. A **wrong
+  type on a real member** (`description`) is caught by the JSON Schema gate — it
+  was latent, not silent, and would have failed the moment anything populated it.
+  An **unknown member name** (`unit`, and `kind` before it) is caught by no
+  schema at all, because none of 3.0/3.1/3.2 sets `additionalProperties`. Only a
+  strict loader refuses it.
+
+  *Migration:* the units are unstated rather than lost — the field names carry
+  them (`co2ePerUnitKg`, `nominalVoltageV`, `expectedLifetimeYears`). Restoring
+  them properly needs an embedded `DataSpecificationIec61360`, which references
+  IDTA's data-specification template IRI and therefore needs a verified
+  provenance record, not a self-certified constant. The four `*_property`
+  helpers drop their trailing `unit` argument.
+
 - **`RegistrySyncPort::notify_transfer` takes the whole transfer record and the
   registry's record id**, replacing `(PassportId, String)`.
 
@@ -107,6 +132,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   previous claims that the commodity code was "absent from the passport model
   entirely" and that the payload "models no granularity concept at all" were
   true when written and are no longer.
+
+### Fixed
+
+- **The member gate now walks every class, not just the shell.** It was added
+  with `kind` and scoped to `AssetAdministrationShell`; `unit` was sitting one
+  level down on `Property` the whole time. It now checks every object that
+  declares a `modelType` against that class's own member set, derived from the
+  intersection of all three vendored revisions, and refuses a `modelType` no
+  revision defines. A gate scoped to where the last defect was found is scoped
+  to the wrong place.
+
+- **Two unit tests asserted the defect.** `property_with_unit_serialises`
+  checked `json["unit"] == "kg"`, so the suite agreed with the code rather than
+  with the metamodel and the bug passed CI for as long as it existed. Replaced
+  by `a_property_carries_no_unit_member`, which asserts the absence and then
+  checks the members that *are* part of the class still ship, so it cannot pass
+  by emitting nothing.
 
 ## [0.15.0] - 2026-08-04
 
