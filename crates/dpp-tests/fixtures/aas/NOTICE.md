@@ -73,6 +73,38 @@ whether a submodel matches a published *submodel template*. Any public wording
 about this must say "schema-valid against IDTA-01001 metamodel 3.0, 3.1 and
 3.2", never "IDTA-conformant".
 
+## The external loader, and what it covers
+
+A separate CI job (`.github/workflows/aas-oracle.yml`) runs every committed
+Environment through an external AAS implementation, because the blind spot below
+means no schema can do this job.
+
+| | |
+|---|---|
+| **Tool** | `aas-core3.0` (aas-core-works, Python) |
+| **Pinned at** | `1.1.4` |
+| **Metamodel it implements** | AAS **3.0** |
+| **Checks** | deserialisation, the specification's own constraint verification, and round-trip |
+
+**It covers metamodel 3.0 only.** We validate documents against the 3.0/3.1/3.2
+schemas but load them through a 3.0 implementation, so the loader-level check —
+the one that catches members no schema sees — is 3.0-scoped. Do not round that
+claim up. `aas-core3.0` is generated from `aas-core-meta`, so a 3.1/3.2 loader
+becomes available if and when upstream generates one.
+
+The pin is exact and deliberate: this is somebody else's judgement about what the
+metamodel permits, and an unpinned upgrade would turn their tightening into a red
+build on code that did not change.
+
+**A lenient implementation is worth nothing here.** Eclipse BaSyx accepts unknown
+members and reported success on the `unit` defect that made every Environment
+unloadable. An oracle has to be strict to be an oracle — which is also why
+"opens in a GUI tool" is not evidence.
+
+Public wording: "passes `aas-core3.0` 1.1.4 for metamodel 3.0". Never
+"IDTA-conformant" — that is a separate process against IDTA's own test tooling,
+and neither claim says anything about submodel-template conformance.
+
 ### The blind spot, named because it caught us
 
 **None of these schemas sets `additionalProperties` anywhere.** A member that is

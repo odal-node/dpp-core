@@ -13,6 +13,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **A CI job loads every Environment through an external AAS implementation.**
+  `aas-core3.0` 1.1.4 (aas-core-works, Python), pinned exactly, in its own
+  workflow so the main gate never acquires a Python dependency and
+  `cargo build --workspace` keeps needing no infrastructure.
+
+  It deserialises, runs the specification's own constraint verification, and
+  round-trips. That is the only check here that can catch a member no schema
+  sees — IDTA sets `additionalProperties` nowhere in 3.0, 3.1 or 3.2 — which is
+  how `kind` and `unit` both shipped.
+
+  **It covers metamodel 3.0 only**, while the schema gate covers 3.0, 3.1 and
+  3.2. The pin, that scope, and the reason a lenient implementation is useless
+  as an oracle are recorded in `dpp-tests/fixtures/aas/NOTICE.md`.
+
+  Passing it is not IDTA conformance. Public wording is "passes aas-core3.0
+  1.1.4 for metamodel 3.0", never "IDTA-conformant".
+
 ### Breaking
 
 - **`AasProperty` loses `unit` and `description`; neither was a member of
@@ -39,6 +58,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   IDTA's data-specification template IRI and therefore needs a verified
   provenance record, not a self-certified constant. The four `*_property`
   helpers drop their trailing `unit` argument.
+
+- **`PassportCredential` and `DppAccessCredential` no longer reference
+  `schema.odal-node.io`, which has no DNS record.** Both hard-coded a second
+  `@context` entry pointing at a `/credentials/...` path on that host — a
+  string entry in `@context` is fetched by a conforming processor at
+  expansion time, so a dead one fails the whole document, and a lenient
+  processor drops every term it cannot define. Neither type went through the
+  `dpp_vc::jsonld::REMOTE_CONTEXTS` seam that a prior release added for
+  exactly this reason, which is how each independently grew its own dead
+  entry.
+
+  Both now inline their term map instead, following that same precedent:
+  `context` becomes `Vec<serde_json::Value>` (was `Vec<String>`) so the
+  second entry can be an object rather than a URL. A cross-crate test now
+  enumerates every `@context` array the workspace can emit — not just the
+  passport envelope — against one verified-resolvable list, so a third type
+  cannot repeat this unnoticed.
+
+  *Migration:* callers building either credential type unchanged still get a
+  valid, resolvable `@context`. Anyone matching the second `@context` entry
+  as a specific string must instead match on the inline term map object.
 
 - **`SectorDescriptor` gains a required `retentionYearsBasis` field, marking
   whether `retentionYears` is sourced from an adopted legal text or carried as
