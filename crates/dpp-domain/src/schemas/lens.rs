@@ -14,7 +14,7 @@
 //! motivated it. They start as Rust impls compiled into core (versioned with the
 //! schemas they bridge); an expression/bundle-delivered form can come later.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use semver::Version;
 use serde_json::Value;
@@ -186,10 +186,91 @@ impl LensRegistry {
                 to: to.clone(),
             })?;
 
+        self.apply(data, from, to, &path)
+    }
+
+    /// Upcast `data` for `sector` as far toward `to` as the registered lenses
+    /// reach, stopping at the newest reachable version no newer than `to`.
+    ///
+    /// [`Self::upcast`] demands a path to exactly `to` and refuses anything
+    /// short of it. That is right for a caller that asked to see a specific
+    /// version, and wrong for a reader that only needs stored data readable at
+    /// the current one: a purely additive version bump after a lens leaves no
+    /// hop ending at the exact current version, so an exact-path search refuses
+    /// a document that the hops it *does* have would have made perfectly
+    /// readable. Battery is already in that position — the registry bridges
+    /// `1.0.0 → 2.0.0` while the current version is further on, every step
+    /// beyond it additive and correctly lens-free.
+    ///
+    /// The remaining additive gap needs no transform by definition, so the
+    /// caller's own deserialize closes it. What this will not do is pretend to
+    /// have bridged something: a real gap that no hop touches is refused with
+    /// [`UpcastError::NoPath`] rather than returned as a silent identity, and
+    /// the returned [`DerivedView`] reports the version actually reached, never
+    /// the one requested. `from == to` is the identity, as for
+    /// [`Self::upcast`] — there is no gap, so there is no progress to require.
+    pub fn upcast_toward(
+        &self,
+        sector: &str,
+        data: &Value,
+        from: &Version,
+        to: &Version,
+    ) -> Result<DerivedView, UpcastError> {
+        match to.cmp(from) {
+            std::cmp::Ordering::Less => {
+                return Err(UpcastError::NotAnUpcast {
+                    from: from.clone(),
+                    to: to.clone(),
+                });
+            }
+            // No gap to bridge, so no progress to require: the identity, as
+            // [`Self::upcast`] gives for the same input.
+            std::cmp::Ordering::Equal => return self.apply(data, from, from, &[]),
+            std::cmp::Ordering::Greater => {}
+        }
+
+        // The newest version reachable that `to` does not precede — fewest hops
+        // is already guaranteed per destination by the breadth-first search.
+        let (reached, path) = self
+            .reachable(sector, from)
+            .into_iter()
+            .filter(|(v, _)| v <= to)
+            .max_by(|(a, _), (b, _)| a.cmp(b))
+            .ok_or_else(|| UpcastError::NoPath {
+                sector: sector.to_owned(),
+                from: from.clone(),
+                to: to.clone(),
+            })?;
+
+        self.apply(data, from, &reached, &path)
+    }
+
+    /// [`Self::upcast_toward`] taking version *strings*, mirroring
+    /// [`Self::upcast_str`].
+    pub fn upcast_str_toward(
+        &self,
+        sector: &str,
+        data: &Value,
+        from: &str,
+        to: &str,
+    ) -> Result<DerivedView, UpcastError> {
+        self.upcast_toward(sector, data, &parse_version(from)?, &parse_version(to)?)
+    }
+
+    /// Run `path`'s hops over `data`, recording the chain and whether any hop
+    /// was lossy. `reached` is the version the chain actually ends at, which is
+    /// not always the one a caller asked for — see [`Self::upcast_toward`].
+    fn apply(
+        &self,
+        data: &Value,
+        from: &Version,
+        reached: &Version,
+        path: &[usize],
+    ) -> Result<DerivedView, UpcastError> {
         let mut current = data.clone();
         let mut lens_chain = Vec::new();
         let mut lossy = false;
-        for &i in &path {
+        for &i in path {
             let lens = &self.lenses[i];
             current = (lens.transform)(&current).map_err(UpcastError::Transform)?;
             lens_chain.push([lens.from.to_string(), lens.to.to_string()]);
@@ -200,7 +281,7 @@ impl LensRegistry {
             data: current,
             derived: true,
             from: from.to_string(),
-            to: to.to_string(),
+            to: reached.to_string(),
             lens_chain,
             lossy,
         })
@@ -216,47 +297,47 @@ impl LensRegistry {
         from: &str,
         to: &str,
     ) -> Result<DerivedView, UpcastError> {
-        let parse = |s: &str| {
-            s.trim_start_matches('v')
-                .parse::<Version>()
-                .map_err(|_| UpcastError::BadVersion(s.to_owned()))
-        };
-        self.upcast(sector, data, &parse(from)?, &parse(to)?)
+        self.upcast(sector, data, &parse_version(from)?, &parse_version(to)?)
     }
 
-    /// Fewest-hop lens path (as lens indices) from `from` to `to` for `sector`,
-    /// via breadth-first search over the sector's lens graph. `None` if no path.
+    /// Fewest-hop lens path (as lens indices) from `from` to `to` for `sector`.
+    /// `None` if no path.
     fn path(&self, sector: &str, from: &Version, to: &Version) -> Option<Vec<usize>> {
+        self.reachable(sector, from).remove(to)
+    }
+
+    /// Every version reachable from `from` for `sector`, each mapped to the
+    /// fewest-hop lens path that reaches it, via breadth-first search over the
+    /// sector's lens graph. Excludes `from` itself: the identity is not a path.
+    fn reachable(&self, sector: &str, from: &Version) -> HashMap<Version, Vec<usize>> {
         let mut queue: VecDeque<Version> = VecDeque::from([from.clone()]);
-        let mut visited: HashSet<Version> = HashSet::from([from.clone()]);
-        // Reached-version → index of the lens that reached it.
-        let mut prev: HashMap<Version, usize> = HashMap::new();
+        let mut paths: HashMap<Version, Vec<usize>> = HashMap::from([(from.clone(), Vec::new())]);
 
         while let Some(v) = queue.pop_front() {
-            if &v == to {
-                break;
-            }
+            // Breadth-first, so the first path found to a version is a shortest
+            // one and later arrivals at it are ignored.
+            let so_far = paths[&v].clone();
             for (i, lens) in self.lenses.iter().enumerate() {
-                if lens.sector == sector && lens.from == v && visited.insert(lens.to.clone()) {
-                    prev.insert(lens.to.clone(), i);
+                if lens.sector == sector && lens.from == v && !paths.contains_key(&lens.to) {
+                    let mut path = so_far.clone();
+                    path.push(i);
+                    paths.insert(lens.to.clone(), path);
                     queue.push_back(lens.to.clone());
                 }
             }
         }
 
-        if !prev.contains_key(to) {
-            return None;
-        }
-        let mut path = Vec::new();
-        let mut cur = to.clone();
-        while &cur != from {
-            let i = *prev.get(&cur)?;
-            path.push(i);
-            cur = self.lenses[i].from.clone();
-        }
-        path.reverse();
-        Some(path)
+        paths.remove(from);
+        paths
     }
+}
+
+/// Parse a version string, tolerating a leading `v` (`v2.0.0`). An unparseable
+/// version is a typed refusal, never a silent identity.
+fn parse_version(s: &str) -> Result<Version, UpcastError> {
+    s.trim_start_matches('v')
+        .parse::<Version>()
+        .map_err(|_| UpcastError::BadVersion(s.to_owned()))
 }
 
 impl Default for LensRegistry {
@@ -588,6 +669,101 @@ mod tests {
                 ["2.0.0".to_string(), "3.0.0".to_string()],
             ]
         );
+    }
+
+    // ── upcast_toward ───────────────────────────────────────────────────────
+
+    #[test]
+    fn toward_reaches_the_newest_registered_version_short_of_the_target() {
+        // Battery's registered lens ends at 2.0.0 while the schema has since
+        // moved on additively, so no chain lands on the current version and
+        // none should have to: `upcast` refuses the gap outright, and a reader
+        // that only needs the data readable must not inherit that refusal.
+        let reg = LensRegistry::new();
+        let current: Version = crate::catalog::SectorCatalog::new()
+            .current_schema_version("battery")
+            .expect("battery is in the catalog")
+            .parse()
+            .expect("catalog versions are semver");
+        assert!(
+            current > v("2.0.0"),
+            "this test is only meaningful while battery's current version is \
+             past its last lens — got {current}"
+        );
+
+        assert!(matches!(
+            reg.upcast("battery", &battery_v1(), &v("1.0.0"), &current),
+            Err(UpcastError::NoPath { .. })
+        ));
+
+        let derived = reg
+            .upcast_toward("battery", &battery_v1(), &v("1.0.0"), &current)
+            .expect("the 1.0.0 -> 2.0.0 hop must still be applied");
+
+        // It reports the version actually reached, not the one asked for, and
+        // the hop really ran.
+        assert_eq!(derived.to, "2.0.0");
+        assert_eq!(derived.from, "1.0.0");
+        assert_eq!(
+            derived.lens_chain,
+            vec![["1.0.0".to_string(), "2.0.0".to_string()]]
+        );
+        assert_eq!(derived.data["ratedEnergyWh"].as_f64(), Some(4800.0));
+    }
+
+    #[test]
+    fn toward_never_overshoots_the_target() {
+        let reg = LensRegistry::from_lenses(vec![
+            Lens::new("demo", v("1.0.0"), v("2.0.0"), false, "add a", add_a),
+            Lens::new("demo", v("2.0.0"), v("3.0.0"), false, "add b", add_b_lossy),
+        ]);
+        let data = serde_json::json!({ "dropped": 1 });
+
+        // 2.0.0 is reachable and is the ceiling; the 3.0.0 hop must not run.
+        let derived = reg
+            .upcast_toward("demo", &data, &v("1.0.0"), &v("2.5.0"))
+            .expect("2.0.0 is reachable and below the ceiling");
+        assert_eq!(derived.to, "2.0.0");
+        assert_eq!(derived.data["a"], Value::Bool(true));
+        assert!(derived.data.get("b").is_none());
+    }
+
+    #[test]
+    fn toward_still_refuses_a_gap_no_lens_touches_at_all() {
+        // Making progress optional would turn every unbridgeable gap into a
+        // silent identity, which is the one thing this module refuses to do.
+        let reg = LensRegistry::new();
+        let err = reg
+            .upcast_toward("textile", &serde_json::json!({}), &v("1.0.0"), &v("1.2.0"))
+            .unwrap_err();
+        assert!(
+            matches!(err, UpcastError::NoPath { .. }),
+            "nothing leaves textile 1.0.0, so this must stay a typed refusal"
+        );
+    }
+
+    #[test]
+    fn toward_refuses_a_downcast() {
+        let reg = LensRegistry::new();
+        assert!(matches!(
+            reg.upcast_toward("battery", &battery_v1(), &v("2.0.0"), &v("1.0.0")),
+            Err(UpcastError::NotAnUpcast { .. })
+        ));
+    }
+
+    #[test]
+    fn toward_is_the_identity_for_the_same_version() {
+        // No gap means no progress to require — refusing here would make a
+        // sector with no lenses at all unreadable at its own current version.
+        let reg = LensRegistry::new();
+        let data = battery_v1();
+        let derived = reg
+            .upcast_toward("battery", &data, &v("2.0.0"), &v("2.0.0"))
+            .expect("same version is the identity, not a missing path");
+        assert!(derived.lens_chain.is_empty());
+        assert!(!derived.lossy);
+        assert_eq!(derived.to, "2.0.0");
+        assert_eq!(derived.data, data);
     }
 
     #[test]

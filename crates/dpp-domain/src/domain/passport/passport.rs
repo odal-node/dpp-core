@@ -98,7 +98,20 @@ pub struct Passport {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
-    /// Semantic version of the sector schema used to validate this record.
+    /// Semantic version of the *sector* schema used to validate this record.
+    ///
+    /// Scoped to `sector_data` only — there is no equivalent version for the
+    /// envelope fields on this struct. [`Passport::from_stored`] uses this to
+    /// decide whether `sector_data` needs upcasting through a lens before
+    /// this record can be re-read. Envelope fields have no such escape hatch
+    /// and never will: a lens transforms one sector's sub-object, but an
+    /// envelope field is shared by every sector's stored documents, so a
+    /// non-additive envelope change would need a transform over the whole
+    /// document — one mistake there corrupts every sector at once, not one.
+    /// The envelope's rule is therefore additive-only, permanently, with no
+    /// exception path: `Option<T>` + `#[serde(default)]`, or a rename that
+    /// keeps accepting the old key, never a bare requirement added to an
+    /// existing field.
     pub schema_version: String,
     /// Set to `true` permanently on first publish; never unset thereafter.
     ///
@@ -173,7 +186,90 @@ fn default_version() -> u32 {
     1
 }
 
+/// The catalog sector key and recorded schema version a stored document's
+/// `sectorData` was written under, read without assuming the document
+/// deserializes into the current shape. `None` if either is absent or
+/// malformed — [`Passport::from_stored`] then skips upcasting and lets the
+/// final deserialize surface whatever is actually wrong.
+fn stored_sector_version(doc: &serde_json::Value) -> Option<(String, String)> {
+    let sector_data = doc.get("sectorData")?;
+    let tag = sector_data.get("sector")?.as_str()?;
+    let sector_key = Sector::from_wire_tag(tag).catalog_key().to_owned();
+    let recorded = doc.get("schemaVersion")?.as_str()?.to_owned();
+    Some((sector_key, recorded))
+}
+
 impl Passport {
+    /// Deserialize a passport as it was actually stored. Tries the direct,
+    /// current-shape deserialize first — most schema evolution is additive
+    /// and a document written under an older `schemaVersion` reads directly
+    /// with no transform needed, exactly as before this method existed. Only
+    /// on failure does it fall back to upcasting `sectorData` through the
+    /// registered lens chain and retrying, so a version gap that needs no
+    /// lens (the common case) never pays for one.
+    ///
+    /// The fallback upcasts as far toward the sector's current version as the
+    /// registered lenses reach ([`crate::schemas::lens::LensRegistry::upcast_toward`]),
+    /// not to a chain landing on it exactly. A sector whose schema has moved on
+    /// additively since its last lens has no hop ending at the current version,
+    /// and requiring one would refuse every document the lenses it *does* have
+    /// would have made readable. The additive remainder needs no transform by
+    /// definition, so the deserialize below closes it.
+    ///
+    /// **Envelope fields (everything outside `sectorData`) are not lensed —
+    /// deliberately, not an oversight.** A lens transforms one sector's
+    /// sub-object; an envelope field is shared by every sector's documents, so
+    /// a non-additive envelope change would need a transform over the *whole*
+    /// document, and getting that wrong silently corrupts every sector at
+    /// once rather than one. The envelope's compatibility rule is simpler and
+    /// stricter instead: additive only, permanently, no exceptions — see
+    /// [`Passport::schema_version`]'s doc comment. A stored document that
+    /// still fails to deserialize after its `sectorData` has been upcast is
+    /// therefore either genuinely malformed or violates that rule, and this
+    /// method does not try to guess which.
+    ///
+    /// Two distinct failure shapes, both typed rather than a generic error:
+    /// - [`crate::domain::error::DppError::SchemaIncompatible`] — the recorded `schemaVersion` is
+    ///   older than current and no registered lens bridges any of the gap.
+    ///   This is not always fixable by writing one: a required field the
+    ///   document predates (no source data anywhere in the document to derive
+    ///   it from) has no honest transform, and this crate will not synthesize
+    ///   one.
+    /// - [`crate::domain::error::DppError::Serialisation`] — the direct attempt failed for a reason
+    ///   unrelated to a bridgeable version gap (no sector data, sector
+    ///   unknown to the catalog, already at the current version, or the
+    ///   upcast document still does not match the current shape).
+    pub fn from_stored(
+        doc: serde_json::Value,
+        lenses: &crate::schemas::lens::LensRegistry,
+        catalog: &crate::catalog::SectorCatalog,
+    ) -> Result<Self, crate::domain::error::DppError> {
+        use crate::domain::error::DppError;
+        use serde::Deserialize as _;
+
+        let direct_err = match Self::deserialize(&doc) {
+            Ok(passport) => return Ok(passport),
+            Err(e) => e,
+        };
+
+        let Some((sector_key, recorded)) = stored_sector_version(&doc) else {
+            return Err(DppError::Serialisation(direct_err.to_string()));
+        };
+        let Some(current) = catalog.current_schema_version(&sector_key) else {
+            return Err(DppError::Serialisation(direct_err.to_string()));
+        };
+        if recorded == current {
+            return Err(DppError::Serialisation(direct_err.to_string()));
+        }
+
+        let sector_data = doc["sectorData"].clone();
+        let derived = lenses.upcast_str_toward(&sector_key, &sector_data, &recorded, current)?;
+        let mut doc = doc;
+        doc["sectorData"] = derived.data;
+
+        serde_json::from_value(doc).map_err(|e| DppError::Serialisation(e.to_string()))
+    }
+
     /// Validate passport fields for structural correctness and sector-data integrity.
     ///
     /// Checks:
