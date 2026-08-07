@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-07
+
 ### Added
 
 - **A CI job loads every Environment through an external AAS implementation.**
