@@ -25,6 +25,14 @@ pub enum DppError {
     #[error("serialisation error: {0}")]
     Serialisation(String),
 
+    /// A stored document's sector data predates the current schema by more
+    /// than the registered lens chain can bridge — e.g. a required field the
+    /// document was written before, with no source data anywhere to derive it
+    /// from. Not a bug to fix by writing a lens: some gaps have no honest
+    /// transform. See [`crate::schemas::lens`].
+    #[error("stored data does not match the current schema: {0}")]
+    SchemaIncompatible(#[from] crate::schemas::lens::UpcastError),
+
     /// Returned when an attempt is made to delete or overwrite a passport that
     /// has been published and is therefore subject to EU ESPR retention obligations.
     /// Published passports must remain accessible for the legally defined period

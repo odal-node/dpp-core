@@ -13,6 +13,39 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **`Passport::from_stored` reads a document as it was actually stored,
+  instead of assuming it already matches the current struct shape.** A
+  document written under an older `schemaVersion` used to be handed straight
+  to `serde_json::from_value`, so any non-additive change to a persisted
+  sector-data shape — a newly required field, a renamed key — made every
+  older document unreadable the moment a reader upgraded, with no signal
+  before the 500.
+
+  `from_stored` tries the direct, current-shape read first — most schema
+  evolution is additive, and the common case pays nothing extra. Only on
+  failure does it fall back to upcasting `sectorData` through the registered
+  lens chain (`schemas::lens`) and retrying, so a version gap that needs no
+  lens never risks a false refusal from a chain that happens not to reach the
+  exact recorded version.
+
+  Two distinct, typed failure shapes, never a panic or a bare
+  `serde_json::Error`: `DppError::SchemaIncompatible` when the recorded
+  version is older than current and no lens chain bridges the gap — not
+  always fixable by writing one, since a required field the document
+  predates has no honest transform and this crate will not synthesize one —
+  and `DppError::Serialisation` for a shape mismatch unrelated to a
+  bridgeable version gap.
+
+  **Envelope fields (everything on `Passport` outside `sectorData`) are
+  deliberately not covered.** A lens transforms one sector's sub-object; an
+  envelope field is shared by every sector's stored documents, so bridging a
+  non-additive envelope change would need a transform over the whole
+  document, where one mistake corrupts every sector at once instead of one.
+  The envelope's rule is stricter instead: additive only, permanently, no
+  exception path.
+
 ### Breaking
 
 - **`AasProperty` loses `unit` and `description`; neither was a member of

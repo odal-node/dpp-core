@@ -1,11 +1,14 @@
-﻿//! Serde round-trip, state-machine, validation, and redaction tests for `Passport`.
+//! Serde round-trip, state-machine, validation, and redaction tests for `Passport`.
 
 use super::*;
+use crate::catalog::SectorCatalog;
+use crate::domain::error::DppError;
 use crate::domain::identity::Audience;
 use crate::domain::sector::{
     BatteryChemistry, BatteryData, CarbonFootprint, RepairabilityScore, Sector, SectorData,
 };
 use crate::domain::status::PassportStatus;
+use crate::schemas::lens::LensRegistry;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -526,4 +529,91 @@ fn public_view_omits_every_non_public_passport_field() {
             );
         }
     }
+}
+
+// ── Passport::from_stored ──────────────────────────────────────────────
+
+fn textile_passport() -> Passport {
+    Passport {
+        sector: Sector::Textile,
+        sector_data: Some(SectorData::Textile(
+            crate::test_support::sample_textile_data(),
+        )),
+        schema_version: "1.2.0".into(),
+        ..make_passport()
+    }
+}
+
+#[test]
+fn from_stored_reads_current_shape_directly() {
+    let passport = textile_passport();
+    let doc = serde_json::to_value(&passport).expect("serialise");
+    let lenses = LensRegistry::new();
+    let catalog = SectorCatalog::new();
+
+    let back = Passport::from_stored(doc, &lenses, &catalog).expect("current shape reads as-is");
+    assert_eq!(back.id, passport.id);
+    assert_eq!(back.sector_data, passport.sector_data);
+}
+
+#[test]
+fn from_stored_upcasts_a_legacy_country_field() {
+    // A real textile 1.1.0 document: same schema, old country-of-origin key.
+    // The 1.1.0 -> 1.2.0 lens exists for exactly this rename.
+    let passport = textile_passport();
+    let mut doc = serde_json::to_value(&passport).expect("serialise");
+    doc["schemaVersion"] = "1.1.0".into();
+    let country = doc["sectorData"]["countryOfOrigin"].take();
+    doc["sectorData"]["countryOfManufacturing"] = country;
+
+    let lenses = LensRegistry::new();
+    let catalog = SectorCatalog::new();
+    let back = Passport::from_stored(doc, &lenses, &catalog)
+        .expect("the registered lens bridges 1.1.0 -> 1.2.0");
+
+    let Some(SectorData::Textile(textile)) = back.sector_data else {
+        panic!("expected textile sector data");
+    };
+    assert_eq!(textile.country_of_origin, "PT");
+}
+
+#[test]
+fn from_stored_refuses_a_gap_no_lens_bridges() {
+    // Textile's current version is 1.2.0, and today's registry only bridges
+    // 1.1.0 -> 1.2.0 — nothing leaves 1.0.0. A document honestly recorded at
+    // 1.0.0 (old country key, so the direct read genuinely fails) cannot be
+    // upgraded, and must fail loudly and typed, not panic or silently pass
+    // through as if it were current.
+    let passport = textile_passport();
+    let mut doc = serde_json::to_value(&passport).expect("serialise");
+    doc["schemaVersion"] = "1.0.0".into();
+    let country = doc["sectorData"]["countryOfOrigin"].take();
+    doc["sectorData"]["countryOfManufacturing"] = country;
+
+    let lenses = LensRegistry::new();
+    let catalog = SectorCatalog::new();
+    let err = Passport::from_stored(doc, &lenses, &catalog)
+        .expect_err("no lens chain reaches 1.2.0 from 1.0.0");
+    assert!(
+        matches!(err, DppError::SchemaIncompatible(_)),
+        "expected a typed SchemaIncompatible refusal, got: {err}"
+    );
+}
+
+#[test]
+fn from_stored_surfaces_a_same_version_mismatch_as_serialisation() {
+    // schemaVersion already matches current, so there is no version gap to
+    // blame — a genuine shape mismatch, not a compatibility question.
+    let passport = textile_passport();
+    let mut doc = serde_json::to_value(&passport).expect("serialise");
+    doc["sectorData"].as_object_mut().unwrap().remove("gtin");
+
+    let lenses = LensRegistry::new();
+    let catalog = SectorCatalog::new();
+    let err = Passport::from_stored(doc, &lenses, &catalog)
+        .expect_err("gtin is required and there is no version gap to bridge");
+    assert!(
+        matches!(err, DppError::Serialisation(_)),
+        "expected a typed Serialisation error, got: {err}"
+    );
 }
