@@ -1,7 +1,7 @@
 ﻿//! Redaction, validation, and serde round-trip tests for sector data.
 
 use super::*;
-use crate::catalog::{Regime, RegulatoryStatus, SectorCatalog, SectorDescriptor};
+use crate::catalog::{Regime, RegulatoryStatus, RetentionBasis, SectorCatalog, SectorDescriptor};
 use crate::domain::gtin::Gtin;
 use crate::domain::identity::Audience;
 use crate::domain::identity::Disclosure;
@@ -23,6 +23,7 @@ fn battery_descriptor_with_tiers() -> SectorDescriptor {
         legal_basis: vec!["EU 2023/1542".into()],
         dpp_applies_from: None,
         retention_years: 10,
+        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],
@@ -84,6 +85,7 @@ fn empty_disclosure_retains_all_fields() {
         legal_basis: vec!["EU 2023/1542".into()],
         dpp_applies_from: None,
         retention_years: 10,
+        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],

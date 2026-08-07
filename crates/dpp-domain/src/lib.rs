@@ -23,7 +23,9 @@ pub mod schemas;
 #[cfg(test)]
 mod test_support;
 
-pub use catalog::{CatalogError, RegulatoryStatus, SectorCatalog, SectorDescriptor};
+pub use catalog::{
+    CatalogError, RegulatoryStatus, RetentionBasis, SectorCatalog, SectorDescriptor,
+};
 
 pub use domain::{
     commodity_code::{CommodityCode, CommodityCodeError},
