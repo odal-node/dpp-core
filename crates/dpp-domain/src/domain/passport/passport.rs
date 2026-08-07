@@ -206,8 +206,15 @@ impl Passport {
     /// with no transform needed, exactly as before this method existed. Only
     /// on failure does it fall back to upcasting `sectorData` through the
     /// registered lens chain and retrying, so a version gap that needs no
-    /// lens (the common case) never pays for one or risks a false refusal
-    /// from a chain that happens not to reach the exact recorded version.
+    /// lens (the common case) never pays for one.
+    ///
+    /// The fallback upcasts as far toward the sector's current version as the
+    /// registered lenses reach ([`crate::schemas::lens::LensRegistry::upcast_toward`]),
+    /// not to a chain landing on it exactly. A sector whose schema has moved on
+    /// additively since its last lens has no hop ending at the current version,
+    /// and requiring one would refuse every document the lenses it *does* have
+    /// would have made readable. The additive remainder needs no transform by
+    /// definition, so the deserialize below closes it.
     ///
     /// **Envelope fields (everything outside `sectorData`) are not lensed —
     /// deliberately, not an oversight.** A lens transforms one sector's
@@ -223,10 +230,11 @@ impl Passport {
     ///
     /// Two distinct failure shapes, both typed rather than a generic error:
     /// - [`crate::domain::error::DppError::SchemaIncompatible`] — the recorded `schemaVersion` is
-    ///   older than current and no lens chain bridges the gap. This is not
-    ///   always fixable by writing one: a required field the document
-    ///   predates (no source data anywhere in the document to derive it from)
-    ///   has no honest transform, and this crate will not synthesize one.
+    ///   older than current and no registered lens bridges any of the gap.
+    ///   This is not always fixable by writing one: a required field the
+    ///   document predates (no source data anywhere in the document to derive
+    ///   it from) has no honest transform, and this crate will not synthesize
+    ///   one.
     /// - [`crate::domain::error::DppError::Serialisation`] — the direct attempt failed for a reason
     ///   unrelated to a bridgeable version gap (no sector data, sector
     ///   unknown to the catalog, already at the current version, or the
@@ -255,7 +263,7 @@ impl Passport {
         }
 
         let sector_data = doc["sectorData"].clone();
-        let derived = lenses.upcast_str(&sector_key, &sector_data, &recorded, current)?;
+        let derived = lenses.upcast_str_toward(&sector_key, &sector_data, &recorded, current)?;
         let mut doc = doc;
         doc["sectorData"] = derived.data;
 
