@@ -90,6 +90,7 @@ fn register_runtime_sector() {
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
+        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["1.0.0".into()],
         current_schema_version: "1.0.0".into(),
         product_categories: vec![],
@@ -114,6 +115,7 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
         legal_basis: vec!["ESPR Working Plan".into()],
         dpp_applies_from: None,
         retention_years: 10,
+        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: versions,
         current_schema_version: current.into(),
         product_categories: vec![],
@@ -216,6 +218,11 @@ fn every_sector_declares_a_retention_period() {
         assert!(
             descriptor.retention_years > 0,
             "sector '{key}' declares no retention period"
+        );
+        assert_eq!(
+            catalog.retention_years_basis(key),
+            Some(descriptor.retention_years_basis),
+            "retention_years_basis() disagrees with the descriptor for '{key}'"
         );
     }
 
@@ -391,7 +398,7 @@ fn a_watch_sector_may_declare_no_regime() {
     // sector is currently in Watch.
     let watch = r#"{
         "key": "w", "title": "W", "status": "watch", "regime": "none",
-        "legalBasis": [], "retentionYears": 10,
+        "legalBasis": [], "retentionYears": 10, "retentionYearsBasis": "assumed",
         "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
     }"#;
     let d: SectorDescriptor = serde_json::from_str(watch).expect("watch + none must parse");

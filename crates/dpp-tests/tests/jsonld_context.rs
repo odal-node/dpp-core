@@ -8,6 +8,8 @@
 //! this crate, one hand-rolled in the resolver, each pointing at a different
 //! dead URL.
 
+use dpp_domain::PassportCredential;
+use dpp_vc::credential::{CredentialBuilder, CredentialRole, DppCredentialSubject};
 use dpp_vc::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 use serde_json::{Value, json};
 
@@ -16,25 +18,71 @@ use serde_json::{Value, json};
 /// Deliberately a hardcoded list rather than a live fetch: the main gate must
 /// not depend on the network. The value is that adding a remote context means
 /// editing this list, which is the moment someone checks the URL.
-const VERIFIED_RESOLVABLE: &[(&str, &str)] = &[("https://www.w3.org/ns/did/v1", "2026-07-30")];
+///
+/// Workspace-wide, not just `dpp_vc::jsonld`: every `@context` array the
+/// workspace can emit is checked against this same list, in
+/// `every_context_array_the_workspace_can_emit_is_verified_resolvable` below.
+const VERIFIED_RESOLVABLE: &[(&str, &str)] = &[
+    ("https://www.w3.org/ns/did/v1", "2026-07-30"),
+    ("https://www.w3.org/ns/credentials/v2", "2026-08-07"),
+];
+
+/// Fail on any string `@context` entry not in [`VERIFIED_RESOLVABLE`]. Object
+/// entries (inline term maps) carry no fetch obligation and are skipped.
+fn assert_verified_resolvable(label: &str, entries: &[Value]) {
+    for entry in entries {
+        let Value::String(url) = entry else {
+            continue;
+        };
+        assert!(
+            VERIFIED_RESOLVABLE.iter().any(|(known, _)| known == url),
+            "{label}: '{url}' is referenced as a remote context but is not in \
+             VERIFIED_RESOLVABLE. Confirm it resolves, add it with the date \
+             checked, or inline the terms instead."
+        );
+    }
+}
 
 /// Every string entry in the context is one somebody has confirmed resolves.
 #[test]
 fn every_remote_context_is_verified_resolvable() {
     let ctx = context_value();
     let entries = ctx.as_array().expect("@context is an array");
+    assert_verified_resolvable("dpp_vc::jsonld::passport_context", entries);
+}
 
-    for entry in entries {
-        let Value::String(url) = entry else {
-            continue; // inline term maps carry no fetch obligation
-        };
-        assert!(
-            VERIFIED_RESOLVABLE.iter().any(|(known, _)| known == url),
-            "'{url}' is referenced as a remote context but is not in the \
-             verified-resolvable list. Confirm it resolves, add it with the date \
-             checked, or inline the terms instead."
-        );
-    }
+/// Every `@context` array anything in the workspace can emit — not just the
+/// passport envelope — references only verified-resolvable remote contexts.
+///
+/// Both `PassportCredential` and `DppAccessCredential` hard-code their own
+/// `@context` array, so neither was covered by the passport-envelope-only
+/// check above, which is why each independently grew a dead
+/// `schema.odal-node.io` entry. This is the guard that stops a third type
+/// from doing the same.
+#[test]
+fn every_context_array_the_workspace_can_emit_is_verified_resolvable() {
+    let passport_credential = PassportCredential::new(
+        "did:web:issuer.example.com".into(),
+        dpp_domain::PassportCredentialSubject {
+            id: "urn:uuid:00000000-0000-0000-0000-000000000000".into(),
+            payload_hash: "deadbeef".into(),
+        },
+    );
+    assert_verified_resolvable("PassportCredential", &passport_credential.context);
+
+    let access_credential = CredentialBuilder::new(
+        "did:web:authority.example.com".into(),
+        DppCredentialSubject {
+            id: "did:web:holder.example.com".into(),
+            name: "Test Holder".into(),
+            role: CredentialRole::AuthorisedRepairer,
+            country: "DE".into(),
+            sectors: vec!["textile".into()],
+            product_categories: vec![],
+        },
+    )
+    .build();
+    assert_verified_resolvable("DppAccessCredential", &access_credential.context);
 }
 
 /// The declared list and what is actually emitted cannot drift apart.
@@ -78,18 +126,46 @@ fn the_passport_vocabulary_is_inlined() {
     }
 }
 
-/// No dead URL from either previous definition comes back.
+/// No dead URL from any previous definition comes back, in any context array.
 #[test]
 fn the_withdrawn_context_urls_stay_out() {
-    let serialised = serde_json::to_string(&passport_context()).expect("serialises");
+    let passport_credential = PassportCredential::new(
+        "did:web:issuer.example.com".into(),
+        dpp_domain::PassportCredentialSubject {
+            id: "urn:uuid:00000000-0000-0000-0000-000000000000".into(),
+            payload_hash: "deadbeef".into(),
+        },
+    );
+    let access_credential = CredentialBuilder::new(
+        "did:web:authority.example.com".into(),
+        DppCredentialSubject {
+            id: "did:web:holder.example.com".into(),
+            name: "Test Holder".into(),
+            role: CredentialRole::AuthorisedRepairer,
+            country: "DE".into(),
+            sectors: vec!["textile".into()],
+            product_categories: vec![],
+        },
+    )
+    .build();
+
+    let serialised = [
+        serde_json::to_string(&passport_context()).expect("serialises"),
+        serde_json::to_string(&passport_credential.context).expect("serialises"),
+        serde_json::to_string(&access_credential.context).expect("serialises"),
+    ]
+    .join("\n");
+
     for dead in [
         "https://odal-node.io/schemas/dpp/v1",
         "https://ref.gs1.org/standards/digital-link/context/",
+        "https://schema.odal-node.io/credentials/dpp-passport/v1",
+        "https://schema.odal-node.io/credentials/dpp-access/v1",
     ] {
         assert!(
             !serialised.contains(dead),
-            "'{dead}' returned 404 when checked and must not be referenced as a \
-             remote context"
+            "'{dead}' does not resolve — no DNS record — and must not be \
+             referenced as a remote context"
         );
     }
 }

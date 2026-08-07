@@ -15,6 +15,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A CI job loads every Environment through an external AAS implementation.**
+  `aas-core3.0` 1.1.4 (aas-core-works, Python), pinned exactly, in its own
+  workflow so the main gate never acquires a Python dependency and
+  `cargo build --workspace` keeps needing no infrastructure.
+
+  It deserialises, runs the specification's own constraint verification, and
+  round-trips. That is the only check here that can catch a member no schema
+  sees — IDTA sets `additionalProperties` nowhere in 3.0, 3.1 or 3.2 — which is
+  how `kind` and `unit` both shipped.
+
+  **It covers metamodel 3.0 only**, while the schema gate covers 3.0, 3.1 and
+  3.2. The pin, that scope, and the reason a lenient implementation is useless
+  as an oracle are recorded in `dpp-tests/fixtures/aas/NOTICE.md`.
+
+  Passing it is not IDTA conformance. Public wording is "passes aas-core3.0
+  1.1.4 for metamodel 3.0", never "IDTA-conformant".
+
 - **`Passport::from_stored` reads a document as it was actually stored,
   instead of assuming it already matches the current struct shape.** A
   document written under an older `schemaVersion` used to be handed straight
@@ -26,13 +43,20 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `from_stored` tries the direct, current-shape read first — most schema
   evolution is additive, and the common case pays nothing extra. Only on
   failure does it fall back to upcasting `sectorData` through the registered
-  lens chain (`schemas::lens`) and retrying, so a version gap that needs no
-  lens never risks a false refusal from a chain that happens not to reach the
-  exact recorded version.
+  lens chain (`schemas::lens`) and retrying.
+
+  That fallback upcasts as far toward the current version as the registered
+  lenses reach, rather than demanding a chain that lands on it exactly. The
+  distinction is not academic: a sector whose schema has moved on additively
+  since its last lens has no hop ending at the current version, so an
+  exact-path search would refuse every document the lenses it *does* have
+  would have made readable. Battery is already in that position. The
+  remaining additive gap needs no transform by definition, so the deserialize
+  closes it.
 
   Two distinct, typed failure shapes, never a panic or a bare
   `serde_json::Error`: `DppError::SchemaIncompatible` when the recorded
-  version is older than current and no lens chain bridges the gap — not
+  version is older than current and no lens bridges any of the gap — not
   always fixable by writing one, since a required field the document
   predates has no honest transform and this crate will not synthesize one —
   and `DppError::Serialisation` for a shape mismatch unrelated to a
@@ -45,6 +69,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   document, where one mistake corrupts every sector at once instead of one.
   The envelope's rule is stricter instead: additive only, permanently, no
   exception path.
+
+- **`LensRegistry::upcast_toward`** upcasts as far toward a target version as
+  the registered lenses reach, returning the version actually reached.
+  `upcast` is unchanged and still demands an exact path — right for a caller
+  asking to see one specific version, wrong for a reader that only needs
+  stored data readable at the current one.
 
 ### Breaking
 
@@ -72,6 +102,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   IDTA's data-specification template IRI and therefore needs a verified
   provenance record, not a self-certified constant. The four `*_property`
   helpers drop their trailing `unit` argument.
+
+- **`PassportCredential` and `DppAccessCredential` no longer reference
+  `schema.odal-node.io`, which has no DNS record.** Both hard-coded a second
+  `@context` entry pointing at a `/credentials/...` path on that host — a
+  string entry in `@context` is fetched by a conforming processor at
+  expansion time, so a dead one fails the whole document, and a lenient
+  processor drops every term it cannot define. Neither type went through the
+  `dpp_vc::jsonld::REMOTE_CONTEXTS` seam that a prior release added for
+  exactly this reason, which is how each independently grew its own dead
+  entry.
+
+  Both now inline their term map instead, following that same precedent:
+  `context` becomes `Vec<serde_json::Value>` (was `Vec<String>`) so the
+  second entry can be an object rather than a URL. A cross-crate test now
+  enumerates every `@context` array the workspace can emit — not just the
+  passport envelope — against one verified-resolvable list, so a third type
+  cannot repeat this unnoticed.
+
+  *Migration:* callers building either credential type unchanged still get a
+  valid, resolvable `@context`. Anyone matching the second `@context` entry
+  as a specific string must instead match on the inline term map object.
+
+- **`SectorDescriptor` gains a required `retentionYearsBasis` field, marking
+  whether `retentionYears` is sourced from an adopted legal text or carried as
+  an assumption.** `retentionYears: 10` shipped identically for every sector,
+  but checked against the OJ texts it is sourced for three (toy, detergent,
+  construction — each regulation states 10 years after placing on the
+  market), a documentation-retention figure for a different obligation for
+  battery (Reg. (EU) 2023/1542's 10-year figures are technical documentation
+  and conformity records, not passport availability, which sits with the
+  unadopted Art. 77(9) act), and unsourced for the rest: ESPR Art. 9(2)(i)
+  ties retention to a product group's expected lifetime, delegated per group,
+  and no ESPR product-group delegated act has been adopted.
+
+  A plausible number with no traceable basis is the same defect class the
+  claim-provenance work exists to prevent. Rather than silently changing the
+  figures — which nobody can currently source better — the new
+  `RetentionBasis` marker makes the distinction explicit on every manifest,
+  with the citation or caveat in that sector's `notes`.
+
+  *Migration:* any manifest or `SectorDescriptor` literal must add
+  `retentionYearsBasis` / `retention_years_basis`; there is no default.
 
 ### Fixed
 
