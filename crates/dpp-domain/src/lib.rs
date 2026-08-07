@@ -28,6 +28,7 @@ pub use catalog::{
 };
 
 pub use domain::{
+    commodity_code::{CommodityCode, CommodityCodeError},
     error::DppError,
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
     identity::{

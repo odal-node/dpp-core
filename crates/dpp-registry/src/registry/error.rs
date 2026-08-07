@@ -16,6 +16,16 @@ pub enum RegistryValidationError {
     InvalidCountryCode { code: String },
     /// A required payload field is empty.
     MissingRequiredField(String),
+    /// An identifier finer than the declared registration level travels with
+    /// the payload — e.g. a batch identifier on a model-level registration.
+    GranularityMismatch {
+        granularity: &'static str,
+        identifier: &'static str,
+    },
+    /// The commodity code is not structurally a tariff code (HS-6/CN-8/TARIC-10).
+    InvalidCommodityCode { value: String },
+    /// A declared back-up URL is not `https://`.
+    InsecureBackupUrl { value: String },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -38,6 +48,24 @@ impl std::fmt::Display for RegistryValidationError {
             }
             Self::MissingRequiredField(field) => {
                 write!(f, "required field '{field}' is empty")
+            }
+            Self::GranularityMismatch {
+                granularity,
+                identifier,
+            } => {
+                write!(
+                    f,
+                    "a '{granularity}'-level registration must not carry a '{identifier}'"
+                )
+            }
+            Self::InvalidCommodityCode { value } => {
+                write!(
+                    f,
+                    "invalid commodity code '{value}': expected 6 (HS), 8 (CN) or 10 (TARIC) digits"
+                )
+            }
+            Self::InsecureBackupUrl { value } => {
+                write!(f, "back-up URL '{value}' must be https://")
             }
         }
     }

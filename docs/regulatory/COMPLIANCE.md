@@ -164,25 +164,46 @@ interface types that **predate the published specification**:
   `GhostRegistrySync` placeholder) that the platform implements once the
   official API specification is released.
 
-These types remain explicitly unstable, and are **known to diverge** from the
-published specification rather than merely being provisional. Divergences
-confirmed against the OJ text:
+These types remain explicitly unstable. What the OJ text *fixes* has now been
+reconciled against it; what only the API specification can fix has not, and is
+listed separately below so the two are never confused.
 
-- **Commodity code** is absent from these types and from the passport model
-  entirely. It is stored by the registry for products intended for the customs
-  procedure "release for free circulation" (Art. 3(e)) and validated *where
-  relevant* on submission (Art. 8(7)(d)) — so it is conditional on the customs
-  path, not universal, but unrepresentable for us today either way.
-- **Registration granularity** — the specification requires model, batch or item
-  level with the corresponding identifiers linked (Art. 8(1), (4), (5));
-  `RegistrationPayload` carries an unconditional item identifier and models no
-  granularity or identifier-linking concept at all.
+### Reconciled against the OJ text (0.16.0)
+
+- **Registration granularity** — `RegistrationLevel` carries the model / batch /
+  item level (Art. 8(1)) and the identifiers Art. 8(4) and 8(5) require it to
+  link. Absence of a model or batch identifier is treated as lawful, because
+  both obligations are conditional on such a design existing and recital (14)
+  is explicit that products unique by nature have neither. `item_id` is now
+  conditional on the declared level rather than unconditional.
+- **Commodity code** — represented by `CommodityCode` on the passport and on the
+  registration payload, validated *structurally* as HS-6, CN-8 or TARIC-10.
+  Whether a code falls inside the range a product group permits (Art. 8(7)(d))
+  is **not** checked here: those ranges live in the applicable delegated act.
+  Absence remains lawful — the obligation is qualified "where relevant".
+- **Operator identifier scheme** — carried explicitly rather than assumed, so a
+  VAT, LEI, EORI or DUNS identifier is stated as what it is. An identifier with
+  no scheme is refused rather than defaulted.
+- **Asynchronous validation** — Art. 8(7) has the registry rule on a submission
+  after accepting it, so `RegistryStatusCode::Pending` is a normal outcome and
+  not a success. `Deactivated` is likewise distinct from `Rejected`.
+
+### Still divergent — blocked on the published API specification
+
 - **Authentication** — `EuRegistryEnvelope` anticipates a bearer-token
   mechanism; registration rests on eIDAS verified-operator identity instead
-  (Arts. 4–5). This is a structural mismatch, not a wrong endpoint.
+  (Arts. 4–5). This is a structural mismatch, not a wrong endpoint, and it is
+  the largest remaining gap.
+- **Endpoint paths and API version** — the registry hosts are the Commission's
+  published ones; the resource paths beneath them and `api_version` are not
+  specified anywhere we can read, and remain our own construction.
+- **Proof of registration** (Art. 9) — a secure electronic document, valid 90
+  calendar days with regeneration, retrievable on request. No type models it,
+  because the retrieval contract is unspecified.
+- **Payload and envelope shape** — the field names and nesting are a reading of
+  what Art. 8 requires to be registered, not a transcription of a schema.
 
-Reconciling these is a breaking change to a core crate and is scheduled for the
-next minor. Do not treat the current shapes as an implementation target.
+Do not treat the shapes in the second list as an implementation target.
 
 ## Transfer-of-Responsibility Article Pin
 

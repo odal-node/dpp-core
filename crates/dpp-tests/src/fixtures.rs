@@ -55,6 +55,7 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
         component_refs: Vec::new(),
         retention_until: None,
         product_id: None,
+        commodity_code: None,
         operator_identifier: None,
         facility: None,
         seal: None,
@@ -73,6 +74,7 @@ pub fn make_operator(
         name: name.into(),
         role,
         eu_operator_id: None,
+        eu_operator_id_scheme: None,
         country: country.into(),
     }
 }

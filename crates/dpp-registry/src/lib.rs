@@ -35,9 +35,9 @@ pub mod registry;
 
 pub use registry::{
     EuRegistryEnvelope, EuRegistryError, EuRegistryErrorKind, EuRegistryResponse,
-    FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
-    RegistrationPayload, RegistryAuthority, RegistryEndpoint, RegistryStatusCode,
-    RegistryValidationError, StatusResponse, TransferNotification,
+    FacilityIdentifier, Granularity, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
+    RegistrationLevel, RegistrationPayload, RegistryAuthority, RegistryEndpoint,
+    RegistryStatusCode, RegistryValidationError, StatusResponse, TransferNotification,
 };
 
 /// Compile-checks this crate's README examples.

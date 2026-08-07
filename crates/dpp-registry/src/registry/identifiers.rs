@@ -184,6 +184,16 @@ impl OperatorIdentifier {
                 "operatorId.name".into(),
             ));
         }
+        // An identifier with no scheme is not identifiable: the value alone does
+        // not say whether it is a VAT number, an LEI or a DID. Refused here
+        // because the per-scheme check below accepts any unrecognised scheme —
+        // including the empty one — so without this an unscheme'd identifier
+        // would pass validation and be submitted as if it were well-formed.
+        if self.scheme.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "operatorId.scheme".into(),
+            ));
+        }
         validate_country_code(&self.country)?;
         validate_operator_scheme(&self.scheme, &self.value)
     }

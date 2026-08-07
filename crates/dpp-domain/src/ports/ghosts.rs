@@ -132,11 +132,12 @@ impl RegistrySyncPort for GhostRegistrySync {
 
     async fn notify_transfer(
         &self,
-        passport_id: PassportId,
-        _new_operator_identifier: String,
+        record: &crate::domain::transfer::TransferRecord,
+        _registry_id: &str,
     ) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(
-            "ghost registry has no record for {passport_id}"
+            "ghost registry has no record for {}",
+            record.passport_id
         )))
     }
 }
@@ -182,13 +183,17 @@ impl SealPort for GhostSeal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ports::registry_sync::RegistrationGranularity;
 
     #[tokio::test]
     async fn ghost_register_returns_pending() {
         let sync = GhostRegistrySync;
         let request = RegistrationRequest {
+            request_id: Uuid::now_v7(),
             passport_id: PassportId::new(),
             operator_identifier: "did:web:acme.example.com".into(),
+            operator_identifier_scheme: "did".into(),
+            operator_name: "Acme GmbH".into(),
             facility_identifier: "FAC-001".into(),
             facility: None,
             product_category: "textile".into(),
@@ -197,6 +202,10 @@ mod tests {
             jws_signature: None,
             published_at: None,
             country_code: String::new(),
+            granularity: RegistrationGranularity::Item,
+            model_id: None,
+            commodity_code: None,
+            backup_url: None,
         };
         let record = sync.register(request).await.unwrap();
         assert_eq!(record.status, RegistryStatus::Pending);
@@ -212,10 +221,35 @@ mod tests {
 
     #[tokio::test]
     async fn ghost_notify_transfer_returns_not_found() {
+        use crate::domain::transfer::{
+            OperatorRole, ResponsibleOperator, TransferReason, TransferRecord,
+        };
+
+        let operator = |did: &str, name: &str| ResponsibleOperator {
+            did: did.to_owned(),
+            name: name.to_owned(),
+            role: OperatorRole::Manufacturer,
+            eu_operator_id: None,
+            eu_operator_id_scheme: None,
+            country: "DE".to_owned(),
+        };
+        let record = TransferRecord {
+            transfer_id: Uuid::now_v7(),
+            passport_id: PassportId::new(),
+            from_operator: operator("did:web:old.example.com", "Old Operator GmbH"),
+            to_operator: operator("did:web:new.example.com", "New Operator GmbH"),
+            reason: TransferReason::Sale,
+            from_signature: None,
+            to_signature: None,
+            initiated_at: Utc::now(),
+            completed_at: None,
+            rejected_at: None,
+            cancelled_at: None,
+            notes: None,
+        };
+
         let sync = GhostRegistrySync;
-        let result = sync
-            .notify_transfer(PassportId::new(), "did:web:new-operator.example.com".into())
-            .await;
+        let result = sync.notify_transfer(&record, "EU-REG-1").await;
         assert!(result.is_err());
     }
 

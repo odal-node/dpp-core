@@ -76,6 +76,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   asking to see one specific version, wrong for a reader that only needs
   stored data readable at the current one.
 
+- **`SectorData::model_identifier`** — which field of a product group's data is
+  the *model* identifier, so a registration can link it as Art. 8(4) and 8(5)
+  require. Only the battery group carries one today (Annex XIII §1); the match
+  is exhaustive rather than wildcarded, so adding a product group that has one
+  is a compile error rather than a silent "no model design exists" told to a
+  registry. `RegistrationRequest::from_published_passport` now populates
+  `model_id` from it.
+- **`CommodityCode`** — customs tariff classification (HS-6, CN-8, TARIC-10),
+  validated structurally. Separators are refused rather than stripped:
+  compacting `"8507 60 00"` would turn a mistyped code into a different, valid
+  tariff heading.
+- **`Granularity` and `RegistrationLevel`** — the model / batch / item level a
+  registration declares and the higher-level identifiers Art. 8(4) and 8(5)
+  require it to link. Absence is lawful; a claimed-but-blank identifier, or one
+  finer than the declared level, is refused.
+- **`TransferNotification::validate`** — the type previously had no validation
+  at all. Both operators must be identified and a reason given. The two
+  signatures are deliberately *not* required: a transfer is countersigned only
+  on acceptance, so requiring one would make a pending transfer unnotifiable.
+- **`TransferReason::wire_str`** — a stable wire form, spelled out rather than
+  derived from `Serialize`, so renaming a variant cannot silently change what a
+  registry receives.
+- **`ResponsibleOperator::eu_operator_id_scheme`** — pairs a scheme with the
+  EU-assigned identifier, so a value is never stated without saying what it is.
+
 ### Breaking
 
 - **`AasProperty` loses `unit` and `description`; neither was a member of
@@ -144,6 +169,79 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   *Migration:* any manifest or `SectorDescriptor` literal must add
   `retentionYearsBasis` / `retention_years_basis`; there is no default.
+
+- **`RegistrySyncPort::notify_transfer` takes the whole transfer record and the
+  registry's record id**, replacing `(PassportId, String)`.
+
+  The old signature could not express a transfer. A notification names *both*
+  legal persons on either side of a handover and carries the two JWS signatures
+  by which they authorised it; the port handed an adapter only the incoming
+  operator's identifier, so the outgoing operator could only be sent as empty
+  strings and both signatures were discarded. It also carried no way to say
+  *which* registry record the handover amends.
+
+  *Migration:* pass the `TransferRecord` and the registry id returned when the
+  passport was registered. A caller that does not yet hold one must wait rather
+  than send an unattached notification.
+
+- **`RegistrationRequest` gains `request_id`, `operator_name`,
+  `operator_identifier_scheme`, `granularity`, `model_id`, `commodity_code` and
+  `backup_url`**, and `from_published_passport` takes a `RegisteringOperator`
+  and a `RegistrationGranularity`.
+
+  `RegistrationPayload::validate` requires a non-empty operator legal name, and
+  nothing carried one — so no registration this crate could build passed its own
+  validation. The operator's name, country and identifier scheme are facts about
+  the operator rather than the product, so they come from the caller; the
+  passport records the *manufacturer*, which is frequently a different legal
+  person.
+
+  *Migration:* build the request with `RegisteringOperator { legal_name,
+  country, identifier_scheme }` sourced from operator configuration. `request_id`
+  is minted once and must be replayed unchanged on retries — it is the
+  idempotency key, and a fresh one per attempt makes a retry look like a new
+  registration.
+
+- **`RegistrationPayload` gains `level`, `commodity_code` and `backup_url`, and
+  `item_id` becomes `Option<ProductItemIdentifier>`.**
+
+  Registration happens at model, batch or item level (IR (EU) 2026/1778
+  Art. 8(1)); an unconditional item identifier asserted item granularity for
+  every product group regardless of what its delegated act requires.
+
+  *Migration:* set `level` to the level the applicable delegated act specifies.
+  `item_id` is required at item level and refused above it.
+
+- **`OperatorIdentifier::validate` now refuses an empty `scheme`.**
+
+  The per-scheme check accepts any unrecognised scheme, including the empty one,
+  so an identifier with no scheme previously validated and was submitted as
+  though well-formed. *Migration:* state the scheme (`vat`, `lei`, `eori`,
+  `duns`, `did`, …).
+
+- **`RegistryStatus::Transferred` removed; `RegistryStatus::Deactivated`
+  added.**
+
+  `Transferred` had no counterpart in `RegistryStatusCode` and was unreachable —
+  a transfer amends a record, it does not restatus it. `Deactivated` was
+  previously collapsed into `Rejected`, which are opposite situations: a
+  rejection is a defective submission that can be corrected, a deactivation is a
+  record withdrawn from service.
+
+- **`Passport` gains `commodity_code`.** Additive for construction via struct
+  update syntax; breaking for exhaustive struct literals.
+
+- **`RegistryEndpoint` URLs changed.** The previous hosts were invented and
+  resolve to nothing; production and test now use the Commission's published
+  addresses. Paths beneath them remain unspecified.
+
+### Changed
+
+- `docs/regulatory/COMPLIANCE.md` now separates what the OJ text fixes (and has
+  been reconciled) from what only the published API specification can fix. Its
+  previous claims that the commodity code was "absent from the passport model
+  entirely" and that the payload "models no granularity concept at all" were
+  true when written and are no longer.
 
 ### Fixed
 
