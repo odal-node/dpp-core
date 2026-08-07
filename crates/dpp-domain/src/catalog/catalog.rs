@@ -3,6 +3,7 @@
 
 use super::descriptor::SectorDescriptor;
 use super::error::CatalogError;
+use super::retention::RetentionBasis;
 use super::status::RegulatoryStatus;
 
 struct EmbeddedManifest {
@@ -137,6 +138,14 @@ impl SectorCatalog {
     #[must_use]
     pub fn retention_years(&self, key: &str) -> Option<u32> {
         self.get(key).map(|d| d.retention_years)
+    }
+
+    /// Whether [`Self::retention_years`] for `key` is sourced from an adopted
+    /// legal text or carried as an assumption. `None` for a sector with no
+    /// catalog entry.
+    #[must_use]
+    pub fn retention_years_basis(&self, key: &str) -> Option<RetentionBasis> {
+        self.get(key).map(|d| d.retention_years_basis)
     }
 
     /// The schema version applicable to *new* passports in `key`.

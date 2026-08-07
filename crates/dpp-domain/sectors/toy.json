@@ -5,10 +5,11 @@
   "regime": "toy-safety",
   "legalBasis": ["Regulation (EU) 2025/2509 (Toy Safety)"],
   "retentionYears": 10,
+  "retentionYearsBasis": "sourced",
   "schemaVersions": ["1.0.0", "1.1.0"],
   "currentSchemaVersion": "1.1.0",
   "productCategories": [],
   "disclosure": { "svhcSubstances": "restricted" },
   "plugin": "sector-toy",
-  "notes": "Toy Safety Regulation adopted; CE marking already required, but the DPP obligation is anticipated ~2030. Provisional until then."
+  "notes": "Toy Safety Regulation adopted; CE marking already required, but the DPP obligation is anticipated ~2030. Provisional until then. retentionYears sourced: Reg. (EU) 2025/2509 requires 10 years after placing on the market, including in cases of insolvency, liquidation or cessation of activity."
 }

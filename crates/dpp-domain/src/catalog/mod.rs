@@ -21,6 +21,7 @@
 //!
 //! - [`regime`] — the [`Regime`] legal-instrument axis.
 //! - [`status`] — the [`RegulatoryStatus`] gate.
+//! - [`retention`] — the [`RetentionBasis`] provenance marker.
 //! - [`descriptor`] — the [`SectorDescriptor`] record shape.
 //! - [`error`] — [`CatalogError`].
 //! - [`catalog`] — [`SectorCatalog`] itself, plus the embedded manifests.
@@ -30,6 +31,7 @@ pub mod catalog;
 pub mod descriptor;
 pub mod error;
 pub mod regime;
+pub mod retention;
 pub mod status;
 
 #[cfg(test)]
@@ -39,4 +41,5 @@ pub use catalog::SectorCatalog;
 pub use descriptor::SectorDescriptor;
 pub use error::CatalogError;
 pub use regime::Regime;
+pub use retention::RetentionBasis;
 pub use status::RegulatoryStatus;
