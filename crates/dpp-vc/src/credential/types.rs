@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Re-export the canonical access vocabulary from dpp-domain.
 pub use dpp_domain::Audience;
@@ -86,7 +87,7 @@ pub struct DppCredentialSubject {
 pub struct DppAccessCredential {
     /// JSON-LD context (always includes the VC context).
     #[serde(rename = "@context")]
-    pub context: Vec<String>,
+    pub context: Vec<Value>,
     /// Credential type (always includes "VerifiableCredential").
     #[serde(rename = "type")]
     pub credential_type: Vec<String>,
