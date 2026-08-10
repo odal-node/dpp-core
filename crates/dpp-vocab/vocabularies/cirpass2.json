@@ -1,0 +1,14 @@
+{
+  "key": "cirpass2",
+  "title": "CIRPASS-2 EUDPP Core Ontology",
+  "authority": "CIRPASS-2 (EU-funded DPP pilot programme)",
+  "layer": "community-profile",
+  "namespaceIri": "https://w3id.org/eudpp#",
+  "usedFor": "EU DPP pilot requirements feeding CEN/CENELEC JTC 24. The closest community profile to the standards track we are actually measured against.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey, read twice — 2026-08-07 and an earlier pass the same week.",
+  "finding": "This entry is the reason term counts are not stored in this crate. Two readings of the same survey page, for the same stated ontology version (v2.0.5), reported the term count as 233 and as 338. One of the two is wrong and nothing in the survey says which. That is a direct measurement of how much a secondary summary is worth, on the vocabulary otherwise most tempting to trust — because CIRPASS-2 feeds JTC 24, which the registry now requires the Unique Product Identifier to conform to.",
+  "nextStep": "Fetch the ontology at its own w3id.org IRI and count the terms there, rather than reading anyone's summary of it. That single act settles which figure was wrong and establishes whether the IRI resolves at all."
+}

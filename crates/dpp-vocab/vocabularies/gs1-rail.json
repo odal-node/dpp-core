@@ -1,0 +1,14 @@
+{
+  "key": "gs1-rail",
+  "title": "GS1 Rail Vocabulary",
+  "authority": "GS1 AISBL / GS1 Switzerland",
+  "layer": "sectoral",
+  "namespaceIri": "https://gs1-epcis-reg.org/rail/voc/data#",
+  "usedFor": "Nothing today. Recorded because it was found alongside the others and because rail rolling stock carries batteries, which is the only route by which it could become relevant.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey.",
+  "finding": "Out of scope. We model no rail product group and none is announced. Its sensor-metadata and EPCIS-registry shapes are the part that could matter later, since Battery Regulation Annex VII state-of-health parameters are sensor-shaped, but that is a reason to remember it exists, not to map to it.",
+  "nextStep": "None. Revisit only if a rail or rolling-stock product group is announced, or if the Annex VII parameter-set modelling wants an existing sensor vocabulary rather than a new one."
+}

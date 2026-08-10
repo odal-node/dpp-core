@@ -1,0 +1,14 @@
+{
+  "key": "jtc24",
+  "title": "CEN/CENELEC JTC 24 — EN 18216–18223, prEN 18239/18246",
+  "authority": "CEN/CENELEC Joint Technical Committee 24",
+  "layer": "conformance-bridge",
+  "namespaceIri": null,
+  "usedFor": "Conformance target, not a term source. A harmonised-standards series is something we are tested by, not something we model in.",
+  "licence": "Purchased standards. Redistribution of clause text is prohibited; the standard numbers themselves are freely citable.",
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Standards-series listing seen in a third-party survey. No EN text has been read by anyone here.",
+  "finding": "The highest-stakes entry in this directory, on two counts. First, it stopped being optional: the EU DPP Registry's Economic Operator User Guide requires the Unique Product Identifier to be 'a URL format compliant with JTC 24 standards', so a JTC 24 text now sits on the registration path rather than the conformance path. Second, we already contradict ourselves about what EN 18223 covers — a voided internal document assesses it as 'System Interoperability' while a third-party source calls it the DPP information model, and neither reading came from the standard. Nothing may be claimed about conformance to any of these: the series carries no OJEU citation, so there is no presumption of conformity to claim even if a text had been read.",
+  "nextStep": "Buy EN 18223 first — it is the one that governs passport structure and the one our own records disagree about. The UPI requirement decides which of the series follows it."
+}

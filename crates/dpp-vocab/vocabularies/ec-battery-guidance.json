@@ -1,0 +1,14 @@
+{
+  "key": "ec-battery-guidance",
+  "title": "European Commission — Digital Batteries Passport: data points by category",
+  "authority": "European Commission",
+  "layer": "conformance-bridge",
+  "namespaceIri": null,
+  "usedFor": "The Commission's own data-point list for the battery passport, with per-category applicability. Potentially the single most valuable gap-analysis input we have for the sector with the earliest obligation date.",
+  "licence": "Reported as CC-BY-4.0, which carries an attribution obligation. Unverified, and it attaches to the document's content rather than to the fact of its existence.",
+  "status": "tracked",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey, citing v1.0 of July 2026, reference Ares(2026)7579758, 71 data points, applicability as of February 2027.",
+  "finding": "The document is real and is the right kind of source; the IRI is not. The surveying site serves it under `https://ref.openepcis.io/vocab/ec-battery-passport-guidance/1.0#` and states plainly, in its own description, that **the Commission publishes no IRIs**. So that identifier is a third party's coinage standing in for an authority that mints none. Emitting it would assert Commission authority through an identifier the Commission has never seen. Separately, an earlier pass of this survey reported this same entry as 'v1.0 as of February 2027' — a future date — so its metadata has already been observed to be wrong once.",
+  "nextStep": "Obtain the Commission document itself by its Ares reference rather than through any intermediary, and read the 71 data points against our battery model. That is a gap analysis against a Commission source, which is worth doing; it produces our own terms with a citation, never an IRI. The reported applicability month is the same month the Art. 77(1) battery passport obligation begins, which is a reason to get the document early rather than a coincidence."
+}

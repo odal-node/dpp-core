@@ -1,0 +1,14 @@
+{
+  "key": "batterypass-samm",
+  "title": "Battery Pass Consortium SAMM aspect models",
+  "authority": "Battery Pass Consortium (published and validated via GEFEG)",
+  "layer": "conformance-bridge",
+  "namespaceIri": "urn:samm:io.BatteryPass",
+  "usedFor": "A conformance target for the battery product group — the sector with the earliest binding obligation date.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey, reporting v1.2.0 with Performance at 1.2.1.",
+  "finding": "This is NOT the SAMM vocabulary already recorded in this project. `dpp-aas` tracks `urn:samm:io.catenax.battery.battery_pass` — Catena-X / Eclipse Tractus-X — and this is `urn:samm:io.BatteryPass`, the Battery Pass Consortium's own. Two different aspect-model families under the same URN scheme, for the same product group, from two different organisations. Treating them as one would be a category error, and the near-identical names make it an easy one. Which of the two the EU ecosystem actually converges on is unknown here and worth more than either model's field list.",
+  "nextStep": "Establish the relationship between this and the Catena-X models before mapping to either. Then compare one of them, field by field, against our battery model — that comparison is the concrete route to the missing-field gap, and it is a gap analysis, not an adoption."
+}
