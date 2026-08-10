@@ -28,6 +28,7 @@ chrono     = { workspace = true }
 [dev-dependencies]
 dpp-digital-link    = { workspace = true }
 dpp-aas             = { workspace = true }
+dpp-vocab           = { workspace = true }
 serde_json = { workspace = true }
 uuid       = { workspace = true }
 semver     = { workspace = true }

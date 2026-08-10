@@ -34,6 +34,15 @@ pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
 /// operational obligation, not a library decision. An inline term map cannot
 /// 404, and it can be adopted later without invalidating passports issued now.
 ///
+/// Every term maps to our own `dpp:` prefix. `gtin`, `createdAt` and
+/// `updatedAt` used to borrow GS1's and Schema.org's prefixes
+/// (`gs1:gtin`, `schema:dateCreated`, `schema:dateModified`) with no
+/// provenance record — neither vocabulary is verified in `dpp-vocab` (both are
+/// `surveyed`: known to exist, nothing read), so claiming their terms was
+/// exactly the unsupported claim this crate's own provenance rule exists to
+/// catch. An honest `dpp:` term says "this is our concept"; the borrowed
+/// prefixes said "this is GS1's/Schema.org's concept", unverified.
+///
 /// The literal is built once and cloned per call — callers extend the
 /// returned value (e.g. [`frame_passport`] merges passport fields into it),
 /// so it must stay an owned, independently-mutable `Value` per call site.
@@ -46,16 +55,14 @@ pub fn passport_context() -> Value {
                     REMOTE_CONTEXTS[0],
                     {
                         "dpp": "https://schema.odal-node.io/dpp#",
-                        "gs1": "https://ref.gs1.org/voc/",
-                        "schema": "https://schema.org/",
-                        "gtin": "gs1:gtin",
+                        "gtin": "dpp:gtin",
                         "sector": "dpp:sector",
                         "passportId": "dpp:passportId",
                         "status": "dpp:status",
                         "sectorData": "dpp:sectorData",
                         "complianceResult": "dpp:complianceResult",
-                        "createdAt": "schema:dateCreated",
-                        "updatedAt": "schema:dateModified",
+                        "createdAt": "dpp:createdAt",
+                        "updatedAt": "dpp:updatedAt",
                         "jws": "dpp:jws"
                     }
                 ]

@@ -117,7 +117,7 @@ fn the_passport_vocabulary_is_inlined() {
         .find(|e| e.is_object())
         .expect("the context carries an inline term map");
 
-    for term in ["dpp", "gs1", "schema", "gtin", "sector", "passportId"] {
+    for term in ["dpp", "gtin", "sector", "passportId"] {
         assert!(
             inline.get(term).is_some(),
             "term '{term}' is not defined inline — a consumer would have to \
@@ -168,6 +168,57 @@ fn the_withdrawn_context_urls_stay_out() {
              referenced as a remote context"
         );
     }
+}
+
+/// Every prefix this context declares is either our own namespace or a
+/// vocabulary `dpp-vocab` records as verified — the same rule `dpp-aas`
+/// enforces for `semanticId`, extended to the JSON-LD door.
+///
+/// `gs1:` and `schema:` used to be declared here with no provenance record
+/// (neither GS1 nor Schema.org is verified in `dpp-vocab` — both are
+/// `surveyed`, meaning nothing has been read). They were removed in favour of
+/// `dpp:`-only terms, and this test is what stops a third borrowed prefix
+/// arriving the same way. A term that maps to another declared prefix (e.g.
+/// `"gtin": "dpp:gtin"`) is not itself a namespace declaration and is skipped
+/// — only entries whose value is an absolute IRI declare one.
+#[test]
+fn every_declared_prefix_is_ours_or_verified() {
+    // This crate's own JSON-LD vocabulary — a dereferenceable-shaped IRI by
+    // JSON-LD convention, distinct from `dpp_vocab::OWN_NAMESPACE`
+    // (`urn:odal-node:`), which is `dpp-aas`'s `semanticId` scheme. Two
+    // conventions for one project, each right for its own door.
+    const OWN_JSONLD_NAMESPACE: &str = "https://schema.odal-node.io/dpp#";
+
+    let ctx = context_value();
+    let inline = ctx
+        .as_array()
+        .expect("array")
+        .iter()
+        .find(|e| e.is_object())
+        .expect("the context carries an inline term map")
+        .as_object()
+        .expect("the inline entry is an object");
+
+    let register = dpp_vocab::VocabularyRegister::new();
+    let mut checked = 0usize;
+    for (term, value) in inline {
+        let Some(iri) = value.as_str() else { continue };
+        if !iri.contains("://") {
+            continue; // a compact-IRI term alias, not a prefix declaration
+        }
+        checked += 1;
+        let verdict = register.verdict(iri);
+        assert!(
+            iri.starts_with(OWN_JSONLD_NAMESPACE) || verdict.is_permitted(),
+            "term '{term}' declares prefix '{iri}', which is neither our own \
+             namespace nor a verified vocabulary: {}",
+            verdict.reason()
+        );
+    }
+    assert!(
+        checked > 0,
+        "the gate asserted nothing — no prefix declarations found"
+    );
 }
 
 /// Framing keeps the payload intact and stripping is its inverse.

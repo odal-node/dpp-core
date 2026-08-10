@@ -4,11 +4,11 @@
   "authority": "GS1 AISBL",
   "layer": "foundational",
   "namespaceIri": "https://ref.gs1.org/voc/",
-  "usedFor": "Supply-chain identifiers (GTIN, GLN) and general product attributes. Already referenced as the `gs1:` prefix in this project's JSON-LD context.",
+  "usedFor": "Supply-chain identifiers (GTIN, GLN) and general product attributes. Candidate `gs1:` prefix for this project's JSON-LD context.",
   "licence": null,
   "status": "surveyed",
-  "checkedOn": "2026-08-07",
+  "checkedOn": "2026-08-10",
   "source": "Third-party vocabulary survey. GS1's own publication has not been read.",
-  "finding": "The prefix IRI is already emitted by this project's JSON-LD context, together with a `gtin -> gs1:gtin` term mapping, and neither has a provenance record. That mapping is very likely correct — GS1 defines GTIN and we mean GTIN — but 'very likely correct' is the standard that put six wrong IDTA identifiers into a published crate. The claim is unverified until someone reads GS1's own definition and records it.",
-  "nextStep": "Read the GS1 Web Vocabulary's published definition of `gtin`, confirm the prefix IRI resolves, and establish the licence under which term labels may be redistributed. Then the existing JSON-LD mapping can become a verified entry instead of an inherited assumption."
+  "finding": "This project's JSON-LD context used to emit the prefix IRI, together with a `gtin -> gs1:gtin` term mapping, with no provenance record for either. That mapping was very likely correct — GS1 defines GTIN and we mean GTIN — but 'very likely correct' is the standard that put six wrong IDTA identifiers into a published crate, so both were removed on 2026-08-10 in favour of `gtin -> dpp:gtin`. The claim stays unadoptable until someone reads GS1's own definition and records it here.",
+  "nextStep": "Read the GS1 Web Vocabulary's published definition of `gtin`, confirm the prefix IRI resolves, and establish the licence under which term labels may be redistributed. Then `gtin -> gs1:gtin` can be restored as a verified entry instead of an inherited assumption."
 }

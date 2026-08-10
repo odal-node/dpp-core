@@ -15,15 +15,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
-- **`Passport.product_category` is gone**, along with the `ProductCategory`
-  type. It was a typed cross-sector sub-classification that measurement found
-  had zero readers anywhere in this repo or the engine — `ProductCategory::`
-  was never constructed outside tests. Every sector that needs sub-classifying
-  already carries its own field for it, under its own name, sourced from its
-  own regulation (e.g. battery's `battery_type`), and nothing bridged the
-  envelope field to any of them. Deleting it removes a second, unvalidated,
-  drifting model of the same information rather than losing any.
-
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was
@@ -40,7 +31,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   value — when it is absent, since a passport published before the mandate
   cannot be made to satisfy it.
 
+- **`Passport.product_category` is gone**, along with the `ProductCategory`
+  type. It was a typed cross-sector sub-classification that measurement found
+  had zero readers anywhere in this repo or the engine — `ProductCategory::`
+  was never constructed outside tests. Every sector that needs sub-classifying
+  already carries its own field for it, under its own name, sourced from its
+  own regulation (e.g. battery's `battery_type`), and nothing bridged the
+  envelope field to any of them. Deleting it removes a second, unvalidated,
+  drifting model of the same information rather than losing any.
+
+- **The JSON-LD passport context no longer borrows `gs1:` or `schema:`.**
+  `gtin`, `createdAt` and `updatedAt` now map to `dpp:gtin`, `dpp:createdAt`
+  and `dpp:updatedAt` instead of `gs1:gtin`, `schema:dateCreated` and
+  `schema:dateModified`. Neither GS1 nor Schema.org is a verified vocabulary
+  in `dpp-vocab` — both are `surveyed`, meaning nothing has been read — so the
+  borrowed prefixes were an unsupported claim, the same defect class `dpp-aas`
+  was already gated against. A consumer of the `ld+json` door that resolved
+  these terms against GS1's or Schema.org's own vocabularies will see `dpp:`
+  terms instead.
+
 ### Added
+
+- **`dpp-aas`'s semanticId provenance gate and `dpp-vc`'s JSON-LD context now
+  share one gate: `dpp-vocab`.** `dpp-aas/src/semantic_ids/allowlist.json` is
+  deleted — its `tracked` records move to `dpp-vocab` as two new authority
+  records, `idta` and `eclass`, each freshly re-verified against the
+  authorities' own current publications rather than restated from the removed
+  file. `OWN_NAMESPACE` is no longer defined twice: `dpp-aas` now depends on
+  `dpp_vocab::is_own`. A new test in `dpp-tests` walks the JSON-LD context's
+  declared prefixes the same way the AAS gate walks `semanticId`s, so both
+  wire surfaces are covered by the one rule.
 
 - **`dpp-vocab` — a register of the upstream vocabularies this project may name,
   and the gate that refuses the ones nobody has read.**
@@ -57,7 +77,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   every third-party identifier is refused. That is the accurate state of what
   this project knows, not a placeholder.
 
-  Twelve records ship in `vocabularies/`, one JSON file per authority, each
+  Fourteen records ship in `vocabularies/`, one JSON file per authority, each
   carrying the finding that got it to its status and the step that would move it
   on. Two of them record something worth stating plainly: the IRIs under which a
   third-party site serves the European Commission's battery-passport guidance
@@ -73,10 +93,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A leaf crate: no workspace dependencies. Everything else here changes when an
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
-
-  **Nothing is migrated into it yet.** `dpp-aas`'s allowlist and the JSON-LD
-  context's inlined prefixes move in a separate change, because that edit is
-  wire-visible and this one is not.
 
 ## [0.16.0] - 2026-08-07
 

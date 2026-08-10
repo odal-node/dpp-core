@@ -10,5 +10,5 @@
   "checkedOn": "2026-07-30",
   "source": "https://github.com/eclipse-tractusx/sldt-semantic-models",
   "finding": "The only third-party identifier this project has ever checked and found clean: correct SAMM URN form, real released version, current at 6.0.0, and a licence that is actually stated. It is nonetheless not adopted — correspondence between the aspect model's field set and our battery submodel was never established, so the semantic claim would be unsupported even though the identifier is valid. A well-formed identifier attached to a mismatched concept is still a false statement to a machine.",
-  "nextStep": "Compare the aspect model's field set against our battery submodel. If they correspond, this becomes the first verified entry in this directory. Per-identifier provenance for it currently lives in `dpp-aas/src/semantic_ids/allowlist.json` under `tracked` and moves here when the consumers migrate."
+  "nextStep": "Compare the aspect model's field set against our battery submodel. If they correspond, this becomes the first verified entry in this directory."
 }
