@@ -15,6 +15,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`Passport.product_category` is gone**, along with the `ProductCategory`
+  type. It was a typed cross-sector sub-classification that measurement found
+  had zero readers anywhere in this repo or the engine — `ProductCategory::`
+  was never constructed outside tests. Every sector that needs sub-classifying
+  already carries its own field for it, under its own name, sourced from its
+  own regulation (e.g. battery's `battery_type`), and nothing bridged the
+  envelope field to any of them. Deleting it removes a second, unvalidated,
+  drifting model of the same information rather than losing any.
+
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was

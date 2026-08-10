@@ -14,7 +14,7 @@ The plugin system has three layers:
 
 **PluginHost** (port trait in `dpp-domain::ports`) — the trait that a runtime host implements to load and execute plugins. The host implementation lives downstream.
 
-> **Dispatch is by sector, never by product category.** The host selects a plugin from the `Sector` of the passport data. A product category (e.g. battery `portable` vs `ev`, electronics `smartphone`) is *sector data* the plugin may branch on internally — it never changes which plugin runs. See `DATA-MODEL.md` §3.5.
+> **Dispatch is by sector, never by product category.** The host selects a plugin from the `Sector` of the passport data. A product category (e.g. battery `portable` vs `ev`, electronics `smartphone`) is *sector data* the plugin may branch on internally — it never changes which plugin runs. See `DATA-MODEL.md` §3.4.
 
 ```
 ComplianceRegistry::compute(sector, data)

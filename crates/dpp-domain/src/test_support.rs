@@ -21,7 +21,6 @@ pub(crate) fn sample_passport() -> Passport {
         batch_id: None,
         product_name: "Test Product".into(),
         sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),
             address: "Berlin, DE".into(),

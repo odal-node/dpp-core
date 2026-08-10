@@ -38,7 +38,6 @@ pub use domain::{
     lint::{LintFinding, LintResult, LintSeverity, lint_sector_data},
     passport::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportView,
-        ProductCategory,
     },
     product_identity::ProductIdentity,
     sector::{

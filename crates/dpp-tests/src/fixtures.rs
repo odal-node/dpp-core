@@ -22,7 +22,6 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
         batch_id: Some("LOT-X-0001".into()),
         product_name: format!("{} reference product", sector.catalog_key()),
         sector,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "Acme Manufacturing GmbH".into(),
             address: "Hauptstraße 1, 10115 Berlin, DE".into(),

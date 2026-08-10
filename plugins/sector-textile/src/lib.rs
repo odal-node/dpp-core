@@ -7,7 +7,7 @@
 //! `meta().sector` can only name one sector, so the host cannot cleanly select a
 //! dedicated `unsold-goods` plugin. Splitting `unsold-goods` into its own
 //! crate is a candidate for the sector-coverage plan — see
-//! docs/architecture/DATA-MODEL.md §3.5 and PLUGIN-HOST.md.
+//! docs/architecture/DATA-MODEL.md §3.4 and PLUGIN-HOST.md.
 
 mod fibre_composition;
 mod unsold_goods;

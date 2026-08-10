@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 use super::{
     FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
-    ProductCategory,
 };
 use crate::domain::{
     identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
@@ -31,10 +30,6 @@ pub struct Passport {
     /// schema and plugin. (Replaces the former misnamed `product_category`
     /// field, which actually held a sector.)
     pub sector: Sector,
-    /// Optional typed product category — a sub-type *within* `sector`
-    /// (e.g. `Smartphone`, `EvBattery`). Never a dispatch key. See DATA-MODEL §3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub product_category: Option<ProductCategory>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
     /// CO₂ equivalent per unit — manufacturer-supplied or engine-calculated.

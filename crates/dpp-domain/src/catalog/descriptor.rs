@@ -49,7 +49,7 @@ pub struct SectorDescriptor {
     /// be one of `schema_versions`.
     pub current_schema_version: String,
     /// Product categories *within* this sector — sub-types a plugin may branch
-    /// on, never dispatch keys. See `DATA-MODEL.md` §3.5.
+    /// on, never dispatch keys. See `DATA-MODEL.md` §3.4.
     #[serde(default)]
     pub product_categories: Vec<String>,
     /// Per-field [`Disclosure`](crate::domain::identity::Disclosure) class for
