@@ -34,7 +34,7 @@ pub use data::{
     redact_sector_data,
 };
 pub use enums::{
-    BatteryChemistry, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
+    BatteryChemistry, BatteryType, CarbonFootprintClass, CarbonFootprintClassError, DeviceType,
     EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
 };
 pub use metrics::{CarbonFootprint, RepairCriterion, RepairabilityScore};
