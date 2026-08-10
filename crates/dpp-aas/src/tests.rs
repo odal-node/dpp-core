@@ -15,7 +15,6 @@ fn minimal_passport(sector: Sector) -> Passport {
         batch_id: Some("BATCH-001".into()),
         product_name: "Test Product".into(),
         sector,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".into(),
             address: "123 Main St, Berlin, DE".into(),

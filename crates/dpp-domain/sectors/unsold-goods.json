@@ -24,5 +24,5 @@
     "destructionJustification": "restricted"
   },
   "plugin": "sector-textile",
-  "notes": "Destruction ban on unsold apparel/footwear: large companies from 2026-07-19, medium-sized from 2030, micro/small exempt. Currently handled by the sector-textile plugin via in-payload dispatch; candidate to split into its own crate (see DATA-MODEL.md §3.5). retentionYears is assumed, not sourced: ESPR Art. 9(2)(i) sets no figure — it requires availability for at least the expected lifetime of the product, delegated per product group, and no textile delegated act has been adopted."
+  "notes": "Destruction ban on unsold apparel/footwear: large companies from 2026-07-19, medium-sized from 2030, micro/small exempt. Currently handled by the sector-textile plugin via in-payload dispatch; candidate to split into its own crate (see DATA-MODEL.md §3.4). retentionYears is assumed, not sourced: ESPR Art. 9(2)(i) sets no figure — it requires availability for at least the expected lifetime of the product, delegated per product group, and no textile delegated act has been adopted."
 }

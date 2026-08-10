@@ -64,7 +64,7 @@ The dependency root. Every other crate may depend on it; it depends on nothing i
 
 ### Domain Types
 
-Canonical DPP types: `Passport`, `PassportId`, `ProductCategory`, `ManufacturerInfo`, `MaterialEntry`, `BatteryData`, `TextileData`, `SignedCredential`. All types derive `Serialize` + `Deserialize` and are `wasm32`-safe.
+Canonical DPP types: `Passport`, `PassportId`, `ManufacturerInfo`, `MaterialEntry`, `BatteryData`, `TextileData`, `SignedCredential`. All types derive `Serialize` + `Deserialize` and are `wasm32`-safe.
 
 ### Port Traits
 
