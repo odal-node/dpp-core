@@ -18,7 +18,6 @@ fn make_passport() -> Passport {
         batch_id: Some("BATCH-001".to_owned()),
         product_name: "Eco Widget".to_owned(),
         sector: Sector::Electronics,
-        product_category: Some(ProductCategory::Smartphone),
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".to_owned(),
             address: "123 Main St, Berlin, DE".to_owned(),
@@ -48,13 +47,11 @@ fn passport_serde_round_trip() {
 }
 
 #[test]
-fn passport_carries_typed_sector_and_category() {
+fn passport_carries_typed_sector() {
     let json = serde_json::to_value(make_passport()).expect("serialise");
     assert_eq!(json["sector"], "electronics"); // Sector → camelCase
-    assert_eq!(json["productCategory"], "smartphone"); // ProductCategory → snake_case
     let back: Passport = serde_json::from_value(json).expect("deserialise");
     assert_eq!(back.sector, Sector::Electronics);
-    assert_eq!(back.product_category, Some(ProductCategory::Smartphone));
 }
 
 #[test]

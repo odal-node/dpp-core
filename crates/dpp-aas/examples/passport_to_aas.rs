@@ -17,7 +17,6 @@ fn main() {
         batch_id: Some("LOT-Q2-2026".into()),
         product_name: "EcoWear Organic T-Shirt".into(),
         sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Berlin, DE".into(),

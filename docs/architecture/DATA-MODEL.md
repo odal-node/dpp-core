@@ -54,7 +54,6 @@ All DPPs — regardless of sector — carry these fields. Source: `dpp-domain/sr
 | `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9) |
 | `product_name` | `String` | `"productName"` | Human-readable product name (ESPR Art. 9) |
 | `sector` | `Sector` enum | `"sector"` | EU ESPR sector — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
-| `product_category` | `Option<ProductCategory>` | `"productCategory"` | Optional typed sub-type *within* the sector (`smartphone`, `evBattery`…). Not a dispatch key. See §3.5. |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill of materials entries |
 | `co2e_per_unit` | `Option<f64>` | `"co2ePerUnit"` | CO₂e per unit in kg — may be set by compliance engine |
@@ -92,54 +91,25 @@ Elements of `Passport.materials` — bill of materials entries.
 | `recycled_pct` | `Option<f64>` | `"recycledPct"` | Recycled content percentage (0–100) |
 | `country_of_origin` | `Option<String>` | `"countryOfOrigin"` | ISO 3166-1 alpha-2 country of origin |
 
-### 3.4 ProductCategory
+### 3.4 Sector vs. product-group sub-classification
 
-Typed `snake_case` enum of sub-types *within* a sector — `EvBattery`, `IndustrialBattery`, `LmtBattery`, `Apparel`, `Footwear`, `HomeTextile`, `Smartphone`, `Laptop`, `Charger`, and `Other(String)` for anything not yet modelled. It is **never** a dispatch key (that is `Sector`); a plugin may branch on it. Carried on `Passport.product_category` as `Option<ProductCategory>`.
+`Sector` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-sector sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers in either this repo or the engine, and every sector that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
 
-> ✅ The former misnomer (a `ProductCategory` enum that actually held *sectors*) was fixed in Phase 2: `Passport` now carries `sector: Sector` (dispatch) and `product_category: Option<ProductCategory>` (this typed sub-type). See §3.5.
-
-### 3.5 Sector vs. Product Category — terminology (IMPORTANT)
-
-These two concepts are routinely confused and **must be kept distinct**. The current model conflates them; this section is the canonical definition and the target shape.
-
-| Concept | What it is | Role | Example values |
-|---|---|---|---|
-| **Sector** | The EU delegated-act / regulatory domain a product falls under | **Dispatch key** — selects the schema version *and* the Wasm plugin | `battery`, `textile`, `electronics`, `steel` |
-| **Product category** | A sub-type *within* a sector | **Data attribute** — a field a sector schema/plugin may branch on internally; never a dispatch key | `ev_battery`, `apparel`, `smartphone`, steel `flat` |
+| Sector | Field | Source |
+|---|---|---|
+| `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
+| `steel` | `product_category` | `"flat"` / `"long"` / … |
+| `electronics` | `product_category` | `"smartphone"` / `"laptop"` / … |
+| `unsold-goods` | `product_category` | `"apparel"` / `"footwear"` / … |
+| `furniture` | `product_type` | — |
+| `tyre` | `tyre_class` | `"C1"` / … |
 
 **Rules:**
-1. The host dispatches compliance **only** on `Sector`. A plugin is selected by sector, never by product category.
-2. Product category is plain sector data. A plugin *may* read it to choose an internal rule path (e.g. battery `portable` vs `ev`), but it does not change which plugin runs.
-3. One sector → one plugin → potentially many product categories.
-
-**Realized shape** (✅ implemented in Phase 2 — breaking `x.0.0`):
-
-`Passport` carries **both** `sector: Sector` (dispatch) and `product_category: Option<ProductCategory>` (a typed sub-type). The old misnamed `ProductCategory`-of-sectors enum is gone; `ProductCategory` is now the typed sub-type enum:
-
-```rust
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ProductCategory {
-    // Battery
-    EvBattery,
-    IndustrialBattery,
-    LmtBattery,
-    // Textile
-    Apparel,
-    Footwear,
-    HomeTextile,
-    // Electronics
-    Smartphone,
-    Laptop,
-    Charger,
-    // Extensible escape hatch.
-    Other(String),
-}
-```
+1. The host dispatches compliance **only** on `Sector`. A plugin is selected by sector, never by a sector-internal field.
+2. These fields are plain sector data. A plugin *may* read one to choose an internal rule path, but it does not change which plugin runs.
+3. The names and shapes are deliberately uneven — they track what each sector's own act defines, not a normalised cross-sector vocabulary. Only `battery_type` is a closed, required, typed enum; that follows from Art. 1(3) being a named enumeration in law, which is not true of the others.
 
 `Passport::validate()` enforces that `sector` matches `sector_data`'s sector when the latter is present.
-
-**Still open (finer-grained, not part of Phase 2):** sector-*internal* sub-classifications remain as `String` fields on the sector data structs under inconsistent names — `SteelData.product_category` (`"flat"`), `FurnitureData.product_type`, `TyreData.tyre_class` (`"C1"`). These are a different, finer granularity than the top-level `ProductCategory` and can be reconciled later if needed.
 
 ---
 
@@ -186,7 +156,7 @@ Source: EU Battery Regulation (EU) 2023/1542, Annex XIII. Battery DPP mandatory 
 | `operating_temp_min_c` | `Option<f64>` | `"operatingTempMinC"` | Annex XIII |
 | `operating_temp_max_c` | `Option<f64>` | `"operatingTempMaxC"` | Annex XIII |
 | `battery_weight_kg` | `Option<f64>` | `"batteryWeightKg"` | Annex XIII |
-| `battery_type` | `Option<String>` | `"batteryType"` | Per regulation: portable, industrial, ev, lmt, starting-lighting-ignition |
+| `battery_type` | `String` (required since v2.5.0) | `"batteryType"` | Art. 1(3), closed enum: portable, industrial, ev, lmt, starting-lighting-ignition — mandatory public content (Annex VI Part A pt 2 via Annex XIII pt 1(a)) |
 | `round_trip_efficiency_pct` | `Option<f64>` | `"roundTripEfficiencyPct"` | Art. 10 — at 50% SoC |
 | `internal_resistance_mohm` | `Option<f64>` | `"internalResistanceMohm"` | Art. 10 — at 50% SoC |
 
@@ -251,7 +221,6 @@ When a DPP transitions to `Published`, it is wrapped in a W3C Verifiable Credent
   "credentialSubject": {
     "type": "DigitalProductPassport",
     "schemaVersion": "2.0.0",
-    "productCategory": "BATTERY",
     "productName": "EcoCell Pro 48V",
     "manufacturer": { "name": "EcoTech", "address": "DE" },
     "sectorData": { "batteryChemistry": "LFP", "nominalVoltageV": 48.0 }

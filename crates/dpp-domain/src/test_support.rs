@@ -10,7 +10,7 @@ use chrono::Utc;
 
 use crate::domain::gtin::Gtin;
 use crate::domain::passport::{ManufacturerInfo, Passport, PassportId};
-use crate::domain::sector::{BatteryChemistry, BatteryData, Sector, TextileData};
+use crate::domain::sector::{BatteryChemistry, BatteryData, BatteryType, Sector, TextileData};
 use crate::domain::status::PassportStatus;
 
 /// A minimal, valid `Passport` with no sector data.
@@ -21,7 +21,6 @@ pub(crate) fn sample_passport() -> Passport {
         batch_id: None,
         product_name: "Test Product".into(),
         sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),
             address: "Berlin, DE".into(),
@@ -89,7 +88,7 @@ pub(crate) fn sample_battery_data() -> BatteryData {
         rated_energy_wh: None,
         recycled_content_lead_pct: None,
         battery_weight_kg: None,
-        battery_type: None,
+        battery_type: BatteryType::Portable,
         round_trip_efficiency_pct: None,
         internal_resistance_mohm: None,
         placed_on_market_date: None,

@@ -113,7 +113,7 @@ fn make_battery_passport() -> Passport {
                 rated_energy_wh: Some(320.0),
                 recycled_content_lead_pct: Some(0.0),
                 battery_weight_kg: Some(15.5),
-                battery_type: Some(BatteryType::Ev),
+                battery_type: BatteryType::Ev,
                 round_trip_efficiency_pct: Some(94.5),
                 internal_resistance_mohm: Some(0.8),
                 placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
@@ -141,7 +141,7 @@ fn battery_passport_serialisation_round_trip() {
     if let Some(SectorData::Battery(bd)) = &back.sector_data {
         assert_eq!(bd.battery_chemistry, BatteryChemistry::Lfp);
         assert_eq!(bd.expected_lifetime_cycles, 6000);
-        assert_eq!(bd.battery_type, Some(BatteryType::Ev));
+        assert_eq!(bd.battery_type, BatteryType::Ev);
         assert_eq!(bd.cathode_material.as_ref().unwrap().len(), 1);
         assert_eq!(bd.critical_raw_materials.as_ref().unwrap().len(), 1);
         assert_eq!(bd.gtin.as_str(), VALID_GTIN);

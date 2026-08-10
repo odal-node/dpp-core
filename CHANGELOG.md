@@ -15,6 +15,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`BatteryData.battery_type` is required and closed.** Annex VI Part A
+  point 2, made public by Annex XIII point 1(a), lists the battery category as
+  mandatory content of the passport's publicly accessible tier — the field was
+  `Option<BatteryType>` and `BatteryType` carried a `#[serde(other)]` catch-all
+  that silently flattened any unrecognised value to `Other`, discarding it on
+  round-trip. Art. 1(3) is a closed enumeration of five categories with a
+  strictest-requirements tie-break that only functions over a closed set, so
+  the catch-all is gone: an unrecognised value is now a parse error, the same
+  fix already shipped for `CarbonFootprintClass`.
+
+  New schema `v2.5.0`: `batteryType` moves into `required` and its enum drops
+  `null`. A `v2.4.0 → v2.5.0` lens passes existing records through unchanged
+  when `batteryType` is present and **refuses** — rather than inventing a
+  value — when it is absent, since a passport published before the mandate
+  cannot be made to satisfy it.
+
+- **`Passport.product_category` is gone**, along with the `ProductCategory`
+  type. It was a typed cross-sector sub-classification that measurement found
+  had zero readers anywhere in this repo or the engine — `ProductCategory::`
+  was never constructed outside tests. Every sector that needs sub-classifying
+  already carries its own field for it, under its own name, sourced from its
+  own regulation (e.g. battery's `battery_type`), and nothing bridged the
+  envelope field to any of them. Deleting it removes a second, unvalidated,
+  drifting model of the same information rather than losing any.
+
 - **The JSON-LD passport context no longer borrows `gs1:` or `schema:`.**
   `gtin`, `createdAt` and `updatedAt` now map to `dpp:gtin`, `dpp:createdAt`
   and `dpp:updatedAt` instead of `gs1:gtin`, `schema:dateCreated` and
@@ -52,7 +77,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   every third-party identifier is refused. That is the accurate state of what
   this project knows, not a placeholder.
 
-  Twelve records ship in `vocabularies/`, one JSON file per authority, each
+  Fourteen records ship in `vocabularies/`, one JSON file per authority, each
   carrying the finding that got it to its status and the step that would move it
   on. Two of them record something worth stating plainly: the IRIs under which a
   third-party site serves the European Commission's battery-passport guidance
@@ -68,10 +93,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A leaf crate: no workspace dependencies. Everything else here changes when an
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
-
-  **Nothing is migrated into it yet.** `dpp-aas`'s allowlist and the JSON-LD
-  context's inlined prefixes move in a separate change, because that edit is
-  wire-visible and this one is not.
 
 ## [0.16.0] - 2026-08-07
 

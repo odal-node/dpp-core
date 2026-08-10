@@ -57,7 +57,6 @@ fn main() {
         batch_id: Some("BATCH-2026-Q2-001".into()),
         product_name: "EcoWear Organic T-Shirt".into(),
         sector: Sector::Textile,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Torstrasse 12, 10119 Berlin, DE".into(),

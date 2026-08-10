@@ -4,7 +4,7 @@ Wasm sector plugins implementing the EU ESPR compliance logic per **sector**.
 
 ## Sector vs. product category
 
-A **sector** is the EU delegated-act bucket the host dispatches on (`battery`, `textile`, `steel`, …) — it selects both the schema version and the plugin. A **product category** (e.g. `ev`/`portable` for batteries, `smartphone` for electronics) is *sector data* a plugin may branch on internally; it is **never** a dispatch key. One sector → one plugin → many product categories. See `docs/architecture/DATA-MODEL.md` §3.5.
+A **sector** is the EU delegated-act bucket the host dispatches on (`battery`, `textile`, `steel`, …) — it selects both the schema version and the plugin. A **product category** (e.g. `ev`/`portable` for batteries, `smartphone` for electronics) is *sector data* a plugin may branch on internally; it is **never** a dispatch key. One sector → one plugin → many product categories. See `docs/architecture/DATA-MODEL.md` §3.4.
 
 ## Building
 

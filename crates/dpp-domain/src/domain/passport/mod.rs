@@ -1,6 +1,5 @@
 //! The `Passport` aggregate root and its unique identifier type.
 
-pub mod category;
 pub mod facility;
 pub mod id;
 pub mod manufacturer;
@@ -13,7 +12,6 @@ pub mod view;
 #[cfg(test)]
 mod tests;
 
-pub use category::ProductCategory;
 pub use facility::FacilitySnapshot;
 pub use id::PassportId;
 pub use manufacturer::ManufacturerInfo;

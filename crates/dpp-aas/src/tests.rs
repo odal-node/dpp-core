@@ -15,7 +15,6 @@ fn minimal_passport(sector: Sector) -> Passport {
         batch_id: Some("BATCH-001".into()),
         product_name: "Test Product".into(),
         sector,
-        product_category: None,
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".into(),
             address: "123 Main St, Berlin, DE".into(),
@@ -243,7 +242,7 @@ fn battery_data_with_due_diligence() -> BatteryData {
         rated_energy_wh: None,
         recycled_content_lead_pct: None,
         battery_weight_kg: Some(8.5),
-        battery_type: Some(BatteryType::Ev),
+        battery_type: BatteryType::Ev,
         round_trip_efficiency_pct: Some(94.0),
         internal_resistance_mohm: Some(3.2),
         placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
