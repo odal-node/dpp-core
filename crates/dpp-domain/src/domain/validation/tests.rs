@@ -252,7 +252,8 @@ fn validate_raw_sector_data_known_sector_succeeds() {
         "nominalVoltageV": 48.0,
         "nominalCapacityAh": 100.0,
         "expectedLifetimeCycles": 3000,
-        "co2ePerUnitKg": 85.4
+        "co2ePerUnitKg": 85.4,
+        "batteryType": "portable"
     });
     let registry = SectorValidatorRegistry::default();
     assert!(validate_raw_sector_data("battery", &data, &registry).is_ok());

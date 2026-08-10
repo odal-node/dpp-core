@@ -98,6 +98,7 @@ fn known_sectors_still_deserialize_to_their_typed_variants() {
         "nominalCapacityAh": 100.0,
         "expectedLifetimeCycles": 3000,
         "co2ePerUnitKg": 85.4,
+        "batteryType": "portable",
     });
 
     let data: SectorData = serde_json::from_value(battery).expect("battery deserializes");

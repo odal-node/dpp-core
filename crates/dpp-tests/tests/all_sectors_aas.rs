@@ -1656,7 +1656,8 @@ fn battery_case() -> (Sector, SectorData, &'static str) {
         "dueDiligenceUrl": "https://acme.example.com/due-diligence",
         "disassemblyInstructionsUrl": "https://acme.example.com/disassembly",
         "sohMethodology": "IEC 62660-1 capacity fade",
-        "stateOfHealthPct": 97.5
+        "stateOfHealthPct": 97.5,
+        "batteryType": "ev"
     }))
     .expect("the battery wire form is valid");
     (Sector::Battery, data, "1.0.0")
