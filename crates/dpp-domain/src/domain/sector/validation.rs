@@ -60,6 +60,14 @@ pub fn battery_recycled_chemistry_conflicts(
     )
 }
 
+/// Whether a commodity code falls within ESPR Annex VII's destruction-ban
+/// scope (apparel & clothing accessories, or footwear). Delegates to
+/// [`dpp_rules`].
+#[must_use]
+pub fn unsold_goods_annex_vii_scope(commodity_code: &str) -> bool {
+    dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope(commodity_code)
+}
+
 /// Validate a detergent surfactant list. Delegates to [`dpp_rules`].
 pub fn validate_surfactants(surfactants: &[SurfactantEntry]) -> Result<(), String> {
     let inputs: Vec<dpp_rules::SurfactantInput<'_>> = surfactants

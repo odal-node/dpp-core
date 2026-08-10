@@ -36,6 +36,7 @@ pub mod chemicals;
 pub mod batteries;
 pub mod electronics;
 pub mod textiles;
+pub mod unsold_goods;
 
 // Plausibility lints — non-binding findings, never a compliance gate.
 pub mod lint;
