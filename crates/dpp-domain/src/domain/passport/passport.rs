@@ -293,6 +293,8 @@ impl Passport {
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `sector_data.sector()` matches `self.sector` if present
+    /// - for `Sector::UnsoldGoods`, `commodity_code` is present and within
+    ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear)
     /// - `sector_data` passes JSON Schema + cross-field rules via
     ///   [`crate::domain::validation::validate_sector_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
@@ -357,6 +359,26 @@ impl Passport {
                 field: "/sector".to_owned(),
                 message: "sector must match sector_data's sector".to_owned(),
             });
+        }
+
+        // ESPR Annex VII eligibility: an unsold-goods passport must declare a
+        // commodity code within Annex VII's two headings (apparel & clothing
+        // accessories, or footwear) — a passport cannot claim this sector for
+        // a product the destruction ban does not cover.
+        if self.sector == Sector::UnsoldGoods {
+            match &self.commodity_code {
+                None => errors.push(FieldError {
+                    field: "/commodityCode".to_owned(),
+                    message: "commodity_code is required for sector unsoldGoods (ESPR Annex VII scope check)".to_owned(),
+                }),
+                Some(code) if !crate::domain::sector::unsold_goods_annex_vii_scope(code.as_str()) => {
+                    errors.push(FieldError {
+                        field: "/commodityCode".to_owned(),
+                        message: "commodity_code is not within ESPR Annex VII scope (apparel/clothing accessories or footwear)".to_owned(),
+                    });
+                }
+                _ => {}
+            }
         }
 
         // Sector-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).

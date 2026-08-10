@@ -65,6 +65,47 @@ fn sector_data_mismatch_fails_validation() {
 }
 
 #[test]
+fn unsold_goods_without_commodity_code_fails_validation() {
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = None;
+    p.commodity_code = None;
+    let err = p.validate().unwrap_err().to_string();
+    assert!(err.contains("commodity_code is required"), "got: {err}");
+}
+
+#[test]
+fn unsold_goods_with_out_of_scope_commodity_code_fails_validation() {
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = None;
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("851712").expect("valid code"));
+    let err = p.validate().unwrap_err().to_string();
+    assert!(
+        err.contains("not within ESPR Annex VII scope"),
+        "got: {err}"
+    );
+}
+
+#[test]
+fn unsold_goods_with_annex_vii_commodity_code_passes_the_scope_check() {
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = None;
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("620342").expect("valid code"));
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
+#[test]
+fn missing_commodity_code_is_fine_outside_unsold_goods() {
+    let mut p = make_passport(); // sector = Electronics
+    p.commodity_code = None;
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
+#[test]
 fn passport_json_uses_camel_case() {
     let passport = make_passport();
     let json = serde_json::to_value(&passport).expect("serialise");
