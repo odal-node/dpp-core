@@ -65,22 +65,20 @@ without a human ever reading it — so this crate holds one rule:
 > carries a provenance record naming who verified it against the authority's own
 > published source, and when.
 
-**The rule is enforced by a test, not by a comment.** An entry missing
-`verifiedOn` or `verifiedBy` is refused, and CI fails on any identifier that
-satisfies neither branch.
+**The rule is enforced by a test, not by a comment.** CI fails on any
+identifier that is neither in our own namespace nor a verified vocabulary.
 
-The record is [`src/semantic_ids/allowlist.json`](src/semantic_ids/allowlist.json).
-It has two sections with fixed key sets, also test-enforced:
+The record is the [`dpp-vocab`](../dpp-vocab) crate, not a file in this one —
+one home for this class of claim, regardless of which projection carries it.
+`dpp_vocab::is_own` answers the namespace question; `VocabularyRegister`
+answers everything else. Identifiers evaluated and not adopted are recorded
+there too, under the authority that publishes them (`idta`, `eclass`,
+`catena-x-battery-pass`), each with the finding and what would move it on.
+**No vocabulary is verified yet, so this crate emits none.**
 
-- **`allowlist`** — identifiers this crate may emit. Currently empty: **it emits
-  none.** The claim is therefore the narrow, accurate one — AAS-shaped output
-  carrying our own semantics, not IDTA conformance.
-- **`tracked`** — identifiers evaluated and not adopted, each with the reason,
-  the correct value where established, and what to check before adopting it.
-  Nothing here is permitted; a test asserts it.
-
-Adopting a third-party identifier means moving it between those sections and
-naming a reader — never editing a status field.
+Adopting a third-party identifier means a person reading the authority's own
+source and the vocabulary record moving to `verified` — never editing a status
+field on faith.
 
 ## Relationship to other crates
 

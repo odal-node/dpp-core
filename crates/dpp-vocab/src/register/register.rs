@@ -62,6 +62,14 @@ const EMBEDDED: &[Embedded] = &[
         key: "ec-battery-guidance",
         json: include_str!("../../vocabularies/ec-battery-guidance.json"),
     },
+    Embedded {
+        key: "idta",
+        json: include_str!("../../vocabularies/idta.json"),
+    },
+    Embedded {
+        key: "eclass",
+        json: include_str!("../../vocabularies/eclass.json"),
+    },
 ];
 
 /// The upstream vocabularies this project has recorded.

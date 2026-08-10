@@ -493,8 +493,8 @@ fn no_sector_template_yet_names_a_ratified_third_party_standard() {
         ratified.is_empty(),
         "these templates claim a ratified third-party template: {ratified:?}. \
          Confirm a named reader verified each identifier against the authority's \
-         own source and recorded it in semantic_ids/allowlist.json, then update \
-         this test."
+         own source and recorded it as verified in dpp-vocab, then update this \
+         test."
     );
 }
 
@@ -563,55 +563,14 @@ fn every_catalog_sector_has_an_aas_case() {
 // once it is written. So it is enforced here rather than trusted to a comment.
 //
 // The rule: every identifier we emit is either in our own `urn:odal-node:`
-// namespace, or carries a provenance record in `semantic_ids/allowlist.json`
-// naming who verified it against the authority's own source, and when.
+// namespace, or belongs to a vocabulary `dpp-vocab` records as verified. One
+// gate, in one crate, regardless of which projection carries the identifier —
+// `SubmodelTemplate::is_placeholder` and this test cannot disagree about where
+// our namespace ends, because both defer to `dpp_vocab::is_own`.
+use dpp_vocab::VocabularyRegister;
 
-// Taken from the crate rather than restated, so the provenance gate and
-// `SubmodelTemplate::is_placeholder` cannot disagree about where our namespace
-// ends. A second copy here would be a third place for the boundary to drift.
-use dpp_aas::semantic_ids::OWN_NAMESPACE;
-
-/// The allowlist, minus any entry whose provenance is incomplete.
-///
-/// An entry missing `verifiedOn` or `verifiedBy` is dropped rather than
-/// honoured, so a half-filled record fails the gate exactly like an absent one.
-fn allowlisted_identifiers() -> Vec<String> {
-    allowlisted_from(&allowlist_document())
-}
-
-fn allowlist_document() -> serde_json::Value {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../dpp-aas/src/semantic_ids/allowlist.json"
-    );
-    let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
-    serde_json::from_str(&raw).expect("the allowlist is valid JSON")
-}
-
-/// Split out from the loader so the provenance rule can be tested against
-/// synthetic entries. With the live allowlist deliberately empty, testing it
-/// through the real file would assert nothing.
-fn allowlisted_from(doc: &serde_json::Value) -> Vec<String> {
-    let entries = doc["allowlist"]
-        .as_object()
-        .expect("the allowlist has an `allowlist` object");
-
-    entries
-        .iter()
-        .filter(|(_, record)| {
-            let filled = |field: &str| {
-                record[field]
-                    .as_str()
-                    .is_some_and(|value| !value.trim().is_empty())
-            };
-            filled("verifiedOn") && filled("verifiedBy")
-        })
-        .map(|(identifier, _)| identifier.clone())
-        .collect()
-}
-
-fn is_permitted(identifier: &str, allowlist: &[String]) -> bool {
-    identifier.starts_with(OWN_NAMESPACE) || allowlist.iter().any(|a| a == identifier)
+fn is_permitted(identifier: &str) -> bool {
+    VocabularyRegister::new().verdict(identifier).is_permitted()
 }
 
 /// Collect every `semanticId` in a serialised AAS document, with its path.
@@ -650,7 +609,6 @@ fn collect_semantic_ids(node: &serde_json::Value, path: &str, found: &mut Vec<(S
 /// Nothing we emit may claim a third party's vocabulary without provenance.
 #[test]
 fn every_emitted_semantic_id_is_ours_or_provenanced() {
-    let allowlist = allowlisted_identifiers();
     let mut checked = 0usize;
 
     for (sector, data, version, _) in all_sector_cases() {
@@ -674,10 +632,10 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
 
         for (path, id) in &found {
             assert!(
-                is_permitted(id, &allowlist),
+                is_permitted(id),
                 "sector '{key}' emits unprovenanced semanticId '{id}' at '{path}'. \
-                 Either move it into the urn:odal-node: namespace, or add a \
-                 verified entry to semantic_ids/allowlist.json."
+                 Either move it into the urn:odal-node: namespace, or read the \
+                 authority's own source and verify it in dpp-vocab."
             );
         }
         checked += found.len();
@@ -698,7 +656,7 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
     );
     for (path, id) in &found {
         assert!(
-            is_permitted(id, &allowlist),
+            is_permitted(id),
             "the generic mapper emits unprovenanced semanticId '{id}' at '{path}'"
         );
     }
@@ -714,7 +672,6 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
 /// one. Its template identifier would otherwise go unchecked entirely.
 #[test]
 fn every_sector_template_semantic_id_is_ours_or_provenanced() {
-    let allowlist = allowlisted_identifiers();
     let catalog = dpp_domain::catalog::SectorCatalog::new();
 
     for descriptor in catalog.all().iter() {
@@ -723,7 +680,7 @@ fn every_sector_template_semantic_id_is_ours_or_provenanced() {
             continue;
         };
         assert!(
-            is_permitted(template.semantic_id, &allowlist),
+            is_permitted(template.semantic_id),
             "sector template '{key}' carries unprovenanced semanticId \
              '{}'",
             template.semantic_id
@@ -731,158 +688,25 @@ fn every_sector_template_semantic_id_is_ours_or_provenanced() {
     }
 }
 
-/// A record without a reader is not provenance.
-#[test]
-fn an_allowlist_entry_missing_provenance_is_refused() {
-    let complete = serde_json::json!({
-        "allowlist": {
-            "urn:example:concept": { "verifiedOn": "2026-01-01", "verifiedBy": "A. Reader" }
-        }
-    });
-    assert_eq!(
-        allowlisted_from(&complete),
-        vec!["urn:example:concept".to_owned()],
-        "a complete record should be honoured"
-    );
-
-    for (missing, doc) in [
-        (
-            "no reader",
-            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedOn": "2026-01-01"}}}),
-        ),
-        (
-            "no date",
-            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedBy": "A. Reader"}}}),
-        ),
-        (
-            "blank reader",
-            serde_json::json!({"allowlist": {"urn:example:concept": {"verifiedOn": "2026-01-01", "verifiedBy": "   "}}}),
-        ),
-    ] {
-        assert!(
-            allowlisted_from(&doc).is_empty(),
-            "an entry with {missing} was honoured — a half-filled record must fail \
-             the gate exactly like an absent one"
-        );
-    }
-}
-
-/// The live allowlist is empty, and that is a decision.
-///
-/// This crate emits no third-party semanticIds. The test exists so that adding
-/// one is a deliberate act with a visible diff here, rather than something that
-/// slips in — and so an empty allowlist is never mistaken for a broken loader.
-#[test]
-fn no_third_party_identifier_is_currently_permitted() {
-    assert!(
-        allowlisted_identifiers().is_empty(),
-        "a third-party identifier was allowlisted; confirm a named reader checked \
-         it against the authority's own source, then update this test"
-    );
-}
-
 /// A plausible-looking identifier is exactly the thing this gate exists to
 /// catch — it must not pass on the strength of looking official.
+///
+/// The research record itself (which authorities were checked and refused,
+/// and why) now lives in `dpp-vocab` — see
+/// `the_six_removed_idta_and_eclass_identifiers_stay_refused` and
+/// `no_vocabulary_is_verified_yet` there, which cover the fixed-key-set and
+/// nothing-tracked-is-permitted guarantees this test used to duplicate here.
 #[test]
 fn a_fabricated_third_party_identifier_is_refused() {
-    let allowlist = allowlisted_identifiers();
     for fake in [
         "urn:eclass:0173-1#01-XXXXXX#001",
         "urn:idta:aas:submodel:digital-product-passport:1.0",
         "https://admin-shell.io/IDTA/02023/0/9",
     ] {
         assert!(
-            !is_permitted(fake, &allowlist),
+            !is_permitted(fake),
             "'{fake}' passed the gate — a coined identifier in a standards-body \
              namespace is the defect this test exists for"
-        );
-    }
-}
-
-/// Both sections carry a fixed key set.
-///
-/// Entries accreted per-entry keys once already — some carrying `finding`,
-/// others `whyWithdrawn`, others neither — which makes the file unreadable as
-/// data and lets a required field go missing without anything noticing. The
-/// shape is documented in the file's own `$comment` and enforced here.
-#[test]
-fn every_entry_carries_its_section_key_set() {
-    const ALLOWLIST_KEYS: &[&str] = &[
-        "authority",
-        "source",
-        "release",
-        "meaning",
-        "usedFor",
-        "licence",
-        "verifiedOn",
-        "verifiedBy",
-    ];
-    const TRACKED_KEYS: &[&str] = &[
-        "authority",
-        "source",
-        "usedFor",
-        "status",
-        "checkedOn",
-        "finding",
-        "correctIdentifier",
-        "licence",
-        "nextStep",
-    ];
-
-    let doc = allowlist_document();
-    for (section, required) in [("allowlist", ALLOWLIST_KEYS), ("tracked", TRACKED_KEYS)] {
-        let entries = doc[section]
-            .as_object()
-            .unwrap_or_else(|| panic!("`{section}` is an object"));
-
-        for (identifier, record) in entries {
-            let record = record
-                .as_object()
-                .unwrap_or_else(|| panic!("{section}['{identifier}'] is an object"));
-
-            let mut actual: Vec<&str> = record.keys().map(String::as_str).collect();
-            actual.sort_unstable();
-            let mut expected = required.to_vec();
-            expected.sort_unstable();
-
-            assert_eq!(
-                actual, expected,
-                "{section}['{identifier}'] has the wrong key set — every entry                  carries every key of its section, with null for anything not                  established"
-            );
-        }
-    }
-}
-
-/// Every identifier in the research record stays refused.
-///
-/// `tracked` documents identifiers we investigated and did not adopt, with the
-/// correct value where it is known. It is a note to a future reader, and this
-/// test is what stops it becoming a second, softer allowlist: promoting one
-/// means moving it into `allowlist` **and** naming who read the source, not
-/// editing a status string.
-#[test]
-fn nothing_in_the_research_record_is_permitted() {
-    let allowlist = allowlisted_identifiers();
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../dpp-aas/src/semantic_ids/allowlist.json"
-    );
-    let raw = std::fs::read_to_string(path).expect("the allowlist file is present");
-    let doc: serde_json::Value = serde_json::from_str(&raw).expect("valid JSON");
-
-    let tracked = doc["tracked"]
-        .as_object()
-        .expect("the file carries a `tracked` record");
-    assert!(
-        !tracked.is_empty(),
-        "the research record should not be empty"
-    );
-
-    for identifier in tracked.keys() {
-        assert!(
-            !is_permitted(identifier, &allowlist),
-            "'{identifier}' is in `tracked` but the gate permits it — a tracked \
-             identifier must never also be allowlisted"
         );
     }
 }

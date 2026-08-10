@@ -13,7 +13,29 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **The JSON-LD passport context no longer borrows `gs1:` or `schema:`.**
+  `gtin`, `createdAt` and `updatedAt` now map to `dpp:gtin`, `dpp:createdAt`
+  and `dpp:updatedAt` instead of `gs1:gtin`, `schema:dateCreated` and
+  `schema:dateModified`. Neither GS1 nor Schema.org is a verified vocabulary
+  in `dpp-vocab` — both are `surveyed`, meaning nothing has been read — so the
+  borrowed prefixes were an unsupported claim, the same defect class `dpp-aas`
+  was already gated against. A consumer of the `ld+json` door that resolved
+  these terms against GS1's or Schema.org's own vocabularies will see `dpp:`
+  terms instead.
+
 ### Added
+
+- **`dpp-aas`'s semanticId provenance gate and `dpp-vc`'s JSON-LD context now
+  share one gate: `dpp-vocab`.** `dpp-aas/src/semantic_ids/allowlist.json` is
+  deleted — its `tracked` records move to `dpp-vocab` as two new authority
+  records, `idta` and `eclass`, each freshly re-verified against the
+  authorities' own current publications rather than restated from the removed
+  file. `OWN_NAMESPACE` is no longer defined twice: `dpp-aas` now depends on
+  `dpp_vocab::is_own`. A new test in `dpp-tests` walks the JSON-LD context's
+  declared prefixes the same way the AAS gate walks `semanticId`s, so both
+  wire surfaces are covered by the one rule.
 
 - **`dpp-vocab` — a register of the upstream vocabularies this project may name,
   and the gate that refuses the ones nobody has read.**

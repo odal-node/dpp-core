@@ -54,6 +54,7 @@ dpp-crypto        = { path = "crates/dpp-crypto", version = "0.16.0" }
 dpp-digital-link  = { path = "crates/dpp-digital-link", version = "0.16.0" }
 dpp-aas           = { path = "crates/dpp-aas", version = "0.16.0" }
 dpp-vc            = { path = "crates/dpp-vc", version = "0.16.0" }
+dpp-vocab         = { path = "crates/dpp-vocab", version = "0.16.0" }
 dpp-calc          = { path = "crates/dpp-calc", version = "0.16.0" }
 dpp-tests         = { path = "crates/dpp-tests", version = "0.16.0" }
 

@@ -2,33 +2,26 @@
 // a third-party identifier that was verified against its authority's own
 // published source. There is deliberately no third category.
 //
-// This crate currently emits none. Identifiers that were evaluated and not
-// adopted are recorded in `allowlist.json` under `tracked`, with the correct
-// value where it is known, so adopting one starts from that record. Nothing
-// there is permitted: the gate reads `allowlist` only.
+// This crate currently emits none. The gate and the record of what was
+// evaluated and not adopted both live in `dpp-vocab` now — see
+// `dpp_vocab::is_own` for the namespace test and the `idta`, `eclass` and
+// `catena-x-battery-pass` vocabulary records for what was checked and why it
+// was refused.
 //
-// Five identifiers claiming IDTA and ECLASS authority were removed on
+// Six identifiers claiming IDTA and ECLASS authority were removed on
 // 2026-07-29 because they were wrong — not stale, wrong. IDTA semanticIds are
 // name-based (`https://admin-shell.io/idta/nameplate/3/0/Nameplate`,
-// `.../idta/CarbonFootprint/CarbonFootprint/0/9`); the removed ones used a
+// `.../idta/CarbonFootprint/CarbonFootprint/1/0`); the removed ones used a
 // `admin-shell.io/IDTA/<specification-document-number>/<v>/<v>` form that IDTA
 // does not use, so no consumer would have resolved them. The ECLASS IRDI
 // additionally carried Code Space Identifier `01` (Classification Class) while
 // being used as a Property semanticId, where `02` is the Property space.
 //
-// Adopting the *correct* IDTA identifiers is a separate change and needs the
-// specification PDFs read first. Coining an honest `urn:odal-node:` identifier
-// is not a lesser option: it says "this is our concept" truthfully, where a
-// wrong IRDI says "this is IDTA's concept" falsely, to a machine.
-
-/// The namespace this crate coins its own identifiers in.
-///
-/// An identifier under this prefix names *our* concept and needs no provenance
-/// record; anything outside it claims another organisation's vocabulary and is
-/// permitted only by a verified `allowlist.json` entry. One definition, because
-/// the provenance gate and the placeholder rule must not be able to disagree
-/// about where the boundary is.
-pub const OWN_NAMESPACE: &str = "urn:odal-node:";
+// Adopting the *correct* IDTA identifiers is a separate change and needs each
+// template's field set compared against ours first. Coining an honest
+// `urn:odal-node:` identifier is not a lesser option: it says "this is our
+// concept" truthfully, where a wrong IRDI says "this is IDTA's concept"
+// falsely, to a machine.
 
 // ── Submodel templates ───────────────────────────────────────────────────────
 // The semanticId of a Submodel. Distinct from the properties inside it: an AAS
@@ -77,7 +70,7 @@ pub const REPAIRABILITY_SCORE: &str = "urn:odal-node:aas:property:repairability-
 
 // The Catena-X Battery Pass aspect model is a candidate here; its
 // correspondence to this submodel's field set is not yet established. See
-// `allowlist.json` under `tracked`.
+// the `catena-x-battery-pass` vocabulary record in `dpp-vocab`.
 /// Odal Node battery technical data template.
 pub const BATTERY_TECHNICAL_DATA: &str =
     "urn:odal-node:aas:submodel-template:battery-technical-data:1.0";

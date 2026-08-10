@@ -26,7 +26,7 @@ impl SubmodelTemplate {
     /// A value that can be derived from another must be, or the two will
     /// eventually disagree and the wrong one will be the one somebody trusts.
     pub fn is_placeholder(&self) -> bool {
-        self.semantic_id.starts_with(semantic_ids::OWN_NAMESPACE)
+        dpp_vocab::is_own(self.semantic_id)
     }
 }
 

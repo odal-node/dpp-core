@@ -4,11 +4,11 @@
   "authority": "Schema.org (W3C Community Group; Google, Microsoft, Yahoo, Yandex)",
   "layer": "foundational",
   "namespaceIri": "https://schema.org/",
-  "usedFor": "Universal web fallback — generic metadata, dates, ratings, observations. Already referenced as the `schema:` prefix in this project's JSON-LD context.",
+  "usedFor": "Universal web fallback — generic metadata, dates, ratings, observations. Candidate `schema:` prefix for this project's JSON-LD context.",
   "licence": null,
   "status": "surveyed",
-  "checkedOn": "2026-08-07",
+  "checkedOn": "2026-08-10",
   "source": "Third-party vocabulary survey. Schema.org's own terms page has not been read for the terms we use.",
-  "finding": "This project's JSON-LD context already maps `createdAt -> schema:dateCreated` and `updatedAt -> schema:dateModified` with no provenance record. Both are plausible and neither is verified. `dateCreated`/`dateModified` carry Schema.org's own semantics about a CreativeWork, and whether those match a passport record's lifecycle timestamps is exactly the kind of near-miss that a machine consumer acts on and a human never re-reads.",
-  "nextStep": "Read Schema.org's definitions of `dateCreated` and `dateModified` and decide whether they mean what our lifecycle timestamps mean. If they do not, the honest move is a `urn:odal-node:` term, not a close-enough borrow."
+  "finding": "This project's JSON-LD context used to map `createdAt -> schema:dateCreated` and `updatedAt -> schema:dateModified` with no provenance record. Both were plausible and neither was verified — `dateCreated`/`dateModified` carry Schema.org's own semantics about a CreativeWork, and whether those match a passport record's lifecycle timestamps is exactly the kind of near-miss that a machine consumer acts on and a human never re-reads — so both were removed on 2026-08-10 in favour of `dpp:createdAt`/`dpp:updatedAt`.",
+  "nextStep": "Read Schema.org's definitions of `dateCreated` and `dateModified` and decide whether they mean what our lifecycle timestamps mean. If they do, restore the `schema:` mapping as a verified entry; if not, the `dpp:` terms stay the honest choice."
 }

@@ -1,0 +1,14 @@
+{
+  "key": "eclass",
+  "title": "ECLASS",
+  "authority": "ECLASS e.V.",
+  "layer": "foundational",
+  "namespaceIri": null,
+  "usedFor": "Candidate IRDI for the Repairability submodel's repairabilityScore property (EN 45554 index).",
+  "licence": null,
+  "status": "tracked",
+  "checkedOn": "2026-08-10",
+  "source": "https://eclass.eu/support/technical-specification/structure-and-elements/irdi, ECLASS's own technical-specification pages, read directly for this record.",
+  "finding": "One identifier was coined for this project's repairabilityScore property and removed on 2026-07-29: urn:eclass:0173-1#01-AKJ975#001. 'urn:eclass:' is not a scheme ECLASS publishes — an IRDI (International Registration Data Identifier, ISO/IEC 11179-6 / ISO 29002 / ISO/IEC 6523) is not itself a URI, and ECLASS does not mint a urn: form of it. The Code Space Identifier (CSI) segment was also wrong for the use: confirmed directly against ECLASS's own technical-specification page, CSI 01 denotes a Classification Class and CSI 02 a Property (05/07/09/11 separately cover unit of measure, property value, data type and ontology), and 01-AKJ975 was attached to a Property. No namespaceIri is recorded here because ECLASS does not publish IRDIs as dereferenceable IRIs under one prefix the way GS1 or Schema.org do — an IRDI is compared and looked up as a structured code, not matched by URI prefix.",
+  "nextStep": "With ECLASS Advanced access, locate the Property-space (02-) IRDI for the EN 45554 repairability index specifically, then confirm it against ECLASS's own definition before restoring the identifier."
+}
