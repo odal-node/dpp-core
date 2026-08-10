@@ -32,11 +32,12 @@
 //!
 //! # Current state
 //!
-//! **No vocabulary is verified.** Every third-party identifier is therefore
-//! refused. That is the accurate state of this project's knowledge rather than
-//! a gap waiting to be filled by default — the twelve records in
-//! `vocabularies/` each carry the finding that got them to their status and the
-//! step that would move them on.
+//! Five of the fourteen records in `vocabularies/` are verified as of
+//! 2026-08-11 (`batterypass-samm`, `catena-x-battery-pass`,
+//! `ec-battery-guidance`, `gs1`, `semic`) — each because a person read the
+//! authority's own publication and recorded what it said, not because the
+//! claim looked plausible. Everything else stays refused. Each record carries
+//! the finding that got it to its status and the step that would move it on.
 //!
 //! ```
 //! use dpp_vocab::{VocabularyRegister, Verdict};
