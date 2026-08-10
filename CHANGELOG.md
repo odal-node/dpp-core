@@ -31,6 +31,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   value — when it is absent, since a passport published before the mandate
   cannot be made to satisfy it.
 
+### Added
+
+- **`dpp-vocab` — a register of the upstream vocabularies this project may name,
+  and the gate that refuses the ones nobody has read.**
+
+  Naming another organisation's term asserts, to a machine, that our field means
+  what that organisation says its identifier means. Until now that claim had two
+  homes at two standards of rigour: `dpp-aas` recorded per-identifier provenance
+  and gated it in CI, while the JSON-LD context inlined `gs1:` and `schema:`
+  prefixes and three term mappings with no record at all.
+
+  The rule is one line: **an identifier is either in the `urn:odal-node:`
+  namespace, or it belongs to a vocabulary somebody has read.** There is
+  deliberately no third category, and today **no vocabulary is verified** — so
+  every third-party identifier is refused. That is the accurate state of what
+  this project knows, not a placeholder.
+
+  Twelve records ship in `vocabularies/`, one JSON file per authority, each
+  carrying the finding that got it to its status and the step that would move it
+  on. Two of them record something worth stating plainly: the IRIs under which a
+  third-party site serves the European Commission's battery-passport guidance
+  and GEFEG's BatteryPass-Ready attributes are **that site's own coinages** —
+  the Commission publishes none — so those records carry a null namespace and
+  the gate refuses anything under the intermediary's prefix.
+
+  Tests keep the six IDTA and ECLASS identifiers removed in 0.13.0 permanently
+  refused, and assert that `http://` and `https://` forms of a namespace are
+  different namespaces, since several EU persistent identifiers are minted on
+  `http` and an IRI is compared as a string.
+
+  A leaf crate: no workspace dependencies. Everything else here changes when an
+  EU regulation changes; this changes when GS1 or IDTA publishes, which is why
+  it sits apart from the passport model rather than inside it.
+
+  **Nothing is migrated into it yet.** `dpp-aas`'s allowlist and the JSON-LD
+  context's inlined prefixes move in a separate change, because that edit is
+  wire-visible and this one is not.
+
 ## [0.16.0] - 2026-08-07
 
 ### Added

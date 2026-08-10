@@ -1,0 +1,14 @@
+{
+  "key": "untp",
+  "title": "UN Transparency Protocol (UNTP)",
+  "authority": "UN/CEFACT — United Nations Economic Commission for Europe",
+  "layer": "community-profile",
+  "namespaceIri": "https://vocabulary.uncefact.org/untp/",
+  "usedFor": "Product-transparency and conformity credential detail. The nearest community profile to this project's credential work, and the only Layer-2 entry with a directly consumable artefact.",
+  "licence": null,
+  "status": "tracked",
+  "checkedOn": "2026-08-07",
+  "source": "https://vocabulary.uncefact.org/untp/ and its published sub-resources — classes, properties, code-lists, and the versioned context at /untp/0.7.0/context/. Fetched directly, not read from a survey.",
+  "finding": "Its JSON-LD context resolves and is real JSON-LD 1.1 — `@version: 1.1`, declaring `untp:`, `schema:`, `xsd:` and `renderMethodPrefix: https://w3id.org/vc/render-method#`. Terms are `@protected`, which means a later context cannot silently redefine them; that is a genuine integrity property for a signed document and the strongest technical argument for this vocabulary over its Layer-2 peers. Two things hold it at tracked. First, LICENCE: none is stated anywhere, and the page carries '(c) United Nations Economic Commission for Europe' — a copyright notice with no grant is a reuse blocker, not an absence of one. Second, VERSION: 0.7.0 is pre-1.0, and referencing a remote context is an operational commitment rather than a library decision — a string entry in `@context` is fetched at expansion time, and this project already removed two remote contexts for returning 404. Separately and usefully: its code lists include ProductIDGranularity and ProductStatus but NO product classification, category or commodity-code list. A UN/CEFACT protocol built for this exact domain defines no product-category vocabulary either, which corroborates from outside the OJ texts that there is no cross-sector category axis to adopt.",
+  "nextStep": "Establish the licence — it is the only thing between this and verified status, and UNECE material is usually reusable on terms that simply are not stated on the vocabulary page. Then read the conformity-credential model against this project's credential types BEFORE the credential door is built, so the shape is chosen with the profile in view rather than mapped to it afterwards. Its ProductIDGranularity list is worth comparing against RegistrationGranularity, which models the same model/batch/item axis that IR 2026/1778 Art. 8 requires."
+}

@@ -1,0 +1,14 @@
+{
+  "key": "dpp-keystone",
+  "title": "DPP Keystone",
+  "authority": "DPP Keystone project",
+  "layer": "community-profile",
+  "namespaceIri": "https://dpp-keystone.org/spec/v2/terms#",
+  "usedFor": "Peer DPP profile (v2) — iron and steel, EPD, textile and construction terms.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey. The Keystone specification has not been read.",
+  "finding": "A peer profile with no institutional standing behind it — neither a standards body nor a Commission programme. Useful as a gap-analysis input for the product groups it covers, which overlap ours in steel, textile and construction. It is not an authority to anchor to.",
+  "nextStep": "Nothing until a term gap is being worked in one of the four overlapping product groups. Reading a peer's model to find what we have not modelled is legitimate; adopting its IRIs is not, unless it turns out to carry standing this survey missed."
+}

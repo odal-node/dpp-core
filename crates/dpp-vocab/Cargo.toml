@@ -1,0 +1,21 @@
+[package]
+name        = "dpp-vocab"
+description = "Upstream vocabulary register for Digital Product Passports — who publishes a term, under what licence, and whether a human verified it"
+keywords    = ["dpp", "vocabulary", "semantic", "gs1", "provenance"]
+categories  = ["data-structures"]
+version.workspace     = true
+edition.workspace     = true
+authors.workspace     = true
+license.workspace     = true
+repository.workspace  = true
+homepage.workspace    = true
+rust-version.workspace = true
+
+# Leaf crate: no workspace dependencies, by design. A vocabulary record is a
+# fact about someone else's publication, not about a passport — if this crate
+# ever needs `dpp-domain`, the dependency is the signal that something
+# passport-shaped has leaked into it.
+[dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }

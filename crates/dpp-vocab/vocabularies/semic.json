@@ -1,0 +1,14 @@
+{
+  "key": "semic",
+  "title": "EU SEMICeu Core Vocabularies",
+  "authority": "European Commission — SEMIC (Semantic Interoperability Community)",
+  "layer": "foundational",
+  "namespaceIri": "http://data.europa.eu/m8g/",
+  "usedFor": "EU public-sector canonical models — conformity (CCCEV), legal entities, addresses, identifier schemes (CPOV, Core Location, ADMS). The natural anchor for operator identity and conformity assertions.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey. The SEMIC publication has not been read.",
+  "finding": "The one foundational vocabulary here published by the same institution that writes the law we implement, which makes it the strongest anchor available for operator- and conformity-shaped terms. Note the namespace is `http://`, not `https://` — EU persistent identifiers are commonly minted on `http` and must be reproduced exactly rather than silently upgraded, since an IRI is compared as a string.",
+  "nextStep": "Read the Core Vocabularies specifications for the conformity and legal-entity terms, and check whether IR (EU) 2026/1778 Art. 12's semantic repository builds on them — Art. 11(2) says data models 'may build on existing Union semantic assets, controlled vocabularies and reference data models', which is most likely a reference to these."
+}

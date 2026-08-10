@@ -11,6 +11,7 @@ members = [
     "crates/dpp-plugin-sdk",
     "crates/dpp-registry",
     "crates/dpp-calc",
+    "crates/dpp-vocab",
     "crates/dpp-tests",
     "benches",
 ]

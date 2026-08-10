@@ -1,0 +1,14 @@
+{
+  "key": "batterypass-ready",
+  "title": "GEFEG BatteryPass-Ready longlist attributes",
+  "authority": "GEFEG (publication and validation channel for the Battery Pass Consortium)",
+  "layer": "conformance-bridge",
+  "namespaceIri": null,
+  "usedFor": "The few battery attributes reported to have no SAMM equivalent — a DPP-information group plus lossless-carrier keys.",
+  "licence": null,
+  "status": "tracked",
+  "checkedOn": "2026-08-07",
+  "source": "Third-party vocabulary survey, reporting v1.3.",
+  "finding": "`namespaceIri` is null deliberately. The survey serves these terms under `https://ref.openepcis.io/vocab/batterypass-ready/1.3#` — an IRI minted by the surveying site, not by GEFEG. Recording it as GEFEG's namespace would assert GEFEG authority through a third party's coined identifier, which is the defect that put six wrong IDTA identifiers into a published crate in 2026-07. The attributes may well be real and worth having; the IRI is not GEFEG's to lend and not ours to borrow.",
+  "nextStep": "Find out whether GEFEG publishes IRIs for these attributes at all. If it does not, they can only ever be modelled as our own terms with a citation to GEFEG — never under a namespace that implies GEFEG minted them."
+}
