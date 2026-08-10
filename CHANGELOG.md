@@ -13,6 +13,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`BatteryData.battery_type` is required and closed.** Annex VI Part A
+  point 2, made public by Annex XIII point 1(a), lists the battery category as
+  mandatory content of the passport's publicly accessible tier — the field was
+  `Option<BatteryType>` and `BatteryType` carried a `#[serde(other)]` catch-all
+  that silently flattened any unrecognised value to `Other`, discarding it on
+  round-trip. Art. 1(3) is a closed enumeration of five categories with a
+  strictest-requirements tie-break that only functions over a closed set, so
+  the catch-all is gone: an unrecognised value is now a parse error, the same
+  fix already shipped for `CarbonFootprintClass`.
+
+  New schema `v2.5.0`: `batteryType` moves into `required` and its enum drops
+  `null`. A `v2.4.0 → v2.5.0` lens passes existing records through unchanged
+  when `batteryType` is present and **refuses** — rather than inventing a
+  value — when it is absent, since a passport published before the mandate
+  cannot be made to satisfy it.
+
 ### Added
 
 - **`dpp-vocab` — a register of the upstream vocabularies this project may name,

@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_domain::domain::gtin::Gtin;
 use dpp_domain::domain::sector::{
-    BatteryChemistry, BatteryData, FibreEntry, SectorData, TextileData,
+    BatteryChemistry, BatteryData, BatteryType, FibreEntry, SectorData, TextileData,
 };
 use dpp_domain::domain::validation::{validate_sector_data, validate_sector_data_batch};
 
@@ -36,7 +36,7 @@ fn valid_battery() -> SectorData {
         rated_energy_wh: None,
         recycled_content_lead_pct: None,
         battery_weight_kg: None,
-        battery_type: None,
+        battery_type: BatteryType::Portable,
         round_trip_efficiency_pct: None,
         internal_resistance_mohm: None,
         placed_on_market_date: None,

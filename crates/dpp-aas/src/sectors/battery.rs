@@ -1,7 +1,9 @@
 use dpp_domain::BatteryData;
 
 use crate::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
-use crate::property::{double_property, integer_property, opt_enum_wire_str, string_property};
+use crate::property::{
+    double_property, enum_wire_str, integer_property, opt_enum_wire_str, string_property,
+};
 use crate::semantic_ids;
 
 pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasSubmodel {
@@ -20,6 +22,7 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
             b.co2e_per_unit_kg,
             Some(semantic_ids::CO2E_PER_UNIT),
         ),
+        string_property("batteryType", &enum_wire_str(&b.battery_type), None),
     ];
 
     macro_rules! push_opt_double {
@@ -51,9 +54,6 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
     push_opt_double!(b.recycled_content_lead_pct, "recycledContentLeadPct");
     if let Some(s) = opt_enum_wire_str(&b.carbon_footprint_class) {
         elements.push(string_property("carbonFootprintClass", &s, None));
-    }
-    if let Some(s) = opt_enum_wire_str(&b.battery_type) {
-        elements.push(string_property("batteryType", &s, None));
     }
     push_opt_str!(b.soh_methodology, "sohMethodology");
 

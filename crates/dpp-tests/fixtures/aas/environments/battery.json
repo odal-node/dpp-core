@@ -358,6 +358,12 @@
               }
             ]
           }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "batteryType",
+          "valueType": "xs:string",
+          "value": "ev"
         }
       ]
     }

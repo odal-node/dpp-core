@@ -360,6 +360,17 @@ fn builtin_lenses() -> Vec<Lens> {
             battery_v1_to_v2,
         ),
         Lens::new(
+            "battery",
+            Version::new(2, 4, 0),
+            Version::new(2, 5, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Annex VI Part A point 2 (via Annex XIII \
+             point 1(a)) v2.5.0: batteryType becomes required and closed. A v2.4.0 \
+             record with no batteryType predates the mandate and cannot be upgraded \
+             without inventing a value, so this hop refuses rather than default one.",
+            battery_v2_4_to_v2_5,
+        ),
+        Lens::new(
             "steel",
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
@@ -469,6 +480,26 @@ fn battery_v1_to_v2(v1: &Value) -> Result<Value, LensError> {
         obj.insert("ratedEnergyWh".to_owned(), serde_json::json!(wh));
     }
     Ok(out)
+}
+
+/// Battery `v2.4.0 → v2.5.0`: passes every field through unchanged. Refuses,
+/// rather than defaulting a value, when `batteryType` is absent or not a
+/// string — the field becomes required at v2.5.0, and a record written before
+/// the mandate existed cannot be made to satisfy it without inventing a
+/// category the manufacturer never declared.
+fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
+    let obj = v
+        .as_object()
+        .ok_or_else(|| LensError("battery sector data must be a JSON object".to_owned()))?;
+    match obj.get("batteryType") {
+        Some(Value::String(_)) => Ok(v.clone()),
+        _ => Err(LensError(
+            "batteryType is required from v2.5.0 (EU 2023/1542 Annex VI Part A point 2 \
+             via Annex XIII point 1(a)); this record predates the mandate and has none, \
+             so it cannot be upgraded"
+                .to_owned(),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -793,6 +824,39 @@ mod tests {
                 .unwrap();
             assert_eq!(d.data["ratedEnergyWh"].as_f64(), Some(wh), "kwh {kwh}");
         }
+    }
+
+    #[test]
+    fn battery_v2_4_to_v2_5_passes_through_with_battery_type() {
+        let lenses = LensRegistry::new();
+        let schemas = VersionedSchemaRegistry::new();
+        let mut v2_4 = battery_v1();
+        v2_4.as_object_mut()
+            .unwrap()
+            .insert("batteryType".into(), serde_json::json!("ev"));
+
+        let derived = lenses
+            .upcast("battery", &v2_4, &v("2.4.0"), &v("2.5.0"))
+            .unwrap();
+
+        assert!(!derived.lossy);
+        assert_eq!(derived.data["batteryType"], "ev");
+        schemas
+            .validate("battery", &v("2.5.0"), &derived.data)
+            .expect("derived view must validate against v2.5.0");
+    }
+
+    #[test]
+    fn battery_v2_4_to_v2_5_refuses_when_battery_type_is_absent() {
+        // The one hard question this lens exists to answer: a passport
+        // published without batteryType predates the v2.5.0 mandate and
+        // cannot be upgraded into satisfying it without inventing a value.
+        // A typed refusal is correct here, not a silent identity or a guess.
+        let lenses = LensRegistry::new();
+        let err = lenses
+            .upcast("battery", &battery_v1(), &v("2.4.0"), &v("2.5.0"))
+            .unwrap_err();
+        assert!(matches!(err, UpcastError::Transform(_)));
     }
 
     #[test]

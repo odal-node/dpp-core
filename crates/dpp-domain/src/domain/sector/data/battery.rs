@@ -121,9 +121,15 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub battery_weight_kg: Option<f64>,
 
-    /// Battery type category per EU Battery Regulation 2023/1542 Art. 2.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub battery_type: Option<BatteryType>,
+    /// Battery category per EU Battery Regulation 2023/1542 Art. 1(3).
+    ///
+    /// **Required since v2.5.0.** Annex VI Part A point 2, made public by
+    /// Annex XIII point 1(a), lists "the battery category" as mandatory
+    /// content of the publicly accessible tier — so a battery passport
+    /// without one omits content the law requires. Earlier schema versions
+    /// carry no equivalent field, which is why the v2.4.0 → v2.5.0 lens
+    /// refuses rather than upgrading a record that predates the mandate.
+    pub battery_type: BatteryType,
 
     /// Round-trip energy efficiency at 50% state of charge (percentage).
     #[serde(skip_serializing_if = "Option::is_none")]
