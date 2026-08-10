@@ -186,7 +186,7 @@ Source: EU Battery Regulation (EU) 2023/1542, Annex XIII. Battery DPP mandatory 
 | `operating_temp_min_c` | `Option<f64>` | `"operatingTempMinC"` | Annex XIII |
 | `operating_temp_max_c` | `Option<f64>` | `"operatingTempMaxC"` | Annex XIII |
 | `battery_weight_kg` | `Option<f64>` | `"batteryWeightKg"` | Annex XIII |
-| `battery_type` | `Option<String>` | `"batteryType"` | Per regulation: portable, industrial, ev, lmt, starting-lighting-ignition |
+| `battery_type` | `String` (required since v2.5.0) | `"batteryType"` | Art. 1(3), closed enum: portable, industrial, ev, lmt, starting-lighting-ignition — mandatory public content (Annex VI Part A pt 2 via Annex XIII pt 1(a)) |
 | `round_trip_efficiency_pct` | `Option<f64>` | `"roundTripEfficiencyPct"` | Art. 10 — at 50% SoC |
 | `internal_resistance_mohm` | `Option<f64>` | `"internalResistanceMohm"` | Art. 10 — at 50% SoC |
 

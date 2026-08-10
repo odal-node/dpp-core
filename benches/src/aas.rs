@@ -7,7 +7,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_aas::build_aas_from_passport;
 use dpp_domain::Audience;
 use dpp_domain::domain::gtin::Gtin;
-use dpp_domain::domain::sector::{BatteryChemistry, BatteryData, SectorData};
+use dpp_domain::domain::sector::{BatteryChemistry, BatteryData, BatteryType, SectorData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, Sector};
 use dpp_tests::fixtures::base_passport;
 
@@ -65,7 +65,7 @@ fn battery_passport() -> Passport {
                 rated_energy_wh: Some(320.0),
                 recycled_content_lead_pct: None,
                 battery_weight_kg: Some(15.5),
-                battery_type: None,
+                battery_type: BatteryType::Ev,
                 round_trip_efficiency_pct: Some(94.5),
                 internal_resistance_mohm: Some(0.8),
                 placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),

@@ -325,6 +325,20 @@ fn battery_enum_wire_values_match_schema() {
     }
 }
 
+// Regression: Art. 1(3) is a closed set of five categories, and an
+// unrecognised value used to flatten to `BatteryType::Other`, discarding the
+// declared string on round-trip — the same defect class already fixed for
+// `CarbonFootprintClass`. There is no catch-all left to absorb it.
+#[test]
+fn unrecognised_battery_type_is_rejected_not_flattened() {
+    for bad in ["\"stationary\"", "\"Portable\"", "\"\"", "null"] {
+        assert!(
+            serde_json::from_str::<BatteryType>(bad).is_err(),
+            "should reject {bad}"
+        );
+    }
+}
+
 #[test]
 fn sector_data_textile_round_trip() {
     let mut data = test_textile_data();
