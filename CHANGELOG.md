@@ -15,6 +15,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`SectorData::Battery` and `SectorData::Textile` now hold a `Box`.** Both
+  product groups have real models rather than stubs, and an unboxed variant made
+  *every* `SectorData` — a toy's included — as large as the largest one:
+  `BatteryData` alone reached 1 KiB once the Annex XIII point 1 tier landed.
+  Boxing keeps the enum the size of its largest *unboxed* variant and costs one
+  indirection on those two paths only. Serde treats `Box<T>` as `T`, so **the
+  wire is unchanged**; only Rust construction and destructuring move. The rule
+  is the payload's size, not the sector — a stub that grows a body gets boxed
+  when it does.
+
 - **Annex XIII points 1(n) and 1(o) each become two fields, and one of them
   named the wrong thing.** Both are single fields in `v2.5.0` where the
   regulation asks for a pair.
