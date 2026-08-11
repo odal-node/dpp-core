@@ -16,6 +16,33 @@ use super::shared::CriticalRawMaterial;
 /// are mandatory for publishing a battery DPP. Fields added in v2.0.0 of the
 /// schema are marked `Option` and `skip_serializing_if` to maintain backward
 /// compatibility with v1.0.0 data.
+///
+/// # Superseded fields are kept, not deleted
+///
+/// The standing rule for this crate, and the reason `state_of_health_pct`,
+/// `round_trip_efficiency_pct` and `internal_resistance_mohm` are all still
+/// here:
+///
+/// > **A superseded field is marked legacy and retained. A field is deleted
+/// > only when keeping it is itself the defect.**
+///
+/// Retention is the default because a stored record is entitled to keep its
+/// value under the name it was written with. Re-homing it into a successor
+/// asserts a correspondence the source never made — `internal_resistance_mohm`
+/// cannot say whether it held the cell or the pack figure, so any lens that
+/// picked one would invent the distinction the split exists to record. A legacy
+/// field costs a doc comment and a `skip_serializing_if`; a wrong migration
+/// costs the meaning of the data.
+///
+/// Deletion is reserved for the cases where the field's continued existence is
+/// the harm rather than its obsolescence — `BatteryType::Other` silently
+/// discarded unrecognised categories on round-trip, and the withdrawn IDTA and
+/// ECLASS identifiers asserted another organisation's authority falsely. In
+/// both, keeping the thing was the defect.
+///
+/// Legacy is marked by doc comment rather than `#[deprecated]`: the attribute
+/// fires on every struct-literal construction, including every fixture, which
+/// buys warning noise rather than safety in a struct nobody builds by accident.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BatteryData {
@@ -169,6 +196,31 @@ pub struct BatteryData {
     /// travels with the field rather than in a comment that was wrong.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub round_trip_efficiency_at_half_cycle_life_pct: Option<f64>,
+
+    /// **Legacy.** Round trip energy efficiency, unqualified — the single field
+    /// that preceded the Annex XIII point 1(n) pair above.
+    ///
+    /// Retained so a record written against v2.5.0 keeps its value under its own
+    /// name rather than being reinterpreted or refused. Its doc comment then
+    /// read "at 50% state of charge", a condition 1(n) does not state, so the
+    /// number's exact meaning is whatever the filer intended. New passports
+    /// populate [`initial_round_trip_efficiency_pct`](Self::initial_round_trip_efficiency_pct)
+    /// or
+    /// [`round_trip_efficiency_at_half_cycle_life_pct`](Self::round_trip_efficiency_at_half_cycle_life_pct).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub round_trip_efficiency_pct: Option<f64>,
+
+    /// **Legacy.** Internal resistance in milliohms, without saying whether it
+    /// is the cell or the pack figure Annex XIII point 1(o) requires.
+    ///
+    /// That ambiguity is the reason the field was split, and the reason this one
+    /// is kept rather than migrated: no rule can decide which measurement a
+    /// stored value was, and inventing one would manufacture the distinction.
+    /// Preserved verbatim; new passports populate
+    /// [`internal_cell_resistance_mohm`](Self::internal_cell_resistance_mohm)
+    /// and [`internal_pack_resistance_mohm`](Self::internal_pack_resistance_mohm).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_resistance_mohm: Option<f64>,
 
     /// Internal **cell** resistance in milliohms (mΩ) — **Annex XIII point
     /// 1(o)**, *"internal battery cell and pack resistance"*.

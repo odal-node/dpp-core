@@ -15,6 +15,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`round_trip_efficiency_pct` and `internal_resistance_mohm` are back, marked
+  legacy.** Both were deleted when Annex XIII points 1(n) and 1(o) split into
+  pairs. Neither should have been: they were *mislabelled*, not harmful, and a
+  stored record is entitled to keep its value under the name it was written
+  with.
+
+  Keeping them also lets the `v2.5.0 → v2.6.0` lens stop refusing.
+  `internalResistanceMohm` cannot say whether it held the cell or the pack
+  figure, so any lens that picked one would invent the distinction the split
+  exists to record — and any lens that dropped it would lose the number. Now
+  both legacy keys are carried verbatim and the successor fields carry new
+  declarations only.
+
+  This sets the standing rule, recorded on `BatteryData`: **a superseded field
+  is marked legacy and retained; a field is deleted only when keeping it is
+  itself the defect.** `BatteryType::Other` had to go because it silently
+  discarded unrecognised categories; the withdrawn IDTA and ECLASS identifiers
+  had to go because they asserted another organisation's authority falsely. An
+  obsolete-but-honest field costs a doc comment.
+
 - **Disclosure is now sourced from the passport's own schema version, and
   `SectorAccessPolicy::from_catalog` is deprecated.** `for_schema_version` reads
   a field's access class from the schema the passport was validated against, so

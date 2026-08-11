@@ -526,50 +526,22 @@ fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
 /// materialising an empty point-4 block would assert that the battery reported
 /// measurements it never reported.
 ///
-/// **`roundTripEfficiencyPct` → `roundTripEfficiencyAtHalfCycleLifePct`.** A
-/// rename, not a reinterpretation: v2.5.0 documented the field as "at 50% state
-/// of charge", which names no data point in the regulation. Annex XIII
-/// point 1(n) asks for efficiency when new and at 50 % of *cycle-life*, and
-/// carries no state-of-charge qualifier anywhere. The stored number was
-/// therefore always the 1(n) second figure whatever the comment said, so
-/// carrying it across loses nothing.
-///
-/// **`internalResistanceMohm` refuses when present.** Annex XIII point 1(o) is
-/// *"internal battery cell **and** pack resistance"* — two measurements. One
-/// stored number cannot say which it is, and the two are not interchangeable.
-/// Guessing a home for it would invent the distinction the split exists to
-/// record, so this hop refuses, the same choice the `v2.4.0` hop makes about
-/// `batteryType`. Absent, there is nothing to place and the record passes.
-///
-/// That refusal covers an empty population by construction — no version from
-/// v2.5.0 onward has ever been published — but the lens has to be right about
-/// the general case rather than about today's data.
+/// **`roundTripEfficiencyPct` and `internalResistanceMohm` are carried
+/// verbatim.** Annex XIII splits each into a pair at v2.6.0 — 1(n) into the
+/// initial figure and the one at 50 % of cycle-life, 1(o) into cell and pack —
+/// but neither legacy value can be assigned to a half of its pair. The first
+/// was documented against "50% state of charge", a condition 1(n) does not
+/// state; the second cannot say whether it was the cell or the pack. Both keys
+/// therefore survive into v2.6.0 under their own names, marked legacy, and the
+/// successor fields carry new declarations only. Moving a value would invent
+/// the very distinction the split exists to record.
 fn battery_v2_5_to_v2_6(v: &Value) -> Result<Value, LensError> {
-    let obj = v
-        .as_object()
-        .ok_or_else(|| LensError("battery sector data must be a JSON object".to_owned()))?;
-
-    if obj
-        .get("internalResistanceMohm")
-        .is_some_and(|r| !r.is_null())
-    {
+    if !v.is_object() {
         return Err(LensError(
-            "internalResistanceMohm cannot be upgraded: Annex XIII point 1(o) requires \
-             internal cell *and* pack resistance, and one stored value does not say \
-             which it is. Re-declare it as internalCellResistanceMohm or \
-             internalPackResistanceMohm."
-                .to_owned(),
+            "battery sector data must be a JSON object".to_owned(),
         ));
     }
-
-    let mut out = obj.clone();
-    out.remove("internalResistanceMohm");
-    if let Some(rte) = out.remove("roundTripEfficiencyPct")
-        && !rte.is_null()
-    {
-        out.insert("roundTripEfficiencyAtHalfCycleLifePct".to_owned(), rte);
-    }
-    Ok(Value::Object(out))
+    Ok(v.clone())
 }
 
 #[cfg(test)]
@@ -980,62 +952,40 @@ mod tests {
     }
 
     #[test]
-    fn battery_v2_5_to_v2_6_renames_the_round_trip_efficiency_figure() {
-        // Annex XIII point 1(n) qualifies its second figure by cycle-life. The
-        // v2.5.0 key was documented "at 50% state of charge", which names no
-        // data point in the regulation, so the stored number was always the
-        // 1(n) figure and the rename loses nothing.
+    fn battery_v2_5_to_v2_6_carries_both_legacy_keys_verbatim() {
+        // Neither legacy value can be assigned to a half of its Annex XIII pair
+        // — one names a condition the annex does not state, the other cannot
+        // say whether it was cell or pack. So both survive under their own
+        // names rather than being moved, guessed at, or refused.
         let lenses = LensRegistry::new();
         let schemas = VersionedSchemaRegistry::new();
         let mut data = battery_v1();
         let obj = data.as_object_mut().unwrap();
         obj.insert("batteryType".into(), serde_json::json!("ev"));
         obj.insert("roundTripEfficiencyPct".into(), serde_json::json!(91.5));
+        obj.insert("internalResistanceMohm".into(), serde_json::json!(12.0));
 
         let derived = lenses
             .upcast("battery", &data, &v("2.5.0"), &v("2.6.0"))
             .unwrap();
 
         assert!(!derived.lossy);
-        assert_eq!(
-            derived.data["roundTripEfficiencyAtHalfCycleLifePct"],
-            serde_json::json!(91.5)
-        );
-        assert!(
-            derived.data.get("roundTripEfficiencyPct").is_none(),
-            "the old key survived the rename"
-        );
+        assert_eq!(derived.data["roundTripEfficiencyPct"], 91.5);
+        assert_eq!(derived.data["internalResistanceMohm"], 12.0);
+        for successor in [
+            "roundTripEfficiencyAtHalfCycleLifePct",
+            "initialRoundTripEfficiencyPct",
+            "internalCellResistanceMohm",
+            "internalPackResistanceMohm",
+        ] {
+            assert!(
+                derived.data.get(successor).is_none(),
+                "the lens populated '{successor}', inventing a distinction the                  source never made"
+            );
+        }
         schemas
             .validate("battery", &v("2.6.0"), &derived.data)
-            .expect("the renamed view validates");
-    }
-
-    #[test]
-    fn battery_v2_5_to_v2_6_refuses_an_unattributable_internal_resistance() {
-        // Annex XIII point 1(o) requires cell *and* pack resistance. One stored
-        // number cannot say which it was, and picking a home for it would
-        // invent exactly the distinction the split exists to record. Refusing
-        // is the same choice the v2.4.0 hop makes about batteryType.
-        let lenses = LensRegistry::new();
-        let mut data = battery_v1();
-        let obj = data.as_object_mut().unwrap();
-        obj.insert("batteryType".into(), serde_json::json!("ev"));
-        obj.insert("internalResistanceMohm".into(), serde_json::json!(12.0));
-
-        let err = lenses
-            .upcast("battery", &data, &v("2.5.0"), &v("2.6.0"))
-            .unwrap_err();
-        assert!(matches!(err, UpcastError::Transform(_)));
-
-        // Absent, there is nothing to place and the record passes.
-        data.as_object_mut()
-            .unwrap()
-            .remove("internalResistanceMohm");
-        assert!(
-            lenses
-                .upcast("battery", &data, &v("2.5.0"), &v("2.6.0"))
-                .is_ok()
-        );
+            .expect("both legacy keys validate against v2.6.0");
     }
 
     #[test]

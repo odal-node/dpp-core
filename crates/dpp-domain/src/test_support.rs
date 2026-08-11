@@ -118,6 +118,8 @@ pub(crate) fn sample_battery_data() -> BatteryData {
         battery_type: BatteryType::Portable,
         initial_round_trip_efficiency_pct: None,
         round_trip_efficiency_at_half_cycle_life_pct: None,
+        round_trip_efficiency_pct: None,
+        internal_resistance_mohm: None,
         internal_cell_resistance_mohm: None,
         internal_pack_resistance_mohm: None,
         placed_on_market_date: None,

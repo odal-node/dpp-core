@@ -280,6 +280,8 @@ fn battery_data_with_due_diligence() -> BatteryData {
         battery_type: BatteryType::Ev,
         initial_round_trip_efficiency_pct: None,
         round_trip_efficiency_at_half_cycle_life_pct: Some(94.0),
+        round_trip_efficiency_pct: None,
+        internal_resistance_mohm: None,
         internal_cell_resistance_mohm: Some(3.2),
         internal_pack_resistance_mohm: None,
         placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
