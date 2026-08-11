@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn clean_battery_produces_no_findings() {
-        let data = SectorData::Battery(battery());
+        let data = SectorData::Battery(Box::new(battery()));
         assert!(lint_sector_data(&data, Utc::now()).is_empty());
     }
 
@@ -195,7 +195,7 @@ mod tests {
     fn battery_energy_mismatch_surfaces_as_domain_finding() {
         let mut b = battery();
         b.rated_energy_wh = Some(500.0); // 3.7 * 10.0 = 37.0 expected
-        let data = SectorData::Battery(b);
+        let data = SectorData::Battery(Box::new(b));
         let findings = lint_sector_data(&data, Utc::now());
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].code, "battery.energy_capacity_mismatch");
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn lint_result_compute_stamps_pack_version_and_timestamp() {
-        let data = SectorData::Battery(battery());
+        let data = SectorData::Battery(Box::new(battery()));
         let result = LintResult::compute(&data);
         assert_eq!(result.pack_version, dpp_rules::lint::LINT_PACK_VERSION);
         assert!(result.findings.is_empty());
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn lint_result_serde_round_trip() {
-        let data = SectorData::Battery(battery());
+        let data = SectorData::Battery(Box::new(battery()));
         let result = LintResult::compute(&data);
         let json = serde_json::to_value(&result).unwrap();
         let back: LintResult = serde_json::from_value(json).unwrap();

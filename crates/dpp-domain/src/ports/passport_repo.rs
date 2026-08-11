@@ -452,9 +452,9 @@ mod tests {
         let repo = InMemoryRepo::default();
         let mut p = draft_passport("Battery A");
         p.sector = Sector::Battery;
-        p.sector_data = Some(SectorData::Battery(
+        p.sector_data = Some(SectorData::Battery(Box::new(
             crate::test_support::sample_battery_data(),
-        ));
+        )));
         p.batch_id = Some("BATCH-1".into());
         let created = repo.create(p).await.unwrap();
 

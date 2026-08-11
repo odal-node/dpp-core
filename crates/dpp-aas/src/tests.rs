@@ -224,6 +224,26 @@ fn battery_data_with_due_diligence() -> BatteryData {
         recycled_content_nickel_pct: None,
         state_of_health_pct: Some(95.0),
         state_of_health: None,
+        hazardous_substances: None,
+        usable_extinguishing_agent: None,
+        renewable_content_pct: None,
+        minimal_voltage_v: None,
+        maximum_voltage_v: None,
+        voltage_temperature_range: None,
+        original_power_capability_w: None,
+        power_limit_min_w: None,
+        power_limit_max_w: None,
+        power_temperature_range: None,
+        expected_lifetime_reference_test: None,
+        capacity_threshold_for_exhaustion_pct: None,
+        not_in_use_temperature_range: None,
+        not_in_use_temperature_reference_test: None,
+        commercial_warranty_period_months: None,
+        cycle_life_test_c_rate: None,
+        marking_information: None,
+        hazard_symbol: None,
+        eu_declaration_of_conformity: None,
+        waste_battery_information: None,
         dynamic_performance: None,
         battery_status: None,
         usage_history: None,
@@ -261,7 +281,9 @@ fn battery_data_with_due_diligence() -> BatteryData {
 #[test]
 fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+    passport.sector_data = Some(SectorData::Battery(Box::new(
+        battery_data_with_due_diligence(),
+    )));
 
     let (shell, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
@@ -312,7 +334,9 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
 #[test]
 fn restricted_audience_receives_the_restricted_battery_field() {
     let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+    passport.sector_data = Some(SectorData::Battery(Box::new(
+        battery_data_with_due_diligence(),
+    )));
 
     let (_, submodels) = build_aas_from_passport(
         &passport,
@@ -338,7 +362,7 @@ fn restricted_audience_receives_the_restricted_battery_field() {
 #[test]
 fn build_aas_textile_has_fibre_composition_collection() {
     let mut passport = minimal_passport(Sector::Textile);
-    passport.sector_data = Some(SectorData::Textile(TextileData {
+    passport.sector_data = Some(SectorData::Textile(Box::new(TextileData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
@@ -376,7 +400,7 @@ fn build_aas_textile_has_fibre_composition_collection() {
         repair_history_url: None,
         repair_count: None,
         pef_score: None,
-    }));
+    })));
 
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
@@ -614,7 +638,9 @@ fn a_sector_without_a_typed_mapper_still_carries_its_data() {
 #[test]
 fn environment_carries_the_shell_and_every_submodel() {
     let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+    passport.sector_data = Some(SectorData::Battery(Box::new(
+        battery_data_with_due_diligence(),
+    )));
 
     let env = build_aas_environment(&passport, "09506000134352", Audience::Public)
         .expect("environment is buildable");
@@ -637,7 +663,9 @@ fn environment_carries_the_shell_and_every_submodel() {
 #[test]
 fn environment_is_masked_for_its_audience() {
     let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(battery_data_with_due_diligence()));
+    passport.sector_data = Some(SectorData::Battery(Box::new(
+        battery_data_with_due_diligence(),
+    )));
 
     let public = build_aas_environment(&passport, "09506000134352", Audience::Public)
         .expect("public environment");

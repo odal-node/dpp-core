@@ -440,10 +440,12 @@ mod tests {
         use crate::domain::sector::SectorData;
 
         let mut passport = make_published_passport();
-        passport.sector_data = Some(SectorData::Battery(crate::domain::sector::BatteryData {
-            battery_model_id: Some("BM-4815".into()),
-            ..crate::test_support::sample_battery_data()
-        }));
+        passport.sector_data = Some(SectorData::Battery(Box::new(
+            crate::domain::sector::BatteryData {
+                battery_model_id: Some("BM-4815".into()),
+                ..crate::test_support::sample_battery_data()
+            },
+        )));
 
         let req = RegistrationRequest::from_published_passport(
             &passport,

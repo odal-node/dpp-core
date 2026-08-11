@@ -6,7 +6,7 @@ use dpp_domain::domain::sector::{
 use dpp_domain::domain::validation::{validate_sector_data, validate_sector_data_batch};
 
 fn valid_battery() -> SectorData {
-    SectorData::Battery(BatteryData {
+    SectorData::Battery(Box::new(BatteryData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 48.0,
@@ -18,6 +18,26 @@ fn valid_battery() -> SectorData {
         recycled_content_nickel_pct: None,
         state_of_health_pct: None,
         state_of_health: None,
+        hazardous_substances: None,
+        usable_extinguishing_agent: None,
+        renewable_content_pct: None,
+        minimal_voltage_v: None,
+        maximum_voltage_v: None,
+        voltage_temperature_range: None,
+        original_power_capability_w: None,
+        power_limit_min_w: None,
+        power_limit_max_w: None,
+        power_temperature_range: None,
+        expected_lifetime_reference_test: None,
+        capacity_threshold_for_exhaustion_pct: None,
+        not_in_use_temperature_range: None,
+        not_in_use_temperature_reference_test: None,
+        commercial_warranty_period_months: None,
+        cycle_life_test_c_rate: None,
+        marking_information: None,
+        hazard_symbol: None,
+        eu_declaration_of_conformity: None,
+        waste_battery_information: None,
         dynamic_performance: None,
         battery_status: None,
         usage_history: None,
@@ -49,11 +69,11 @@ fn valid_battery() -> SectorData {
         manufacturing_place: None,
         battery_model_id: None,
         battery_passport_number: None,
-    })
+    }))
 }
 
 fn valid_textile() -> SectorData {
-    SectorData::Textile(TextileData {
+    SectorData::Textile(Box::new(TextileData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
@@ -91,7 +111,7 @@ fn valid_textile() -> SectorData {
         repair_history_url: None,
         repair_count: None,
         pef_score: None,
-    })
+    }))
 }
 
 fn validation_benchmarks(c: &mut Criterion) {

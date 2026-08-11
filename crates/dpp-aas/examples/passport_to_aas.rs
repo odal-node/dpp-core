@@ -40,7 +40,7 @@ fn main() {
         repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: Some(SectorData::Textile(TextileData {
+        sector_data: Some(SectorData::Textile(Box::new(TextileData {
             gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             fibre_composition: vec![
                 FibreEntry {
@@ -78,7 +78,7 @@ fn main() {
             repair_history_url: None,
             repair_count: None,
             pef_score: None,
-        })),
+        }))),
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,

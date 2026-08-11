@@ -64,6 +64,8 @@ impl DppSectorPlugin for BatteryPlugin {
             .optional_pct("stateOfHealthPct")
             .optional_pct("initialRoundTripEfficiencyPct")
             .optional_pct("roundTripEfficiencyAtHalfCycleLifePct")
+            .optional_pct("renewableContentPct")
+            .optional_pct("capacityThresholdForExhaustionPct")
             .finish()
     }
 

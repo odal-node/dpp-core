@@ -53,15 +53,15 @@ mod tests {
     use crate::ports::compliance::ComplianceStatus;
 
     fn battery_data() -> SectorData {
-        SectorData::Battery(BatteryData {
+        SectorData::Battery(Box::new(BatteryData {
             recycled_content_lithium_pct: Some(12.5),
             rated_capacity_kwh: Some(32.0),
             ..crate::test_support::sample_battery_data()
-        })
+        }))
     }
 
     fn textile_data() -> SectorData {
-        SectorData::Textile(TextileData {
+        SectorData::Textile(Box::new(TextileData {
             fibre_composition: vec![FibreEntry {
                 fibre: "cotton".into(),
                 pct: 100.0,
@@ -74,7 +74,7 @@ mod tests {
             carbon_footprint_kg_co2e: Some(8.5),
             repair_score: Some(7.5),
             ..crate::test_support::sample_textile_data()
-        })
+        }))
     }
 
     #[test]

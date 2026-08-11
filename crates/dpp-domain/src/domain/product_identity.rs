@@ -54,7 +54,7 @@ mod tests {
     }
 
     fn battery_data() -> SectorData {
-        SectorData::Battery(crate::test_support::sample_battery_data())
+        SectorData::Battery(Box::new(crate::test_support::sample_battery_data()))
     }
 
     #[test]
@@ -68,12 +68,12 @@ mod tests {
 
     #[test]
     fn textile_passport_yields_identity() {
-        let textile_data = SectorData::Textile(TextileData {
+        let textile_data = SectorData::Textile(Box::new(TextileData {
             country_of_origin: "BD".into(),
             care_instructions: "wash".into(),
             chemical_compliance_standard: "OEKO-TEX 100".into(),
             ..crate::test_support::sample_textile_data()
-        });
+        }));
         let p = base_passport(Sector::Textile, Some(textile_data));
         let id = ProductIdentity::from_passport(&p).expect("textile has a gtin");
         assert_eq!(id.sector, Sector::Textile);

@@ -73,6 +73,21 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
         b.internal_pack_resistance_mohm,
         "internalPackResistanceMohm"
     );
+    // Annex XIII point 1 technical characteristics. The document-shaped items
+    // of point 1 — declaration of conformity, marking, waste-battery info — are
+    // deliberately not projected: this submodel is a technical-data snapshot,
+    // and a reference to a document is not a property of the asset.
+    push_opt_double!(b.minimal_voltage_v, "minimalVoltageV");
+    push_opt_double!(b.maximum_voltage_v, "maximumVoltageV");
+    push_opt_double!(b.original_power_capability_w, "originalPowerCapabilityW");
+    push_opt_double!(b.power_limit_min_w, "powerLimitMinW");
+    push_opt_double!(b.power_limit_max_w, "powerLimitMaxW");
+    push_opt_double!(b.renewable_content_pct, "renewableContentPct");
+    push_opt_double!(
+        b.capacity_threshold_for_exhaustion_pct,
+        "capacityThresholdForExhaustionPct"
+    );
+    push_opt_double!(b.cycle_life_test_c_rate, "cycleLifeTestCRate");
     push_opt_double!(b.operating_temp_min_c, "operatingTempMinC");
     push_opt_double!(b.operating_temp_max_c, "operatingTempMaxC");
     push_opt_double!(b.recycled_content_lead_pct, "recycledContentLeadPct");

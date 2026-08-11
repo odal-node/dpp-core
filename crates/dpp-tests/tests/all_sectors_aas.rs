@@ -231,7 +231,7 @@ fn all_sector_cases() -> Vec<(Sector, SectorData, &'static str, &'static str)> {
         ),
         (
             Sector::Textile,
-            SectorData::Textile(textile_data()),
+            SectorData::Textile(Box::new(textile_data())),
             "1.1.0",
             "TextileMaterialDeclaration",
         ),

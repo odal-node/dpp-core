@@ -57,9 +57,9 @@ fn passport_carries_typed_sector() {
 #[test]
 fn sector_data_mismatch_fails_validation() {
     let mut p = make_passport(); // sector = Electronics
-    p.sector_data = Some(SectorData::Battery(
+    p.sector_data = Some(SectorData::Battery(Box::new(
         crate::test_support::sample_battery_data(),
-    ));
+    )));
     let err = p.validate().unwrap_err().to_string();
     assert!(err.contains("sector must match"), "got: {err}");
 }
@@ -353,7 +353,7 @@ fn validate_wires_sector_data_validation() {
     use crate::domain::sector::{FibreEntry, TextileData};
     let mut p = make_passport();
     p.sector = Sector::Textile;
-    p.sector_data = Some(SectorData::Textile(TextileData {
+    p.sector_data = Some(SectorData::Textile(Box::new(TextileData {
         // fibre sum = 50% — cross-field rule must catch this
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),
@@ -363,7 +363,7 @@ fn validate_wires_sector_data_validation() {
         country_of_origin: "DE".into(),
         chemical_compliance_standard: "REACH".into(),
         ..crate::test_support::sample_textile_data()
-    }));
+    })));
     let err = p.validate().unwrap_err().to_string();
     assert!(
         err.contains("fibreComposition") || err.contains("fibre"),
@@ -375,11 +375,11 @@ fn validate_wires_sector_data_validation() {
 fn sector_data_preserved_round_trip() {
     let mut passport = make_passport();
     passport.sector = Sector::Battery; // keep sector consistent with the data
-    passport.sector_data = Some(SectorData::Battery(BatteryData {
+    passport.sector_data = Some(SectorData::Battery(Box::new(BatteryData {
         state_of_health_pct: Some(95.3),
         rated_capacity_kwh: Some(32.0),
         ..crate::test_support::sample_battery_data()
-    }));
+    })));
     let json = serde_json::to_string(&passport).unwrap();
     let back: Passport = serde_json::from_str(&json).unwrap();
     if let Some(SectorData::Battery(ref b)) = back.sector_data {
@@ -397,11 +397,11 @@ fn battery_passport_with_due_diligence() -> Passport {
     p.sector = Sector::Battery;
     p.batch_id = Some("BATCH-42".into());
     p.jws_signature = Some("eyJhbGci.test.signature".into());
-    p.sector_data = Some(SectorData::Battery(BatteryData {
+    p.sector_data = Some(SectorData::Battery(Box::new(BatteryData {
         due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
         disassembly_instructions_url: Some("https://acme.example.com/disassembly".into()),
         ..crate::test_support::sample_battery_data()
-    }));
+    })));
     p
 }
 
@@ -574,9 +574,9 @@ fn public_view_omits_every_non_public_passport_field() {
 fn textile_passport() -> Passport {
     Passport {
         sector: Sector::Textile,
-        sector_data: Some(SectorData::Textile(
+        sector_data: Some(SectorData::Textile(Box::new(
             crate::test_support::sample_textile_data(),
-        )),
+        ))),
         schema_version: "1.2.0".into(),
         ..make_passport()
     }

@@ -247,6 +247,112 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state_of_health: Option<Box<StateOfHealth>>,
 
+    // ── v2.6.0 — Annex VI Part A and Annex XIII point 1, public tier ────────
+    /// Hazardous substances **other than** mercury, cadmium or lead — Annex VI
+    /// Part A point 8. Those three are restriction thresholds in `dpp_rules`,
+    /// not declared content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hazardous_substances: Option<Vec<HazardousSubstance>>,
+
+    /// Extinguishing agent usable on this battery — Annex VI Part A point 9.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usable_extinguishing_agent: Option<String>,
+
+    /// Share of renewable content, as a percentage — Annex XIII point 1(f).
+    /// Distinct from recycled content, which point 1(e) covers separately.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub renewable_content_pct: Option<f64>,
+
+    /// Minimal voltage in volts — Annex XIII point 1(h).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimal_voltage_v: Option<f64>,
+
+    /// Maximum voltage in volts — Annex XIII point 1(h).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum_voltage_v: Option<f64>,
+
+    /// The temperature range point 1(h) attaches to the voltage figures
+    /// *"when relevant"*.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voltage_temperature_range: Option<TemperatureRange>,
+
+    /// Original power capability in watts — Annex XIII point 1(i).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_power_capability_w: Option<f64>,
+
+    /// Lower power limit in watts — Annex XIII point 1(i).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_limit_min_w: Option<f64>,
+
+    /// Upper power limit in watts — Annex XIII point 1(i).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_limit_max_w: Option<f64>,
+
+    /// The temperature range point 1(i) attaches to the power limits
+    /// *"when relevant"*.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_temperature_range: Option<TemperatureRange>,
+
+    /// The reference test the declared cycle lifetime was measured under —
+    /// Annex XIII point 1(j), the other half of the requirement whose figure is
+    /// [`BatteryData::expected_lifetime_cycles`]. A cycle count without its
+    /// test is not comparable between manufacturers, which is why the annex
+    /// asks for both.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lifetime_reference_test: Option<String>,
+
+    /// Capacity threshold for exhaustion, as a percentage of rated capacity —
+    /// Annex XIII point 1(k). Mandatory for EV batteries only; the Commission's
+    /// guidance marks it "not to be filled" for LMT and industrial.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity_threshold_for_exhaustion_pct: Option<f64>,
+
+    /// Temperature range the battery can withstand **when not in use** — Annex
+    /// XIII point 1(l).
+    ///
+    /// Not [`BatteryData::operating_temp_min_c`] and its pair, which describe
+    /// the battery in service. The annex asks for both, and a battery tolerates
+    /// more in storage than under load.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_in_use_temperature_range: Option<TemperatureRange>,
+
+    /// The reference test the not-in-use range was measured under — the second
+    /// half of Annex XIII point 1(l).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_in_use_temperature_reference_test: Option<String>,
+
+    /// Period the commercial warranty for calendar life applies, in months —
+    /// Annex XIII point 1(m), *"only if applicable (if commercial warranty
+    /// envisaged)"*.
+    ///
+    /// A **duration**, not a date range: point 1 describes the model, and a
+    /// warranty's start date is a property of an individual sale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commercial_warranty_period_months: Option<u32>,
+
+    /// C-rate of the relevant cycle-life test — Annex XIII point 1(p).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cycle_life_test_c_rate: Option<f64>,
+
+    /// The markings applied under Art. 13(4) — Annex XIII point 1(q).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub marking_information: Option<String>,
+
+    /// The Art. 13(5) chemical symbol, where one applies — Annex XIII point
+    /// 1(q). The article names exactly two, so this is closed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hazard_symbol: Option<HazardSymbol>,
+
+    /// Reference to the EU declaration of conformity under Art. 18 — Annex XIII
+    /// point 1(r).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eu_declaration_of_conformity: Option<String>,
+
+    /// Information on the prevention and management of waste batteries required
+    /// by Art. 74(1) points (a) to (f) — Annex XIII point 1(s).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waste_battery_information: Option<String>,
+
     // ── v2.6.0 — Annex XIII point 4, the rest of the individual-battery tier ─
     /// Measured performance and durability for **this** battery — Annex XIII
     /// point 4(a). See [`DynamicPerformance`].
@@ -261,6 +367,58 @@ pub struct BatteryData {
     /// [`UsageHistory`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_history: Option<Box<UsageHistory>>,
+}
+
+/// A temperature range in degrees Celsius.
+///
+/// Annex XIII asks for a range in three places — attached to the voltage
+/// figures at point 1(h), to the power limits at 1(i), and standing alone at
+/// 1(l) for the not-in-use case. One type rather than six loose bounds, so a
+/// range cannot be half-declared.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TemperatureRange {
+    /// Lower bound in °C.
+    pub min_c: f64,
+    /// Upper bound in °C.
+    pub max_c: f64,
+}
+
+/// A hazardous substance declared under Annex VI Part A point 8.
+///
+/// Deliberately **not** [`SvhcSubstance`](super::shared::SvhcSubstance), which
+/// this crate already carries for textile, electronics and furniture. That type
+/// is REACH-shaped — a concentration against the Art. 33 threshold, an ECHA
+/// SCIP reference — and point 8 is a different instrument naming a different
+/// set. Sharing the struct would assert the concepts are the same, which nobody
+/// has established.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct HazardousSubstance {
+    /// Substance name.
+    pub name: String,
+    /// CAS Registry Number, where the substance has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cas_number: Option<String>,
+    /// Concentration in the battery as weight-%, where declared.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub concentration_pct: Option<f64>,
+}
+
+/// The chemical symbol Art. 13(5) requires on a battery, where one applies.
+///
+/// Closed: Art. 13(5) names cadmium and lead and nothing else, and the
+/// Commission's guidance records the data point as *"cadmium or lead symbol if
+/// applicable"*. "No symbol required" is `Option::None`, which is why there is
+/// no variant for it.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum HazardSymbol {
+    Cadmium,
+    Lead,
 }
 
 /// Measured performance and durability of one physical battery — Annex XIII
