@@ -57,8 +57,22 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
     push_opt_double!(b.rated_capacity_kwh, "ratedCapacityKwh");
     push_opt_double!(b.rated_energy_wh, "ratedEnergyWh");
     push_opt_double!(b.battery_weight_kg, "batteryWeightKg");
-    push_opt_double!(b.round_trip_efficiency_pct, "roundTripEfficiencyPct");
-    push_opt_double!(b.internal_resistance_mohm, "internalResistanceMohm");
+    push_opt_double!(
+        b.initial_round_trip_efficiency_pct,
+        "initialRoundTripEfficiencyPct"
+    );
+    push_opt_double!(
+        b.round_trip_efficiency_at_half_cycle_life_pct,
+        "roundTripEfficiencyAtHalfCycleLifePct"
+    );
+    push_opt_double!(
+        b.internal_cell_resistance_mohm,
+        "internalCellResistanceMohm"
+    );
+    push_opt_double!(
+        b.internal_pack_resistance_mohm,
+        "internalPackResistanceMohm"
+    );
     push_opt_double!(b.operating_temp_min_c, "operatingTempMinC");
     push_opt_double!(b.operating_temp_max_c, "operatingTempMaxC");
     push_opt_double!(b.recycled_content_lead_pct, "recycledContentLeadPct");

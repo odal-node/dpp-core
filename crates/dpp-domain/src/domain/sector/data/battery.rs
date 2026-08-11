@@ -153,13 +153,39 @@ pub struct BatteryData {
     /// refuses rather than upgrading a record that predates the mandate.
     pub battery_type: BatteryType,
 
-    /// Round-trip energy efficiency at 50% state of charge (percentage).
+    /// Round trip energy efficiency when new, as a percentage — **Annex XIII
+    /// point 1(n)**, the first of the two figures that point requires.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub round_trip_efficiency_pct: Option<f64>,
+    pub initial_round_trip_efficiency_pct: Option<f64>,
 
-    /// Internal resistance in milliohms (mΩ) at 50% SoC.
+    /// Round trip energy efficiency *"at 50 % of cycle-life"*, as a percentage
+    /// — **Annex XIII point 1(n)**, the second figure.
+    ///
+    /// The 50% is of **cycle-life**, not of state of charge. This field was
+    /// previously named `round_trip_efficiency_pct` and documented as "at 50%
+    /// state of charge", which names no data point in the regulation: 1(n) has
+    /// no state-of-charge qualifier, and the only other round-trip efficiency
+    /// in the annex is the measured one at point 4(a). Renamed so the condition
+    /// travels with the field rather than in a comment that was wrong.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub internal_resistance_mohm: Option<f64>,
+    pub round_trip_efficiency_at_half_cycle_life_pct: Option<f64>,
+
+    /// Internal **cell** resistance in milliohms (mΩ) — **Annex XIII point
+    /// 1(o)**, *"internal battery cell and pack resistance"*.
+    ///
+    /// Two measurements, not one. The single `internal_resistance_mohm` this
+    /// replaces could not say which it held, and carried an invented "at 50%
+    /// SoC" qualifier that 1(o) does not state. The *measured* per-battery
+    /// resistance is a different data point and lives at
+    /// [`DynamicPerformance::internal_resistance_mohm`], which the annex does
+    /// state as a single value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_cell_resistance_mohm: Option<f64>,
+
+    /// Internal **pack** resistance in milliohms (mΩ) — Annex XIII point 1(o),
+    /// the other half of the same requirement.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_pack_resistance_mohm: Option<f64>,
 
     // ── v2.1.0 ───────────────────────────────────────────────────────────
     /// Date the battery was placed on the EU market or put into service.

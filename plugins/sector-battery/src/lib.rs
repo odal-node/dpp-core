@@ -62,7 +62,8 @@ impl DppSectorPlugin for BatteryPlugin {
             .optional_pct("recycledContentNickelPct")
             .optional_pct("recycledContentLeadPct")
             .optional_pct("stateOfHealthPct")
-            .optional_pct("roundTripEfficiencyPct")
+            .optional_pct("initialRoundTripEfficiencyPct")
+            .optional_pct("roundTripEfficiencyAtHalfCycleLifePct")
             .finish()
     }
 

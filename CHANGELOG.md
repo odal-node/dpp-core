@@ -15,6 +15,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **Annex XIII points 1(n) and 1(o) each become two fields, and one of them
+  named the wrong thing.** Both are single fields in `v2.5.0` where the
+  regulation asks for a pair.
+
+  Point 1(n) requires round trip energy efficiency **when new** and **at 50 % of
+  cycle-life**. `round_trip_efficiency_pct` was documented "at 50% state of
+  charge" — a condition that appears nowhere in the annex, which has no
+  state-of-charge qualifier at all. It becomes
+  `initial_round_trip_efficiency_pct` and
+  `round_trip_efficiency_at_half_cycle_life_pct`, so the condition travels with
+  the field instead of in a comment that was wrong.
+
+  Point 1(o) is *"internal battery cell **and** pack resistance"*.
+  `internal_resistance_mohm` held one of the two without saying which, and
+  carried the same invented "at 50% SoC" qualifier. It becomes
+  `internal_cell_resistance_mohm` and `internal_pack_resistance_mohm`. The
+  *measured* per-battery resistance is a different data point (point 4(a)) and
+  keeps its single-value shape inside `dynamic_performance`.
+
+  The `v2.5.0 → v2.6.0` lens carries the efficiency value across under its new
+  name — the stored number was always the 1(n) figure whatever the comment
+  said — and **refuses** a record carrying `internalResistanceMohm`, because
+  one value cannot say whether it was cell or pack and choosing for it would
+  invent the distinction the split exists to record.
+
 - **`BatteryData.expected_lifetime_cycles` is now `Option<u32>`, and battery
   schema `v2.6.0` drops it from `required`.** Annex XIII point 1(j) does not
   reach every battery: the Commission's own data-point guidance marks it
