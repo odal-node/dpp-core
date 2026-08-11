@@ -102,6 +102,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **Annex XIII points 2 and 3 — the non-public tiers.** `componentPartNumbers`
+  and `sparePartsContacts` (point 2(b)), `safetyMeasures` (2(d)) and
+  `testReportResults` (point 3). The first three are `restricted`; the last is
+  `conformity`. Points 2(a) and 2(c) were already modelled — the
+  cathode/anode/electrolyte composition and the dismantling instructions — so
+  this closes points 2 and 3.
+
+  A test now pins the *shape* of the lattice rather than one tier of it: point 2
+  reaches **both** non-public audiences, point 3 reaches authorities **only**,
+  and point 4 reaches a legitimate interest **only, and explicitly not
+  authorities**. No integer ordering expresses that, which is why `Audience` is
+  not `Ord`. It reads the shipped catalog, so a field added without its
+  disclosure entry fails the build instead of leaking.
+
+- **Annex VI Part A and Annex XIII point 1 — 20 fields, the public tier.**
+  Hazardous substances other than Hg/Cd/Pb and the usable extinguishing agent
+  (Annex VI Part A points 8 and 9); renewable content, minimal and maximum
+  voltage, original power capability and power limits, the expected-lifetime
+  reference test, the capacity threshold for exhaustion, the not-in-use
+  temperature range and its reference test, the commercial warranty period, the
+  cycle-life C-rate, Art. 13(4) marking information, the Art. 13(5) symbol, the
+  EU declaration of conformity, and waste-battery information (Annex XIII
+  point 1(f) through 1(s)).
+
+  Three shapes decided rather than defaulted. `TemperatureRange` is one type
+  because the annex asks for a range in three places, so a range cannot be
+  half-declared. The warranty is a **duration in months**, not a date range:
+  point 1 describes a model, and a warranty's start is a property of a sale.
+  `HazardSymbol` is closed to cadmium and lead, because Art. 13(5) names exactly
+  those two.
+
+  `HazardousSubstance` is deliberately **not** `SvhcSubstance`, which textile,
+  electronics and furniture already share. That type is REACH-shaped — a
+  concentration against the Art. 33 threshold, an ECHA SCIP reference — and
+  Annex VI Part A point 8 is a different instrument naming a different set.
+  Sharing the struct would assert the concepts are the same.
+
+  A test serialises a fully populated `BatteryData` against the current schema.
+  `v2.6.0` sets `additionalProperties: false`, so a struct field added without
+  its schema property now fails in CI rather than on a real passport — which is
+  the drift a hand-written 20-field batch invites.
+
+  Neither points 2 and 3 nor the document-shaped items of point 1 are projected
+  to AAS: that submodel is a technical-data snapshot, and a reference to a
+  document is not a property of the asset.
+
 - **The Annex XIII point 4 individual-battery tier — battery schema `v2.6.0`.**
   Points 1 to 3 describe a battery *model*; point 4 describes one *physical
   battery*, and until now only its state-of-health half was modelled. Three

@@ -523,3 +523,46 @@ fn individual_item_data_is_withheld_from_authorities() {
     assert_eq!(public.filtered_data.as_object().unwrap().len(), 1);
     assert!(public.filtered_data.get("productName").is_some());
 }
+
+/// Annex XIII points 2 and 3 land in different audiences, and the lattice is
+/// not a ladder.
+///
+/// Point 2 reaches **both** non-public audiences; point 3 reaches authorities
+/// **only**; point 4 reaches legitimate interest **only** and explicitly not
+/// authorities. No integer ordering expresses that, which is why `Audience` is
+/// not `Ord` — and why this reads the shipped catalog rather than a hand-built
+/// policy, so a missing disclosure entry fails here instead of leaking.
+#[test]
+fn points_two_three_and_four_each_reach_a_different_audience() {
+    let policy = battery_policy();
+    let data = json!({
+        "gtin": "09506000134352",
+        "safetyMeasures": "Do not puncture",
+        "testReportResults": "Report 42: pass",
+        "batteryStatus": "original",
+    });
+
+    let public = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+    for key in ["safetyMeasures", "testReportResults", "batteryStatus"] {
+        assert!(
+            public.get(key).is_none(),
+            "the public view carries '{key}', which is not point 1 content"
+        );
+    }
+
+    let authority = filter_by_audience(&data, &policy, Audience::Authority).filtered_data;
+    assert!(authority.get("safetyMeasures").is_some(), "point 2");
+    assert!(authority.get("testReportResults").is_some(), "point 3");
+    assert!(
+        authority.get("batteryStatus").is_none(),
+        "point 4 is withheld from authorities — Art. 77(2)(b) does not reach it"
+    );
+
+    let holder = filter_by_audience(&data, &policy, Audience::LegitimateInterest).filtered_data;
+    assert!(holder.get("safetyMeasures").is_some(), "point 2");
+    assert!(holder.get("batteryStatus").is_some(), "point 4");
+    assert!(
+        holder.get("testReportResults").is_none(),
+        "point 3 is authorities only — a legitimate interest does not reach test reports"
+    );
+}
