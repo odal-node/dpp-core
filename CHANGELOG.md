@@ -15,6 +15,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`dpp-aas::OWN_NAMESPACE` is no longer public.** It moved to `dpp-vocab` and
+  is reachable as `dpp_vocab::OWN_NAMESPACE`, with `dpp_vocab::is_own` as the
+  namespace test — `dpp-aas` now defers to both rather than defining its own.
+  Two definitions of where our namespace ends is the condition under which a
+  gate and the thing it guards drift apart. Downstream code naming the constant
+  directly must change its import.
+
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was
@@ -52,13 +59,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`just semver` — the public API against the last published release.** All
+  members publish in lockstep, so each release republishes every crate whether
+  its API moved or not, which is the condition under which 0.13.0's removal of
+  public constants went out unnoticed. The recipe lists every removal since the
+  last release so it can be reconciled against this file's `### Breaking`
+  section; that is now step 3 of the pre-release checklist, which previously
+  named the tool but carried no command. Its first run found the
+  `OWN_NAMESPACE` removal above, which had been recorded as an addition.
+
+  It passes `--release-type patch` deliberately. Below 1.0 a minor bump already
+  admits breaking changes, so the default question — *does the version admit
+  it?* — is always answered yes: measured at 0.16.0 → 0.17.0, plain
+  `cargo semver-checks` runs **0 of 253 lints** and reports "no semver update
+  required". Not wired into `just check` or `just ci`: pre-1.0 releases are
+  allowed to break, so it is red for most of any cycle and belongs to the
+  release rather than the commit.
+
 - **`dpp-aas`'s semanticId provenance gate and `dpp-vc`'s JSON-LD context now
   share one gate: `dpp-vocab`.** `dpp-aas/src/semantic_ids/allowlist.json` is
   deleted — its `tracked` records move to `dpp-vocab` as two new authority
   records, `idta` and `eclass`, each freshly re-verified against the
   authorities' own current publications rather than restated from the removed
-  file. `OWN_NAMESPACE` is no longer defined twice: `dpp-aas` now depends on
-  `dpp_vocab::is_own`. A new test in `dpp-tests` walks the JSON-LD context's
+  file. `OWN_NAMESPACE` is no longer defined twice — see **Breaking** above for
+  the import change that follows. A new test in `dpp-tests` walks the JSON-LD
+  context's
   declared prefixes the same way the AAS gate walks `semanticId`s, so both
   wire surfaces are covered by the one rule.
 
