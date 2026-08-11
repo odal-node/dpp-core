@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "ageGroup": {
       "type": "string",
@@ -26,7 +27,8 @@
         "6-12",
         "12+"
       ],
-      "description": "Intended age group per EU Toy Safety Directive."
+      "description": "Intended age group per EU Toy Safety Directive.",
+      "x-disclosure": "public"
     },
     "primaryMaterial": {
       "type": "string",
@@ -38,16 +40,19 @@
         "mixed",
         "other"
       ],
-      "description": "Primary construction material."
+      "description": "Primary construction material.",
+      "x-disclosure": "public"
     },
     "ceMarking": {
       "type": "boolean",
-      "description": "Whether the toy bears CE marking under the EU Toy Safety Directive 2009/48/EC."
+      "description": "Whether the toy bears CE marking under the EU Toy Safety Directive 2009/48/EC.",
+      "x-disclosure": "public"
     },
     "countryOfManufacture": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of manufacture."
+      "description": "ISO 3166-1 alpha-2 country of manufacture.",
+      "x-disclosure": "public"
     },
     "svhcSubstances": {
       "type": [
@@ -57,21 +62,24 @@
       "items": {
         "$ref": "#/definitions/svhcSubstance"
       },
-      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33.",
+      "x-disclosure": "restricted"
     },
     "containsBattery": {
       "type": [
         "boolean",
         "null"
       ],
-      "description": "Whether the toy contains a battery."
+      "description": "Whether the toy contains a battery.",
+      "x-disclosure": "public"
     },
     "repairabilityInfo": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Free-text or URL pointing to repairability or spare parts information."
+      "description": "Free-text or URL pointing to repairability or spare parts information.",
+      "x-disclosure": "public"
     }
   },
   "definitions": {

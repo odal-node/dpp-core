@@ -6,12 +6,21 @@ use serde_json::json;
 use super::filter::filter_by_audience;
 use super::policy::SectorAccessPolicy;
 
+/// The policy for a sector's current schema version — the path a served
+/// passport actually takes.
+fn current_policy(sector: &str) -> SectorAccessPolicy {
+    let reg = crate::schemas::VersionedSchemaRegistry::new();
+    let (version, _) = reg.latest(sector).expect("sector has a schema");
+    SectorAccessPolicy::for_schema_version(sector, &version.to_string())
+        .expect("current version yields a policy")
+}
+
 fn textile_policy() -> SectorAccessPolicy {
-    SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "textile").expect("textile in catalog")
+    current_policy("textile")
 }
 
 fn battery_policy() -> SectorAccessPolicy {
-    SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "battery").expect("battery in catalog")
+    current_policy("battery")
 }
 
 fn sample_textile_data() -> serde_json::Value {
@@ -405,18 +414,65 @@ fn every_property_declares_a_disclosure_class() {
     );
 }
 
+/// Every schema version of every sector yields a policy, and every property in
+/// each declares a class.
+///
+/// The backfill guarantee. `for_schema_version` fails closed, so a schema
+/// version left un-annotated would not misbehave — it would refuse to serve
+/// that passport at all. Older versions carry today's classes because no
+/// passport has ever been published under any of them; there is no historical
+/// map to preserve, and this is the last moment that is true.
+#[test]
+fn every_sector_version_yields_a_fully_classified_policy() {
+    let reg = crate::schemas::VersionedSchemaRegistry::new();
+    let mut checked = 0usize;
+    for sector in reg.sectors() {
+        for version in reg.versions_for(sector) {
+            let json = reg.get(sector, version).expect("registry listed it");
+            let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+            let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) else {
+                continue;
+            };
+            let undeclared: Vec<&str> = properties
+                .iter()
+                .filter(|(_, p)| {
+                    p.get("x-disclosure")
+                        .and_then(serde_json::Value::as_str)
+                        .is_none()
+                })
+                .map(|(n, _)| n.as_str())
+                .collect();
+            assert!(
+                undeclared.is_empty(),
+                "{sector} v{version}: unclassified properties {undeclared:?}"
+            );
+            assert!(
+                SectorAccessPolicy::for_schema_version(sector, &version.to_string()).is_some(),
+                "{sector} v{version} yields no policy"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 20, "only {checked} schema versions walked");
+}
+
 /// The schema-sourced policy agrees with the catalog map it will replace.
 ///
 /// Until the cutover both exist, and a silent divergence between them would be
 /// worse than either alone — the served view would depend on which constructor
 /// a caller happened to use.
 #[test]
+#[expect(
+    deprecated,
+    reason = "this test exists precisely to compare the two constructors"
+)]
 fn the_schema_policy_matches_the_catalog_policy_today() {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
     let (version, json) = reg.latest("battery").expect("battery schema exists");
     let from_schema = SectorAccessPolicy::from_schema("battery", &version.to_string(), json)
         .expect("the current schema yields a policy");
-    let from_catalog = battery_policy();
+    let from_catalog =
+        SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "battery").expect("in catalog");
 
     for (field, class) in &from_catalog.field_disclosure {
         assert_eq!(

@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "fibreComposition": {
       "type": "array",
@@ -42,22 +43,26 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "x-disclosure": "public"
     },
     "countryOfManufacturing": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured."
+      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured.",
+      "x-disclosure": "public"
     },
     "careInstructions": {
       "type": "string",
       "minLength": 1,
-      "description": "ISO 3758 care symbols or free text care instructions."
+      "description": "ISO 3758 care symbols or free text care instructions.",
+      "x-disclosure": "public"
     },
     "chemicalComplianceStandard": {
       "type": "string",
       "minLength": 1,
-      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS."
+      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS.",
+      "x-disclosure": "public"
     },
     "recycledContentPct": {
       "type": [
@@ -65,7 +70,8 @@
         "null"
       ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "repairScore": {
       "type": [
@@ -73,28 +79,32 @@
         "null"
       ],
       "minimum": 0,
-      "maximum": 10
+      "maximum": 10,
+      "x-disclosure": "public"
     },
     "carbonFootprintKgCo2e": {
       "type": [
         "number",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "x-disclosure": "public"
     },
     "waterUseLitres": {
       "type": [
         "number",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "x-disclosure": "public"
     },
     "countryOfRawMaterialOrigin": {
       "type": [
         "string",
         "null"
       ],
-      "pattern": "^[A-Z]{2}$"
+      "pattern": "^[A-Z]{2}$",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

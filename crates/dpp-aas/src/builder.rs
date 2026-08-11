@@ -2,7 +2,7 @@
 //! a complete AAS shell + submodels.
 
 use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
-use dpp_domain::{Audience, Passport, SectorCatalog};
+use dpp_domain::{Audience, Passport};
 
 use super::model::{
     AasEnvironment, AasSemId, AasShell, AasSubmodel, AssetInformation, SpecificAssetId,
@@ -127,9 +127,19 @@ pub fn build_aas_from_passport(
 /// sector this build has never seen is masked by the conservative default
 /// rather than passed through unfiltered.
 fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
-    // `from_catalog` returns `None` exactly when the catalog has no descriptor
-    // for this key, so it doubles as the unknown-sector test below.
-    let sector_policy = SectorAccessPolicy::from_catalog(catalog(), passport.sector.catalog_key());
+    // Sourced from the passport's *own* schema version, not the catalog's
+    // current map: the projection must be filtered by the disclosure classes
+    // that were in force when this passport was signed, or a reclassification
+    // would silently change what an already-published passport projects.
+    //
+    // `None` covers both an unknown sector and an unparseable or unregistered
+    // version, so it still doubles as the unknown-sector test below — and an
+    // unrecognised version now fails closed instead of borrowing whatever the
+    // current map happens to say.
+    let sector_policy = SectorAccessPolicy::for_schema_version(
+        passport.sector.catalog_key(),
+        &passport.schema_version,
+    );
     let sector_is_unknown = sector_policy.is_none();
     let policy = sector_policy.unwrap_or_else(SectorAccessPolicy::passport_default);
 
@@ -139,6 +149,8 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
 
     if sector_is_unknown {
         redact_unknown_sector_data(&mut filtered);
+    } else {
+        redact_unclassified_sector_fields(&mut filtered, &policy);
     }
 
     serde_json::from_value(filtered)
@@ -166,6 +178,53 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
 /// more of it than an anonymous one. This mirrors, deliberately and for the same
 /// stated reason, the backstop the platform applies when it renders a public
 /// view — the two must not disagree about what an unmodelled sector discloses.
+/// Drop any `sectorData` key the passport's **declared schema version** does not
+/// declare.
+///
+/// # Why this exists
+///
+/// Disclosure classes are sourced from the schema version a passport was
+/// validated against, which is what keeps a published passport filtered by the
+/// rules that produced its signatures. The corollary is the hazard: a key that
+/// version does not declare is classified by nobody, and an unclassified key
+/// falls to the policy default — `Public`.
+///
+/// So the version-sourced policy, which is safer than the catalog map in every
+/// other respect, is *less* safe in exactly one: it under-applies where the map
+/// over-applied. Under-applying disclosure is a leak.
+///
+/// Raising the default to `Restricted` does not work, because this policy is
+/// applied to the whole document and the passport envelope's public fields
+/// (`productName`, `status`, …) are not declared in any sector schema — they
+/// would all vanish. The guard therefore has to be structural and scoped to
+/// `sectorData`, which is the same shape as
+/// [`redact_unknown_sector_data`] one level down: where nobody has classified
+/// the content, keep only what is accounted for.
+///
+/// Reaching this needs an *invalid* passport — every sector schema sets
+/// `additionalProperties: false`, so validation already rejects a document
+/// carrying keys its version does not declare. This is defence in depth, and it
+/// runs for **every** audience: an unclassified field is not more disclosable to
+/// a credentialed reader than to an anonymous one.
+fn redact_unclassified_sector_fields(
+    document: &mut serde_json::Value,
+    policy: &SectorAccessPolicy,
+) {
+    let Some(sector_data) = document
+        .as_object_mut()
+        .and_then(|o| o.get_mut("sectorData"))
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    // `sector` is the variant tag, not a schema property, and the document must
+    // keep round-tripping through `SectorData`.
+    // `field_disclosure` was built from this schema version's own properties,
+    // so its keys are exactly what the version accounts for. Reusing it avoids a
+    // second registry lookup that could disagree with the policy in force.
+    sector_data.retain(|key, _| key == "sector" || policy.field_disclosure.contains_key(key));
+}
+
 fn redact_unknown_sector_data(document: &mut serde_json::Value) {
     let Some(object) = document.as_object_mut() else {
         return;
@@ -209,10 +268,4 @@ pub fn build_aas_environment(
         submodels,
         concept_descriptions: Vec::new(),
     })
-}
-
-/// The embedded sector catalog, built once.
-fn catalog() -> &'static SectorCatalog {
-    static CATALOG: std::sync::OnceLock<SectorCatalog> = std::sync::OnceLock::new();
-    CATALOG.get_or_init(SectorCatalog::new)
 }

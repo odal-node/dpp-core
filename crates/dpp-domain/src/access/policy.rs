@@ -74,12 +74,45 @@ const COMMON_CONFORMITY: &[&str] = &[
 ];
 
 impl SectorAccessPolicy {
-    /// Build a sector's access policy from the catalog's declared per-field
-    /// disclosure classes, folding in the universal conformity fields.
+    /// The policy for the schema version a passport was validated against.
     ///
-    /// This works for **every** sector with no per-sector Rust code — the classes
-    /// are data in the sector manifests (`disclosure`). Returns `None` if
-    /// `sector_key` is not in the catalog.
+    /// **The constructor to reach for.** A passport stores its
+    /// `schema_version`, so passing that here filters it by the same disclosure
+    /// classes that produced its frozen signatures — for the life of the
+    /// passport, whatever the current version later says. See
+    /// [`Self::from_schema`] for why that matters.
+    ///
+    /// Returns `None` when the sector or version is unknown to the registry, so
+    /// an unrecognised pair fails closed rather than serving an all-public view.
+    /// Takes the version as a string so a caller holding a `Passport` can pass
+    /// `passport.schema_version` directly, and so consumers need no `semver`
+    /// dependency of their own. An unparseable version yields `None`, the same
+    /// as an unknown one — both fail closed.
+    #[must_use]
+    pub fn for_schema_version(sector_key: &str, version: &str) -> Option<Self> {
+        let parsed: semver::Version = version.parse().ok()?;
+        let registry = crate::schemas::VersionedSchemaRegistry::new();
+        let json = registry.get(sector_key, &parsed)?;
+        Self::from_schema(sector_key, version, json)
+    }
+
+    /// Build the policy from the catalog's single, unversioned disclosure map.
+    ///
+    /// **Deprecated in favour of [`Self::for_schema_version`].** The catalog
+    /// carries one map against many schema versions, so a passport served
+    /// through this constructor is filtered by whatever the map says *today* —
+    /// not by what it said when the passport's signatures were frozen. A
+    /// reclassification therefore breaks verification for every already-published
+    /// passport at once.
+    ///
+    /// Retained rather than removed: it is the only constructor that answers
+    /// "what does the current build consider public", which is a legitimate
+    /// question for tooling that is not serving a specific passport.
+    #[deprecated(
+        since = "0.17.0",
+        note = "use `for_schema_version` — the catalog map is unversioned, so it \
+                filters published passports by rules that may postdate their signatures"
+    )]
     pub fn from_catalog(catalog: &SectorCatalog, sector_key: &str) -> Option<Self> {
         let descriptor = catalog.get(sector_key)?;
         let mut field_disclosure: HashMap<String, Disclosure> = descriptor.disclosure.clone();

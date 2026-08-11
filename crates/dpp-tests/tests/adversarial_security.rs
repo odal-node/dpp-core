@@ -325,8 +325,8 @@ fn fail_closed_default_disclosure_blocks_unlisted_fields() {
 /// Nested confidential fields cannot bypass redaction via nesting.
 #[test]
 fn nested_confidential_field_cannot_bypass_via_nesting() {
-    let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     let data = json!({
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],

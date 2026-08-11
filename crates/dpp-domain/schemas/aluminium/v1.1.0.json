@@ -17,12 +17,14 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "alloyGrade": {
       "type": "string",
       "minLength": 1,
-      "description": "Alloy series designation, e.g. 1xxx, 3xxx, 5xxx, 6xxx."
+      "description": "Alloy series designation, e.g. 1xxx, 3xxx, 5xxx, 6xxx.",
+      "x-disclosure": "public"
     },
     "productionRoute": {
       "type": "string",
@@ -31,23 +33,27 @@
         "secondary-recycled",
         "mixed"
       ],
-      "description": "Production route: primary (Hall-Heroult electrolysis), secondary-recycled (scrap remelting), or mixed."
+      "description": "Production route: primary (Hall-Heroult electrolysis), secondary-recycled (scrap remelting), or mixed.",
+      "x-disclosure": "public"
     },
     "co2ePerTonneKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon intensity in kg CO2e per tonne of aluminium produced."
+      "description": "Carbon intensity in kg CO2e per tonne of aluminium produced.",
+      "x-disclosure": "public"
     },
     "recycledContentPct": {
       "type": "number",
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled scrap content as a percentage of total input."
+      "description": "Recycled scrap content as a percentage of total input.",
+      "x-disclosure": "public"
     },
     "countryOfOrigin": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of origin (primary production)."
+      "description": "ISO 3166-1 alpha-2 country of origin (primary production).",
+      "x-disclosure": "public"
     },
     "annualProductionTonnes": {
       "type": [
@@ -55,7 +61,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Annual production volume in tonnes (optional)."
+      "description": "Annual production volume in tonnes (optional).",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

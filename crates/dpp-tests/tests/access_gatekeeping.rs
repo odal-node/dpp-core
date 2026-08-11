@@ -65,8 +65,8 @@ fn sample_textile_payload() -> serde_json::Value {
 #[test]
 fn public_tier_sees_only_public_fields() {
     let data = sample_textile_payload();
-    let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     let decision = filter_by_audience(&data, &policy, Audience::Public);
 
@@ -119,8 +119,8 @@ fn public_tier_sees_only_public_fields() {
 #[test]
 fn professional_tier_via_repairer_credential() {
     let data = sample_textile_payload();
-    let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     // Issue a credential to a repairer
     let subject = make_subject(
@@ -188,8 +188,8 @@ fn professional_tier_via_recycler_credential() {
 #[test]
 fn confidential_tier_via_market_surveillance_authority() {
     let data = sample_textile_payload();
-    let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     let subject = make_subject(
         "did:web:surveillance.europa.eu",
@@ -284,8 +284,8 @@ fn wrong_sector_credential_rejected() {
 #[test]
 fn custom_policy_restricts_additional_fields() {
     let data = sample_textile_payload();
-    let mut policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let mut policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     // Make durabilityScore restricted (stricter than default)
     policy

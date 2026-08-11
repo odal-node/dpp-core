@@ -15,6 +15,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **Disclosure is now sourced from the passport's own schema version, and
+  `SectorAccessPolicy::from_catalog` is deprecated.** `for_schema_version` reads
+  a field's access class from the schema the passport was validated against, so
+  a published passport stays filtered by the classes that produced its frozen
+  signatures — permanently, and with no new passport field. `from_catalog` is
+  retained rather than removed: it still answers "what does the current build
+  consider public", which is a fair question for tooling that is not serving a
+  specific passport.
+
+  **A field the declared version does not classify is now stripped from the AAS
+  projection, for every audience.** Version-sourced disclosure is safer than the
+  catalog map in every respect but one: an undeclared key is classified by
+  nobody and would fall to the policy default. Raising that default does not
+  work — the policy applies to the whole document, and the passport envelope's
+  public fields are declared in no sector schema, so they would all vanish. The
+  guard is therefore structural and scoped to `sectorData`, mirroring the
+  existing unknown-sector backstop one level down. Reaching it needs an invalid
+  passport, since every schema sets `additionalProperties: false`; this is
+  defence in depth.
+
+  Test fixtures take their schema version from the catalog rather than a
+  literal. Three declared an old version while carrying data built from current
+  structs — invalid the whole time, and invisible while the disclosure map
+  ignored versions entirely.
+
 - **A battery passport missing content its category makes mandatory can no
   longer be published.** `Passport::transition_to(Published)` now refuses the
   **first** publish when a field the Battery Regulation requires of that

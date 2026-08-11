@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "tyreClass": {
       "type": "string",
@@ -25,7 +26,8 @@
         "C2",
         "C3"
       ],
-      "description": "Tyre class per EU 2020/740: C1 = passenger cars, C2 = vans and light trucks, C3 = heavy-duty trucks."
+      "description": "Tyre class per EU 2020/740: C1 = passenger cars, C2 = vans and light trucks, C3 = heavy-duty trucks.",
+      "x-disclosure": "public"
     },
     "fuelEfficiencyClass": {
       "type": "string",
@@ -36,7 +38,8 @@
         "D",
         "E"
       ],
-      "description": "Fuel efficiency class A-E per EU Regulation 2020/740 (A = lowest rolling resistance). The old A-G scale (Regulation 1222/2009) was replaced on 1 May 2021."
+      "description": "Fuel efficiency class A-E per EU Regulation 2020/740 (A = lowest rolling resistance). The old A-G scale (Regulation 1222/2009) was replaced on 1 May 2021.",
+      "x-disclosure": "public"
     },
     "wetGripClass": {
       "type": "string",
@@ -47,12 +50,14 @@
         "D",
         "E"
       ],
-      "description": "Wet grip class A-E per EU Regulation 2020/740 (A = shortest stopping distance on wet road)."
+      "description": "Wet grip class A-E per EU Regulation 2020/740 (A = shortest stopping distance on wet road).",
+      "x-disclosure": "public"
     },
     "externalRollingNoiseDb": {
       "type": "number",
       "minimum": 0,
-      "description": "External rolling noise in decibels (dB), measured per UN ECE R117."
+      "description": "External rolling noise in decibels (dB), measured per UN ECE R117.",
+      "x-disclosure": "public"
     },
     "noisePerformanceClass": {
       "type": [
@@ -65,7 +70,8 @@
         "C",
         null
       ],
-      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Class A = significantly below limit; B = below limit; C = at or above limit. Thresholds differ per tyre class (C1/C2/C3)."
+      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Class A = significantly below limit; B = below limit; C = at or above limit. Thresholds differ per tyre class (C1/C2/C3).",
+      "x-disclosure": "public"
     },
     "rollingResistanceNPerKn": {
       "type": [
@@ -73,7 +79,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Rolling resistance coefficient in N/kN."
+      "description": "Rolling resistance coefficient in N/kN.",
+      "x-disclosure": "public"
     },
     "recycledRubberPct": {
       "type": [
@@ -82,7 +89,8 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled rubber content as a percentage of total rubber weight."
+      "description": "Recycled rubber content as a percentage of total rubber weight.",
+      "x-disclosure": "public"
     },
     "co2ePerTyreKg": {
       "type": [
@@ -90,7 +98,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per tyre unit."
+      "description": "Carbon footprint in kg CO2e per tyre unit.",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

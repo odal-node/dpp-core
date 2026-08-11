@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "productType": {
       "type": "string",
@@ -27,7 +28,8 @@
         "personal-care",
         "other"
       ],
-      "description": "Detergent product type."
+      "description": "Detergent product type.",
+      "x-disclosure": "public"
     },
     "format": {
       "type": "string",
@@ -39,7 +41,8 @@
         "concentrate",
         "other"
       ],
-      "description": "Physical format of the product."
+      "description": "Physical format of the product.",
+      "x-disclosure": "public"
     },
     "surfactants": {
       "type": "array",
@@ -47,12 +50,14 @@
       "items": {
         "$ref": "#/definitions/surfactantEntry"
       },
-      "description": "List of surfactants in the product formulation. All must be readily biodegradable per EU 2026/405 (no derogations)."
+      "description": "List of surfactants in the product formulation. All must be readily biodegradable per EU 2026/405 (no derogations).",
+      "x-disclosure": "public"
     },
     "countryOfManufacture": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of manufacture."
+      "description": "ISO 3166-1 alpha-2 country of manufacture.",
+      "x-disclosure": "public"
     },
     "co2ePerUnitKg": {
       "type": [
@@ -60,14 +65,16 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per product unit."
+      "description": "Carbon footprint in kg CO2e per product unit.",
+      "x-disclosure": "public"
     },
     "packagingRecyclable": {
       "type": [
         "boolean",
         "null"
       ],
-      "description": "Whether the primary packaging is recyclable."
+      "description": "Whether the primary packaging is recyclable.",
+      "x-disclosure": "public"
     },
     "recommendedDosageMl": {
       "type": [
@@ -75,14 +82,16 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Recommended dosage in millilitres (or grams for powder)."
+      "description": "Recommended dosage in millilitres (or grams for powder).",
+      "x-disclosure": "public"
     },
     "biodegradable": {
       "type": [
         "boolean",
         "null"
       ],
-      "description": "Summary flag: whether all surfactants are readily biodegradable."
+      "description": "Summary flag: whether all surfactants are readily biodegradable.",
+      "x-disclosure": "public"
     }
   },
   "definitions": {

@@ -16,32 +16,38 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "batteryChemistry": {
       "type": "string",
       "minLength": 1,
-      "description": "Battery chemistry code, e.g. LFP, NMC, LCO."
+      "description": "Battery chemistry code, e.g. LFP, NMC, LCO.",
+      "x-disclosure": "public"
     },
     "nominalVoltageV": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal voltage in volts."
+      "description": "Nominal voltage in volts.",
+      "x-disclosure": "public"
     },
     "nominalCapacityAh": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal capacity in ampere-hours."
+      "description": "Nominal capacity in ampere-hours.",
+      "x-disclosure": "public"
     },
     "expectedLifetimeCycles": {
       "type": "integer",
       "minimum": 1,
-      "description": "Expected lifetime in full charge-discharge cycles."
+      "description": "Expected lifetime in full charge-discharge cycles.",
+      "x-disclosure": "public"
     },
     "co2ePerUnitKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per battery unit."
+      "description": "Carbon footprint in kg CO2e per battery unit.",
+      "x-disclosure": "public"
     },
     "recycledContentCobaltPct": {
       "type": [
@@ -49,7 +55,8 @@
         "null"
       ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentLithiumPct": {
       "type": [
@@ -57,7 +64,8 @@
         "null"
       ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentNickelPct": {
       "type": [
@@ -65,7 +73,8 @@
         "null"
       ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "stateOfHealthPct": {
       "type": [
@@ -74,7 +83,8 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Deprecated since v2.2.0 — narrower than Annex VII Part A, which defines state of health as state of certified energy for EV batteries and a five-parameter list for stationary storage and LMT. Populate stateOfHealth instead."
+      "description": "Deprecated since v2.2.0 — narrower than Annex VII Part A, which defines state of health as state of certified energy for EV batteries and a five-parameter list for stationary storage and LMT. Populate stateOfHealth instead.",
+      "x-disclosure": "individual"
     },
     "placedOnMarketDate": {
       "type": [
@@ -82,7 +92,8 @@
         "null"
       ],
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible."
+      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible.",
+      "x-disclosure": "public"
     },
     "ratedCapacityKwh": {
       "type": [
@@ -90,7 +101,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Rated energy in kilowatt-hours."
+      "description": "Rated energy in kilowatt-hours.",
+      "x-disclosure": "public"
     },
     "carbonFootprintClass": {
       "type": [
@@ -98,7 +110,8 @@
         "null"
       ],
       "maxLength": 8,
-      "description": "Carbon footprint performance class label per Art. 7(2), verbatim from the delegated act that established the scale. Not enumerated here: Art. 7(2) defines no labels and requires the Commission to review the number of classes and their thresholds every three years. Meaningless without carbonFootprintClassRulesetId and carbonFootprintClassRulesetVersion."
+      "description": "Carbon footprint performance class label per Art. 7(2), verbatim from the delegated act that established the scale. Not enumerated here: Art. 7(2) defines no labels and requires the Commission to review the number of classes and their thresholds every three years. Meaningless without carbonFootprintClassRulesetId and carbonFootprintClassRulesetVersion.",
+      "x-disclosure": "public"
     },
     "carbonFootprintClassRulesetId": {
       "type": [
@@ -106,7 +119,8 @@
         "null"
       ],
       "maxLength": 128,
-      "description": "Identifier of the ruleset whose class boundaries produced carbonFootprintClass."
+      "description": "Identifier of the ruleset whose class boundaries produced carbonFootprintClass.",
+      "x-disclosure": "public"
     },
     "carbonFootprintClassRulesetVersion": {
       "type": [
@@ -114,7 +128,8 @@
         "null"
       ],
       "maxLength": 32,
-      "description": "Version of the ruleset identified by carbonFootprintClassRulesetId."
+      "description": "Version of the ruleset identified by carbonFootprintClassRulesetId.",
+      "x-disclosure": "public"
     },
     "dueDiligenceUrl": {
       "type": [
@@ -122,7 +137,8 @@
         "null"
       ],
       "format": "uri",
-      "description": "URL to supply chain due diligence documentation (Arts. 48-53)."
+      "description": "URL to supply chain due diligence documentation (Arts. 48-53).",
+      "x-disclosure": "restricted"
     },
     "cathodeMaterial": {
       "type": [
@@ -132,7 +148,8 @@
       "items": {
         "$ref": "#/definitions/materialComposition"
       },
-      "description": "Cathode active material composition."
+      "description": "Cathode active material composition.",
+      "x-disclosure": "restricted"
     },
     "anodeMaterial": {
       "type": [
@@ -142,7 +159,8 @@
       "items": {
         "$ref": "#/definitions/materialComposition"
       },
-      "description": "Anode active material composition."
+      "description": "Anode active material composition.",
+      "x-disclosure": "restricted"
     },
     "electrolyteMaterial": {
       "type": [
@@ -152,7 +170,8 @@
       "items": {
         "$ref": "#/definitions/materialComposition"
       },
-      "description": "Electrolyte composition."
+      "description": "Electrolyte composition.",
+      "x-disclosure": "restricted"
     },
     "criticalRawMaterials": {
       "type": [
@@ -162,35 +181,40 @@
       "items": {
         "$ref": "#/definitions/criticalRawMaterial"
       },
-      "description": "Critical raw materials per EU CRM Act 2024/1252."
+      "description": "Critical raw materials per EU CRM Act 2024/1252.",
+      "x-disclosure": "restricted"
     },
     "disassemblyInstructionsUrl": {
       "type": [
         "string",
         "null"
       ],
-      "description": "URL or text for disassembly/dismantling instructions (Annex XIII point 2(c))."
+      "description": "URL or text for disassembly/dismantling instructions (Annex XIII point 2(c)).",
+      "x-disclosure": "restricted"
     },
     "sohMethodology": {
       "type": [
         "string",
         "null"
       ],
-      "description": "State-of-health determination methodology identifier."
+      "description": "State-of-health determination methodology identifier.",
+      "x-disclosure": "restricted"
     },
     "operatingTempMinC": {
       "type": [
         "number",
         "null"
       ],
-      "description": "Minimum operating temperature in degrees Celsius."
+      "description": "Minimum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
     },
     "operatingTempMaxC": {
       "type": [
         "number",
         "null"
       ],
-      "description": "Maximum operating temperature in degrees Celsius."
+      "description": "Maximum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
     },
     "ratedEnergyWh": {
       "type": [
@@ -198,7 +222,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Rated energy in watt-hours (Wh)."
+      "description": "Rated energy in watt-hours (Wh).",
+      "x-disclosure": "public"
     },
     "recycledContentLeadPct": {
       "type": [
@@ -207,7 +232,8 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled lead content percentage (lead-acid batteries). Note: Art. 8(2)/(3) measure lead as the share present in the battery, whereas cobalt, lithium and nickel are measured in active materials."
+      "description": "Recycled lead content percentage (lead-acid batteries). Note: Art. 8(2)/(3) measure lead as the share present in the battery, whereas cobalt, lithium and nickel are measured in active materials.",
+      "x-disclosure": "public"
     },
     "batteryWeightKg": {
       "type": [
@@ -215,7 +241,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Battery weight in kilograms."
+      "description": "Battery weight in kilograms.",
+      "x-disclosure": "public"
     },
     "batteryType": {
       "type": [
@@ -230,7 +257,8 @@
         "starting-lighting-ignition",
         null
       ],
-      "description": "Battery type category per regulation."
+      "description": "Battery type category per regulation.",
+      "x-disclosure": "public"
     },
     "roundTripEfficiencyPct": {
       "type": [
@@ -239,7 +267,8 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Round-trip energy efficiency at 50% SoC."
+      "description": "Round-trip energy efficiency at 50% SoC.",
+      "x-disclosure": "public"
     },
     "internalResistanceMohm": {
       "type": [
@@ -247,7 +276,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Internal resistance in milliohms at 50% SoC."
+      "description": "Internal resistance in milliohms at 50% SoC.",
+      "x-disclosure": "public"
     },
     "stateOfHealth": {
       "description": "State-of-health parameters per Annex VII Part A, in the parameter set the battery's category requires. Required in the battery management system since 18 Aug 2024 (Art. 14(1)). Accessible only to persons with a legitimate interest (Annex XIII point 4(b)).",
@@ -322,7 +352,8 @@
           },
           "additionalProperties": false
         }
-      ]
+      ],
+      "x-disclosure": "individual"
     },
     "recycledContentReportingYear": {
       "type": [
@@ -331,7 +362,8 @@
       ],
       "minimum": 2000,
       "maximum": 2100,
-      "description": "Calendar year the recycled-content shares pertain to, per Art. 8(1) ('for each battery model per year and per manufacturing plant'). Pair with manufacturingPlace."
+      "description": "Calendar year the recycled-content shares pertain to, per Art. 8(1) ('for each battery model per year and per manufacturing plant'). Pair with manufacturingPlace.",
+      "x-disclosure": "public"
     }
   },
   "definitions": {

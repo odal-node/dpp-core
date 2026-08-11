@@ -17,18 +17,21 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "co2ePerTonneSteel": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon intensity in tonne CO2e per tonne of steel produced."
+      "description": "Carbon intensity in tonne CO2e per tonne of steel produced.",
+      "x-disclosure": "public"
     },
     "recycledScrapContentPct": {
       "type": "number",
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled scrap content as a percentage of total input material."
+      "description": "Recycled scrap content as a percentage of total input material.",
+      "x-disclosure": "public"
     },
     "productCategory": {
       "type": "string",
@@ -39,12 +42,14 @@
         "specialty",
         "other"
       ],
-      "description": "Steel product category."
+      "description": "Steel product category.",
+      "x-disclosure": "public"
     },
     "countryOfProduction": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of production."
+      "description": "ISO 3166-1 alpha-2 country of production.",
+      "x-disclosure": "public"
     },
     "productionRoute": {
       "type": "string",
@@ -53,7 +58,8 @@
         "electric-arc",
         "direct-reduction"
       ],
-      "description": "Primary production route."
+      "description": "Primary production route.",
+      "x-disclosure": "public"
     },
     "annualProductionTonnes": {
       "type": [
@@ -61,7 +67,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Annual production volume in tonnes (optional)."
+      "description": "Annual production volume in tonnes (optional).",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false
