@@ -125,6 +125,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **Disclosure classes now live in the schema version, via `x-disclosure`.**
+  `SectorAccessPolicy::from_schema` reads a field's access class from the schema
+  it was validated against, instead of from the catalog's single unversioned map.
+
+  The map is the problem it solves. A passport's signatures are frozen at
+  publish, but the bytes each covers are produced at *serve* time by whichever
+  policy is in force then — and the catalog carries one disclosure map against
+  many schema versions. The day a delegated act reclassifies a field, the view
+  served for an already-published passport gains one its frozen signature never
+  covered, and verification fails in a way indistinguishable from tampering. A
+  schema version is already stored on the passport and already authoritative for
+  reads, so sourcing disclosure from there keeps every passport filtered by the
+  classes that produced its own signature, permanently, with no new field.
+
+  The annotation sits on the property rather than in a sidecar so a field cannot
+  be added without its class appearing in the same diff, and
+  `every_property_declares_a_disclosure_class` turns that into a build-time
+  guarantee. The catalog map offers no such thing: a field added without an
+  entry silently defaults to public, which for Annex XIII point 2, 3 or 4
+  content is a leak rather than an omission.
+
+  `from_catalog` is untouched and still in use; both are covered by a test that
+  they agree, so the cutover can be its own change. An unparseable schema yields
+  no policy rather than an all-public one.
+
 - **`dpp-rules::batteries::passport_content` — which data points a category
   actually owes.** The schema declares almost every Annex XIII field optional,
   and that is not laxity: the obligations are per category. A field mandatory

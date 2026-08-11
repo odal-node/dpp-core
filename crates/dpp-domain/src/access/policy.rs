@@ -30,6 +30,8 @@ pub struct SectorAccessPolicy {
     /// Map of JSON field name → disclosure class. A listed field is matched
     /// wherever it appears in the document (any nesting depth), by normalized key.
     pub field_disclosure: HashMap<String, Disclosure>,
+    // NOTE: `SectorAccessPolicy::from_schema` below reads the same classes out
+    // of a *versioned* schema. Prefer it — see its doc comment.
     /// Class applied to fields **not** listed in `field_disclosure`. Defaults
     /// to `Public` (backward-compatible: only restricted fields need listing).
     /// Set to a non-public class for a true default-deny (fail-closed) policy,
@@ -88,6 +90,74 @@ impl SectorAccessPolicy {
         }
         Some(Self {
             name: format!("{sector_key}-{}", descriptor.current_schema_version),
+            sector: sector_key.to_owned(),
+            field_disclosure,
+            default_disclosure: Disclosure::Public,
+        })
+    }
+
+    /// Build the policy from a **specific schema version's** own `x-disclosure`
+    /// annotations, rather than from the catalog's single unversioned map.
+    ///
+    /// # Why this exists
+    ///
+    /// A passport's signatures are frozen at publish; the bytes each one covers
+    /// are produced at *serve* time by whichever policy is in force then. The
+    /// catalog carries **one** disclosure map against **many** schema versions,
+    /// so the day a delegated act reclassifies a field — `restricted` →
+    /// `public` is the move these acts make — the view served for an
+    /// already-published passport gains a field its frozen signature never
+    /// covered. Verification then fails for every affected passport at once and
+    /// is indistinguishable from tampering.
+    ///
+    /// A schema version, by contrast, is already stored **on the passport** and
+    /// already authoritative for reads (`resolve_schema_version` returns the
+    /// stored one). Reading disclosure from there means a passport is always
+    /// filtered by the same classes that produced its signature, permanently,
+    /// with no extra field and no new machinery. A reclassification becomes a
+    /// new schema version — which is correct rather than costly: changing who
+    /// may see a field changes what the document means.
+    ///
+    /// # Why the annotation lives on the property
+    ///
+    /// Co-location. A field and its access class are declared in the same
+    /// object, so a field cannot be added without its disclosure slot appearing
+    /// in the same diff — and `every_property_declares_a_disclosure_class`
+    /// turns that into a build-time guarantee. The catalog map has no such
+    /// property: a field added without an entry silently defaults to public,
+    /// which for Annex XIII point 2, 3 or 4 content is a leak.
+    ///
+    /// Returns `None` if the schema is absent or is not a JSON object with
+    /// `properties`. An unparseable schema must not silently produce an
+    /// all-public policy.
+    #[must_use]
+    pub fn from_schema(sector_key: &str, version: &str, schema_json: &str) -> Option<Self> {
+        let schema: serde_json::Value = serde_json::from_str(schema_json).ok()?;
+        let properties = schema.get("properties")?.as_object()?;
+
+        let mut field_disclosure: HashMap<String, Disclosure> = properties
+            .iter()
+            .filter_map(|(name, prop)| {
+                let class = prop.get("x-disclosure")?.as_str()?;
+                let disclosure = match class {
+                    "public" => Disclosure::Public,
+                    "restricted" => Disclosure::Restricted,
+                    "conformity" => Disclosure::Conformity,
+                    "individual" => Disclosure::Individual,
+                    _ => return None,
+                };
+                Some((name.clone(), disclosure))
+            })
+            .collect();
+
+        for field in COMMON_CONFORMITY {
+            field_disclosure
+                .entry((*field).to_owned())
+                .or_insert(Disclosure::Conformity);
+        }
+
+        Some(Self {
+            name: format!("{sector_key}-{version}"),
             sector: sector_key.to_owned(),
             field_disclosure,
             default_disclosure: Disclosure::Public,
