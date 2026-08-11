@@ -452,7 +452,7 @@ fn sector_discriminant_matches_variant() {
         battery_chemistry: BatteryChemistry::Nmc,
         nominal_voltage_v: 4.0,
         nominal_capacity_ah: 50.0,
-        expected_lifetime_cycles: 1000,
+        expected_lifetime_cycles: Some(1000),
         co2e_per_unit_kg: 40.0,
         ..crate::test_support::sample_battery_data()
     });

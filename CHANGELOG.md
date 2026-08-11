@@ -15,6 +15,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`BatteryData.expected_lifetime_cycles` is now `Option<u32>`, and battery
+  schema `v2.6.0` drops it from `required`.** Annex XIII point 1(j) does not
+  reach every battery: the Commission's own data-point guidance marks it
+  mandatory for EV and LMT but *"only applicable for some industrial batteries
+  where lifetime can be expressed in cycles"*, and point 4(a) repeats the
+  carve-out as *"except for non-cycle applications"*. A required field made an
+  industrial battery with no meaningful cycle figure unrepresentable. The
+  constraint belongs in a category-conditional rule, not in the schema.
+
+  `BatteryData` also gains three fields (below) and is not `#[non_exhaustive]`,
+  so struct-literal construction must be updated. The `v2.5.0 → v2.6.0` lens is
+  an identity: a relaxation plus optional additions cannot strand a record that
+  already validated, which is why this hop passes through where the `v2.4.0`
+  one refuses.
+
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was
@@ -51,6 +66,42 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   terms instead.
 
 ### Added
+
+- **The Annex XIII point 4 individual-battery tier — battery schema `v2.6.0`.**
+  Points 1 to 3 describe a battery *model*; point 4 describes one *physical
+  battery*, and until now only its state-of-health half was modelled. Three
+  additions complete it, each carrying the `individual` disclosure class, so
+  they are withheld from the public **and from authorities** and released only
+  to a holder of a legitimate interest:
+
+  - `dynamicPerformance` (point 4(a)) — measured capacity, power, internal
+    resistance, round-trip efficiency, their fade rates, and expected lifetime
+    in both cycles and calendar years.
+  - `batteryStatus` (point 4(c)) — a closed enumeration, because the annex
+    spells the set out inline: original, repurposed, re-used, remanufactured,
+    waste. No `#[serde(other)]`, for the reason already recorded for
+    `BatteryType`.
+  - `usageHistory` (point 4(d)) — charge/discharge cycles, negative events, and
+    periodic environmental and state-of-charge readings.
+
+  Boxed and kept separate rather than flattened onto `BatteryData`, because the
+  same quantity is deliberately carried twice — declared per model and measured
+  per battery. The Commission's guidance makes the pairing explicit, recording
+  the dynamic capacity as *"same as data point number 11 (capacity), but now
+  dynamic"*. Flattening would put the two readings side by side under
+  near-identical names and let a filer put a measured value in a declared field.
+
+  All 71 data points were read from the Commission's guidance document
+  (v1.0, 28 July 2026) against the model. That reading also confirmed the
+  existing `StateOfHealth` sum type is right: state of certified energy is
+  mandatory for EV batteries and *"not to be filled"* for the other two, while
+  the five-parameter list is the exact inverse — so an EV battery carrying an
+  ohmic resistance is a document that must not exist, and the type makes it
+  unrepresentable.
+
+- **`Validator::optional_positive_int` in `dpp-plugin-sdk`.** For a field whose
+  presence is conditional but whose value, once given, is still constrained.
+  `optional_non_negative` would have admitted `0` and a fractional count.
 
 - **`dpp-aas`'s semanticId provenance gate and `dpp-vc`'s JSON-LD context now
   share one gate: `dpp-vocab`.** `dpp-aas/src/semantic_ids/allowlist.json` is

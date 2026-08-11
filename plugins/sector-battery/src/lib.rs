@@ -45,7 +45,7 @@ impl DppSectorPlugin for BatteryPlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.5.0".into(),
+            max_version: "2.6.0".into(),
         }
     }
 
@@ -56,7 +56,7 @@ impl DppSectorPlugin for BatteryPlugin {
             .require_positive("nominalVoltageV")
             .require_positive("nominalCapacityAh")
             .require_non_negative("co2ePerUnitKg")
-            .require_positive_int("expectedLifetimeCycles")
+            .optional_positive_int("expectedLifetimeCycles")
             .optional_pct("recycledContentCobaltPct")
             .optional_pct("recycledContentLithiumPct")
             .optional_pct("recycledContentNickelPct")
@@ -327,7 +327,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.5.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.6.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 

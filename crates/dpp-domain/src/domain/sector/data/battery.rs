@@ -4,7 +4,9 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
-use crate::domain::sector::enums::{BatteryChemistry, BatteryType, CarbonFootprintClass};
+use crate::domain::sector::enums::{
+    BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass,
+};
 
 use super::shared::CriticalRawMaterial;
 
@@ -24,10 +26,30 @@ pub struct BatteryData {
     pub battery_chemistry: BatteryChemistry,
     /// Nominal voltage in volts.
     pub nominal_voltage_v: f64,
-    /// Nominal capacity in ampere-hours.
+    /// Capacity, in ampere-hours. **Annex VI Part A point 6** — "the capacity",
+    /// mandatory for every battery category.
+    ///
+    /// Deliberately *not* Annex XIII point 1(g), "rated capacity (in Ah)",
+    /// which the Commission's data-point guidance marks "not to be
+    /// filled/displayed" for all three categories. The two are easy to
+    /// conflate because this field is named for the second and required like
+    /// the first. A third reading of the same quantity exists as a *measured*
+    /// value in [`DynamicPerformance::rated_capacity_ah`]; that one is per
+    /// battery, this one is per model.
     pub nominal_capacity_ah: f64,
-    /// Expected lifetime in full charge–discharge cycles.
-    pub expected_lifetime_cycles: u32,
+    /// Expected lifetime in full charge–discharge cycles, as **declared for the
+    /// model** — Annex XIII point 1(j).
+    ///
+    /// Optional because the duty is not universal: the obligation covers EV and
+    /// LMT batteries but reaches industrial batteries only *"where lifetime can
+    /// be expressed in cycles"*, and point 4(a) repeats the carve-out as
+    /// *"except for non-cycle applications"*. A required field made an
+    /// industrial battery with no meaningful cycle figure unrepresentable, so
+    /// the constraint moves to a category-conditional rule rather than the
+    /// schema. The *measured* counterpart is
+    /// [`DynamicPerformance::expected_lifetime_cycles`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lifetime_cycles: Option<u32>,
     /// Carbon footprint in kg CO₂e per battery unit (manufacturer-supplied or calculated).
     pub co2e_per_unit_kg: f64,
 
@@ -198,6 +220,148 @@ pub struct BatteryData {
     /// report them, so `SectorData` should not carry their weight inline.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state_of_health: Option<Box<StateOfHealth>>,
+
+    // ── v2.6.0 — Annex XIII point 4, the rest of the individual-battery tier ─
+    /// Measured performance and durability for **this** battery — Annex XIII
+    /// point 4(a). See [`DynamicPerformance`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamic_performance: Option<Box<DynamicPerformance>>,
+
+    /// Where this battery is in its life — Annex XIII point 4(c).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub battery_status: Option<BatteryStatus>,
+
+    /// Recorded use history for **this** battery — Annex XIII point 4(d). See
+    /// [`UsageHistory`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage_history: Option<Box<UsageHistory>>,
+}
+
+/// Measured performance and durability of one physical battery — Annex XIII
+/// point 4(a).
+///
+/// # Why this is a block and not ten more fields on [`BatteryData`]
+///
+/// Point 4 describes **an individual battery**; points 1 to 3 describe a
+/// **model**. The Commission's own data-point guidance makes the pairing
+/// explicit rather than implicit — its entry for `ratedCapacityAh` here reads
+/// *"same as data point number 11 (capacity), but now dynamic"* — so the same
+/// quantity is deliberately carried twice, once as declared and once as
+/// measured. Flattening these onto `BatteryData` would put the two readings
+/// side by side distinguished only by name, and would let a filer put a
+/// measured value in a declared field. Keeping the block separate makes the
+/// distinction structural, and lets one `individual` disclosure entry cover
+/// the whole set — the same shape [`StateOfHealth`] and [`ExpectedLifetime`]
+/// already use.
+///
+/// # Optionality
+///
+/// Every field is `Option`. The guidance marks this set mandatory for EV and
+/// LMT batteries but *"if applicable"* for industrial ones, and marks round
+/// trip efficiency and its fade *"where applicable"* for all three. Which
+/// fields a given battery owes is a category-conditional rule, not a schema
+/// constraint.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DynamicPerformance {
+    /// Rated capacity in ampere-hours, measured. The dynamic counterpart of
+    /// [`BatteryData::nominal_capacity_ah`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rated_capacity_ah: Option<f64>,
+    /// Capacity fade, as a percentage of the original rated capacity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity_fade_pct: Option<f64>,
+    /// Power, in watts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_w: Option<f64>,
+    /// Power fade, as a percentage of the original power.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub power_fade_pct: Option<f64>,
+    /// Internal resistance, in milliohms.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_resistance_mohm: Option<f64>,
+    /// Internal resistance increase, as a percentage of the original.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal_resistance_increase_pct: Option<f64>,
+    /// Energy round trip efficiency, as a percentage. *"Where applicable"* for
+    /// every category, unlike the fields above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub round_trip_efficiency_pct: Option<f64>,
+    /// Energy round trip efficiency fade, as a percentage. *"Where
+    /// applicable"*.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub round_trip_efficiency_fade_pct: Option<f64>,
+    /// Expected lifetime under the reference conditions the battery was
+    /// designed for, in cycles — *"except for non-cycle applications"*. The
+    /// measured counterpart of [`BatteryData::expected_lifetime_cycles`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lifetime_cycles: Option<u32>,
+    /// The same expectation in **calendar years**, which the annex lists as a
+    /// separate data point rather than a unit conversion: a battery can have a
+    /// calendar-life expectation and no meaningful cycle count.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_lifetime_years: Option<f64>,
+}
+
+/// Recorded use history of one physical battery — Annex XIII point 4(d).
+///
+/// Every item in 4(d) is *"if applicable"* for all three battery categories,
+/// so nothing here is ever required by the schema.
+///
+/// **`negativeEvents` deliberately does not duplicate [`HarmfulEvents`].**
+/// Annex VII Part B item 4 already requires harmful-event tracking as part of
+/// the expected-lifetime parameter set, and this annex asks for the same
+/// underlying facts under a different heading. Where a battery reports Part B
+/// figures, [`ExpectedLifetime::harmful_events`] is the structured home and
+/// this field carries what does not fit it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct UsageHistory {
+    /// Number of charging and discharging cycles.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charge_discharge_cycles: Option<u32>,
+    /// Negative events, such as accidents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub negative_events: Option<Vec<String>>,
+    /// Periodically recorded operating environmental conditions, including
+    /// temperature.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operating_conditions: Option<Vec<EnvironmentalReading>>,
+    /// Periodically recorded state of charge, as a percentage.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_of_charge: Option<Vec<StateOfChargeReading>>,
+}
+
+/// One periodic environmental observation — Annex XIII point 4(d).
+///
+/// The annex names temperature explicitly and leaves the rest of "operating
+/// environmental conditions" open, so temperature is the one typed member and
+/// anything further is recorded as a note rather than invented as a field.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EnvironmentalReading {
+    /// When the observation was taken.
+    pub recorded_at: DateTime<Utc>,
+    /// Temperature in °C.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature_c: Option<f64>,
+    /// Any further condition the annex leaves unenumerated.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// One periodic state-of-charge observation — Annex XIII point 4(d).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct StateOfChargeReading {
+    /// When the observation was taken.
+    pub recorded_at: DateTime<Utc>,
+    /// State of charge as a percentage of usable capacity.
+    pub state_of_charge_pct: f64,
 }
 
 /// State-of-health parameters per Annex VII Part A of Reg. (EU) 2023/1542.
