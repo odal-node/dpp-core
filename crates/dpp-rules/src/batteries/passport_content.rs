@@ -175,6 +175,22 @@ pub fn annex_xiii_requirement(field: &str, battery_type: &str) -> Requirement {
     Requirement::Unknown
 }
 
+/// Every field this category must carry, in table order.
+///
+/// The publish gate's input. Iterating the table rather than exposing it keeps
+/// the rows private, so a caller cannot come to depend on their order or arity.
+pub fn mandatory_fields(battery_type: &str) -> impl Iterator<Item = &'static str> {
+    let category = category_of(battery_type);
+    REQUIREMENTS.iter().filter_map(move |(name, ev, lmt, ind)| {
+        let r = match category? {
+            Category::Ev => *ev,
+            Category::Lmt => *lmt,
+            Category::Industrial => *ind,
+        };
+        (r == Requirement::Mandatory).then_some(*name)
+    })
+}
+
 /// Every field of `present` that this category must not carry.
 ///
 /// The complement of the usual question. A passport asserting a capacity
