@@ -196,6 +196,29 @@ impl<'a> Validator<'a> {
         self
     }
 
+    /// If present (and non-null), the value must be an integer of at least 1.
+    ///
+    /// The optional counterpart of [`Self::require_positive_int`], for a field
+    /// whose *presence* is conditional but whose *value*, once given, is still
+    /// constrained. Deliberately not expressible as
+    /// [`Self::optional_non_negative`], which would admit `0` and a fractional
+    /// count.
+    pub fn optional_positive_int(&mut self, key: &str) -> &mut Self {
+        let err = match present(self.input, key) {
+            None => None,
+            Some(v) => match v.as_u64() {
+                None => Some((
+                    "invalid_type",
+                    format!("{key} must be a non-negative integer"),
+                )),
+                Some(0) => Some(("out_of_range", format!("{key} must be at least 1"))),
+                Some(_) => None,
+            },
+        };
+        self.push_opt(key, err);
+        self
+    }
+
     /// Require a present boolean.
     pub fn require_bool(&mut self, key: &str) -> &mut Self {
         let err = match present(self.input, key) {

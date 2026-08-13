@@ -12,11 +12,6 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
         string_property("batteryChemistry", b.battery_chemistry.wire_str(), None),
         double_property("nominalVoltageV", b.nominal_voltage_v, None),
         double_property("nominalCapacityAh", b.nominal_capacity_ah, None),
-        integer_property(
-            "expectedLifetimeCycles",
-            b.expected_lifetime_cycles as i64,
-            None,
-        ),
         double_property(
             "co2ePerUnitKg",
             b.co2e_per_unit_kg,
@@ -38,6 +33,21 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
                 elements.push(string_property($id, v, None));
             }
         };
+    }
+
+    if let Some(cycles) = b.expected_lifetime_cycles {
+        elements.push(integer_property(
+            "expectedLifetimeCycles",
+            i64::from(cycles),
+            None,
+        ));
+    }
+    if let Some(status) = b.battery_status {
+        elements.push(string_property(
+            "batteryStatus",
+            &enum_wire_str(&status),
+            None,
+        ));
     }
 
     push_opt_double!(b.recycled_content_cobalt_pct, "recycledContentCobaltPct");
@@ -96,6 +106,55 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
                 AasCollection {
                     id_short: label.to_owned(),
                     value: items,
+                    semantic_id: None,
+                },
+            ));
+        }
+    }
+
+    // Annex XIII point 4(a), measured per battery. Nested rather than flattened
+    // for the same reason the domain type is: a declared model figure and a
+    // measured one are different claims and must not sit side by side under
+    // near-identical names.
+    //
+    // Point 4(d) — `usageHistory` — is deliberately **not** projected. It is a
+    // set of time series, and this submodel is a technical-data snapshot; a
+    // consumer wanting use history wants the passport, not an AAS property.
+    if let Some(ref dp) = b.dynamic_performance {
+        let mut dyn_elems = Vec::new();
+        for (label, value) in [
+            ("ratedCapacityAh", dp.rated_capacity_ah),
+            ("capacityFadePct", dp.capacity_fade_pct),
+            ("powerW", dp.power_w),
+            ("powerFadePct", dp.power_fade_pct),
+            ("internalResistanceMohm", dp.internal_resistance_mohm),
+            (
+                "internalResistanceIncreasePct",
+                dp.internal_resistance_increase_pct,
+            ),
+            ("roundTripEfficiencyPct", dp.round_trip_efficiency_pct),
+            (
+                "roundTripEfficiencyFadePct",
+                dp.round_trip_efficiency_fade_pct,
+            ),
+            ("expectedLifetimeYears", dp.expected_lifetime_years),
+        ] {
+            if let Some(v) = value {
+                dyn_elems.push(double_property(label, v, None));
+            }
+        }
+        if let Some(cycles) = dp.expected_lifetime_cycles {
+            dyn_elems.push(integer_property(
+                "expectedLifetimeCycles",
+                i64::from(cycles),
+                None,
+            ));
+        }
+        if !dyn_elems.is_empty() {
+            elements.push(AasSubmodelElement::SubmodelElementCollection(
+                AasCollection {
+                    id_short: "dynamicPerformance".to_owned(),
+                    value: dyn_elems,
                     semantic_id: None,
                 },
             ));

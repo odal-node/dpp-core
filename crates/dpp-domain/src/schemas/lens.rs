@@ -371,6 +371,19 @@ fn builtin_lenses() -> Vec<Lens> {
             battery_v2_4_to_v2_5,
         ),
         Lens::new(
+            "battery",
+            Version::new(2, 5, 0),
+            Version::new(2, 6, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Annex XIII point 4 v2.6.0: adds the \
+             individual-battery tier — dynamicPerformance (4(a)), batteryStatus (4(c)) \
+             and usageHistory (4(d)) — all optional, and relaxes \
+             expectedLifetimeCycles out of required, since point 1(j) reaches \
+             industrial batteries only where lifetime can be expressed in cycles. \
+             Identity: additions and a relaxation cannot strand a v2.5.0 record.",
+            battery_v2_5_to_v2_6,
+        ),
+        Lens::new(
             "electronics",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),
@@ -511,6 +524,25 @@ fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
                 .to_owned(),
         )),
     }
+}
+
+/// Battery `v2.5.0 → v2.6.0`: identity.
+///
+/// Every v2.6.0 change is one a v2.5.0 record already satisfies. The three new
+/// keys — `dynamicPerformance`, `batteryStatus` and `usageHistory` — are
+/// optional, and `expectedLifetimeCycles` only *stops* being required, which no
+/// existing record can fail. So unlike the v2.4.0 hop above there is nothing to
+/// refuse: a relaxation cannot strand a document that already validated.
+///
+/// Absence stays absent. An older record has no measured point-4 data and
+/// inventing an empty block would assert that the battery reported one.
+fn battery_v2_5_to_v2_6(v: &Value) -> Result<Value, LensError> {
+    if !v.is_object() {
+        return Err(LensError(
+            "battery sector data must be a JSON object".to_owned(),
+        ));
+    }
+    Ok(v.clone())
 }
 
 /// Electronics `v1.1.0 → v1.2.0`: passes every field through unchanged.
@@ -940,6 +972,98 @@ mod tests {
             )
             .unwrap_err();
         assert!(matches!(err, UpcastError::Transform(_)));
+    }
+
+    #[test]
+    fn battery_v2_5_to_v2_6_upgrades_a_record_with_no_cycle_count() {
+        // The v2.6.0 relaxation exists for industrial batteries whose lifetime
+        // cannot be expressed in cycles (Annex XIII point 1(j)). A record with
+        // no expectedLifetimeCycles fails v2.5.0 and must pass v2.6.0 — this is
+        // the opposite of the v2.4.0 hop above, which refuses. A relaxation
+        // cannot strand a document; a new obligation can.
+        let lenses = LensRegistry::new();
+        let schemas = VersionedSchemaRegistry::new();
+        let mut data = battery_v1();
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("batteryType".into(), serde_json::json!("industrial"));
+        obj.remove("expectedLifetimeCycles");
+
+        assert!(
+            schemas.validate("battery", &v("2.5.0"), &data).is_err(),
+            "the fixture must be one v2.5.0 rejects, or this proves nothing"
+        );
+
+        let derived = lenses
+            .upcast("battery", &data, &v("2.5.0"), &v("2.6.0"))
+            .unwrap();
+        assert!(!derived.lossy);
+        schemas
+            .validate("battery", &v("2.6.0"), &derived.data)
+            .expect("derived view must validate against v2.6.0");
+    }
+
+    #[test]
+    fn battery_v2_5_to_v2_6_does_not_invent_an_empty_point_4_block() {
+        // Absence stays absent. Materialising an empty dynamicPerformance would
+        // assert that the battery reported measured values it never reported.
+        let lenses = LensRegistry::new();
+        let mut data = battery_v1();
+        data.as_object_mut()
+            .unwrap()
+            .insert("batteryType".into(), serde_json::json!("ev"));
+
+        let derived = lenses
+            .upcast("battery", &data, &v("2.5.0"), &v("2.6.0"))
+            .unwrap();
+
+        for key in ["dynamicPerformance", "batteryStatus", "usageHistory"] {
+            assert!(
+                derived.data.get(key).is_none(),
+                "the lens materialised '{key}', which the source never carried"
+            );
+        }
+    }
+
+    #[test]
+    fn battery_v2_6_accepts_the_individual_battery_tier() {
+        let schemas = VersionedSchemaRegistry::new();
+        let mut data = battery_v1();
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("batteryType".into(), serde_json::json!("ev"));
+        obj.insert(
+            "dynamicPerformance".into(),
+            serde_json::json!({ "ratedCapacityAh": 92.0, "capacityFadePct": 8.0 }),
+        );
+        obj.insert("batteryStatus".into(), serde_json::json!("repurposed"));
+        obj.insert(
+            "usageHistory".into(),
+            serde_json::json!({
+                "chargeDischargeCycles": 412,
+                "stateOfCharge": [
+                    { "recordedAt": "2026-08-11T09:00:00Z", "stateOfChargePct": 61.5 }
+                ]
+            }),
+        );
+
+        schemas
+            .validate("battery", &v("2.6.0"), &data)
+            .expect("the point 4 tier validates");
+    }
+
+    #[test]
+    fn battery_v2_6_refuses_a_status_the_annex_does_not_enumerate() {
+        // Annex XIII point 4(c) spells the set out inline, so it is closed for
+        // the same reason batteryType is.
+        let schemas = VersionedSchemaRegistry::new();
+        let mut data = battery_v1();
+        let obj = data.as_object_mut().unwrap();
+        obj.insert("batteryType".into(), serde_json::json!("ev"));
+        obj.insert("batteryStatus".into(), serde_json::json!("refurbished"));
+
+        assert!(
+            schemas.validate("battery", &v("2.6.0"), &data).is_err(),
+            "'refurbished' is not one of the five the annex names"
+        );
     }
 
     #[test]

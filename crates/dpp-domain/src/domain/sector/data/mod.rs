@@ -20,7 +20,8 @@ pub mod unsold_goods;
 
 pub use aluminium::AluminiumData;
 pub use battery::{
-    BatteryData, ExpectedLifetime, HarmfulEvents, MaterialComposition, StateOfHealth,
+    BatteryData, DynamicPerformance, EnvironmentalReading, ExpectedLifetime, HarmfulEvents,
+    MaterialComposition, StateOfChargeReading, StateOfHealth, UsageHistory,
 };
 pub use construction::ConstructionData;
 pub use detergent::{DetergentData, SurfactantEntry};

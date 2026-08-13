@@ -340,12 +340,6 @@
         },
         {
           "modelType": "Property",
-          "idShort": "expectedLifetimeCycles",
-          "valueType": "xs:integer",
-          "value": "1000"
-        },
-        {
-          "modelType": "Property",
           "idShort": "co2ePerUnitKg",
           "valueType": "xs:double",
           "value": "85",
@@ -364,6 +358,12 @@
           "idShort": "batteryType",
           "valueType": "xs:string",
           "value": "ev"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "expectedLifetimeCycles",
+          "valueType": "xs:integer",
+          "value": "1000"
         }
       ]
     }

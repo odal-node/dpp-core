@@ -374,6 +374,46 @@ fn generic_leaf_key_collides_across_objects() {
 // ── Art. 77(2) lattice ───────────────────────────────────────────────────────
 
 #[test]
+fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {
+    // Not a hand-built policy: this reads sectors/battery.json, so it fails if
+    // a point-4 field is added to the type and its disclosure entry is
+    // forgotten — which would publish measured, per-battery data to anyone
+    // scanning the QR code.
+    let policy = battery_policy();
+    let data = json!({
+        "gtin": "09506000134352",
+        "dynamicPerformance": { "ratedCapacityAh": 92.0, "capacityFadePct": 8.0 },
+        "batteryStatus": "repurposed",
+        "usageHistory": { "chargeDischargeCycles": 412 },
+    });
+
+    let point_4 = ["dynamicPerformance", "batteryStatus", "usageHistory"];
+
+    for audience in [Audience::Public, Audience::Authority] {
+        let view = filter_by_audience(&data, &policy, audience);
+        for key in point_4 {
+            assert!(
+                view.filtered_data.get(key).is_none(),
+                "{audience:?} can see '{key}', which Annex XIII point 4 reserves \
+                 to holders of a legitimate interest"
+            );
+        }
+        assert!(
+            view.filtered_data.get("gtin").is_some(),
+            "{audience:?} lost a public field"
+        );
+    }
+
+    let holder = filter_by_audience(&data, &policy, Audience::LegitimateInterest);
+    for key in point_4 {
+        assert!(
+            holder.filtered_data.get(key).is_some(),
+            "a legitimate-interest holder cannot see '{key}', which point 4 grants them"
+        );
+    }
+}
+
+#[test]
 fn individual_item_data_is_withheld_from_authorities() {
     // The end-to-end consequence of the lattice, through the real filter: an
     // authority holds Annex XIII points 2 and 3, a legitimate-interest holder

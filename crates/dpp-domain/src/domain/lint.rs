@@ -178,7 +178,7 @@ mod tests {
         BatteryData {
             nominal_voltage_v: 3.7,
             nominal_capacity_ah: 10.0,
-            expected_lifetime_cycles: 500,
+            expected_lifetime_cycles: Some(500),
             co2e_per_unit_kg: 5.0,
             rated_energy_wh: Some(37.0),
             ..crate::test_support::sample_battery_data()
