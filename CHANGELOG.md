@@ -15,6 +15,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A battery passport must now carry its unique identifier, model
+  identification, place of manufacture and date of manufacture to publish.**
+  The Commission's data-point guidance marks all four mandatory for every
+  category it covers (points 1, 7, 8 and 9), but the requirements table omitted
+  every one of them, so the publish gate let a passport through carrying none —
+  no identifier, and no record of where or when the battery was made. They are
+  now `Mandatory` for EV, LMT and industrial alike, which means a draft that
+  published before this release will be refused until the four are supplied.
+
+  Points 3 and 4 (manufacturer name and postal address) are *not* added here:
+  they live on the passport envelope, where `Passport::validate` already
+  requires them non-empty. The module's docs now say which guidance rows this
+  table deliberately does not carry, so its length can no longer be mistaken
+  for a claim of completeness against all 71.
+
 - **`round_trip_efficiency_pct` and `internal_resistance_mohm` are back, marked
   legacy.** Both were deleted when Annex XIII points 1(n) and 1(o) split into
   pairs. Neither should have been: they were *mislabelled*, not harmful, and a

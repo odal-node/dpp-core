@@ -12,13 +12,36 @@
 //! The Commission's *Guidance Document: Digital Batteries Passport — data
 //! points by category* (v1.0, 28 July 2026), read in full against the model.
 //! Its table has one row per data point and one column per category, which is
-//! exactly the shape of the `REQUIREMENTS` table below — so a reviewer can diff the two
+//! the shape of the `REQUIREMENTS` table below — so a reviewer can diff the two
 //! directly rather than reconstructing the mapping.
 //!
 //! **The guidance covers EV, LMT and industrial batteries only.** It says
 //! nothing about portable or SLI batteries, so this module answers
 //! [`Requirement::Unknown`] for them rather than guessing. Silence in the source
 //! is not permission, and it is not prohibition either.
+//!
+//! # What this table is not
+//!
+//! It is **not** a row-for-row copy of the guidance's 71 data points, and the
+//! two cannot be diffed on length. This table keys on the wire names of
+//! *sector-data* fields, so a guidance row whose content lives on the passport
+//! envelope has no row here and is enforced elsewhere:
+//!
+//! - Data points 3 and 4 (manufacturer name; postal address) are
+//!   `manufacturer.name` and `manufacturer.address`, which the domain's own
+//!   `Passport::validate` already requires to be non-empty.
+//! - Data point 2 (identity of who is registering or is responsible for the
+//!   passport) is carried by the responsible-operator and operator-identifier
+//!   envelope fields.
+//!
+//! An omission here is therefore only meaningful for a data point that *does*
+//! map to a sector-data field. Four such omissions were found and closed:
+//! points 1, 7, 8 and 9 — the unique identifier, model identification, place of
+//! manufacture and date of manufacture — all of which the guidance marks
+//! mandatory for every covered category, and none of which any battery schema
+//! version declared before v2.7.0. The remaining difference between 71 and this
+//! table's length has not been classified row by row; that is open work, not a
+//! statement that the rest is accounted for.
 
 /// What a category owes for one data point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,8 +103,23 @@ use Requirement::{Conditional as C, Mandatory as M, NotApplicable as X};
 /// rather than defaulted, because "we checked and it is uniform" and "we did not
 /// check" must not look the same in this table.
 const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
+    // ── Art. 77(3) — the identifier the passport is reached by ─────────────
+    // Guidance data point 1, "unique identifier", mandatory for all three.
+    // The envelope has no home for it: `product_id` is documented as an
+    // opaque internal link and explicitly not a legal identifier, and the
+    // serial inside `qr_code_url` is derived here rather than attributed by
+    // the operator, which is what Art. 77(3) asks for.
+    ("batteryPassportNumber", M, M, M),
     // ── Annex VI Part A, reached by Annex XIII point 1(a) ──────────────────
     ("batteryType", M, M, M),
+    // Guidance data point 7 — "model identification and batch or serial
+    // number, or product number or another element allowing their
+    // identification", the second half of Part A point 2.
+    ("batteryModelId", M, M, M),
+    // Guidance data point 8 — Part A point 3.
+    ("manufacturingPlace", M, M, M),
+    // Guidance data point 9 — Part A point 4, "month and year".
+    ("manufacturingDate", M, M, M),
     ("batteryWeightKg", M, M, M),
     ("nominalCapacityAh", M, M, M),
     ("batteryChemistry", M, M, M),
