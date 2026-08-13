@@ -67,10 +67,12 @@ audit:
 # to match CHANGELOG's `### Breaking` section, which is step 3 of the
 # pre-release checklist in docs/governance/RELEASE.md.
 #
-# `dpp-vocab` is excluded because it has no baseline — it is new in this cycle
-# and has never been published. Delete the exclusion once it has shipped once.
+# Every publishable crate is checked. `dpp-vocab` was excluded until 0.17.0
+# because it had no crates.io baseline to compare against; it shipped in that
+# release, so the exclusion is gone. A crate left excluded is a crate whose API
+# nobody is checking, which is the same silence this recipe exists to break.
 semver:
-    cargo semver-checks check-release --workspace --exclude dpp-vocab --release-type patch
+    cargo semver-checks check-release --workspace --release-type patch
 
 # Build documentation (warns on missing docs)
 doc:
