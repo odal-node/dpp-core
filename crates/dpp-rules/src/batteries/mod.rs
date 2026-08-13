@@ -2,4 +2,5 @@
 // Placeholder modules — rules to be implemented in a later phase.
 pub mod chemistry;
 pub mod degradation;
+pub mod passport_content;
 pub mod recycled_content;

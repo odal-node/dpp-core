@@ -170,6 +170,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   allowed to break, so it is red for most of any cycle and belongs to the
   release rather than the commit.
 
+- **`dpp-rules::batteries::passport_content` — which data points a category
+  actually owes.** The schema declares almost every Annex XIII field optional,
+  and that is not laxity: the obligations are per category. A field mandatory
+  for an EV battery is *"not to be filled/displayed"* for an LMT one, and
+  requiring it in JSON Schema would make a lawful industrial battery
+  unrepresentable. The constraint lives here instead, as a function of the
+  category.
+
+  `annex_xiii_requirement(field, battery_type)` answers `Mandatory`,
+  `Conditional`, `NotApplicable` or `Unknown` over a table with one row per data
+  point and one column per category — deliberately the same shape as the
+  Commission's own guidance table, so the two can be diffed rather than
+  reconciled. Fields uniform across all three categories are listed explicitly
+  rather than defaulted, because "checked, and uniform" and "not checked" must
+  not look alike.
+
+  Two distinctions the table exists to hold. `NotApplicable` is a recorded
+  exclusion and `Unknown` is an absence of evidence — the guidance covers EV,
+  LMT and industrial only, so portable and SLI answer `Unknown` rather than
+  being silently exempted. And `fields_not_applicable` asks the complement of
+  the usual question: a passport carrying a capacity threshold for exhaustion on
+  an LMT battery is not missing anything, it is carrying content the guidance
+  says does not belong, which no mandatory-fields check would ever notice.
+
 - **Annex XIII points 2 and 3 — the non-public tiers.** `componentPartNumbers`
   and `sparePartsContacts` (point 2(b)), `safetyMeasures` (2(d)) and
   `testReportResults` (point 3). The first three are `restricted`; the last is
