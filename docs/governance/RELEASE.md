@@ -25,9 +25,19 @@ Before running `cargo release`:
 1. **All CI green** — `just check` passes locally (fmt, clippy, nextest, audit).
 2. **CHANGELOG.md updated** — move items from `[Unreleased]` to a new version
    heading with today's date. Follow Keep a Changelog format.
-3. **cargo-semver-checks clean** — run `cargo semver-checks` against the
-   previous release tag. If violations are found, adjust the version bump
-   level or fix the API.
+3. **Breaking changes reconciled** — run `just semver`. It lists every public
+   API removal since the last published release; **every entry must already
+   appear under `### Breaking` in the CHANGELOG**. An entry that does not is
+   the finding: a break nobody recorded, which is how 0.13.0 withdrew public
+   constants unannounced.
+
+   Do **not** read a red result as "adjust the version bump level". Under the
+   pre-1.0 conventions in [`VERSIONING.md`](VERSIONING.md) a minor bump already
+   admits breaking changes, so the bump level is never the answer — which is
+   also why the recipe passes `--release-type patch`. Without it,
+   `cargo semver-checks` sees a minor bump, waives all 253 lints and reports
+   "no semver update required" having checked nothing. Measured at
+   0.16.0 → 0.17.0 on this workspace: 0 checks run.
 4. **No `TODO` or `FIXME` in public API** — `grep -rn 'TODO\|FIXME' crates/`
    should return nothing in public-facing doc comments.
 5. **Doc-tests pass** — `cargo test --doc --workspace`.
