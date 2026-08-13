@@ -15,6 +15,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`ElectronicsData.product_category` is a closed `DeviceType`, not a
+  `String`.** Regulation (EU) 2023/1670 Art. 1(1) enumerates exactly four
+  device types — smartphones, mobile phones other than smartphones, cordless
+  phones and slate tablets. `laptop`, `monitor`, `tv`, `server`, `router`,
+  `charger`, `earphone`, `pcb` and `other` carried no regulatory basis under
+  any EU instrument, in force or dated, and are gone from the type, the schema
+  enum and the sector manifest's `productCategories`.
+
+  `DeviceType` carries no `#[serde(other)]` catch-all, same reasoning as
+  `BatteryType`: a category outside the regulation's scope is not a value this
+  sector can hold. New schema `v1.2.0`; a `v1.1.0 → v1.2.0` lens passes a
+  surviving category through unchanged and **refuses** a removed one rather
+  than substituting a value that would misdescribe the product. A stored
+  record naming a removed category therefore does not deserialize directly —
+  `Passport::from_stored` routes it through that lens and surfaces the
+  refusal.
+
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was

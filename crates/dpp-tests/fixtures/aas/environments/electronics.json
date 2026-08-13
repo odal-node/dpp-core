@@ -324,7 +324,7 @@
           "modelType": "Property",
           "idShort": "productCategory",
           "valueType": "xs:string",
-          "value": "laptop"
+          "value": "smartphone"
         },
         {
           "modelType": "Property",

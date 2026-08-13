@@ -371,6 +371,17 @@ fn builtin_lenses() -> Vec<Lens> {
             battery_v2_4_to_v2_5,
         ),
         Lens::new(
+            "electronics",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "Regulation (EU) 2023/1670 Art. 1(1) v1.2.0: productCategory is narrowed to the \
+             four device types the regulation actually enumerates (smartphone, other mobile \
+             phone, cordless phone, slate tablet). A v1.1.0 record declaring one of the seven \
+             removed values has no lawful category to upgrade into, so this hop refuses.",
+            electronics_v1_1_to_v1_2,
+        ),
+        Lens::new(
             "steel",
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
@@ -497,6 +508,34 @@ fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
             "batteryType is required from v2.5.0 (EU 2023/1542 Annex VI Part A point 2 \
              via Annex XIII point 1(a)); this record predates the mandate and has none, \
              so it cannot be upgraded"
+                .to_owned(),
+        )),
+    }
+}
+
+/// Electronics `v1.1.0 → v1.2.0`: passes every field through unchanged.
+/// Refuses, rather than dropping or substituting the record's own category,
+/// when `productCategory` is not one of the four device types Regulation
+/// (EU) 2023/1670 Art. 1(1) actually enumerates — a record declaring
+/// `laptop`, `tv`, or any of the other removed values was written against a
+/// category this sector never had a lawful basis for, and there is no value
+/// to substitute that would not misdescribe the product.
+fn electronics_v1_1_to_v1_2(v: &Value) -> Result<Value, LensError> {
+    const VALID: [&str; 4] = [
+        "smartphone",
+        "other-mobile-phone",
+        "cordless-phone",
+        "tablet",
+    ];
+    let obj = v
+        .as_object()
+        .ok_or_else(|| LensError("electronics sector data must be a JSON object".to_owned()))?;
+    match obj.get("productCategory") {
+        Some(Value::String(s)) if VALID.contains(&s.as_str()) => Ok(v.clone()),
+        _ => Err(LensError(
+            "productCategory is not one of the four device types Regulation (EU) 2023/1670 \
+             Art. 1(1) enumerates (smartphone, other-mobile-phone, cordless-phone, tablet); \
+             this record predates the narrowing and cannot be upgraded"
                 .to_owned(),
         )),
     }
@@ -855,6 +894,50 @@ mod tests {
         let lenses = LensRegistry::new();
         let err = lenses
             .upcast("battery", &battery_v1(), &v("2.4.0"), &v("2.5.0"))
+            .unwrap_err();
+        assert!(matches!(err, UpcastError::Transform(_)));
+    }
+
+    /// A minimal but valid v1.1.0 electronics record (schema-required fields).
+    fn electronics_v1_1(product_category: &str) -> Value {
+        serde_json::json!({
+            "gtin": "09506000134352",
+            "productCategory": product_category,
+            "energyEfficiencyClass": "B",
+            "co2ePerUnitKg": 120.0
+        })
+    }
+
+    #[test]
+    fn electronics_v1_1_to_v1_2_passes_through_a_surviving_category() {
+        let lenses = LensRegistry::new();
+        let schemas = VersionedSchemaRegistry::new();
+        let v1_1 = electronics_v1_1("smartphone");
+
+        let derived = lenses
+            .upcast("electronics", &v1_1, &v("1.1.0"), &v("1.2.0"))
+            .unwrap();
+
+        assert!(!derived.lossy);
+        assert_eq!(derived.data["productCategory"], "smartphone");
+        schemas
+            .validate("electronics", &v("1.2.0"), &derived.data)
+            .expect("derived view must validate against v1.2.0");
+    }
+
+    #[test]
+    fn electronics_v1_1_to_v1_2_refuses_a_removed_category() {
+        // "laptop" was schema-valid at v1.1.0 but has no lawful basis under
+        // Regulation (EU) 2023/1670 Art. 1(1) — there is no v1.2.0 value to
+        // substitute that would not misdescribe the product.
+        let lenses = LensRegistry::new();
+        let err = lenses
+            .upcast(
+                "electronics",
+                &electronics_v1_1("laptop"),
+                &v("1.1.0"),
+                &v("1.2.0"),
+            )
             .unwrap_err();
         assert!(matches!(err, UpcastError::Transform(_)));
     }
