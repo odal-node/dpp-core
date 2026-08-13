@@ -519,36 +519,40 @@ fn an_unusable_schema_yields_no_policy() {
     assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", r#"{"type":"object"}"#).is_none());
 }
 
+/// Why disclosure is sourced from the passport's own schema version.
+///
+/// This began as a record of a live defect: the class map had no version axis,
+/// so it was read from the compiled-in catalog at *serve* time while passport
+/// signatures were frozen at publish and keyed by disclosure set. A delegated
+/// act reclassifying one field — `restricted → public` is the move these acts
+/// make — would have changed the public bytes served for an already-published
+/// passport, breaking verification for every affected passport at once with
+/// nothing to detect it.
+///
+/// That is fixed: `SectorAccessPolicy::for_schema_version` reads the classes
+/// from the schema version a passport declares, so a passport carries its
+/// classification with it and a newer version cannot move its bytes.
+///
+/// The test is kept, pointed at the mechanism rather than the defect, because
+/// the hazard is what justifies the design. It shows the thing the version axis
+/// prevents: one entry's difference is enough to move the served bytes, and a
+/// signature is a commitment to bytes.
+///
+/// **It is not a regression guard for the fix, and cannot be one yet.** Every
+/// battery schema version currently carries identical classes — deliberately,
+/// since no passport has been published under any of them — so no two versions
+/// disagree about anything and no test can distinguish "use the passport's
+/// version" from "use the current version". The first genuine divergence will
+/// be the first reclassification made after a passport exists, and that is the
+/// point at which this test should be replaced by one that pins an old
+/// passport's bytes against a newer version's map.
 #[test]
-fn reclassifying_one_field_changes_the_served_public_bytes() {
-    // ⚠️ This test records a DEFECT, not a guarantee. It passes today and the
-    // fix will invert it.
-    //
-    // The disclosure map has no version axis: `sectors/battery.json` carries one
-    // flat map and eight schemaVersions, and the map is read from the
-    // compiled-in catalog at *serve* time. Passport signatures, by contrast, are
-    // frozen at publish and keyed by disclosure set (`disclosure_key`).
-    //
-    // So the day a delegated act reclassifies a field — restricted → public is
-    // the move these acts make — the public view we serve for an
-    // already-published passport gains a field its frozen `public` signature
-    // never covered. Verification fails for every affected passport at once, and
-    // nothing detects it.
-    //
-    // Below is that mechanism, in isolation and without crypto: the same data
-    // and the same audience produce different bytes under two maps that differ
-    // by one entry. A signature is a commitment to bytes, so bytes that move
-    // under us are the whole defect.
-    //
-    // The fix is to bind the map (or its hash) to the passport at publish, so
-    // the frozen signature and the filter that produced it stay together. When
-    // that lands, this test should assert that a passport signed under one map
-    // is *refused* rather than silently re-filtered under another.
+fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
     let before = battery_policy();
     assert_eq!(
         before.field_disclosure.get("sohMethodology"),
         Some(&Disclosure::Restricted),
-        "fixture assumption: sohMethodology is restricted in the shipped catalog"
+        "fixture assumption: sohMethodology is restricted in the current schema"
     );
 
     let data = json!({
@@ -575,13 +579,14 @@ fn reclassifying_one_field_changes_the_served_public_bytes() {
         "reclassified to public, so the public view must now carry it"
     );
 
-    // The defect, stated as an assertion: same passport, same audience, same
-    // disclosure-set key — different bytes. Nothing in the passport records
-    // which of these two maps its frozen signature was taken over.
+    // The hazard, stated as an assertion: same data, same audience, same
+    // disclosure-set key — different bytes, from one entry's difference. This
+    // is why the class map must travel with the passport rather than be looked
+    // up fresh at serve time.
     assert_ne!(
         serde_json::to_string(&served_before).unwrap(),
         serde_json::to_string(&served_after).unwrap(),
-        "if these were equal the hazard would not exist and the fix would be unnecessary"
+        "if these were equal the version axis would buy nothing"
     );
 }
 
