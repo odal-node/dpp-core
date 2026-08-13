@@ -56,7 +56,10 @@ audit:
 # position, so the tool waives every lint. Measured on this workspace at
 # 0.16.0 -> 0.17.0: **0 checks run, 253 skipped, "no semver update required"** —
 # green because it stopped looking. With `--release-type patch` the same tree
-# runs 223 checks and reports all five real removals.
+# runs 223 checks per crate and reports every real break — seven of them on the
+# merged 0.17.0 tree, across five lints: a removed const, enum, enum variant,
+# module and struct field, plus a newly `#[deprecated]` method and the fields
+# `BatteryData` gained (breaking for exhaustive struct literals).
 #
 # So this answers "what broke since the last published release", and gives the
 # same answer before and after a version bump. A failure is not a defect by
