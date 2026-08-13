@@ -29,11 +29,11 @@ would ever have resolved them. A test in this crate keeps all six refused.
 
 ## Current state
 
-Five of the fourteen records in `vocabularies/` are verified as of 2026-08-11
+Six of the fourteen records in `vocabularies/` are verified as of 2026-08-11
 (`batterypass-samm`, `catena-x-battery-pass`, `ec-battery-guidance`, `gs1`,
-`semic`) — each because a person read the authority's own publication and
-recorded what it said. Everything else stays refused. Each record carries the
-finding that got it to its status and the step that would move it on.
+`idta`, `semic`) — each because a person read the authority's own publication
+and recorded what it said. Everything else stays refused. Each record carries
+the finding that got it to its status and the step that would move it on.
 
 ```rust
 use dpp_vocab::{VocabularyRegister, Verdict};
