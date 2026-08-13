@@ -343,6 +343,39 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
 
+### Fixed
+
+- **Battery schema `v2.7.0` admits four Annex VI Part A fields the type had
+  emitted since v2.0.0 with no schema version declaring them.** Because the
+  battery schema sets `additionalProperties: false`, a passport that populated
+  `manufacturingDate`, `manufacturingPlace`, `batteryModelId` or
+  `batteryPassportNumber` failed validation outright — a battery could not
+  record when or where it was made. All four are public: Annex XIII point 1(a)
+  makes the whole of Annex VI Part A publicly accessible, and the four map to
+  Part A point 4 (date of manufacture, month and year), point 3 (place of
+  manufacture), the battery-identifying half of point 2, and the Art. 77(3)
+  unique identifier respectively.
+
+  Purely additive, so no lens is needed — `Passport::from_stored` closes an
+  additive gap without one. Verified against the OJ text of Reg. (EU)
+  2023/1542, which also corrects the record on two points:
+  `batteryPassportNumber` is governed by Art. 77(3), which requires conformance
+  with the ISO/IEC 15459 series, not by a pending implementing act; and
+  Part A point 4 asks for month and year, so `manufacturingDate`'s
+  `DateTime<Utc>` carries more precision than the regulation requires and none
+  beyond month/year should be relied on.
+
+- **The fully-populated battery fixture is now exhaustive and
+  compiler-enforced.** It previously ended in `..sample_battery_data()`, which
+  fills the remainder with `None`; serde skips `None`, so those fields never
+  reached the schema and the drift above stayed invisible for seven schema
+  versions while a test named "every field the Rust type can emit" passed.
+  The literal now lists every field with no base expression, so adding one to
+  `BatteryData` fails to compile until it is populated here — the only
+  completeness check available without runtime reflection. It also resolves the
+  version from the catalog instead of naming one, so it cannot quietly end up
+  asserting against a superseded schema.
+
 ## [0.16.0] - 2026-08-07
 
 ### Added
