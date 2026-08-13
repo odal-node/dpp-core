@@ -55,11 +55,17 @@ order:
 2. `dpp-plugin-traits` (no workspace dependencies)
 3. `dpp-crypto` (no workspace dependencies)
 4. `dpp-calc` (no workspace dependencies)
-5. `dpp-domain` (depends on dpp-rules)
-6. `dpp-registry` (depends on dpp-domain)
-7. `dpp-digital-link`, `dpp-aas` (depend on dpp-domain)
-8. `dpp-vc` (depends on dpp-domain + dpp-crypto)
-9. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)
+5. `dpp-vocab` (no workspace dependencies — a leaf, by design)
+6. `dpp-domain` (depends on dpp-rules)
+7. `dpp-registry` (depends on dpp-domain)
+8. `dpp-digital-link` (depends on dpp-domain)
+9. `dpp-aas` (depends on dpp-domain + dpp-vocab)
+10. `dpp-vc` (depends on dpp-domain + dpp-crypto)
+11. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)
+
+`dpp-vocab` is new in 0.17.0 and has never been published. It has no baseline on
+crates.io, which is why `just semver` excludes it — delete that exclusion once
+this release has shipped it once.
 
 `dpp-tests` is `publish = false` and is not published, but it is still lockstep-
 versioned with everything else. `cargo-release` handles publish ordering

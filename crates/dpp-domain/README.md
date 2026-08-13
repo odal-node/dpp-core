@@ -25,20 +25,25 @@ use dpp_domain::catalog::SectorCatalog;
 use dpp_domain::Audience;
 use serde_json::json;
 
-// Sector metadata is data, not code: regime, status, retention and per-field
-// disclosure all come from the catalog manifests.
+// Sector metadata is data, not code: regime, status and retention all come
+// from the catalog manifests.
 let catalog = SectorCatalog::new();
 let battery = catalog.get("battery").expect("battery is in the catalog");
 assert_eq!(battery.key, "battery");
 
-// The disclosure classes declared in that manifest are what the filter applies.
-let policy = SectorAccessPolicy::from_catalog(&catalog, "battery")
-    .expect("battery declares a disclosure policy");
+// Disclosure classes come from the schema *version* a passport declares,
+// not from one unversioned map. That is what lets a published passport keep
+// the classification its signatures were taken under: reclassifying a field
+// is a new schema version, and an older passport goes on being filtered by
+// the version it was validated against.
+let policy = SectorAccessPolicy::for_schema_version("battery", &battery.current_schema_version)
+    .expect("the current battery schema classifies every property");
 
 let full = json!({ "productName": "EcoCell", "stateOfHealthPct": 87.5 });
 let public = filter_by_audience(&full, &policy, Audience::Public);
 
-// State of health is per-item data — withheld from the public audience.
+// State of health is Annex XIII point 4 — data about one individual battery,
+// reserved to holders of a legitimate interest and withheld from the public.
 assert_eq!(public.filtered_data["productName"], "EcoCell");
 assert!(public.filtered_data.get("stateOfHealthPct").is_none());
 ```

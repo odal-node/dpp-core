@@ -12,7 +12,7 @@ Passports mandated by:
 | Regulation | Reference | Status | dpp-core Coverage |
 |---|---|---|---|
 | ESPR | Regulation (EU) 2024/1781 | In force | Core passport model, per-audience field disclosure, schema validation |
-| Battery Regulation | Regulation (EU) 2023/1542 | In force, DPP deadline Feb 2027 | Battery schemas (v1.0.0, v2.0.0), sector plugin |
+| Battery Regulation | Regulation (EU) 2023/1542 | In force, DPP deadline Feb 2027 | Battery schemas (v1.0.0, v2.0.0 … v2.6.0), sector plugin, per-category content rules |
 | Textile (anticipated) | ESPR delegated act (draft) | See timeline note below | Textile schemas (v1.0.0, v1.1.0), sector plugin |
 | CBAM | Regulation (EU) 2023/956 | In force | Steel schema (v1.0.0), embedded emissions fields |
 
@@ -40,6 +40,7 @@ Each JSON schema under `schemas/` is traceable to its regulatory basis:
 |---|---|---|---|
 | `battery/v1.0.0.json` | 2023/1542 | Art. 77, Annex XIII | Minimum viable battery passport |
 | `battery/v2.0.0.json` | 2023/1542 | Art. 77, Annex XIII | Extended fields for carbon footprint |
+| `battery/v2.6.0.json` | 2023/1542 | Annex VI Part A, Annex XIII points 1–4 | Current. All four disclosure tiers, per-property `x-disclosure` |
 | `textile/v1.0.0.json` | ESPR 2024/1781 | Art. 9-10 (framework) | Baseline textile passport |
 | `textile/v1.1.0.json` | ESPR 2024/1781 | Art. 9-10 + anticipated delegated act | Adds fibre composition, durability, microplastics |
 | `unsold-goods/v1.0.0.json` | ESPR 2024/1781 | Art. 25 / Annex VII | Unsold-goods destruction-ban compliance |

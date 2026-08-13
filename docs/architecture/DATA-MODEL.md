@@ -2,7 +2,9 @@
 
 This document defines the canonical data structures for all Digital Product Passports. It is the authoritative reference for domain types in `dpp-domain`, JSON Schema fields, and Verifiable Credential payloads.
 
-> **Last updated**: 2026-05-29 (aligned to actual `Passport` struct, `BatteryData` v2.0.0, `TextileData` v1.1.0)
+> **Last updated**: 2026-08-13 (aligned to `BatteryData` v2.6.0, `TextileData` v1.2.0,
+> `ElectronicsData` v1.2.0). Field-level detail lives in the types and schemas;
+> this document describes shape and rules, not every column.
 
 ---
 
@@ -99,7 +101,7 @@ Elements of `Passport.materials` — bill of materials entries.
 |---|---|---|
 | `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
 | `steel` | `product_category` | `"flat"` / `"long"` / … |
-| `electronics` | `product_category` | `"smartphone"` / `"laptop"` / … |
+| `electronics` | `product_category` | `"smartphone"` / `"other-mobile-phone"` / `"cordless-phone"` / `"tablet"` — closed, Reg. (EU) 2023/1670 Art. 1(1) |
 | `unsold-goods` | `product_category` | `"apparel"` / `"footwear"` / … |
 | `furniture` | `product_type` | — |
 | `tyre` | `tyre_class` | `"C1"` / … |
@@ -119,54 +121,64 @@ Sector-specific data is stored in `SectorData`, a tagged enum. Each variant has 
 
 **Serde**: `SectorData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Sector (`BatteryData`) — v2.0.0
+### 4.1 Battery Sector (`BatteryData`) — v2.6.0
 
-Source: EU Battery Regulation (EU) 2023/1542, Annex XIII. Battery DPP mandatory from 18 Feb 2027.
+Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
+18 Feb 2027.
 
-**Required fields** (6):
+**This section deliberately does not list every field.** `BatteryData` carries
+68, and a hand-maintained copy of that list is the same drift that let four
+Annex VI Part A fields sit in the type for seven schema versions with no schema
+property to validate against. The authoritative pair is:
 
-| Field | Rust Type | JSON name | Reg. Source |
+- `crates/dpp-domain/src/domain/sector/data/battery.rs` — the type, with a
+  per-field regulatory citation on each doc comment.
+- `crates/dpp-domain/schemas/battery/v2.6.0.json` — the wire contract, with an
+  `x-disclosure` class on every property. `additionalProperties` is `false`, and
+  a test asserts the two agree field-for-field.
+
+**Required** (6, and the only ones a passport cannot omit at any category):
+`gtin`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
+`co2ePerUnitKg`, `batteryType`. Everything else is `Option` — not laxity, but
+because the obligations are **per category**: a field mandatory for an
+electric-vehicle battery may be "not to be filled/displayed" for an LMT one.
+That constraint lives in `dpp_rules::batteries::passport_content`, which the
+publish gate enforces, rather than in the schema.
+
+**Shape.** The fields group by the Annex XIII tier that governs who may see
+them, which is also what `x-disclosure` records:
+
+| Tier | Annex XIII | Audience | Examples |
 |---|---|---|---|
-| `gtin` | `String` (14 digits) | `"gtin"` | GS1 / ESPR |
-| `battery_chemistry` | `String` | `"batteryChemistry"` | Art. 13(1)(a) |
-| `nominal_voltage_v` | `f64` | `"nominalVoltageV"` | Art. 13(1)(b) |
-| `nominal_capacity_ah` | `f64` | `"nominalCapacityAh"` | Art. 13(1)(c) |
-| `expected_lifetime_cycles` | `u32` | `"expectedLifetimeCycles"` | Art. 10(1) |
-| `co2e_per_unit_kg` | `f64` | `"co2ePerUnitKg"` | Art. 7(1) |
+| `public` | point 1, incl. Annex VI Part A via 1(a) | anyone | chemistry, voltages, recycled content, place and date of manufacture |
+| `restricted` | point 2 | authorities **and** legitimate interest | cathode/anode/electrolyte composition, dismantling, safety measures |
+| `conformity` | point 3 | authorities only | test report results |
+| `individual` | point 4 | legitimate interest only | measured performance, state of health, status, use history |
 
-**Optional fields** (21 — all `Option`, `skip_serializing_if = "Option::is_none"`):
+Point 4 is per **item** rather than per model, so those fields nest into
+`DynamicPerformance`, `StateOfHealth`, `UsageHistory` and `ExpectedLifetime`
+rather than flattening — a declared model figure and a measured one are
+different claims and must not sit side by side under near-identical names.
 
-| Field | Rust Type | JSON name | Reg. Source |
-|---|---|---|---|
-| `recycled_content_cobalt_pct` | `Option<f64>` | `"recycledContentCobaltPct"` | Art. 8 |
-| `recycled_content_lithium_pct` | `Option<f64>` | `"recycledContentLithiumPct"` | Art. 8 |
-| `recycled_content_nickel_pct` | `Option<f64>` | `"recycledContentNickelPct"` | Art. 8 |
-| `recycled_content_lead_pct` | `Option<f64>` | `"recycledContentLeadPct"` | Art. 8 (lead-acid) |
-| `state_of_health_pct` | `Option<f64>` | `"stateOfHealthPct"` | Art. 14 |
-| `rated_capacity_kwh` | `Option<f64>` | `"ratedCapacityKwh"` | Art. 13(1)(d) |
-| `rated_energy_wh` | `Option<f64>` | `"ratedEnergyWh"` | Art. 13(1)(d) |
-| `carbon_footprint_class` | `Option<String>` | `"carbonFootprintClass"` | Art. 7(2) — A–E |
-| `due_diligence_url` | `Option<String>` | `"dueDiligenceUrl"` | Art. 47-52 |
-| `cathode_material` | `Option<Vec<MaterialComposition>>` | `"cathodeMaterial"` | Annex XIII §4 |
-| `anode_material` | `Option<Vec<MaterialComposition>>` | `"anodeMaterial"` | Annex XIII §4 |
-| `electrolyte_material` | `Option<Vec<MaterialComposition>>` | `"electrolyteMaterial"` | Annex XIII §4 |
-| `critical_raw_materials` | `Option<Vec<CriticalRawMaterial>>` | `"criticalRawMaterials"` | EU CRM Act 2024/1252 |
-| `disassembly_instructions_url` | `Option<String>` | `"disassemblyInstructionsUrl"` | Annex XIII §6 |
-| `soh_methodology` | `Option<String>` | `"sohMethodology"` | Art. 14(2) |
-| `operating_temp_min_c` | `Option<f64>` | `"operatingTempMinC"` | Annex XIII |
-| `operating_temp_max_c` | `Option<f64>` | `"operatingTempMaxC"` | Annex XIII |
-| `battery_weight_kg` | `Option<f64>` | `"batteryWeightKg"` | Annex XIII |
-| `battery_type` | `String` (required since v2.5.0) | `"batteryType"` | Art. 1(3), closed enum: portable, industrial, ev, lmt, starting-lighting-ignition — mandatory public content (Annex VI Part A pt 2 via Annex XIII pt 1(a)) |
-| `round_trip_efficiency_pct` | `Option<f64>` | `"roundTripEfficiencyPct"` | Art. 10 — at 50% SoC |
-| `internal_resistance_mohm` | `Option<f64>` | `"internalResistanceMohm"` | Art. 10 — at 50% SoC |
+**Legacy fields.** `state_of_health_pct`, `round_trip_efficiency_pct` and
+`internal_resistance_mohm` are superseded but retained: a stored record keeps
+its value under the name it was written with. See the type's own doc comment
+for the rule and for why deletion is reserved for the cases where keeping the
+field is itself the defect.
 
 **Helper types**:
-- `MaterialComposition { name: String, weight_pct: f64, cas_number: Option<String> }`
-- `CriticalRawMaterial { name: String, cas_number: Option<String>, weight_grams: Option<f64>, country_of_origin: Option<String> }`
+- `MaterialComposition { name, weight_pct, cas_number }`
+- `CriticalRawMaterial { name, cas_number, weight_grams, country_of_origin }`
+- `HazardousSubstance { name, cas_number, concentration_pct }`
+- `TemperatureRange { min_c, max_c }`
 
-Schema: `schemas/battery/v2.0.0.json`
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.6.0}.json`. Older versions stay
+registered so a passport validated against one remains verifiable, and each
+carries its own disclosure classes — which is what stops a reclassification
+changing the bytes served for an already-published passport.
 
-### 4.2 Textile Sector (`TextileData`) — v1.1.0
+
+### 4.2 Textile Sector (`TextileData`) — v1.2.0
 
 Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2027, compliance ~2028–2029.
 
@@ -246,4 +258,7 @@ Schemas follow semver. The `VersionedSchemaRegistry` in `dpp-domain` discovers a
 | Minor (`1.x.0`) | New optional fields; provisional -> strict | Yes |
 | Major (`x.0.0`) | Field renamed, type changed, or removed | No |
 
-Current schemas: battery/v2.0.0, textile/v1.0.0, textile/v1.1.0, unsold-goods/v1.0.0, steel/v1.0.0.
+Current schemas: 28 embedded versions across 11 sectors — see
+`crates/dpp-domain/src/schemas/embedded.rs` for the registered list. Every one
+is reachable at runtime; a passport is validated against the version it
+declares, not against the newest.

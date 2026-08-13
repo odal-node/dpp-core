@@ -184,11 +184,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   industrial battery with no meaningful cycle figure unrepresentable. The
   constraint belongs in a category-conditional rule, not in the schema.
 
-  `BatteryData` also gains three fields (below) and is not `#[non_exhaustive]`,
-  so struct-literal construction must be updated. The `v2.5.0 → v2.6.0` lens is
-  an identity: a relaxation plus optional additions cannot strand a record that
-  already validated, which is why this hop passes through where the `v2.4.0`
-  one refuses.
+  `BatteryData` is not `#[non_exhaustive]`, so **every** struct literal
+  constructing it must be updated. Across this release the type goes from 37
+  fields to 68 — the Annex XIII point 1, 2, 3 and 4 tiers, plus the four Annex
+  VI Part A identity fields — and none of the 37 is removed. Struct-update
+  syntax (`..base`) is unaffected; exhaustive literals are not. The
+  `v2.5.0 → v2.6.0` lens is an identity: a relaxation plus optional additions
+  cannot strand a record that already validated, which is why this hop passes
+  through where the `v2.4.0` one refuses.
 
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
@@ -428,6 +431,51 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
 
+### Changed
+
+- **The battery AAS submodel projects 17 fields it previously dropped.** What an
+  AAS consumer receives for a battery changes accordingly. Added: the four Annex
+  VI Part A identity fields, the two carbon-footprint ruleset provenance fields,
+  `usableExtinguishingAgent`, `hazardSymbol`, `hazardousSubstances`, the two
+  reference-test conditions, `commercialWarrantyPeriodMonths`,
+  `recycledContentReportingYear`, `placedOnMarketDate`, and the three
+  temperature ranges (each a collection of `minC`/`maxC`, since the two numbers
+  mean nothing apart).
+
+  `carbonFootprintClass` is the one that was actively wrong rather than merely
+  absent: the mapper emitted the bare label while the type's own doc comment
+  says it is "meaningless without the two provenance fields — the same label
+  denotes different thresholds under different revisions of the scale". An
+  exported class with no ruleset is not a weaker claim than a qualified one, it
+  is an unfalsifiable one. The class and its ruleset now travel together.
+
+  Ten schema properties still do not project, and the mapper now says why for
+  each: seven are documents, contacts or time series that a technical-data
+  snapshot deliberately excludes; `expectedLifetime` and `stateOfHealth` are a
+  recorded gap rather than a decision.
+
+- **`carbonFootprintClass` and `dueDiligenceUrl` are barred from a battery
+  passport for now.** The Commission's guidance marks both *"not to be
+  filled/displayed as of February 2027 — format still to be specified in the
+  upcoming implementing act"*, and the per-category table had no row for either.
+  Both are now `NotApplicable` for every covered category, the same class
+  `ratedCapacityAh` already carried for the same words. Advisory rather than
+  blocking: the publish gate reads only the mandatory set, so a passport
+  carrying one is flagged, not refused.
+
+  Not to be confused with disclosure. `dueDiligenceUrl` is Annex XIII point 1(d)
+  and therefore *public* once it is filled; whether a field may be seen and
+  whether it may be filled are different axes, and this release changes both in
+  opposite directions for the same field.
+
+- **All 71 guidance data points are now accounted for.** The per-category table
+  previously stated that the difference between its length and the guidance's 71
+  rows was unclassified. Each row has since been walked against the model and the
+  module records where every one went: envelope fields, one-row-per-block
+  groupings for the point 4 tiers, rows the guidance defers, and rows restated
+  elsewhere in the annex. Four omissions found and closed — see the Breaking
+  entry on the identity data points.
+
 ### Fixed
 
 - **Battery schema `v2.6.0` now declares four Annex VI Part A fields the type
@@ -475,6 +523,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   completeness check available without runtime reflection. It also resolves the
   version from the catalog instead of naming one, so it cannot quietly end up
   asserting against a superseded schema.
+
+  The same guard now exists for textile, the other product group with a real
+  model rather than a stub. A mechanical struct-versus-schema sweep across all
+  ten sectors found battery the only one that had drifted; the other nine were
+  at exact parity.
+
+- **A misspelt `x-disclosure` class published the field it was meant to
+  withhold.** `SectorAccessPolicy::from_schema` matches four known tokens and
+  drops anything else, so `"restrcted"` produced no map entry and the field fell
+  through to the `Public` default. One transposed character was enough, and the
+  coverage tests could not catch it because they asserted only that *some*
+  string was present.
+
+  Both coverage tests now validate the token against the four the constructor
+  accepts, so a typo fails the build rather than the audience check. Raising the
+  default instead does not work: the policy applies to the whole document, and
+  the passport envelope's public fields are declared in no sector schema, so a
+  non-public default would erase them.
 
 ## [0.16.0] - 2026-08-07
 
