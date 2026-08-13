@@ -32,21 +32,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `Passport::from_stored` routes it through that lens and surfaces the
   refusal.
 
-- **`unsold_goods_annex_vii_scope` is replaced by
-  `unsold_goods_annex_vii_heading`.** The old function answered only *whether*
-  a commodity code was in ESPR Annex VII's destruction-ban scope; the new one
-  answers *which* of Annex VII's two headings it falls under, returning
-  `Option<AnnexViiHeading>`. `unsold_goods_category_matches_heading` is added
-  alongside it for the cross-check.
-  `dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope` keeps the
-  boolean shape and is unchanged; callers needing only the yes/no answer
-  should use it.
+- **An unsold-goods passport must now declare an in-scope `commodity_code`, and
+  its `productCategory` must agree with it.** 0.16.0 validated neither. A
+  passport for `Sector::UnsoldGoods` now fails validation unless it carries a
+  `commodity_code` inside one of ESPR Annex VII's two headings — apparel and
+  clothing accessories (CN `4203`, `61`, `62`, `6504`, `6505`), or footwear
+  (CN `6401`–`6405`) — and unless its `sectorData.productCategory` names the
+  same heading. `home-textile` and `other` correspond to no Annex VII heading
+  at all, so they contradict any in-scope code. Passports accepted by 0.16.0
+  may be refused by this release.
 
-  Behavioural, not just structural: an unsold-goods passport whose
-  `sectorData.productCategory` contradicts the heading its `commodity_code`
-  falls under now fails validation. `home-textile` and `other` correspond to
-  no Annex VII heading at all, so they contradict any in-scope code. Such a
-  passport was accepted before.
+  Two fields describing the same product must not contradict each other: the
+  destruction ban applies by commodity code, and a passport whose own category
+  word disagrees with the code is claiming a scope it has not demonstrated.
+
+  `dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope` keeps its
+  boolean shape and is unchanged; `annex_vii_heading` is added alongside it for
+  callers needing to know *which* heading matched.
 
 - **`dpp-aas::OWN_NAMESPACE` is no longer public.** It moved to `dpp-vocab` and
   is reachable as `dpp_vocab::OWN_NAMESPACE`, with `dpp_vocab::is_own` as the
