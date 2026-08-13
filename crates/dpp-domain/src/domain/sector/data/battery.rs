@@ -353,6 +353,40 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub waste_battery_information: Option<String>,
 
+    // ── v2.6.0 — Annex XIII points 2 and 3, the non-public tiers ────────────
+    // Point 2 reaches both non-public audiences; point 3 reaches authorities
+    // only. Neither is projected to AAS: both are documents and contacts, and
+    // that submodel is a technical-data snapshot.
+    /// Part numbers for components — Annex XIII point 2(b).
+    ///
+    /// `restricted`: point 2 is available to notified bodies, market
+    /// surveillance authorities **and** holders of a legitimate interest. The
+    /// other half of 2(b) is [`BatteryData::spare_parts_contacts`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub component_part_numbers: Option<Vec<String>>,
+
+    /// Contact details of sources for replacement spares — Annex XIII point
+    /// 2(b). `restricted`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spare_parts_contacts: Option<String>,
+
+    /// Safety measures — Annex XIII point 2(d). `restricted`.
+    ///
+    /// Distinct from [`BatteryData::usable_extinguishing_agent`], which Annex VI
+    /// Part A point 9 makes *public*: the same subject matter sits in two tiers
+    /// because two annexes ask for it at two levels of detail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub safety_measures: Option<String>,
+
+    /// Results of the test reports proving compliance with this Regulation and
+    /// any act adopted under it — **Annex XIII point 3**.
+    ///
+    /// `conformity`: point 3 is the one tier reserved to authorities alone. A
+    /// holder of a legitimate interest does not receive it, and neither does the
+    /// public.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test_report_results: Option<String>,
+
     // ── v2.6.0 — Annex XIII point 4, the rest of the individual-battery tier ─
     /// Measured performance and durability for **this** battery — Annex XIII
     /// point 4(a). See [`DynamicPerformance`].

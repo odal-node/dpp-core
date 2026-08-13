@@ -840,6 +840,37 @@
         "null"
       ],
       "description": "Waste-battery prevention and management information per Article 74(1)(a)-(f) (Annex XIII point 1(s))."
+    },
+    "componentPartNumbers": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "description": "Part numbers for components (Annex XIII point 2(b)). Restricted tier."
+    },
+    "sparePartsContacts": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Contact details of sources for replacement spares (Annex XIII point 2(b)). Restricted tier."
+    },
+    "safetyMeasures": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Safety measures (Annex XIII point 2(d)). Restricted tier."
+    },
+    "testReportResults": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Results of test reports proving compliance (Annex XIII point 3). Conformity tier — authorities only."
     }
   },
   "definitions": {
