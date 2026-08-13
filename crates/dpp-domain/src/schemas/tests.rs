@@ -983,3 +983,74 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
         .validate("battery", version, &json)
         .expect("every emitted field must be admitted by the current schema");
 }
+
+/// The same completeness guard as the battery one above, for textile.
+///
+/// Battery is not special — it was only the sector where the drift happened to
+/// exist. Any sector whose schema sets `additionalProperties: false` can grow a
+/// struct field with no schema property and reject its own data at validation
+/// time, and textile is the other product group with a real model rather than a
+/// stub. Its literal is exhaustive for the same reason: **do not add `..base`.**
+///
+/// The eight remaining sectors are stubs of seven to ten fields; when one grows
+/// a real model it should gain a fixture like this rather than rely on the
+/// mechanical parity sweep that found the battery gap.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_fully_populated_textile_serialises_into_the_current_schema() {
+    use crate::domain::gtin::Gtin;
+    use crate::domain::sector::{FibreEntry, SvhcSubstance, TextileData};
+
+    let data = TextileData {
+        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        fibre_composition: vec![
+            FibreEntry {
+                fibre: "cotton".into(),
+                pct: 70.0,
+                country_of_origin: Some("PT".into()),
+            },
+            FibreEntry {
+                fibre: "polyester".into(),
+                pct: 30.0,
+                country_of_origin: Some("TR".into()),
+            },
+        ],
+        country_of_origin: "PT".into(),
+        care_instructions: "Machine wash 30°C".into(),
+        chemical_compliance_standard: "OEKO-TEX Standard 100".into(),
+        recycled_content_pct: Some(24.0),
+        carbon_footprint_kg_co2e: Some(8.5),
+        water_use_litres: Some(2_400.0),
+        microplastic_shedding_mg_per_wash: Some(1.7),
+        repair_score: Some(6.5),
+        durability_score: Some(7.5),
+        expected_wash_cycles: Some(50),
+        country_of_raw_material_origin: Some("IN".into()),
+        svhc_substances: Some(vec![SvhcSubstance {
+            cas_number: "80-05-7".into(),
+            substance_name: "Bisphenol A".into(),
+            concentration_pct: 0.15,
+            location_in_product: Some("coating".into()),
+            scip_notification_id: Some("SCIP-0001".into()),
+        }]),
+        allergens: Some(vec!["disperse blue 1".into()]),
+        substances_of_concern: Some(vec!["PFAS".into()]),
+        recyclability_class: Some("B".into()),
+        end_of_life_instructions: Some("Separate trims before fibre recovery".into()),
+        reuse_condition: Some("good".into()),
+        prior_use_cycles: Some(1),
+        disassembly_instructions: Some("Remove buttons, separate layers by colour".into()),
+        spare_parts_available: Some(true),
+        product_weight_grams: Some(420.0),
+        repair_history_url: Some("https://example.invalid/repairs".into()),
+        repair_count: Some(2),
+        pef_score: Some(0.42),
+    };
+
+    let registry = VersionedSchemaRegistry::new();
+    let (version, _) = registry.latest("textile").expect("textile schema exists");
+    let json = serde_json::to_value(&data).expect("serialises");
+    registry
+        .validate("textile", version, &json)
+        .expect("every emitted field must be admitted by the current schema");
+}

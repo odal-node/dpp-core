@@ -157,8 +157,19 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     ("internalCellResistanceMohm", M, M, M),
     ("internalPackResistanceMohm", M, M, M),
     ("cycleLifeTestCRate", M, M, C),
+    // 1(q), guidance row 40: "the marking requirements laid down in Article
+    // 13(4)" — the separate-collection symbol.
+    //
+    // **Do not "correct" these two against the OJ text of 1(q).** It reads
+    // "the marking requirements laid down in Article 13(3) and (4)", while the
+    // guidance splits 1(q) into rows 40 and 41 citing 13(4) and 13(5). The two
+    // instruments disagree, and this table follows the guidance because that is
+    // the source it mirrors and the one that assigns per-category obligations.
+    // Art. 13(3) is the non-rechargeable-portable duration label, which is
+    // outside the three categories the guidance covers at all.
     ("markingInformation", M, M, M),
-    // 1(q), Art. 13(5): "cadmium or lead symbol if applicable".
+    // 1(q), guidance row 41, Art. 13(5): "cadmium or lead symbol if
+    // applicable" — the same words for all three categories.
     ("hazardSymbol", C, C, C),
     ("euDeclarationOfConformity", M, M, M),
     ("wasteBatteryInformation", M, M, M),
