@@ -63,9 +63,11 @@ order:
 10. `dpp-vc` (depends on dpp-domain + dpp-crypto)
 11. `dpp-plugin-sdk` (depends on dpp-plugin-traits + dpp-rules)
 
-`dpp-vocab` is new in 0.17.0 and has never been published. It has no baseline on
-crates.io, which is why `just semver` excludes it — delete that exclusion once
-this release has shipped it once.
+`dpp-vocab` was first published in 0.17.0. Until then `just semver` excluded it,
+because a crate with no crates.io baseline has nothing to diff against; that
+exclusion has been removed. **A new crate needs the same treatment exactly
+once** — exclude it for its first release, then put it back. Leaving it out is
+how a crate ends up with nobody checking its public API.
 
 `dpp-tests` is `publish = false` and is not published, but it is still lockstep-
 versioned with everything else. `cargo-release` handles publish ordering
