@@ -374,6 +374,72 @@ fn generic_leaf_key_collides_across_objects() {
 // ── Art. 77(2) lattice ───────────────────────────────────────────────────────
 
 #[test]
+fn reclassifying_one_field_changes_the_served_public_bytes() {
+    // ⚠️ This test records a DEFECT, not a guarantee. It passes today and the
+    // fix will invert it.
+    //
+    // The disclosure map has no version axis: `sectors/battery.json` carries one
+    // flat map and eight schemaVersions, and the map is read from the
+    // compiled-in catalog at *serve* time. Passport signatures, by contrast, are
+    // frozen at publish and keyed by disclosure set (`disclosure_key`).
+    //
+    // So the day a delegated act reclassifies a field — restricted → public is
+    // the move these acts make — the public view we serve for an
+    // already-published passport gains a field its frozen `public` signature
+    // never covered. Verification fails for every affected passport at once, and
+    // nothing detects it.
+    //
+    // Below is that mechanism, in isolation and without crypto: the same data
+    // and the same audience produce different bytes under two maps that differ
+    // by one entry. A signature is a commitment to bytes, so bytes that move
+    // under us are the whole defect.
+    //
+    // The fix is to bind the map (or its hash) to the passport at publish, so
+    // the frozen signature and the filter that produced it stay together. When
+    // that lands, this test should assert that a passport signed under one map
+    // is *refused* rather than silently re-filtered under another.
+    let before = battery_policy();
+    assert_eq!(
+        before.field_disclosure.get("sohMethodology"),
+        Some(&Disclosure::Restricted),
+        "fixture assumption: sohMethodology is restricted in the shipped catalog"
+    );
+
+    let data = json!({
+        "gtin": "09506000134352",
+        "sohMethodology": "IEC 62660-1:2018",
+    });
+
+    let served_before = filter_by_audience(&data, &before, Audience::Public).filtered_data;
+    assert!(
+        served_before.get("sohMethodology").is_none(),
+        "restricted today, so the public view must not carry it"
+    );
+
+    // One delegated act later: the same field is public.
+    let mut after = battery_policy();
+    after
+        .field_disclosure
+        .insert("sohMethodology".into(), Disclosure::Public);
+    let served_after = filter_by_audience(&data, &after, Audience::Public).filtered_data;
+
+    assert_eq!(
+        served_after.get("sohMethodology"),
+        Some(&json!("IEC 62660-1:2018")),
+        "reclassified to public, so the public view must now carry it"
+    );
+
+    // The defect, stated as an assertion: same passport, same audience, same
+    // disclosure-set key — different bytes. Nothing in the passport records
+    // which of these two maps its frozen signature was taken over.
+    assert_ne!(
+        serde_json::to_string(&served_before).unwrap(),
+        serde_json::to_string(&served_after).unwrap(),
+        "if these were equal the hazard would not exist and the fix would be unnecessary"
+    );
+}
+
+#[test]
 fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {
     // Not a hand-built policy: this reads sectors/battery.json, so it fails if
     // a point-4 field is added to the type and its disclosure entry is
