@@ -29,10 +29,11 @@ would ever have resolved them. A test in this crate keeps all six refused.
 
 ## Current state
 
-**No vocabulary is verified, so every third-party identifier is refused.** That
-is the accurate state of this project's knowledge, not a gap filled by default.
-Each record in `vocabularies/` carries the finding that got it to its status and
-the step that would move it on.
+Six of the fourteen records in `vocabularies/` are verified as of 2026-08-11
+(`batterypass-samm`, `catena-x-battery-pass`, `ec-battery-guidance`, `gs1`,
+`idta`, `semic`) — each because a person read the authority's own publication
+and recorded what it said. Everything else stays refused. Each record carries
+the finding that got it to its status and the step that would move it on.
 
 ```rust
 use dpp_vocab::{VocabularyRegister, Verdict};
@@ -45,8 +46,12 @@ assert_eq!(
     Verdict::Own,
 );
 
-// Nothing third-party is permitted yet — and the refusal says why.
-let verdict = register.verdict("https://ref.gs1.org/voc/gtin");
+// GS1's own definition of `gtin` was read on 2026-08-11 and matches our
+// `Gtin` type exactly, so its terms are permitted.
+assert!(register.verdict("https://ref.gs1.org/voc/gtin").is_permitted());
+
+// Most third-party identifiers still are not — and the refusal says why.
+let verdict = register.verdict("https://schema.org/dateModified");
 assert!(!verdict.is_permitted());
 println!("{}", verdict.reason());
 ```

@@ -40,6 +40,35 @@ fmt-check:
 audit:
     cargo audit
 
+# Check the public API against the last published release.
+#
+# All members share one lockstep version, so every crate is republished on every
+# release whether its API moved or not — which is exactly the condition under
+# which a removal goes out unnoticed. It already has: 0.13.0 withdrew public
+# constants and nothing said so. The first run of this recipe found a second,
+# still unreleased: `dpp-aas::OWN_NAMESPACE` is gone from the public API and the
+# version has not moved.
+#
+# `--release-type patch` is load-bearing and must not be removed. Without it the
+# tool asks "does the version number admit the break?", and under the pre-1.0
+# conventions in docs/governance/VERSIONING.md the answer is always yes: every
+# release here is a lockstep **minor** bump, which below 1.0 *is* the breaking
+# position, so the tool waives every lint. Measured on this workspace at
+# 0.16.0 -> 0.17.0: **0 checks run, 253 skipped, "no semver update required"** —
+# green because it stopped looking. With `--release-type patch` the same tree
+# runs 223 checks and reports all five real removals.
+#
+# So this answers "what broke since the last published release", and gives the
+# same answer before and after a version bump. A failure is not a defect by
+# itself — pre-1.0 minor releases are allowed to break. It is the list that has
+# to match CHANGELOG's `### Breaking` section, which is step 3 of the
+# pre-release checklist in docs/governance/RELEASE.md.
+#
+# `dpp-vocab` is excluded because it has no baseline — it is new in this cycle
+# and has never been published. Delete the exclusion once it has shipped once.
+semver:
+    cargo semver-checks check-release --workspace --exclude dpp-vocab --release-type patch
+
 # Build documentation (warns on missing docs)
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features
@@ -75,6 +104,11 @@ check: fmt-check lint test test-doc test-plugins doc audit
 # Deliberately a superset, not a mirror: `doc` and `test-doc` run here and not in
 # CI, because a broken intra-doc link is cheaper to catch now than after a
 # release. Keep in step with `.github/workflows/` when jobs change.
+#
+# `semver` is in neither, deliberately. It is not a gate: pre-1.0 minor releases
+# are *allowed* to break, so its output is red for most of any cycle and a check
+# that is red by design is one people stop reading. It belongs to the release,
+# not to the commit — see `docs/governance/RELEASE.md` step 3.
 
 # Everything CI runs, plus docs. Run before pushing; `check` is the inner loop.
 ci: check wasm-build build-plugins test-count
