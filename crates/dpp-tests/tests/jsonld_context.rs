@@ -174,13 +174,16 @@ fn the_withdrawn_context_urls_stay_out() {
 /// vocabulary `dpp-vocab` records as verified — the same rule `dpp-aas`
 /// enforces for `semanticId`, extended to the JSON-LD door.
 ///
-/// `gs1:` and `schema:` used to be declared here with no provenance record
-/// (neither GS1 nor Schema.org is verified in `dpp-vocab` — both are
-/// `surveyed`, meaning nothing has been read). They were removed in favour of
-/// `dpp:`-only terms, and this test is what stops a third borrowed prefix
-/// arriving the same way. A term that maps to another declared prefix (e.g.
-/// `"gtin": "dpp:gtin"`) is not itself a namespace declaration and is skipped
-/// — only entries whose value is an absolute IRI declare one.
+/// `gs1:` and `schema:` were both declared here with no provenance record, and
+/// both were removed in favour of `dpp:`-only terms. `gs1:` has since come back
+/// — GS1's `gtin` definition was read on 2026-08-11 and the vocabulary is
+/// `verified` in `dpp-vocab` — and it came back *through* this gate rather than
+/// around it, which is the case the gate was written for. `schema:` is still
+/// refused: Schema.org is `tracked`, evaluated and not adopted.
+///
+/// A term that maps to another declared prefix (e.g. `"gtin": "gs1:gtin"`) is
+/// not itself a namespace declaration and is skipped — only entries whose value
+/// is an absolute IRI declare one.
 #[test]
 fn every_declared_prefix_is_ours_or_verified() {
     // This crate's own JSON-LD vocabulary — a dereferenceable-shaped IRI by
