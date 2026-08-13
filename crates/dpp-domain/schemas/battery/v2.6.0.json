@@ -933,6 +933,24 @@
       ],
       "description": "Results of test reports proving compliance (Annex XIII point 3). Conformity tier — authorities only.",
       "x-disclosure": "conformity"
+    },
+    "roundTripEfficiencyPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Legacy, unqualified round trip energy efficiency. Superseded by the Annex XIII point 1(n) pair; retained so a v2.5.0 record keeps its value under its own name.",
+      "x-disclosure": "public"
+    },
+    "internalResistanceMohm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Legacy internal resistance, without saying whether it is the cell or pack figure Annex XIII point 1(o) requires. Retained because no rule can decide which a stored value was.",
+      "x-disclosure": "public"
     }
   },
   "definitions": {
