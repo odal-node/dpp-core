@@ -110,18 +110,50 @@ fn a_conformance_bridge_is_never_speakable_even_when_verified() {
 }
 
 #[test]
-fn no_vocabulary_is_verified_yet() {
-    // The honest current state. When this test fails, somebody has read an
-    // authority's publication — at which point the failure is the reminder to
-    // record who, when, and from what.
-    for v in register().all() {
-        assert_ne!(
-            v.status,
-            Status::Verified,
-            "vocabulary '{}' claims verified status; update this test and record the reader",
-            v.key
-        );
-    }
+fn batterypass_consortium_bridge_is_never_speakable_even_when_verified() {
+    // Read 2026-08-11: the model files' own SPDX headers confirm CC-BY-4.0
+    // (the surveyed `licence: null` was wrong), and the field-by-field
+    // comparison against `BatteryData` is recorded in the vocabulary's own
+    // `finding`. Same shape as the Catena-X case above — verified as a
+    // conformance target, still refused as a namespace to speak.
+    let r = register();
+    let v = r.verdict("urn:samm:io.BatteryPass:1.2.0#GeneralProductInformation");
+    assert_eq!(
+        v,
+        Verdict::BridgeNotSpeakable {
+            vocabulary: "batterypass-samm".to_owned()
+        }
+    );
+    assert!(v.reason().contains("tested by it"));
+}
+
+#[test]
+fn exactly_six_vocabularies_are_verified_so_far() {
+    // `batterypass-samm`, `catena-x-battery-pass`, `ec-battery-guidance`,
+    // `gs1`, `idta` and `semic` — all read 2026-08-11, see each one's own
+    // `finding` for who and what. Everything else stays `Surveyed`/`Tracked`
+    // until someone reads it too. When this count changes, update it here
+    // and record the reader in the vocabulary's own `checkedOn`/`finding`
+    // fields, not just in this test.
+    let r = register();
+    let mut verified: Vec<&str> = r
+        .all()
+        .iter()
+        .filter(|v| v.status == Status::Verified)
+        .map(|v| v.key.as_str())
+        .collect();
+    verified.sort_unstable();
+    assert_eq!(
+        verified,
+        vec![
+            "batterypass-samm",
+            "catena-x-battery-pass",
+            "ec-battery-guidance",
+            "gs1",
+            "idta",
+            "semic"
+        ]
+    );
 }
 
 #[test]

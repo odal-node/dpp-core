@@ -35,12 +35,12 @@ pub use data::{
 };
 pub use enums::{
     BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
-    EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
+    DeviceType, EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
 };
 pub use metrics::{CarbonFootprint, RepairCriterion, RepairabilityScore};
 pub use sector::Sector;
 pub use validation::{
-    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_scope,
-    validate_battery_operating_temp, validate_fibre_composition, validate_surfactants,
-    validate_svhc_substances,
+    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
+    unsold_goods_category_matches_heading, validate_battery_operating_temp,
+    validate_fibre_composition, validate_surfactants, validate_svhc_substances,
 };
