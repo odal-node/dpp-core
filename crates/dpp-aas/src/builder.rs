@@ -157,27 +157,6 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
         .map_err(|e| AasError::Masking(format!("redacted document no longer valid: {e}")))
 }
 
-/// Reduce an unrecognised sector's `sectorData` to its `sector` tag alone.
-///
-/// The filter above cannot help here. Both policies it can choose from carry
-/// `default_disclosure: Public`, which is safe only because a *listed* sector's
-/// non-public fields are listed — and an unlisted sector has nothing listed, so
-/// every field it carries is unlisted, and every unlisted field is Public. The
-/// filter therefore passes the whole payload through, and the more unusual the
-/// sector, the more certain it is that nobody has classified its fields.
-///
-/// So the backstop is structural rather than policy-driven: with no field
-/// policy, keep only the discriminant. Nothing is lost by dropping the tag from
-/// the sector submodel itself — `ProductIdentification` carries `sector`
-/// independently — but it is kept here so the redacted document still
-/// round-trips through [`SectorData::Other`](dpp_domain::SectorData::Other),
-/// which reads its variant from that key.
-///
-/// **Applied for every audience, not just `Public`.** An unrecognised sector has
-/// no field policy for *any* audience, so a credentialed reader must not receive
-/// more of it than an anonymous one. This mirrors, deliberately and for the same
-/// stated reason, the backstop the platform applies when it renders a public
-/// view — the two must not disagree about what an unmodelled sector discloses.
 /// Drop any `sectorData` key the passport's **declared schema version** does not
 /// declare.
 ///
@@ -225,6 +204,27 @@ fn redact_unclassified_sector_fields(
     sector_data.retain(|key, _| key == "sector" || policy.field_disclosure.contains_key(key));
 }
 
+/// Reduce an unrecognised sector's `sectorData` to its `sector` tag alone.
+///
+/// The filter above cannot help here. Both policies it can choose from carry
+/// `default_disclosure: Public`, which is safe only because a *listed* sector's
+/// non-public fields are listed — and an unlisted sector has nothing listed, so
+/// every field it carries is unlisted, and every unlisted field is Public. The
+/// filter therefore passes the whole payload through, and the more unusual the
+/// sector, the more certain it is that nobody has classified its fields.
+///
+/// So the backstop is structural rather than policy-driven: with no field
+/// policy, keep only the discriminant. Nothing is lost by dropping the tag from
+/// the sector submodel itself — `ProductIdentification` carries `sector`
+/// independently — but it is kept here so the redacted document still
+/// round-trips through [`SectorData::Other`](dpp_domain::SectorData::Other),
+/// which reads its variant from that key.
+///
+/// **Applied for every audience, not just `Public`.** An unrecognised sector has
+/// no field policy for *any* audience, so a credentialed reader must not receive
+/// more of it than an anonymous one. This mirrors, deliberately and for the same
+/// stated reason, the backstop the platform applies when it renders a public
+/// view — the two must not disagree about what an unmodelled sector discloses.
 fn redact_unknown_sector_data(document: &mut serde_json::Value) {
     let Some(object) = document.as_object_mut() else {
         return;

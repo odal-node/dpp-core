@@ -137,7 +137,7 @@
       ],
       "format": "uri",
       "description": "URL to supply chain due diligence documentation (Arts. 48-53).",
-      "x-disclosure": "restricted"
+      "x-disclosure": "public"
     },
     "cathodeMaterial": {
       "type": [
@@ -181,7 +181,7 @@
         "$ref": "#/definitions/criticalRawMaterial"
       },
       "description": "Critical raw materials per EU CRM Act 2024/1252.",
-      "x-disclosure": "restricted"
+      "x-disclosure": "public"
     },
     "disassemblyInstructionsUrl": {
       "type": [

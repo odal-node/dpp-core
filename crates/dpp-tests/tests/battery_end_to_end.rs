@@ -248,21 +248,23 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     // Public sees the basics...
     assert!(public.filtered_data.get("gtin").is_some());
     assert!(public.filtered_data.get("batteryChemistry").is_some());
-    // ...but NOT the restricted fields.
+    // ...including the point 1 fields that are publicly accessible in their own
+    // right: 1(d) responsible sourcing, and 1(b) critical raw materials.
     assert!(
-        public.filtered_data.get("dueDiligenceUrl").is_none(),
-        "public must not see due-diligence url"
+        public.filtered_data.get("dueDiligenceUrl").is_some(),
+        "Annex XIII point 1(d) is publicly accessible"
     );
     assert!(
-        public.filtered_data.get("criticalRawMaterials").is_none(),
-        "public must not see critical raw materials"
+        public.filtered_data.get("criticalRawMaterials").is_some(),
+        "Annex XIII point 1(b) is publicly accessible"
     );
+    // ...but NOT point 2 content.
     assert!(public.filtered_data.get("cathodeMaterial").is_none());
     assert!(public.filtered_data.get("sohMethodology").is_none());
     assert!(
         public
             .redacted_fields
-            .contains(&"dueDiligenceUrl".to_string())
+            .contains(&"cathodeMaterial".to_string())
     );
 
     // ── Legitimate interest (via recycler VC) ──────────────────────────────
@@ -300,20 +302,24 @@ fn redact_sector_data_strips_professional_fields_at_public_tier() {
     let descriptor = catalog.get("battery").expect("battery in catalog");
     let data = passport.sector_data.as_ref().unwrap();
 
-    // Public viewer: professional fields stripped, public fields retained.
+    // Public viewer: point 2 stripped, point 1 retained. `dueDiligenceUrl`
+    // (point 1(d)) and `criticalRawMaterials` (point 1(b), and Annex VI Part A
+    // point 10 via point 1(a)) are on the public tier — this test asserted the
+    // opposite until the annex was read against it.
     let public = redact_sector_data(data, Audience::Public, descriptor);
     let public_obj = public.as_object().expect("redacted data is an object");
     assert!(public_obj.contains_key("gtin"));
-    assert!(!public_obj.contains_key("dueDiligenceUrl"));
-    assert!(!public_obj.contains_key("criticalRawMaterials"));
+    assert!(public_obj.contains_key("dueDiligenceUrl"));
+    assert!(public_obj.contains_key("criticalRawMaterials"));
+    assert!(!public_obj.contains_key("disassemblyInstructionsUrl"));
 
     // Authority sees Restricted and Conformity fields. It does *not* see
     // `Individual` ones — Annex XIII point 4 is legitimate-interest-only, which
     // is why this is a lattice and not a ranking.
     let authority = redact_sector_data(data, Audience::Authority, descriptor);
     let conf_obj = authority.as_object().unwrap();
+    assert!(conf_obj.contains_key("disassemblyInstructionsUrl"));
     assert!(conf_obj.contains_key("dueDiligenceUrl"));
-    assert!(conf_obj.contains_key("criticalRawMaterials"));
 }
 
 #[test]

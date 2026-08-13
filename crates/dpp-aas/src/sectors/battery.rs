@@ -73,10 +73,28 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
         b.internal_pack_resistance_mohm,
         "internalPackResistanceMohm"
     );
-    // Annex XIII point 1 technical characteristics. The document-shaped items
-    // of point 1 — declaration of conformity, marking, waste-battery info — are
-    // deliberately not projected: this submodel is a technical-data snapshot,
-    // and a reference to a document is not a property of the asset.
+    // Annex XIII point 1 technical characteristics.
+    //
+    // # What this submodel deliberately does not carry
+    //
+    // Collected here so an omission reads as a decision rather than an
+    // oversight — a distinction the absence itself cannot make:
+    //
+    // - **Document-shaped point 1 items** — `euDeclarationOfConformity`,
+    //   `markingInformation`, `wasteBatteryInformation`. This submodel is a
+    //   technical-data snapshot, and a reference to a document is not a
+    //   property of the asset.
+    // - **Annex XIII points 2 and 3** — `componentPartNumbers`,
+    //   `sparePartsContacts`, `safetyMeasures`, `testReportResults`. Same
+    //   reason: documents and contacts. They are still carried on the passport
+    //   and still gated by their disclosure classes; they just do not project.
+    // - **Point 4(d) `usageHistory`** — see the note beside
+    //   `dynamicPerformance` below.
+    //
+    // `expectedLifetime` and `stateOfHealth` are in none of those categories.
+    // Both are measurements and both belong in a technical snapshot; they are
+    // absent because nobody has mapped them, which is a gap rather than a
+    // decision, and the only one left in this mapper.
     push_opt_double!(b.minimal_voltage_v, "minimalVoltageV");
     push_opt_double!(b.maximum_voltage_v, "maximumVoltageV");
     push_opt_double!(b.original_power_capability_w, "originalPowerCapabilityW");
@@ -91,10 +109,131 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
     push_opt_double!(b.operating_temp_min_c, "operatingTempMinC");
     push_opt_double!(b.operating_temp_max_c, "operatingTempMaxC");
     push_opt_double!(b.recycled_content_lead_pct, "recycledContentLeadPct");
+    // The class never travels without the ruleset that produced it. Its own
+    // type says why: "the same label denotes different thresholds under
+    // different revisions of the scale, and Art. 7(2) requires those thresholds
+    // to be reviewed every three years". A bare `B` in an exported AAS is not a
+    // weaker claim than a qualified one — it is an unfalsifiable one, because a
+    // consumer cannot tell which scale it was measured against.
     if let Some(s) = opt_enum_wire_str(&b.carbon_footprint_class) {
         elements.push(string_property("carbonFootprintClass", &s, None));
     }
+    push_opt_str!(
+        b.carbon_footprint_class_ruleset_id,
+        "carbonFootprintClassRulesetId"
+    );
+    push_opt_str!(
+        b.carbon_footprint_class_ruleset_version,
+        "carbonFootprintClassRulesetVersion"
+    );
     push_opt_str!(b.soh_methodology, "sohMethodology");
+
+    // Annex VI Part A identity — points 2 (the battery-identifying half), 3 and
+    // 4, plus the Art. 77(3) unique identifier. They project here rather than
+    // into `ProductIdentification` because that submodel is built from the
+    // passport envelope and never sees sector data; this is the only place they
+    // can reach a consumer at all.
+    push_opt_str!(b.battery_model_id, "batteryModelId");
+    push_opt_str!(b.battery_passport_number, "batteryPassportNumber");
+    push_opt_str!(b.manufacturing_place, "manufacturingPlace");
+    if let Some(when) = b.manufacturing_date {
+        elements.push(string_property(
+            "manufacturingDate",
+            &when.to_rfc3339(),
+            None,
+        ));
+    }
+
+    // Annex VI Part A points 8 and 9, and the Annex XIII point 1 conditions
+    // that qualify the figures above. All are properties of the asset rather
+    // than documents about it, so the exclusion stated further up does not
+    // reach them.
+    push_opt_str!(b.usable_extinguishing_agent, "usableExtinguishingAgent");
+    push_opt_str!(
+        b.expected_lifetime_reference_test,
+        "expectedLifetimeReferenceTest"
+    );
+    push_opt_str!(
+        b.not_in_use_temperature_reference_test,
+        "notInUseTemperatureReferenceTest"
+    );
+    if let Some(ref sym) = b.hazard_symbol {
+        elements.push(string_property("hazardSymbol", &enum_wire_str(sym), None));
+    }
+    if let Some(months) = b.commercial_warranty_period_months {
+        elements.push(integer_property(
+            "commercialWarrantyPeriodMonths",
+            i64::from(months),
+            None,
+        ));
+    }
+    if let Some(year) = b.recycled_content_reporting_year {
+        elements.push(integer_property(
+            "recycledContentReportingYear",
+            i64::from(year),
+            None,
+        ));
+    }
+    if let Some(date) = b.placed_on_market_date {
+        elements.push(string_property(
+            "placedOnMarketDate",
+            &date.to_string(),
+            None,
+        ));
+    }
+
+    // Annex XIII point 1(h), (i) and (l) each attach a temperature range to a
+    // figure. The range is two numbers that mean nothing apart, so it projects
+    // as a collection rather than two loose properties named by convention.
+    for (label, opt_range) in [
+        ("voltageTemperatureRange", b.voltage_temperature_range),
+        ("powerTemperatureRange", b.power_temperature_range),
+        ("notInUseTemperatureRange", b.not_in_use_temperature_range),
+    ] {
+        if let Some(range) = opt_range {
+            elements.push(AasSubmodelElement::SubmodelElementCollection(
+                AasCollection {
+                    id_short: label.to_owned(),
+                    value: vec![
+                        double_property("minC", range.min_c, None),
+                        double_property("maxC", range.max_c, None),
+                    ],
+                    semantic_id: None,
+                },
+            ));
+        }
+    }
+
+    // Annex VI Part A point 8 — the substances themselves, not a document about
+    // them, and the one place a public reader learns what is in the battery
+    // beyond its chemistry.
+    if let Some(ref subs) = b.hazardous_substances {
+        let items = subs
+            .iter()
+            .enumerate()
+            .map(|(i, hs)| {
+                let mut hs_elems = vec![string_property("name", &hs.name, None)];
+                if let Some(ref cas) = hs.cas_number {
+                    hs_elems.push(string_property("casNumber", cas, None));
+                }
+                if let Some(pct) = hs.concentration_pct {
+                    hs_elems.push(double_property("concentrationPct", pct, None));
+                }
+                AasSubmodelElement::SubmodelElementCollection(AasCollection {
+                    id_short: format!("hazardousSubstance_{i}"),
+                    value: hs_elems,
+                    semantic_id: None,
+                })
+            })
+            .collect();
+        elements.push(AasSubmodelElement::SubmodelElementCollection(
+            AasCollection {
+                id_short: "hazardousSubstances".to_owned(),
+                value: items,
+                semantic_id: None,
+            },
+        ));
+    }
 
     if let Some(ref url) = b.due_diligence_url {
         elements.push(AasSubmodelElement::ReferenceElement(

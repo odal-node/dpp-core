@@ -504,12 +504,12 @@ fn redact_public_strips_gated_sector_fields() {
     let view = p.redact(Audience::Public, &catalog).into_value();
     let sd = &view["sectorData"];
     assert!(
-        sd.get("dueDiligenceUrl").is_none(),
-        "dueDiligenceUrl is Professional — must be hidden"
+        sd.get("dueDiligenceUrl").is_some(),
+        "dueDiligenceUrl is Annex XIII point 1(d) — publicly accessible"
     );
     assert!(
         sd.get("disassemblyInstructionsUrl").is_none(),
-        "disassemblyInstructionsUrl is Professional"
+        "disassemblyInstructionsUrl is Annex XIII point 2(c) — withheld from the public"
     );
     assert!(
         sd.get("batteryChemistry").is_some(),
@@ -793,6 +793,14 @@ fn publishable_battery(battery_type: crate::domain::sector::BatteryType) -> Pass
         dynamic_performance: Some(Box::new(DynamicPerformance::default())),
         state_of_health: Some(Box::new(StateOfHealth::ElectricVehicle { soce_pct: 99.0 })),
         battery_status: Some(BatteryStatus::Original),
+        // Guidance data points 1, 7, 8 and 9 — mandatory for every covered
+        // category, and unrepresentable until v2.6.0 declared them.
+        battery_passport_number: Some("URN:UUID:6F1C9D2E-0000-4000-8000-000000000000".into()),
+        battery_model_id: Some("LFP-64-A".into()),
+        manufacturing_place: Some("PL:Wrocław".into()),
+        manufacturing_date: Some(
+            chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 3, 1, 0, 0, 0).unwrap(),
+        ),
         ..crate::test_support::sample_battery_data()
     };
     Passport {
@@ -835,6 +843,49 @@ fn a_missing_mandatory_field_blocks_names_it_and_leaves_no_lock() {
     assert!(!p.retention_locked, "a refused publish must not lock");
     assert!(p.published_at.is_none());
     assert_eq!(p.status, PassportStatus::Draft);
+}
+
+/// The four identity data points the guidance marks mandatory for every
+/// covered category each block a publish on their own.
+///
+/// These were absent from the requirements table *and* from every battery
+/// schema property, so a passport could be published carrying none of
+/// them: no unique identifier, no model identification, and no record of where
+/// or when the battery was made. The schema could not even store them —
+/// `additionalProperties: false` rejected all four — so this test is the guard
+/// on both halves of that defect at once. It fails if either the requirements
+/// row or the schema property is removed.
+#[test]
+fn each_identity_data_point_blocks_publish_on_its_own() {
+    for (name, clear) in [
+        (
+            "batteryPassportNumber",
+            (|b: &mut BatteryData| b.battery_passport_number = None) as fn(&mut BatteryData),
+        ),
+        ("batteryModelId", |b: &mut BatteryData| {
+            b.battery_model_id = None;
+        }),
+        ("manufacturingPlace", |b: &mut BatteryData| {
+            b.manufacturing_place = None;
+        }),
+        ("manufacturingDate", |b: &mut BatteryData| {
+            b.manufacturing_date = None;
+        }),
+    ] {
+        let mut p = publishable_battery(crate::domain::sector::BatteryType::Ev);
+        battery_field(&mut p, clear);
+
+        let err = match p.transition_to(PassportStatus::Published) {
+            Err(e) => e,
+            Ok(()) => panic!(
+                "{name} is mandatory for every covered category, but the publish was allowed"
+            ),
+        };
+        let msg = format!("{err:?}");
+        assert!(msg.contains(name), "the refusal must name {name}: {msg}");
+        assert!(!p.retention_locked, "a refused publish must not lock");
+        assert_eq!(p.status, PassportStatus::Draft);
+    }
 }
 
 #[test]

@@ -57,6 +57,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   gate and the thing it guards drift apart. Downstream code naming the constant
   directly must change its import.
 
+- **A battery passport must now carry its unique identifier, model
+  identification, place of manufacture and date of manufacture to publish.**
+  The Commission's data-point guidance marks all four mandatory for every
+  category it covers (points 1, 7, 8 and 9), but the requirements table omitted
+  every one of them, so the publish gate let a passport through carrying none —
+  no identifier, and no record of where or when the battery was made. They are
+  now `Mandatory` for EV, LMT and industrial alike, which means a draft that
+  published before this release will be refused until the four are supplied.
+
+  Points 3 and 4 (manufacturer name and postal address) are *not* added here:
+  they live on the passport envelope, where `Passport::validate` already
+  requires them non-empty. The module's docs now say which guidance rows this
+  table deliberately does not carry, so its length can no longer be mistaken
+  for a claim of completeness against all 71.
+
 - **`round_trip_efficiency_pct` and `internal_resistance_mohm` are back, marked
   legacy.** Both were deleted when Annex XIII points 1(n) and 1(o) split into
   pairs. Neither should have been: they were *mislabelled*, not harmful, and a
@@ -412,6 +427,54 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A leaf crate: no workspace dependencies. Everything else here changes when an
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
+
+### Fixed
+
+- **Battery schema `v2.6.0` now declares four Annex VI Part A fields the type
+  had emitted since v2.0.0 with no schema version admitting them.** Because the
+  battery schema sets `additionalProperties: false`, a passport that populated
+  `manufacturingDate`, `manufacturingPlace`, `batteryModelId` or
+  `batteryPassportNumber` failed validation outright — a battery could not
+  record when or where it was made. All four are public: Annex XIII point 1(a)
+  makes the whole of Annex VI Part A publicly accessible, and the four map to
+  Part A point 4 (date of manufacture, month and year), point 3 (place of
+  manufacture), the battery-identifying half of point 2, and the Art. 77(3)
+  unique identifier respectively.
+
+  Folded into `v2.6.0` rather than added as a new version. `v2.6.0` is itself
+  unreleased — 0.16.0 shipped battery schemas up to `v2.4.0` — so there is no
+  published artefact to preserve and no lens to write. A new version would have
+  recorded a migration between two states that never both existed in the world.
+
+  Verified against the OJ text of Reg. (EU) 2023/1542, which also corrects the
+  record on two points: `batteryPassportNumber` is governed by Art. 77(3),
+  which requires conformance with the ISO/IEC 15459 series, not by a pending
+  implementing act; and Part A point 4 asks for month and year, so
+  `manufacturingDate`'s `DateTime<Utc>` carries more precision than the
+  regulation requires and none beyond month/year should be relied on.
+
+- **`criticalRawMaterials` and `dueDiligenceUrl` are public, not restricted.**
+  Annex XIII point 1(b) lists "critical raw materials present in the battery"
+  in the same sentence as chemistry and hazardous substances — both of which
+  were already public — and Annex VI Part A point 10 reaches the same result
+  through point 1(a). Point 1(d) puts responsible-sourcing information in the
+  publicly accessible tier likewise. Classified `restricted`, both were being
+  withheld from the public view the regulation requires them to appear in.
+  Corrected in `v2.6.0` for the same reason as above: nothing has been
+  published under it, so the reclassification costs nothing. After a passport
+  exists, it would not be free — a disclosure class is frozen into that
+  passport's signatures.
+
+- **The fully-populated battery fixture is now exhaustive and
+  compiler-enforced.** It previously ended in `..sample_battery_data()`, which
+  fills the remainder with `None`; serde skips `None`, so those fields never
+  reached the schema and the drift above stayed invisible for seven schema
+  versions while a test named "every field the Rust type can emit" passed.
+  The literal now lists every field with no base expression, so adding one to
+  `BatteryData` fails to compile until it is populated here — the only
+  completeness check available without runtime reflection. It also resolves the
+  version from the catalog instead of naming one, so it cannot quietly end up
+  asserting against a superseded schema.
 
 ## [0.16.0] - 2026-08-07
 

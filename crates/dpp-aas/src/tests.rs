@@ -3,9 +3,9 @@ use chrono::Utc;
 use dpp_domain::Audience;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
-    Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportStatus,
-    RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination, UnsoldGoodsReason,
-    UnsoldGoodsReport,
+    Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
+    PassportStatus, RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination,
+    UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use serde_json::json;
 
@@ -266,7 +266,15 @@ fn battery_data_with_due_diligence() -> BatteryData {
         carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
         carbon_footprint_class_ruleset_version: Some("0.0.0-test".into()),
         due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
-        cathode_material: None,
+        // Annex XIII point 2(a), "detailed composition, including materials
+        // used in the cathode, anode and electrolyte" — restricted, and one
+        // of the few point-2 fields the battery mapper actually emits, so the
+        // envelope's masking can be tested against genuinely non-public content.
+        cathode_material: Some(vec![MaterialComposition {
+            name: "Lithium iron phosphate".into(),
+            weight_pct: 32.0,
+            cas_number: None,
+        }]),
         anode_material: None,
         electrolyte_material: None,
         critical_raw_materials: None,
@@ -329,17 +337,24 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     });
     assert!(has_co2e, "co2ePerUnitKg property missing");
 
-    // `dueDiligenceUrl` is `restricted` in the battery catalog, so it must NOT
-    // reach a public projection. This assertion used to be its inverse — the
-    // mappers emitted it to everyone, and the test locked that in. It is kept
-    // pointing the other way as the regression marker for that defect.
+    // `dueDiligenceUrl` **must** reach a public projection: Annex XIII point
+    // 1(d), "information on responsible sourcing as indicated in the report on
+    // battery due diligence policy referred to in Article 52(3)", sits in the
+    // publicly accessible tier.
+    //
+    // This assertion has now been written both ways round, which is the reason
+    // it carries its citation. It first asserted presence, was flipped to
+    // absence when the field was classified `restricted`, and is flipped back
+    // here because that classification did not match the annex. Withholding it
+    // is not the safe direction — it makes the public passport omit content the
+    // regulation requires to be in it.
     let has_due_diligence_ref = battery_sub.submodel_elements.iter().any(|e| match e {
         AasSubmodelElement::ReferenceElement(r) => r.id_short == "dueDiligenceUrl",
         _ => false,
     });
     assert!(
-        !has_due_diligence_ref,
-        "restricted field dueDiligenceUrl leaked into a public AAS projection"
+        has_due_diligence_ref,
+        "Annex XIII point 1(d) is public: dueDiligenceUrl must appear in a public projection"
     );
 }
 
@@ -685,22 +700,33 @@ fn environment_is_masked_for_its_audience() {
         .expect("public environment");
     let serialised = serde_json::to_string(&public).expect("serialises");
 
-    // `dueDiligenceUrl` is `restricted` in the battery catalog. The envelope
-    // delegates to the masked builder, so it must not appear at any depth —
-    // an envelope that assembled its own content could reintroduce it.
+    // The envelope delegates to the masked builder, so a non-public field must
+    // not appear at any depth — an envelope that assembled its own content
+    // could reintroduce one. `cathodeMaterial` is Annex XIII point 2(a), which
+    // Art. 77(2) withholds from the general public.
     assert!(
-        !serialised.contains("dueDiligenceUrl"),
+        !serialised.contains("cathodeMaterial"),
         "restricted field leaked into a public AAS Environment"
+    );
+    // …while a point 1(d) field must survive the same masking. Testing both
+    // directions on one document is the point: a mask that drops everything
+    // would pass the assertion above on its own.
+    assert!(
+        serialised.contains("dueDiligenceUrl"),
+        "Annex XIII point 1(d) is public and must survive masking"
     );
 
     let restricted =
         build_aas_environment(&passport, "09506000134352", Audience::LegitimateInterest)
             .expect("restricted environment");
+    let restricted = serde_json::to_string(&restricted).expect("serialises");
     assert!(
-        serde_json::to_string(&restricted)
-            .expect("serialises")
-            .contains("dueDiligenceUrl"),
-        "a legitimate-interest caller must still receive it"
+        restricted.contains("cathodeMaterial"),
+        "a legitimate-interest caller must receive point 2 content"
+    );
+    assert!(
+        restricted.contains("dueDiligenceUrl"),
+        "and must still receive the public tier"
     );
 }
 
@@ -765,4 +791,99 @@ fn a_sector_field_the_declared_version_does_not_know_is_dropped() {
             "{audience:?}: an unclassified sector field reached the projection"
         );
     }
+}
+
+/// A carbon footprint class never projects without the ruleset that produced it.
+///
+/// `BatteryData::carbon_footprint_class` says of itself that it is "meaningless
+/// without the two provenance fields below: the same label denotes different
+/// thresholds under different revisions of the scale, and Art. 7(2) requires
+/// those thresholds to be reviewed every three years". The mapper emitted the
+/// bare label and neither provenance field, so an exported AAS carried a class
+/// a consumer had no way to interpret — not a weaker claim than a qualified
+/// one, an unfalsifiable one.
+///
+/// The passport fixtures are all-`None` for these fields, which is why the
+/// committed-Environment test never caught it: an unpopulated field cannot
+/// reveal a mapping that does not exist.
+#[test]
+fn a_carbon_footprint_class_projects_with_its_ruleset() {
+    let mut data = battery_data_with_due_diligence();
+    data.carbon_footprint_class = Some(CarbonFootprintClass::new("B").expect("valid label"));
+    data.carbon_footprint_class_ruleset_id = Some("eu-battery-cfb".into());
+    data.carbon_footprint_class_ruleset_version = Some("2026.1".into());
+
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(Box::new(data)));
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+    let json = serde_json::to_string(&submodels).expect("serialises");
+
+    assert!(
+        json.contains("carbonFootprintClass"),
+        "the class must project"
+    );
+    assert!(
+        json.contains("carbonFootprintClassRulesetId"),
+        "and never without the ruleset that produced it"
+    );
+    assert!(
+        json.contains("carbonFootprintClassRulesetVersion"),
+        "including the revision, since the scale is reviewed every three years"
+    );
+}
+
+/// The Annex XIII point 1 conditions and Annex VI Part A safety data reach the
+/// projection, not just the passport.
+///
+/// Each of these is a property of the asset rather than a document about it, so
+/// none falls under the document-shaped exclusion the mapper states. They were
+/// absent purely because nobody had mapped them, and the committed-Environment
+/// fixture could not show it: its battery data leaves every one of them `None`.
+#[test]
+fn the_point_1_conditions_and_safety_data_project() {
+    let mut data = battery_data_with_due_diligence();
+    data.usable_extinguishing_agent = Some("Class D dry powder".into());
+    data.hazard_symbol = Some(HazardSymbol::Cadmium);
+    data.commercial_warranty_period_months = Some(96);
+    data.recycled_content_reporting_year = Some(2026);
+    data.expected_lifetime_reference_test = Some("IEC 62660-1:2018".into());
+    // Both types are `#[non_exhaustive]`, so they are built through serde
+    // rather than a struct literal — which incidentally pins their wire names.
+    data.voltage_temperature_range =
+        Some(serde_json::from_value(json!({ "minC": -20.0, "maxC": 60.0 })).expect("range"));
+    data.hazardous_substances = Some(vec![
+        serde_json::from_value(json!({
+            "name": "Nickel sulfate",
+            "casNumber": "7786-81-4",
+            "concentrationPct": 0.4
+        }))
+        .expect("substance"),
+    ]);
+    data.battery_model_id = Some("LFP-64-A".into());
+    data.manufacturing_place = Some("PL:Wroclaw".into());
+
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(Box::new(data)));
+    let (_, submodels) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+    let json = serde_json::to_string(&submodels).expect("serialises");
+
+    for id in [
+        "usableExtinguishingAgent",
+        "hazardSymbol",
+        "commercialWarrantyPeriodMonths",
+        "recycledContentReportingYear",
+        "expectedLifetimeReferenceTest",
+        "voltageTemperatureRange",
+        "hazardousSubstances",
+        "batteryModelId",
+        "manufacturingPlace",
+    ] {
+        assert!(json.contains(id), "{id} is public and must project");
+    }
+    // The range is a collection of two numbers, not two loose properties.
+    assert!(json.contains("minC") && json.contains("maxC"));
+    // Nickel sulfate is Annex VI Part A point 8 content and public.
+    assert!(json.contains("7786-81-4"));
 }

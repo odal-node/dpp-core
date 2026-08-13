@@ -128,8 +128,24 @@ fn unknown_fields_default_to_public() {
     );
 }
 
+/// The public view keeps Annex XIII point 1 content and drops point 2 content.
+///
+/// Both halves matter, and this test previously got one of them backwards. It
+/// asserted that `dueDiligenceUrl` and `criticalRawMaterials` were redacted
+/// from the public view, which does not match the annex:
+///
+/// - Point 1(b) lists "critical raw materials present in the battery" in the
+///   same sentence as chemistry and hazardous substances, and Annex VI Part A
+///   point 10 reaches the same result through point 1(a).
+/// - Point 1(d) is "information on responsible sourcing as indicated in the
+///   report on battery due diligence policy referred to in Article 52(3)".
+///
+/// Both sit in the publicly accessible tier. Over-redaction is not the safe
+/// direction here: it makes the public passport omit content the regulation
+/// requires it to carry, and a test asserting the omission makes that
+/// permanent.
 #[test]
-fn battery_policy_public_redacts_due_diligence() {
+fn battery_policy_public_keeps_point_1_and_drops_point_2() {
     let policy = battery_policy();
     let data = json!({
         "gtin": "09506000134352",
@@ -142,13 +158,22 @@ fn battery_policy_public_redacts_due_diligence() {
     });
     let decision = filter_by_audience(&data, &policy, Audience::Public);
     assert!(decision.filtered_data.get("gtin").is_some());
-    assert!(decision.filtered_data.get("dueDiligenceUrl").is_none());
-    assert!(decision.filtered_data.get("criticalRawMaterials").is_none());
+    // Point 1 — must survive.
+    assert!(
+        decision.filtered_data.get("dueDiligenceUrl").is_some(),
+        "Annex XIII point 1(d) is publicly accessible"
+    );
+    assert!(
+        decision.filtered_data.get("criticalRawMaterials").is_some(),
+        "Annex XIII point 1(b) is publicly accessible"
+    );
+    // Point 2(c), dismantling information — must not.
     assert!(
         decision
             .filtered_data
             .get("disassemblyInstructionsUrl")
-            .is_none()
+            .is_none(),
+        "Annex XIII point 2(c) is withheld from the general public"
     );
 }
 
@@ -390,29 +415,41 @@ fn generic_leaf_key_collides_across_objects() {
 /// defaults to `Public`, and for Annex XIII point 2, 3 or 4 content that is a
 /// leak rather than an omission. Co-locating the class with the property makes
 /// the gap visible in the same diff; this test makes it fail the build.
+///
+/// **A misspelt class is checked too, not just a missing one.**
+/// `SectorAccessPolicy::from_schema` matches the four known tokens and drops
+/// anything else, so `"restrcted"` produces no map entry and the field falls to
+/// `default_disclosure` — `Public`. A typo in one character therefore publishes
+/// a restricted field, and asserting only that *some* string is present would
+/// not catch it.
 #[test]
-fn every_property_declares_a_disclosure_class() {
+fn every_property_declares_a_valid_disclosure_class() {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
     let (version, json) = reg.latest("battery").expect("battery schema exists");
     let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
     let properties = schema["properties"].as_object().expect("has properties");
 
-    let undeclared: Vec<&str> = properties
+    let bad: Vec<(&str, &str)> = properties
         .iter()
-        .filter(|(_, p)| {
-            p.get("x-disclosure")
+        .filter_map(|(n, p)| {
+            let class = p
+                .get("x-disclosure")
                 .and_then(serde_json::Value::as_str)
-                .is_none()
+                .unwrap_or("<missing>");
+            (!VALID_DISCLOSURE_TOKENS.contains(&class)).then_some((n.as_str(), class))
         })
-        .map(|(n, _)| n.as_str())
         .collect();
 
     assert!(
-        undeclared.is_empty(),
-        "battery v{version}: these properties declare no x-disclosure class, so they \
-         would default to public: {undeclared:?}"
+        bad.is_empty(),
+        "battery v{version}: these properties declare no usable x-disclosure class, so they \
+         would default to public: {bad:?}"
     );
 }
+
+/// The four tokens `SectorAccessPolicy::from_schema` recognises. Anything else
+/// is dropped by that constructor and falls through to the public default.
+const VALID_DISCLOSURE_TOKENS: [&str; 4] = ["public", "restricted", "conformity", "individual"];
 
 /// Every schema version of every sector yields a policy, and every property in
 /// each declares a class.
@@ -433,14 +470,17 @@ fn every_sector_version_yields_a_fully_classified_policy() {
             let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) else {
                 continue;
             };
-            let undeclared: Vec<&str> = properties
+            // Missing *and* misspelt: both land the field on the public
+            // default, so both have to fail the build.
+            let undeclared: Vec<(&str, &str)> = properties
                 .iter()
-                .filter(|(_, p)| {
-                    p.get("x-disclosure")
+                .filter_map(|(n, p)| {
+                    let class = p
+                        .get("x-disclosure")
                         .and_then(serde_json::Value::as_str)
-                        .is_none()
+                        .unwrap_or("<missing>");
+                    (!VALID_DISCLOSURE_TOKENS.contains(&class)).then_some((n.as_str(), class))
                 })
-                .map(|(n, _)| n.as_str())
                 .collect();
             assert!(
                 undeclared.is_empty(),
@@ -494,36 +534,132 @@ fn an_unusable_schema_yields_no_policy() {
     assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", r#"{"type":"object"}"#).is_none());
 }
 
+/// An unrecognised `x-disclosure` token fails **open**, and this pins that.
+///
+/// `from_schema` matches the four known tokens and drops anything else, so a
+/// misspelt class produces no map entry and the field falls to
+/// `default_disclosure` — `Public`. One transposed character therefore publishes
+/// a field meant to be withheld, and the failure is silent at every layer that
+/// consumes the policy.
+///
+/// Raising the default instead does not work: the policy is applied to the whole
+/// document and the passport envelope's public fields are declared in no sector
+/// schema, so a non-public default would erase them. The containment is
+/// therefore build-time —
+/// [`every_property_declares_a_valid_disclosure_class`] and its all-sector
+/// counterpart reject a schema carrying a token this constructor cannot read.
+///
+/// This test exists so that behaviour is *recorded* rather than assumed. If
+/// `from_schema` is ever changed to reject an unknown token outright, this test
+/// is the one that should fail and be rewritten to assert the refusal.
 #[test]
-fn reclassifying_one_field_changes_the_served_public_bytes() {
-    // ⚠️ This test records a DEFECT, not a guarantee. It passes today and the
-    // fix will invert it.
-    //
-    // The disclosure map has no version axis: `sectors/battery.json` carries one
-    // flat map and eight schemaVersions, and the map is read from the
-    // compiled-in catalog at *serve* time. Passport signatures, by contrast, are
-    // frozen at publish and keyed by disclosure set (`disclosure_key`).
-    //
-    // So the day a delegated act reclassifies a field — restricted → public is
-    // the move these acts make — the public view we serve for an
-    // already-published passport gains a field its frozen `public` signature
-    // never covered. Verification fails for every affected passport at once, and
-    // nothing detects it.
-    //
-    // Below is that mechanism, in isolation and without crypto: the same data
-    // and the same audience produce different bytes under two maps that differ
-    // by one entry. A signature is a commitment to bytes, so bytes that move
-    // under us are the whole defect.
-    //
-    // The fix is to bind the map (or its hash) to the passport at publish, so
-    // the frozen signature and the filter that produced it stay together. When
-    // that lands, this test should assert that a passport signed under one map
-    // is *refused* rather than silently re-filtered under another.
+fn an_unrecognised_disclosure_token_falls_through_to_public() {
+    let schema = r#"{
+        "properties": {
+            "safetyMeasures": { "type": "string", "x-disclosure": "restrcted" },
+            "cathodeMaterial": { "type": "string", "x-disclosure": "restricted" }
+        }
+    }"#;
+    let policy =
+        SectorAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
+
+    assert!(
+        !policy.field_disclosure.contains_key("safetyMeasures"),
+        "a misspelt token must not produce a map entry"
+    );
+    assert_eq!(
+        policy.disclosure_for_field("safetyMeasures"),
+        Disclosure::Public,
+        "and the field therefore falls to the public default — the hazard"
+    );
+    // The correctly spelt sibling is unaffected, so this is a per-field silent
+    // failure rather than a whole-policy one, which is what makes it easy to miss.
+    assert_eq!(
+        policy.disclosure_for_field("cathodeMaterial"),
+        Disclosure::Restricted
+    );
+
+    // And the leak is real through the filter, not just the map.
+    let data = json!({ "safetyMeasures": "Isolate at the service disconnect" });
+    let served = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+    assert!(
+        served.get("safetyMeasures").is_some(),
+        "the public view carries a field the typo declassified"
+    );
+}
+
+/// The version axis is live: two versions of one sector yield different maps.
+///
+/// Without this, `for_schema_version` could be reading the current version for
+/// every input and nothing would notice — every version currently carries
+/// identical *classes*, so class comparison cannot tell the two apart. The
+/// field **set** can: `dueDiligenceUrl` arrived in battery v2.0.0, so v1.0.0
+/// must not classify it.
+///
+/// A field the declared version does not know is not thereby restricted — it
+/// falls to the public default, which is exactly why `dpp-aas` carries a
+/// structural backstop that drops `sectorData` keys the version does not
+/// declare. Both halves are asserted here so the pair cannot drift apart.
+#[test]
+fn an_older_version_classifies_only_the_fields_it_declared() {
+    let old = SectorAccessPolicy::for_schema_version("battery", "1.0.0")
+        .expect("v1.0.0 is a registered battery version");
+    let current = battery_policy();
+
+    assert!(
+        !old.field_disclosure.contains_key("dueDiligenceUrl"),
+        "v1.0.0 predates the field and must not classify it"
+    );
+    assert!(
+        current.field_disclosure.contains_key("dueDiligenceUrl"),
+        "the current version does classify it"
+    );
+    assert!(
+        old.field_disclosure.len() < current.field_disclosure.len(),
+        "v1.0.0 declares strictly fewer fields, so the two policies are not the same object"
+    );
+    // The consequence the backstop exists for.
+    assert_eq!(
+        old.disclosure_for_field("dueDiligenceUrl"),
+        Disclosure::Public,
+        "an undeclared field falls to the public default rather than being withheld"
+    );
+}
+
+/// Why disclosure is sourced from the passport's own schema version.
+///
+/// This began as a record of a live defect: the class map had no version axis,
+/// so it was read from the compiled-in catalog at *serve* time while passport
+/// signatures were frozen at publish and keyed by disclosure set. A delegated
+/// act reclassifying one field — `restricted → public` is the move these acts
+/// make — would have changed the public bytes served for an already-published
+/// passport, breaking verification for every affected passport at once with
+/// nothing to detect it.
+///
+/// That is fixed: `SectorAccessPolicy::for_schema_version` reads the classes
+/// from the schema version a passport declares, so a passport carries its
+/// classification with it and a newer version cannot move its bytes.
+///
+/// The test is kept, pointed at the mechanism rather than the defect, because
+/// the hazard is what justifies the design. It shows the thing the version axis
+/// prevents: one entry's difference is enough to move the served bytes, and a
+/// signature is a commitment to bytes.
+///
+/// **It is not a regression guard for the fix, and cannot be one yet.** Every
+/// battery schema version currently carries identical classes — deliberately,
+/// since no passport has been published under any of them — so no two versions
+/// disagree about anything and no test can distinguish "use the passport's
+/// version" from "use the current version". The first genuine divergence will
+/// be the first reclassification made after a passport exists, and that is the
+/// point at which this test should be replaced by one that pins an old
+/// passport's bytes against a newer version's map.
+#[test]
+fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
     let before = battery_policy();
     assert_eq!(
         before.field_disclosure.get("sohMethodology"),
         Some(&Disclosure::Restricted),
-        "fixture assumption: sohMethodology is restricted in the shipped catalog"
+        "fixture assumption: sohMethodology is restricted in the current schema"
     );
 
     let data = json!({
@@ -550,13 +686,14 @@ fn reclassifying_one_field_changes_the_served_public_bytes() {
         "reclassified to public, so the public view must now carry it"
     );
 
-    // The defect, stated as an assertion: same passport, same audience, same
-    // disclosure-set key — different bytes. Nothing in the passport records
-    // which of these two maps its frozen signature was taken over.
+    // The hazard, stated as an assertion: same data, same audience, same
+    // disclosure-set key — different bytes, from one entry's difference. This
+    // is why the class map must travel with the passport rather than be looked
+    // up fresh at serve time.
     assert_ne!(
         serde_json::to_string(&served_before).unwrap(),
         serde_json::to_string(&served_after).unwrap(),
-        "if these were equal the hazard would not exist and the fix would be unnecessary"
+        "if these were equal the version axis would buy nothing"
     );
 }
 

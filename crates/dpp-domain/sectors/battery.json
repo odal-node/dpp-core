@@ -29,8 +29,6 @@
     "starting-lighting-ignition"
   ],
   "disclosure": {
-    "dueDiligenceUrl": "restricted",
-    "criticalRawMaterials": "restricted",
     "disassemblyInstructionsUrl": "restricted",
     "cathodeMaterial": "restricted",
     "anodeMaterial": "restricted",

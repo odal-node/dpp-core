@@ -364,6 +364,19 @@
           "idShort": "expectedLifetimeCycles",
           "valueType": "xs:integer",
           "value": "1000"
+        },
+        {
+          "modelType": "ReferenceElement",
+          "idShort": "dueDiligenceUrl",
+          "value": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "https://acme.example.com/due-diligence"
+              }
+            ]
+          }
         }
       ]
     }
