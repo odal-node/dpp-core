@@ -18,9 +18,9 @@ use dpp_aas::{
 use dpp_domain::Audience;
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
-    AluminiumData, ConstructionData, DetergentData, ElectronicsData, EnergyEfficiencyClass,
-    FibreEntry, FurnitureData, Gtin, ProductionRoute, RepairabilityScore, Sector, SectorData,
-    SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
+    AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
+    EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, ProductionRoute, RepairabilityScore,
+    Sector, SectorData, SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
     UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use dpp_tests::fixtures::base_passport as base;
@@ -49,7 +49,7 @@ fn crm() -> CriticalRawMaterial {
 fn electronics_data() -> ElectronicsData {
     ElectronicsData {
         gtin: Gtin::parse(VALID_GTIN).unwrap(),
-        product_category: "laptop".into(),
+        product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 210.0,
         repairability_score: Some(RepairabilityScore::from_scalar(7.5)),

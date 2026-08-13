@@ -294,7 +294,9 @@ impl Passport {
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `sector_data.sector()` matches `self.sector` if present
     /// - for `Sector::UnsoldGoods`, `commodity_code` is present and within
-    ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear)
+    ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear),
+    ///   and `sector_data.product_category` (when present) agrees with the
+    ///   Annex VII heading the commodity code falls under
     /// - `sector_data` passes JSON Schema + cross-field rules via
     ///   [`crate::domain::validation::validate_sector_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
@@ -364,20 +366,35 @@ impl Passport {
         // ESPR Annex VII eligibility: an unsold-goods passport must declare a
         // commodity code within Annex VII's two headings (apparel & clothing
         // accessories, or footwear) — a passport cannot claim this sector for
-        // a product the destruction ban does not cover.
+        // a product the destruction ban does not cover. When sector_data is
+        // also present, its own product_category word must agree with the
+        // heading the commodity code actually falls under — two fields
+        // describing the same product must not contradict each other.
         if self.sector == Sector::UnsoldGoods {
             match &self.commodity_code {
                 None => errors.push(FieldError {
                     field: "/commodityCode".to_owned(),
                     message: "commodity_code is required for sector unsoldGoods (ESPR Annex VII scope check)".to_owned(),
                 }),
-                Some(code) if !crate::domain::sector::unsold_goods_annex_vii_scope(code.as_str()) => {
-                    errors.push(FieldError {
+                Some(code) => match crate::domain::sector::unsold_goods_annex_vii_heading(code.as_str()) {
+                    None => errors.push(FieldError {
                         field: "/commodityCode".to_owned(),
                         message: "commodity_code is not within ESPR Annex VII scope (apparel/clothing accessories or footwear)".to_owned(),
-                    });
-                }
-                _ => {}
+                    }),
+                    Some(heading) => {
+                        if let Some(SectorData::UnsoldGoods(report)) = &self.sector_data
+                            && !crate::domain::sector::unsold_goods_category_matches_heading(
+                                &report.product_category,
+                                heading,
+                            )
+                        {
+                            errors.push(FieldError {
+                                field: "/sectorData/productCategory".to_owned(),
+                                message: "product_category does not match the Annex VII heading commodity_code falls under".to_owned(),
+                            });
+                        }
+                    }
+                },
             }
         }
 
