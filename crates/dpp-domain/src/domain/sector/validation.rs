@@ -60,12 +60,26 @@ pub fn battery_recycled_chemistry_conflicts(
     )
 }
 
-/// Whether a commodity code falls within ESPR Annex VII's destruction-ban
-/// scope (apparel & clothing accessories, or footwear). Delegates to
+/// The ESPR Annex VII heading a commodity code falls under, if any
+/// (apparel & clothing accessories, or footwear). `None` means the code is
+/// out of Annex VII's destruction-ban scope entirely. Delegates to
 /// [`dpp_rules`].
 #[must_use]
-pub fn unsold_goods_annex_vii_scope(commodity_code: &str) -> bool {
-    dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope(commodity_code)
+pub fn unsold_goods_annex_vii_heading(
+    commodity_code: &str,
+) -> Option<dpp_rules::unsold_goods::annex_vii::AnnexViiHeading> {
+    dpp_rules::unsold_goods::annex_vii::annex_vii_heading(commodity_code)
+}
+
+/// Whether a declared `UnsoldGoodsReport.product_category` word is
+/// consistent with the Annex VII heading a passport's `commodity_code`
+/// falls under. Delegates to [`dpp_rules`].
+#[must_use]
+pub fn unsold_goods_category_matches_heading(
+    product_category: &str,
+    heading: dpp_rules::unsold_goods::annex_vii::AnnexViiHeading,
+) -> bool {
+    dpp_rules::unsold_goods::annex_vii::product_category_matches_heading(product_category, heading)
 }
 
 /// Validate a detergent surfactant list. Delegates to [`dpp_rules`].
