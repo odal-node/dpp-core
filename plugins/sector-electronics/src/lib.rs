@@ -6,8 +6,9 @@
 //! - Repairability ≥ 6.0 AND energy class A/B/C → COMPLIANT.
 //! - Otherwise (borderline) → NOT_ASSESSED.
 //!
-//! "electronics" is the **sector**; `productCategory` (`smartphone`, `laptop`,
-//! …) is a product category the plugin records but does not dispatch on.
+//! "electronics" is the **sector**; `productCategory` (one of the four
+//! device types Regulation (EU) 2023/1670 Art. 1(1) enumerates) is a product
+//! category the plugin records but does not dispatch on.
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
@@ -34,14 +35,17 @@ impl DppSectorPlugin for ElectronicsPlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.0.0".into(),
+            max_version: "1.2.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
             .require_gtin("gtin")
-            .require_str("productCategory")
+            .require_enum(
+                "productCategory",
+                &["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
+            )
             .require_enum(
                 "energyEfficiencyClass",
                 &["A", "B", "C", "D", "E", "F", "G"],
@@ -143,6 +147,14 @@ mod tests {
     fn invalid_energy_class_fails_validation() {
         let mut d = base();
         d["energyEfficiencyClass"] = json!("Z");
+        assert!(ElectronicsPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn out_of_scope_product_category_fails_validation() {
+        // "laptop" is not within Regulation (EU) 2023/1670 Art. 1(1)'s scope.
+        let mut d = base();
+        d["productCategory"] = json!("laptop");
         assert!(ElectronicsPlugin.validate_input(&d).is_err());
     }
 

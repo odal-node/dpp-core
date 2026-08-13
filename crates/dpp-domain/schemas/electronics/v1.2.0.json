@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/electronics-v1.2.0.json",
+  "title": "Odal Node — Electronics Sector Data (v1.2.0)",
+  "description": "ICT and electronics fields. Regulatory basis: Regulation (EU) 2023/1670 Art. 1(1) (ecodesign) and Regulation (EU) 2023/1669 (energy labelling), in force since 2025-06-20. Applicability dates and regulatory status are held in the sector manifest, not here. v1.2.0 narrows productCategory to the four device types Art. 1(1) actually enumerates (smartphone, other mobile phone, cordless phone, slate tablet) — laptop/monitor/tv/server/router/charger/earphone/pcb/other carried no regulatory basis and are removed. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 declared it as a bare number, which the Rust type never produced.",
+  "type": "object",
+  "required": [
+    "gtin",
+    "productCategory",
+    "energyEfficiencyClass",
+    "co2ePerUnitKg"
+  ],
+  "properties": {
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number."
+    },
+    "productCategory": {
+      "type": "string",
+      "enum": ["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
+      "description": "Device type per Regulation (EU) 2023/1670 Art. 1(1)."
+    },
+    "energyEfficiencyClass": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D", "E", "F", "G"],
+      "description": "EU energy label class (A = most efficient, G = least efficient)."
+    },
+    "co2ePerUnitKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Whole-lifecycle carbon footprint in kg CO2e per unit."
+    },
+    "repairabilityScore": {
+      "type": ["object", "null"],
+      "description": "Repairability score (non-regulatory heuristic, not EN 45554 / EU 2023/1669). overall is 0.0-10.0; >= 6.0 is considered good.",
+      "required": ["overall"],
+      "properties": {
+        "overall": { "type": "number", "minimum": 0, "maximum": 10 },
+        "criteria": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/repairCriterion" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sparePartsAvailable": {
+      "type": ["boolean", "null"],
+      "description": "Whether spare parts are commercially available from the manufacturer."
+    },
+    "repairManualUrl": {
+      "type": ["string", "null"],
+      "description": "URL to the repair manual or repair information portal."
+    },
+    "disassemblyInstructionsUrl": {
+      "type": ["string", "null"],
+      "description": "URL to disassembly or dismantling instructions."
+    },
+    "svhcSubstances": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/svhcSubstance" },
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+    },
+    "rohsCompliant": {
+      "type": ["boolean", "null"],
+      "description": "Whether the product complies with RoHS Directive 2011/65/EU."
+    },
+    "criticalRawMaterials": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/definitions/criticalRawMaterial" },
+      "description": "Critical raw materials present per EU CRM Act 2024/1252."
+    },
+    "recycledContentPct": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled content as a percentage of total product weight."
+    },
+    "standbyPowerW": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Standby power consumption in watts."
+    },
+    "expectedLifetimeYears": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Expected product lifetime in years under normal use."
+    },
+    "firmwareUpdateUntil": {
+      "type": ["string", "null"],
+      "description": "Date until which firmware or software updates are guaranteed (ISO 8601)."
+    }
+  },
+  "definitions": {
+    "svhcSubstance": {
+      "type": "object",
+      "required": ["casNumber", "substanceName", "concentrationPct"],
+      "properties": {
+        "casNumber": { "type": "string", "minLength": 1 },
+        "substanceName": { "type": "string", "minLength": 1 },
+        "concentrationPct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "locationInProduct": { "type": ["string", "null"] },
+        "scipNotificationId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "criticalRawMaterial": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "casNumber": { "type": ["string", "null"] },
+        "weightGrams": { "type": ["number", "null"], "minimum": 0 },
+        "countryOfOrigin": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{2}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "repairCriterion": {
+      "type": "object",
+      "required": ["name", "score", "weight"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "score": { "type": "number" },
+        "weight": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
