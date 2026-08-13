@@ -15,6 +15,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`unsold_goods_annex_vii_scope` is replaced by
+  `unsold_goods_annex_vii_heading`.** The old function answered only *whether*
+  a commodity code was in ESPR Annex VII's destruction-ban scope; the new one
+  answers *which* of Annex VII's two headings it falls under, returning
+  `Option<AnnexViiHeading>`. `unsold_goods_category_matches_heading` is added
+  alongside it for the cross-check.
+  `dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope` keeps the
+  boolean shape and is unchanged; callers needing only the yes/no answer
+  should use it.
+
+  Behavioural, not just structural: an unsold-goods passport whose
+  `sectorData.productCategory` contradicts the heading its `commodity_code`
+  falls under now fails validation. `home-textile` and `other` correspond to
+  no Annex VII heading at all, so they contradict any in-scope code. Such a
+  passport was accepted before.
+
 - **`BatteryData.battery_type` is required and closed.** Annex VI Part A
   point 2, made public by Annex XIII point 1(a), lists the battery category as
   mandatory content of the passport's publicly accessible tier — the field was
