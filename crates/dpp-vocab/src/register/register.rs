@@ -83,8 +83,12 @@ const EMBEDDED: &[Embedded] = &[
 /// // Our own identifiers are always permitted.
 /// assert!(register.verdict("urn:odal-node:aas:property:product-name:1.0").is_permitted());
 ///
-/// // Nothing third-party is, yet — no vocabulary has been read.
-/// assert!(!register.verdict("https://ref.gs1.org/voc/gtin").is_permitted());
+/// // GS1's own definition of `gtin` was read on 2026-08-11 and matches our
+/// // `Gtin` type exactly, so its terms are now permitted.
+/// assert!(register.verdict("https://ref.gs1.org/voc/gtin").is_permitted());
+///
+/// // Most third-party identifiers still are not — nobody has read them yet.
+/// assert!(!register.verdict("https://schema.org/dateModified").is_permitted());
 /// ```
 #[derive(Debug, Clone)]
 pub struct VocabularyRegister {
