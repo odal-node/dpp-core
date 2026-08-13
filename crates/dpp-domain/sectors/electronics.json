@@ -1,18 +1,18 @@
 {
   "key": "electronics",
-  "title": "Electronics (smartphones & tablets)",
+  "title": "Electronics (smartphones, mobile phones & tablets)",
   "status": "in_force",
   "regime": "ecodesign-energy-labelling",
   "legalBasis": [
-    "Regulation (EU) 2023/1670 (ecodesign — smartphones & tablets)",
+    "Regulation (EU) 2023/1670 Art. 1(1) (ecodesign — smartphones, other mobile phones, cordless phones, slate tablets)",
     "Regulation (EU) 2023/1669 (energy labelling — smartphones & tablets)"
   ],
   "dppAppliesFrom": "2025-06-20",
   "retentionYears": 10,
   "retentionYearsBasis": "assumed",
-  "schemaVersions": ["1.0.0", "1.1.0"],
-  "currentSchemaVersion": "1.1.0",
-  "productCategories": ["smartphone", "tablet", "laptop", "monitor", "tv", "server", "charger", "earphone"],
+  "schemaVersions": ["1.0.0", "1.1.0", "1.2.0"],
+  "currentSchemaVersion": "1.2.0",
+  "productCategories": ["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
   "disclosure": {
     "svhcSubstances": "restricted",
     "disassemblyInstructionsUrl": "restricted",
@@ -20,5 +20,5 @@
     "criticalRawMaterials": "restricted"
   },
   "plugin": "sector-electronics",
-  "notes": "In force for smartphones & tablets since 2025-06-20 (repairability class A-E, durability, 7-year spare parts, OS updates). Broader consumer-electronics DPP delegated act anticipated ~2027 — schema will extend then. v1.1.0 (current) corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 is kept for historical immutability (it incorrectly declared repairabilityScore as a bare number). retentionYears is assumed, not sourced: not covered by the 2026-07-28 citation pass that checked the other sectors — Reg. (EU) 2023/1670 and 2023/1669 have not been checked for a passport-retention figure."
+  "notes": "In force for smartphones, other mobile phones, cordless phones & slate tablets since 2025-06-20 (repairability class A-E, durability, 7-year spare parts, OS updates). v1.2.0 (current) narrows productCategory to exactly these four Art. 1(1) device types — laptop/monitor/tv/server/router/charger/earphone/pcb/other are removed: none of them has a DPP obligation, in force or dated, under any EU instrument. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 is kept for historical immutability (it incorrectly declared repairabilityScore as a bare number). retentionYears is assumed, not sourced: not covered by the 2026-07-28 citation pass that checked the other sectors — Reg. (EU) 2023/1670 and 2023/1669 have not been checked for a passport-retention figure."
 }

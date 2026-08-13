@@ -34,14 +34,26 @@ pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
 /// operational obligation, not a library decision. An inline term map cannot
 /// 404, and it can be adopted later without invalidating passports issued now.
 ///
-/// Every term maps to our own `dpp:` prefix. `gtin`, `createdAt` and
-/// `updatedAt` used to borrow GS1's and Schema.org's prefixes
-/// (`gs1:gtin`, `schema:dateCreated`, `schema:dateModified`) with no
-/// provenance record — neither vocabulary is verified in `dpp-vocab` (both are
-/// `surveyed`: known to exist, nothing read), so claiming their terms was
-/// exactly the unsupported claim this crate's own provenance rule exists to
-/// catch. An honest `dpp:` term says "this is our concept"; the borrowed
-/// prefixes said "this is GS1's/Schema.org's concept", unverified.
+/// Every term maps to our own `dpp:` prefix, with one exception.
+///
+/// `gtin`, `createdAt` and `updatedAt` all used to borrow GS1's and
+/// Schema.org's prefixes (`gs1:gtin`, `schema:dateCreated`,
+/// `schema:dateModified`) with no provenance record, which is exactly the
+/// unsupported claim `dpp-vocab`'s rule exists to catch. All three were
+/// withdrawn to `dpp:` on 2026-08-10.
+///
+/// **`gtin` is back, and only `gtin`.** GS1's own definition was read on
+/// 2026-08-11 at `https://ref.gs1.org/voc/gtin`: the 14-digit key, `xsd:string`,
+/// `skos:exactMatch` to `schema:gtin14` and `closeMatch` to the shorter forms.
+/// That is [`Gtin`](dpp_domain::Gtin)'s shape exactly — 14 digits, mod-10 check,
+/// shorter forms zero-padded to the canonical one — so the term now says
+/// something true. The vocabulary is Apache-2.0, which our own licence admits
+/// without a copyleft obligation.
+///
+/// The other two stay `dpp:`. Schema.org is `tracked` in `dpp-vocab`: evaluated,
+/// not adopted. And note that what was read here was **one term**, not the GS1
+/// vocabulary — declaring the `gs1:` prefix is what makes the compact form
+/// expand, not a claim that anything else under it has been checked.
 ///
 /// The literal is built once and cloned per call — callers extend the
 /// returned value (e.g. [`frame_passport`] merges passport fields into it),
@@ -55,7 +67,8 @@ pub fn passport_context() -> Value {
                     REMOTE_CONTEXTS[0],
                     {
                         "dpp": "https://schema.odal-node.io/dpp#",
-                        "gtin": "dpp:gtin",
+                        "gs1": "https://ref.gs1.org/voc/",
+                        "gtin": "gs1:gtin",
                         "sector": "dpp:sector",
                         "passportId": "dpp:passportId",
                         "status": "dpp:status",

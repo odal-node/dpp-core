@@ -15,6 +15,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`ElectronicsData.product_category` is a closed `DeviceType`, not a
+  `String`.** Regulation (EU) 2023/1670 Art. 1(1) enumerates exactly four
+  device types — smartphones, mobile phones other than smartphones, cordless
+  phones and slate tablets. `laptop`, `monitor`, `tv`, `server`, `router`,
+  `charger`, `earphone`, `pcb` and `other` carried no regulatory basis under
+  any EU instrument, in force or dated, and are gone from the type, the schema
+  enum and the sector manifest's `productCategories`.
+
+  `DeviceType` carries no `#[serde(other)]` catch-all, same reasoning as
+  `BatteryType`: a category outside the regulation's scope is not a value this
+  sector can hold. New schema `v1.2.0`; a `v1.1.0 → v1.2.0` lens passes a
+  surviving category through unchanged and **refuses** a removed one rather
+  than substituting a value that would misdescribe the product. A stored
+  record naming a removed category therefore does not deserialize directly —
+  `Passport::from_stored` routes it through that lens and surfaces the
+  refusal.
+
 - **`unsold_goods_annex_vii_scope` is replaced by
   `unsold_goods_annex_vii_heading`.** The old function answered only *whether*
   a commodity code was in ESPR Annex VII's destruction-ban scope; the new one
@@ -56,15 +73,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   envelope field to any of them. Deleting it removes a second, unvalidated,
   drifting model of the same information rather than losing any.
 
-- **The JSON-LD passport context no longer borrows `gs1:` or `schema:`.**
-  `gtin`, `createdAt` and `updatedAt` now map to `dpp:gtin`, `dpp:createdAt`
-  and `dpp:updatedAt` instead of `gs1:gtin`, `schema:dateCreated` and
-  `schema:dateModified`. Neither GS1 nor Schema.org is a verified vocabulary
-  in `dpp-vocab` — both are `surveyed`, meaning nothing has been read — so the
-  borrowed prefixes were an unsupported claim, the same defect class `dpp-aas`
-  was already gated against. A consumer of the `ld+json` door that resolved
-  these terms against GS1's or Schema.org's own vocabularies will see `dpp:`
+- **The JSON-LD passport context no longer borrows `schema:`.** `createdAt` and
+  `updatedAt` now map to `dpp:createdAt` and `dpp:updatedAt` instead of
+  `schema:dateCreated` and `schema:dateModified`, and the `schema:` prefix
+  declaration is gone. Schema.org is `tracked` in `dpp-vocab` — evaluated and
+  not adopted — so naming its terms was an unsupported claim, the same defect
+  class `dpp-aas` was already gated against. A consumer of the `ld+json` door
+  that resolved these two terms against Schema.org's vocabulary will see `dpp:`
   terms instead.
+
+  **`gtin` is unchanged from 0.16.0** and still maps to `gs1:gtin`. It was
+  withdrawn to `dpp:gtin` mid-cycle alongside the other two and restored before
+  release once GS1's own definition had been read: verbatim at
+  `https://ref.gs1.org/voc/gtin`, the 14-digit key with `skos:exactMatch` to
+  `schema:gtin14` and `closeMatch` to the shorter forms, which is `Gtin`'s shape
+  exactly, under Apache-2.0. The prefix now sits behind the same provenance gate
+  as every `semanticId`, and `dpp-tests` fails the build if it stops being
+  verified. Recorded because the two terms next to it did change, not because
+  any consumer could observe this one moving.
 
 ### Added
 
@@ -89,9 +115,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   The rule is one line: **an identifier is either in the `urn:odal-node:`
   namespace, or it belongs to a vocabulary somebody has read.** There is
-  deliberately no third category, and today **no vocabulary is verified** — so
-  every third-party identifier is refused. That is the accurate state of what
-  this project knows, not a placeholder.
+  deliberately no third category. Six of the fourteen are `verified` — each
+  because a person read the authority's own publication, not because the claim
+  looked plausible — and every other third-party identifier is refused. That is
+  the accurate state of what this project knows, not a placeholder.
 
   Fourteen records ship in `vocabularies/`, one JSON file per authority, each
   carrying the finding that got it to its status and the step that would move it
