@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
-use crate::domain::sector::enums::EnergyEfficiencyClass;
+use crate::domain::sector::enums::{DeviceType, EnergyEfficiencyClass};
 use crate::domain::sector::metrics::RepairabilityScore;
 
 use super::shared::{CriticalRawMaterial, SvhcSubstance};
@@ -22,9 +22,8 @@ use super::shared::{CriticalRawMaterial, SvhcSubstance};
 pub struct ElectronicsData {
     /// 14-digit GTIN identifying the product model.
     pub gtin: Gtin,
-    /// Product category, e.g. `"smartphone"`, `"laptop"`, `"tablet"`, `"monitor"`,
-    /// `"tv"`, `"server"`, `"charger"`, `"earphone"`, `"other"`.
-    pub product_category: String,
+    /// Device type per EU Regulation (EU) 2023/1670 Art. 1(1).
+    pub product_category: DeviceType,
     /// EU energy label class (A–G) per Energy Labelling Regulation 2017/1369.
     pub energy_efficiency_class: EnergyEfficiencyClass,
     /// Whole-lifecycle carbon footprint in kg CO₂e per unit.
