@@ -339,6 +339,40 @@ fn unrecognised_battery_type_is_rejected_not_flattened() {
     }
 }
 
+// Regression: Art. 1(1) is a closed set of four device types, and the
+// removed values (`laptop`, `tv`, etc.) must be rejected outright rather
+// than accepted by an `Other`/`#[serde(other)]` catch-all this type does not
+// carry.
+#[test]
+fn device_type_wire_values_round_trip() {
+    let cases: &[(DeviceType, &str)] = &[
+        (DeviceType::Smartphone, "smartphone"),
+        (DeviceType::OtherMobilePhone, "other-mobile-phone"),
+        (DeviceType::CordlessPhone, "cordless-phone"),
+        (DeviceType::Tablet, "tablet"),
+    ];
+    for (variant, expected) in cases {
+        let json = serde_json::to_value(variant).unwrap();
+        assert_eq!(
+            json.as_str().unwrap(),
+            *expected,
+            "DeviceType::{variant:?} must serialise as \"{expected}\""
+        );
+        let back: DeviceType = serde_json::from_str(&format!("\"{expected}\"")).unwrap();
+        assert_eq!(back, *variant, "round-trip failed for \"{expected}\"");
+    }
+}
+
+#[test]
+fn unrecognised_device_type_is_rejected() {
+    for bad in ["\"laptop\"", "\"tv\"", "\"Smartphone\"", "\"\"", "null"] {
+        assert!(
+            serde_json::from_str::<DeviceType>(bad).is_err(),
+            "should reject {bad}"
+        );
+    }
+}
+
 #[test]
 fn sector_data_textile_round_trip() {
     let mut data = test_textile_data();
@@ -497,7 +531,7 @@ fn sample_aluminium_data() -> SectorData {
 fn sample_electronics_data() -> SectorData {
     SectorData::Electronics(ElectronicsData {
         gtin: Gtin::parse("09506000134352").unwrap(),
-        product_category: "laptop".into(),
+        product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 120.0,
         repairability_score: Some(RepairabilityScore {
