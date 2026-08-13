@@ -6,6 +6,7 @@ use crate::domain::error::DppError;
 use crate::domain::identity::Audience;
 use crate::domain::sector::{
     BatteryChemistry, BatteryData, CarbonFootprint, RepairabilityScore, Sector, SectorData,
+    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use crate::domain::status::PassportStatus;
 use crate::schemas::lens::LensRegistry;
@@ -103,6 +104,74 @@ fn missing_commodity_code_is_fine_outside_unsold_goods() {
     let mut p = make_passport(); // sector = Electronics
     p.commodity_code = None;
     assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
+fn unsold_goods_report(product_category: &str) -> UnsoldGoodsReport {
+    UnsoldGoodsReport {
+        reporting_period: "2026-Q3".to_owned(),
+        volume_kg: 120.0,
+        product_category: product_category.to_owned(),
+        reason: UnsoldGoodsReason::EndOfSeason,
+        destination: UnsoldGoodsDestination::Donation,
+        destruction_justification: None,
+        country_of_disposal: "DE".to_owned(),
+        operator_name: Some("Caritas Berlin".to_owned()),
+    }
+}
+
+#[test]
+fn unsold_goods_category_matching_the_commodity_code_heading_passes() {
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = Some(SectorData::UnsoldGoods(unsold_goods_report("apparel")));
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("620342").expect("valid code"));
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
+#[test]
+fn unsold_goods_accessories_matches_the_apparel_heading_too() {
+    // Annex VII has one heading for apparel & clothing accessories, not two —
+    // "accessories" must be accepted alongside "apparel" for the same code.
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = Some(SectorData::UnsoldGoods(unsold_goods_report("accessories")));
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("650400").expect("valid code"));
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
+#[test]
+fn unsold_goods_category_contradicting_the_commodity_code_heading_fails() {
+    // Footwear commodity code, apparel category word — same passport, two
+    // fields describing the product, disagreeing with each other.
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = Some(SectorData::UnsoldGoods(unsold_goods_report("apparel")));
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("64011000").expect("valid code"));
+    let err = p.validate().unwrap_err().to_string();
+    assert!(
+        err.contains("does not match the Annex VII heading"),
+        "got: {err}"
+    );
+}
+
+#[test]
+fn unsold_goods_home_textile_category_always_contradicts_annex_vii_scope() {
+    // "home-textile" has no Annex VII heading at all, so it can never be
+    // consistent with a commodity_code that (per the scope check above) must
+    // already be apparel- or footwear-headed.
+    let mut p = make_passport();
+    p.sector = Sector::UnsoldGoods;
+    p.sector_data = Some(SectorData::UnsoldGoods(unsold_goods_report("home-textile")));
+    p.commodity_code =
+        Some(crate::domain::commodity_code::CommodityCode::parse("620342").expect("valid code"));
+    let err = p.validate().unwrap_err().to_string();
+    assert!(
+        err.contains("does not match the Annex VII heading"),
+        "got: {err}"
+    );
 }
 
 #[test]
