@@ -16,17 +16,26 @@
     "reportingPeriod": {
       "type": "string",
       "minLength": 1,
-      "description": "Reference period covered by this report (e.g. '2026-Q2', '2026-07')."
+      "description": "Reference period covered by this report (e.g. '2026-Q2', '2026-07').",
+      "x-disclosure": "public"
     },
     "volumeKg": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Total volume of unsold goods disposed in this report, in kilograms."
+      "description": "Total volume of unsold goods disposed in this report, in kilograms.",
+      "x-disclosure": "public"
     },
     "productCategory": {
       "type": "string",
-      "enum": ["apparel", "footwear", "home-textile", "accessories", "other"],
-      "description": "High-level product category."
+      "enum": [
+        "apparel",
+        "footwear",
+        "home-textile",
+        "accessories",
+        "other"
+      ],
+      "description": "High-level product category.",
+      "x-disclosure": "public"
     },
     "reason": {
       "type": "string",
@@ -38,7 +47,8 @@
         "customer_return",
         "other"
       ],
-      "description": "Reason the goods were unsold."
+      "description": "Reason the goods were unsold.",
+      "x-disclosure": "public"
     },
     "destination": {
       "type": "string",
@@ -49,31 +59,45 @@
         "supplier_return",
         "exempt_destruction"
       ],
-      "description": "Disposal destination. 'exempt_destruction' requires destructionJustification."
+      "description": "Disposal destination. 'exempt_destruction' requires destructionJustification.",
+      "x-disclosure": "public"
     },
     "destructionJustification": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "minLength": 10,
-      "description": "Mandatory justification text if destination is 'exempt_destruction'."
+      "description": "Mandatory justification text if destination is 'exempt_destruction'.",
+      "x-disclosure": "restricted"
     },
     "countryOfDisposal": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country where disposal took place."
+      "description": "ISO 3166-1 alpha-2 country where disposal took place.",
+      "x-disclosure": "public"
     },
     "operatorName": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "minLength": 1,
-      "description": "Name of the disposal operator, charity, or recycler — required for audit trail."
+      "description": "Name of the disposal operator, charity, or recycler — required for audit trail.",
+      "x-disclosure": "restricted"
     }
   },
   "if": {
     "properties": {
-      "destination": { "const": "exempt_destruction" }
+      "destination": {
+        "const": "exempt_destruction"
+      }
     }
   },
   "then": {
-    "required": ["destructionJustification"],
+    "required": [
+      "destructionJustification"
+    ],
     "properties": {
       "destructionJustification": {
         "type": "string",

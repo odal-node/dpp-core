@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "fibreComposition": {
       "type": "array",
@@ -47,22 +48,26 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "x-disclosure": "public"
     },
     "countryOfManufacturing": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured."
+      "description": "ISO 3166-1 alpha-2 country code where the textile was manufactured.",
+      "x-disclosure": "public"
     },
     "careInstructions": {
       "type": "string",
       "minLength": 1,
-      "description": "ISO 3758 care symbols or free text care instructions."
+      "description": "ISO 3758 care symbols or free text care instructions.",
+      "x-disclosure": "public"
     },
     "chemicalComplianceStandard": {
       "type": "string",
       "minLength": 1,
-      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS."
+      "description": "Chemical compliance standard, e.g. OEKO-TEX 100, REACH, GOTS.",
+      "x-disclosure": "public"
     },
     "recycledContentPct": {
       "type": [
@@ -71,7 +76,8 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Total recycled content as a percentage of total weight."
+      "description": "Total recycled content as a percentage of total weight.",
+      "x-disclosure": "public"
     },
     "carbonFootprintKgCo2e": {
       "type": [
@@ -79,7 +85,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per unit."
+      "description": "Carbon footprint in kg CO2e per unit.",
+      "x-disclosure": "public"
     },
     "waterUseLitres": {
       "type": [
@@ -87,7 +94,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Water consumption in litres per unit produced."
+      "description": "Water consumption in litres per unit produced.",
+      "x-disclosure": "public"
     },
     "microplasticSheddingMgPerWash": {
       "type": [
@@ -95,7 +103,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Microplastic fibre shedding in milligrams per wash cycle (ISO/DIS 4484)."
+      "description": "Microplastic fibre shedding in milligrams per wash cycle (ISO/DIS 4484).",
+      "x-disclosure": "public"
     },
     "repairScore": {
       "type": [
@@ -104,7 +113,8 @@
       ],
       "minimum": 0,
       "maximum": 10,
-      "description": "Repairability score (0–10) per EU methodology."
+      "description": "Repairability score (0–10) per EU methodology.",
+      "x-disclosure": "public"
     },
     "durabilityScore": {
       "type": [
@@ -113,7 +123,8 @@
       ],
       "minimum": 0,
       "maximum": 10,
-      "description": "Durability score (0–10) covering pilling, colour fastness, dimensional stability, seam strength."
+      "description": "Durability score (0–10) covering pilling, colour fastness, dimensional stability, seam strength.",
+      "x-disclosure": "public"
     },
     "expectedWashCycles": {
       "type": [
@@ -121,7 +132,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Expected number of wash cycles before significant quality degradation."
+      "description": "Expected number of wash cycles before significant quality degradation.",
+      "x-disclosure": "public"
     },
     "countryOfRawMaterialOrigin": {
       "type": [
@@ -129,7 +141,8 @@
         "null"
       ],
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of raw material origin (product-level fallback)."
+      "description": "ISO 3166-1 alpha-2 country of raw material origin (product-level fallback).",
+      "x-disclosure": "public"
     },
     "svhcSubstances": {
       "type": [
@@ -171,21 +184,24 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "x-disclosure": "restricted"
     },
     "disassemblyInstructions": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Disassembly / deconstruction instructions (Professional tier)."
+      "description": "Disassembly / deconstruction instructions (Professional tier).",
+      "x-disclosure": "restricted"
     },
     "sparePartsAvailable": {
       "type": [
         "boolean",
         "null"
       ],
-      "description": "Whether spare parts or replacement components are available."
+      "description": "Whether spare parts or replacement components are available.",
+      "x-disclosure": "restricted"
     },
     "productWeightGrams": {
       "type": [
@@ -193,7 +209,8 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Product net weight in grams."
+      "description": "Product net weight in grams.",
+      "x-disclosure": "public"
     },
     "allergens": {
       "type": [
@@ -204,7 +221,8 @@
       "items": {
         "type": "string",
         "minLength": 1
-      }
+      },
+      "x-disclosure": "public"
     },
     "substancesOfConcern": {
       "type": [
@@ -215,28 +233,32 @@
       "items": {
         "type": "string",
         "minLength": 1
-      }
+      },
+      "x-disclosure": "public"
     },
     "recyclabilityClass": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Recyclability classification, e.g. mono-material, multi-material, not-recyclable."
+      "description": "Recyclability classification, e.g. mono-material, multi-material, not-recyclable.",
+      "x-disclosure": "public"
     },
     "endOfLifeInstructions": {
       "type": [
         "string",
         "null"
       ],
-      "description": "How to dispose of or recycle the product. Free text or URL to take-back/collection point information."
+      "description": "How to dispose of or recycle the product. Free text or URL to take-back/collection point information.",
+      "x-disclosure": "public"
     },
     "reuseCondition": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Condition grade of a refurbished or reused product, e.g. like-new, good, fair."
+      "description": "Condition grade of a refurbished or reused product, e.g. like-new, good, fair.",
+      "x-disclosure": "public"
     },
     "priorUseCycles": {
       "type": [
@@ -244,14 +266,16 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Number of prior ownership cycles (0 for new products)."
+      "description": "Number of prior ownership cycles (0 for new products).",
+      "x-disclosure": "public"
     },
     "repairHistoryUrl": {
       "type": [
         "string",
         "null"
       ],
-      "description": "URL or structured log of repair events performed on this specific item."
+      "description": "URL or structured log of repair events performed on this specific item.",
+      "x-disclosure": "public"
     },
     "repairCount": {
       "type": [
@@ -259,14 +283,16 @@
         "null"
       ],
       "minimum": 0,
-      "description": "Number of completed professional repairs on this item."
+      "description": "Number of completed professional repairs on this item.",
+      "x-disclosure": "public"
     },
     "pefScore": {
       "type": [
         "number",
         "null"
       ],
-      "description": "Environmental impact score per garment lifecycle (PEF/OEF methodology). Dimensionless single score aggregating multiple impact categories."
+      "description": "Environmental impact score per garment lifecycle (PEF/OEF methodology). Dimensionless single score aggregating multiple impact categories.",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

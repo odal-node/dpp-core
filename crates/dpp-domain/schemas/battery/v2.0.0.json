@@ -16,141 +16,256 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "batteryChemistry": {
       "type": "string",
       "minLength": 1,
-      "description": "Battery chemistry code, e.g. LFP, NMC, LCO."
+      "description": "Battery chemistry code, e.g. LFP, NMC, LCO.",
+      "x-disclosure": "public"
     },
     "nominalVoltageV": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal voltage in volts."
+      "description": "Nominal voltage in volts.",
+      "x-disclosure": "public"
     },
     "nominalCapacityAh": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal capacity in ampere-hours."
+      "description": "Nominal capacity in ampere-hours.",
+      "x-disclosure": "public"
     },
     "expectedLifetimeCycles": {
       "type": "integer",
       "minimum": 1,
-      "description": "Expected lifetime in full charge-discharge cycles."
+      "description": "Expected lifetime in full charge-discharge cycles.",
+      "x-disclosure": "public"
     },
     "co2ePerUnitKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per battery unit."
+      "description": "Carbon footprint in kg CO2e per battery unit.",
+      "x-disclosure": "public"
     },
     "recycledContentCobaltPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentLithiumPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentNickelPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "stateOfHealthPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "individual"
     },
     "ratedCapacityKwh": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "description": "Rated energy in kilowatt-hours."
+      "description": "Rated energy in kilowatt-hours.",
+      "x-disclosure": "public"
     },
     "carbonFootprintClass": {
-      "type": ["string", "null"],
-      "enum": ["A", "B", "C", "D", "E", null],
-      "description": "Carbon footprint performance class label (A-E) per Art. 7(2)."
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        null
+      ],
+      "description": "Carbon footprint performance class label (A-E) per Art. 7(2).",
+      "x-disclosure": "public"
     },
     "dueDiligenceUrl": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uri",
-      "description": "URL to supply chain due diligence documentation (Art. 47-52)."
+      "description": "URL to supply chain due diligence documentation (Art. 47-52).",
+      "x-disclosure": "restricted"
     },
     "cathodeMaterial": {
-      "type": ["array", "null"],
-      "items": { "$ref": "#/definitions/materialComposition" },
-      "description": "Cathode active material composition."
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/materialComposition"
+      },
+      "description": "Cathode active material composition.",
+      "x-disclosure": "restricted"
     },
     "anodeMaterial": {
-      "type": ["array", "null"],
-      "items": { "$ref": "#/definitions/materialComposition" },
-      "description": "Anode active material composition."
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/materialComposition"
+      },
+      "description": "Anode active material composition.",
+      "x-disclosure": "restricted"
     },
     "electrolyteMaterial": {
-      "type": ["array", "null"],
-      "items": { "$ref": "#/definitions/materialComposition" },
-      "description": "Electrolyte composition."
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/materialComposition"
+      },
+      "description": "Electrolyte composition.",
+      "x-disclosure": "restricted"
     },
     "criticalRawMaterials": {
-      "type": ["array", "null"],
-      "items": { "$ref": "#/definitions/criticalRawMaterial" },
-      "description": "Critical raw materials per EU CRM Act 2024/1252."
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/criticalRawMaterial"
+      },
+      "description": "Critical raw materials per EU CRM Act 2024/1252.",
+      "x-disclosure": "restricted"
     },
     "disassemblyInstructionsUrl": {
-      "type": ["string", "null"],
-      "description": "URL or text for disassembly/dismantling instructions (Annex XIII §6)."
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "URL or text for disassembly/dismantling instructions (Annex XIII §6).",
+      "x-disclosure": "restricted"
     },
     "sohMethodology": {
-      "type": ["string", "null"],
-      "description": "State-of-health determination methodology identifier."
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "State-of-health determination methodology identifier.",
+      "x-disclosure": "restricted"
     },
     "operatingTempMinC": {
-      "type": ["number", "null"],
-      "description": "Minimum operating temperature in degrees Celsius."
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Minimum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
     },
     "operatingTempMaxC": {
-      "type": ["number", "null"],
-      "description": "Maximum operating temperature in degrees Celsius."
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
     },
     "ratedEnergyWh": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "description": "Rated energy in watt-hours (Wh)."
+      "description": "Rated energy in watt-hours (Wh).",
+      "x-disclosure": "public"
     },
     "recycledContentLeadPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled lead content percentage (lead-acid batteries)."
+      "description": "Recycled lead content percentage (lead-acid batteries).",
+      "x-disclosure": "public"
     },
     "batteryWeightKg": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "description": "Battery weight in kilograms."
+      "description": "Battery weight in kilograms.",
+      "x-disclosure": "public"
     },
     "batteryType": {
-      "type": ["string", "null"],
-      "enum": ["portable", "industrial", "ev", "lmt", "starting-lighting-ignition", null],
-      "description": "Battery type category per regulation."
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "portable",
+        "industrial",
+        "ev",
+        "lmt",
+        "starting-lighting-ignition",
+        null
+      ],
+      "description": "Battery type category per regulation.",
+      "x-disclosure": "public"
     },
     "roundTripEfficiencyPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Round-trip energy efficiency at 50% SoC."
+      "description": "Round-trip energy efficiency at 50% SoC.",
+      "x-disclosure": "public"
     },
     "internalResistanceMohm": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "description": "Internal resistance in milliohms at 50% SoC."
+      "description": "Internal resistance in milliohms at 50% SoC.",
+      "x-disclosure": "public"
     }
   },
   "definitions": {
     "materialComposition": {
       "type": "object",
-      "required": ["name", "weightPct"],
+      "required": [
+        "name",
+        "weightPct"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -164,7 +279,10 @@
           "description": "Weight percentage in the component."
         },
         "casNumber": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "CAS Registry Number."
         }
       },
@@ -172,7 +290,9 @@
     },
     "criticalRawMaterial": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -180,16 +300,25 @@
           "description": "Material name, e.g. cobalt, lithium."
         },
         "casNumber": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "CAS or EC number."
         },
         "weightGrams": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "Weight in grams present in the battery."
         },
         "countryOfOrigin": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[A-Z]{2}$",
           "description": "ISO 3166-1 alpha-2 country of primary extraction."
         }

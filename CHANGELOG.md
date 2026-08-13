@@ -57,6 +57,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   gate and the thing it guards drift apart. Downstream code naming the constant
   directly must change its import.
 
+- **Disclosure is now sourced from the passport's own schema version, and
+  `SectorAccessPolicy::from_catalog` is deprecated.** `for_schema_version` reads
+  a field's access class from the schema the passport was validated against, so
+  a published passport stays filtered by the classes that produced its frozen
+  signatures — permanently, and with no new passport field. `from_catalog` is
+  retained rather than removed: it still answers "what does the current build
+  consider public", which is a fair question for tooling that is not serving a
+  specific passport.
+
+  **A field the declared version does not classify is now stripped from the AAS
+  projection, for every audience.** Version-sourced disclosure is safer than the
+  catalog map in every respect but one: an undeclared key is classified by
+  nobody and would fall to the policy default. Raising that default does not
+  work — the policy applies to the whole document, and the passport envelope's
+  public fields are declared in no sector schema, so they would all vanish. The
+  guard is therefore structural and scoped to `sectorData`, mirroring the
+  existing unknown-sector backstop one level down. Reaching it needs an invalid
+  passport, since every schema sets `additionalProperties: false`; this is
+  defence in depth.
+
+  Test fixtures take their schema version from the catalog rather than a
+  literal. Three declared an old version while carrying data built from current
+  structs — invalid the whole time, and invisible while the disclosure map
+  ignored versions entirely.
+
 - **A battery passport missing content its category makes mandatory can no
   longer be published.** `Passport::transition_to(Published)` now refuses the
   **first** publish when a field the Battery Regulation requires of that
@@ -367,6 +392,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A leaf crate: no workspace dependencies. Everything else here changes when an
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
+
+### Fixed
+
+- **Electronics `v1.2.0` carried no `x-disclosure` annotations, which made its
+  whole sector payload public.** The schema was written before disclosure moved
+  into the schema version, so `SectorAccessPolicy::from_schema` found nothing to
+  read, built an empty class map, and fell through to the `Public` default.
+  `svhcSubstances`, `criticalRawMaterials`, `disassemblyInstructionsUrl` and
+  `repairManualUrl` would all have been served to anonymous callers for any
+  electronics passport at the current version.
+
+  Neither change was wrong alone — the schema predated the mechanism and the
+  mechanism assumed every schema carried the annotation. The defect existed only
+  once both were in the same tree, which is why nothing caught it until they
+  met. Backfilled from `v1.1.0`'s classes: 11 public, 4 restricted.
 
 ## [0.16.0] - 2026-08-07
 

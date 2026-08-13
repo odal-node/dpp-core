@@ -172,8 +172,8 @@ fn credential_issuance_and_audience_filtering() {
         _ => sector_json.clone(),
     };
 
-    let policy = SectorAccessPolicy::from_catalog(&dpp_domain::SectorCatalog::new(), "textile")
-        .expect("textile in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
 
     // ── Public audience ────────────────────────────────────────────────────
     let public_decision = filter_by_audience(&textile_fields, &policy, Audience::Public);

@@ -16,6 +16,27 @@ use dpp_vc::{CredentialRole, DppCredentialSubject};
 /// repairability) all exercise their optional branches. Callers override
 /// individual fields via struct-update syntax for scenario-specific values.
 pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passport {
+    // A caller-supplied version is honoured only if it is one this build knows;
+    // otherwise the sector's current version is used.
+    //
+    // Disclosure classes are now sourced from the declared schema version, so a
+    // fixture that declares an older version while carrying data built from the
+    // *current* typed structs classifies none of the newer fields — and the
+    // masking backstop strips them, leaving a submodel with nothing in it. That
+    // is the fixture being wrong rather than the code, and it was invisible
+    // while the catalog's disclosure map ignored versions entirely.
+    let catalog = dpp_domain::SectorCatalog::new();
+    let schema_version = catalog.get(sector.catalog_key()).map_or_else(
+        || schema_version.to_owned(),
+        |d| {
+            if d.schema_versions.iter().any(|v| v == schema_version) {
+                d.current_schema_version.clone()
+            } else {
+                schema_version.to_owned()
+            }
+        },
+    );
+    let schema_version = schema_version.as_str();
     let now = Utc::now();
     Passport {
         id: PassportId::new(),

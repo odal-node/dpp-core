@@ -16,7 +16,8 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "productFamily": {
       "type": "string",
@@ -30,22 +31,26 @@
         "timber",
         "other"
       ],
-      "description": "EU CPR product family classification."
+      "description": "EU CPR product family classification.",
+      "x-disclosure": "public"
     },
     "countryOfManufacture": {
       "type": "string",
       "pattern": "^[A-Z]{2}$",
-      "description": "ISO 3166-1 alpha-2 country of manufacture."
+      "description": "ISO 3166-1 alpha-2 country of manufacture.",
+      "x-disclosure": "public"
     },
     "co2ePerFunctionalUnitKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per functional unit."
+      "description": "Carbon footprint in kg CO2e per functional unit.",
+      "x-disclosure": "public"
     },
     "functionalUnit": {
       "type": "string",
       "minLength": 1,
-      "description": "Description of the functional unit, e.g. 'per tonne', 'per m2', 'per m3'."
+      "description": "Description of the functional unit, e.g. 'per tonne', 'per m2', 'per m3'.",
+      "x-disclosure": "public"
     },
     "recycledContentPct": {
       "type": [
@@ -54,21 +59,24 @@
       ],
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled content as a percentage of total input material."
+      "description": "Recycled content as a percentage of total input material.",
+      "x-disclosure": "public"
     },
     "epdUrl": {
       "type": [
         "string",
         "null"
       ],
-      "description": "URL to the Environmental Product Declaration (EPD)."
+      "description": "URL to the Environmental Product Declaration (EPD).",
+      "x-disclosure": "restricted"
     },
     "ceMarking": {
       "type": [
         "boolean",
         "null"
       ],
-      "description": "Whether the product carries CE marking under EU CPR."
+      "description": "Whether the product carries CE marking under EU CPR.",
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

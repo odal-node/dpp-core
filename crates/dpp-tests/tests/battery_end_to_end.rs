@@ -165,7 +165,9 @@ fn battery_passport_serialisation_round_trip() {
     assert_eq!(back.id, passport.id);
     assert_eq!(back.product_name, "PowerCell EV Module 4680");
     assert_eq!(back.sector, Sector::Battery);
-    assert_eq!(back.schema_version, "2.0.0");
+    // Compared against the source rather than a literal: this asserts the
+    // round trip, and the fixture now takes its version from the catalog.
+    assert_eq!(back.schema_version, passport.schema_version);
 
     if let Some(SectorData::Battery(bd)) = &back.sector_data {
         assert_eq!(bd.battery_chemistry, BatteryChemistry::Lfp);
@@ -236,8 +238,8 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     let passport = make_battery_passport();
     let battery_fields = serde_json::to_value(passport.sector_data.as_ref().unwrap()).unwrap();
 
-    let policy = SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "battery")
-        .expect("battery in catalog");
+    let policy =
+        SectorAccessPolicy::for_schema_version("battery", "2.6.0").expect("battery in catalog");
 
     // ── Public audience ─────────────────────────────────────────────────────
     let public = filter_by_audience(&battery_fields, &policy, Audience::Public);

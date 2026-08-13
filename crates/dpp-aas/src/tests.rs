@@ -10,6 +10,9 @@ use dpp_domain::{
 use serde_json::json;
 
 fn minimal_passport(sector: Sector) -> Passport {
+    let schema_version = dpp_domain::SectorCatalog::new()
+        .get(sector.catalog_key())
+        .map_or_else(|| "1.0.0".to_owned(), |d| d.current_schema_version.clone());
     Passport {
         id: PassportId::new(),
         batch_id: Some("BATCH-001".into()),
@@ -39,7 +42,12 @@ fn minimal_passport(sector: Sector) -> Passport {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         published_at: None,
-        schema_version: "1.0.0".into(),
+        // Derived from the sector, not hardcoded. Disclosure is sourced from the
+        // declared schema version, so a fixture claiming a version that never
+        // held its fields would classify none of them — which is a fixture
+        // defect that used to be invisible because the catalog map ignored
+        // versions entirely.
+        schema_version,
         retention_locked: false,
         version: 1,
         supersedes_id: None,
@@ -716,4 +724,43 @@ fn environment_serialises_with_idta_field_names() {
         value.get("conceptDescriptions").is_none(),
         "an empty conceptDescriptions array must not reach the wire"
     );
+}
+
+/// A sector-data key the passport's declared schema version does not know about
+/// is dropped, for every audience.
+///
+/// Disclosure is sourced from the declared version, so an undeclared key is
+/// classified by nobody and would fall to the policy default — `Public`. That
+/// makes the version-sourced policy *less* safe than the catalog map in exactly
+/// one direction, and this is the guard that closes it.
+///
+/// Reaching this needs an invalid passport: every sector schema sets
+/// `additionalProperties: false`, so validation already rejects such a
+/// document. Defence in depth, and asserted for the credentialed audience too —
+/// an unclassified field is not more disclosable to a repairer than to anyone
+/// else.
+#[test]
+fn a_sector_field_the_declared_version_does_not_know_is_dropped() {
+    let mut passport = minimal_passport(Sector::Battery);
+    passport.sector_data = Some(SectorData::Battery(Box::new(
+        battery_data_with_due_diligence(),
+    )));
+
+    let mut document = serde_json::to_value(&passport).expect("serialises");
+    document["sectorData"]["smuggledField"] = serde_json::json!("should not survive");
+    let smuggled: Passport = serde_json::from_value(document).expect("round-trips via Other keys");
+
+    for audience in [
+        Audience::Public,
+        Audience::LegitimateInterest,
+        Audience::Authority,
+    ] {
+        let (_, submodels) = build_aas_from_passport(&smuggled, "09506000134352", audience)
+            .expect("masking succeeds");
+        let serialised = serde_json::to_string(&submodels).expect("serialises");
+        assert!(
+            !serialised.contains("smuggledField"),
+            "{audience:?}: an unclassified sector field reached the projection"
+        );
+    }
 }

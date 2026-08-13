@@ -16,56 +16,82 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "batteryChemistry": {
       "type": "string",
       "minLength": 1,
-      "description": "Battery chemistry code, e.g. LFP, NMC, LCO."
+      "description": "Battery chemistry code, e.g. LFP, NMC, LCO.",
+      "x-disclosure": "public"
     },
     "nominalVoltageV": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal voltage in volts."
+      "description": "Nominal voltage in volts.",
+      "x-disclosure": "public"
     },
     "nominalCapacityAh": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "Nominal capacity in ampere-hours."
+      "description": "Nominal capacity in ampere-hours.",
+      "x-disclosure": "public"
     },
     "expectedLifetimeCycles": {
       "type": "integer",
       "minimum": 1,
-      "description": "Expected lifetime in full charge-discharge cycles."
+      "description": "Expected lifetime in full charge-discharge cycles.",
+      "x-disclosure": "public"
     },
     "co2ePerUnitKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per battery unit."
+      "description": "Carbon footprint in kg CO2e per battery unit.",
+      "x-disclosure": "public"
     },
     "recycledContentCobaltPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentLithiumPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "recycledContentNickelPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "public"
     },
     "stateOfHealthPct": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "x-disclosure": "individual"
     },
     "ratedCapacityKwh": {
-      "type": ["number", "null"],
-      "minimum": 0
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "x-disclosure": "public"
     }
   },
   "additionalProperties": false

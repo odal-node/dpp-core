@@ -14,22 +14,26 @@
     "gtin": {
       "type": "string",
       "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number."
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
     },
     "productCategory": {
       "type": "string",
       "enum": ["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
-      "description": "Device type per Regulation (EU) 2023/1670 Art. 1(1)."
+      "description": "Device type per Regulation (EU) 2023/1670 Art. 1(1).",
+      "x-disclosure": "public"
     },
     "energyEfficiencyClass": {
       "type": "string",
       "enum": ["A", "B", "C", "D", "E", "F", "G"],
-      "description": "EU energy label class (A = most efficient, G = least efficient)."
+      "description": "EU energy label class (A = most efficient, G = least efficient).",
+      "x-disclosure": "public"
     },
     "co2ePerUnitKg": {
       "type": "number",
       "minimum": 0,
-      "description": "Whole-lifecycle carbon footprint in kg CO2e per unit."
+      "description": "Whole-lifecycle carbon footprint in kg CO2e per unit.",
+      "x-disclosure": "public"
     },
     "repairabilityScore": {
       "type": ["object", "null"],
@@ -42,53 +46,64 @@
           "items": { "$ref": "#/definitions/repairCriterion" }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "x-disclosure": "public"
     },
     "sparePartsAvailable": {
       "type": ["boolean", "null"],
-      "description": "Whether spare parts are commercially available from the manufacturer."
+      "description": "Whether spare parts are commercially available from the manufacturer.",
+      "x-disclosure": "public"
     },
     "repairManualUrl": {
       "type": ["string", "null"],
-      "description": "URL to the repair manual or repair information portal."
+      "description": "URL to the repair manual or repair information portal.",
+      "x-disclosure": "restricted"
     },
     "disassemblyInstructionsUrl": {
       "type": ["string", "null"],
-      "description": "URL to disassembly or dismantling instructions."
+      "description": "URL to disassembly or dismantling instructions.",
+      "x-disclosure": "restricted"
     },
     "svhcSubstances": {
       "type": ["array", "null"],
       "items": { "$ref": "#/definitions/svhcSubstance" },
-      "description": "SVHC substances present above 0.1% w/w per REACH Article 33."
+      "description": "SVHC substances present above 0.1% w/w per REACH Article 33.",
+      "x-disclosure": "restricted"
     },
     "rohsCompliant": {
       "type": ["boolean", "null"],
-      "description": "Whether the product complies with RoHS Directive 2011/65/EU."
+      "description": "Whether the product complies with RoHS Directive 2011/65/EU.",
+      "x-disclosure": "public"
     },
     "criticalRawMaterials": {
       "type": ["array", "null"],
       "items": { "$ref": "#/definitions/criticalRawMaterial" },
-      "description": "Critical raw materials present per EU CRM Act 2024/1252."
+      "description": "Critical raw materials present per EU CRM Act 2024/1252.",
+      "x-disclosure": "restricted"
     },
     "recycledContentPct": {
       "type": ["number", "null"],
       "minimum": 0,
       "maximum": 100,
-      "description": "Recycled content as a percentage of total product weight."
+      "description": "Recycled content as a percentage of total product weight.",
+      "x-disclosure": "public"
     },
     "standbyPowerW": {
       "type": ["number", "null"],
       "minimum": 0,
-      "description": "Standby power consumption in watts."
+      "description": "Standby power consumption in watts.",
+      "x-disclosure": "public"
     },
     "expectedLifetimeYears": {
       "type": ["integer", "null"],
       "minimum": 1,
-      "description": "Expected product lifetime in years under normal use."
+      "description": "Expected product lifetime in years under normal use.",
+      "x-disclosure": "public"
     },
     "firmwareUpdateUntil": {
       "type": ["string", "null"],
-      "description": "Date until which firmware or software updates are guaranteed (ISO 8601)."
+      "description": "Date until which firmware or software updates are guaranteed (ISO 8601).",
+      "x-disclosure": "public"
     }
   },
   "definitions": {
