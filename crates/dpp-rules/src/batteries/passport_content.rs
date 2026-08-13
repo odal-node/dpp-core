@@ -35,13 +35,38 @@
 //!   envelope fields.
 //!
 //! An omission here is therefore only meaningful for a data point that *does*
-//! map to a sector-data field. Four such omissions were found and closed:
-//! points 1, 7, 8 and 9 — the unique identifier, model identification, place of
-//! manufacture and date of manufacture — all of which the guidance marks
-//! mandatory for every covered category, and none of which any battery schema
-//! version had ever declared. The remaining difference between 71 and this
-//! table's length has not been classified row by row; that is open work, not a
-//! statement that the rest is accounted for.
+//! map to a sector-data field.
+//!
+//! # Where all 71 rows went
+//!
+//! Every guidance row has been walked against the model. The difference between
+//! 71 and this table's length is accounted for as follows, so a future reader
+//! can check the claim rather than take it:
+//!
+//! - **Envelope, not sector data** — rows 2, 3, 4 (registrant identity;
+//!   manufacturer name; postal address), enforced as above. Row 5
+//!   (manufacturer web and email) is *"optional, to be filled if such data is
+//!   available"*, so it carries no obligation to enforce.
+//! - **One block, many rows** — rows 51–60 are the ten members of
+//!   `DynamicPerformance`, rows 61–66 the two disjoint `StateOfHealth`
+//!   parameter sets, and rows 68–71 the four members of `UsageHistory`. Each
+//!   block is one row here because the block is what a passport carries or
+//!   omits; the per-member conditions live in the types.
+//! - **Deferred by the guidance** — rows 17, 18, 19 and 44 are *"not to be
+//!   filled/displayed as of February 2027"*. The two with a modelled field
+//!   (`carbonFootprintClass`, `dueDiligenceUrl`) are listed below as
+//!   `NotApplicable`; rows 17 and 44 (carbon footprint *declaration*, and
+//!   instructions for use) have no field at all, which is the correct state for
+//!   a data point whose format has not been specified.
+//! - **Restated elsewhere in the annex** — row 16 is Annex XIII point 1(c)
+//!   material composition, deferred, but its constituents are separately
+//!   mandatory as Annex VI Part A points 7, 8 and 10 (rows 12, 13, 15) and are
+//!   enforced there.
+//!
+//! Four omissions were found and closed by this audit's first pass: points 1,
+//! 7, 8 and 9 — the unique identifier, model identification, place of
+//! manufacture and date of manufacture — all mandatory for every covered
+//! category, and none of which any battery schema version had ever declared.
 
 /// What a category owes for one data point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +152,22 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     ("usableExtinguishingAgent", M, M, M),
     ("criticalRawMaterials", M, M, M),
     // ── Annex XIII point 1 ─────────────────────────────────────────────────
+    // Guidance rows 18 and 19 are both *"not to be filled/displayed as of
+    // February 2027 — format still to be specified in the upcoming
+    // implementing act"*, for all three categories.
+    //
+    // `NotApplicable` is the honest class for that, and it is the same one
+    // `ratedCapacityAh` already carries for the same words below. It is not a
+    // statement that the field is wrong — it is the guidance saying the format
+    // does not exist yet, so a value filed today cannot be the one the act will
+    // ask for. Both entries come out when that act lands.
+    //
+    // Distinct from disclosure: `dueDiligenceUrl` is Annex XIII point 1(d) and
+    // therefore *public* when it is eventually filled. What may be seen and
+    // whether it may be filled are different axes, and this table only answers
+    // the second.
+    ("carbonFootprintClass", X, X, X),
+    ("dueDiligenceUrl", X, X, X),
     ("recycledContentCobaltPct", M, M, M),
     ("recycledContentLithiumPct", M, M, M),
     ("recycledContentNickelPct", M, M, M),
@@ -300,6 +341,42 @@ mod tests {
             annex_xiii_requirement("nominalCapacityAh", "ev"),
             Requirement::Mandatory
         );
+    }
+
+    /// The two fields the guidance defers are barred for every category, and
+    /// the deferral is not the same thing as a disclosure class.
+    ///
+    /// Guidance rows 18 and 19 read *"not to be filled/displayed as of February
+    /// 2027 — format still to be specified in the upcoming implementing act"*.
+    /// `dueDiligenceUrl` is simultaneously an Annex XIII point 1(d) field and
+    /// therefore **public** once it is filled; the two facts sit on different
+    /// axes and neither cancels the other. A reader who conflates them will
+    /// either publish a value the act has not defined, or withhold one the annex
+    /// puts in the public tier.
+    #[test]
+    fn the_deferred_data_points_are_barred_for_every_category() {
+        for field in ["carbonFootprintClass", "dueDiligenceUrl"] {
+            for category in ["ev", "lmt", "industrial"] {
+                assert_eq!(
+                    annex_xiii_requirement(field, category),
+                    Requirement::NotApplicable,
+                    "{field} is deferred by the guidance for {category}"
+                );
+            }
+            assert!(
+                !annex_xiii_requirement(field, "ev").permits_presence(),
+                "{field} must not be carried while the format is unspecified"
+            );
+        }
+
+        // And they are reported by the helper the linter uses, rather than only
+        // being absent from the mandatory set. No `Vec` here — this crate is
+        // `no_std`.
+        let present = ["gtin", "dueDiligenceUrl", "carbonFootprintClass"];
+        let mut flagged = fields_not_applicable(&present, "ev");
+        assert_eq!(flagged.next(), Some("dueDiligenceUrl"));
+        assert_eq!(flagged.next(), Some("carbonFootprintClass"));
+        assert_eq!(flagged.next(), None, "gtin is mandatory, not barred");
     }
 
     #[test]
