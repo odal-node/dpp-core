@@ -5,10 +5,10 @@
   "layer": "foundational",
   "namespaceIri": "https://ref.gs1.org/voc/",
   "usedFor": "Supply-chain identifiers (GTIN, GLN) and general product attributes. Candidate `gs1:` prefix for this project's JSON-LD context.",
-  "licence": null,
-  "status": "surveyed",
-  "checkedOn": "2026-08-10",
-  "source": "Third-party vocabulary survey. GS1's own publication has not been read.",
-  "finding": "This project's JSON-LD context used to emit the prefix IRI, together with a `gtin -> gs1:gtin` term mapping, with no provenance record for either. That mapping was very likely correct — GS1 defines GTIN and we mean GTIN — but 'very likely correct' is the standard that put six wrong IDTA identifiers into a published crate, so both were removed on 2026-08-10 in favour of `gtin -> dpp:gtin`. The claim stays unadoptable until someone reads GS1's own definition and records it here.",
-  "nextStep": "Read the GS1 Web Vocabulary's published definition of `gtin`, confirm the prefix IRI resolves, and establish the licence under which term labels may be redistributed. Then `gtin -> gs1:gtin` can be restored as a verified entry instead of an inherited assumption."
+  "licence": "Apache License 2.0. Confirmed 2026-08-11 two ways from GS1's own repository (`github.com/gs1/WebVoc`): the `LICENSE` file itself, and the README stating verbatim \"The GS1 Web vocabulary is released under an Apache 2.0 licence.\" Fully compatible with this project's own Apache-2.0 licensing — redistributing the term identifier and definition with attribution carries no copyleft risk.",
+  "status": "verified",
+  "checkedOn": "2026-08-11",
+  "source": "https://ref.gs1.org/voc/gtin — fetched and read directly (a client-rendered page; a naive HTTP-only fetch under-renders it, a real browser was needed).",
+  "finding": "`gs1:gtin`'s own definition, verbatim: \"A Global Trade Item Number (GTIN) is the 14 digit GS1 Identification Key used to identify products. The key comprises a GS1 Company Prefix followed by an Item Reference Number and a Check Digit.\" Status: stable. Range `xsd:string`. Recorded as `skos:exactMatch` to `schema:gtin14` and `skos:closeMatch` (not exact) to `schema:gtin13/12/8` — GS1's own model already treats the 14-digit form as canonical and shorter forms as related-but-distinct. That matches `crates/dpp-domain/src/domain/gtin.rs` exactly: `Gtin` requires 14 ASCII digits with a verified mod-10 check digit, and explicitly tests that a valid EAN-13 zero-padded to 14 digits parses (`prepend_zero_to_valid_ean13_gives_valid_gtin14`) — same canonical-form-plus-related-forms shape GS1 describes.",
+  "nextStep": "Restore `gtin -> gs1:gtin` in the JSON-LD context (removed 2026-08-10 in favour of `dpp:gtin` pending exactly this verification), citing `https://ref.gs1.org/voc/gtin` and Apache-2.0 in the provenance record. This is the first entry in this register with nothing left to check — a code change, not further research."
 }
