@@ -373,6 +373,71 @@ fn generic_leaf_key_collides_across_objects() {
 
 // ── Art. 77(2) lattice ───────────────────────────────────────────────────────
 
+/// Every property of the current battery schema declares an `x-disclosure`
+/// class.
+///
+/// This is the guarantee the annotation exists to provide. The catalog map it
+/// replaces has no equivalent: a field added there without an entry silently
+/// defaults to `Public`, and for Annex XIII point 2, 3 or 4 content that is a
+/// leak rather than an omission. Co-locating the class with the property makes
+/// the gap visible in the same diff; this test makes it fail the build.
+#[test]
+fn every_property_declares_a_disclosure_class() {
+    let reg = crate::schemas::VersionedSchemaRegistry::new();
+    let (version, json) = reg.latest("battery").expect("battery schema exists");
+    let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+    let properties = schema["properties"].as_object().expect("has properties");
+
+    let undeclared: Vec<&str> = properties
+        .iter()
+        .filter(|(_, p)| {
+            p.get("x-disclosure")
+                .and_then(serde_json::Value::as_str)
+                .is_none()
+        })
+        .map(|(n, _)| n.as_str())
+        .collect();
+
+    assert!(
+        undeclared.is_empty(),
+        "battery v{version}: these properties declare no x-disclosure class, so they \
+         would default to public: {undeclared:?}"
+    );
+}
+
+/// The schema-sourced policy agrees with the catalog map it will replace.
+///
+/// Until the cutover both exist, and a silent divergence between them would be
+/// worse than either alone — the served view would depend on which constructor
+/// a caller happened to use.
+#[test]
+fn the_schema_policy_matches_the_catalog_policy_today() {
+    let reg = crate::schemas::VersionedSchemaRegistry::new();
+    let (version, json) = reg.latest("battery").expect("battery schema exists");
+    let from_schema = SectorAccessPolicy::from_schema("battery", &version.to_string(), json)
+        .expect("the current schema yields a policy");
+    let from_catalog = battery_policy();
+
+    for (field, class) in &from_catalog.field_disclosure {
+        assert_eq!(
+            from_schema.disclosure_for_field(field),
+            *class,
+            "'{field}' disagrees between the catalog map and the schema annotation"
+        );
+    }
+}
+
+/// A schema with no `properties` yields no policy rather than an all-public one.
+///
+/// Failing open here would serve every field of an unparseable sector to
+/// anyone, which is the fail-open class this project already fixed once at the
+/// unknown-sector boundary.
+#[test]
+fn an_unusable_schema_yields_no_policy() {
+    assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", "not json").is_none());
+    assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", r#"{"type":"object"}"#).is_none());
+}
+
 #[test]
 fn reclassifying_one_field_changes_the_served_public_bytes() {
     // ⚠️ This test records a DEFECT, not a guarantee. It passes today and the
