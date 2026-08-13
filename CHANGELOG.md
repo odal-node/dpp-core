@@ -393,6 +393,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   EU regulation changes; this changes when GS1 or IDTA publishes, which is why
   it sits apart from the passport model rather than inside it.
 
+### Fixed
+
+- **Electronics `v1.2.0` carried no `x-disclosure` annotations, which made its
+  whole sector payload public.** The schema was written before disclosure moved
+  into the schema version, so `SectorAccessPolicy::from_schema` found nothing to
+  read, built an empty class map, and fell through to the `Public` default.
+  `svhcSubstances`, `criticalRawMaterials`, `disassemblyInstructionsUrl` and
+  `repairManualUrl` would all have been served to anonymous callers for any
+  electronics passport at the current version.
+
+  Neither change was wrong alone — the schema predated the mechanism and the
+  mechanism assumed every schema carried the annotation. The defect existed only
+  once both were in the same tree, which is why nothing caught it until they
+  met. Backfilled from `v1.1.0`'s classes: 11 public, 4 restricted.
+
 ## [0.16.0] - 2026-08-07
 
 ### Added
