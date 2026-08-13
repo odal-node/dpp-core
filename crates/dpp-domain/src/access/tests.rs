@@ -128,8 +128,24 @@ fn unknown_fields_default_to_public() {
     );
 }
 
+/// The public view keeps Annex XIII point 1 content and drops point 2 content.
+///
+/// Both halves matter, and this test previously got one of them backwards. It
+/// asserted that `dueDiligenceUrl` and `criticalRawMaterials` were redacted
+/// from the public view, which does not match the annex:
+///
+/// - Point 1(b) lists "critical raw materials present in the battery" in the
+///   same sentence as chemistry and hazardous substances, and Annex VI Part A
+///   point 10 reaches the same result through point 1(a).
+/// - Point 1(d) is "information on responsible sourcing as indicated in the
+///   report on battery due diligence policy referred to in Article 52(3)".
+///
+/// Both sit in the publicly accessible tier. Over-redaction is not the safe
+/// direction here: it makes the public passport omit content the regulation
+/// requires it to carry, and a test asserting the omission makes that
+/// permanent.
 #[test]
-fn battery_policy_public_redacts_due_diligence() {
+fn battery_policy_public_keeps_point_1_and_drops_point_2() {
     let policy = battery_policy();
     let data = json!({
         "gtin": "09506000134352",
@@ -142,13 +158,22 @@ fn battery_policy_public_redacts_due_diligence() {
     });
     let decision = filter_by_audience(&data, &policy, Audience::Public);
     assert!(decision.filtered_data.get("gtin").is_some());
-    assert!(decision.filtered_data.get("dueDiligenceUrl").is_none());
-    assert!(decision.filtered_data.get("criticalRawMaterials").is_none());
+    // Point 1 — must survive.
+    assert!(
+        decision.filtered_data.get("dueDiligenceUrl").is_some(),
+        "Annex XIII point 1(d) is publicly accessible"
+    );
+    assert!(
+        decision.filtered_data.get("criticalRawMaterials").is_some(),
+        "Annex XIII point 1(b) is publicly accessible"
+    );
+    // Point 2(c), dismantling information — must not.
     assert!(
         decision
             .filtered_data
             .get("disassemblyInstructionsUrl")
-            .is_none()
+            .is_none(),
+        "Annex XIII point 2(c) is withheld from the general public"
     );
 }
 

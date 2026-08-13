@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/battery-v2.6.0.json",
   "title": "Odal Node — Battery Sector Data (v2.6.0)",
-  "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.5.0 makes batteryType required and closed: Annex VI Part A point 2, made public by Annex XIII point 1(a), lists the battery category as mandatory content of the publicly accessible tier, and Art. 1(3)'s strictest-requirements tie-break only functions over a closed set, so an unrecognised value is no longer accepted as null.",
+  "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.6.0 adds the Annex XIII point 4 individual-battery tier, relaxes expectedLifetimeCycles out of required, and declares the four Annex VI Part A identity fields the Rust type had emitted since v2.0.0 with no schema version admitting them: place of manufacture (Part A point 3), date of manufacture (Part A point 4, month and year), the battery-identifying half of Part A point 2, and the Art. 77(3) unique identifier. Because this schema sets additionalProperties false, a passport populating any of them previously failed validation outright. All four are public via Annex XIII point 1(a). criticalRawMaterials and dueDiligenceUrl are public for the same reason — Annex XIII points 1(b) and 1(d) respectively place them in the publicly accessible tier; both were previously restricted. Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.5.0 makes batteryType required and closed: Annex VI Part A point 2, made public by Annex XIII point 1(a), lists the battery category as mandatory content of the publicly accessible tier, and Art. 1(3)'s strictest-requirements tie-break only functions over a closed set, so an unrecognised value is no longer accepted as null.",
   "type": "object",
   "required": [
     "gtin",
@@ -13,11 +13,16 @@
     "batteryType"
   ],
   "properties": {
-    "gtin": {
-      "type": "string",
-      "pattern": "^[0-9]{14}$",
-      "description": "14-digit Global Trade Item Number.",
-      "x-disclosure": "public"
+    "anodeMaterial": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/materialComposition"
+      },
+      "description": "Anode active material composition.",
+      "x-disclosure": "restricted"
     },
     "batteryChemistry": {
       "type": "string",
@@ -25,86 +30,69 @@
       "description": "Battery chemistry code, e.g. LFP, NMC, LCO.",
       "x-disclosure": "public"
     },
-    "nominalVoltageV": {
-      "type": "number",
-      "exclusiveMinimum": 0,
-      "description": "Nominal voltage in volts.",
-      "x-disclosure": "public"
-    },
-    "nominalCapacityAh": {
-      "type": "number",
-      "exclusiveMinimum": 0,
-      "description": "Nominal capacity in ampere-hours.",
-      "x-disclosure": "public"
-    },
-    "expectedLifetimeCycles": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "minimum": 1,
-      "description": "Declared expected lifetime in cycles for the model (Annex XIII point 1(j)). Not required: the duty reaches industrial batteries only where lifetime can be expressed in cycles.",
-      "x-disclosure": "public"
-    },
-    "co2ePerUnitKg": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Carbon footprint in kg CO2e per battery unit.",
-      "x-disclosure": "public"
-    },
-    "recycledContentCobaltPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "recycledContentLithiumPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "recycledContentNickelPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "stateOfHealthPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "maximum": 100,
-      "description": "Deprecated since v2.2.0 — narrower than Annex VII Part A, which defines state of health as state of certified energy for EV batteries and a five-parameter list for stationary storage and LMT. Populate stateOfHealth instead.",
-      "x-disclosure": "individual"
-    },
-    "placedOnMarketDate": {
+    "batteryModelId": {
       "type": [
         "string",
         "null"
       ],
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible.",
+      "minLength": 1,
+      "description": "Information identifying the battery — the second half of Annex VI Part A point 2 (\"the battery category and information identifying the battery in accordance with Article 38(6)\"), public via Annex XIII point 1(a). The category half is batteryType.",
       "x-disclosure": "public"
     },
-    "ratedCapacityKwh": {
+    "batteryPassportNumber": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "The unique identifier the economic operator placing the battery on the market attributes to it (Art. 77(3)), as defined in Art. 2(66) — a unique string of characters identifying the battery that also enables a web link to the passport. Art. 77(3) requires conformance with ISO/IEC 15459-1:2014, -2:2015, -3:2014, -4:2014, -5:2014 and -6:2014, or equivalent.",
+      "x-disclosure": "public"
+    },
+    "batteryStatus": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "original",
+        "repurposed",
+        "re-used",
+        "remanufactured",
+        "waste",
+        null
+      ],
+      "description": "Status of this individual battery (Annex XIII point 4(c)). The annex enumerates the set inline, so it is closed. Accessible only to persons with a legitimate interest.",
+      "x-disclosure": "individual"
+    },
+    "batteryType": {
+      "type": "string",
+      "enum": [
+        "portable",
+        "industrial",
+        "ev",
+        "lmt",
+        "starting-lighting-ignition"
+      ],
+      "description": "Battery category per Art. 1(3) — closed enumeration, mandatory public passport content (Annex VI Part A point 2 via Annex XIII point 1(a)).",
+      "x-disclosure": "public"
+    },
+    "batteryWeightKg": {
       "type": [
         "number",
         "null"
       ],
       "minimum": 0,
-      "description": "Rated energy in kilowatt-hours.",
+      "description": "Battery weight in kilograms.",
+      "x-disclosure": "public"
+    },
+    "capacityThresholdForExhaustionPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Capacity threshold for exhaustion (Annex XIII point 1(k)). EV batteries only.",
+      "minimum": 0,
+      "maximum": 100,
       "x-disclosure": "public"
     },
     "carbonFootprintClass": {
@@ -134,15 +122,6 @@
       "description": "Version of the ruleset identified by carbonFootprintClassRulesetId.",
       "x-disclosure": "public"
     },
-    "dueDiligenceUrl": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "format": "uri",
-      "description": "URL to supply chain due diligence documentation (Arts. 48-53).",
-      "x-disclosure": "restricted"
-    },
     "cathodeMaterial": {
       "type": [
         "array",
@@ -154,26 +133,30 @@
       "description": "Cathode active material composition.",
       "x-disclosure": "restricted"
     },
-    "anodeMaterial": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/materialComposition"
-      },
-      "description": "Anode active material composition.",
-      "x-disclosure": "restricted"
+    "co2ePerUnitKg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per battery unit.",
+      "x-disclosure": "public"
     },
-    "electrolyteMaterial": {
+    "commercialWarrantyPeriodMonths": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Commercial warranty period for calendar life, in months (Annex XIII point 1(m)). A duration, not a date range.",
+      "x-disclosure": "public"
+    },
+    "componentPartNumbers": {
       "type": [
         "array",
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/materialComposition"
+        "type": "string"
       },
-      "description": "Electrolyte composition.",
+      "description": "Part numbers for components (Annex XIII point 2(b)). Restricted tier.",
       "x-disclosure": "restricted"
     },
     "criticalRawMaterials": {
@@ -184,8 +167,17 @@
       "items": {
         "$ref": "#/definitions/criticalRawMaterial"
       },
-      "description": "Critical raw materials per EU CRM Act 2024/1252.",
-      "x-disclosure": "restricted"
+      "description": "Critical raw materials present in the battery. Public: Annex XIII point 1(b) lists \"critical raw materials present in the battery\" alongside chemistry and hazardous substances as part of the publicly accessible material composition, and Annex VI Part A point 10 reaches the same result via point 1(a). The EU CRM Act 2024/1252 defines the canonical list; it does not govern disclosure.",
+      "x-disclosure": "public"
+    },
+    "cycleLifeTestCRate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "C-rate of the relevant cycle-life test (Annex XIII point 1(p)).",
+      "minimum": 0,
+      "x-disclosure": "public"
     },
     "disassemblyInstructionsUrl": {
       "type": [
@@ -195,223 +187,14 @@
       "description": "URL or text for disassembly/dismantling instructions (Annex XIII point 2(c)).",
       "x-disclosure": "restricted"
     },
-    "sohMethodology": {
+    "dueDiligenceUrl": {
       "type": [
         "string",
         "null"
       ],
-      "description": "State-of-health determination methodology identifier.",
-      "x-disclosure": "restricted"
-    },
-    "operatingTempMinC": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Minimum operating temperature in degrees Celsius.",
+      "format": "uri",
+      "description": "URL to the battery due diligence policy report. Public: Annex XIII point 1(d) is \"information on responsible sourcing as indicated in the report on battery due diligence policy referred to in Article 52(3)\", which sits in the publicly accessible tier.",
       "x-disclosure": "public"
-    },
-    "operatingTempMaxC": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Maximum operating temperature in degrees Celsius.",
-      "x-disclosure": "public"
-    },
-    "ratedEnergyWh": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "description": "Rated energy in watt-hours (Wh).",
-      "x-disclosure": "public"
-    },
-    "recycledContentLeadPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "maximum": 100,
-      "description": "Recycled lead content percentage (lead-acid batteries). Note: Art. 8(2)/(3) measure lead as the share present in the battery, whereas cobalt, lithium and nickel are measured in active materials.",
-      "x-disclosure": "public"
-    },
-    "batteryWeightKg": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "description": "Battery weight in kilograms.",
-      "x-disclosure": "public"
-    },
-    "batteryType": {
-      "type": "string",
-      "enum": [
-        "portable",
-        "industrial",
-        "ev",
-        "lmt",
-        "starting-lighting-ignition"
-      ],
-      "description": "Battery category per Art. 1(3) — closed enumeration, mandatory public passport content (Annex VI Part A point 2 via Annex XIII point 1(a)).",
-      "x-disclosure": "public"
-    },
-    "stateOfHealth": {
-      "description": "State-of-health parameters per Annex VII Part A, in the parameter set the battery's category requires. Required in the battery management system since 18 Aug 2024 (Art. 14(1)). Accessible only to persons with a legitimate interest (Annex XIII point 4(b)).",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "parameterSet",
-            "socePct"
-          ],
-          "properties": {
-            "parameterSet": {
-              "const": "electricVehicle"
-            },
-            "socePct": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100,
-              "description": "State of certified energy (SOCE) — the only Annex VII Part A parameter for EV batteries."
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "parameterSet",
-            "remainingCapacityPct",
-            "selfDischargeRatePctPerMonth"
-          ],
-          "properties": {
-            "parameterSet": {
-              "const": "stationaryOrLmt"
-            },
-            "remainingCapacityPct": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100,
-              "description": "Annex VII Part A item 1 — unconditional."
-            },
-            "remainingPowerCapabilityPct": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "minimum": 0,
-              "maximum": 100,
-              "description": "Annex VII Part A item 2 — 'where possible'."
-            },
-            "remainingRoundTripEfficiencyPct": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "minimum": 0,
-              "maximum": 100,
-              "description": "Annex VII Part A item 3 — 'where possible'."
-            },
-            "selfDischargeRatePctPerMonth": {
-              "type": "number",
-              "minimum": 0,
-              "description": "Annex VII Part A item 4 — unconditional."
-            },
-            "ohmicResistanceMohm": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "minimum": 0,
-              "description": "Annex VII Part A item 5 — 'where possible'."
-            }
-          },
-          "additionalProperties": false
-        }
-      ],
-      "x-disclosure": "individual"
-    },
-    "recycledContentReportingYear": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "minimum": 2000,
-      "maximum": 2100,
-      "description": "Calendar year the recycled-content shares pertain to, per Art. 8(1) ('for each battery model per year and per manufacturing plant'). Pair with manufacturingPlace.",
-      "x-disclosure": "public"
-    },
-    "expectedLifetime": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "description": "Measured expected-lifetime parameters per Annex VII Part B. Stationary storage and LMT only. Accessible only to persons with a legitimate interest (Annex XIII point 4(d)).",
-      "required": [
-        "energyThroughputKwh",
-        "capacityThroughputAh",
-        "harmfulEvents",
-        "fullEquivalentCycles"
-      ],
-      "properties": {
-        "putIntoServiceDate": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-          "description": "Annex VII Part B item 1, second half — 'where appropriate'. The date of manufacture is manufacturingDate."
-        },
-        "energyThroughputKwh": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Annex VII Part B item 2."
-        },
-        "capacityThroughputAh": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Annex VII Part B item 3."
-        },
-        "harmfulEvents": {
-          "type": "object",
-          "description": "Annex VII Part B item 4. The annex lists these 'such as', so the set is illustrative and every member is optional.",
-          "properties": {
-            "deepDischargeEvents": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "minimum": 0
-            },
-            "hoursInExtremeTemperature": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "minimum": 0
-            },
-            "hoursChargingInExtremeTemperature": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "minimum": 0
-            }
-          },
-          "additionalProperties": false
-        },
-        "fullEquivalentCycles": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Annex VII Part B item 5."
-        }
-      },
-      "additionalProperties": false,
-      "x-disclosure": "individual"
     },
     "dynamicPerformance": {
       "type": [
@@ -508,21 +291,581 @@
       "additionalProperties": false,
       "x-disclosure": "individual"
     },
-    "batteryStatus": {
+    "electrolyteMaterial": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/materialComposition"
+      },
+      "description": "Electrolyte composition.",
+      "x-disclosure": "restricted"
+    },
+    "euDeclarationOfConformity": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference to the EU declaration of conformity under Article 18 (Annex XIII point 1(r)).",
+      "x-disclosure": "public"
+    },
+    "expectedLifetime": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Measured expected-lifetime parameters per Annex VII Part B. Stationary storage and LMT only. Accessible only to persons with a legitimate interest (Annex XIII point 4(d)).",
+      "required": [
+        "energyThroughputKwh",
+        "capacityThroughputAh",
+        "harmfulEvents",
+        "fullEquivalentCycles"
+      ],
+      "properties": {
+        "putIntoServiceDate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Annex VII Part B item 1, second half — 'where appropriate'. The date of manufacture is manufacturingDate."
+        },
+        "energyThroughputKwh": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Annex VII Part B item 2."
+        },
+        "capacityThroughputAh": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Annex VII Part B item 3."
+        },
+        "harmfulEvents": {
+          "type": "object",
+          "description": "Annex VII Part B item 4. The annex lists these 'such as', so the set is illustrative and every member is optional.",
+          "properties": {
+            "deepDischargeEvents": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "hoursInExtremeTemperature": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "hoursChargingInExtremeTemperature": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "fullEquivalentCycles": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Annex VII Part B item 5."
+        }
+      },
+      "additionalProperties": false,
+      "x-disclosure": "individual"
+    },
+    "expectedLifetimeCycles": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "description": "Declared expected lifetime in cycles for the model (Annex XIII point 1(j)). Not required: the duty reaches industrial batteries only where lifetime can be expressed in cycles.",
+      "x-disclosure": "public"
+    },
+    "expectedLifetimeReferenceTest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference test the declared cycle lifetime was measured under (Annex XIII point 1(j)).",
+      "x-disclosure": "public"
+    },
+    "gtin": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$",
+      "description": "14-digit Global Trade Item Number.",
+      "x-disclosure": "public"
+    },
+    "hazardSymbol": {
       "type": [
         "string",
         "null"
       ],
       "enum": [
-        "original",
-        "repurposed",
-        "re-used",
-        "remanufactured",
-        "waste",
+        "cadmium",
+        "lead",
         null
       ],
-      "description": "Status of this individual battery (Annex XIII point 4(c)). The annex enumerates the set inline, so it is closed. Accessible only to persons with a legitimate interest.",
+      "description": "Article 13(5) chemical symbol where one applies (Annex XIII point 1(q)). Closed: the article names exactly two.",
+      "x-disclosure": "public"
+    },
+    "hazardousSubstances": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "Hazardous substances other than mercury, cadmium or lead (Annex VI Part A point 8).",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "casNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "concentrationPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "x-disclosure": "public"
+    },
+    "initialRoundTripEfficiencyPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Round trip energy efficiency when new (Annex XIII point 1(n), first figure).",
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "internalCellResistanceMohm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Internal cell resistance in milliohms (Annex XIII point 1(o)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "internalPackResistanceMohm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Internal pack resistance in milliohms (Annex XIII point 1(o)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "internalResistanceMohm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Legacy internal resistance, without saying whether it is the cell or pack figure Annex XIII point 1(o) requires. Retained because no rule can decide which a stored value was.",
+      "x-disclosure": "public"
+    },
+    "manufacturingDate": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Date of manufacture — Annex VI Part A point 4, public via Annex XIII point 1(a). The regulation requires month and year only; this field carries a full timestamp because the Rust type does, so any precision beyond month/year is not required and should not be relied on.",
+      "x-disclosure": "public"
+    },
+    "manufacturingPlace": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Place of manufacture — Annex VI Part A point 3, \"the geographical location of a battery manufacturing plant\", public via Annex XIII point 1(a).",
+      "x-disclosure": "public"
+    },
+    "markingInformation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Markings applied under Article 13(4) (Annex XIII point 1(q)).",
+      "x-disclosure": "public"
+    },
+    "maximumVoltageV": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum voltage in volts (Annex XIII point 1(h)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "minimalVoltageV": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Minimal voltage in volts (Annex XIII point 1(h)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "nominalCapacityAh": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal capacity in ampere-hours.",
+      "x-disclosure": "public"
+    },
+    "nominalVoltageV": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Nominal voltage in volts.",
+      "x-disclosure": "public"
+    },
+    "notInUseTemperatureRange": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Temperature range the battery withstands when not in use (Annex XIII point 1(l)). Not the operating range.",
+      "required": [
+        "minC",
+        "maxC"
+      ],
+      "properties": {
+        "minC": {
+          "type": "number",
+          "description": "Lower bound in degrees Celsius."
+        },
+        "maxC": {
+          "type": "number",
+          "description": "Upper bound in degrees Celsius."
+        }
+      },
+      "additionalProperties": false,
+      "x-disclosure": "public"
+    },
+    "notInUseTemperatureReferenceTest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference test for the not-in-use temperature range (Annex XIII point 1(l)).",
+      "x-disclosure": "public"
+    },
+    "operatingTempMaxC": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
+    },
+    "operatingTempMinC": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Minimum operating temperature in degrees Celsius.",
+      "x-disclosure": "public"
+    },
+    "originalPowerCapabilityW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Original power capability in watts (Annex XIII point 1(i)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "placedOnMarketDate": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible.",
+      "x-disclosure": "public"
+    },
+    "powerLimitMaxW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Upper power limit in watts (Annex XIII point 1(i)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "powerLimitMinW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Lower power limit in watts (Annex XIII point 1(i)).",
+      "minimum": 0,
+      "x-disclosure": "public"
+    },
+    "powerTemperatureRange": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Temperature range point 1(i) attaches to the power limits 'when relevant'.",
+      "required": [
+        "minC",
+        "maxC"
+      ],
+      "properties": {
+        "minC": {
+          "type": "number",
+          "description": "Lower bound in degrees Celsius."
+        },
+        "maxC": {
+          "type": "number",
+          "description": "Upper bound in degrees Celsius."
+        }
+      },
+      "additionalProperties": false,
+      "x-disclosure": "public"
+    },
+    "ratedCapacityKwh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Rated energy in kilowatt-hours.",
+      "x-disclosure": "public"
+    },
+    "ratedEnergyWh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Rated energy in watt-hours (Wh).",
+      "x-disclosure": "public"
+    },
+    "recycledContentCobaltPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "recycledContentLeadPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Recycled lead content percentage (lead-acid batteries). Note: Art. 8(2)/(3) measure lead as the share present in the battery, whereas cobalt, lithium and nickel are measured in active materials.",
+      "x-disclosure": "public"
+    },
+    "recycledContentLithiumPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "recycledContentNickelPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "recycledContentReportingYear": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 2000,
+      "maximum": 2100,
+      "description": "Calendar year the recycled-content shares pertain to, per Art. 8(1) ('for each battery model per year and per manufacturing plant'). Pair with manufacturingPlace.",
+      "x-disclosure": "public"
+    },
+    "renewableContentPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Share of renewable content (Annex XIII point 1(f)). Distinct from recycled content.",
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "roundTripEfficiencyAtHalfCycleLifePct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Round trip energy efficiency at 50 % of cycle-life (Annex XIII point 1(n), second figure). The 50 % is of cycle-life, not of state of charge.",
+      "minimum": 0,
+      "maximum": 100,
+      "x-disclosure": "public"
+    },
+    "roundTripEfficiencyPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Legacy, unqualified round trip energy efficiency. Superseded by the Annex XIII point 1(n) pair; retained so a v2.5.0 record keeps its value under its own name.",
+      "x-disclosure": "public"
+    },
+    "safetyMeasures": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Safety measures (Annex XIII point 2(d)). Restricted tier.",
+      "x-disclosure": "restricted"
+    },
+    "sohMethodology": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "State-of-health determination methodology identifier.",
+      "x-disclosure": "restricted"
+    },
+    "sparePartsContacts": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Contact details of sources for replacement spares (Annex XIII point 2(b)). Restricted tier.",
+      "x-disclosure": "restricted"
+    },
+    "stateOfHealth": {
+      "description": "State-of-health parameters per Annex VII Part A, in the parameter set the battery's category requires. Required in the battery management system since 18 Aug 2024 (Art. 14(1)). Accessible only to persons with a legitimate interest (Annex XIII point 4(b)).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "parameterSet",
+            "socePct"
+          ],
+          "properties": {
+            "parameterSet": {
+              "const": "electricVehicle"
+            },
+            "socePct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "State of certified energy (SOCE) — the only Annex VII Part A parameter for EV batteries."
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "parameterSet",
+            "remainingCapacityPct",
+            "selfDischargeRatePctPerMonth"
+          ],
+          "properties": {
+            "parameterSet": {
+              "const": "stationaryOrLmt"
+            },
+            "remainingCapacityPct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Annex VII Part A item 1 — unconditional."
+            },
+            "remainingPowerCapabilityPct": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Annex VII Part A item 2 — 'where possible'."
+            },
+            "remainingRoundTripEfficiencyPct": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Annex VII Part A item 3 — 'where possible'."
+            },
+            "selfDischargeRatePctPerMonth": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Annex VII Part A item 4 — unconditional."
+            },
+            "ohmicResistanceMohm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "Annex VII Part A item 5 — 'where possible'."
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
       "x-disclosure": "individual"
+    },
+    "stateOfHealthPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Deprecated since v2.2.0 — narrower than Annex VII Part A, which defines state of health as state of certified energy for EV batteries and a five-parameter list for stationary storage and LMT. Populate stateOfHealth instead.",
+      "x-disclosure": "individual"
+    },
+    "testReportResults": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Results of test reports proving compliance (Annex XIII point 3). Conformity tier — authorities only.",
+      "x-disclosure": "conformity"
+    },
+    "usableExtinguishingAgent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Extinguishing agent usable on this battery (Annex VI Part A point 9).",
+      "x-disclosure": "public"
     },
     "usageHistory": {
       "type": [
@@ -614,114 +957,6 @@
       "additionalProperties": false,
       "x-disclosure": "individual"
     },
-    "initialRoundTripEfficiencyPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Round trip energy efficiency when new (Annex XIII point 1(n), first figure).",
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "roundTripEfficiencyAtHalfCycleLifePct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Round trip energy efficiency at 50 % of cycle-life (Annex XIII point 1(n), second figure). The 50 % is of cycle-life, not of state of charge.",
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "internalCellResistanceMohm": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Internal cell resistance in milliohms (Annex XIII point 1(o)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "internalPackResistanceMohm": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Internal pack resistance in milliohms (Annex XIII point 1(o)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "hazardousSubstances": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "description": "Hazardous substances other than mercury, cadmium or lead (Annex VI Part A point 8).",
-      "items": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "casNumber": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "concentrationPct": {
-            "type": [
-              "number",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 100
-          }
-        },
-        "additionalProperties": false
-      },
-      "x-disclosure": "public"
-    },
-    "usableExtinguishingAgent": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Extinguishing agent usable on this battery (Annex VI Part A point 9).",
-      "x-disclosure": "public"
-    },
-    "renewableContentPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Share of renewable content (Annex XIII point 1(f)). Distinct from recycled content.",
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "minimalVoltageV": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Minimal voltage in volts (Annex XIII point 1(h)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "maximumVoltageV": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Maximum voltage in volts (Annex XIII point 1(h)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
     "voltageTemperatureRange": {
       "type": [
         "object",
@@ -745,211 +980,12 @@
       "additionalProperties": false,
       "x-disclosure": "public"
     },
-    "originalPowerCapabilityW": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Original power capability in watts (Annex XIII point 1(i)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "powerLimitMinW": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Lower power limit in watts (Annex XIII point 1(i)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "powerLimitMaxW": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Upper power limit in watts (Annex XIII point 1(i)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "powerTemperatureRange": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "description": "Temperature range point 1(i) attaches to the power limits 'when relevant'.",
-      "required": [
-        "minC",
-        "maxC"
-      ],
-      "properties": {
-        "minC": {
-          "type": "number",
-          "description": "Lower bound in degrees Celsius."
-        },
-        "maxC": {
-          "type": "number",
-          "description": "Upper bound in degrees Celsius."
-        }
-      },
-      "additionalProperties": false,
-      "x-disclosure": "public"
-    },
-    "expectedLifetimeReferenceTest": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Reference test the declared cycle lifetime was measured under (Annex XIII point 1(j)).",
-      "x-disclosure": "public"
-    },
-    "capacityThresholdForExhaustionPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "Capacity threshold for exhaustion (Annex XIII point 1(k)). EV batteries only.",
-      "minimum": 0,
-      "maximum": 100,
-      "x-disclosure": "public"
-    },
-    "notInUseTemperatureRange": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "description": "Temperature range the battery withstands when not in use (Annex XIII point 1(l)). Not the operating range.",
-      "required": [
-        "minC",
-        "maxC"
-      ],
-      "properties": {
-        "minC": {
-          "type": "number",
-          "description": "Lower bound in degrees Celsius."
-        },
-        "maxC": {
-          "type": "number",
-          "description": "Upper bound in degrees Celsius."
-        }
-      },
-      "additionalProperties": false,
-      "x-disclosure": "public"
-    },
-    "notInUseTemperatureReferenceTest": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Reference test for the not-in-use temperature range (Annex XIII point 1(l)).",
-      "x-disclosure": "public"
-    },
-    "commercialWarrantyPeriodMonths": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "minimum": 0,
-      "description": "Commercial warranty period for calendar life, in months (Annex XIII point 1(m)). A duration, not a date range.",
-      "x-disclosure": "public"
-    },
-    "cycleLifeTestCRate": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "description": "C-rate of the relevant cycle-life test (Annex XIII point 1(p)).",
-      "minimum": 0,
-      "x-disclosure": "public"
-    },
-    "markingInformation": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Markings applied under Article 13(4) (Annex XIII point 1(q)).",
-      "x-disclosure": "public"
-    },
-    "hazardSymbol": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "enum": [
-        "cadmium",
-        "lead",
-        null
-      ],
-      "description": "Article 13(5) chemical symbol where one applies (Annex XIII point 1(q)). Closed: the article names exactly two.",
-      "x-disclosure": "public"
-    },
-    "euDeclarationOfConformity": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Reference to the EU declaration of conformity under Article 18 (Annex XIII point 1(r)).",
-      "x-disclosure": "public"
-    },
     "wasteBatteryInformation": {
       "type": [
         "string",
         "null"
       ],
       "description": "Waste-battery prevention and management information per Article 74(1)(a)-(f) (Annex XIII point 1(s)).",
-      "x-disclosure": "public"
-    },
-    "componentPartNumbers": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      },
-      "description": "Part numbers for components (Annex XIII point 2(b)). Restricted tier.",
-      "x-disclosure": "restricted"
-    },
-    "sparePartsContacts": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Contact details of sources for replacement spares (Annex XIII point 2(b)). Restricted tier.",
-      "x-disclosure": "restricted"
-    },
-    "safetyMeasures": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Safety measures (Annex XIII point 2(d)). Restricted tier.",
-      "x-disclosure": "restricted"
-    },
-    "testReportResults": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Results of test reports proving compliance (Annex XIII point 3). Conformity tier — authorities only.",
-      "x-disclosure": "conformity"
-    },
-    "roundTripEfficiencyPct": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "description": "Legacy, unqualified round trip energy efficiency. Superseded by the Annex XIII point 1(n) pair; retained so a v2.5.0 record keeps its value under its own name.",
-      "x-disclosure": "public"
-    },
-    "internalResistanceMohm": {
-      "type": [
-        "number",
-        "null"
-      ],
-      "minimum": 0,
-      "description": "Legacy internal resistance, without saying whether it is the cell or pack figure Annex XIII point 1(o) requires. Retained because no rule can decide which a stored value was.",
       "x-disclosure": "public"
     }
   },

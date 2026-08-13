@@ -360,8 +360,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
-- **Battery schema `v2.7.0` admits four Annex VI Part A fields the type had
-  emitted since v2.0.0 with no schema version declaring them.** Because the
+- **Battery schema `v2.6.0` now declares four Annex VI Part A fields the type
+  had emitted since v2.0.0 with no schema version admitting them.** Because the
   battery schema sets `additionalProperties: false`, a passport that populated
   `manufacturingDate`, `manufacturingPlace`, `batteryModelId` or
   `batteryPassportNumber` failed validation outright — a battery could not
@@ -371,14 +371,29 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   manufacture), the battery-identifying half of point 2, and the Art. 77(3)
   unique identifier respectively.
 
-  Purely additive, so no lens is needed — `Passport::from_stored` closes an
-  additive gap without one. Verified against the OJ text of Reg. (EU)
-  2023/1542, which also corrects the record on two points:
-  `batteryPassportNumber` is governed by Art. 77(3), which requires conformance
-  with the ISO/IEC 15459 series, not by a pending implementing act; and
-  Part A point 4 asks for month and year, so `manufacturingDate`'s
-  `DateTime<Utc>` carries more precision than the regulation requires and none
-  beyond month/year should be relied on.
+  Folded into `v2.6.0` rather than added as a new version. `v2.6.0` is itself
+  unreleased — 0.16.0 shipped battery schemas up to `v2.4.0` — so there is no
+  published artefact to preserve and no lens to write. A new version would have
+  recorded a migration between two states that never both existed in the world.
+
+  Verified against the OJ text of Reg. (EU) 2023/1542, which also corrects the
+  record on two points: `batteryPassportNumber` is governed by Art. 77(3),
+  which requires conformance with the ISO/IEC 15459 series, not by a pending
+  implementing act; and Part A point 4 asks for month and year, so
+  `manufacturingDate`'s `DateTime<Utc>` carries more precision than the
+  regulation requires and none beyond month/year should be relied on.
+
+- **`criticalRawMaterials` and `dueDiligenceUrl` are public, not restricted.**
+  Annex XIII point 1(b) lists "critical raw materials present in the battery"
+  in the same sentence as chemistry and hazardous substances — both of which
+  were already public — and Annex VI Part A point 10 reaches the same result
+  through point 1(a). Point 1(d) puts responsible-sourcing information in the
+  publicly accessible tier likewise. Classified `restricted`, both were being
+  withheld from the public view the regulation requires them to appear in.
+  Corrected in `v2.6.0` for the same reason as above: nothing has been
+  published under it, so the reclassification costs nothing. After a passport
+  exists, it would not be free — a disclosure class is frozen into that
+  passport's signatures.
 
 - **The fully-populated battery fixture is now exhaustive and
   compiler-enforced.** It previously ended in `..sample_battery_data()`, which

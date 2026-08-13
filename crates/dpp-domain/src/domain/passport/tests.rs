@@ -435,12 +435,12 @@ fn redact_public_strips_gated_sector_fields() {
     let view = p.redact(Audience::Public, &catalog).into_value();
     let sd = &view["sectorData"];
     assert!(
-        sd.get("dueDiligenceUrl").is_none(),
-        "dueDiligenceUrl is Professional — must be hidden"
+        sd.get("dueDiligenceUrl").is_some(),
+        "dueDiligenceUrl is Annex XIII point 1(d) — publicly accessible"
     );
     assert!(
         sd.get("disassemblyInstructionsUrl").is_none(),
-        "disassemblyInstructionsUrl is Professional"
+        "disassemblyInstructionsUrl is Annex XIII point 2(c) — withheld from the public"
     );
     assert!(
         sd.get("batteryChemistry").is_some(),
@@ -725,7 +725,7 @@ fn publishable_battery(battery_type: crate::domain::sector::BatteryType) -> Pass
         state_of_health: Some(Box::new(StateOfHealth::ElectricVehicle { soce_pct: 99.0 })),
         battery_status: Some(BatteryStatus::Original),
         // Guidance data points 1, 7, 8 and 9 — mandatory for every covered
-        // category, and unrepresentable before schema v2.7.0 declared them.
+        // category, and unrepresentable until v2.6.0 declared them.
         battery_passport_number: Some("URN:UUID:6F1C9D2E-0000-4000-8000-000000000000".into()),
         battery_model_id: Some("LFP-64-A".into()),
         manufacturing_place: Some("PL:Wrocław".into()),
@@ -780,7 +780,7 @@ fn a_missing_mandatory_field_blocks_names_it_and_leaves_no_lock() {
 /// covered category each block a publish on their own.
 ///
 /// These were absent from the requirements table *and* from every battery
-/// schema before v2.7.0, so a passport could be published carrying none of
+/// schema property, so a passport could be published carrying none of
 /// them: no unique identifier, no model identification, and no record of where
 /// or when the battery was made. The schema could not even store them —
 /// `additionalProperties: false` rejected all four — so this test is the guard

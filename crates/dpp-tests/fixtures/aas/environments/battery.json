@@ -127,7 +127,7 @@
           "modelType": "Property",
           "idShort": "schemaVersion",
           "valueType": "xs:string",
-          "value": "2.7.0"
+          "value": "2.6.0"
         },
         {
           "modelType": "Property",
@@ -364,6 +364,19 @@
           "idShort": "expectedLifetimeCycles",
           "valueType": "xs:integer",
           "value": "1000"
+        },
+        {
+          "modelType": "ReferenceElement",
+          "idShort": "dueDiligenceUrl",
+          "value": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "GlobalReference",
+                "value": "https://acme.example.com/due-diligence"
+              }
+            ]
+          }
         }
       ]
     }

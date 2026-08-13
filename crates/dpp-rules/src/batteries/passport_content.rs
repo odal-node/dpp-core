@@ -39,7 +39,7 @@
 //! points 1, 7, 8 and 9 — the unique identifier, model identification, place of
 //! manufacture and date of manufacture — all of which the guidance marks
 //! mandatory for every covered category, and none of which any battery schema
-//! version declared before v2.7.0. The remaining difference between 71 and this
+//! version had ever declared. The remaining difference between 71 and this
 //! table's length has not been classified row by row; that is open work, not a
 //! statement that the rest is accounted for.
 

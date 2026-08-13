@@ -3,9 +3,9 @@ use chrono::Utc;
 use dpp_domain::Audience;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
-    Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportStatus,
-    RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination, UnsoldGoodsReason,
-    UnsoldGoodsReport,
+    Gtin, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
+    PassportStatus, RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination,
+    UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use serde_json::json;
 
@@ -266,7 +266,15 @@ fn battery_data_with_due_diligence() -> BatteryData {
         carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
         carbon_footprint_class_ruleset_version: Some("0.0.0-test".into()),
         due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
-        cathode_material: None,
+        // Annex XIII point 2(a), "detailed composition, including materials
+        // used in the cathode, anode and electrolyte" — restricted, and one
+        // of the few point-2 fields the battery mapper actually emits, so the
+        // envelope's masking can be tested against genuinely non-public content.
+        cathode_material: Some(vec![MaterialComposition {
+            name: "Lithium iron phosphate".into(),
+            weight_pct: 32.0,
+            cas_number: None,
+        }]),
         anode_material: None,
         electrolyte_material: None,
         critical_raw_materials: None,
@@ -329,17 +337,24 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     });
     assert!(has_co2e, "co2ePerUnitKg property missing");
 
-    // `dueDiligenceUrl` is `restricted` in the battery catalog, so it must NOT
-    // reach a public projection. This assertion used to be its inverse — the
-    // mappers emitted it to everyone, and the test locked that in. It is kept
-    // pointing the other way as the regression marker for that defect.
+    // `dueDiligenceUrl` **must** reach a public projection: Annex XIII point
+    // 1(d), "information on responsible sourcing as indicated in the report on
+    // battery due diligence policy referred to in Article 52(3)", sits in the
+    // publicly accessible tier.
+    //
+    // This assertion has now been written both ways round, which is the reason
+    // it carries its citation. It first asserted presence, was flipped to
+    // absence when the field was classified `restricted`, and is flipped back
+    // here because that classification did not match the annex. Withholding it
+    // is not the safe direction — it makes the public passport omit content the
+    // regulation requires to be in it.
     let has_due_diligence_ref = battery_sub.submodel_elements.iter().any(|e| match e {
         AasSubmodelElement::ReferenceElement(r) => r.id_short == "dueDiligenceUrl",
         _ => false,
     });
     assert!(
-        !has_due_diligence_ref,
-        "restricted field dueDiligenceUrl leaked into a public AAS projection"
+        has_due_diligence_ref,
+        "Annex XIII point 1(d) is public: dueDiligenceUrl must appear in a public projection"
     );
 }
 
@@ -685,22 +700,33 @@ fn environment_is_masked_for_its_audience() {
         .expect("public environment");
     let serialised = serde_json::to_string(&public).expect("serialises");
 
-    // `dueDiligenceUrl` is `restricted` in the battery catalog. The envelope
-    // delegates to the masked builder, so it must not appear at any depth —
-    // an envelope that assembled its own content could reintroduce it.
+    // The envelope delegates to the masked builder, so a non-public field must
+    // not appear at any depth — an envelope that assembled its own content
+    // could reintroduce one. `cathodeMaterial` is Annex XIII point 2(a), which
+    // Art. 77(2) withholds from the general public.
     assert!(
-        !serialised.contains("dueDiligenceUrl"),
+        !serialised.contains("cathodeMaterial"),
         "restricted field leaked into a public AAS Environment"
+    );
+    // …while a point 1(d) field must survive the same masking. Testing both
+    // directions on one document is the point: a mask that drops everything
+    // would pass the assertion above on its own.
+    assert!(
+        serialised.contains("dueDiligenceUrl"),
+        "Annex XIII point 1(d) is public and must survive masking"
     );
 
     let restricted =
         build_aas_environment(&passport, "09506000134352", Audience::LegitimateInterest)
             .expect("restricted environment");
+    let restricted = serde_json::to_string(&restricted).expect("serialises");
     assert!(
-        serde_json::to_string(&restricted)
-            .expect("serialises")
-            .contains("dueDiligenceUrl"),
-        "a legitimate-interest caller must still receive it"
+        restricted.contains("cathodeMaterial"),
+        "a legitimate-interest caller must receive point 2 content"
+    );
+    assert!(
+        restricted.contains("dueDiligenceUrl"),
+        "and must still receive the public tier"
     );
 }
 
