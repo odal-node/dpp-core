@@ -57,6 +57,29 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   gate and the thing it guards drift apart. Downstream code naming the constant
   directly must change its import.
 
+- **A battery passport missing content its category makes mandatory can no
+  longer be published.** `Passport::transition_to(Published)` now refuses the
+  **first** publish when a field the Battery Regulation requires of that
+  category is absent, reporting every missing field at once with the category
+  named. A refused publish leaves nothing behind — no retention lock, no
+  `published_at` — since retention lock is permanent and setting it on a failed
+  attempt would make the passport unrepairable.
+
+  The gate lives in `dpp-domain`, not in a consumer, so no caller can opt out of
+  it: a check bolted onto one engine is bypassed by the next.
+
+  **Only the first publish is gated.** `Suspended → Published` is not, because
+  gating a republish would let a later change to the requirements table strand a
+  passport that was lawfully published under the earlier one — and a
+  retention-locked document cannot be repaired. Content is judged once, when it
+  is fixed.
+
+  **Portable and SLI batteries are ungated, deliberately.** The source covers
+  electric-vehicle, LMT and industrial batteries only, and inventing a
+  requirement it declines to state would be the defect this crate exists to
+  avoid. That is a real hole, held open until a source covering those categories
+  exists.
+
 - **`SectorData::Battery` and `SectorData::Textile` now hold a `Box`.** Both
   product groups have real models rather than stubs, and an unboxed variant made
   *every* `SectorData` — a toy's included — as large as the largest one:

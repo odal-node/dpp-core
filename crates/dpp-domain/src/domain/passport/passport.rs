@@ -1,4 +1,4 @@
-﻿//! The [`Passport`] aggregate root.
+//! The [`Passport`] aggregate root.
 
 use std::collections::BTreeMap;
 
@@ -442,8 +442,10 @@ impl Passport {
 
         let now = chrono::Utc::now();
 
-        // First publish: lock retention and record the timestamp.
+        // First publish: gate on mandatory content, then lock retention and
+        // record the timestamp.
         if next == PassportStatus::Published && self.published_at.is_none() {
+            self.check_mandatory_content()?;
             self.retention_locked = true;
             self.published_at = Some(now);
         }
@@ -451,6 +453,85 @@ impl Passport {
         self.status = next;
         self.updated_at = now;
         Ok(())
+    }
+
+    /// Refuse a first publish that omits content the battery's category makes
+    /// mandatory.
+    ///
+    /// # Why this is a hard gate and not a lint
+    ///
+    /// A passport missing content the law requires is not a passport with a
+    /// quality problem — it is one that should not exist. Putting the check in
+    /// `dpp-domain` rather than in a consumer means no caller can opt out of
+    /// it: an engine-side check would be bypassed by the next engine.
+    ///
+    /// # Why only on the *first* publish
+    ///
+    /// `transition_to` also runs on `Suspended → Published`. Gating a republish
+    /// would let a later change to the requirements table strand a passport
+    /// that was lawfully published under the earlier one — the same hazard as a
+    /// lens that refuses, and worse, because the operator cannot fix a
+    /// retention-locked document. The content is fixed at first publish; that is
+    /// where it is judged.
+    ///
+    /// # Scope
+    ///
+    /// Battery only, and only for the three categories the source covers. A
+    /// portable or SLI battery is **ungated** — the Commission's guidance says
+    /// nothing about them, and inventing a requirement it declines to state
+    /// would be the defect this crate exists to avoid. That is a real hole and
+    /// it is deliberate; it closes when a source covering those categories
+    /// exists.
+    fn check_mandatory_content(&self) -> Result<(), crate::domain::error::DppError> {
+        use crate::domain::field_error::{FieldError, ValidationErrors};
+
+        if self.sector != crate::domain::sector::Sector::Battery {
+            return Ok(());
+        }
+        let Some(data) = self.sector_data.as_ref() else {
+            return Err(crate::domain::error::DppError::Validation(
+                ValidationErrors {
+                    errors: vec![FieldError {
+                        field: "/sectorData".to_owned(),
+                        message: "a battery passport cannot be published without sector data"
+                            .to_owned(),
+                    }],
+                },
+            ));
+        };
+        let Ok(value) = serde_json::to_value(data) else {
+            return Ok(());
+        };
+        let Some(battery_type) = value.get("batteryType").and_then(serde_json::Value::as_str)
+        else {
+            // batteryType is required by the schema from v2.5.0; if it is absent
+            // here the schema check is the right place to say so.
+            return Ok(());
+        };
+
+        // A key present but null is absent: `skip_serializing_if` means a `None`
+        // never reaches the wire, so an explicit null came from somewhere else
+        // and carries no value either way.
+        let missing: Vec<FieldError> =
+            dpp_rules::batteries::passport_content::mandatory_fields(battery_type)
+                .filter(|f| value.get(*f).is_none_or(serde_json::Value::is_null))
+                .map(|f| FieldError {
+                    field: format!("/sectorData/{f}"),
+                    message: format!(
+                        "'{f}' is mandatory for a '{battery_type}' battery and is absent; \
+                         a passport omitting it does not carry the content the Battery \
+                         Regulation requires of this category"
+                    ),
+                })
+                .collect();
+
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(crate::domain::error::DppError::Validation(
+                ValidationErrors { errors: missing },
+            ))
+        }
     }
 
     /// Return an audience-filtered JSON view of this passport.
