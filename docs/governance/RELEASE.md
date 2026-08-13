@@ -81,17 +81,33 @@ release, instead of cargo-release's default of one tag per publishable crate.
 
 ## Release Command
 
-```sh
-# Dry run first — always
-cargo release patch --workspace --exclude dpp-benches --dry-run
+**Check `Cargo.toml` first.** In this project the version bump usually rides in
+on a feature PR rather than being made at release time, so by the time you get
+here `[workspace.package] version` is often *already* the version you intend to
+ship. Passing a bump level in that state releases the version **after** the one
+you meant:
 
-# If the dry run is clean
-cargo release patch --workspace --exclude dpp-benches --execute
+```sh
+# The version in Cargo.toml is already the one you are shipping — the
+# usual case here. No level argument: publish and tag what is there.
+cargo release --workspace --exclude dpp-benches --dry-run
+cargo release --workspace --exclude dpp-benches --execute
 ```
 
-Replace `patch` with `minor` or `major` as appropriate per the
+```sh
+# The version in Cargo.toml is still the last *released* one, and you want
+# cargo-release to bump it for you.
+cargo release minor --workspace --exclude dpp-benches --dry-run
+cargo release minor --workspace --exclude dpp-benches --execute
+```
+
+Replace `minor` with `patch` or `major` as appropriate per the
 [versioning policy](VERSIONING.md). `--execute` also pushes the commit and tag
 to `origin` unless `--no-push` is given.
+
+Read the dry run's output rather than skimming it: it names the exact version
+each crate will be published at. That line is the check on which of the two
+cases above you are actually in.
 
 ## Post-Release
 

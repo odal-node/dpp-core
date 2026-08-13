@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-13
+
 ### Breaking
 
 - **`ElectronicsData.product_category` is a closed `DeviceType`, not a
