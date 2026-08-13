@@ -613,6 +613,233 @@
       ],
       "description": "Internal pack resistance in milliohms (Annex XIII point 1(o)).",
       "minimum": 0
+    },
+    "hazardousSubstances": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "Hazardous substances other than mercury, cadmium or lead (Annex VI Part A point 8).",
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "casNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "concentrationPct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "usableExtinguishingAgent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Extinguishing agent usable on this battery (Annex VI Part A point 9)."
+    },
+    "renewableContentPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Share of renewable content (Annex XIII point 1(f)). Distinct from recycled content.",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "minimalVoltageV": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Minimal voltage in volts (Annex XIII point 1(h)).",
+      "minimum": 0
+    },
+    "maximumVoltageV": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum voltage in volts (Annex XIII point 1(h)).",
+      "minimum": 0
+    },
+    "voltageTemperatureRange": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Temperature range point 1(h) attaches to the voltage figures 'when relevant'.",
+      "required": [
+        "minC",
+        "maxC"
+      ],
+      "properties": {
+        "minC": {
+          "type": "number",
+          "description": "Lower bound in degrees Celsius."
+        },
+        "maxC": {
+          "type": "number",
+          "description": "Upper bound in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
+    },
+    "originalPowerCapabilityW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Original power capability in watts (Annex XIII point 1(i)).",
+      "minimum": 0
+    },
+    "powerLimitMinW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Lower power limit in watts (Annex XIII point 1(i)).",
+      "minimum": 0
+    },
+    "powerLimitMaxW": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Upper power limit in watts (Annex XIII point 1(i)).",
+      "minimum": 0
+    },
+    "powerTemperatureRange": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Temperature range point 1(i) attaches to the power limits 'when relevant'.",
+      "required": [
+        "minC",
+        "maxC"
+      ],
+      "properties": {
+        "minC": {
+          "type": "number",
+          "description": "Lower bound in degrees Celsius."
+        },
+        "maxC": {
+          "type": "number",
+          "description": "Upper bound in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
+    },
+    "expectedLifetimeReferenceTest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference test the declared cycle lifetime was measured under (Annex XIII point 1(j))."
+    },
+    "capacityThresholdForExhaustionPct": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Capacity threshold for exhaustion (Annex XIII point 1(k)). EV batteries only.",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "notInUseTemperatureRange": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Temperature range the battery withstands when not in use (Annex XIII point 1(l)). Not the operating range.",
+      "required": [
+        "minC",
+        "maxC"
+      ],
+      "properties": {
+        "minC": {
+          "type": "number",
+          "description": "Lower bound in degrees Celsius."
+        },
+        "maxC": {
+          "type": "number",
+          "description": "Upper bound in degrees Celsius."
+        }
+      },
+      "additionalProperties": false
+    },
+    "notInUseTemperatureReferenceTest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference test for the not-in-use temperature range (Annex XIII point 1(l))."
+    },
+    "commercialWarrantyPeriodMonths": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Commercial warranty period for calendar life, in months (Annex XIII point 1(m)). A duration, not a date range."
+    },
+    "cycleLifeTestCRate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "C-rate of the relevant cycle-life test (Annex XIII point 1(p)).",
+      "minimum": 0
+    },
+    "markingInformation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Markings applied under Article 13(4) (Annex XIII point 1(q))."
+    },
+    "hazardSymbol": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "cadmium",
+        "lead",
+        null
+      ],
+      "description": "Article 13(5) chemical symbol where one applies (Annex XIII point 1(q)). Closed: the article names exactly two."
+    },
+    "euDeclarationOfConformity": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference to the EU declaration of conformity under Article 18 (Annex XIII point 1(r))."
+    },
+    "wasteBatteryInformation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Waste-battery prevention and management information per Article 74(1)(a)-(f) (Annex XIII point 1(s))."
     }
   },
   "definitions": {

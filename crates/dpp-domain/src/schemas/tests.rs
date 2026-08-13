@@ -809,3 +809,54 @@ fn schema_rejects_a_state_of_health_mixing_both_annex_vii_lists() {
     });
     assert!(reg.validate("battery", &v, &valid).is_ok());
 }
+
+/// Every field the Rust type can emit is a field the current schema admits.
+///
+/// `v2.6.0` sets `additionalProperties: false`, so this fails the moment a
+/// struct field is added without its schema property — the drift that would
+/// otherwise surface as a validation error on a real passport rather than in
+/// CI. Populates the Annex VI Part A and Annex XIII point 1 additions
+/// specifically: serde skips `None`, so an all-`None` fixture would prove
+/// nothing about them.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_fully_populated_battery_serialises_into_the_current_schema() {
+    use crate::domain::sector::{BatteryData, HazardSymbol, HazardousSubstance, TemperatureRange};
+
+    let range = TemperatureRange {
+        min_c: -20.0,
+        max_c: 60.0,
+    };
+    let data = BatteryData {
+        hazardous_substances: Some(vec![HazardousSubstance {
+            name: "Nickel sulfate".into(),
+            cas_number: Some("7786-81-4".into()),
+            concentration_pct: Some(0.4),
+        }]),
+        usable_extinguishing_agent: Some("Class D dry powder".into()),
+        renewable_content_pct: Some(12.5),
+        minimal_voltage_v: Some(2.5),
+        maximum_voltage_v: Some(4.2),
+        voltage_temperature_range: Some(range),
+        original_power_capability_w: Some(150_000.0),
+        power_limit_min_w: Some(1_000.0),
+        power_limit_max_w: Some(180_000.0),
+        power_temperature_range: Some(range),
+        expected_lifetime_reference_test: Some("IEC 62660-1:2018".into()),
+        capacity_threshold_for_exhaustion_pct: Some(80.0),
+        not_in_use_temperature_range: Some(range),
+        not_in_use_temperature_reference_test: Some("IEC 62660-1:2018 clause 7".into()),
+        commercial_warranty_period_months: Some(96),
+        cycle_life_test_c_rate: Some(1.0),
+        marking_information: Some("Separate collection symbol applied".into()),
+        hazard_symbol: Some(HazardSymbol::Cadmium),
+        eu_declaration_of_conformity: Some("DoC-2027-0001".into()),
+        waste_battery_information: Some("https://example.invalid/waste".into()),
+        ..crate::test_support::sample_battery_data()
+    };
+
+    let json = serde_json::to_value(&data).expect("serialises");
+    VersionedSchemaRegistry::new()
+        .validate("battery", &"2.6.0".parse().unwrap(), &json)
+        .expect("every emitted field must be admitted by the current schema");
+}

@@ -80,7 +80,7 @@ fn main() {
         repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: Some(SectorData::Textile(textile_data)),
+        sector_data: Some(SectorData::Textile(Box::new(textile_data))),
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,

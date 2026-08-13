@@ -31,8 +31,20 @@ use crate::domain::sector::Sector;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum SectorData {
-    Battery(BatteryData),
-    Textile(TextileData),
+    /// Boxed, unlike its siblings. Battery carries more law than any other
+    /// product group — the Annex XIII point 1 and point 4 tiers are most of
+    /// `BatteryData` — and an unboxed variant makes *every* `SectorData`, a
+    /// toy's included, as large as the largest one. Boxing keeps the enum the
+    /// size of its second-largest variant and costs one indirection on the
+    /// battery path alone. Serde treats `Box<T>` as `T`, so the wire is
+    /// unchanged.
+    Battery(Box<BatteryData>),
+    /// Boxed for the same reason as [`SectorData::Battery`]: textile is the
+    /// other product group with a real model rather than a stub, and leaving it
+    /// inline would keep every variant the size of this one. The rule is the
+    /// payload's size, not the sector — a stub that grows a body gets boxed
+    /// when it does.
+    Textile(Box<TextileData>),
     UnsoldGoods(UnsoldGoodsReport),
     Steel(SteelData),
     Electronics(ElectronicsData),

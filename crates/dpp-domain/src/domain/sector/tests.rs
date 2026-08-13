@@ -34,11 +34,11 @@ fn battery_descriptor_with_tiers() -> SectorDescriptor {
 }
 
 fn minimal_battery_data() -> SectorData {
-    SectorData::Battery(BatteryData {
+    SectorData::Battery(Box::new(BatteryData {
         due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
         disassembly_instructions_url: Some("https://acme.example.com/disassembly".into()),
         ..crate::test_support::sample_battery_data()
-    })
+    }))
 }
 
 #[test]
@@ -266,14 +266,14 @@ fn surfactants_invalid_band_rejects() {
 
 #[test]
 fn sector_data_battery_round_trip() {
-    let data = SectorData::Battery(BatteryData {
+    let data = SectorData::Battery(Box::new(BatteryData {
         recycled_content_lithium_pct: Some(12.5),
         rated_capacity_kwh: Some(32.0),
         carbon_footprint_class: Some(CarbonFootprintClass::new("B").expect("valid label")),
         carbon_footprint_class_ruleset_id: Some("test-cfb-classes".into()),
         carbon_footprint_class_ruleset_version: Some("0.0.0-test".into()),
         ..crate::test_support::sample_battery_data()
-    });
+    }));
     let json = serde_json::to_value(&data).unwrap();
     assert_eq!(json["sector"], "battery", "sector tag must be lowercase");
     assert_eq!(json["batteryChemistry"], "LFP");
@@ -394,7 +394,7 @@ fn sector_data_textile_round_trip() {
         scip_notification_id: Some("SCIP-12345".into()),
     }]);
 
-    let sector = SectorData::Textile(data.clone());
+    let sector = SectorData::Textile(Box::new(data.clone()));
     let json = serde_json::to_value(&sector).unwrap();
     assert_eq!(json["sector"], "textile", "sector tag must be lowercase");
     assert_eq!(json["countryOfOrigin"], "BD");
@@ -408,13 +408,13 @@ fn sector_data_textile_round_trip() {
     );
 
     let back: SectorData = serde_json::from_value(json).unwrap();
-    assert_eq!(SectorData::Textile(data), back);
+    assert_eq!(SectorData::Textile(Box::new(data)), back);
 }
 
 #[test]
 fn textile_none_fields_not_serialized() {
     // Verify skip_serializing_if works — None fields should be absent from JSON
-    let data = SectorData::Textile(test_textile_data());
+    let data = SectorData::Textile(Box::new(test_textile_data()));
     let json = serde_json::to_value(&data).unwrap();
     assert!(
         json.get("svhcSubstances").is_none(),
@@ -481,7 +481,7 @@ fn every_sector_declares_a_catalog_key() {
 
 #[test]
 fn sector_discriminant_matches_variant() {
-    let battery = SectorData::Battery(BatteryData {
+    let battery = SectorData::Battery(Box::new(BatteryData {
         gtin: Gtin::parse("00000000000000").unwrap(),
         battery_chemistry: BatteryChemistry::Nmc,
         nominal_voltage_v: 4.0,
@@ -489,7 +489,7 @@ fn sector_discriminant_matches_variant() {
         expected_lifetime_cycles: Some(1000),
         co2e_per_unit_kg: 40.0,
         ..crate::test_support::sample_battery_data()
-    });
+    }));
     assert_eq!(battery.sector(), Sector::Battery);
 }
 
@@ -649,7 +649,7 @@ fn every_sector_with_an_embedded_schema_round_trips_through_its_current_schema()
 
     let samples: Vec<SectorData> = vec![
         minimal_battery_data(),
-        SectorData::Textile(test_textile_data()),
+        SectorData::Textile(Box::new(test_textile_data())),
         sample_unsold_goods_data(),
         sample_steel_data(),
         sample_electronics_data(),

@@ -54,7 +54,7 @@ fn make_textile_passport() -> Passport {
         updated_at: now,
         ..base_passport(
             Sector::Textile,
-            SectorData::Textile(TextileData {
+            SectorData::Textile(Box::new(TextileData {
                 gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
                 fibre_composition: vec![
                     FibreEntry {
@@ -100,7 +100,7 @@ fn make_textile_passport() -> Passport {
                 repair_history_url: None,
                 repair_count: None,
                 pef_score: None,
-            }),
+            })),
             "1.1.0",
         )
     }

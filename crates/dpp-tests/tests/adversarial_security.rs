@@ -510,7 +510,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         updated_at: now,
         ..base_passport(
             Sector::Textile,
-            SectorData::Textile(TextileData {
+            SectorData::Textile(Box::new(TextileData {
                 gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
                 // sum = 50%, should be ~100%
                 fibre_composition: vec![FibreEntry {
@@ -542,7 +542,7 @@ fn passport_validate_catches_bad_fibre_sum() {
                 repair_history_url: None,
                 repair_count: None,
                 pef_score: None,
-            }),
+            })),
             "1.1.0",
         )
     };

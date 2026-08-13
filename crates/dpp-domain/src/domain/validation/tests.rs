@@ -8,14 +8,14 @@ use crate::schemas::VersionedSchemaRegistry;
 use semver::Version;
 
 fn valid_battery() -> SectorData {
-    SectorData::Battery(BatteryData {
+    SectorData::Battery(Box::new(BatteryData {
         nominal_voltage_v: 48.0,
         ..crate::test_support::sample_battery_data()
-    })
+    }))
 }
 
 fn valid_textile() -> SectorData {
-    SectorData::Textile(TextileData {
+    SectorData::Textile(Box::new(TextileData {
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),
@@ -32,7 +32,7 @@ fn valid_textile() -> SectorData {
         care_instructions: "30°C machine wash".into(),
         chemical_compliance_standard: "OEKO-TEX 100".into(),
         ..crate::test_support::sample_textile_data()
-    })
+    }))
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn valid_battery_passes() {
 
 fn battery_inner() -> BatteryData {
     match valid_battery() {
-        SectorData::Battery(b) => b,
+        SectorData::Battery(b) => *b,
         _ => unreachable!("valid_battery is Battery"),
     }
 }
@@ -52,7 +52,7 @@ fn battery_inner() -> BatteryData {
 fn battery_positive_cobalt_on_lfp_fails_cross_field() {
     let mut b = battery_inner(); // chemistry = LFP (no cobalt)
     b.recycled_content_cobalt_pct = Some(5.0);
-    let err = validate_sector_data(&SectorData::Battery(b)).unwrap_err();
+    let err = validate_sector_data(&SectorData::Battery(Box::new(b))).unwrap_err();
     assert!(
         err.errors
             .iter()
@@ -66,7 +66,7 @@ fn battery_zero_cobalt_on_lfp_passes() {
     let mut b = battery_inner();
     b.recycled_content_cobalt_pct = Some(0.0); // "no recycled cobalt" — not a conflict
     b.recycled_content_lithium_pct = Some(12.5);
-    assert!(validate_sector_data(&SectorData::Battery(b)).is_ok());
+    assert!(validate_sector_data(&SectorData::Battery(Box::new(b))).is_ok());
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn battery_inverted_operating_temp_fails_cross_field() {
     let mut b = battery_inner();
     b.operating_temp_min_c = Some(60.0);
     b.operating_temp_max_c = Some(-20.0);
-    let err = validate_sector_data(&SectorData::Battery(b)).unwrap_err();
+    let err = validate_sector_data(&SectorData::Battery(Box::new(b))).unwrap_err();
     assert!(
         err.errors.iter().any(|e| e.field == "/operatingTempMinC"),
         "expected operating-temp conflict, got: {err:?}"
@@ -159,7 +159,7 @@ fn textile_empty_fibre_composition_fails() {
 #[test]
 fn textile_fibre_sum_not_100_fails() {
     // Schema passes (pct 0–100 individually); the cross-field rule fails.
-    let data = SectorData::Textile(TextileData {
+    let data = SectorData::Textile(Box::new(TextileData {
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),
@@ -175,7 +175,7 @@ fn textile_fibre_sum_not_100_fails() {
         care_instructions: "Hand wash only".into(),
         chemical_compliance_standard: "REACH".into(),
         ..crate::test_support::sample_textile_data()
-    });
+    }));
     let err = validate_sector_data(&data).unwrap_err();
     assert!(
         err.errors.iter().any(|e| e.field == "/fibreComposition"),
@@ -278,7 +278,7 @@ fn batch_validation_mixed_results() {
         valid_battery(),
         valid_textile(),
         // Invalid: fibre sum != 100
-        SectorData::Textile(TextileData {
+        SectorData::Textile(Box::new(TextileData {
             fibre_composition: vec![FibreEntry {
                 fibre: "cotton".into(),
                 pct: 50.0,
@@ -287,7 +287,7 @@ fn batch_validation_mixed_results() {
             care_instructions: "Hand wash".into(),
             chemical_compliance_standard: "REACH".into(),
             ..crate::test_support::sample_textile_data()
-        }),
+        })),
     ];
 
     let results = validate_sector_data_batch(&items);
