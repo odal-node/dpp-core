@@ -225,53 +225,6 @@ fn redact_unclassified_sector_fields(
 /// more of it than an anonymous one. This mirrors, deliberately and for the same
 /// stated reason, the backstop the platform applies when it renders a public
 /// view — the two must not disagree about what an unmodelled sector discloses.
-/// Drop any `sectorData` key the passport's **declared schema version** does not
-/// declare.
-///
-/// # Why this exists
-///
-/// Disclosure classes are sourced from the schema version a passport was
-/// validated against, which is what keeps a published passport filtered by the
-/// rules that produced its signatures. The corollary is the hazard: a key that
-/// version does not declare is classified by nobody, and an unclassified key
-/// falls to the policy default — `Public`.
-///
-/// So the version-sourced policy, which is safer than the catalog map in every
-/// other respect, is *less* safe in exactly one: it under-applies where the map
-/// over-applied. Under-applying disclosure is a leak.
-///
-/// Raising the default to `Restricted` does not work, because this policy is
-/// applied to the whole document and the passport envelope's public fields
-/// (`productName`, `status`, …) are not declared in any sector schema — they
-/// would all vanish. The guard therefore has to be structural and scoped to
-/// `sectorData`, which is the same shape as
-/// [`redact_unknown_sector_data`] one level down: where nobody has classified
-/// the content, keep only what is accounted for.
-///
-/// Reaching this needs an *invalid* passport — every sector schema sets
-/// `additionalProperties: false`, so validation already rejects a document
-/// carrying keys its version does not declare. This is defence in depth, and it
-/// runs for **every** audience: an unclassified field is not more disclosable to
-/// a credentialed reader than to an anonymous one.
-fn redact_unclassified_sector_fields(
-    document: &mut serde_json::Value,
-    policy: &SectorAccessPolicy,
-) {
-    let Some(sector_data) = document
-        .as_object_mut()
-        .and_then(|o| o.get_mut("sectorData"))
-        .and_then(serde_json::Value::as_object_mut)
-    else {
-        return;
-    };
-    // `sector` is the variant tag, not a schema property, and the document must
-    // keep round-tripping through `SectorData`.
-    // `field_disclosure` was built from this schema version's own properties,
-    // so its keys are exactly what the version accounts for. Reusing it avoids a
-    // second registry lookup that could disagree with the policy in force.
-    sector_data.retain(|key, _| key == "sector" || policy.field_disclosure.contains_key(key));
-}
-
 fn redact_unknown_sector_data(document: &mut serde_json::Value) {
     let Some(object) = document.as_object_mut() else {
         return;
