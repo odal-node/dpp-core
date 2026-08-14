@@ -18,14 +18,24 @@ use serde::{Deserialize, Serialize};
 pub enum SealMode {
     /// Platform holds its own qualified seal; operators use delegated access.
     ///
-    /// Permitted: a verified economic operator may authorise a third party to
-    /// perform registration actions on its behalf, provided that third party has
-    /// itself completed the verification process for value chain actors
-    /// (IR 2026/1778 **Art. 19(4)**). Note what does *not* transfer — the
-    /// operator "shall remain fully responsible for compliance with the
-    /// obligations set out in this Regulation" and remains the controller of the
-    /// data it submits (**Art. 19(5)**). This mode moves the mechanics, never
-    /// the liability.
+    /// **The legal basis for this mode is not established by the registry
+    /// rules.** Verified against the OJ text of IR 2026/1778: Art. 19(4) permits
+    /// a verified economic operator to authorise a third party to perform
+    /// *"registration actions in the registry"* on its behalf, provided that
+    /// third party follows the verification process in accordance with Art. 5.
+    /// That is delegated **registration**, and it says nothing about who may
+    /// hold or use a qualified electronic seal.
+    ///
+    /// Art. 19(5) is likewise about data rather than seals: each verified
+    /// economic operator *"shall be responsible for the data it submits to the
+    /// Commission as manager of the registry and shall be considered as the
+    /// controller of the data it submits"*.
+    ///
+    /// So delegation of registration is settled and delegation of sealing is
+    /// not. Whether one party may hold a qualified seal covering content another
+    /// party authored is a question under eIDAS and the applicable delegated
+    /// act, not one these articles answer — and the mechanics moving would not
+    /// move the responsibility either way.
     ProviderSeal,
     /// Operator holds and manages their own qualified seal.
     OperatorSeal,
@@ -95,6 +105,23 @@ pub struct SealedEnvelope {
 pub struct SealCapabilities {
     pub supported_formats: Vec<SealFormat>,
     pub supported_modes: Vec<SealMode>,
+}
+
+impl SealCapabilities {
+    /// Whether these capabilities cover what `req` asks for.
+    ///
+    /// Defined once, here, so every adapter answers the question the same way.
+    /// An adapter that rolled its own check would be free to disagree with the
+    /// capabilities it advertises, which is the disagreement the check exists to
+    /// make impossible.
+    ///
+    /// Both axes must match. A provider that produces the right envelope format
+    /// under the wrong certificate holder has not produced what was asked for:
+    /// the mode decides *whose* attestation the seal is, which is a statement
+    /// about responsibility rather than a serialisation detail.
+    pub fn can_produce(&self, req: &SealRequest) -> bool {
+        self.supported_formats.contains(&req.sig_format) && self.supported_modes.contains(&req.mode)
+    }
 }
 
 /// Result of verifying a `SealedEnvelope`.

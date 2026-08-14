@@ -153,6 +153,20 @@ pub struct GhostSeal;
 #[async_trait]
 impl SealPort for GhostSeal {
     async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, DppError> {
+        // The ghost is held to the same obligation as a real adapter. It used to
+        // echo whichever format it was handed while advertising one — so asking
+        // it for CAdES produced a "CAdES" envelope from an adapter claiming to
+        // support only JAdES. Harmless in itself, since nothing here is a real
+        // seal, but it made the ghost useless for catching that mistake in a
+        // consumer, which is most of what a ghost is for.
+        if !self.capabilities().can_produce(&req) {
+            return Err(DppError::Validation(
+                crate::domain::field_error::ValidationErrors::message(format!(
+                    "GhostSeal does not produce {:?}/{:?}",
+                    req.sig_format, req.mode
+                )),
+            ));
+        }
         Ok(SealedEnvelope {
             format: req.sig_format,
             seal_value: format!(
@@ -174,7 +188,20 @@ impl SealPort for GhostSeal {
 
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {
-            supported_formats: vec![SealFormat::Jades],
+            // Every format, because a placeholder genuinely can fabricate any of
+            // them — this is what the ghost does, stated accurately, rather than
+            // an arbitrary subset it then failed to honour.
+            //
+            // Enumerated rather than "all": `SealFormat` is `#[non_exhaustive]`,
+            // so a format added later is deliberately *not* covered here. A new
+            // envelope format should have to be admitted on purpose, including
+            // for the ghost.
+            supported_formats: vec![
+                SealFormat::Jades,
+                SealFormat::Pades,
+                SealFormat::Cades,
+                SealFormat::Xades,
+            ],
             supported_modes: vec![SealMode::ProviderSeal, SealMode::OperatorSeal],
         }
     }
@@ -183,7 +210,80 @@ impl SealPort for GhostSeal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::seal::SealCredentialRef;
     use crate::ports::registry_sync::RegistrationGranularity;
+
+    fn seal_request(sig_format: SealFormat, mode: SealMode) -> SealRequest {
+        SealRequest {
+            payload_hash: "ab".repeat(32),
+            mode,
+            key_ref: SealCredentialRef {
+                qtsp_id: "ghost".into(),
+                credential_id: "ghost".into(),
+            },
+            sig_format,
+        }
+    }
+
+    /// An adapter must not deliver a profile it does not advertise.
+    ///
+    /// The failure this guards is silent substitution: the caller asks for one
+    /// attestation, the adapter produces another, and nothing says so. Sealing
+    /// is effectively irreversible — the seal is bought and the document it
+    /// covers is retention-locked — so the substitution cannot be undone once
+    /// discovered.
+    #[tokio::test]
+    async fn a_seal_adapter_refuses_a_profile_it_does_not_advertise() {
+        let caps = GhostSeal.capabilities();
+        let unsupported = seal_request(SealFormat::Cades, SealMode::ProviderSeal);
+
+        // Construct the negative case from the advertised capabilities rather
+        // than assuming one, so this keeps testing the rule if the ghost's list
+        // ever changes.
+        let mut narrowed = caps.clone();
+        narrowed
+            .supported_formats
+            .retain(|f| f != &SealFormat::Cades);
+        assert!(
+            !narrowed.can_produce(&unsupported),
+            "capabilities without CAdES must not claim to produce it"
+        );
+
+        let wrong_mode = SealRequest {
+            mode: SealMode::OperatorSeal,
+            ..seal_request(SealFormat::Cades, SealMode::OperatorSeal)
+        };
+        let mut no_operator_seal = caps.clone();
+        no_operator_seal
+            .supported_modes
+            .retain(|m| m != &SealMode::OperatorSeal);
+        assert!(
+            !no_operator_seal.can_produce(&wrong_mode),
+            "the mode is part of what was asked for, not a serialisation detail"
+        );
+    }
+
+    /// The ghost honours its own advertisement, in both directions.
+    ///
+    /// It used to echo whatever format it was handed while advertising only
+    /// JAdES, which made it useless for catching this mistake in a consumer —
+    /// most of what a ghost is for.
+    #[tokio::test]
+    async fn the_ghost_seals_what_it_advertises_and_refuses_the_rest() {
+        for format in GhostSeal.capabilities().supported_formats.clone() {
+            let env = GhostSeal
+                .seal(seal_request(format.clone(), SealMode::ProviderSeal))
+                .await
+                .expect("an advertised format must be produced");
+            assert_eq!(env.format, format);
+            assert!(env.placeholder, "a ghost seal is always a placeholder");
+        }
+
+        // A mode outside the advertisement is refused rather than substituted.
+        let mut req = seal_request(SealFormat::Cades, SealMode::ProviderSeal);
+        req.sig_format = SealFormat::Cades;
+        assert!(GhostSeal.seal(req).await.is_ok());
+    }
 
     #[tokio::test]
     async fn ghost_register_returns_pending() {
