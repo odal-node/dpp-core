@@ -35,7 +35,8 @@ use super::registry_sync::{
     RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
 };
 use super::seal::{
-    SealCapabilities, SealFormat, SealMode, SealPort, SealRequest, SealVerification, SealedEnvelope,
+    SealCapabilities, SealChecks, SealFormat, SealIndication, SealMode, SealPort, SealRequest,
+    SealVerification, SealedEnvelope,
 };
 use crate::domain::error::DppError;
 use crate::domain::passport::{Passport, PassportId};
@@ -181,7 +182,14 @@ impl SealPort for GhostSeal {
 
     async fn verify(&self, env: &SealedEnvelope) -> Result<SealVerification, DppError> {
         Ok(SealVerification {
-            valid: false,
+            // Not `TotalFailed`: nothing about this envelope was checked, so
+            // calling it invalid would be a verdict the ghost did not reach.
+            // A placeholder is precisely the indeterminate case — there is
+            // nothing here to validate, and saying so is the honest answer.
+            indication: SealIndication::Indeterminate(
+                "placeholder seal: no validation was performed and none is possible".to_owned(),
+            ),
+            checks: SealChecks::None,
             placeholder: env.placeholder,
         })
     }
@@ -382,8 +390,18 @@ mod tests {
             placeholder: true,
         };
         let result = ghost.verify(&env).await.unwrap();
-        assert!(!result.valid);
         assert!(result.placeholder);
+        // Indeterminate rather than failed: nothing was checked, so there is no
+        // negative verdict to report either.
+        assert!(matches!(
+            result.indication,
+            SealIndication::Indeterminate(_)
+        ));
+        assert_eq!(result.checks, SealChecks::None);
+        assert!(
+            !result.is_qualified_pass(),
+            "a placeholder must never satisfy a compliance claim"
+        );
     }
 
     #[tokio::test]

@@ -124,13 +124,86 @@ impl SealCapabilities {
     }
 }
 
+/// The outcome of validating a seal.
+///
+/// Three-valued, because AdES validation is. The names follow the status
+/// indications in **ETSI EN 319 102-1**, the standard that specifies how an AdES
+/// signature is validated, so a verdict produced here maps onto one produced by
+/// any conformant validator without a translation step that could lose its
+/// meaning.
+///
+/// The middle value is the reason this is not a boolean.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SealIndication {
+    /// The seal passed the validation that was performed.
+    ///
+    /// What that is worth depends entirely on [`SealChecks`] — a pass over a
+    /// signature check alone is a far smaller claim than a pass over a full
+    /// validation, and the two must never be read as the same statement.
+    TotalPassed,
+
+    /// The format is wrong, or the signature value failed verification.
+    ///
+    /// A definite negative: this seal does not attest what it claims to.
+    TotalFailed(String),
+
+    /// Validation did not fail, but there was not enough information to decide.
+    ///
+    /// The ordinary answer whenever material has to be fetched — revocation data
+    /// unreachable, a timestamp not yet corroborated, a trust anchor
+    /// unresolvable at the moment of asking. It means *ask again later*, not
+    /// *reject this passport*, and collapsing it either way is wrong: to failed,
+    /// and a sound passport is reported non-compliant; to passed, and a check
+    /// that never completed is claimed as one that did.
+    Indeterminate(String),
+}
+
+/// How far validation got — what a [`SealIndication`] is actually founded on.
+///
+/// Without this, `TotalPassed` from two very different checks is one value. They
+/// are not one claim: proving a signature is consistent with the certificate it
+/// carries says nothing about whether that certificate was qualified, current,
+/// or issued by anyone trustworthy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SealChecks {
+    /// Nothing was checked — the verdict describes the envelope, not a
+    /// validation. What a placeholder yields.
+    None,
+    /// The signature was checked against the certificate carried inside the
+    /// seal, and nothing else: no certificate path, no revocation, no timestamp,
+    /// no Trusted List.
+    SignatureOnly,
+    /// A full AdES validation: certificate path to a trust anchor, revocation
+    /// status and timestamp, as well as the signature.
+    FullValidation,
+}
+
 /// Result of verifying a `SealedEnvelope`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SealVerification {
-    /// Whether the seal cryptographically verifies.
-    pub valid: bool,
+    /// What the validation concluded.
+    pub indication: SealIndication,
+    /// What was actually checked to reach it.
+    pub checks: SealChecks,
     /// True if this was a ghost/placeholder seal (always unverified in production).
     pub placeholder: bool,
+}
+
+impl SealVerification {
+    /// Whether this is a pass that a relying party may rest a compliance claim on.
+    ///
+    /// A named method because the mistake it prevents is the easy one to make:
+    /// reading `TotalPassed` alone as "this is a valid qualified seal", when the
+    /// check behind it may have been a bare signature comparison against a
+    /// self-signed certificate. Requiring both parts at every call site would
+    /// work exactly as well right up until one site forgot.
+    pub fn is_qualified_pass(&self) -> bool {
+        !self.placeholder
+            && self.checks == SealChecks::FullValidation
+            && self.indication == SealIndication::TotalPassed
+    }
 }
 
 #[cfg(test)]
@@ -149,6 +222,51 @@ mod tests {
             let back: SealFormat = serde_json::from_str(&json).unwrap();
             assert_eq!(fmt, back);
         }
+    }
+
+    /// A pass is not a pass is not a pass.
+    ///
+    /// The whole reason the verdict is not a boolean: `TotalPassed` over a bare
+    /// signature check and `TotalPassed` over a full AdES validation are
+    /// different claims, and only the second is one a compliance decision may
+    /// rest on. If these ever collapse, a self-signed development seal satisfies
+    /// the same test a qualified one does.
+    #[test]
+    fn a_signature_check_is_not_a_qualified_pass() {
+        let signature_only = SealVerification {
+            indication: SealIndication::TotalPassed,
+            checks: SealChecks::SignatureOnly,
+            placeholder: false,
+        };
+        assert!(
+            !signature_only.is_qualified_pass(),
+            "a signature check says nothing about the certificate behind it"
+        );
+
+        let full = SealVerification {
+            checks: SealChecks::FullValidation,
+            ..signature_only.clone()
+        };
+        assert!(full.is_qualified_pass());
+
+        // And a placeholder never passes, however it is labelled.
+        let placeholder = SealVerification {
+            placeholder: true,
+            ..full.clone()
+        };
+        assert!(!placeholder.is_qualified_pass());
+    }
+
+    /// Indeterminate is neither pass nor fail, and must not be read as either.
+    #[test]
+    fn indeterminate_is_not_a_pass() {
+        let unresolved = SealVerification {
+            indication: SealIndication::Indeterminate("revocation data unreachable".into()),
+            checks: SealChecks::FullValidation,
+            placeholder: false,
+        };
+        assert!(!unresolved.is_qualified_pass());
+        assert_ne!(unresolved.indication, SealIndication::TotalPassed);
     }
 
     #[test]
