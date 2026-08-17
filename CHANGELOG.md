@@ -304,6 +304,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   The widened gate immediately found eight properties under `stateOfHealth`'s
   `oneOf` branches that the first pass of this change had missed.
+### Added
+
+- **`ports::seal::conformance` — a kit that holds any `SealPort` to its own
+  contract.** `SealPort::seal` says an implementation must refuse a profile it
+  does not advertise. Until now that was a doc comment, and the only real
+  adapter in the project does not honour it: it builds its envelope with a
+  hardcoded format regardless of what the caller asked for, and never consults
+  `SealCapabilities::can_produce`. A contract with one implementor that ignores
+  it is weaker than no contract, because it reads as a guarantee.
+
+  `check_seal_port` exercises five rules — an advertised profile is produced, in
+  the format asked for; an unadvertised one is refused on **both** axes; no
+  verdict is `TotalPassed` founded on `SealChecks::None`; a placeholder never
+  satisfies `is_qualified_pass`. It returns a report separating **failures**
+  (violations) from **notes**, because an adapter that cannot verify is not
+  violating the trait — it is occupying a position an operator should be told
+  about, and collapsing the two would force a choice between failing it and
+  staying silent.
+
+  The kit lives here rather than beside an adapter on purpose: the contract
+  belongs to the port, so an adapter writing its own checks would be free to
+  test the behaviour it happens to have. It cannot tell you a seal is
+  *qualified* — that is a claim about a certificate, a creation device and a
+  QTSP, none of it observable through this trait.
+
+- **`SealVerification::passed` / `failed` / `indeterminate` / `placeholder`**,
+  and **`is_coherent`**. The constructors take `SealChecks` rather than
+  defaulting it, because what was verified is the whole content of a verdict and
+  there is no safe default — guessing high overstates the claim, guessing low
+  understates it. `is_coherent` rejects the one incoherent combination:
+  `TotalPassed` over `SealChecks::None`, a pass with no referent, which is the
+  exact shape of the worst defect this port could ship.
+
+- **`SealFormat::ALL` and `SealMode::ALL`.** Both enums are `#[non_exhaustive]`,
+  so a consumer cannot enumerate them — and the conformance kit must, in order
+  to ask an adapter for a profile it does *not* advertise. A variant added later
+  is deliberately not covered until it is added here on purpose.
 ### Breaking
 
 - **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
