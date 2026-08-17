@@ -101,6 +101,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   because anything fuzzy enough to catch a paraphrase is fuzzy enough to fire on
   innocent text. It catches the exact claim returning by copy — which is the
   failure that has now happened twice.
+- **`SectorData::other` refuses a non-object payload.** It accepted any
+  `serde_json::Value`. `Serialize` stamps the `sector` tag onto the payload only
+  when it is an object, so an array or scalar serialised **untagged** — which
+  meant it did not round-trip, and, more sharply, that `dpp-aas`'s
+  unknown-sector backstop returned early. That backstop keys off the tag, so an
+  untagged payload was left to a policy whose default class is `Public`, and its
+  contents would have been served to every audience.
+
+  Only a Rust caller could construct one — deserialization needs the object to
+  find the tag in the first place — so this was never reachable from the wire.
+  Refusing here closes it at the only door it has.
+
+- **`SectorData::other` now stores the payload with its tag**, matching what
+  `Other::data` has always documented ("the full object, including its `sector`
+  key") and what `Deserialize` produces. An untagged input previously built a
+  value that serialised *with* the tag and deserialised back **unequal to
+  itself** — the same value in two shapes depending on whether it had been
+  through the wire yet. Found by a round-trip test written for the guard above.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public

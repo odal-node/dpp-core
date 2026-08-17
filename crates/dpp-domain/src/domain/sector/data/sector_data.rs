@@ -158,7 +158,8 @@ impl SectorData {
     /// Build an untyped payload, reading the tag from the object's own
     /// `sector` field. Falls back to `"other"` when the object carries none.
     ///
-    /// Returns `None` if the tag names a sector this build *does* type.
+    /// Returns `None` if `data` is not a JSON object, or if the tag names a
+    /// sector this build *does* type.
     ///
     /// # Why this can fail
     ///
@@ -169,13 +170,37 @@ impl SectorData {
     /// same bytes deserialize into a valid `Battery`. Deserialization already
     /// routes known tags to their variants; this constructor must not offer a
     /// way around it.
+    ///
+    /// **A non-object payload is refused for a different and sharper reason.**
+    /// [`Serialize`] stamps the `sector` tag onto the payload only when it is an
+    /// object, so an array or scalar serialises with no tag at all. Two things
+    /// follow, and the second is the one that matters:
+    ///
+    /// 1. It does not round-trip — [`Deserialize`] requires a `sector` key and
+    ///    rejects what this produced.
+    /// 2. `dpp-aas`'s unknown-sector backstop keys off that tag. With no tag it
+    ///    returns early, leaving the payload to a policy whose default class is
+    ///    `Public` — so an untagged array's contents would be served to every
+    ///    audience.
+    ///
+    /// Only a Rust caller could construct one: deserialization cannot, since it
+    /// needs the object to find the tag in the first place. Refusing here closes
+    /// it at the only door it has.
     #[must_use]
-    pub fn other(data: serde_json::Value) -> Option<Self> {
-        let sector = data
+    pub fn other(mut data: serde_json::Value) -> Option<Self> {
+        let map = data.as_object_mut()?;
+        let sector = map
             .get("sector")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("other")
             .to_owned();
+        // `Other::data` is documented as the full object *including* its
+        // `sector` key, and `Deserialize` builds it that way. An untagged input
+        // would otherwise produce a value that serialises with the tag and
+        // deserialises back unequal to itself — the same value, two shapes,
+        // depending on whether it had been through the wire yet.
+        map.entry("sector")
+            .or_insert_with(|| serde_json::Value::String(sector.clone()));
         match Sector::from_wire_tag(&sector) {
             Sector::Other(_) => Some(Self::Other { sector, data }),
             _ => None,
@@ -290,4 +315,77 @@ pub fn redact_sector_data(
         });
     }
     value
+}
+
+#[cfg(test)]
+mod other_constructor_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// A non-object payload is refused rather than accepted untagged.
+    ///
+    /// The hazard is not the round-trip failure, which is merely wrong. It is
+    /// that `Serialize` only stamps the `sector` tag onto an object, so an
+    /// untagged payload slips past `dpp-aas`'s unknown-sector backstop — which
+    /// keys off exactly that tag — and is filtered by a policy defaulting to
+    /// `Public`.
+    #[test]
+    fn a_non_object_payload_is_refused() {
+        for payload in [
+            json!([{ "secret": "value" }]),
+            json!(42),
+            json!("battery"),
+            json!(null),
+            json!(true),
+        ] {
+            assert!(
+                SectorData::other(payload.clone()).is_none(),
+                "a non-object payload must not become SectorData::Other: {payload}"
+            );
+        }
+    }
+
+    /// An object for an untyped sector is still accepted, tag or not.
+    #[test]
+    fn an_object_for_an_unknown_sector_is_still_accepted() {
+        let tagged = SectorData::other(json!({ "sector": "quantum-widget", "spinPct": 3 }))
+            .expect("an unknown tagged sector is representable");
+        assert_eq!(tagged.sector(), Sector::Other("quantum-widget".into()));
+
+        let untagged = SectorData::other(json!({ "spinPct": 3 }))
+            .expect("an untagged object defaults to other");
+        assert_eq!(untagged.sector(), Sector::Other("other".into()));
+    }
+
+    /// A typed sector's tag is still refused — the pre-existing rule.
+    #[test]
+    fn a_typed_sectors_tag_is_still_refused() {
+        assert!(SectorData::other(json!({ "sector": "battery" })).is_none());
+    }
+
+    /// Everything this constructor accepts round-trips.
+    ///
+    /// The property the object guard buys: previously a caller could build a
+    /// value that serialised to something `Deserialize` then rejected.
+    #[test]
+    fn everything_accepted_round_trips() {
+        for payload in [
+            json!({ "sector": "quantum-widget", "spinPct": 3 }),
+            json!({ "spinPct": 3 }),
+            json!({}),
+        ] {
+            let Some(built) = SectorData::other(payload.clone()) else {
+                continue;
+            };
+            let wire = serde_json::to_value(&built).expect("serialises");
+            assert!(
+                wire.get("sector")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some(),
+                "the serialised form must carry a sector tag: {wire}"
+            );
+            let back: SectorData = serde_json::from_value(wire).expect("round-trips");
+            assert_eq!(back, built);
+        }
+    }
 }
