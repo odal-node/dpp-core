@@ -2,7 +2,50 @@
 
 use std::sync::OnceLock;
 
+use dpp_vocab::{OWN_JSONLD_NAMESPACE, VocabularyRegister};
 use serde_json::{Value, json};
+
+/// The `gs1:` prefix IRI, read from the register rather than written here.
+///
+/// # Why this is not a literal
+///
+/// It was one, and the doc comment below carried its provenance — the date GS1's
+/// definition was read, what it said, the licence. That is the right *content*
+/// filed in the wrong *place*: a doc comment is not a record, nothing checks it,
+/// and `dpp-vocab` exists precisely so this class of claim has one home with a
+/// source and a `checkedOn` date. The register was created to unify two
+/// mechanisms held to different standards of rigour; this was the one still on
+/// the looser standard.
+///
+/// # Panics
+///
+/// If the `gs1` record is absent, carries no `namespaceIri`, or no longer
+/// permits emission. All three are build-time facts about files embedded in
+/// `dpp-vocab`, and every one of them means this context must stop claiming
+/// GS1's vocabulary. Emitting a prefix the register refuses is the failure this
+/// arrangement exists to prevent, so it is not papered over with a fallback.
+fn gs1_namespace() -> &'static str {
+    static GS1: OnceLock<String> = OnceLock::new();
+    GS1.get_or_init(|| {
+        let register = VocabularyRegister::new();
+        let record = register
+            .all()
+            .iter()
+            .find(|v| v.key == "gs1")
+            .expect("the gs1 record is embedded in dpp-vocab")
+            .clone();
+        assert!(
+            record.permits_emission(),
+            "the gs1 record no longer permits emission ({:?}/{:?}), so this context              must not declare a gs1: prefix",
+            record.status,
+            record.layer
+        );
+        record
+            .namespace_iri
+            .expect("the gs1 record carries a namespaceIri")
+    })
+    .as_str()
+}
 
 /// Remote contexts this passport context references.
 ///
@@ -42,18 +85,18 @@ pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
 /// unsupported claim `dpp-vocab`'s rule exists to catch. All three were
 /// withdrawn to `dpp:` on 2026-08-10.
 ///
-/// **`gtin` is back, and only `gtin`.** GS1's own definition was read on
-/// 2026-08-11 at `https://ref.gs1.org/voc/gtin`: the 14-digit key, `xsd:string`,
-/// `skos:exactMatch` to `schema:gtin14` and `closeMatch` to the shorter forms.
-/// That is [`Gtin`](dpp_domain::Gtin)'s shape exactly — 14 digits, mod-10 check,
-/// shorter forms zero-padded to the canonical one — so the term now says
-/// something true. The vocabulary is Apache-2.0, which our own licence admits
-/// without a copyleft obligation.
+/// **`gtin` is back, and only `gtin`.** Its record is `vocabularies/gs1.json`
+/// in `dpp-vocab`, carrying what was read, when, and under what licence —
+/// `gs1_namespace` reads the prefix IRI from there rather than repeating it,
+/// so the claim and its evidence cannot drift apart. GS1's `gtin` is
+/// [`Gtin`](dpp_domain::Gtin)'s shape exactly, which is why the term says
+/// something true.
 ///
 /// The other two stay `dpp:`. Schema.org is `tracked` in `dpp-vocab`: evaluated,
-/// not adopted. And note that what was read here was **one term**, not the GS1
-/// vocabulary — declaring the `gs1:` prefix is what makes the compact form
-/// expand, not a claim that anything else under it has been checked.
+/// not adopted, and its record does not permit emission. And note that what was
+/// read was **one term**, not the GS1 vocabulary — declaring the `gs1:` prefix
+/// is what makes the compact form expand, not a claim that anything else under
+/// it has been checked.
 ///
 /// The literal is built once and cloned per call — callers extend the
 /// returned value (e.g. [`frame_passport`] merges passport fields into it),
@@ -66,8 +109,8 @@ pub fn passport_context() -> Value {
                 "@context": [
                     REMOTE_CONTEXTS[0],
                     {
-                        "dpp": "https://schema.odal-node.io/dpp#",
-                        "gs1": "https://ref.gs1.org/voc/",
+                        "dpp": OWN_JSONLD_NAMESPACE,
+                        "gs1": gs1_namespace(),
                         "gtin": "gs1:gtin",
                         "sector": "dpp:sector",
                         "passportId": "dpp:passportId",

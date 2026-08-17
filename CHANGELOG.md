@@ -205,6 +205,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cleared the plaintext `Vec` but not the `[u8; 32]` copied out of it, and the
   length-check error path returned before clearing either. Both are now
   `Zeroizing`.
+### Changed
+
+- **`dpp-vc`'s JSON-LD context reads its prefix IRIs from `dpp-vocab` instead of
+  hardcoding them**, and `dpp-vc` now depends on that crate. `dpp-vocab` was
+  carved because the external-vocabulary-provenance mechanism existed twice at
+  two standards of rigour — `dpp-aas` provenanced and CI-gated, `dpp-vc` inlining
+  `gs1:` and `dpp:` with neither. `dpp-aas` migrated; this side did not, so the
+  register had a consumer and a hold-out.
+
+  The provenance was not absent, it was filed in the wrong place: a doc comment
+  recorded the date GS1's definition was read, what it said and under what
+  licence. That is the right content somewhere nothing can query it, nothing
+  fails when the underlying record changes, and no `checkedOn` date is legible to
+  the build.
+
+### Added
+
+- **Two gates on the emitted `@context`.** Every declared prefix must be ours or
+  covered by a record whose `permits_emission()` holds; every compact term must
+  expand to an IRI the register permits. The second is not implied by the first —
+  declaring a permitted prefix and then coining a term under it is still a claim
+  about that authority's vocabulary. A third test pins the `gs1:` prefix to the
+  record's `namespaceIri` so the derivation cannot quietly become a copy again.
+
+- **`dpp_vocab::OWN_JSONLD_NAMESPACE`** — the `https://schema.odal-node.io/dpp#`
+  form the `dpp:` prefix expands into. `OWN_NAMESPACE` is a URN and cannot serve:
+  a JSON-LD prefix is concatenated with the term, and `urn:odal-node:` + `sector`
+  is not an IRI a consumer can use.
+
+  `is_own` deliberately does **not** cover the new constant. It governs AAS
+  `semanticId` values, where the URN form is the only one this project mints, and
+  widening it to admit an `https://` prefix would put every `https://` semanticId
+  one hostname away from being classified as ours — in the check whose whole job
+  is to refuse exactly that.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public
