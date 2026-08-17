@@ -20,6 +20,17 @@ use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
 /// over-redacting Annex III public fields. Use only specific, unambiguous field
 /// names (e.g. `dueDiligenceUrl`, `svhcSubstances`). Gating a shared leaf on a
 /// single path would require making the matcher path-aware first.
+///
+/// A schema cannot get this wrong quietly: `access::tests`'
+/// `no_schema_declares_one_field_name_in_two_classes` fails the build if one
+/// name is declared in two classes. It is a real limit rather than an
+/// oversight, and it decides how a nested field may be classified — a nested
+/// property sharing a leaf name with a more permissive field elsewhere in the
+/// same schema cannot be restricted on the leaf, because that would restrict
+/// the twin as well. Where that arises the **enclosing object** carries the
+/// restriction and [`super::filter::filter_by_audience`] removes the whole
+/// subtree before reaching the leaf, which is why it is a constraint on
+/// expression rather than a hole in enforcement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SectorAccessPolicy {
@@ -72,6 +83,75 @@ const COMMON_CONFORMITY: &[&str] = &[
     "auditHistory",
     "supplyChainTrace",
 ];
+
+/// Parse one `x-disclosure` token. `None` for anything outside the four classes.
+fn parse_disclosure(token: &str) -> Option<Disclosure> {
+    match token {
+        "public" => Some(Disclosure::Public),
+        "restricted" => Some(Disclosure::Restricted),
+        "conformity" => Some(Disclosure::Conformity),
+        "individual" => Some(Disclosure::Individual),
+        _ => None,
+    }
+}
+
+/// Walk every `properties` map in a schema and record each declared class.
+///
+/// Descends through nested `properties`, array `items`, `additionalProperties`,
+/// the `definitions` / `$defs` blocks that `$ref` resolves into, and the
+/// `allOf` / `anyOf` / `oneOf` combinators.
+///
+/// `$ref` itself is deliberately **not** followed. Matching is by leaf name, so
+/// a definition's properties are reached by walking the definitions block
+/// directly; following the pointer as well would visit them twice and buy
+/// nothing. It also means a cyclic `$ref` cannot loop this function.
+///
+/// A leaf name declared twice with **different** classes keeps the more
+/// restrictive one. That is a fail-closed tie-break for a schema that should
+/// not exist — `access::tests` rejects the ambiguity at build time — and it is
+/// never reached by a schema that passes that gate.
+fn collect_disclosures(node: &serde_json::Value, out: &mut HashMap<String, Disclosure>) {
+    let Some(object) = node.as_object() else {
+        return;
+    };
+
+    if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
+        for (name, prop) in properties {
+            if let Some(class) = prop
+                .get("x-disclosure")
+                .and_then(serde_json::Value::as_str)
+                .and_then(parse_disclosure)
+            {
+                out.entry(name.clone())
+                    .and_modify(|existing| *existing = existing.most_restrictive(class))
+                    .or_insert(class);
+            }
+            collect_disclosures(prop, out);
+        }
+    }
+
+    for key in ["items", "additionalProperties"] {
+        if let Some(child) = object.get(key) {
+            collect_disclosures(child, out);
+        }
+    }
+
+    for key in ["definitions", "$defs"] {
+        if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
+            for definition in block.values() {
+                collect_disclosures(definition, out);
+            }
+        }
+    }
+
+    for key in ["allOf", "anyOf", "oneOf"] {
+        if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
+            for branch in branches {
+                collect_disclosures(branch, out);
+            }
+        }
+    }
+}
 
 impl SectorAccessPolicy {
     /// The policy for the schema version a passport was validated against.
@@ -155,10 +235,25 @@ impl SectorAccessPolicy {
     ///
     /// Co-location. A field and its access class are declared in the same
     /// object, so a field cannot be added without its disclosure slot appearing
-    /// in the same diff — and `every_property_declares_a_disclosure_class`
+    /// in the same diff — and `every_property_declares_a_valid_disclosure_class`
     /// turns that into a build-time guarantee. The catalog map has no such
     /// property: a field added without an entry silently defaults to public,
     /// which for Annex XIII point 2, 3 or 4 content is a leak.
+    ///
+    /// # Every depth, not only the top level
+    ///
+    /// Annotations are collected from **every** `properties` map in the schema —
+    /// nested objects, array `items`, and the `definitions`/`$defs` blocks that
+    /// `$ref` pulls in — not just the root one.
+    ///
+    /// Reading only the root was a silent hole: [`super::filter::filter_by_audience`]
+    /// classifies keys at every nesting depth, so a nested property fell to
+    /// `default_disclosure` — `Public` — no matter what it declared. A field
+    /// annotated `restricted` in the place this doc comment tells an author to
+    /// put it was served to anyone, and neither build-time gate looked deep
+    /// enough to notice. Nothing leaked, because every nested property then in
+    /// the tree sat under a public parent and was correctly public anyway; the
+    /// defect was that annotating one correctly would not have helped.
     ///
     /// Returns `None` if the schema is absent or is not a JSON object with
     /// `properties`. An unparseable schema must not silently produce an
@@ -166,22 +261,13 @@ impl SectorAccessPolicy {
     #[must_use]
     pub fn from_schema(sector_key: &str, version: &str, schema_json: &str) -> Option<Self> {
         let schema: serde_json::Value = serde_json::from_str(schema_json).ok()?;
-        let properties = schema.get("properties")?.as_object()?;
+        // The root `properties` map is still required: a schema without one is
+        // not a shape this policy can describe, and guessing is how an
+        // unparseable sector ends up all-public.
+        schema.get("properties")?.as_object()?;
 
-        let mut field_disclosure: HashMap<String, Disclosure> = properties
-            .iter()
-            .filter_map(|(name, prop)| {
-                let class = prop.get("x-disclosure")?.as_str()?;
-                let disclosure = match class {
-                    "public" => Disclosure::Public,
-                    "restricted" => Disclosure::Restricted,
-                    "conformity" => Disclosure::Conformity,
-                    "individual" => Disclosure::Individual,
-                    _ => return None,
-                };
-                Some((name.clone(), disclosure))
-            })
-            .collect();
+        let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
+        collect_disclosures(&schema, &mut field_disclosure);
 
         for field in COMMON_CONFORMITY {
             field_disclosure
@@ -230,11 +316,25 @@ impl SectorAccessPolicy {
     /// Get the disclosure class for a field, matched by normalized key name
     /// (case/separator-insensitive). Unlisted fields fall back to
     /// `default_disclosure`.
+    ///
+    /// **Deterministic when more than one key matches.** `field_disclosure` is
+    /// keyed by the literal name but matched after normalization, so two
+    /// distinct keys — `jwsSignature` and `jws_signature` — can both answer one
+    /// lookup. Taking the first match meant taking whichever one `HashMap`
+    /// iteration reached first, which is unspecified and reseeded per map: the
+    /// same passport, policy and audience could be answered `Conformity` on one
+    /// call and `Public` on the next, in one process. A disclosure verdict that
+    /// varies per map instance also makes the served field set unstable, which
+    /// is fatal for content-binding.
+    ///
+    /// So every match is considered and the **most restrictive** wins. Ambiguity
+    /// resolves the safe way, and it resolves the same way every time.
     pub fn disclosure_for_field(&self, field_name: &str) -> Disclosure {
         self.field_disclosure
             .iter()
-            .find(|(k, _)| keys_match_normalized(k, field_name))
+            .filter(|(k, _)| keys_match_normalized(k, field_name))
             .map(|(_, d)| *d)
+            .reduce(Disclosure::most_restrictive)
             .unwrap_or(self.default_disclosure)
     }
 }

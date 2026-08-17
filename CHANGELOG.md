@@ -239,6 +239,71 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   widening it to admit an `https://` prefix would put every `https://` semanticId
   one hostname away from being classified as ours — in the check whose whole job
   is to refuse exactly that.
+- **Disclosure classes are now read from every depth of a schema, not only the
+  top level.** `SectorAccessPolicy::from_schema` walked the root `properties`
+  map and stopped, while `filter_by_audience` classifies keys at **every**
+  nesting depth. A property annotated `"x-disclosure": "restricted"` inside an
+  object, an array's `items`, or a `definitions` block was therefore not in the
+  policy map at all, fell to `default_disclosure` — `Public` — and was served to
+  anyone.
+
+  The author had done everything right: the annotation sat exactly where the
+  constructor's own documentation says to put it, and it did nothing.
+
+  **Nothing leaked.** Every nested property in the tree today sits under a public
+  parent and was correctly public anyway; the differential check on this change
+  compares all 28 embedded schemas across all three audiences and finds the
+  served field set byte-identical. The defect was that annotating one correctly
+  would not have helped.
+
+- **An ambiguous field-name lookup no longer depends on hash order.**
+  `disclosure_for_field` matches after normalization but the map is keyed by
+  literal name, so `jwsSignature` and `jws_signature` can both answer one
+  lookup. It returned the first match found by `HashMap` iteration — unspecified,
+  and reseeded per map — so the same policy could answer `Conformity` on one
+  call and `Public` on the next, in one process. It now considers every match
+  and keeps the **most restrictive**. No embedded schema could reach this; a
+  hand-built policy could.
+
+### Added
+
+- **`x-disclosure` on all 184 previously unannotated nested properties**, across
+  19 schema files. Each carries the class the filter already applied, so the
+  served output is unchanged for every audience.
+
+  A nested property's class can only be more restrictive than public where its
+  leaf name is globally unambiguous, and two constraints decide that. Within a
+  schema, `name` and `casNumber` are shared between a restricted
+  `materialComposition` and a public `criticalRawMaterials`. Across the
+  document, a sector policy is applied to the **whole passport**, so a schema
+  restricting `name` or `countryOfOrigin` would redact `materials[].name` and
+  `materials[].countryOfOrigin` from the envelope — Annex III content that is
+  public. In both cases the permissive class is recorded and the **enclosing
+  object** keeps the restriction, which is what the filter already relies on.
+
+  The second constraint was found by the committed AAS environment fixtures,
+  which caught `countryOfOrigin` disappearing from the public electronics
+  projection after a first pass had restricted it. Over-redaction is not the
+  safe direction: it makes the public passport omit content the regulation
+  requires it to carry.
+
+  Expressing a restricted nested leaf whose name is shared needs a path-aware
+  matcher. That is a larger change and is deliberately not here; the limit is
+  now documented on `SectorAccessPolicy` and enforced by a gate rather than
+  left to be rediscovered.
+
+- **Both disclosure gates walk the whole schema**, and a third rejects
+  ambiguity. `every_property_declares_a_valid_disclosure_class` and
+  `every_sector_version_yields_a_fully_classified_policy` now traverse nested
+  `properties`, `items`, `additionalProperties`, `definitions`/`$defs` and the
+  `allOf`/`anyOf`/`oneOf` combinators — the same tree the constructor reads,
+  because a gate that walks a different tree is a gate over a different schema.
+  `no_schema_declares_one_field_name_in_two_classes` fails the build when one
+  name is declared in two classes, so the constructor's fail-closed tie-break is
+  never reached by a shipped schema.
+
+  The widened gate immediately found eight properties under `stateOfHealth`'s
+  `oneOf` branches that the first pass of this change had missed.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public

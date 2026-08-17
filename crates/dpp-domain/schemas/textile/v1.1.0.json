@@ -32,17 +32,20 @@
         "properties": {
           "fibre": {
             "type": "string",
+            "x-disclosure": "public",
             "minLength": 1,
             "description": "Fibre name, e.g. cotton, polyester, recycled_polyester."
           },
           "pct": {
             "type": "number",
+            "x-disclosure": "public",
             "minimum": 0,
             "maximum": 100,
             "description": "Percentage by weight (0–100)."
           },
           "countryOfOrigin": {
             "type": "string",
+            "x-disclosure": "public",
             "pattern": "^[A-Z]{2}$",
             "description": "ISO 3166-1 alpha-2 country code where this fibre was sourced."
           }
@@ -160,26 +163,31 @@
         "properties": {
           "casNumber": {
             "type": "string",
+            "x-disclosure": "restricted",
             "minLength": 1,
             "description": "CAS Registry Number, e.g. 80-05-7."
           },
           "substanceName": {
             "type": "string",
+            "x-disclosure": "restricted",
             "minLength": 1,
             "description": "Human-readable substance name."
           },
           "concentrationPct": {
             "type": "number",
+            "x-disclosure": "restricted",
             "minimum": 0,
             "maximum": 100,
             "description": "Concentration in the article as weight-%."
           },
           "locationInProduct": {
             "type": "string",
+            "x-disclosure": "restricted",
             "description": "Where in the product the substance is found, e.g. coating, dye, finish."
           },
           "scipNotificationId": {
             "type": "string",
+            "x-disclosure": "restricted",
             "description": "ECHA SCIP database notification reference."
           }
         },

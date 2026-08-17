@@ -290,10 +290,12 @@
           ],
           "properties": {
             "parameterSet": {
+              "x-disclosure": "individual",
               "const": "electricVehicle"
             },
             "socePct": {
               "type": "number",
+              "x-disclosure": "individual",
               "minimum": 0,
               "maximum": 100,
               "description": "State of certified energy (SOCE) — the only Annex VII Part A parameter for EV batteries."
@@ -310,10 +312,12 @@
           ],
           "properties": {
             "parameterSet": {
+              "x-disclosure": "individual",
               "const": "stationaryOrLmt"
             },
             "remainingCapacityPct": {
               "type": "number",
+              "x-disclosure": "individual",
               "minimum": 0,
               "maximum": 100,
               "description": "Annex VII Part A item 1 — unconditional."
@@ -323,6 +327,7 @@
                 "number",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0,
               "maximum": 100,
               "description": "Annex VII Part A item 2 — 'where possible'."
@@ -332,12 +337,14 @@
                 "number",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0,
               "maximum": 100,
               "description": "Annex VII Part A item 3 — 'where possible'."
             },
             "selfDischargeRatePctPerMonth": {
               "type": "number",
+              "x-disclosure": "individual",
               "minimum": 0,
               "description": "Annex VII Part A item 4 — unconditional."
             },
@@ -346,6 +353,7 @@
                 "number",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0,
               "description": "Annex VII Part A item 5 — 'where possible'."
             }
@@ -383,21 +391,25 @@
             "string",
             "null"
           ],
+          "x-disclosure": "individual",
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
           "description": "Annex VII Part B item 1, second half — 'where appropriate'. The date of manufacture is manufacturingDate."
         },
         "energyThroughputKwh": {
           "type": "number",
+          "x-disclosure": "individual",
           "minimum": 0,
           "description": "Annex VII Part B item 2."
         },
         "capacityThroughputAh": {
           "type": "number",
+          "x-disclosure": "individual",
           "minimum": 0,
           "description": "Annex VII Part B item 3."
         },
         "harmfulEvents": {
           "type": "object",
+          "x-disclosure": "individual",
           "description": "Annex VII Part B item 4. The annex lists these 'such as', so the set is illustrative and every member is optional.",
           "properties": {
             "deepDischargeEvents": {
@@ -405,6 +417,7 @@
                 "integer",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0
             },
             "hoursInExtremeTemperature": {
@@ -412,6 +425,7 @@
                 "number",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0
             },
             "hoursChargingInExtremeTemperature": {
@@ -419,6 +433,7 @@
                 "number",
                 "null"
               ],
+              "x-disclosure": "individual",
               "minimum": 0
             }
           },
@@ -426,6 +441,7 @@
         },
         "fullEquivalentCycles": {
           "type": "number",
+          "x-disclosure": "individual",
           "minimum": 0,
           "description": "Annex VII Part B item 5."
         }
@@ -444,11 +460,13 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1,
           "description": "Chemical name or formula."
         },
         "weightPct": {
           "type": "number",
+          "x-disclosure": "restricted",
           "minimum": 0,
           "maximum": 100,
           "description": "Weight percentage in the component."
@@ -458,6 +476,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "description": "CAS Registry Number."
         }
       },
@@ -471,6 +490,7 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1,
           "description": "Material name, e.g. cobalt, lithium."
         },
@@ -479,6 +499,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "description": "CAS or EC number."
         },
         "weightGrams": {
@@ -486,6 +507,7 @@
             "number",
             "null"
           ],
+          "x-disclosure": "public",
           "minimum": 0,
           "description": "Weight in grams present in the battery."
         },
@@ -494,6 +516,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "pattern": "^[A-Z]{2}$",
           "description": "ISO 3166-1 alpha-2 country of primary extraction."
         }

@@ -408,7 +408,7 @@ fn generic_leaf_key_collides_across_objects() {
 // ── Art. 77(2) lattice ───────────────────────────────────────────────────────
 
 /// Every property of the current battery schema declares an `x-disclosure`
-/// class.
+/// class — **at every depth**.
 ///
 /// This is the guarantee the annotation exists to provide. The catalog map it
 /// replaces has no equivalent: a field added there without an entry silently
@@ -422,24 +422,20 @@ fn generic_leaf_key_collides_across_objects() {
 /// `default_disclosure` — `Public`. A typo in one character therefore publishes
 /// a restricted field, and asserting only that *some* string is present would
 /// not catch it.
+///
+/// **Depth is the part this used to miss.** It walked `schema["properties"]`
+/// and stopped, so 184 properties nested inside objects, array `items` and
+/// `definitions` blocks were unchecked — and the constructor could not have
+/// read them anyway. Both halves are fixed together: reading one without
+/// gating the other leaves a field that silently defaults to public, and
+/// gating one without reading the other rejects schemas the code then ignores.
 #[test]
 fn every_property_declares_a_valid_disclosure_class() {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
     let (version, json) = reg.latest("battery").expect("battery schema exists");
     let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
-    let properties = schema["properties"].as_object().expect("has properties");
 
-    let bad: Vec<(&str, &str)> = properties
-        .iter()
-        .filter_map(|(n, p)| {
-            let class = p
-                .get("x-disclosure")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("<missing>");
-            (!VALID_DISCLOSURE_TOKENS.contains(&class)).then_some((n.as_str(), class))
-        })
-        .collect();
-
+    let bad = undeclared_properties(&schema);
     assert!(
         bad.is_empty(),
         "battery v{version}: these properties declare no usable x-disclosure class, so they \
@@ -450,6 +446,169 @@ fn every_property_declares_a_valid_disclosure_class() {
 /// The four tokens `SectorAccessPolicy::from_schema` recognises. Anything else
 /// is dropped by that constructor and falls through to the public default.
 const VALID_DISCLOSURE_TOKENS: [&str; 4] = ["public", "restricted", "conformity", "individual"];
+
+/// Every property in `schema`, at any depth, that declares no usable class.
+///
+/// Mirrors the traversal `SectorAccessPolicy::from_schema` performs, for the
+/// same reason the two are described together: a gate that walks a different
+/// tree from the constructor is a gate over a different schema.
+fn undeclared_properties(schema: &serde_json::Value) -> Vec<(String, String)> {
+    fn walk(node: &serde_json::Value, path: &str, out: &mut Vec<(String, String)>) {
+        let Some(object) = node.as_object() else {
+            return;
+        };
+        if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
+            for (name, prop) in properties {
+                let child = if path.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{path}.{name}")
+                };
+                let class = prop
+                    .get("x-disclosure")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("<missing>");
+                if !VALID_DISCLOSURE_TOKENS.contains(&class) {
+                    out.push((child.clone(), class.to_owned()));
+                }
+                walk(prop, &child, out);
+            }
+        }
+        for key in ["items", "additionalProperties"] {
+            if let Some(child) = object.get(key) {
+                walk(child, &format!("{path}[]"), out);
+            }
+        }
+        for key in ["definitions", "$defs"] {
+            if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
+                for (name, definition) in block {
+                    walk(definition, &format!("{key}.{name}"), out);
+                }
+            }
+        }
+        for key in ["allOf", "anyOf", "oneOf"] {
+            if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
+                for branch in branches {
+                    walk(branch, path, out);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(schema, "", &mut out);
+    out
+}
+
+/// No schema declares one field name in two different classes.
+///
+/// Matching is by normalized **leaf name** at any depth, so `materialComposition.name`
+/// and `criticalRawMaterial.name` are one key. A schema declaring them
+/// differently is asking for something the matcher cannot express, and the
+/// constructor would have to pick — silently, and for every field of that name
+/// in the document.
+///
+/// It picks the more restrictive one, which is the safe direction but is still
+/// a guess at what the author meant. This test means no shipped schema ever
+/// makes it guess. It is also what keeps `disclosure_for_field` honest: the
+/// tie-break exists for hand-built policies, not for these.
+///
+/// **This is the constraint that decides how a nested field may be classified.**
+/// A nested property whose leaf name is shared with a more permissive field
+/// elsewhere in the same schema cannot be restricted by annotation alone —
+/// restricting it would restrict the twin. Where that arises today the parent
+/// object carries the restriction instead, and the filter removes the whole
+/// subtree before ever reaching the leaf. Expressing it on the leaf itself
+/// needs a path-aware matcher, which this crate does not have.
+#[test]
+fn no_schema_declares_one_field_name_in_two_classes() {
+    use std::collections::HashMap;
+
+    let reg = crate::schemas::VersionedSchemaRegistry::new();
+    for sector in reg.sectors() {
+        for version in reg.versions_for(sector) {
+            let json = reg.get(sector, version).expect("registry listed it");
+            let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+
+            let mut seen: HashMap<String, (String, Disclosure)> = HashMap::new();
+            let mut clashes: Vec<String> = Vec::new();
+            collect_declared(&schema, "", &mut |path: &str, name: &str, class| {
+                let key: String = name
+                    .chars()
+                    .filter(char::is_ascii_alphanumeric)
+                    .map(|c| c.to_ascii_lowercase())
+                    .collect();
+                if let Some((first_path, first)) = seen.get(&key) {
+                    if *first != class {
+                        clashes.push(format!(
+                            "'{name}' is {first:?} at {first_path} and {class:?} at {path}"
+                        ));
+                    }
+                } else {
+                    seen.insert(key, (path.to_owned(), class));
+                }
+            });
+
+            assert!(
+                clashes.is_empty(),
+                "{sector} v{version}: one field name declared in two classes, so the policy \
+                 cannot express both: {clashes:?}"
+            );
+        }
+    }
+}
+
+/// Visit every declared `(path, name, class)` triple in a schema.
+fn collect_declared(
+    node: &serde_json::Value,
+    path: &str,
+    visit: &mut impl FnMut(&str, &str, Disclosure),
+) {
+    let Some(object) = node.as_object() else {
+        return;
+    };
+    if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
+        for (name, prop) in properties {
+            let child = if path.is_empty() {
+                name.clone()
+            } else {
+                format!("{path}.{name}")
+            };
+            if let Some(class) = prop
+                .get("x-disclosure")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|t| match t {
+                    "public" => Some(Disclosure::Public),
+                    "restricted" => Some(Disclosure::Restricted),
+                    "conformity" => Some(Disclosure::Conformity),
+                    "individual" => Some(Disclosure::Individual),
+                    _ => None,
+                })
+            {
+                visit(&child, name, class);
+            }
+            collect_declared(prop, &child, visit);
+        }
+    }
+    for key in ["items", "additionalProperties"] {
+        if let Some(child) = object.get(key) {
+            collect_declared(child, &format!("{path}[]"), visit);
+        }
+    }
+    for key in ["definitions", "$defs"] {
+        if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
+            for (name, definition) in block {
+                collect_declared(definition, &format!("{key}.{name}"), visit);
+            }
+        }
+    }
+    for key in ["allOf", "anyOf", "oneOf"] {
+        if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
+            for branch in branches {
+                collect_declared(branch, path, visit);
+            }
+        }
+    }
+}
 
 /// Every schema version of every sector yields a policy, and every property in
 /// each declares a class.
@@ -471,17 +630,11 @@ fn every_sector_version_yields_a_fully_classified_policy() {
                 continue;
             };
             // Missing *and* misspelt: both land the field on the public
-            // default, so both have to fail the build.
-            let undeclared: Vec<(&str, &str)> = properties
-                .iter()
-                .filter_map(|(n, p)| {
-                    let class = p
-                        .get("x-disclosure")
-                        .and_then(serde_json::Value::as_str)
-                        .unwrap_or("<missing>");
-                    (!VALID_DISCLOSURE_TOKENS.contains(&class)).then_some((n.as_str(), class))
-                })
-                .collect();
+            // default, so both have to fail the build. Walked at every depth —
+            // a nested property with no class defaults to public exactly as a
+            // top-level one does.
+            let _ = properties;
+            let undeclared = undeclared_properties(&schema);
             assert!(
                 undeclared.is_empty(),
                 "{sector} v{version}: unclassified properties {undeclared:?}"
@@ -585,6 +738,122 @@ fn an_unrecognised_disclosure_token_falls_through_to_public() {
     assert!(
         served.get("safetyMeasures").is_some(),
         "the public view carries a field the typo declassified"
+    );
+}
+
+/// A nested property's declared class is read, and it is enforced.
+///
+/// The regression this pins: `from_schema` read `schema["properties"]` and
+/// stopped, while `filter_by_audience` classifies keys at every depth. A
+/// property annotated `restricted` inside an object was not in the map at all,
+/// so it fell to `default_disclosure` — `Public` — and was served to anyone.
+///
+/// The shape of that failure is what makes it worth a test of its own: the
+/// author did everything right. The annotation sat in the place the
+/// constructor's own doc comment says to put it, and it did nothing. Neither
+/// build-time gate looked deep enough to say so.
+#[test]
+fn a_nested_property_is_classified_by_its_own_annotation() {
+    let schema = r#"{
+        "properties": {
+            "supplier": {
+                "type": "object",
+                "x-disclosure": "public",
+                "properties": {
+                    "tradingName":     { "type": "string", "x-disclosure": "public" },
+                    "internalContact": { "type": "string", "x-disclosure": "restricted" }
+                }
+            },
+            "shipments": {
+                "type": "array",
+                "x-disclosure": "public",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "reference":  { "type": "string", "x-disclosure": "public" },
+                        "unitCostEur": { "type": "number", "x-disclosure": "conformity" }
+                    }
+                }
+            }
+        }
+    }"#;
+    let policy =
+        SectorAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
+
+    assert_eq!(
+        policy.disclosure_for_field("internalContact"),
+        Disclosure::Restricted,
+        "a nested annotation must reach the policy map"
+    );
+    assert_eq!(
+        policy.disclosure_for_field("unitCostEur"),
+        Disclosure::Conformity,
+        "inside array items, too"
+    );
+
+    // And through the filter, which is where it actually mattered.
+    let data = json!({
+        "supplier":  { "tradingName": "ACME", "internalContact": "ops@example.invalid" },
+        "shipments": [ { "reference": "S-1", "unitCostEur": 12.5 } ]
+    });
+    let public = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+
+    assert!(
+        public["supplier"].get("internalContact").is_none(),
+        "the public view must not carry a nested restricted field"
+    );
+    assert_eq!(
+        public["supplier"]["tradingName"],
+        json!("ACME"),
+        "its public sibling survives"
+    );
+    assert!(
+        public["shipments"][0].get("unitCostEur").is_none(),
+        "conformity content inside an array item is withheld from the public"
+    );
+    assert_eq!(public["shipments"][0]["reference"], json!("S-1"));
+
+    // The audience that may see it, does.
+    let authority = filter_by_audience(&data, &policy, Audience::Authority).filtered_data;
+    assert_eq!(authority["shipments"][0]["unitCostEur"], json!(12.5));
+    assert_eq!(
+        authority["supplier"]["internalContact"],
+        json!("ops@example.invalid")
+    );
+}
+
+/// Two normalized-equal keys give one answer, and the same answer every time.
+///
+/// `field_disclosure` is keyed by literal name but matched after
+/// normalization, so `jwsSignature` and `jws_signature` both answer one lookup.
+/// Resolving by `HashMap` iteration order meant resolving by an unspecified,
+/// per-map-reseeded order: the same policy could answer `Conformity` once and
+/// `Public` the next call, in one process.
+///
+/// Built fresh inside the loop on purpose — `RandomState` seeds per map, so a
+/// single map reused across iterations would report a stable answer and prove
+/// nothing.
+#[test]
+fn an_ambiguous_field_name_resolves_the_same_way_every_time() {
+    // A `HashSet`, not a `BTreeSet`: `Disclosure` is a lattice and deliberately
+    // implements no `Ord`, because ordering it is exactly the mistake
+    // `Audience`'s doc comment exists to prevent.
+    let mut answers = std::collections::HashSet::new();
+    for _ in 0..512 {
+        let mut policy = SectorAccessPolicy::passport_default();
+        policy
+            .field_disclosure
+            .insert("jws_signature".into(), Disclosure::Public);
+        answers.insert(policy.disclosure_for_field("jwsSignature"));
+    }
+    assert_eq!(
+        answers.len(),
+        1,
+        "one lookup must not depend on hash order; got {answers:?}"
+    );
+    assert!(
+        answers.contains(&Disclosure::Conformity),
+        "and ambiguity must resolve to the more restrictive class; got {answers:?}"
     );
 }
 

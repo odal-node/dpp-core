@@ -32,11 +32,13 @@
         "properties": {
           "fibre": {
             "type": "string",
+            "x-disclosure": "public",
             "minLength": 1,
             "description": "Fibre name, e.g. cotton, polyester, recycled_polyester."
           },
           "pct": {
             "type": "number",
+            "x-disclosure": "public",
             "minimum": 0,
             "maximum": 100,
             "description": "Percentage by weight (0–100)."

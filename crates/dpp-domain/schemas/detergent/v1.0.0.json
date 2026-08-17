@@ -105,15 +105,18 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1,
           "description": "INCI or IUPAC name of the surfactant."
         },
         "biodegradable": {
           "type": "boolean",
+          "x-disclosure": "public",
           "description": "Whether the surfactant is readily biodegradable per EU 2026/405 (ultimate biodegradability). All surfactants must be true; false triggers NON_COMPLIANT."
         },
         "concentrationBand": {
           "type": "string",
+          "x-disclosure": "public",
           "enum": [
             "<5%",
             "5-15%",
@@ -126,7 +129,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "public"
         }
       },
       "additionalProperties": false
