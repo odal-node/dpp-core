@@ -49,8 +49,8 @@ use async_trait::async_trait;
 use crate::domain::error::DppError;
 
 pub use crate::domain::seal::{
-    SealCapabilities, SealCredentialRef, SealFormat, SealMode, SealRequest, SealVerification,
-    SealedEnvelope,
+    SealCapabilities, SealChecks, SealCredentialRef, SealFormat, SealIndication, SealMode,
+    SealRequest, SealVerification, SealedEnvelope,
 };
 
 // ─── Port Trait ──────────────────────────────────────────────────────────────
@@ -63,6 +63,20 @@ pub use crate::domain::seal::{
 #[async_trait]
 pub trait SealPort: Send + Sync {
     /// Apply a qualified seal to the given payload hash.
+    ///
+    /// # An implementation must refuse what it cannot produce
+    ///
+    /// If [`SealCapabilities::can_produce`] is false for `req`, this must return
+    /// an error rather than a seal. Advertising one thing and delivering another
+    /// is not a convenience — it silently substitutes a different attestation
+    /// than the caller asked for, and both axes carry meaning that cannot be
+    /// swapped: the format decides what a verifier must run, and the mode decides
+    /// *whose* attestation the seal is.
+    ///
+    /// Sealing is normally irreversible in practice — the seal is bought, and
+    /// the document it covers is retention-locked — so a substitution discovered
+    /// later cannot be undone by re-sealing. Refusing costs a failed request;
+    /// accepting costs an attestation that says something nobody chose.
     async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, DppError>;
 
     /// Verify a previously produced seal envelope.
@@ -71,6 +85,20 @@ pub trait SealPort: Send + Sync {
     /// Report which formats and modes this adapter supports.
     fn capabilities(&self) -> SealCapabilities;
 }
+
+// ─── Conformance ─────────────────────────────────────────────────────────────
+
+/// A kit that holds any [`SealPort`] implementation to the contract above.
+///
+/// The refusal rule on [`SealPort::seal`] was a doc comment and nothing else,
+/// and a contract with one implementor that does not honour it is weaker than
+/// no contract, because it reads as a guarantee. Run
+/// [`conformance::check_seal_port`] against an adapter to find out.
+///
+/// A submodule of the port rather than a sibling of it: the contract belongs to
+/// `SealPort`, so the checks do too, and `ports/mod.rs` stays an inventory of
+/// ports — which the `ports_inventory` tripwire holds it to.
+pub mod conformance;
 
 // ─── Ghost implementation (development / pre-QTSP) ───────────────────────────
 

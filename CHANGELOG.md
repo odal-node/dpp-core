@@ -304,6 +304,103 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   The widened gate immediately found eight properties under `stateOfHealth`'s
   `oneOf` branches that the first pass of this change had missed.
+### Added
+
+- **`ports::seal::conformance` — a kit that holds any `SealPort` to its own
+  contract.** `SealPort::seal` says an implementation must refuse a profile it
+  does not advertise. Until now that was a doc comment, and the only real
+  adapter in the project does not honour it: it builds its envelope with a
+  hardcoded format regardless of what the caller asked for, and never consults
+  `SealCapabilities::can_produce`. A contract with one implementor that ignores
+  it is weaker than no contract, because it reads as a guarantee.
+
+  `check_seal_port` exercises five rules — an advertised profile is produced, in
+  the format asked for; an unadvertised one is refused on **both** axes; no
+  verdict is `TotalPassed` founded on `SealChecks::None`; a placeholder never
+  satisfies `is_qualified_pass`. It returns a report separating **failures**
+  (violations) from **notes**, because an adapter that cannot verify is not
+  violating the trait — it is occupying a position an operator should be told
+  about, and collapsing the two would force a choice between failing it and
+  staying silent.
+
+  The kit lives here rather than beside an adapter on purpose: the contract
+  belongs to the port, so an adapter writing its own checks would be free to
+  test the behaviour it happens to have. It cannot tell you a seal is
+  *qualified* — that is a claim about a certificate, a creation device and a
+  QTSP, none of it observable through this trait.
+
+- **`SealVerification::passed` / `failed` / `indeterminate` / `placeholder`**,
+  and **`is_coherent`**. The constructors take `SealChecks` rather than
+  defaulting it, because what was verified is the whole content of a verdict and
+  there is no safe default — guessing high overstates the claim, guessing low
+  understates it. `is_coherent` rejects the one incoherent combination:
+  `TotalPassed` over `SealChecks::None`, a pass with no referent, which is the
+  exact shape of the worst defect this port could ship.
+
+- **`SealFormat::ALL` and `SealMode::ALL`.** Both enums are `#[non_exhaustive]`,
+  so a consumer cannot enumerate them — and the conformance kit must, in order
+  to ask an adapter for a profile it does *not* advertise. A variant added later
+  is deliberately not covered until it is added here on purpose.
+### Breaking
+
+- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
+  validation has three outcomes, not two: a seal passes, fails, or is
+  **indeterminate** — verification did not fail, but there was not enough
+  information to decide. That is the ordinary answer whenever material has to be
+  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
+  anchor unresolvable), and it is the one carrying the most operational meaning:
+  *ask again later*, not *reject this passport*.
+
+  A boolean could not hold it, and both collapses are wrong. Indeterminate
+  reported as invalid marks a sound passport non-compliant; reported as valid
+  claims a check that never completed.
+
+  `SealIndication` names the three after the status indications in **ETSI EN 319
+  102-1**, so a verdict maps onto one from any conformant validator without a
+  translation step that could lose its meaning. `SealChecks` records *what was
+  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
+  and previously `valid: true` from either was one value.
+
+  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
+  question is "may a compliance decision rest on this", which is almost always
+  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
+  placeholder — a named method because the easy mistake is reading a pass over a
+  bare signature check against a self-signed certificate as a qualified seal.
+  Match on `indication` directly only where the three outcomes genuinely differ.
+
+  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
+  than `valid: false`: nothing about a placeholder is checked, so a negative
+  verdict was one it had not reached either.
+
+### Fixed
+
+- **`SealPort` implementations must refuse a profile they do not advertise**, and
+  `GhostSeal` no longer breaks that rule. It echoed whichever `sig_format` it was
+  handed while advertising JAdES only, so asking it for CAdES produced a "CAdES"
+  envelope from an adapter claiming not to support one. Harmless in itself —
+  nothing a ghost returns is a real seal — but it made the ghost useless for
+  catching that mistake in a consumer, which is most of what a ghost is for.
+
+  `SealCapabilities::can_produce` defines the check once so adapters cannot
+  disagree with their own advertisement, and it covers **both** axes: a provider
+  producing the right envelope under the wrong certificate holder has not
+  produced what was asked for, because the mode decides whose attestation the
+  seal is. The ghost now advertises every format it will synthesise, which is all
+  of the enumerated ones, and refuses anything else.
+
+- **`SealMode::ProviderSeal` cited IR 2026/1778 Art. 19(4)/(5) for a claim those
+  articles do not make.** Verified against the OJ text: Art. 19(4) permits a
+  third party to perform *"registration actions in the registry"* on a verified
+  operator's behalf, following the Art. 5 verification process — delegated
+  **registration**, saying nothing about who may hold or use a qualified seal.
+  Art. 19(5) is likewise about data: the operator *"shall be responsible for the
+  data it submits to the Commission as manager of the registry and shall be
+  considered as the controller of the data it submits"*.
+
+  The doc comment additionally quoted 19(5) as *"shall remain fully responsible
+  for compliance with the obligations set out in this Regulation"*, which is not
+  its text. Both are corrected, and the mode's doc now states plainly that
+  delegated registration is settled while delegated sealing is not.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public

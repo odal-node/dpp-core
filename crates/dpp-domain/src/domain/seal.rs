@@ -18,14 +18,24 @@ use serde::{Deserialize, Serialize};
 pub enum SealMode {
     /// Platform holds its own qualified seal; operators use delegated access.
     ///
-    /// Permitted: a verified economic operator may authorise a third party to
-    /// perform registration actions on its behalf, provided that third party has
-    /// itself completed the verification process for value chain actors
-    /// (IR 2026/1778 **Art. 19(4)**). Note what does *not* transfer — the
-    /// operator "shall remain fully responsible for compliance with the
-    /// obligations set out in this Regulation" and remains the controller of the
-    /// data it submits (**Art. 19(5)**). This mode moves the mechanics, never
-    /// the liability.
+    /// **The legal basis for this mode is not established by the registry
+    /// rules.** Verified against the OJ text of IR 2026/1778: Art. 19(4) permits
+    /// a verified economic operator to authorise a third party to perform
+    /// *"registration actions in the registry"* on its behalf, provided that
+    /// third party follows the verification process in accordance with Art. 5.
+    /// That is delegated **registration**, and it says nothing about who may
+    /// hold or use a qualified electronic seal.
+    ///
+    /// Art. 19(5) is likewise about data rather than seals: each verified
+    /// economic operator *"shall be responsible for the data it submits to the
+    /// Commission as manager of the registry and shall be considered as the
+    /// controller of the data it submits"*.
+    ///
+    /// So delegation of registration is settled and delegation of sealing is
+    /// not. Whether one party may hold a qualified seal covering content another
+    /// party authored is a question under eIDAS and the applicable delegated
+    /// act, not one these articles answer — and the mechanics moving would not
+    /// move the responsibility either way.
     ProviderSeal,
     /// Operator holds and manages their own qualified seal.
     OperatorSeal,
@@ -90,6 +100,21 @@ pub struct SealedEnvelope {
     pub placeholder: bool,
 }
 
+impl SealFormat {
+    /// Every format this build models, for exhaustive iteration.
+    ///
+    /// `SealFormat` is `#[non_exhaustive]`, so a consumer outside this crate
+    /// cannot enumerate it — and the conformance kit has to, in order to ask an
+    /// adapter for a format it does **not** advertise. A format added later is
+    /// deliberately not covered until it is added here on purpose.
+    pub const ALL: &'static [Self] = &[Self::Jades, Self::Pades, Self::Cades, Self::Xades];
+}
+
+impl SealMode {
+    /// Every mode this build models. Same reasoning as [`SealFormat::ALL`].
+    pub const ALL: &'static [Self] = &[Self::ProviderSeal, Self::OperatorSeal];
+}
+
 /// Which seal formats and modes an adapter supports.
 #[derive(Debug, Clone)]
 pub struct SealCapabilities {
@@ -97,13 +122,178 @@ pub struct SealCapabilities {
     pub supported_modes: Vec<SealMode>,
 }
 
+impl SealCapabilities {
+    /// Whether these capabilities cover what `req` asks for.
+    ///
+    /// Defined once, here, so every adapter answers the question the same way.
+    /// An adapter that rolled its own check would be free to disagree with the
+    /// capabilities it advertises, which is the disagreement the check exists to
+    /// make impossible.
+    ///
+    /// Both axes must match. A provider that produces the right envelope format
+    /// under the wrong certificate holder has not produced what was asked for:
+    /// the mode decides *whose* attestation the seal is, which is a statement
+    /// about responsibility rather than a serialisation detail.
+    pub fn can_produce(&self, req: &SealRequest) -> bool {
+        self.supported_formats.contains(&req.sig_format) && self.supported_modes.contains(&req.mode)
+    }
+}
+
+/// The outcome of validating a seal.
+///
+/// Three-valued, because AdES validation is. The names follow the status
+/// indications in **ETSI EN 319 102-1**, the standard that specifies how an AdES
+/// signature is validated, so a verdict produced here maps onto one produced by
+/// any conformant validator without a translation step that could lose its
+/// meaning.
+///
+/// The middle value is the reason this is not a boolean.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SealIndication {
+    /// The seal passed the validation that was performed.
+    ///
+    /// What that is worth depends entirely on [`SealChecks`] — a pass over a
+    /// signature check alone is a far smaller claim than a pass over a full
+    /// validation, and the two must never be read as the same statement.
+    TotalPassed,
+
+    /// The format is wrong, or the signature value failed verification.
+    ///
+    /// A definite negative: this seal does not attest what it claims to.
+    TotalFailed(String),
+
+    /// Validation did not fail, but there was not enough information to decide.
+    ///
+    /// The ordinary answer whenever material has to be fetched — revocation data
+    /// unreachable, a timestamp not yet corroborated, a trust anchor
+    /// unresolvable at the moment of asking. It means *ask again later*, not
+    /// *reject this passport*, and collapsing it either way is wrong: to failed,
+    /// and a sound passport is reported non-compliant; to passed, and a check
+    /// that never completed is claimed as one that did.
+    Indeterminate(String),
+}
+
+/// How far validation got — what a [`SealIndication`] is actually founded on.
+///
+/// Without this, `TotalPassed` from two very different checks is one value. They
+/// are not one claim: proving a signature is consistent with the certificate it
+/// carries says nothing about whether that certificate was qualified, current,
+/// or issued by anyone trustworthy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SealChecks {
+    /// Nothing was checked — the verdict describes the envelope, not a
+    /// validation. What a placeholder yields.
+    None,
+    /// The signature was checked against the certificate carried inside the
+    /// seal, and nothing else: no certificate path, no revocation, no timestamp,
+    /// no Trusted List.
+    SignatureOnly,
+    /// A full AdES validation: certificate path to a trust anchor, revocation
+    /// status and timestamp, as well as the signature.
+    FullValidation,
+}
+
 /// Result of verifying a `SealedEnvelope`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SealVerification {
-    /// Whether the seal cryptographically verifies.
-    pub valid: bool,
+    /// What the validation concluded.
+    pub indication: SealIndication,
+    /// What was actually checked to reach it.
+    pub checks: SealChecks,
     /// True if this was a ghost/placeholder seal (always unverified in production).
     pub placeholder: bool,
+}
+
+impl SealVerification {
+    /// A pass, founded on `checks`.
+    ///
+    /// Takes the checks rather than defaulting them, because "what was
+    /// verified" is the whole content of a pass. There is no sensible default:
+    /// guessing high overstates the claim and guessing low understates it.
+    #[must_use]
+    pub fn passed(checks: SealChecks) -> Self {
+        Self {
+            indication: SealIndication::TotalPassed,
+            checks,
+            placeholder: false,
+        }
+    }
+
+    /// A definite negative — the seal does not attest what it claims to.
+    #[must_use]
+    pub fn failed(checks: SealChecks, reason: impl Into<String>) -> Self {
+        Self {
+            indication: SealIndication::TotalFailed(reason.into()),
+            checks,
+            placeholder: false,
+        }
+    }
+
+    /// Validation did not fail, but there was not enough information to decide.
+    ///
+    /// The ordinary answer whenever material has to be fetched. Reach for this
+    /// rather than [`Self::failed`] when the check did not complete: a sound
+    /// passport reported non-compliant because a revocation endpoint was
+    /// unreachable is a defect, not caution.
+    #[must_use]
+    pub fn indeterminate(checks: SealChecks, reason: impl Into<String>) -> Self {
+        Self {
+            indication: SealIndication::Indeterminate(reason.into()),
+            checks,
+            placeholder: false,
+        }
+    }
+
+    /// The verdict for a placeholder envelope: nothing checked, nothing decided.
+    ///
+    /// Indeterminate rather than failed, and the distinction matters. A
+    /// placeholder is not a seal that failed validation; it is a seal no
+    /// validation was attempted on. Reporting it as failed would put a definite
+    /// negative on a passport whose seal nobody has looked at.
+    #[must_use]
+    pub fn placeholder(reason: impl Into<String>) -> Self {
+        Self {
+            indication: SealIndication::Indeterminate(reason.into()),
+            checks: SealChecks::None,
+            placeholder: true,
+        }
+    }
+
+    /// Whether this is a pass that a relying party may rest a compliance claim on.
+    ///
+    /// A named method because the mistake it prevents is the easy one to make:
+    /// reading `TotalPassed` alone as "this is a valid qualified seal", when the
+    /// check behind it may have been a bare signature comparison against a
+    /// self-signed certificate. Requiring both parts at every call site would
+    /// work exactly as well right up until one site forgot.
+    #[must_use]
+    pub fn is_qualified_pass(&self) -> bool {
+        !self.placeholder
+            && self.checks == SealChecks::FullValidation
+            && self.indication == SealIndication::TotalPassed
+    }
+
+    /// Whether the verdict is internally consistent.
+    ///
+    /// One combination is incoherent: `TotalPassed` founded on
+    /// [`SealChecks::None`] — a pass over nothing checked. That is not a
+    /// stricter or looser claim than the others, it is a claim with no referent,
+    /// and it is precisely the shape of the worst defect this port could ship: a
+    /// verifier reporting a seal it never examined as good.
+    ///
+    /// `TotalFailed` with `None` is coherent, and deliberately so — an envelope
+    /// can be rejected on its format before any validation is attempted.
+    ///
+    /// The fields are public, so this cannot be an unrepresentable state without
+    /// a breaking redesign of a persisted value object. It is instead checkable,
+    /// and [`crate::ports::seal::conformance`] checks it for every verdict an
+    /// adapter produces.
+    #[must_use]
+    pub fn is_coherent(&self) -> bool {
+        !(self.indication == SealIndication::TotalPassed && self.checks == SealChecks::None)
+    }
 }
 
 #[cfg(test)]
@@ -122,6 +312,51 @@ mod tests {
             let back: SealFormat = serde_json::from_str(&json).unwrap();
             assert_eq!(fmt, back);
         }
+    }
+
+    /// A pass is not a pass is not a pass.
+    ///
+    /// The whole reason the verdict is not a boolean: `TotalPassed` over a bare
+    /// signature check and `TotalPassed` over a full AdES validation are
+    /// different claims, and only the second is one a compliance decision may
+    /// rest on. If these ever collapse, a self-signed development seal satisfies
+    /// the same test a qualified one does.
+    #[test]
+    fn a_signature_check_is_not_a_qualified_pass() {
+        let signature_only = SealVerification {
+            indication: SealIndication::TotalPassed,
+            checks: SealChecks::SignatureOnly,
+            placeholder: false,
+        };
+        assert!(
+            !signature_only.is_qualified_pass(),
+            "a signature check says nothing about the certificate behind it"
+        );
+
+        let full = SealVerification {
+            checks: SealChecks::FullValidation,
+            ..signature_only.clone()
+        };
+        assert!(full.is_qualified_pass());
+
+        // And a placeholder never passes, however it is labelled.
+        let placeholder = SealVerification {
+            placeholder: true,
+            ..full.clone()
+        };
+        assert!(!placeholder.is_qualified_pass());
+    }
+
+    /// Indeterminate is neither pass nor fail, and must not be read as either.
+    #[test]
+    fn indeterminate_is_not_a_pass() {
+        let unresolved = SealVerification {
+            indication: SealIndication::Indeterminate("revocation data unreachable".into()),
+            checks: SealChecks::FullValidation,
+            placeholder: false,
+        };
+        assert!(!unresolved.is_qualified_pass());
+        assert_ne!(unresolved.indication, SealIndication::TotalPassed);
     }
 
     #[test]
