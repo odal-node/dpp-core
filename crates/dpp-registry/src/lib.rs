@@ -4,16 +4,28 @@
 //! ESPR Article 13. It provides request/response envelopes, error types, and
 //! identifier structures.
 //!
-//! ⚠️ **These shapes predate the published specification.** The registry became
-//! operational on 20 July 2026 under Commission Implementing Regulation (EU)
-//! 2026/1778; the types here were derived from ESPR articles and JTC 24 draft
-//! discussions before that, and are known to diverge from it in three respects:
-//! no commodity code, no registration-granularity or identifier-linking concept
-//! (IR Art. 8(1), (4), (5)), and a bearer-token authentication assumption where
-//! registration rests on eIDAS verified-operator identity (IR Arts. 4–5). See
-//! the EU Registry Readiness section of `docs/regulatory/COMPLIANCE.md`.
-//! Reconciliation is a breaking change scheduled for the next minor. Do not
-//! treat these as an implementation target.
+//! ⚠️ **One structural divergence remains, and it is the authentication model.**
+//! [`RegistryEndpoint::token_endpoint`] models an OAuth2 bearer-token exchange.
+//! Registration identity is eIDAS-based: a verified operator proves identity by
+//! qualified electronic seal or qualified electronic attestation of attributes
+//! (IR (EU) 2026/1778 Arts. 4–5). Those are different mechanisms and one does
+//! not stand in for the other. The field exists so an adapter compiles, and is
+//! marked wrong at its own definition. **Do not treat it as an implementation
+//! target.** Endpoint paths and `api_version` are likewise our own construction,
+//! each flagged at the point of use.
+//!
+//! What the OJ text fixes *has* been reconciled against it — registration
+//! granularity and identifier linking, commodity codes, the operator-identifier
+//! scheme, asynchronous validation. The full account, item by item and split
+//! between what is settled and what is still blocked on an unpublished API
+//! specification, is the EU Registry Readiness section of
+//! `docs/regulatory/COMPLIANCE.md`. It is not repeated here.
+//!
+//! That split is the point. This notice used to summarise three open
+//! divergences; two were closed and the summary stayed as it was, telling
+//! readers not to build against types that had since been fixed. A count is the
+//! part that goes stale silently, so the count is gone and the one warning a
+//! consumer must not miss is stated directly.
 //!
 //! The crate is safe to compile for `wasm32-unknown-unknown` — it contains no
 //! I/O, no HTTP clients, no async runtime. The platform repo provides the

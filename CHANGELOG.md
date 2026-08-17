@@ -13,6 +13,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Fixed
+
+- **`dpp-registry`'s divergence notice described two gaps that had been closed.**
+  Its module doc listed three divergences from IR (EU) 2026/1778 — no commodity
+  code, no registration-granularity or identifier-linking concept, and a
+  bearer-token authentication assumption — and told readers *"do not treat these
+  as an implementation target"*. The first two were reconciled in 0.16.0. The
+  notice was not updated, so a published crate spent a release telling consumers
+  not to build against types that had since been fixed.
+
+  `docs/regulatory/COMPLIANCE.md` had the correct account the whole time, split
+  between what the OJ text settles and what is still blocked on an unpublished
+  API specification. The module doc was the stale copy.
+
+  Rewritten to state the one divergence that remains — authentication is
+  eIDAS-based (Arts. 4–5), not a bearer-token exchange, and that is structural —
+  and to point at the doc for the rest rather than summarising it again. The
+  count is deliberately gone: a summary count is the part that goes stale
+  without anything failing.
+
 ## [0.17.0] - 2026-08-13
 
 ### Breaking
