@@ -59,6 +59,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   trace to primary text — and this file had neither the provenance nor the
   disclaimer, leaving a reader to assume whichever they expected. The header now
   says what the vectors are and what would make them conformance vectors.
+- **`dpp-vocab`'s README no longer asserts a claim its own record retracts.** It
+  stated that the EN 18216 series "carries no OJEU citation, so there is no
+  presumption of conformity to claim" — while shipping, in the same crate and the
+  same release, a `jtc24` record whose `finding` calls that claim stale and cites
+  the Implementing Decision that made it so. Both went to crates.io together.
+
+  The paragraph's *conclusion* was right and survives: nothing in this crate
+  licenses the phrase "JTC 24 conformant". Its *reason* was inverted, and the
+  direction matters. A presumption that **is** available and that we cannot claim
+  is a gap worth costing; one that does not exist is merely a fact about the
+  world. The README now points at the record instead of summarising it.
+
+- **`docs/regulatory/COMPLIANCE.md` listed the JTC 24 series as "Draft
+  (monitoring)"**, the same stale claim in a second file. Corrected, with a note
+  directing readers to the record rather than restating its finding again.
+
+- **`schema_conformity.rs` no longer claims to be a conformity check.** Its
+  header said it "approximates what a conformity assessment body would check";
+  its field lists are our own expectations, asserted against a schema also
+  written here. Both sides are ours, so agreement between them is evidence of
+  internal consistency and nothing else — worth having as a regression test, but
+  a different claim.
+
+  The `JTC24_*` constants are renamed to `EXPECTED_*`: the old names implied a
+  provenance they never had, since no EN clause text has been read. The header
+  now records the unlock condition, which is a purchase rather than an
+  engineering task — buy the standard, read it, replace the lists with
+  clause-cited ones.
+
+### Added
+
+- **A retracted-claim tripwire in `dpp-vocab`.** When a record's `finding`
+  retracts a claim, the retracted phrasing is listed in
+  `a_retracted_claim_does_not_reappear_in_the_crates_prose` and the build fails
+  if it comes back in the README or any doc comment. A companion test asserts the
+  record behind each retraction still carries it, so the guard cannot pass
+  trivially by the reason for it being edited away.
+
+  Deliberately not a general prose checker: phrases are listed one at a time,
+  because anything fuzzy enough to catch a paraphrase is fuzzy enough to fire on
+  innocent text. It catches the exact claim returning by copy — which is the
+  failure that has now happened twice.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public

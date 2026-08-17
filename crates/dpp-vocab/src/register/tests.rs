@@ -242,3 +242,117 @@ fn a_licence_is_recorded_or_explicitly_unknown() {
         }
     }
 }
+
+/// A claim a record has retracted must not survive anywhere in the crate's prose.
+///
+/// # Why this exists
+///
+/// The register's whole purpose is that a fact about someone else's publication
+/// has **one home**, with a source and a `checkedOn` date. Prose that restates
+/// such a fact is a copy, and a copy is what drifts: this crate shipped a README
+/// paragraph asserting the EN 182xx series carried no OJEU citation, at the same
+/// version as a `jtc24` record whose own `finding` calls that claim stale and
+/// cites the Implementing Decision that made it so. Both went to crates.io
+/// together.
+///
+/// Nothing in the existing gate could catch it. `cargo doc` compiles the README
+/// as a doctest but does not read it; the register tests check the records, not
+/// the prose about them.
+///
+/// # How to use it
+///
+/// When a record's `finding` retracts a claim, add the retracted phrasing here
+/// with the record that killed it. This is the corrections-register discipline
+/// the project already applies to regulatory claims, pointed at our own writing.
+///
+/// # What it deliberately is not
+///
+/// A general prose checker. Phrases are listed one at a time, on purpose:
+/// anything fuzzy enough to catch a paraphrase is fuzzy enough to fire on
+/// innocent text, and a tripwire that cries wolf is one people switch off. It
+/// catches the *exact* claim coming back — which is the failure that actually
+/// happened, twice now, by copy rather than by reinvention.
+#[test]
+fn a_retracted_claim_does_not_reappear_in_the_crates_prose() {
+    /// `(retracted phrasing, the record whose finding retracted it, why)`.
+    const RETRACTED: &[(&str, &str, &str)] = &[(
+        "no OJEU citation",
+        "jtc24",
+        "six EN 182xx:2026 standards are cited as harmonised — see the record's \
+         source and finding, which name the Implementing Decision",
+    )];
+
+    let crate_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut prose: Vec<(String, String)> = Vec::new();
+
+    let readme = crate_root.join("README.md");
+    prose.push((
+        "README.md".to_owned(),
+        std::fs::read_to_string(&readme).expect("README.md is readable"),
+    ));
+
+    // Doc comments count too: the three recorded instances of this drift class
+    // were a module doc, a schema description and a README paragraph.
+    let src = crate_root.join("src");
+    let mut stack = vec![src];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("src is readable") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                let text = std::fs::read_to_string(&path).expect("source is readable");
+                prose.push((path.display().to_string(), text));
+            }
+        }
+    }
+
+    let mut offenders = Vec::new();
+    for (phrase, record, why) in RETRACTED {
+        for (name, text) in &prose {
+            // This test necessarily contains every phrase it forbids.
+            if name.ends_with("tests.rs") {
+                continue;
+            }
+            if text.contains(phrase) {
+                offenders.push(format!(
+                    "{name} still asserts {phrase:?}, which the '{record}' record retracted: {why}"
+                ));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "retracted claims found in this crate's prose — reference the record instead of \
+         restating it:\n  {}",
+        offenders.join("\n  ")
+    );
+}
+
+/// The record that retraction rests on is still present and still says so.
+///
+/// Without this, the guard above passes trivially the day someone edits the
+/// `jtc24` finding: the phrase would be gone from the prose *and* the reason for
+/// forbidding it would be gone from the register, and nothing would say the pair
+/// had come apart.
+#[test]
+fn the_record_behind_the_retraction_still_carries_it() {
+    let register = register();
+    let jtc24 = register
+        .all()
+        .iter()
+        .find(|r| r.key == "jtc24")
+        .expect("the jtc24 record exists")
+        .clone();
+
+    assert!(
+        jtc24.finding.contains("harmonised"),
+        "the jtc24 finding must still record the harmonisation that retracted the \
+         'no OJEU citation' claim; if this changed, revisit the retraction list"
+    );
+    assert!(
+        jtc24.source.contains("2026/1736"),
+        "and it must still cite the Implementing Decision it was verified against"
+    );
+}

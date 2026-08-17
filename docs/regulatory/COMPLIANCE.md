@@ -30,7 +30,14 @@ registry connectivity). Those belong in the platform layer.
 | W3C Verifiable Credentials | W3C | Data Model v2.0 | `dpp-crypto` — VC issuance and verification |
 | DID:web | W3C | did:web Method Spec | `dpp-crypto` — DID document builder |
 | JSON Schema | IETF | Draft 2020-12 | `dpp-domain` — passport data validation |
-| CEN/CENELEC JTC 24 | CEN | Draft (monitoring) | Schema structure anticipated to align |
+| CEN/CENELEC JTC 24 | CEN | Six EN 182xx:2026 harmonised; two still draft | Conformance target, not a term source — no clause text read |
+
+> **On the JTC 24 row.** Whether these standards are cited in the OJEU — and so
+> whether conformity to one carries a presumption of conformity — is a fact with
+> one home: the `jtc24` record in `dpp-vocab`'s `vocabularies/`, which carries the
+> source and the date it was checked. This table names the standard; it does not
+> restate that record's finding. An earlier version of this row said "Draft
+> (monitoring)" and was stale, which is the reason for the split.
 
 ## Schema-to-Regulation Mapping
 
