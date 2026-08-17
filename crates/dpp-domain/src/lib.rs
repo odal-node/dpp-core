@@ -80,7 +80,7 @@ pub use ports::registry_sync::{
     RegistrySyncPort,
 };
 
-pub use compliance::passthrough_registry::PassthroughRegistry;
+pub use compliance::{PassthroughBatteryStrategy, PassthroughRegistry, PassthroughTextileStrategy};
 
 /// Compile-checks this crate's README examples.
 ///

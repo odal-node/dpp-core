@@ -23,8 +23,27 @@ pub use crate::domain::compliance::{
 
 /// Per-sector compliance calculation strategy.
 ///
-/// The OSS binary ships `PassthroughBatteryStrategy` and `PassthroughTextileStrategy`.
-/// Proprietary tiers implement `PremiumBatteryStrategy`, etc.
+/// The Apache-2.0 build ships
+/// [`PassthroughBatteryStrategy`](crate::compliance::PassthroughBatteryStrategy)
+/// and
+/// [`PassthroughTextileStrategy`](crate::compliance::PassthroughTextileStrategy),
+/// both registered in
+/// [`PassthroughRegistry::new`](crate::compliance::PassthroughRegistry::new). A
+/// proprietary tier registers its own for the sectors it models and leaves the
+/// rest on passthrough.
+///
+/// This is the **per-sector** seam;
+/// [`ComplianceRegistry`] is the whole-registry one. The distinction is the
+/// useful granularity: a tier that computes a real battery determination still
+/// wants passthrough for the sectors it does not model, and swapping the
+/// registry to get one sector means reimplementing dispatch for all of them.
+///
+/// # Contract
+///
+/// An implementation receives the [`SectorData`] for **its own** sector and
+/// must return [`ComplianceErrorKind::InvalidInput`] rather than panicking if
+/// handed another's — a routing mistake in a host should be reportable, not
+/// fatal.
 pub trait ComplianceStrategy: Send + Sync {
     /// The catalog key of the sector this strategy handles.
     ///
