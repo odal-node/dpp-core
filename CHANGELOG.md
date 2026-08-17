@@ -32,6 +32,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and to point at the doc for the rest rather than summarising it again. The
   count is deliberately gone: a summary count is the part that goes stale
   without anything failing.
+### Added
+
+- **`domain_concerns` — a drift tripwire over `dpp-domain`'s top-level modules.**
+  It is the largest crate in the workspace, roughly three and a half times the
+  next, and the hub everything else depends on — so it is the one most able to
+  absorb a new capability without anyone noticing. Adding a concern now means
+  editing `lib.rs` *and* the inventory in `docs/architecture/ARCHITECTURE.md`,
+  which is the point at which somebody asks whether it belongs. Fails in both
+  directions. Modelled on `ports_inventory`, which does the same for `ports/` and
+  caught a real misfiling during this audit.
+
+  The architecture record it replaces described `access` as the crate's "sixth
+  top-level concern" while there were six others beside it — `compliance`
+  predates that record and was never listed. Nothing failed, because a prose
+  count has nothing checking it. The doc now names the concerns rather than
+  counting them.
+
+### Fixed
+
+- **`co2e/golden_vectors.rs` no longer implies an external oracle.** Its inputs
+  are invented and its expected outputs come from the same formula the module
+  implements, so agreement between them shows the arithmetic has not changed and
+  nothing more. Its two siblings are honest about this — one states plainly that
+  its vectors are not EU 2023/1669 conformance vectors, the other's constants
+  trace to primary text — and this file had neither the provenance nor the
+  disclaimer, leaving a reader to assume whichever they expected. The header now
+  says what the vectors are and what would make them conformance vectors.
 
 ## [0.17.0] - 2026-08-13
 

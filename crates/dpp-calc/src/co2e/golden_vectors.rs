@@ -1,4 +1,26 @@
-//! Golden-vector regression tests for the cradle-to-gate CO₂e calculator.
+//! Arithmetic regression vectors for the cradle-to-gate CO₂e calculator.
+//!
+//! **These are not conformance vectors, and the file name overstates it.** Every
+//! input below is invented here and every expected output is the result of the
+//! same formula the module implements. Agreement between them shows the
+//! arithmetic has not changed since it was written — which is worth catching, and
+//! is all this proves. There is no external oracle: no worked example from a
+//! delegated act, no published dataset, nobody else's number to disagree with.
+//!
+//! Its sibling [`crate::repairability`]'s vectors say this plainly in their own
+//! header ("hand-verified … **not** EU 2023/1669 conformance vectors"), and
+//! [`crate::repairability_index`]'s constants trace to primary text. This file
+//! had neither the provenance nor the disclaimer, which left a reader to assume
+//! whichever they expected.
+//!
+//! # What would give these provenance
+//!
+//! Annex II of Regulation (EU) 2023/1542 sets the battery carbon-footprint
+//! methodology, and the Commission's implementing act carries the calculation
+//! rules. A vector transcribed from a worked example there would be a conformance
+//! vector. Until one is, the honest name for what is here is a regression test,
+//! and the emission factors are placeholders chosen for arithmetic legibility
+//! rather than for being anyone's published values.
 
 use super::*;
 use crate::clock::AssessmentClock;
