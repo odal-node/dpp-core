@@ -13,154 +13,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
-### Fixed
-
-- **`dpp-registry`'s divergence notice described two gaps that had been closed.**
-  Its module doc listed three divergences from IR (EU) 2026/1778 — no commodity
-  code, no registration-granularity or identifier-linking concept, and a
-  bearer-token authentication assumption — and told readers *"do not treat these
-  as an implementation target"*. The first two were reconciled in 0.16.0. The
-  notice was not updated, so a published crate spent a release telling consumers
-  not to build against types that had since been fixed.
-
-  `docs/regulatory/COMPLIANCE.md` had the correct account the whole time, split
-  between what the OJ text settles and what is still blocked on an unpublished
-  API specification. The module doc was the stale copy.
-
-  Rewritten to state the one divergence that remains — authentication is
-  eIDAS-based (Arts. 4–5), not a bearer-token exchange, and that is structural —
-  and to point at the doc for the rest rather than summarising it again. The
-  count is deliberately gone: a summary count is the part that goes stale
-  without anything failing.
-### Added
-
-- **`domain_concerns` — a drift tripwire over `dpp-domain`'s top-level modules.**
-  It is the largest crate in the workspace, roughly three and a half times the
-  next, and the hub everything else depends on — so it is the one most able to
-  absorb a new capability without anyone noticing. Adding a concern now means
-  editing `lib.rs` *and* the inventory in `docs/architecture/ARCHITECTURE.md`,
-  which is the point at which somebody asks whether it belongs. Fails in both
-  directions. Modelled on `ports_inventory`, which does the same for `ports/` and
-  caught a real misfiling during this audit.
-
-  The architecture record it replaces described `access` as the crate's "sixth
-  top-level concern" while there were six others beside it — `compliance`
-  predates that record and was never listed. Nothing failed, because a prose
-  count has nothing checking it. The doc now names the concerns rather than
-  counting them.
-
-### Fixed
-
-- **`co2e/golden_vectors.rs` no longer implies an external oracle.** Its inputs
-  are invented and its expected outputs come from the same formula the module
-  implements, so agreement between them shows the arithmetic has not changed and
-  nothing more. Its two siblings are honest about this — one states plainly that
-  its vectors are not EU 2023/1669 conformance vectors, the other's constants
-  trace to primary text — and this file had neither the provenance nor the
-  disclaimer, leaving a reader to assume whichever they expected. The header now
-  says what the vectors are and what would make them conformance vectors.
-- **`dpp-vocab`'s README no longer asserts a claim its own record retracts.** It
-  stated that the EN 18216 series "carries no OJEU citation, so there is no
-  presumption of conformity to claim" — while shipping, in the same crate and the
-  same release, a `jtc24` record whose `finding` calls that claim stale and cites
-  the Implementing Decision that made it so. Both went to crates.io together.
-
-  The paragraph's *conclusion* was right and survives: nothing in this crate
-  licenses the phrase "JTC 24 conformant". Its *reason* was inverted, and the
-  direction matters. A presumption that **is** available and that we cannot claim
-  is a gap worth costing; one that does not exist is merely a fact about the
-  world. The README now points at the record instead of summarising it.
-
-- **`docs/regulatory/COMPLIANCE.md` listed the JTC 24 series as "Draft
-  (monitoring)"**, the same stale claim in a second file. Corrected, with a note
-  directing readers to the record rather than restating its finding again.
-
-- **`schema_conformity.rs` no longer claims to be a conformity check.** Its
-  header said it "approximates what a conformity assessment body would check";
-  its field lists are our own expectations, asserted against a schema also
-  written here. Both sides are ours, so agreement between them is evidence of
-  internal consistency and nothing else — worth having as a regression test, but
-  a different claim.
-
-  The `JTC24_*` constants are renamed to `EXPECTED_*`: the old names implied a
-  provenance they never had, since no EN clause text has been read. The header
-  now records the unlock condition, which is a purchase rather than an
-  engineering task — buy the standard, read it, replace the lists with
-  clause-cited ones.
-
-### Added
-
-- **A retracted-claim tripwire in `dpp-vocab`.** When a record's `finding`
-  retracts a claim, the retracted phrasing is listed in
-  `a_retracted_claim_does_not_reappear_in_the_crates_prose` and the build fails
-  if it comes back in the README or any doc comment. A companion test asserts the
-  record behind each retraction still carries it, so the guard cannot pass
-  trivially by the reason for it being edited away.
-
-  Deliberately not a general prose checker: phrases are listed one at a time,
-  because anything fuzzy enough to catch a paraphrase is fuzzy enough to fire on
-  innocent text. It catches the exact claim returning by copy — which is the
-  failure that has now happened twice.
-- **`SectorData::other` refuses a non-object payload.** It accepted any
-  `serde_json::Value`. `Serialize` stamps the `sector` tag onto the payload only
-  when it is an object, so an array or scalar serialised **untagged** — which
-  meant it did not round-trip, and, more sharply, that `dpp-aas`'s
-  unknown-sector backstop returned early. That backstop keys off the tag, so an
-  untagged payload was left to a policy whose default class is `Public`, and its
-  contents would have been served to every audience.
-
-  Only a Rust caller could construct one — deserialization needs the object to
-  find the tag in the first place — so this was never reachable from the wire.
-  Refusing here closes it at the only door it has.
-
-- **`SectorData::other` now stores the payload with its tag**, matching what
-  `Other::data` has always documented ("the full object, including its `sector`
-  key") and what `Deserialize` produces. An untagged input previously built a
-  value that serialised *with* the tag and deserialised back **unequal to
-  itself** — the same value in two shapes depending on whether it had been
-  through the wire yet. Found by a round-trip test written for the guard above.
-### Added
-
-- **`PassthroughBatteryStrategy` and `PassthroughTextileStrategy`** — the two
-  `ComplianceStrategy` implementations `ports::compliance` has claimed the
-  Apache-2.0 build ships since the trait was written. Neither existed. The trait
-  had **zero implementors anywhere** — core, engine or plugins — nothing
-  constructed one, and `PassthroughRegistry` implemented `ComplianceRegistry`
-  directly, bypassing the per-sector seam entirely. A published trait documented
-  as having two implementations that a reader cannot find is the same defect as
-  a stale claim in prose, in code that ships.
-
-- **`PassthroughRegistry` dispatches through the strategy trait**, with
-  `register`, `empty` and `registered_sectors`. A sector with a registered
-  strategy routes to it; every other sector takes a bare-passthrough fallback.
-  An unregistered sector is **not** an error — the catalog is open by design, so
-  `UnknownSector` here would make the registry the one closed part of a
-  data-driven model.
-
-  This is the granularity that makes the seam worth having: a proprietary tier
-  computing a real battery determination still wants passthrough for the eleven
-  sectors it does not model, and swapping the whole registry to get one sector
-  means reimplementing dispatch for all of them.
-
-### Changed
-
-- **A passthrough result now carries the metrics the manufacturer declared**, for
-  the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
-  (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts
-  `recycledContentPct` and `repairScore`. Previously every field was `null`.
-
-  `compliance_status` is unchanged and still `PassthroughNoValidation`, and the
-  result still carries no findings, no ruleset version and no receipt — nothing
-  claims a determination was made. `ComplianceResult::co2e_score` is documented
-  as "calculated **or** manufacturer-supplied", so this is the field being used
-  as specified rather than a new claim.
-
-  **Battery `recycledContentPct` stays `null` deliberately.** Art. 8(2) and 8(3)
-  set per-metal minima for cobalt, lead, lithium and nickel, and the measurement
-  basis differs between them — cobalt, lithium and nickel are measured "in active
-  materials", lead as the share "present in the battery". One number cannot carry
-  four metals over two denominators, and a reader would take it for a compliance
-  figure.
 ### Breaking
 
 - **`KeyStore::open` refuses a store that predates a current security property.**
@@ -199,28 +51,105 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   associated data derived from the map key would make every archived key
   undecryptable the moment it was archived.
 
-### Fixed
 
-- **Zeroization covers the decrypted private key completely.** `decrypt_record`
-  cleared the plaintext `Vec` but not the `[u8; 32]` copied out of it, and the
-  length-check error path returned before clearing either. Both are now
-  `Zeroizing`.
-### Changed
+- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
+  validation has three outcomes, not two: a seal passes, fails, or is
+  **indeterminate** — verification did not fail, but there was not enough
+  information to decide. That is the ordinary answer whenever material has to be
+  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
+  anchor unresolvable), and it is the one carrying the most operational meaning:
+  *ask again later*, not *reject this passport*.
 
-- **`dpp-vc`'s JSON-LD context reads its prefix IRIs from `dpp-vocab` instead of
-  hardcoding them**, and `dpp-vc` now depends on that crate. `dpp-vocab` was
-  carved because the external-vocabulary-provenance mechanism existed twice at
-  two standards of rigour — `dpp-aas` provenanced and CI-gated, `dpp-vc` inlining
-  `gs1:` and `dpp:` with neither. `dpp-aas` migrated; this side did not, so the
-  register had a consumer and a hold-out.
+  A boolean could not hold it, and both collapses are wrong. Indeterminate
+  reported as invalid marks a sound passport non-compliant; reported as valid
+  claims a check that never completed.
 
-  The provenance was not absent, it was filed in the wrong place: a doc comment
-  recorded the date GS1's definition was read, what it said and under what
-  licence. That is the right content somewhere nothing can query it, nothing
-  fails when the underlying record changes, and no `checkedOn` date is legible to
-  the build.
+  `SealIndication` names the three after the status indications in **ETSI EN 319
+  102-1**, so a verdict maps onto one from any conformant validator without a
+  translation step that could lose its meaning. `SealChecks` records *what was
+  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
+  and previously `valid: true` from either was one value.
+
+  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
+  question is "may a compliance decision rest on this", which is almost always
+  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
+  placeholder — a named method because the easy mistake is reading a pass over a
+  bare signature check against a self-signed certificate as a qualified seal.
+  Match on `indication` directly only where the three outcomes genuinely differ.
+
+  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
+  than `valid: false`: nothing about a placeholder is checked, so a negative
+  verdict was one it had not reached either.
 
 ### Added
+
+- **`domain_concerns` — a drift tripwire over `dpp-domain`'s top-level modules.**
+  It is the largest crate in the workspace, roughly three and a half times the
+  next, and the hub everything else depends on — so it is the one most able to
+  absorb a new capability without anyone noticing. Adding a concern now means
+  editing `lib.rs` *and* the inventory in `docs/architecture/ARCHITECTURE.md`,
+  which is the point at which somebody asks whether it belongs. Fails in both
+  directions. Modelled on `ports_inventory`, which does the same for `ports/` and
+  caught a real misfiling during this audit.
+
+  The architecture record it replaces described `access` as the crate's "sixth
+  top-level concern" while there were six others beside it — `compliance`
+  predates that record and was never listed. Nothing failed, because a prose
+  count has nothing checking it. The doc now names the concerns rather than
+  counting them.
+
+
+- **A retracted-claim tripwire in `dpp-vocab`.** When a record's `finding`
+  retracts a claim, the retracted phrasing is listed in
+  `a_retracted_claim_does_not_reappear_in_the_crates_prose` and the build fails
+  if it comes back in the README or any doc comment. A companion test asserts the
+  record behind each retraction still carries it, so the guard cannot pass
+  trivially by the reason for it being edited away.
+
+  Deliberately not a general prose checker: phrases are listed one at a time,
+  because anything fuzzy enough to catch a paraphrase is fuzzy enough to fire on
+  innocent text. It catches the exact claim returning by copy — which is the
+  failure that has now happened twice.
+- **`SectorData::other` refuses a non-object payload.** It accepted any
+  `serde_json::Value`. `Serialize` stamps the `sector` tag onto the payload only
+  when it is an object, so an array or scalar serialised **untagged** — which
+  meant it did not round-trip, and, more sharply, that `dpp-aas`'s
+  unknown-sector backstop returned early. That backstop keys off the tag, so an
+  untagged payload was left to a policy whose default class is `Public`, and its
+  contents would have been served to every audience.
+
+  Only a Rust caller could construct one — deserialization needs the object to
+  find the tag in the first place — so this was never reachable from the wire.
+  Refusing here closes it at the only door it has.
+
+- **`SectorData::other` now stores the payload with its tag**, matching what
+  `Other::data` has always documented ("the full object, including its `sector`
+  key") and what `Deserialize` produces. An untagged input previously built a
+  value that serialised *with* the tag and deserialised back **unequal to
+  itself** — the same value in two shapes depending on whether it had been
+  through the wire yet. Found by a round-trip test written for the guard above.
+
+- **`PassthroughBatteryStrategy` and `PassthroughTextileStrategy`** — the two
+  `ComplianceStrategy` implementations `ports::compliance` has claimed the
+  Apache-2.0 build ships since the trait was written. Neither existed. The trait
+  had **zero implementors anywhere** — core, engine or plugins — nothing
+  constructed one, and `PassthroughRegistry` implemented `ComplianceRegistry`
+  directly, bypassing the per-sector seam entirely. A published trait documented
+  as having two implementations that a reader cannot find is the same defect as
+  a stale claim in prose, in code that ships.
+
+- **`PassthroughRegistry` dispatches through the strategy trait**, with
+  `register`, `empty` and `registered_sectors`. A sector with a registered
+  strategy routes to it; every other sector takes a bare-passthrough fallback.
+  An unregistered sector is **not** an error — the catalog is open by design, so
+  `UnknownSector` here would make the registry the one closed part of a
+  data-driven model.
+
+  This is the granularity that makes the seam worth having: a proprietary tier
+  computing a real battery determination still wants passthrough for the eleven
+  sectors it does not model, and swapping the whole registry to get one sector
+  means reimplementing dispatch for all of them.
+
 
 - **Two gates on the emitted `@context`.** Every declared prefix must be ours or
   covered by a record whose `permits_emission()` holds; every compact term must
@@ -265,7 +194,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and keeps the **most restrictive**. No embedded schema could reach this; a
   hand-built policy could.
 
-### Added
 
 - **`x-disclosure` on all 184 previously unannotated nested properties**, across
   19 schema files. Each carries the class the filter already applied, so the
@@ -304,7 +232,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   The widened gate immediately found eight properties under `stateOfHealth`'s
   `oneOf` branches that the first pass of this change had missed.
-### Added
 
 - **`SealRequest` and `SealCapabilities` model the conformance level and the
   envelope**, not only the format and the mode. The CSC API carries three axes —
@@ -367,38 +294,102 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so a consumer cannot enumerate them — and the conformance kit must, in order
   to ask an adapter for a profile it does *not* advertise. A variant added later
   is deliberately not covered until it is added here on purpose.
-### Breaking
 
-- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
-  validation has three outcomes, not two: a seal passes, fails, or is
-  **indeterminate** — verification did not fail, but there was not enough
-  information to decide. That is the ordinary answer whenever material has to be
-  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
-  anchor unresolvable), and it is the one carrying the most operational meaning:
-  *ask again later*, not *reject this passport*.
+### Changed
 
-  A boolean could not hold it, and both collapses are wrong. Indeterminate
-  reported as invalid marks a sound passport non-compliant; reported as valid
-  claims a check that never completed.
+- **A passthrough result now carries the metrics the manufacturer declared**, for
+  the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
+  (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts
+  `recycledContentPct` and `repairScore`. Previously every field was `null`.
 
-  `SealIndication` names the three after the status indications in **ETSI EN 319
-  102-1**, so a verdict maps onto one from any conformant validator without a
-  translation step that could lose its meaning. `SealChecks` records *what was
-  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
-  and previously `valid: true` from either was one value.
+  `compliance_status` is unchanged and still `PassthroughNoValidation`, and the
+  result still carries no findings, no ruleset version and no receipt — nothing
+  claims a determination was made. `ComplianceResult::co2e_score` is documented
+  as "calculated **or** manufacturer-supplied", so this is the field being used
+  as specified rather than a new claim.
 
-  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
-  question is "may a compliance decision rest on this", which is almost always
-  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
-  placeholder — a named method because the easy mistake is reading a pass over a
-  bare signature check against a self-signed certificate as a qualified seal.
-  Match on `indication` directly only where the three outcomes genuinely differ.
+  **Battery `recycledContentPct` stays `null` deliberately.** Art. 8(2) and 8(3)
+  set per-metal minima for cobalt, lead, lithium and nickel, and the measurement
+  basis differs between them — cobalt, lithium and nickel are measured "in active
+  materials", lead as the share "present in the battery". One number cannot carry
+  four metals over two denominators, and a reader would take it for a compliance
+  figure.
 
-  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
-  than `valid: false`: nothing about a placeholder is checked, so a negative
-  verdict was one it had not reached either.
+- **`dpp-vc`'s JSON-LD context reads its prefix IRIs from `dpp-vocab` instead of
+  hardcoding them**, and `dpp-vc` now depends on that crate. `dpp-vocab` was
+  carved because the external-vocabulary-provenance mechanism existed twice at
+  two standards of rigour — `dpp-aas` provenanced and CI-gated, `dpp-vc` inlining
+  `gs1:` and `dpp:` with neither. `dpp-aas` migrated; this side did not, so the
+  register had a consumer and a hold-out.
+
+  The provenance was not absent, it was filed in the wrong place: a doc comment
+  recorded the date GS1's definition was read, what it said and under what
+  licence. That is the right content somewhere nothing can query it, nothing
+  fails when the underlying record changes, and no `checkedOn` date is legible to
+  the build.
 
 ### Fixed
+
+- **`dpp-registry`'s divergence notice described two gaps that had been closed.**
+  Its module doc listed three divergences from IR (EU) 2026/1778 — no commodity
+  code, no registration-granularity or identifier-linking concept, and a
+  bearer-token authentication assumption — and told readers *"do not treat these
+  as an implementation target"*. The first two were reconciled in 0.16.0. The
+  notice was not updated, so a published crate spent a release telling consumers
+  not to build against types that had since been fixed.
+
+  `docs/regulatory/COMPLIANCE.md` had the correct account the whole time, split
+  between what the OJ text settles and what is still blocked on an unpublished
+  API specification. The module doc was the stale copy.
+
+  Rewritten to state the one divergence that remains — authentication is
+  eIDAS-based (Arts. 4–5), not a bearer-token exchange, and that is structural —
+  and to point at the doc for the rest rather than summarising it again. The
+  count is deliberately gone: a summary count is the part that goes stale
+  without anything failing.
+
+- **`co2e/golden_vectors.rs` no longer implies an external oracle.** Its inputs
+  are invented and its expected outputs come from the same formula the module
+  implements, so agreement between them shows the arithmetic has not changed and
+  nothing more. Its two siblings are honest about this — one states plainly that
+  its vectors are not EU 2023/1669 conformance vectors, the other's constants
+  trace to primary text — and this file had neither the provenance nor the
+  disclaimer, leaving a reader to assume whichever they expected. The header now
+  says what the vectors are and what would make them conformance vectors.
+- **`dpp-vocab`'s README no longer asserts a claim its own record retracts.** It
+  stated that the EN 18216 series "carries no OJEU citation, so there is no
+  presumption of conformity to claim" — while shipping, in the same crate and the
+  same release, a `jtc24` record whose `finding` calls that claim stale and cites
+  the Implementing Decision that made it so. Both went to crates.io together.
+
+  The paragraph's *conclusion* was right and survives: nothing in this crate
+  licenses the phrase "JTC 24 conformant". Its *reason* was inverted, and the
+  direction matters. A presumption that **is** available and that we cannot claim
+  is a gap worth costing; one that does not exist is merely a fact about the
+  world. The README now points at the record instead of summarising it.
+
+- **`docs/regulatory/COMPLIANCE.md` listed the JTC 24 series as "Draft
+  (monitoring)"**, the same stale claim in a second file. Corrected, with a note
+  directing readers to the record rather than restating its finding again.
+
+- **`schema_conformity.rs` no longer claims to be a conformity check.** Its
+  header said it "approximates what a conformity assessment body would check";
+  its field lists are our own expectations, asserted against a schema also
+  written here. Both sides are ours, so agreement between them is evidence of
+  internal consistency and nothing else — worth having as a regression test, but
+  a different claim.
+
+  The `JTC24_*` constants are renamed to `EXPECTED_*`: the old names implied a
+  provenance they never had, since no EN clause text has been read. The header
+  now records the unlock condition, which is a purchase rather than an
+  engineering task — buy the standard, read it, replace the lists with
+  clause-cited ones.
+
+
+- **Zeroization covers the decrypted private key completely.** `decrypt_record`
+  cleared the plaintext `Vec` but not the `[u8; 32]` copied out of it, and the
+  length-check error path returned before clearing either. Both are now
+  `Zeroizing`.
 
 - **`SealPort` implementations must refuse a profile they do not advertise**, and
   `GhostSeal` no longer breaks that rule. It echoed whichever `sig_format` it was
