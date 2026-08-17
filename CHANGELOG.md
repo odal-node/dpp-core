@@ -161,6 +161,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   materials", lead as the share "present in the battery". One number cannot carry
   four metals over two denominators, and a reader would take it for a compliance
   figure.
+### Breaking
+
+- **`KeyStore::open` refuses a store that predates a current security property.**
+  It previously accepted every legacy shape silently, which meant an attacker who
+  could write the file could *choose* the weaker shape and be opened without
+  complaint. The three shapes, each now named in the error:
+
+  - **legacy SHA-256 KDF** — no salt, no iterations;
+  - **no envelope HMAC** — every plaintext field unauthenticated, including
+    `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
+    from the published DID document. A store in this shape could have a
+    revocation flipped back and a revoked key republished, undetected;
+  - **unbound records** (pre-V4) — see below.
+
+  **Nothing is stranded and nothing was removed.** `KeyStore::open_and_migrate`
+  opens all three, upgrades them in place, and then re-opens *strictly* — so a
+  migration that did not finish the job is reported rather than papered over. The
+  legacy KDF is still there and still readable; what changed is that reaching it
+  now requires a caller who asked for the migration door by name.
+
+  Both production entry points in the platform already call `open_and_migrate`.
+  Every remaining `KeyStore::open` call site creates a fresh store, which is
+  written in the current format by construction.
+
+- **Store format V4 binds each record's ciphertext to its own fingerprint** via
+  AES-GCM associated data. Records previously carried no AAD, so a record's
+  encrypted private key could be grafted onto another record's plaintext —
+  its `verifying_key_hex`, its `fingerprint`, its `revoked` flag — and would
+  decrypt cleanly. The envelope HMAC also catches that, and both are wanted: the
+  HMAC covers the map in aggregate, the binding covers each record on its own,
+  and a control that only works in aggregate fails differently from one that
+  works per record.
+
+  Bound to the **fingerprint**, not the map key. `archive_key` and
+  `rotate_inner` copy a record to a new map key *without re-encrypting it*, so
+  associated data derived from the map key would make every archived key
+  undecryptable the moment it was archived.
+
+### Fixed
+
+- **Zeroization covers the decrypted private key completely.** `decrypt_record`
+  cleared the plaintext `Vec` but not the `[u8; 32]` copied out of it, and the
+  length-check error path returned before clearing either. Both are now
+  `Zeroizing`.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public

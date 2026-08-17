@@ -121,19 +121,28 @@ fn legacy_sha256_store_can_be_opened_and_migrated() {
     let bytes = serde_json::to_vec(&map).expect("serialize");
     std::fs::write(&path, bytes).expect("write");
 
-    // Open the legacy store — should succeed.
-    let store = KeyStore::open(&path, passphrase).expect("open legacy store");
+    // `open` refuses it, by name, and says where to go.
+    // `expect_err` would need `KeyStore: Debug`, and it deliberately has none —
+    // the struct holds a passphrase-derived cipher.
+    let Err(refused) = KeyStore::open(&path, passphrase) else {
+        panic!("a legacy-KDF store must not open through `open`");
+    };
+    let message = refused.to_string();
+    assert!(message.contains("legacy SHA-256 KDF"), "{message}");
+    assert!(message.contains("open_and_migrate"), "{message}");
+
+    // The migration door opens it, upgrades it, and hands back a store that
+    // satisfies `open` on its own terms.
+    let store = KeyStore::open_and_migrate(&path, passphrase).expect("migrate legacy store");
     let loaded = store.load_key("legacy-key").expect("load legacy key");
     assert_eq!(loaded.fingerprint, fingerprint);
 
-    // Migrate.
-    store
-        .migrate_if_needed(passphrase)
-        .expect("migration failed");
-
-    // Verify the file now contains the argon2id marker.
     let raw_file = std::fs::read_to_string(&path).expect("read");
     assert!(raw_file.contains("argon2id"), "file must be migrated");
+
+    // And it is now openable strictly — which is the property that says the
+    // upgrade actually finished rather than merely ran.
+    KeyStore::open(&path, passphrase).expect("migrated store opens strictly");
 }
 
 #[test]
@@ -155,7 +164,10 @@ fn malformed_nonce_returns_error_not_panic() {
     map.insert("bad-key".to_string(), record);
     std::fs::write(&path, serde_json::to_vec(&map).expect("serialize")).expect("write");
 
-    let store = KeyStore::open(&path, "any-pass").expect("open legacy store");
+    // Reached through the migration door, since a raw-map store is legacy by
+    // definition. Migration itself fails on the malformed record, so the check
+    // is on the permissive open that precedes it.
+    let store = KeyStore::open_permissively(&path, "any-pass").expect("open legacy store");
     assert!(
         store.load_key("bad-key").is_err(),
         "malformed nonce must return Err, not panic"
@@ -404,4 +416,176 @@ fn public_key_info_carries_the_algorithm() {
     store.generate_key("alg-info").expect("generate");
     let info = store.public_key("alg-info").expect("public key");
     assert_eq!(info.algorithm, default_algorithm());
+}
+
+// ─── Legacy-shape refusal, and what each shape costs ─────────────────────────
+
+/// Strip a field from a store file, producing an older shape on disk.
+fn strip_field(path: &PathBuf, field: &str) {
+    let raw = std::fs::read_to_string(path).expect("read");
+    let mut envelope: serde_json::Value = serde_json::from_str(&raw).expect("parse");
+    envelope
+        .as_object_mut()
+        .expect("envelope is an object")
+        .remove(field);
+    std::fs::write(path, serde_json::to_vec(&envelope).expect("serialize")).expect("write");
+}
+
+/// A store with no integrity tag is refused, not opened quietly.
+///
+/// This is the one that mattered most. Without the tag, every plaintext field is
+/// unauthenticated — including `revoked`, which `dpp-vc`'s `did:web` builder
+/// reads to drop a compromised key from the published DID document. An attacker
+/// with write access and no passphrase could flip it back and republish a
+/// revoked key, and the old `open` accepted that file with an `info!` log.
+#[test]
+fn a_store_with_no_integrity_tag_is_refused() {
+    let (store, path) = temp_store_at("nohmac", "pw");
+    store.generate_key("iss").expect("generate");
+    drop(store);
+
+    strip_field(&path, "hmac");
+
+    let Err(refused) = KeyStore::open(&path, "pw") else {
+        panic!("a store with no integrity tag must not open");
+    };
+    let message = refused.to_string();
+    assert!(message.contains("integrity tag"), "{message}");
+    assert!(message.contains("open_and_migrate"), "{message}");
+
+    // Repairable through the migration door, and strictly openable afterwards.
+    KeyStore::open_and_migrate(&path, "pw").expect("upgrade restores the tag");
+    KeyStore::open(&path, "pw").expect("and it opens strictly once repaired");
+}
+
+/// A genuine pre-binding (V3) store is refused, then upgraded.
+///
+/// Built by hand rather than by stripping a marker off a current store: a V3
+/// store's records were sealed with **no** associated data, and a file that
+/// merely claims to be V3 while holding bound records is not the thing under
+/// test. The migration has to actually re-encrypt, so it has to actually decrypt
+/// the old shape first.
+#[test]
+fn a_store_with_unbound_records_is_refused_then_upgraded() {
+    let path = temp_path("unbound");
+    let passphrase = "pw";
+
+    let mut salt = [0u8; 16];
+    crate::os_rng().fill_bytes(&mut salt);
+    let cipher_key =
+        super::crypto::derive_aes_key_argon2(passphrase, &salt).expect("derive aes key");
+    let cipher = Aes256Gcm::new(&cipher_key);
+
+    let signing_key = SigningKey::generate(&mut crate::os_rng());
+    let verifying_key = signing_key.verifying_key();
+    let fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
+
+    let mut nonce_bytes = [0u8; 12];
+    crate::os_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = <&Nonce<U12>>::from(&nonce_bytes);
+    let mut raw = signing_key.to_bytes();
+    // No associated data — this is what V3 wrote.
+    let encrypted = cipher.encrypt(nonce, raw.as_ref()).expect("encrypt");
+    raw.zeroize();
+
+    let mut keys: KeyRecordMap = HashMap::new();
+    keys.insert(
+        "iss".to_owned(),
+        KeyRecord {
+            encrypted_signing_key: encrypted,
+            nonce: nonce_bytes.to_vec(),
+            fingerprint: fingerprint.clone(),
+            verifying_key_hex: hex::encode(verifying_key.as_bytes()),
+            revoked: false,
+            algorithm: default_algorithm(),
+        },
+    );
+
+    let salt_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, salt);
+    let integrity_key =
+        super::crypto::derive_integrity_key(passphrase, &salt).expect("integrity key");
+    let hmac = compute_envelope_hmac(&integrity_key, "argon2id", &salt_b64, &keys).expect("hmac");
+
+    // A V3 envelope: argon2id, a valid tag, and no `version`.
+    let envelope = serde_json::json!({
+        "kdf": "argon2id",
+        "salt": salt_b64,
+        "hmac": hmac,
+        "keys": keys,
+    });
+    std::fs::write(&path, serde_json::to_vec(&envelope).expect("serialize")).expect("write");
+
+    let Err(refused) = KeyStore::open(&path, passphrase) else {
+        panic!("a pre-binding store must not open strictly");
+    };
+    assert!(
+        refused.to_string().contains("per-record binding"),
+        "{refused}"
+    );
+
+    let upgraded = KeyStore::open_and_migrate(&path, passphrase).expect("upgrade");
+    assert_eq!(
+        upgraded.load_key("iss").expect("load").fingerprint,
+        fingerprint,
+        "the key survives the upgrade unchanged"
+    );
+    KeyStore::open(&path, passphrase).expect("opens strictly once upgraded");
+}
+
+/// A record's ciphertext cannot be grafted onto another record's identity.
+///
+/// The attack the associated data blocks: take the encrypted private key from
+/// one record and file it under another record's `verifying_key_hex`,
+/// `fingerprint` and `revoked` flag. Before binding, that decrypted cleanly and
+/// the store happily reported the wrong public key — and, worse, the wrong
+/// revocation state — for that private key. Now the AEAD refuses it.
+///
+/// The envelope HMAC also catches this, and both are wanted: the HMAC covers the
+/// map as a whole, the binding covers each record on its own, and a control that
+/// only works in aggregate fails differently from one that works per record.
+#[test]
+fn a_record_ciphertext_cannot_be_moved_onto_another_identity() {
+    let (store, path) = temp_store_at("graft", "pw");
+    store.generate_key("alice").expect("generate alice");
+    store.generate_key("bob").expect("generate bob");
+    drop(store);
+
+    let raw = std::fs::read_to_string(&path).expect("read");
+    let mut envelope: serde_json::Value = serde_json::from_str(&raw).expect("parse");
+    let alice = envelope["keys"]["alice"].clone();
+    let bob = envelope["keys"]["bob"].clone();
+
+    // Bob's plaintext identity, Alice's encrypted private key.
+    let mut grafted = bob.clone();
+    grafted["encryptedSigningKey"] = alice["encryptedSigningKey"].clone();
+    grafted["nonce"] = alice["nonce"].clone();
+    envelope["keys"]["bob"] = grafted;
+
+    // Recompute the envelope tag so the HMAC is not what rejects this — the
+    // point is that the per-record binding rejects it independently.
+    let keys: KeyRecordMap = serde_json::from_value(envelope["keys"].clone()).expect("keys parse");
+    let salt_b64 = envelope["salt"].as_str().expect("salt").to_owned();
+    let integrity_key = super::crypto::derive_integrity_key(
+        "pw",
+        &base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            salt_b64.as_str(),
+        )
+        .expect("salt b64"),
+    )
+    .expect("integrity key");
+    envelope["hmac"] = serde_json::Value::String(
+        compute_envelope_hmac(&integrity_key, "argon2id", &salt_b64, &keys).expect("hmac"),
+    );
+    std::fs::write(&path, serde_json::to_vec(&envelope).expect("serialize")).expect("write");
+
+    let store = KeyStore::open(&path, "pw").expect("envelope is internally consistent");
+    assert!(
+        store.load_key("bob").is_err(),
+        "a ciphertext bound to another fingerprint must not decrypt"
+    );
+    assert!(
+        store.load_key("alice").is_ok(),
+        "the untouched record still opens"
+    );
 }

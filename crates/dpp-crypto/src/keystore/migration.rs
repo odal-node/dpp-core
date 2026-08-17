@@ -17,9 +17,14 @@ impl KeyStore {
     /// This is the recommended entry point for production code. For stores
     /// already at V2/V3 (Argon2id) it is identical to a single `open` call.
     pub fn open_and_migrate(path: impl AsRef<std::path::Path>, passphrase: &str) -> Result<Self> {
-        let store = Self::open(path.as_ref(), passphrase)?;
+        // The permissive door: this is the one function allowed to open a store
+        // that predates a current security property, because it is the one that
+        // repairs it. `open` refuses them and points here.
+        let store = Self::open_permissively(path.as_ref(), passphrase)?;
         if store.migrate_if_needed(passphrase)? {
-            // Re-open with the migrated file so the in-memory cipher is updated.
+            // Re-open strictly. The upgraded file must satisfy `open` on its own
+            // terms — if it does not, the migration did not finish the job and
+            // saying so beats handing back a store nobody checked.
             Self::open(path, passphrase)
         } else {
             Ok(store)
@@ -34,12 +39,16 @@ impl KeyStore {
     /// V2/V3. Use `open_and_migrate` in production to avoid the post-migration
     /// cipher inconsistency (this object's `self.cipher` is not updated here).
     pub fn migrate_if_needed(&self, passphrase: &str) -> Result<bool> {
-        let needs = *self.needs_migration.read().expect("lock");
-        if !needs {
+        // Three things can require an upgrade and they are not independent: a
+        // legacy-KDF store also lacks an integrity tag and record binding. One
+        // pass re-encrypts every record under the current key with its
+        // fingerprint as associated data and rewrites the envelope, which
+        // satisfies all three at once.
+        let Some(reason) = self.upgrade_needed else {
             return Ok(false);
-        }
+        };
 
-        tracing::info!("migrating key store from SHA-256 to Argon2id KDF");
+        tracing::info!(?reason, "upgrading key store to the current format");
 
         // Decrypt all records with the old cipher, re-encrypt with the new one.
         let new_key = derive_aes_key_argon2(passphrase, &self.salt)?;
@@ -56,19 +65,36 @@ impl KeyStore {
                     record.nonce.len()
                 )
             })?;
-            let mut raw = self
-                .cipher
-                .decrypt(nonce, record.encrypted_signing_key.as_ref())
-                .map_err(|_| {
-                    anyhow::anyhow!("AES-GCM decrypt failed during migration for key {id}")
-                })?;
+            // Read with whatever binding the *stored* record has, write with the
+            // current one.
+            let opened = if self.records_bound {
+                self.cipher.decrypt(
+                    nonce,
+                    aes_gcm::aead::Payload {
+                        msg: record.encrypted_signing_key.as_ref(),
+                        aad: record.fingerprint.as_bytes(),
+                    },
+                )
+            } else {
+                self.cipher
+                    .decrypt(nonce, record.encrypted_signing_key.as_ref())
+            };
+            let mut raw = opened.map_err(|_| {
+                anyhow::anyhow!("AES-GCM decrypt failed during migration for key {id}")
+            })?;
 
             // Re-encrypt with new cipher + fresh nonce.
             let mut nonce_bytes = [0u8; 12];
             crate::os_rng().fill_bytes(&mut nonce_bytes);
             let new_nonce = <&Nonce<U12>>::from(&nonce_bytes);
             let encrypted = new_cipher
-                .encrypt(new_nonce, raw.as_ref())
+                .encrypt(
+                    new_nonce,
+                    aes_gcm::aead::Payload {
+                        msg: raw.as_ref(),
+                        aad: record.fingerprint.as_bytes(),
+                    },
+                )
                 .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed during migration"))?;
             raw.zeroize();
 
@@ -91,7 +117,7 @@ impl KeyStore {
 
         // self.cipher still holds the old key; callers must use open_and_migrate
         // (which re-opens the file) rather than continuing to use this object.
-        tracing::info!("key store migrated from SHA-256 to Argon2id");
+        tracing::info!("key store upgraded to the current format");
         Ok(true)
     }
 }
