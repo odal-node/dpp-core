@@ -306,6 +306,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `oneOf` branches that the first pass of this change had missed.
 ### Added
 
+- **`SealRequest` and `SealCapabilities` model the conformance level and the
+  envelope**, not only the format and the mode. The CSC API carries three axes —
+  `signature_format`, `conformance_level`, `signed_envelope_property` — and this
+  port carried two.
+
+  **The missing level is the one with teeth.** `AdES-B-B` is a bare signature;
+  `AdES-B-LT` adds the certificates and revocation data a verifier needs to
+  check the seal *after the signing certificate expires*. ESPR retention outlives
+  certificate lifetimes comfortably, so a `B-B` seal on a passport is one that
+  stops verifying well inside the period it must cover — and nothing in the port
+  let a caller ask for better or notice they had not got it. The seal is bought
+  once and the document is retention-locked, so it cannot be corrected later.
+
+  `SealRequest::conformance_level` defaults to `BaselineLt` on the wire — the
+  weakest level that survives certificate expiry. `can_produce` now checks all
+  four axes, and `SealCapabilities::can_outlive_certificate_expiry` answers the
+  operator-facing question directly. The conformance kit notes an adapter that
+  cannot.
+
+  `SealEnvelope` (detached / enveloping / attached) is modelled rather than
+  assumed, because a qualified seal **can** be a JWS signature — JAdES
+  (ETSI TS 119 182-1) is an AdES format built on RFC 7515 whose scope covers
+  qualified electronic seals explicitly, and its `sigD` header spans the detached
+  case too. Which shape is available is a fact about a provider's product menu,
+  not about the law, and the two move independently.
+
 - **`ports::seal::conformance` — a kit that holds any `SealPort` to its own
   contract.** `SealPort::seal` says an implementation must refuse a profile it
   does not advertise. Until now that was a doc comment, and the only real

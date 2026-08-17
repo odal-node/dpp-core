@@ -59,6 +59,100 @@ pub enum SealFormat {
     Xades,
 }
 
+/// How much validation material the seal carries with it.
+///
+/// The AdES baseline levels, named as the CSC API names them
+/// (`conformance_level`). They are cumulative: each adds to the one before.
+///
+/// # Why this is on the request and not left to the adapter
+///
+/// **A `BaselineB` seal on a ten-year passport stops verifying when its signing
+/// certificate expires.** The level decides whether a verifier years from now
+/// can still establish that the seal was valid when it was made, and ESPR
+/// retention outlives certificate lifetimes comfortably. The seal is bought once
+/// and the document it covers is retention-locked, so this cannot be corrected
+/// afterwards by re-sealing — the same irreversibility that makes the refusal
+/// rule on [`SealCapabilities::can_produce`] worth having.
+///
+/// Leaving it implicit meant a caller could not ask for long-term validity and
+/// could not tell they had not got it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum SealConformanceLevel {
+    /// `AdES-B-B` — the signature alone. No timestamp, no validation material.
+    ///
+    /// Verifiable only while the signing certificate is valid and its status is
+    /// still resolvable. Adequate for a short-lived attestation and not for a
+    /// passport.
+    BaselineB,
+    /// `AdES-B-T` — adds a trusted timestamp, so the signing *time* is
+    /// established independently of the signer's clock.
+    BaselineT,
+    /// `AdES-B-LT` — adds the certificates and revocation data a verifier needs,
+    /// so the seal remains verifiable after the signing certificate expires.
+    ///
+    /// **The first level that survives certificate expiry**, and therefore the
+    /// first that suits a retention-locked document.
+    BaselineLt,
+    /// `AdES-B-LTA` — adds archival timestamps, extending validity past the
+    /// cryptographic lifetime of the algorithms themselves.
+    BaselineLta,
+}
+
+impl SealConformanceLevel {
+    /// Every level this build models. Same reasoning as [`SealFormat::ALL`].
+    pub const ALL: &'static [Self] = &[
+        Self::BaselineB,
+        Self::BaselineT,
+        Self::BaselineLt,
+        Self::BaselineLta,
+    ];
+
+    /// Whether a seal at this level stays verifiable after its signing
+    /// certificate expires.
+    ///
+    /// The property that actually matters for a retention-locked passport, named
+    /// so a caller can ask for it without having to know which letters mean what.
+    #[must_use]
+    pub const fn survives_certificate_expiry(self) -> bool {
+        matches!(self, Self::BaselineLt | Self::BaselineLta)
+    }
+}
+
+/// Where the seal sits relative to the bytes it covers.
+///
+/// # Why the port models both rather than choosing
+///
+/// A qualified seal **can** be a JWS signature: JAdES (ETSI TS 119 182-1) is an
+/// AdES format built on RFC 7515, and its scope covers qualified electronic
+/// seals explicitly. So "the seal is the payload's signature" and "the seal
+/// wraps a digest of the payload" are both available at the standards layer, and
+/// JAdES itself spans them — its `sigD` header identifies a detached payload
+/// precisely because RFC 7515 has no native way to.
+///
+/// What decides which is available is **the provider's format menu, not the
+/// law**. Those move independently, so a port that picked one would encode a
+/// supplier's product decision as an architectural one. It is a capability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum SealEnvelope {
+    /// The seal is returned alongside the data, covering a digest of it.
+    /// Two artefacts: the payload signs itself, the seal attests it separately.
+    Detached,
+    /// The signed data is carried inside the seal structure. One artefact.
+    Enveloping,
+    /// The seal is embedded into the document it covers, which stays readable
+    /// in its own format.
+    Attached,
+}
+
+impl SealEnvelope {
+    /// Every packaging this build models. Same reasoning as [`SealFormat::ALL`].
+    pub const ALL: &'static [Self] = &[Self::Detached, Self::Enveloping, Self::Attached];
+}
+
 /// A CSC-style reference to a QTSP-held credential. Never contains key material.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,6 +175,28 @@ pub struct SealRequest {
     pub key_ref: SealCredentialRef,
     /// Desired AdES envelope format. JAdES is recommended.
     pub sig_format: SealFormat,
+    /// How much validation material the seal must carry.
+    ///
+    /// Defaults to [`SealConformanceLevel::BaselineLt`] on the wire — the
+    /// weakest level that survives certificate expiry. A default that did not
+    /// would quietly hand a retention-locked passport a seal with a shelf life.
+    #[serde(default = "default_conformance_level")]
+    pub conformance_level: SealConformanceLevel,
+    /// Where the seal sits relative to the bytes it covers.
+    ///
+    /// Defaults to [`SealEnvelope::Detached`], which is what a request built
+    /// from a payload hash means: the caller already holds the bytes and wants
+    /// an attestation over them.
+    #[serde(default = "default_envelope")]
+    pub envelope: SealEnvelope,
+}
+
+fn default_conformance_level() -> SealConformanceLevel {
+    SealConformanceLevel::BaselineLt
+}
+
+fn default_envelope() -> SealEnvelope {
+    SealEnvelope::Detached
 }
 
 /// A completed qualified seal envelope returned by the QTSP.
@@ -115,11 +231,23 @@ impl SealMode {
     pub const ALL: &'static [Self] = &[Self::ProviderSeal, Self::OperatorSeal];
 }
 
-/// Which seal formats and modes an adapter supports.
+/// Which seal profiles an adapter supports.
+///
+/// Four axes, mirroring what the CSC API's `credentials/info` reports back —
+/// `signature_formats`, `conformance_levels`, and the envelope properties each
+/// format admits. Capability discovery is in that protocol already; this is the
+/// same idea at the port.
 #[derive(Debug, Clone)]
 pub struct SealCapabilities {
     pub supported_formats: Vec<SealFormat>,
     pub supported_modes: Vec<SealMode>,
+    /// Baseline levels this adapter can produce. An adapter offering only
+    /// [`SealConformanceLevel::BaselineB`] cannot seal a retention-locked
+    /// document in a way that outlives its own certificate — a procurement
+    /// problem, and one a caller can now see rather than discover.
+    pub supported_levels: Vec<SealConformanceLevel>,
+    /// Packagings this adapter can produce.
+    pub supported_envelopes: Vec<SealEnvelope>,
 }
 
 impl SealCapabilities {
@@ -130,12 +258,31 @@ impl SealCapabilities {
     /// capabilities it advertises, which is the disagreement the check exists to
     /// make impossible.
     ///
-    /// Both axes must match. A provider that produces the right envelope format
-    /// under the wrong certificate holder has not produced what was asked for:
-    /// the mode decides *whose* attestation the seal is, which is a statement
-    /// about responsibility rather than a serialisation detail.
+    /// **Every** axis must match, and each carries meaning no other can stand in
+    /// for. A provider that produces the right format under the wrong
+    /// certificate holder has not produced what was asked for — the mode decides
+    /// *whose* attestation the seal is. One that produces the right format at a
+    /// lower baseline level has delivered a seal with a shorter life than the
+    /// document it covers. Neither is a serialisation detail.
     pub fn can_produce(&self, req: &SealRequest) -> bool {
-        self.supported_formats.contains(&req.sig_format) && self.supported_modes.contains(&req.mode)
+        self.supported_formats.contains(&req.sig_format)
+            && self.supported_modes.contains(&req.mode)
+            && self.supported_levels.contains(&req.conformance_level)
+            && self.supported_envelopes.contains(&req.envelope)
+    }
+
+    /// Whether this adapter can produce any seal that outlives its signing
+    /// certificate.
+    ///
+    /// A node whose only sealing provider answers `false` here can issue
+    /// passports whose seals stop verifying long before the retention period
+    /// ends. Surfaced as a question an operator can ask at boot, rather than one
+    /// discovered years later by a verifier.
+    #[must_use]
+    pub fn can_outlive_certificate_expiry(&self) -> bool {
+        self.supported_levels
+            .iter()
+            .any(|l| l.survives_certificate_expiry())
     }
 }
 

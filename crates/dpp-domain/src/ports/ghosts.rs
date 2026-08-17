@@ -35,8 +35,8 @@ use super::registry_sync::{
     RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
 };
 use super::seal::{
-    SealCapabilities, SealChecks, SealFormat, SealIndication, SealMode, SealPort, SealRequest,
-    SealVerification, SealedEnvelope,
+    SealCapabilities, SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication,
+    SealMode, SealPort, SealRequest, SealVerification, SealedEnvelope,
 };
 use crate::domain::error::DppError;
 use crate::domain::passport::{Passport, PassportId};
@@ -211,6 +211,21 @@ impl SealPort for GhostSeal {
                 SealFormat::Xades,
             ],
             supported_modes: vec![SealMode::ProviderSeal, SealMode::OperatorSeal],
+            // A placeholder can fabricate any baseline level as readily as any
+            // other — none of it is real. Advertising all four keeps the ghost
+            // useful for exercising a consumer that asks for long-term validity,
+            // which is the case a real provider is most likely to refuse.
+            supported_levels: vec![
+                SealConformanceLevel::BaselineB,
+                SealConformanceLevel::BaselineT,
+                SealConformanceLevel::BaselineLt,
+                SealConformanceLevel::BaselineLta,
+            ],
+            supported_envelopes: vec![
+                SealEnvelope::Detached,
+                SealEnvelope::Enveloping,
+                SealEnvelope::Attached,
+            ],
         }
     }
 }
@@ -230,6 +245,8 @@ mod tests {
                 credential_id: "ghost".into(),
             },
             sig_format,
+            conformance_level: SealConformanceLevel::BaselineLt,
+            envelope: SealEnvelope::Detached,
         }
     }
 
@@ -372,6 +389,8 @@ mod tests {
                 credential_id: "cred-001".into(),
             },
             sig_format: SealFormat::Jades,
+            conformance_level: SealConformanceLevel::BaselineLt,
+            envelope: SealEnvelope::Detached,
         };
         let env = ghost.seal(req).await.unwrap();
         assert!(env.placeholder);
