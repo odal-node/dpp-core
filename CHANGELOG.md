@@ -15,6 +15,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
+  now, so `PassthroughRegistry` as a literal no longer compiles — use
+  `PassthroughRegistry::new()` (the two Apache-2.0 strategies registered) or
+  `::empty()` (none, everything on the fallback). It also stops being
+  `UnwindSafe`, because `Box<dyn ComplianceStrategy>` is not; a caller that held
+  one across `catch_unwind` needs `AssertUnwindSafe`.
+
+  Detected by `cargo semver-checks` as `unit_struct_changed_kind` and
+  `auto_trait_impl_removed`.
+
+- **`SealRequest` and `SealCapabilities` gain fields**, which breaks exhaustive
+  struct literals. `SealRequest` adds `conformance_level` and `envelope`;
+  `SealCapabilities` adds `supported_levels` and `supported_envelopes`. Both new
+  `SealRequest` fields have serde defaults, so **the wire format is
+  backward-compatible** — only Rust construction changes. Adding `..Default` is
+  not available here; name the fields.
+
+  Detected by `cargo semver-checks` as `constructible_struct_adds_field`.
+
 - **`KeyStore::open` refuses a store that predates a current security property.**
   It previously accepted every legacy shape silently, which meant an attacker who
   could write the file could *choose* the weaker shape and be opened without
