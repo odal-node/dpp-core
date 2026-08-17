@@ -1,17 +1,44 @@
-﻿//! Integration test: Schema conformity validation.
+﻿//! Integration test: schema shape and field-set regression.
 //!
 //! Validates that:
 //! 1. All JSON schemas are syntactically valid and loadable.
-//! 2. Textile v1.1.0 schema covers the fields required by JTC 24 draft.
+//! 2. The textile schema still carries the field set recorded below.
 //! 3. Valid textile data passes schema validation.
 //! 4. Invalid textile data is correctly rejected.
-//! 5. The VersionedSchemaRegistry resolves the correct schema version.
+//! 5. The `VersionedSchemaRegistry` resolves the correct schema version.
 //! 6. Battery and steel schemas are present and valid.
 //!
-//! This approximates what a conformity assessment body would check. Schemas are
-//! loaded through the public `VersionedSchemaRegistry` — the same resolution
-//! path a consumer uses — rather than by reaching into files, so the test also
-//! covers registry embedding.
+//! Schemas are loaded through the public `VersionedSchemaRegistry` — the same
+//! resolution path a consumer uses — rather than by reaching into files, so the
+//! test also covers registry embedding.
+//!
+//! # This is not a conformity check, and used to say it was
+//!
+//! An earlier version of this header claimed the file "approximates what a
+//! conformity assessment body would check". It does not, and the difference is
+//! the whole point of the distinction: a conformity assessment body checks a
+//! product against a **published standard**. Every field list below is *our own
+//! expectation*, written here, asserted against a schema also written here. Both
+//! sides are ours, so agreement between them is evidence of internal consistency
+//! and of nothing else.
+//!
+//! That is still worth having — a field silently disappearing from the schema is
+//! exactly the regression these catch — but it is a different claim, and the
+//! stronger one was the sort of overstatement this project treats as a defect
+//! rather than as marketing.
+//!
+//! # What would make it a real conformity check
+//!
+//! One purchase. Six EN 182xx:2026 standards are cited as harmonised, so
+//! conformity to them now carries a presumption of conformity to the
+//! corresponding ESPR articles — the fact, its source and its date live in the
+//! `jtc24` record in `dpp-vocab`'s `vocabularies/`, which is the one home for it.
+//! Nobody here has read the clause text: the standards are purchase-gated and
+//! their text may not be redistributed.
+//!
+//! So the unlock condition is concrete and is not an engineering task: **buy the
+//! relevant standard, read it, and replace the lists below with clause-cited
+//! ones.** Until then the constants are named for what they are.
 
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use semver::Version;
@@ -25,19 +52,25 @@ fn schema(sector: &str, version: &str) -> serde_json::Value {
     serde_json::from_str(json).expect("embedded schema must be valid JSON")
 }
 
-// ─── JTC 24 mandatory field coverage ──────────────────────────────────────
+// ─── Recorded field-set expectations ──────────────────────────────────────
+//
+// Our own expectations, not a standard's requirements. See the header: no EN
+// clause text has been read, so nothing here is traceable to one.
 
-/// The fields anticipated as mandatory by the JTC 24 textile DPP draft.
-/// This list is used to assert that our schema v1.1.0 covers them.
-const JTC24_TEXTILE_MANDATORY_FIELDS: &[&str] = &[
+/// Textile fields this project expects to be present **and** required.
+///
+/// Derived from our reading of what a textile passport needs, not from a
+/// published standard. Renamed from `EXPECTED_TEXTILE_REQUIRED_FIELDS`, which
+/// implied a provenance it never had.
+const EXPECTED_TEXTILE_REQUIRED_FIELDS: &[&str] = &[
     "fibreComposition",
     "countryOfManufacturing",
     "careInstructions",
     "chemicalComplianceStandard",
 ];
 
-/// Fields anticipated by JTC 24 as important for environmental metrics.
-const JTC24_TEXTILE_ENVIRONMENTAL_FIELDS: &[&str] = &[
+/// Textile environmental-metric fields this project expects to be present.
+const EXPECTED_TEXTILE_ENVIRONMENTAL_FIELDS: &[&str] = &[
     "recycledContentPct",
     "carbonFootprintKgCo2e",
     "waterUseLitres",
@@ -46,11 +79,13 @@ const JTC24_TEXTILE_ENVIRONMENTAL_FIELDS: &[&str] = &[
     "repairScore",
 ];
 
-/// Fields required for SVHC/SCIP disclosure under REACH Article 33.
-const JTC24_SVHC_FIELDS: &[&str] = &["svhcSubstances"];
+/// SVHC/SCIP disclosure field. Unlike the lists above this one *does* trace to
+/// a named instrument — REACH Article 33 — though the mapping from that article
+/// to this field name is still ours.
+const EXPECTED_SVHC_FIELDS: &[&str] = &["svhcSubstances"];
 
-/// Fields classified Restricted (disassembly, spare parts).
-const JTC24_PROFESSIONAL_FIELDS: &[&str] = &["disassemblyInstructions", "sparePartsAvailable"];
+/// Fields this project classifies as restricted (disassembly, spare parts).
+const EXPECTED_RESTRICTED_FIELDS: &[&str] = &["disassemblyInstructions", "sparePartsAvailable"];
 
 #[test]
 fn textile_v1_1_schema_is_valid_json_schema() {
@@ -67,7 +102,7 @@ fn textile_v1_1_schema_is_valid_json_schema() {
 }
 
 #[test]
-fn textile_v1_1_schema_covers_jtc24_mandatory_fields() {
+fn textile_schema_still_carries_every_expected_required_field() {
     let schema = schema("textile", "1.1.0");
 
     let properties = schema["properties"]
@@ -78,14 +113,14 @@ fn textile_v1_1_schema_covers_jtc24_mandatory_fields() {
         .expect("schema must have required array");
     let required_names: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
 
-    for field in JTC24_TEXTILE_MANDATORY_FIELDS {
+    for field in EXPECTED_TEXTILE_REQUIRED_FIELDS {
         assert!(
             properties.contains_key(*field),
-            "schema missing JTC 24 mandatory field: {field}"
+            "schema no longer declares expected field: {field}"
         );
         assert!(
             required_names.contains(field),
-            "JTC 24 mandatory field '{field}' must be in 'required' array"
+            "expected field '{field}' is declared but no longer in 'required'"
         );
     }
 }
@@ -96,7 +131,7 @@ fn textile_v1_1_schema_covers_environmental_fields() {
 
     let properties = schema["properties"].as_object().unwrap();
 
-    for field in JTC24_TEXTILE_ENVIRONMENTAL_FIELDS {
+    for field in EXPECTED_TEXTILE_ENVIRONMENTAL_FIELDS {
         assert!(
             properties.contains_key(*field),
             "schema missing environmental field: {field}"
@@ -110,9 +145,9 @@ fn textile_v1_1_schema_covers_svhc_and_professional_fields() {
 
     let properties = schema["properties"].as_object().unwrap();
 
-    for field in JTC24_SVHC_FIELDS
+    for field in EXPECTED_SVHC_FIELDS
         .iter()
-        .chain(JTC24_PROFESSIONAL_FIELDS.iter())
+        .chain(EXPECTED_RESTRICTED_FIELDS.iter())
     {
         assert!(
             properties.contains_key(*field),

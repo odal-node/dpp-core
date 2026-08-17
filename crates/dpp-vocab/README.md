@@ -113,9 +113,18 @@ what the `namespaceIri` field in each record exists to supply.
 It records **identity provenance**, not structural conformance. That an
 identifier is well-formed, current and correctly attributed says nothing about
 whether our field set matches the model behind it. Nothing here licenses the
-phrase "IDTA-conformant", "JTC 24 conformant", or any equivalent — the EN 18216
-series carries no OJEU citation, so there is no presumption of conformity to
-claim even once a text has been read.
+phrase "IDTA-conformant", "JTC 24 conformant", or any equivalent.
+
+The reason is that we have not read the standards, **not** that there is nothing
+to claim. Whether a presumption of conformity is available at all is a fact about
+the OJEU, and it has one home: the `jtc24` record in `vocabularies/`, with its
+own source and `checkedOn` date. Read it there rather than trusting a summary
+here — an earlier version of this paragraph asserted the opposite of what that
+record now says, and survived the correction because prose is not gated.
+
+That direction matters. A presumption that *is* available and that we cannot
+claim is a gap worth costing; one that does not exist is merely a fact about the
+world. The gap is the first kind.
 
 ## Design
 
