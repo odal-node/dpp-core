@@ -49,8 +49,8 @@ use async_trait::async_trait;
 use crate::domain::error::DppError;
 
 pub use crate::domain::seal::{
-    SealCapabilities, SealChecks, SealCredentialRef, SealFormat, SealIndication, SealMode,
-    SealRequest, SealVerification, SealedEnvelope,
+    SealCapabilities, SealChecks, SealConformanceLevel, SealCredentialRef, SealEnvelope,
+    SealFormat, SealIndication, SealMode, SealRequest, SealVerification, SealedEnvelope,
 };
 
 // ─── Port Trait ──────────────────────────────────────────────────────────────

@@ -41,8 +41,8 @@
 use std::fmt;
 
 use super::{
-    SealCapabilities, SealCredentialRef, SealFormat, SealIndication, SealMode, SealPort,
-    SealRequest, SealVerification,
+    SealCapabilities, SealConformanceLevel, SealCredentialRef, SealEnvelope, SealFormat,
+    SealIndication, SealMode, SealPort, SealRequest, SealVerification,
 };
 
 /// A conformance finding: something an adapter got wrong.
@@ -110,7 +110,13 @@ impl fmt::Display for ConformanceReport {
 /// The payload hash is a well-formed SHA-256 hex digest so an adapter that
 /// validates its input shape accepts it — the kit is testing the capability
 /// contract, and a rejection for the wrong reason would look like conformance.
-fn request(format: SealFormat, mode: SealMode) -> SealRequest {
+/// A request naming all four axes explicitly.
+fn profiled_request(
+    format: SealFormat,
+    mode: SealMode,
+    conformance_level: SealConformanceLevel,
+    envelope: SealEnvelope,
+) -> SealRequest {
     SealRequest {
         payload_hash: "ab".repeat(32),
         mode,
@@ -119,6 +125,8 @@ fn request(format: SealFormat, mode: SealMode) -> SealRequest {
             credential_id: "conformance".into(),
         },
         sig_format: format,
+        conformance_level,
+        envelope,
     }
 }
 
@@ -155,6 +163,15 @@ pub async fn check_seal_port<P: SealPort + ?Sized>(adapter: &P) -> ConformanceRe
         );
     }
 
+    if !capabilities.can_outlive_certificate_expiry() {
+        report.notes.push(
+            "no advertised conformance level survives certificate expiry (B-LT or higher) — \
+             seals from this adapter stop verifying when the signing certificate does, which \
+             is inside the retention period of any passport it seals"
+                .to_owned(),
+        );
+    }
+
     check_advertised(adapter, &capabilities, &mut report).await;
     check_unadvertised(adapter, &capabilities, &mut report).await;
 
@@ -172,7 +189,21 @@ async fn check_advertised<P: SealPort + ?Sized>(
     for format in &capabilities.supported_formats {
         for mode in &capabilities.supported_modes {
             report.combinations_checked = report.combinations_checked.saturating_add(1);
-            let req = request(format.clone(), mode.clone());
+            // The first advertised level and envelope, so every advertised
+            // format/mode pair is still exercised exactly once. The remaining
+            // level and envelope combinations are covered by the refusal sweep
+            // below, which is where a mismatch actually shows.
+            let level = capabilities
+                .supported_levels
+                .first()
+                .copied()
+                .unwrap_or(SealConformanceLevel::BaselineLt);
+            let packaging = capabilities
+                .supported_envelopes
+                .first()
+                .copied()
+                .unwrap_or(SealEnvelope::Detached);
+            let req = profiled_request(format.clone(), mode.clone(), level, packaging);
 
             let envelope = match adapter.seal(req).await {
                 Ok(envelope) => envelope,
@@ -256,20 +287,24 @@ async fn check_unadvertised<P: SealPort + ?Sized>(
 ) {
     for format in SealFormat::ALL {
         for mode in SealMode::ALL {
-            let req = request(format.clone(), mode.clone());
-            if capabilities.can_produce(&req) {
-                continue;
-            }
-            report.combinations_checked = report.combinations_checked.saturating_add(1);
-            if let Ok(envelope) = adapter.seal(req).await {
-                report.fail(
-                    "seal.accepted_unadvertised",
-                    format!(
-                        "does not advertise {format:?}/{mode:?} but produced a {:?} envelope \
-                         for it",
-                        envelope.format
-                    ),
-                );
+            for level in SealConformanceLevel::ALL {
+                for packaging in SealEnvelope::ALL {
+                    let req = profiled_request(format.clone(), mode.clone(), *level, *packaging);
+                    if capabilities.can_produce(&req) {
+                        continue;
+                    }
+                    report.combinations_checked = report.combinations_checked.saturating_add(1);
+                    if let Ok(produced) = adapter.seal(req).await {
+                        report.fail(
+                            "seal.accepted_unadvertised",
+                            format!(
+                                "does not advertise {format:?}/{mode:?}/{level:?}/{packaging:?} \
+                                 but produced a {:?} envelope for it",
+                                produced.format
+                            ),
+                        );
+                    }
+                }
             }
         }
     }
@@ -325,6 +360,8 @@ mod tests {
             SealCapabilities {
                 supported_formats: vec![SealFormat::Jades, SealFormat::Cades],
                 supported_modes: vec![SealMode::ProviderSeal],
+                supported_levels: vec![SealConformanceLevel::BaselineLt],
+                supported_envelopes: vec![SealEnvelope::Detached],
             }
         }
     }
@@ -381,6 +418,8 @@ mod tests {
             SealCapabilities {
                 supported_formats: vec![SealFormat::Jades],
                 supported_modes: vec![SealMode::ProviderSeal],
+                supported_levels: vec![SealConformanceLevel::BaselineLt],
+                supported_envelopes: vec![SealEnvelope::Detached],
             }
         }
     }
@@ -395,6 +434,91 @@ mod tests {
                 .iter()
                 .any(|f| f.rule == "verify.incoherent_verdict"),
             "{report}"
+        );
+    }
+
+    /// An adapter that can only produce short-lived seals is noted.
+    ///
+    /// `B-B` carries no validation material, so the seal stops verifying when
+    /// its signing certificate expires — comfortably inside the retention period
+    /// of any passport it covers. That is a procurement fact rather than a
+    /// contract violation, so it is a note; the point is that it is *visible*
+    /// before a decade of passports depend on it.
+    struct ShortLivedOnly;
+
+    #[async_trait]
+    impl SealPort for ShortLivedOnly {
+        async fn seal(
+            &self,
+            req: SealRequest,
+        ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+            if !self.capabilities().can_produce(&req) {
+                return Err(crate::domain::error::DppError::Validation(
+                    crate::domain::field_error::ValidationErrors::message("profile not advertised"),
+                ));
+            }
+            Ok(SealedEnvelope {
+                format: req.sig_format,
+                seal_value: "synthetic".into(),
+                signing_cert_ref: None,
+                sealed_at: Utc::now(),
+                placeholder: false,
+            })
+        }
+        async fn verify(
+            &self,
+            _env: &SealedEnvelope,
+        ) -> Result<SealVerification, crate::domain::error::DppError> {
+            Ok(SealVerification::passed(SealChecks::FullValidation))
+        }
+        fn capabilities(&self) -> SealCapabilities {
+            SealCapabilities {
+                supported_formats: vec![SealFormat::Cades],
+                supported_modes: vec![SealMode::ProviderSeal],
+                supported_levels: vec![SealConformanceLevel::BaselineB],
+                supported_envelopes: vec![SealEnvelope::Detached],
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn an_adapter_that_cannot_outlive_its_certificate_is_noted() {
+        let report = check_seal_port(&ShortLivedOnly).await;
+        assert!(
+            report.is_conformant(),
+            "offering only B-B is honest, not a contract breach: {report}"
+        );
+        assert!(
+            report
+                .notes
+                .iter()
+                .any(|n| n.contains("certificate expiry")),
+            "but an operator must be told: {report}"
+        );
+    }
+
+    /// Asking for long-term validity and being handed a bare signature is caught.
+    ///
+    /// The substitution this axis exists to prevent, and the one with the
+    /// longest tail: a `B-B` seal where `B-LT` was requested looks identical
+    /// until the certificate expires, years after the passport was locked.
+    #[tokio::test]
+    async fn a_downgraded_conformance_level_is_refused() {
+        let caps = ShortLivedOnly.capabilities();
+        let long_lived = profiled_request(
+            SealFormat::Cades,
+            SealMode::ProviderSeal,
+            SealConformanceLevel::BaselineLt,
+            SealEnvelope::Detached,
+        );
+        assert!(
+            !caps.can_produce(&long_lived),
+            "a B-B-only adapter must not claim it can produce B-LT"
+        );
+        assert!(!caps.can_outlive_certificate_expiry());
+        assert!(
+            ShortLivedOnly.seal(long_lived).await.is_err(),
+            "and it must refuse rather than quietly hand back B-B"
         );
     }
 
@@ -435,6 +559,8 @@ mod tests {
             SealCapabilities {
                 supported_formats: vec![SealFormat::Cades],
                 supported_modes: vec![SealMode::ProviderSeal],
+                supported_levels: vec![SealConformanceLevel::BaselineLt],
+                supported_envelopes: vec![SealEnvelope::Detached],
             }
         }
     }
