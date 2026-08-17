@@ -119,6 +119,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   value that serialised *with* the tag and deserialised back **unequal to
   itself** — the same value in two shapes depending on whether it had been
   through the wire yet. Found by a round-trip test written for the guard above.
+### Added
+
+- **`PassthroughBatteryStrategy` and `PassthroughTextileStrategy`** — the two
+  `ComplianceStrategy` implementations `ports::compliance` has claimed the
+  Apache-2.0 build ships since the trait was written. Neither existed. The trait
+  had **zero implementors anywhere** — core, engine or plugins — nothing
+  constructed one, and `PassthroughRegistry` implemented `ComplianceRegistry`
+  directly, bypassing the per-sector seam entirely. A published trait documented
+  as having two implementations that a reader cannot find is the same defect as
+  a stale claim in prose, in code that ships.
+
+- **`PassthroughRegistry` dispatches through the strategy trait**, with
+  `register`, `empty` and `registered_sectors`. A sector with a registered
+  strategy routes to it; every other sector takes a bare-passthrough fallback.
+  An unregistered sector is **not** an error — the catalog is open by design, so
+  `UnknownSector` here would make the registry the one closed part of a
+  data-driven model.
+
+  This is the granularity that makes the seam worth having: a proprietary tier
+  computing a real battery determination still wants passthrough for the eleven
+  sectors it does not model, and swapping the whole registry to get one sector
+  means reimplementing dispatch for all of them.
+
+### Changed
+
+- **A passthrough result now carries the metrics the manufacturer declared**, for
+  the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
+  (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts
+  `recycledContentPct` and `repairScore`. Previously every field was `null`.
+
+  `compliance_status` is unchanged and still `PassthroughNoValidation`, and the
+  result still carries no findings, no ruleset version and no receipt — nothing
+  claims a determination was made. `ComplianceResult::co2e_score` is documented
+  as "calculated **or** manufacturer-supplied", so this is the field being used
+  as specified rather than a new claim.
+
+  **Battery `recycledContentPct` stays `null` deliberately.** Art. 8(2) and 8(3)
+  set per-metal minima for cobalt, lead, lithium and nickel, and the measurement
+  basis differs between them — cobalt, lithium and nickel are measured "in active
+  materials", lead as the share "present in the battery". One number cannot carry
+  four metals over two denominators, and a reader would take it for a compliance
+  figure.
 
 ## [0.17.0] - 2026-08-13
 - **A vocabulary record no longer carries a filesystem path into a non-public
