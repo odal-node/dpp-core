@@ -61,6 +61,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   says what the vectors are and what would make them conformance vectors.
 
 ## [0.17.0] - 2026-08-13
+- **A vocabulary record no longer carries a filesystem path into a non-public
+  repository.** `ec-battery-guidance.json`'s `source` field recorded where a
+  local copy of the Commission guidance document is filed. That file is
+  `include_str!`d into `dpp-vocab`, so the path was compiled into the artefact
+  published as 0.17.0 and is on crates.io permanently — this release stops
+  carrying it forward, it cannot withdraw it. The citable provenance is
+  unchanged and complete: the Commission download URL, the document title,
+  version 1.0, 28 July 2026, the issuing directorate, the electronic-signature
+  date and the CC BY 4.0 confirmation all remain. The named individual contact
+  is also gone; the directorate identifies the source adequately and a personal
+  name compiled into a published crate is a different distribution from a name
+  on a public web page.
+
+### Added
+
+- **`just check-refs` — a gate step that reads prose.** Scans every text file
+  for references to non-public sibling repositories, internal decision records,
+  and the company internal planning material once described as a pilot. Runs
+  first in `just check` and as its own CI job.
+
+  Existing gate steps read Rust. Every recorded instance of this leak has been
+  in prose or data — a module doc, a schema `description`, a README paragraph,
+  and now a JSON `source` string — so a check that reads code was never going
+  to catch one. The scanner is deliberately narrow: unambiguous patterns only,
+  because a tripwire that cries wolf is a tripwire people switch off. It is
+  pinned by a negative control — it fails on the record as 0.17.0 shipped it
+  and passes on the corrected one.
 
 ### Breaking
 

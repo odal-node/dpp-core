@@ -40,6 +40,19 @@ fmt-check:
 audit:
     cargo audit
 
+# Fail if any file references private material — a non-public sibling repo, an
+# internal decision record, or the company internal planning once described as a
+# pilot. See CLAUDE.md section 6.
+#
+# Reads **prose**, not only code. Every recorded instance of this failure has
+# been in a doc comment, a schema `description`, a README paragraph or a JSON
+# data field, and the one that reached crates.io was in a vocabulary record's
+# `source` string — compiled into the published artefact by `include_str!` and
+# invisible to a reviewer reading the Rust. A crate version cannot be
+# unpublished, so this belongs in the gate rather than in review.
+check-refs:
+    python .github/scripts/check_private_refs.py
+
 # Check the public API against the last published release.
 #
 # All members share one lockstep version, so every crate is republished on every
@@ -98,8 +111,11 @@ test-plugins:
     done
     echo "All plugin tests passed."
 
-# Run all gate checks (fmt → lint → test → plugin tests → doc → audit)
-check: fmt-check lint test test-doc test-plugins doc audit
+# Run all gate checks (refs → fmt → lint → test → plugin tests → doc → audit)
+#
+# `check-refs` runs first because it is the cheapest and because what it catches
+# is the only failure here that cannot be undone after a release.
+check: check-refs fmt-check lint test test-doc test-plugins doc audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
