@@ -59,6 +59,6 @@ pub mod namespace;
 pub mod register;
 pub mod vocabulary;
 
-pub use namespace::{OWN_NAMESPACE, is_own};
+pub use namespace::{OWN_JSONLD_NAMESPACE, OWN_NAMESPACE, is_own};
 pub use register::{Verdict, VocabularyRegister};
 pub use vocabulary::{Layer, Status, Vocabulary};

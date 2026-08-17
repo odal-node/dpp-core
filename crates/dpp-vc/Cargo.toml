@@ -17,6 +17,9 @@ path = "src/lib.rs"
 
 [dependencies]
 dpp-domain = { workspace = true }
+# The JSON-LD `@context` names GS1's vocabulary, and where that prefix IRI comes
+# from — and whether anyone has read it — is a claim with one home.
+dpp-vocab  = { workspace = true }
 dpp-crypto = { workspace = true }
 async-trait = { workspace = true }
 base64      = { workspace = true }
