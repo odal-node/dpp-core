@@ -67,11 +67,13 @@
       "properties": {
         "overall": {
           "type": "number",
+          "x-disclosure": "public",
           "minimum": 0,
           "maximum": 10
         },
         "criteria": {
           "type": "array",
+          "x-disclosure": "public",
           "items": {
             "$ref": "#/definitions/repairCriterion"
           }
@@ -182,14 +184,17 @@
       "properties": {
         "casNumber": {
           "type": "string",
+          "x-disclosure": "restricted",
           "minLength": 1
         },
         "substanceName": {
           "type": "string",
+          "x-disclosure": "restricted",
           "minLength": 1
         },
         "concentrationPct": {
           "type": "number",
+          "x-disclosure": "restricted",
           "minimum": 0,
           "maximum": 100
         },
@@ -197,13 +202,15 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "restricted"
         },
         "scipNotificationId": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "restricted"
         }
       },
       "additionalProperties": false
@@ -216,19 +223,22 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1
         },
         "casNumber": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "restricted"
         },
         "weightGrams": {
           "type": [
             "number",
             "null"
           ],
+          "x-disclosure": "restricted",
           "minimum": 0
         },
         "countryOfOrigin": {
@@ -236,6 +246,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "pattern": "^[A-Z]{2}$"
         }
       },
@@ -251,13 +262,16 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1
         },
         "score": {
-          "type": "number"
+          "type": "number",
+          "x-disclosure": "public"
         },
         "weight": {
-          "type": "number"
+          "type": "number",
+          "x-disclosure": "public"
         }
       },
       "additionalProperties": false

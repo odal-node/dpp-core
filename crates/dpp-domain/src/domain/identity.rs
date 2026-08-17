@@ -77,6 +77,45 @@ pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
 ];
 
 impl Disclosure {
+    /// How many of the three audiences may see this class.
+    ///
+    /// Not an ordering of the lattice — there isn't one. It is the only totally
+    /// ordered thing the lattice offers, which is what a deterministic tie-break
+    /// needs.
+    const fn audience_count(self) -> u8 {
+        match self {
+            // Everyone.
+            Self::Public => 3,
+            // Legitimate interest and authorities, not the public.
+            Self::Restricted => 2,
+            // Exactly one audience each, and not the same one.
+            Self::Conformity | Self::Individual => 1,
+        }
+    }
+
+    /// The more restrictive of two classes — the one fewer audiences may see.
+    ///
+    /// Exists so that an ambiguous lookup resolves the safe way and resolves it
+    /// **identically every time**. Used by
+    /// [`SectorAccessPolicy::disclosure_for_field`](crate::access::SectorAccessPolicy::disclosure_for_field)
+    /// when two normalized-equal keys both match.
+    ///
+    /// `Conformity` and `Individual` are genuinely incomparable — Art. 77(2)
+    /// gives each to one audience, and neither audience contains the other, so
+    /// no class means "withheld from both". The tie-break returns `Individual`,
+    /// which is a choice rather than a derivation, and it is only ever reached
+    /// by a policy that declares one field name in both classes. That is an
+    /// authoring error a schema cannot commit: `access::tests` rejects it at
+    /// build time.
+    #[must_use]
+    pub const fn most_restrictive(self, other: Self) -> Self {
+        if other.audience_count() <= self.audience_count() {
+            other
+        } else {
+            self
+        }
+    }
+
     /// The stable wire token for this class, used to build a disclosure-set key.
     ///
     /// Deliberately not `Serialize`-derived: this string is baked into stored

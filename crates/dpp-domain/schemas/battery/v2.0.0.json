@@ -269,11 +269,13 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1,
           "description": "Chemical name or formula."
         },
         "weightPct": {
           "type": "number",
+          "x-disclosure": "restricted",
           "minimum": 0,
           "maximum": 100,
           "description": "Weight percentage in the component."
@@ -283,6 +285,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "description": "CAS Registry Number."
         }
       },
@@ -296,6 +299,7 @@
       "properties": {
         "name": {
           "type": "string",
+          "x-disclosure": "public",
           "minLength": 1,
           "description": "Material name, e.g. cobalt, lithium."
         },
@@ -304,6 +308,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "description": "CAS or EC number."
         },
         "weightGrams": {
@@ -311,6 +316,7 @@
             "number",
             "null"
           ],
+          "x-disclosure": "public",
           "minimum": 0,
           "description": "Weight in grams present in the battery."
         },
@@ -319,6 +325,7 @@
             "string",
             "null"
           ],
+          "x-disclosure": "public",
           "pattern": "^[A-Z]{2}$",
           "description": "ISO 3166-1 alpha-2 country of primary extraction."
         }

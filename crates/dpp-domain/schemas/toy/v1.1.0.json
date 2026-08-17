@@ -93,14 +93,17 @@
       "properties": {
         "casNumber": {
           "type": "string",
+          "x-disclosure": "restricted",
           "minLength": 1
         },
         "substanceName": {
           "type": "string",
+          "x-disclosure": "restricted",
           "minLength": 1
         },
         "concentrationPct": {
           "type": "number",
+          "x-disclosure": "restricted",
           "minimum": 0,
           "maximum": 100
         },
@@ -108,13 +111,15 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "restricted"
         },
         "scipNotificationId": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-disclosure": "restricted"
         }
       },
       "additionalProperties": false
