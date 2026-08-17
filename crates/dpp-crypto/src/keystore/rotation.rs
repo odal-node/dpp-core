@@ -82,9 +82,18 @@ impl KeyStore {
         crate::os_rng().fill_bytes(&mut nonce_bytes);
         let nonce = <&Nonce<U12>>::from(&nonce_bytes);
         let mut raw = signing_key.to_bytes();
+        // Bound to the new key's own fingerprint. The archived copy below keeps
+        // the one it was sealed under, which is why the binding is to the
+        // fingerprint rather than the map key it is filed at.
         let encrypted = self
             .cipher
-            .encrypt(nonce, raw.as_ref())
+            .encrypt(
+                nonce,
+                aes_gcm::aead::Payload {
+                    msg: raw.as_ref(),
+                    aad: fingerprint.as_bytes(),
+                },
+            )
             .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
         raw.zeroize();
         let new_record = KeyRecord::new(

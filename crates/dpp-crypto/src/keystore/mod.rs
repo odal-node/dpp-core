@@ -10,7 +10,15 @@
 //! - `store` — [`KeyStore`] itself: the encrypted record map and its
 //!   open/generate/load/persist paths.
 //! - `crypto`, `rotation`, `migration` — key derivation, rotation, and
-//!   legacy-KDF migration, each already a focused file.
+//!   legacy-format migration, each already a focused file.
+//!
+//! ## Opening a store
+//!
+//! [`KeyStore::open`] refuses a store that predates any current security
+//! property and names which one — see [`UpgradeNeeded`].
+//! [`KeyStore::open_and_migrate`] opens it anyway, upgrades it in place, and
+//! then re-opens strictly. Production callers want the second; it is a no-op for
+//! a store already in the current format.
 
 mod crypto;
 mod entry;
@@ -21,4 +29,4 @@ mod store;
 mod tests;
 
 pub use entry::KeyEntry;
-pub use store::{KeyStore, PublicKeyInfo};
+pub use store::{KeyStore, PublicKeyInfo, UpgradeNeeded};

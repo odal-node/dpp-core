@@ -6,13 +6,13 @@ use std::sync::RwLock;
 
 use aes_gcm::{
     Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit, consts::U12},
+    aead::{Aead, KeyInit, Payload, consts::U12},
 };
 use anyhow::{Context, Result};
 use ed25519_dalek::SigningKey;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use super::crypto::{
     compute_envelope_hmac, derive_aes_key_argon2, derive_aes_key_sha256, derive_integrity_key,
@@ -26,6 +26,17 @@ pub(crate) type KeyRecordMap = HashMap<String, KeyRecord>;
 
 /// Salt length for Argon2id key derivation (16 bytes = 128 bits).
 const ARGON2_SALT_LEN: usize = 16;
+
+/// The store format this build writes.
+///
+/// V1 was a bare record map under a SHA-256-derived key. V2 added `kdf`/`salt`
+/// (Argon2id). V3 added the envelope `hmac`. **V4 binds each record's ciphertext
+/// to its own fingerprint** via AES-GCM associated data — see
+/// [`KeyStore::record_aad`].
+///
+/// Absent from a file means pre-V4, which is the only thing the number is used
+/// to decide.
+const STORE_VERSION: u32 = 4;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct KeyRecord {
@@ -107,6 +118,10 @@ impl From<&KeyRecord> for PublicKeyInfo {
 /// This detects file tampering (swapped keys, modified fingerprints, etc.).
 #[derive(serde::Serialize, serde::Deserialize)]
 struct StoreEnvelope {
+    /// Store format version. Absent means pre-V4 — records are not bound to
+    /// their fingerprints. See [`STORE_VERSION`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<u32>,
     /// KDF identifier. `"argon2id"` for V2+, absent for V1 (legacy SHA-256).
     #[serde(default)]
     kdf: Option<String>,
@@ -114,12 +129,43 @@ struct StoreEnvelope {
     #[serde(default)]
     salt: Option<String>,
     /// HMAC-SHA256 over the canonical JSON serialisation of `keys`, keyed
-    /// with a passphrase-derived integrity key. Absent for V1/V2 stores
-    /// (will be added on next write).
+    /// with a passphrase-derived integrity key. Absent for V1/V2 stores.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     hmac: Option<String>,
     /// The key records themselves.
     keys: KeyRecordMap,
+}
+
+/// Why a store cannot be opened by [`KeyStore::open`] without being upgraded.
+///
+/// Each variant is a security property the store predates. They are reported
+/// rather than silently accommodated: every one of them was previously accepted
+/// on open, which meant a store could be *downgraded* into the weaker shape and
+/// opened without complaint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradeNeeded {
+    /// Encrypted under the bare SHA-256 KDF — no salt, no iterations.
+    LegacyKdf,
+    /// No envelope HMAC, so the plaintext fields — including `revoked` — are
+    /// unauthenticated and a record swap is undetectable.
+    MissingIntegrityTag,
+    /// Records are not bound to their fingerprints (pre-V4).
+    UnboundRecords,
+}
+
+impl UpgradeNeeded {
+    /// What is wrong, and what it costs.
+    const fn describe(self) -> &'static str {
+        match self {
+            Self::LegacyKdf => "encrypted with the legacy SHA-256 KDF (no salt, no iterations)",
+            Self::MissingIntegrityTag => {
+                "carries no integrity tag, so its revocation flags and key IDs are unauthenticated"
+            }
+            Self::UnboundRecords => {
+                "predates per-record binding, so a record's ciphertext is not tied to its own fingerprint"
+            }
+        }
+    }
 }
 
 /// Thread-safe store that loads, encrypts, and caches Ed25519 signing keys.
@@ -140,10 +186,55 @@ pub struct KeyStore {
     /// True if the store was opened with a legacy SHA-256 derived key and
     /// needs re-encryption with Argon2id on next write.
     pub(crate) needs_migration: RwLock<bool>,
+    /// Which security property this store predates, if any. `None` once it is
+    /// at [`STORE_VERSION`] with an Argon2id key and a verified integrity tag.
+    pub(crate) upgrade_needed: Option<UpgradeNeeded>,
+    /// Whether this store's records are bound to their own fingerprints.
+    ///
+    /// Read on every decrypt: a pre-V4 record was encrypted with no associated
+    /// data and will not open if we supply some.
+    pub(crate) records_bound: bool,
 }
 
 impl KeyStore {
+    /// Open a store, refusing one that predates any of the current security
+    /// properties.
+    ///
+    /// # Why this refuses rather than accommodates
+    ///
+    /// Every legacy shape [`UpgradeNeeded`] names was previously accepted here
+    /// silently: a store with `kdf` absent opened under the unsalted SHA-256
+    /// KDF, and a store with no `hmac` opened with **no integrity check at
+    /// all** — which left the plaintext `revoked` flag unauthenticated, and that
+    /// flag is what `dpp-vc`'s `did:web` builder reads to drop a compromised key
+    /// from the published DID document.
+    ///
+    /// Accepting a weaker shape on read means an attacker who can write the file
+    /// can *choose* the weaker shape. The tolerance was for stores written by
+    /// older versions of this crate, and refusing them here does not strand one:
+    /// [`Self::open_and_migrate`] upgrades and opens them. What changes is that
+    /// the weak path now requires a caller who asked for it by name.
+    ///
+    /// # Errors
+    ///
+    /// Names the specific property the store predates, and points at
+    /// `open_and_migrate`.
     pub fn open(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
+        let store = Self::open_permissively(path, passphrase)?;
+        if let Some(reason) = store.upgrade_needed {
+            anyhow::bail!(
+                "key store {}; open it with `KeyStore::open_and_migrate` to upgrade it in place",
+                reason.describe()
+            );
+        }
+        Ok(store)
+    }
+
+    /// Open a store whatever shape it is in, recording what it predates.
+    ///
+    /// `pub(crate)` — [`Self::open`] and [`Self::open_and_migrate`] are the two
+    /// doors, and this is deliberately not a third.
+    pub(crate) fn open_permissively(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
         if path.as_ref().exists() {
             let bytes = std::fs::read(&path).context("Failed to read key store file")?;
 
@@ -156,6 +247,7 @@ impl KeyStore {
                     let keys: KeyRecordMap = serde_json::from_slice(&bytes)
                         .context("Failed to deserialise key store")?;
                     StoreEnvelope {
+                        version: None,
                         kdf: None,
                         salt: None,
                         hmac: None,
@@ -163,6 +255,7 @@ impl KeyStore {
                     }
                 }
             };
+            let records_bound = envelope.version.unwrap_or(0) >= STORE_VERSION;
 
             if envelope.kdf.as_deref() == Some("argon2id") {
                 // V2/V3 format — Argon2id.
@@ -182,8 +275,16 @@ impl KeyStore {
                 let cipher = Aes256Gcm::new(&cipher_key);
                 let integrity_key = derive_integrity_key(passphrase, &salt)?;
 
-                // Verify HMAC if present (V3). V2 stores without HMAC are
-                // accepted — the HMAC will be added on next write.
+                // A present HMAC is always verified, and a failure is fatal
+                // regardless of which door was used: a tampered store is not a
+                // store to be upgraded, it is one to be refused.
+                //
+                // An absent HMAC no longer opens quietly. It is recorded as an
+                // upgrade requirement so `open` refuses it and
+                // `open_and_migrate` repairs it — the plaintext `revoked` flag
+                // is unauthenticated without it, and that flag decides whether a
+                // compromised key stays in the published DID document.
+                let mut upgrade_needed = None;
                 if let Some(ref stored_hmac) = envelope.hmac {
                     verify_envelope_hmac(
                         &integrity_key,
@@ -192,10 +293,11 @@ impl KeyStore {
                         &envelope.keys,
                         stored_hmac,
                     )?;
+                    if !records_bound {
+                        upgrade_needed = Some(UpgradeNeeded::UnboundRecords);
+                    }
                 } else {
-                    tracing::info!(
-                        "key store has no HMAC — integrity check will be added on next write"
-                    );
+                    upgrade_needed = Some(UpgradeNeeded::MissingIntegrityTag);
                 }
 
                 Ok(Self {
@@ -205,6 +307,8 @@ impl KeyStore {
                     salt,
                     records: RwLock::new(envelope.keys),
                     needs_migration: RwLock::new(false),
+                    upgrade_needed,
+                    records_bound,
                 })
             } else {
                 // V1 format — legacy SHA-256. Open with legacy KDF, flag for migration.
@@ -241,6 +345,10 @@ impl KeyStore {
                     salt,
                     records: RwLock::new(records),
                     needs_migration: RwLock::new(true),
+                    upgrade_needed: Some(UpgradeNeeded::LegacyKdf),
+                    // A legacy store predates binding by definition; migration
+                    // re-encrypts every record and sets this.
+                    records_bound: false,
                 })
             }
         } else {
@@ -258,6 +366,10 @@ impl KeyStore {
                 salt,
                 records: RwLock::new(HashMap::new()),
                 needs_migration: RwLock::new(false),
+                upgrade_needed: None,
+                // Nothing to migrate: every record this store will ever hold is
+                // written by this build, bound.
+                records_bound: true,
             })
         }
     }
@@ -281,7 +393,7 @@ impl KeyStore {
         let mut raw = signing_key.to_bytes();
         let encrypted = self
             .cipher
-            .encrypt(nonce, raw.as_ref())
+            .encrypt(nonce, Self::record_payload(raw.as_ref(), &fingerprint))
             .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
         raw.zeroize();
 
@@ -376,6 +488,31 @@ impl KeyStore {
         result
     }
 
+    /// The associated data binding a record's ciphertext to its own identity.
+    ///
+    /// The **fingerprint**, not the map key. `archive_key` and `rotate_inner`
+    /// copy a record to a new map key *without re-encrypting it*, so associated
+    /// data derived from the map key would make every archived key undecryptable
+    /// the moment it was archived. The fingerprint is the SHA-256 of the public
+    /// half: unique per key pair, stored in plaintext beside the ciphertext, and
+    /// it travels with the record wherever it is filed.
+    ///
+    /// What this buys: a record's encrypted private key can no longer be moved
+    /// onto a different record's plaintext. Swapping two records' ciphertexts —
+    /// or grafting one onto a `verifying_key_hex` and `revoked` flag from
+    /// another — now fails to decrypt instead of succeeding quietly.
+    fn record_aad(fingerprint: &str) -> &[u8] {
+        fingerprint.as_bytes()
+    }
+
+    /// An AES-GCM payload carrying `msg` bound to `fingerprint`.
+    fn record_payload<'a>(msg: &'a [u8], fingerprint: &'a str) -> Payload<'a, 'a> {
+        Payload {
+            msg,
+            aad: Self::record_aad(fingerprint),
+        }
+    }
+
     fn decrypt_record(&self, record: &KeyRecord) -> Result<KeyEntry> {
         let nonce = <&Nonce<U12>>::try_from(record.nonce.as_slice()).map_err(|_| {
             anyhow::anyhow!(
@@ -383,15 +520,29 @@ impl KeyStore {
                 record.nonce.len()
             )
         })?;
-        let mut raw = self
-            .cipher
-            .decrypt(nonce, record.encrypted_signing_key.as_ref())
-            .map_err(|_| anyhow::anyhow!("AES-GCM decrypt failed"))?;
+        // A pre-V4 record was sealed with no associated data and will not open
+        // if we supply any. `open` refuses such a store outright; this path is
+        // reached only through `open_and_migrate`, which is re-encrypting them.
+        let plaintext = if self.records_bound {
+            self.cipher.decrypt(
+                nonce,
+                Self::record_payload(record.encrypted_signing_key.as_ref(), &record.fingerprint),
+            )
+        } else {
+            self.cipher
+                .decrypt(nonce, record.encrypted_signing_key.as_ref())
+        };
+        let mut raw =
+            Zeroizing::new(plaintext.map_err(|_| anyhow::anyhow!("AES-GCM decrypt failed"))?);
 
-        let bytes: [u8; 32] = raw
-            .as_slice()
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("unexpected key length"))?;
+        // `Zeroizing` on both: the intermediate array is a second copy of the
+        // private key, and the early return below used to drop `raw` without
+        // clearing it.
+        let bytes: Zeroizing<[u8; 32]> = Zeroizing::new(
+            raw.as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("unexpected key length"))?,
+        );
         let signing_key = SigningKey::from_bytes(&bytes);
         let verifying_key = signing_key.verifying_key();
         raw.zeroize();
@@ -414,6 +565,7 @@ impl KeyStore {
             compute_envelope_hmac(&self.integrity_key, "argon2id", &salt_b64, &keys_clone)?;
 
         let envelope = StoreEnvelope {
+            version: Some(STORE_VERSION),
             kdf: Some("argon2id".into()),
             salt: Some(salt_b64),
             hmac: Some(hmac_hex),
