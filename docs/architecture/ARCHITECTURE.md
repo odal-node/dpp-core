@@ -62,6 +62,36 @@ dpp-tests — cross-crate integration tests (not published)
 
 The dependency root. Every other crate may depend on it; it depends on nothing internal.
 
+### Top-level concerns
+
+This is the largest crate in the workspace and the one most able to absorb a new
+capability without anyone noticing, so what it contains is inventoried rather
+than described. A module added here is a deliberate act: `domain_concerns.rs`
+compares this list against `lib.rs` and fails the build in either direction.
+
+| Concern | What it holds |
+|---|---|
+| `access` | The per-field disclosure contract — `SectorAccessPolicy`, `filter_by_audience` |
+| `catalog` | Sector manifests: regulatory status, regime, retention, schema versions |
+| `compliance` | The Apache-2.0 passthrough registry and its per-sector strategies |
+| `domain` | The passport aggregate, sector data, lifecycle, transfer, validation |
+| `ports` | The core↔platform trait boundary (see [PORTS.md](PORTS.md)) |
+| `schemas` | `VersionedSchemaRegistry`, the embedded JSON Schemas, and version lenses |
+
+Prefer naming the concerns over asserting a count — a count is the part that
+goes stale while every claim around it stays checkable.
+
+<!-- DOMAIN-CONCERNS:BEGIN (one module name per line; parsed by domain_concerns.rs) -->
+```
+access
+catalog
+compliance
+domain
+ports
+schemas
+```
+<!-- DOMAIN-CONCERNS:END -->
+
 ### Domain Types
 
 Canonical DPP types: `Passport`, `PassportId`, `ManufacturerInfo`, `MaterialEntry`, `BatteryData`, `TextileData`, `SignedCredential`. All types derive `Serialize` + `Deserialize` and are `wasm32`-safe.
