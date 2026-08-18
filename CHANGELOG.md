@@ -340,6 +340,20 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   either, since short guessable names make a digest obfuscation rather than
   secrecy. That check belongs where those names are already allowed to exist.
 
+- **Party names are scanned for, from a list this repository does not contain.**
+  The structural rules above catch what can be described in the open. The name of
+  a client, operator, manufacturer or collaborator cannot be — checking for one
+  means listing it, and a denylist of names that must stay unpublished cannot
+  live in the repository it protects.
+
+  So the list arrives through the environment, from a repository secret. Two
+  properties make that safe rather than merely clever. The failure **reports a
+  file and a line and never the matched text**, because these logs are public and
+  a check that printed what it found would publish it on the very commit that
+  tried to leak it. And an absent list **fails CI** rather than skipping, because
+  a check that quietly does nothing reports success; locally it skips with a
+  message naming what went unchecked.
+
 - **A passthrough result now carries the metrics the manufacturer declared**, for
   the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
   (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts

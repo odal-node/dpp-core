@@ -24,8 +24,8 @@
 //! how such decisions are numbered, and that the reasoning lives somewhere they
 //! cannot reach.
 //!
-//! **Severe, and deliberately *not* checked here — see below.** The name of any
-//! client, operator, manufacturer or collaborating party.
+//! **Severe, and checked from a list this file does not contain.** The name of
+//! any client, operator, manufacturer or collaborating party — see below.
 //!
 //! **Premature rather than dangerous.** The bare name of a sibling repository.
 //! These are operating terms that become public eventually; naming one in an
@@ -33,21 +33,23 @@
 //! description** is different, because that is the customer-facing surface and
 //! crates.io renders it. So the bare names are checked *only* there.
 //!
-//! # Why party names are not in this file
+//! # Party names are checked, and the list is not in this file
 //!
-//! Checking for them would require listing them, and this file is public. A
+//! Party names are checked — by [`no_public_file_names_a_private_party`] — but
+//! from a list supplied through the environment, never from one written here. A
 //! denylist of things that must stay secret cannot live in the repository it is
-//! protecting — writing the list *is* the disclosure, and it would be a worse
-//! one than the leak it prevents, because it would be authoritative and
-//! enumerated.
+//! protecting: writing the list *is* the disclosure, and a worse one than the
+//! leak it prevents, because it would be authoritative and enumerated rather
+//! than incidental.
 //!
-//! Hashing them is not a fix either: party names are short and guessable, so a
-//! digest is obfuscation rather than secrecy, and calling it secrecy is how a
-//! control stops being examined.
+//! Hashing them into this file is not a fix either. Party names are short and
+//! guessable, so a digest is obfuscation rather than secrecy, and calling it
+//! secrecy is how a control stops being examined.
 //!
-//! That check belongs where the names are already allowed to exist, which is not
-//! here. This file's job is the part that can be done in the open, and it says
-//! so rather than implying the surface is fully covered.
+//! **The failure message names a file and a line and never the matched text.**
+//! This runs in a public repository's CI, and its logs are public, so a check
+//! that printed what it found would publish the very thing it exists to keep
+//! unpublished — on the exact commit that tried to leak it.
 //!
 //! # What it deliberately does not look for
 //!
@@ -333,4 +335,95 @@ fn the_matcher_separates_severe_from_premature() {
     assert!(scan_line("the ADR process").is_none());
     // A longer word merely containing a sibling name is not a hit.
     assert!(scan_line("dpp-webhooks is a workspace concept").is_none());
+}
+
+/// The environment variable carrying the party-name list, newline-separated.
+///
+/// In CI it comes from a repository secret. Locally it is whatever the
+/// developer exports, and most will export nothing — which is handled by
+/// skipping loudly rather than silently.
+const PARTY_NAMES_VAR: &str = "ODAL_PARTY_NAMES";
+
+/// Whether this is a CI run, where an absent list is a failure rather than a
+/// skip. GitHub Actions sets `CI=true`, as does essentially every other runner.
+fn is_ci() -> bool {
+    std::env::var("CI").is_ok_and(|v| !v.is_empty() && v != "false")
+}
+
+/// No file in this public repository names a client, operator, manufacturer or
+/// collaborating party.
+///
+/// # Why the list is injected
+///
+/// See the module documentation: the names cannot be written down here. They
+/// arrive through [`PARTY_NAMES_VAR`], one per line, `#` comments ignored.
+///
+/// # Why an absent list fails CI
+///
+/// A check that quietly does nothing is worse than no check, because it reports
+/// success. Locally an absent list is ordinary and skips with a message saying
+/// what was not checked. In CI it is a misconfiguration — the secret is missing
+/// or was renamed — and the honest response is red, not green.
+#[test]
+fn no_public_file_names_a_private_party() {
+    let Ok(raw) = std::env::var(PARTY_NAMES_VAR) else {
+        assert!(
+            !is_ci(),
+            "{PARTY_NAMES_VAR} is not set in CI. The party-name scan cannot run, and \
+             passing without it would report a clean tree that was never checked. \
+             Set the repository secret this job injects."
+        );
+        eprintln!(
+            "note: {PARTY_NAMES_VAR} is unset, so no party-name scan ran. \
+             The structural rules in this file still did."
+        );
+        return;
+    };
+
+    let names: Vec<String> = raw
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim().to_lowercase())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    assert!(
+        !names.is_empty(),
+        "{PARTY_NAMES_VAR} is set but holds no names — a scan with nothing to \
+         find always passes, which is indistinguishable from a clean tree"
+    );
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("the repository root is two levels above this crate");
+
+    // Deliberately `Vec<String>` of locations only. No matched text, no excerpt,
+    // no name — this runs in public CI with public logs.
+    let mut locations = Vec::new();
+    let mut scanned = 0usize;
+
+    for (path, rel) in text_files(&root) {
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        scanned += 1;
+        for (lineno, line) in text.lines().enumerate() {
+            let haystack = line.to_lowercase();
+            if names.iter().any(|n| find_word(&haystack, n).is_some()) {
+                locations.push(format!("{rel}:{}", lineno + 1));
+            }
+        }
+    }
+
+    assert!(scanned > 0, "scanned no files at all — the walk is broken");
+
+    assert!(
+        locations.is_empty(),
+        "A private party is named in {} location(s) in this public repository:\n\n  {}\n\n\
+         The matched text is deliberately not printed: these logs are public, and \
+         reporting the name would publish it on the commit that tried to. Open each \
+         line and remove the party reference — write the substance, drop the name.",
+        locations.len(),
+        locations.join("\n  ")
+    );
 }

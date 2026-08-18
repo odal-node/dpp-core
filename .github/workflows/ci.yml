@@ -23,8 +23,19 @@ jobs:
       # the least reversible consequence. It reads every text file in the tree,
       # including the prose and JSON data fields that every recorded instance of
       # this leak has lived in.
+      # ODAL_PARTY_NAMES carries the party-name list, newline-separated. It is a
+      # secret because the list itself is the sensitive thing — a denylist of
+      # names that must stay unpublished cannot live in the repository it
+      # protects. The scan reports a file and a line and never the matched text,
+      # because these logs are public: a check that printed what it found would
+      # publish it on the very commit that tried to.
+      #
+      # An absent secret fails this job rather than skipping it. A check that
+      # quietly does nothing is worse than no check, because it reports success.
       - name: Scan for private material
         run: cargo test -p dpp-tests --test private_refs
+        env:
+          ODAL_PARTY_NAMES: ${{ secrets.ODAL_PARTY_NAMES }}
 
   fmt:
     name: Format check
