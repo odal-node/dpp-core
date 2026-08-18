@@ -134,6 +134,16 @@ impl SealConformanceLevel {
 /// What decides which is available is **the provider's format menu, not the
 /// law**. Those move independently, so a port that picked one would encode a
 /// supplier's product decision as an architectural one. It is a capability.
+///
+/// # Not every packaging goes with every format
+///
+/// The values below are the union across all formats, and the union is not
+/// meaningful on its own — the CSC API defines `signed_envelope_property` **per
+/// signature format**, and the sets barely overlap. `Enveloping` is an XAdES
+/// packaging; `Certification` and `Revision` are PAdES revisions and mean
+/// nothing elsewhere. Which ones a given format admits is
+/// [`SealFormat::envelopes`], and [`SealCapabilities::can_produce`] rejects a
+/// pair no format defines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
@@ -146,11 +156,36 @@ pub enum SealEnvelope {
     /// The seal is embedded into the document it covers, which stays readable
     /// in its own format.
     Attached,
+    /// Independent seals over the same content, none countersigning another.
+    ///
+    /// The packaging for *two parties attesting the same passport* — a
+    /// manufacturer's seal and a third party's beside it — which is why its
+    /// absence mattered enough to add it.
+    Parallel,
+    /// The seal is placed inside the signed document's own structure, which
+    /// continues to contain the data. XAdES only.
+    Enveloped,
+    /// A PAdES certification (author) signature: the first, which may restrict
+    /// what later revisions are permitted to change.
+    Certification,
+    /// A PAdES approval signature in an incremental revision of the document.
+    Revision,
 }
 
 impl SealEnvelope {
     /// Every packaging this build models. Same reasoning as [`SealFormat::ALL`].
-    pub const ALL: &'static [Self] = &[Self::Detached, Self::Enveloping, Self::Attached];
+    ///
+    /// The union across formats. To enumerate the packagings that are legal for
+    /// one format, use [`SealFormat::envelopes`].
+    pub const ALL: &'static [Self] = &[
+        Self::Detached,
+        Self::Enveloping,
+        Self::Attached,
+        Self::Parallel,
+        Self::Enveloped,
+        Self::Certification,
+        Self::Revision,
+    ];
 }
 
 /// A CSC-style reference to a QTSP-held credential. Never contains key material.
@@ -224,6 +259,54 @@ impl SealFormat {
     /// adapter for a format it does **not** advertise. A format added later is
     /// deliberately not covered until it is added here on purpose.
     pub const ALL: &'static [Self] = &[Self::Jades, Self::Pades, Self::Cades, Self::Xades];
+
+    /// The packagings this format defines, in the CSC API's order.
+    ///
+    /// Transcribed from the CSC API's `signed_envelope_property` table, where
+    /// the permitted values *depend on the value of `signature_format`*. The
+    /// sets are not interchangeable and barely overlap:
+    ///
+    /// | Format | Packagings |
+    /// |---|---|
+    /// | JAdES | Detached, Attached, Parallel |
+    /// | CAdES | Detached, Attached, Parallel |
+    /// | XAdES | Enveloped, Enveloping, Detached |
+    /// | PAdES | Certification, Revision |
+    ///
+    /// So `Enveloping` is meaningless for a JAdES seal and `Detached` is
+    /// meaningless for a PAdES one — not merely unsupported by some provider,
+    /// but undefined by the protocol that would carry the request.
+    ///
+    /// The first entry of each row is the CSC default for that format. This
+    /// deliberately does **not** become the request default: `SealRequest`
+    /// defaults to [`SealEnvelope::Detached`] because a request built from a
+    /// payload hash means the caller already holds the bytes, and that reasoning
+    /// is about our callers rather than about the protocol.
+    #[must_use]
+    pub const fn envelopes(&self) -> &'static [SealEnvelope] {
+        match self {
+            Self::Jades | Self::Cades => &[
+                SealEnvelope::Attached,
+                SealEnvelope::Detached,
+                SealEnvelope::Parallel,
+            ],
+            Self::Xades => &[
+                SealEnvelope::Enveloped,
+                SealEnvelope::Enveloping,
+                SealEnvelope::Detached,
+            ],
+            Self::Pades => &[SealEnvelope::Certification, SealEnvelope::Revision],
+        }
+    }
+
+    /// Whether this format defines `envelope` as one of its packagings.
+    ///
+    /// Asked by [`SealCapabilities::can_produce`] so that a request naming a
+    /// pair no format defines is refused before any adapter sees it.
+    #[must_use]
+    pub fn admits(&self, envelope: SealEnvelope) -> bool {
+        self.envelopes().contains(&envelope)
+    }
 }
 
 impl SealMode {
@@ -246,7 +329,13 @@ pub struct SealCapabilities {
     /// document in a way that outlives its own certificate — a procurement
     /// problem, and one a caller can now see rather than discover.
     pub supported_levels: Vec<SealConformanceLevel>,
-    /// Packagings this adapter can produce.
+    /// Packagings this adapter can produce, across every format it supports.
+    ///
+    /// Flat, and deliberately so: an adapter says which packagings it can build,
+    /// and which of those are *legal* for a given format is the protocol's
+    /// answer rather than the adapter's ([`SealFormat::envelopes`]). Listing a
+    /// packaging here is therefore not a claim that it combines with every
+    /// entry in `supported_formats` — [`Self::can_produce`] applies both.
     pub supported_envelopes: Vec<SealEnvelope>,
 }
 
@@ -264,11 +353,26 @@ impl SealCapabilities {
     /// *whose* attestation the seal is. One that produces the right format at a
     /// lower baseline level has delivered a seal with a shorter life than the
     /// document it covers. Neither is a serialisation detail.
+    ///
+    /// # The pair check, which is not about this adapter
+    ///
+    /// The four axes are not independent: a packaging is only meaningful for the
+    /// formats that define it ([`SealFormat::envelopes`]). So a request is also
+    /// refused when its format and envelope name a pair **no** format defines —
+    /// a JAdES seal packaged `Enveloping`, say — regardless of what this adapter
+    /// advertises.
+    ///
+    /// That check belongs here rather than in an adapter because it is not a
+    /// statement about any provider. An adapter listing both values separately
+    /// would otherwise be read as offering their combination, and the first
+    /// place anyone would discover otherwise is a rejected request to a QTSP —
+    /// or worse, an attestation packaged some other way.
     pub fn can_produce(&self, req: &SealRequest) -> bool {
         self.supported_formats.contains(&req.sig_format)
             && self.supported_modes.contains(&req.mode)
             && self.supported_levels.contains(&req.conformance_level)
             && self.supported_envelopes.contains(&req.envelope)
+            && req.sig_format.admits(req.envelope)
     }
 
     /// Whether this adapter can produce any seal that outlives its signing
@@ -513,5 +617,93 @@ mod tests {
             let back: SealMode = serde_json::from_str(&json).unwrap();
             assert_eq!(mode, back);
         }
+    }
+
+    #[test]
+    fn seal_envelope_serde_round_trips() {
+        for envelope in SealEnvelope::ALL {
+            let json = serde_json::to_string(envelope).unwrap();
+            let back: SealEnvelope = serde_json::from_str(&json).unwrap();
+            assert_eq!(*envelope, back);
+        }
+    }
+
+    /// Every packaging belongs to at least one format, and every format has one.
+    ///
+    /// Guards the two ways the table and the enum can drift apart: a variant
+    /// added to [`SealEnvelope`] and never given to a format is unrequestable,
+    /// and a format whose row is empty cannot be asked for at all.
+    #[test]
+    fn every_format_and_packaging_is_reachable() {
+        for format in SealFormat::ALL {
+            assert!(
+                !format.envelopes().is_empty(),
+                "{format:?} defines no packaging, so no request for it is well-formed"
+            );
+        }
+        for envelope in SealEnvelope::ALL {
+            assert!(
+                SealFormat::ALL.iter().any(|f| f.admits(*envelope)),
+                "{envelope:?} belongs to no format, so nothing can ask for it"
+            );
+        }
+    }
+
+    /// The packagings are per-format, and the sets genuinely differ.
+    ///
+    /// Transcribed from the CSC API's `signed_envelope_property` table. If these
+    /// ever collapse into one set, the distinction the table draws is gone and
+    /// `can_produce` is back to four independent membership checks.
+    #[test]
+    fn packagings_are_scoped_to_the_formats_that_define_them() {
+        // `Enveloping` is XAdES's, and JAdES/CAdES do not define it.
+        assert!(SealFormat::Xades.admits(SealEnvelope::Enveloping));
+        assert!(!SealFormat::Jades.admits(SealEnvelope::Enveloping));
+        assert!(!SealFormat::Cades.admits(SealEnvelope::Enveloping));
+
+        // PAdES is disjoint from every other format.
+        assert!(SealFormat::Pades.admits(SealEnvelope::Certification));
+        assert!(!SealFormat::Pades.admits(SealEnvelope::Detached));
+        assert!(!SealFormat::Jades.admits(SealEnvelope::Certification));
+
+        // `Parallel` — two parties sealing the same passport — is JAdES and
+        // CAdES only, and was the packaging missing entirely before this table.
+        assert!(SealFormat::Jades.admits(SealEnvelope::Parallel));
+        assert!(SealFormat::Cades.admits(SealEnvelope::Parallel));
+        assert!(!SealFormat::Xades.admits(SealEnvelope::Parallel));
+    }
+
+    /// A pair no format defines is refused however generous the advertisement.
+    ///
+    /// The defect this pins: an adapter listing `Jades` and `Enveloping`
+    /// separately reads as offering their combination, which the protocol
+    /// carrying the request has no way to express.
+    #[test]
+    fn can_produce_refuses_a_pair_no_format_defines() {
+        let capabilities = SealCapabilities {
+            supported_formats: vec![SealFormat::Jades, SealFormat::Xades],
+            supported_modes: vec![SealMode::ProviderSeal],
+            supported_levels: vec![SealConformanceLevel::BaselineLt],
+            supported_envelopes: vec![SealEnvelope::Enveloping, SealEnvelope::Detached],
+        };
+        let request = |sig_format: SealFormat, envelope: SealEnvelope| SealRequest {
+            payload_hash: "ab".repeat(32),
+            mode: SealMode::ProviderSeal,
+            key_ref: SealCredentialRef {
+                qtsp_id: "q".into(),
+                credential_id: "c".into(),
+            },
+            sig_format,
+            conformance_level: SealConformanceLevel::BaselineLt,
+            envelope,
+        };
+
+        // Every axis is advertised, and the pair is still not one that exists.
+        assert!(!capabilities.can_produce(&request(SealFormat::Jades, SealEnvelope::Enveloping)));
+
+        // The same packaging under the format that defines it is fine, so the
+        // refusal is about the pair and not about `Enveloping`.
+        assert!(capabilities.can_produce(&request(SealFormat::Xades, SealEnvelope::Enveloping)));
+        assert!(capabilities.can_produce(&request(SealFormat::Jades, SealEnvelope::Detached)));
     }
 }

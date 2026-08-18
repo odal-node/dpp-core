@@ -271,12 +271,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   operator-facing question directly. The conformance kit notes an adapter that
   cannot.
 
-  `SealEnvelope` (detached / enveloping / attached) is modelled rather than
-  assumed, because a qualified seal **can** be a JWS signature — JAdES
-  (ETSI TS 119 182-1) is an AdES format built on RFC 7515 whose scope covers
-  qualified electronic seals explicitly, and its `sigD` header spans the detached
-  case too. Which shape is available is a fact about a provider's product menu,
-  not about the law, and the two move independently.
+  `SealEnvelope` is modelled rather than assumed, because a qualified seal
+  **can** be a JWS signature — JAdES (ETSI TS 119 182-1) is an AdES format built
+  on RFC 7515 whose scope covers qualified electronic seals explicitly, and its
+  `sigD` header spans the detached case too. Which shape is available is a fact
+  about a provider's product menu, not about the law, and the two move
+  independently.
+
+- **The seal packagings are scoped to the formats that define them.**
+  `SealEnvelope` carries all seven values the CSC API defines across formats —
+  detached, enveloping, attached, parallel, enveloped, certification, revision —
+  and `SealFormat::envelopes` says which belong to which, transcribed from the
+  API's own per-format table. `SealFormat::admits` asks the question directly.
+
+  It was a flat set of three, which was wrong in both directions. `Parallel` was
+  absent altogether — the packaging for *two parties sealing the same passport*,
+  a manufacturer's seal and a third party's beside it — and PAdES had no legal
+  value at all, so no well-formed PAdES request could be built. Meanwhile
+  `Enveloping` was offered for every format when it is XAdES's alone.
+
+  `can_produce` now also refuses a format/envelope pair that **no** format
+  defines, independently of what an adapter advertises, because that is a fact
+  about the protocol rather than about any provider. An adapter listing a format
+  and a packaging separately would otherwise read as offering their combination,
+  and the first place anyone would find out is a rejected request to a QTSP — or
+  an attestation packaged some other way. The conformance kit gains the matching
+  rule: advertising a format while advertising none of its packagings makes that
+  format unrequestable, and is now reported.
 
 - **`ports::seal::conformance` — a kit that holds any `SealPort` to its own
   contract.** `SealPort::seal` says an implementation must refuse a profile it
