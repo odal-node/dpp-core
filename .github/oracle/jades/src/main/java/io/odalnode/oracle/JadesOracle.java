@@ -1,6 +1,5 @@
 package io.odalnode.oracle;
 
-import eu.europa.esig.dss.diagnostic.DiagnosticData;
 import eu.europa.esig.dss.enumerations.SignatureForm;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.model.FileDocument;
@@ -84,7 +83,6 @@ public final class JadesOracle {
 
         Reports reports = validator.validateDocument();
         SimpleReport simple = reports.getSimpleReport();
-        DiagnosticData diagnostic = reports.getDiagnosticData();
 
         List<String> signatureIds = simple.getSignatureIdList();
         if (signatureIds.isEmpty()) {
@@ -107,7 +105,6 @@ public final class JadesOracle {
         System.out.printf("  level:     %s%n", level);
         System.out.printf("  indication:%s / %s%n",
             simple.getIndication(id), simple.getSubIndication(id));
-        System.out.printf("  signed by: %s%n", diagnostic.getSignedBy(id));
 
         boolean ok = true;
         if (form != EXPECTED_FORM) {
