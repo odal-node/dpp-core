@@ -11,17 +11,6 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  private-refs:
-    name: Private-material references
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # No Rust toolchain needed — this reads text, including the prose and JSON
-      # data files that every previous instance of this leak lived in. Kept as
-      # its own job so it reports separately and fails in seconds.
-      - name: Scan for private-material references
-        run: python .github/scripts/check_private_refs.py
-
   fmt:
     name: Format check
     runs-on: ubuntu-latest

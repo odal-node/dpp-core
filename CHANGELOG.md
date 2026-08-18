@@ -437,6 +437,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Changed
 
+- **The private-material scan is removed, with nothing replacing it yet.** Stated
+  plainly because it is a reduction in protection: no check now looks for a leak
+  into this public repository, and the rule it enforced still stands in
+  `CLAUDE.md` section 6 as a matter of discipline alone.
+
+  It was removed rather than fixed because its central mechanism was wrong. It
+  worked from a denylist of things that must not be published — sibling
+  repository names and the name of a non-customer — and that list lived in this
+  public repository. The list was the disclosure: authoritative, enumerated, and
+  more informative than any leak it caught. It exempted itself from its own scan,
+  so it could not see that.
+
+  What replaces it has to separate two problems the one script conflated.
+  Structural leaks — a pointer into a private document, a reference to an
+  internal decision record — are describable in the open and need no list.
+  Party names are not, and a list of them cannot live here or in a secret this
+  repository reads; that check belongs to a scanner run from where those names
+  are already allowed to exist, over every public repository at once.
+
 - **A passthrough result now carries the metrics the manufacturer declared**, for
   the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
   (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts
