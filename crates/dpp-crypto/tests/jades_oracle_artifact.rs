@@ -115,7 +115,8 @@ fn emit_and_self_check_a_jades_artifact() {
     let header = JadesHeader {
         alg: "EdDSA".into(),
         iat: chrono::Utc::now().timestamp(),
-        certificate: CertificateRef::Chain(vec![B64STD.encode(&cert_der)]),
+        certificate: CertificateRef::chain_of_der(&[cert_der.clone()])
+            .expect("a one-certificate chain"),
         content_type: Some("json".into()),
     };
     let body = payload();
