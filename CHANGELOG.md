@@ -316,6 +316,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Changed
 
+- **The private-material tripwire is a Rust test, and its rules are ranked.** It
+  was a Python script invoked by the gate, which put an interpreter in the path
+  of `just check` for the one tripwire that needs no library at all — while the
+  oracles sit in their own workflows *specifically* so the gate would not
+  acquire a toolchain. The principle and the gate disagreed; the gate was wrong.
+  It now lives beside `domain_concerns` and `ports_inventory`, which are the
+  same kind of check, and `just check` needs no interpreter.
+
+  The rules are no longer flat, because they were never equally severe. A
+  **pointer into a private document** or a **reference to an internal decision
+  record** is severe and fails anywhere in the tree. The **bare name of a
+  not-yet-public sibling repository** is a question of placement rather than
+  secrecy — harmless in an internal comment, wrong on the customer-facing
+  surface — so it fails only in a README or a `Cargo.toml`, which is what
+  crates.io renders.
+
+  Party names — client, operator, manufacturer, collaborator — are **deliberately
+  out of scope here, and the file says so.** Checking for them would mean listing
+  them, and a denylist of things that must stay secret cannot live in the public
+  repository it protects: writing the list is a worse disclosure than the leak it
+  prevents, because it is authoritative and enumerated. Hashing is not a fix
+  either, since short guessable names make a digest obfuscation rather than
+  secrecy. That check belongs where those names are already allowed to exist.
+
 - **A passthrough result now carries the metrics the manufacturer declared**, for
   the two sectors with a strategy. `co2eScore` comes from `co2ePerUnitKg`
   (battery) or `carbonFootprintKgCo2e` (textile); textile also lifts
