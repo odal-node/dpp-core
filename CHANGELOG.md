@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-18
+
 ### Added
 
 - **A JAdES conformance oracle.** `just jades-oracle` (and the `jades-oracle.yml`
@@ -69,114 +71,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and **stays parseable by a plain RFC 7515 library** — V1.2.1 suppressed
   V1.1.1's blanket `crit` requirement for exactly that reason.
 
-### Breaking
 
-- **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
-  now, so `PassthroughRegistry` as a literal no longer compiles — use
-  `PassthroughRegistry::new()` (the two Apache-2.0 strategies registered) or
-  `::empty()` (none, everything on the fallback). It also stops being
-  `UnwindSafe`, because `Box<dyn ComplianceStrategy>` is not; a caller that held
-  one across `catch_unwind` needs `AssertUnwindSafe`.
-
-  Detected by `cargo semver-checks` as `unit_struct_changed_kind` and
-  `auto_trait_impl_removed`.
-
-- **`SealRequest` and `SealCapabilities` gain fields**, which breaks exhaustive
-  struct literals. `SealRequest` adds `conformance_level` and `envelope`;
-  `SealCapabilities` adds `supported_levels` and `supported_envelopes`. Both new
-  `SealRequest` fields have serde defaults, so **the wire format is
-  backward-compatible** — only Rust construction changes. Adding `..Default` is
-  not available here; name the fields.
-
-  Detected by `cargo semver-checks` as `constructible_struct_adds_field`.
-
-- **`KeyStore::open` refuses a store that predates a current security property.**
-  It previously accepted every legacy shape silently, which meant an attacker who
-  could write the file could *choose* the weaker shape and be opened without
-  complaint. The three shapes, each now named in the error:
-
-  - **legacy SHA-256 KDF** — no salt, no iterations;
-  - **no envelope HMAC** — every plaintext field unauthenticated, including
-    `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
-    from the published DID document. A store in this shape could have a
-    revocation flipped back and a revoked key republished, undetected;
-  - **unbound records** (pre-V4) — see below.
-
-  **Nothing is stranded and nothing was removed.** `KeyStore::open_and_migrate`
-  opens all three, upgrades them in place, and then re-opens *strictly* — so a
-  migration that did not finish the job is reported rather than papered over. The
-  legacy KDF is still there and still readable; what changed is that reaching it
-  now requires a caller who asked for the migration door by name.
-
-  Both production entry points in the platform already call `open_and_migrate`.
-  Every remaining `KeyStore::open` call site creates a fresh store, which is
-  written in the current format by construction.
-
-- **Store format V4 binds each record's ciphertext to its own fingerprint** via
-  AES-GCM associated data. Records previously carried no AAD, so a record's
-  encrypted private key could be grafted onto another record's plaintext —
-  its `verifying_key_hex`, its `fingerprint`, its `revoked` flag — and would
-  decrypt cleanly. The envelope HMAC also catches that, and both are wanted: the
-  HMAC covers the map in aggregate, the binding covers each record on its own,
-  and a control that only works in aggregate fails differently from one that
-  works per record.
-
-  Bound to the **fingerprint**, not the map key. `archive_key` and
-  `rotate_inner` copy a record to a new map key *without re-encrypting it*, so
-  associated data derived from the map key would make every archived key
-  undecryptable the moment it was archived.
-
-
-- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
-  validation has three outcomes, not two: a seal passes, fails, or is
-  **indeterminate** — verification did not fail, but there was not enough
-  information to decide. That is the ordinary answer whenever material has to be
-  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
-  anchor unresolvable), and it is the one carrying the most operational meaning:
-  *ask again later*, not *reject this passport*.
-
-  A boolean could not hold it, and both collapses are wrong. Indeterminate
-  reported as invalid marks a sound passport non-compliant; reported as valid
-  claims a check that never completed.
-
-  `SealIndication` names the three after the status indications in **ETSI EN 319
-  102-1**, so a verdict maps onto one from any conformant validator without a
-  translation step that could lose its meaning. `SealChecks` records *what was
-  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
-  and previously `valid: true` from either was one value.
-
-  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
-  question is "may a compliance decision rest on this", which is almost always
-  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
-  placeholder — a named method because the easy mistake is reading a pass over a
-  bare signature check against a self-signed certificate as a qualified seal.
-  Match on `indication` directly only where the three outcomes genuinely differ.
-
-  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
-  than `valid: false`: nothing about a placeholder is checked, so a negative
-  verdict was one it had not reached either.
-
-- **`dpp-registry`'s modules moved to the crate root**, so the paths are
-  `dpp_registry::payload` rather than `dpp_registry::registry::payload`. The
-  crate's `src/` held exactly one directory, named for the crate, and every path
-  through it stuttered. A `src/` subdirectory is named for a concern that could
-  have a sibling; a single-concern crate puts its modules at the root with only
-  `lib.rs` above them.
-
-  **Most consumers are unaffected.** Every type was already re-exported at the
-  crate root and the root re-exports are unchanged, so `use dpp_registry::
-  RegistryStatusCode` — the form the README documents — is untouched. Only an
-  import naming the `registry` module explicitly needs the segment dropped.
-
-  Deferred once on the grounds that a path rename should not spend a breaking
-  release of its own. It is not spending one here: the release was already
-  breaking.
-
-  Detected by `cargo semver-checks` as `module_missing`, `enum_missing` and
-  `struct_missing` — all three naming the old nested path, none naming a type
-  that stopped existing.
-
-### Added
 
 - **A GS1 syntax oracle over every Digital Link we build.** We wrote this GS1
   Digital Link implementation, and every test of it was written by whoever wrote
@@ -434,6 +329,113 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so a consumer cannot enumerate them — and the conformance kit must, in order
   to ask an adapter for a profile it does *not* advertise. A variant added later
   is deliberately not covered until it is added here on purpose.
+
+### Breaking
+
+- **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
+  now, so `PassthroughRegistry` as a literal no longer compiles — use
+  `PassthroughRegistry::new()` (the two Apache-2.0 strategies registered) or
+  `::empty()` (none, everything on the fallback). It also stops being
+  `UnwindSafe`, because `Box<dyn ComplianceStrategy>` is not; a caller that held
+  one across `catch_unwind` needs `AssertUnwindSafe`.
+
+  Detected by `cargo semver-checks` as `unit_struct_changed_kind` and
+  `auto_trait_impl_removed`.
+
+- **`SealRequest` and `SealCapabilities` gain fields**, which breaks exhaustive
+  struct literals. `SealRequest` adds `conformance_level` and `envelope`;
+  `SealCapabilities` adds `supported_levels` and `supported_envelopes`. Both new
+  `SealRequest` fields have serde defaults, so **the wire format is
+  backward-compatible** — only Rust construction changes. Adding `..Default` is
+  not available here; name the fields.
+
+  Detected by `cargo semver-checks` as `constructible_struct_adds_field`.
+
+- **`KeyStore::open` refuses a store that predates a current security property.**
+  It previously accepted every legacy shape silently, which meant an attacker who
+  could write the file could *choose* the weaker shape and be opened without
+  complaint. The three shapes, each now named in the error:
+
+  - **legacy SHA-256 KDF** — no salt, no iterations;
+  - **no envelope HMAC** — every plaintext field unauthenticated, including
+    `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
+    from the published DID document. A store in this shape could have a
+    revocation flipped back and a revoked key republished, undetected;
+  - **unbound records** (pre-V4) — see below.
+
+  **Nothing is stranded and nothing was removed.** `KeyStore::open_and_migrate`
+  opens all three, upgrades them in place, and then re-opens *strictly* — so a
+  migration that did not finish the job is reported rather than papered over. The
+  legacy KDF is still there and still readable; what changed is that reaching it
+  now requires a caller who asked for the migration door by name.
+
+  Both production entry points in the platform already call `open_and_migrate`.
+  Every remaining `KeyStore::open` call site creates a fresh store, which is
+  written in the current format by construction.
+
+- **Store format V4 binds each record's ciphertext to its own fingerprint** via
+  AES-GCM associated data. Records previously carried no AAD, so a record's
+  encrypted private key could be grafted onto another record's plaintext —
+  its `verifying_key_hex`, its `fingerprint`, its `revoked` flag — and would
+  decrypt cleanly. The envelope HMAC also catches that, and both are wanted: the
+  HMAC covers the map in aggregate, the binding covers each record on its own,
+  and a control that only works in aggregate fails differently from one that
+  works per record.
+
+  Bound to the **fingerprint**, not the map key. `archive_key` and
+  `rotate_inner` copy a record to a new map key *without re-encrypting it*, so
+  associated data derived from the map key would make every archived key
+  undecryptable the moment it was archived.
+
+
+- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
+  validation has three outcomes, not two: a seal passes, fails, or is
+  **indeterminate** — verification did not fail, but there was not enough
+  information to decide. That is the ordinary answer whenever material has to be
+  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
+  anchor unresolvable), and it is the one carrying the most operational meaning:
+  *ask again later*, not *reject this passport*.
+
+  A boolean could not hold it, and both collapses are wrong. Indeterminate
+  reported as invalid marks a sound passport non-compliant; reported as valid
+  claims a check that never completed.
+
+  `SealIndication` names the three after the status indications in **ETSI EN 319
+  102-1**, so a verdict maps onto one from any conformant validator without a
+  translation step that could lose its meaning. `SealChecks` records *what was
+  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
+  and previously `valid: true` from either was one value.
+
+  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
+  question is "may a compliance decision rest on this", which is almost always
+  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
+  placeholder — a named method because the easy mistake is reading a pass over a
+  bare signature check against a self-signed certificate as a qualified seal.
+  Match on `indication` directly only where the three outcomes genuinely differ.
+
+  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
+  than `valid: false`: nothing about a placeholder is checked, so a negative
+  verdict was one it had not reached either.
+
+- **`dpp-registry`'s modules moved to the crate root**, so the paths are
+  `dpp_registry::payload` rather than `dpp_registry::registry::payload`. The
+  crate's `src/` held exactly one directory, named for the crate, and every path
+  through it stuttered. A `src/` subdirectory is named for a concern that could
+  have a sibling; a single-concern crate puts its modules at the root with only
+  `lib.rs` above them.
+
+  **Most consumers are unaffected.** Every type was already re-exported at the
+  crate root and the root re-exports are unchanged, so `use dpp_registry::
+  RegistryStatusCode` — the form the README documents — is untouched. Only an
+  import naming the `registry` module explicitly needs the segment dropped.
+
+  Deferred once on the grounds that a path rename should not spend a breaking
+  release of its own. It is not spending one here: the release was already
+  breaking.
+
+  Detected by `cargo semver-checks` as `module_missing`, `enum_missing` and
+  `struct_missing` — all three naming the old nested path, none naming a type
+  that stopped existing.
 
 ### Changed
 
