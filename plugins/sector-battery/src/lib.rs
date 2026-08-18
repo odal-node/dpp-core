@@ -22,7 +22,7 @@ use dpp_plugin_sdk::rules::batteries::recycled_content::{
 };
 use dpp_plugin_sdk::rules::common::date::CalendarDate;
 use dpp_plugin_sdk::traits::{
-    DppSectorPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginComplianceStatus,
+    DppSectorPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus,
     PluginError, PluginFinding, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
@@ -76,24 +76,21 @@ impl DppSectorPlugin for BatteryPlugin {
         let co2e = num(input, "co2ePerUnitKg");
 
         // The Battery Regulation tracks recycled content *per metal* (cobalt,
-        // lithium, nickel, lead). The flat `recycled_content_pct` field cannot
-        // represent that faithfully, so we expose the mean of declared metals
-        // there and the full per-metal breakdown under `extra` — no metal is
-        // silently dropped.
+        // lithium, nickel, lead), so the flat `recycled_content_pct` metric is
+        // left unset and the full per-metal breakdown travels under `extra`.
+        //
+        // This used to report the mean of the declared metals there. Art. 8(2)
+        // and 8(3) set a separate minimum per metal, over two different
+        // measurement bases — for cobalt, lithium and nickel the share is
+        // measured in *active materials*, for lead it is the share *present in
+        // the battery*. A mean conflates four thresholds and two denominators
+        // into one figure the regulation never asks for, and a reader takes it
+        // for a compliance number. Nothing downstream can undo that, because by
+        // then the four inputs are gone.
         let cobalt = num(input, "recycledContentCobaltPct");
         let lithium = num(input, "recycledContentLithiumPct");
         let nickel = num(input, "recycledContentNickelPct");
         let lead = num(input, "recycledContentLeadPct");
-
-        let declared: Vec<f64> = [cobalt, lithium, nickel, lead]
-            .into_iter()
-            .flatten()
-            .collect();
-        let recycled_mean = if declared.is_empty() {
-            None
-        } else {
-            Some(declared.iter().sum::<f64>() / declared.len() as f64)
-        };
 
         let chemistry = input
             .get("batteryChemistry")
@@ -275,7 +272,6 @@ impl DppSectorPlugin for BatteryPlugin {
         // the status stays NotAssessed and co2e is passed through as a metric.
         let result = PluginResult::new(PluginComplianceStatus::NotAssessed)
             .maybe_metric(METRIC_CO2E_SCORE, co2e)
-            .maybe_metric(METRIC_RECYCLED_CONTENT_PCT, recycled_mean)
             .with_extra(json!({
                 "recycledContentByMetal": {
                     "cobaltPct": cobalt,
@@ -386,8 +382,13 @@ mod tests {
             result.compliance_status,
             PluginComplianceStatus::NotAssessed
         );
-        // mean of cobalt(16) + lithium(6) = 11
-        assert_eq!(result.recycled_content_pct(), Some(11.0));
+        // Four per-metal minima over two measurement bases do not become one
+        // number. The flat metric stays unset; the metals travel under `extra`.
+        assert_eq!(
+            result.recycled_content_pct(),
+            None,
+            "a mean of the declared metals is not an Art. 8 figure"
+        );
         let extra = result.extra.unwrap();
         assert_eq!(extra["recycledContentByMetal"]["cobaltPct"], 16.0);
         assert_eq!(extra["recycledContentByMetal"]["lithiumPct"], 6.0);
