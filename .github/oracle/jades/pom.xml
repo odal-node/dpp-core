@@ -7,9 +7,9 @@
   signature is. Every other test of the JAdES module checks our output against
   our own reading of ETSI TS 119 182-1; this one does not, which is the point.
 
-  Deliberately outside the Rust workspace and outside `just check`. `cargo build
-  --workspace` succeeding with zero infrastructure is a property this project
-  states publicly, and a Java toolchain in the main gate would end that.
+  Deliberately outside the Rust workspace and outside `just check`. Building the
+  whole workspace with zero infrastructure is a property this project states
+  publicly, and a Java toolchain in the main gate would end that.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

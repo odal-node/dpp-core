@@ -131,7 +131,14 @@ test-plugins:
 jades-oracle:
     #!/usr/bin/env bash
     set -euo pipefail
-    command -v mvn >/dev/null || { echo "Maven is not installed — this recipe needs a JVM and Maven. CI runs it in jades-oracle.yml."; exit 1; }
+    # Well-formedness first, and without a JVM. The oracle's first CI run failed
+    # on an unparseable POM — `--` is illegal inside an XML comment (XML 1.0
+    # clause 2.5) and a doc comment mentioned a command-line flag. That is
+    # catchable on any machine, and was not being caught on the machines most
+    # likely to edit the file: the ones without Maven, which skipped straight
+    # past it.
+    python -c "import xml.dom.minidom,sys; xml.dom.minidom.parse('.github/oracle/jades/pom.xml'); print('pom.xml is well-formed XML')"
+    command -v mvn >/dev/null || { echo "Maven is not installed, so the DSS run is skipped. The POM check above still ran. CI runs the full oracle in jades-oracle.yml."; exit 0; }
     EMIT_JADES_ARTIFACT=1 cargo test -p dpp-crypto --test jades_oracle_artifact -- --nocapture
     (cd .github/oracle/jades && mvn -q -B package)
     java -jar .github/oracle/jades/target/jades-oracle.jar target/jades-oracle/signature.jws
