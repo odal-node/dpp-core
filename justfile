@@ -111,6 +111,38 @@ test-plugins:
     done
     echo "All plugin tests passed."
 
+# Ask the European Commission's AdES reference implementation (DSS) what our
+# JAdES signature actually is.
+#
+# Not in `check` or `ci`, deliberately. It needs a JVM and Maven, and `cargo
+# build --workspace` succeeding with zero infrastructure is a property this
+# project states publicly — the same reasoning that keeps the AAS loader oracle
+# in its own workflow. CI runs this as `jades-oracle.yml`.
+#
+# Every Rust test of the JAdES module checks our output against our own reading
+# of ETSI TS 119 182-1. A test built from a transcription agrees with the
+# transcription, including wherever the transcription is wrong. This is the one
+# check that is not circular.
+#
+# It asserts form and level only. The artefact is signed under a self-signed
+# certificate, so DSS reports it untrusted — correctly, and that is not a
+# failure. Trust needs a chain to a supervised trust service; qualified status
+# needs a certificate, a creation device and a QTSP together.
+jades-oracle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Well-formedness first, and without a JVM. The oracle's first CI run failed
+    # on an unparseable POM — `--` is illegal inside an XML comment (XML 1.0
+    # clause 2.5) and a doc comment mentioned a command-line flag. That is
+    # catchable on any machine, and was not being caught on the machines most
+    # likely to edit the file: the ones without Maven, which skipped straight
+    # past it.
+    python -c "import xml.dom.minidom,sys; xml.dom.minidom.parse('.github/oracle/jades/pom.xml'); print('pom.xml is well-formed XML')"
+    command -v mvn >/dev/null || { echo "Maven is not installed, so the DSS run is skipped. The POM check above still ran. CI runs the full oracle in jades-oracle.yml."; exit 0; }
+    EMIT_JADES_ARTIFACT=1 cargo test -p dpp-crypto --test jades_oracle_artifact -- --nocapture
+    (cd .github/oracle/jades && mvn -q -B package)
+    java -jar .github/oracle/jades/target/jades-oracle.jar target/jades-oracle/signature.jws
+
 # Run all gate checks (refs → fmt → lint → test → plugin tests → doc → audit)
 #
 # `check-refs` runs first because it is the cheapest and because what it catches

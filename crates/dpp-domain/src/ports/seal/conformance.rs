@@ -198,11 +198,25 @@ async fn check_advertised<P: SealPort + ?Sized>(
                 .first()
                 .copied()
                 .unwrap_or(SealConformanceLevel::BaselineLt);
-            let packaging = capabilities
+            // The first advertised packaging *this format defines*. Picking the
+            // first advertised one outright would hand the adapter a pair the
+            // protocol has no way to express — a JAdES seal packaged
+            // `Enveloping` — and then read the refusal as a defect.
+            let Some(packaging) = capabilities
                 .supported_envelopes
-                .first()
+                .iter()
                 .copied()
-                .unwrap_or(SealEnvelope::Detached);
+                .find(|e| format.admits(*e))
+            else {
+                report.fail(
+                    "capabilities.format_without_envelope",
+                    format!(
+                        "advertises {format:?} but no advertised packaging is one {format:?} \
+                         defines, so no request for it can be well-formed"
+                    ),
+                );
+                continue;
+            };
             let req = profiled_request(format.clone(), mode.clone(), level, packaging);
 
             let envelope = match adapter.seal(req).await {
@@ -575,6 +589,57 @@ mod tests {
         assert!(
             report.notes.iter().any(|n| n.contains("cannot check")),
             "but it must be surfaced: {report}"
+        );
+    }
+
+    /// Advertises PAdES, and only packagings PAdES does not define.
+    ///
+    /// The advertisement reads as complete — a format, a mode, a level and a
+    /// packaging are all present — but no well-formed request can name this
+    /// format, because the packagings belong to other formats entirely.
+    struct FormatWithNoPackaging;
+
+    #[async_trait]
+    impl SealPort for FormatWithNoPackaging {
+        async fn seal(
+            &self,
+            _req: SealRequest,
+        ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+            Ok(SealedEnvelope {
+                format: SealFormat::Pades,
+                seal_value: "synthetic".into(),
+                signing_cert_ref: None,
+                sealed_at: Utc::now(),
+                placeholder: false,
+            })
+        }
+        async fn verify(
+            &self,
+            _env: &SealedEnvelope,
+        ) -> Result<SealVerification, crate::domain::error::DppError> {
+            Ok(SealVerification::passed(SealChecks::FullValidation))
+        }
+        fn capabilities(&self) -> SealCapabilities {
+            SealCapabilities {
+                supported_formats: vec![SealFormat::Pades],
+                supported_modes: vec![SealMode::ProviderSeal],
+                supported_levels: vec![SealConformanceLevel::BaselineLt],
+                // Both belong to other formats; PAdES defines neither.
+                supported_envelopes: vec![SealEnvelope::Detached, SealEnvelope::Enveloping],
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_format_with_no_advertised_packaging_is_caught() {
+        let report = check_seal_port(&FormatWithNoPackaging).await;
+        assert!(!report.is_conformant(), "{report}");
+        assert!(
+            report
+                .failures
+                .iter()
+                .any(|f| f.rule == "capabilities.format_without_envelope"),
+            "an unrequestable format is a defect in the advertisement, not in a request: {report}"
         );
     }
 }
