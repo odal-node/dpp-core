@@ -42,7 +42,7 @@ dpp-core/
   crates/
     dpp-domain .......... Domain types, port traits, VersionedSchemaRegistry, JSON Schema validation
       schemas/ .......... Versioned JSON Schemas for 11 sectors (battery, textile, electronics, …), embedded via include_str!
-    dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify
+    dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify, JAdES
     dpp-digital-link .... GS1 Digital Link parser and link-type negotiation
     dpp-aas ............. Asset Administration Shell (AAS) shells and submodels
     dpp-vc .............. W3C Verifiable Credentials, did:web, JSON-LD context

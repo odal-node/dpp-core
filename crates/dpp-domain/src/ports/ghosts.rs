@@ -221,10 +221,19 @@ impl SealPort for GhostSeal {
                 SealConformanceLevel::BaselineLt,
                 SealConformanceLevel::BaselineLta,
             ],
+            // Every packaging, for the same reason as the formats — and because
+            // advertising all four formats while omitting any one format's
+            // packagings would leave that format unrequestable, which is a
+            // stranger thing for a ghost to claim than fabricating them all.
+            // Enumerated rather than `SealEnvelope::ALL` on the same principle.
             supported_envelopes: vec![
                 SealEnvelope::Detached,
                 SealEnvelope::Enveloping,
                 SealEnvelope::Attached,
+                SealEnvelope::Parallel,
+                SealEnvelope::Enveloped,
+                SealEnvelope::Certification,
+                SealEnvelope::Revision,
             ],
         }
     }
@@ -236,7 +245,13 @@ mod tests {
     use crate::domain::seal::SealCredentialRef;
     use crate::ports::registry_sync::RegistrationGranularity;
 
+    /// A request whose packaging is one the format actually defines.
+    ///
+    /// Not `Detached` for everything: PAdES does not define `Detached`, so a
+    /// fixed packaging silently made every PAdES request ill-formed rather than
+    /// testing PAdES.
     fn seal_request(sig_format: SealFormat, mode: SealMode) -> SealRequest {
+        let envelope = sig_format.envelopes()[0];
         SealRequest {
             payload_hash: "ab".repeat(32),
             mode,
@@ -246,7 +261,7 @@ mod tests {
             },
             sig_format,
             conformance_level: SealConformanceLevel::BaselineLt,
-            envelope: SealEnvelope::Detached,
+            envelope,
         }
     }
 

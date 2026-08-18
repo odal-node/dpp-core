@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  JAdES conformance oracle.
+
+  Runs a JAdES signature this workspace produced through the European
+  Commission's own AdES reference implementation (DSS) and asks it what the
+  signature is. Every other test of the JAdES module checks our output against
+  our own reading of ETSI TS 119 182-1; this one does not, which is the point.
+
+  Deliberately outside the Rust workspace and outside `just check`. Building the
+  whole workspace with zero infrastructure is a property this project states
+  publicly, and a Java toolchain in the main gate would end that.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.odal-node.oracle</groupId>
+  <artifactId>jades-oracle</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>JAdES conformance oracle</name>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!--
+      Pinned exactly, for the same reason the AAS oracle pins its dependency:
+      this is somebody else's judgement about what the standard permits, and an
+      unpinned upgrade would turn their tightening into our red build on code
+      that did not change. Moving the pin is a deliberate edit with a visible
+      diff.
+
+      6.2 is the latest stable release on Maven Central at the time of writing.
+    -->
+    <dss.version>6.2</dss.version>
+  </properties>
+
+  <dependencies>
+    <!-- The JAdES reader. Without it DSS parses the file and finds no signature. -->
+    <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-jades</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+
+    <!-- Validation per ETSI EN 319 102-1 — what actually produces the verdict. -->
+    <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-validation</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+
+    <!--
+      DSS requires exactly one `dss-utils` implementation on the classpath and
+      exactly one CRL parser. Neither is optional: with none, DSS fails at
+      runtime rather than at build time, which is a confusing way to discover a
+      missing dependency.
+    -->
+    <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-utils-apache-commons</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-crl-parser-x509crl</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>jades-oracle</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>io.odalnode.oracle.JadesOracle</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
