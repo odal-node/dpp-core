@@ -235,7 +235,7 @@ obligation had been cited inconsistently as either Art. 9 or Art. 12):
   duty that makes a stale post-transfer passport non-compliant. That duty,
   together with the registry-upload duty (**Art. 13(4)**), is the narrow
   basis cited in `docs/regulatory/CONFORMITY.md` and
-  `dpp-registry::registry::transfer`; it stands and is not superseded here.
+  `dpp-registry`'s `transfer` module; it stands and is not superseded here.
 - **Art. 12** (unique-*identifier* issuance mechanics, not registry upload)
   does not address transfer at all — the "Art. 12" leg of the earlier
   "Art. 9/12" citation was not traceable to operative text and is superseded

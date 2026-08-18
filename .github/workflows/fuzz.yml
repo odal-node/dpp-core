@@ -21,8 +21,14 @@ jobs:
         target: [digital_link_parse]
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
+      # The trailing comment is load-bearing, not decoration. `rust-toolchain`
+      # keeps one branch per channel and bakes that channel into the `toolchain`
+      # input's *default* on each branch — this SHA defaults to `nightly`, the
+      # one every other workflow pins defaults to `stable`. Collapsing the two
+      # to a single SHA would switch this job to stable with nothing to notice
+      # it, and cargo-fuzz needs nightly.
+      - uses: dtolnay/rust-toolchain@7c8d7d138f5c09cef361f8214cf96882cd029cdb # nightly
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: fuzz
       - name: Install cargo-fuzz

@@ -1,0 +1,53 @@
+# Judges the Digital Link URIs we build with GS1's own syntax tooling.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the AAS
+# oracle is: this is the only check here that needs Node, and `cargo build
+# --workspace` succeeding with no native toolchain and no services is a property
+# this project states publicly. Keeping the dependency here means the main gate
+# never acquires it.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever. This job is seconds long, so running it always
+# costs little and leaves it eligible to be required.
+name: GS1 syntax oracle
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Digital Links are well-formed GS1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and
+      # rustup is already on the runner, so invoking cargo selects the pinned
+      # toolchain by itself — an action here would add a third-party dependency
+      # to a job whose entire purpose is running somebody else's tool, and
+      # `@stable` would name a channel this repo does not build against.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Pinned exactly, like the AAS oracle's reference implementation. This is
+      # GS1's judgement about what their own syntax permits; an unpinned upgrade
+      # would turn a tightening on their side into a red build here on code that
+      # did not change. Moving the pin is a deliberate edit with a visible diff.
+      - name: Install the GS1 Barcode Syntax Engine
+        run: npm install --no-audit --no-fund --prefix .github/scripts
+
+      - name: Build the corpus from our own builder
+        run: EMIT_GS1_CORPUS=1 cargo test -p dpp-digital-link --test gs1_oracle_corpus
+
+      - name: Judge every Digital Link
+        run: node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl
+        env:
+          NODE_PATH: .github/scripts/node_modules

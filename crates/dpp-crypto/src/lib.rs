@@ -13,6 +13,7 @@
 //!
 //! [`dpp-vc`]: https://docs.rs/dpp-vc
 
+pub mod jades;
 pub mod jws;
 pub mod keystore;
 
