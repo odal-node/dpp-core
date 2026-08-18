@@ -57,3 +57,11 @@ coverage/
 # land in the tree.
 keys.json
 *.keystore.json
+
+# -----------------------------------------------------------------------------
+# CI ORACLES
+# -----------------------------------------------------------------------------
+# Oracle tooling installs its engine under .github/scripts. CI-only: no published
+# crate depends on it, and `cargo build` never sees it.
+.github/scripts/node_modules/
+.github/scripts/package-lock.json
