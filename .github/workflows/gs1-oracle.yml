@@ -28,8 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@stable
-
+      # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and
+      # rustup is already on the runner, so invoking cargo selects the pinned
+      # toolchain by itself — an action here would add a third-party dependency
+      # to a job whose entire purpose is running somebody else's tool, and
+      # `@stable` would name a channel this repo does not build against.
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
