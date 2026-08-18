@@ -13,6 +13,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Fixed
+
+- **`sector-battery` no longer reports a mean recycled-content percentage.**
+  The plugin averaged whichever of cobalt, lithium, nickel and lead were
+  declared and emitted the result as the flat `recycledContentPct` metric.
+  Art. 8(2) and 8(3) set a **separate minimum per metal**, over two different
+  measurement bases — for cobalt, lithium and nickel the share is measured "in
+  active materials"; for lead it is the share "present in the battery". A mean
+  conflates four thresholds and two denominators into one figure the regulation
+  never asks for, and a reader takes it for a compliance number.
+
+  `PassthroughBatteryStrategy` already declined to compute this figure, for
+  these reasons, in a doc comment on the type. The two Apache-2.0 paths
+  therefore disagreed about the same field — and because the plugin path wins
+  wherever a battery plugin is loaded, the considered answer was the one that
+  never ran. The metric is now unset on both paths; the four per-metal values
+  continue to travel under `extra.recycledContentByMetal`, where they keep their
+  own thresholds.
+
+- **`just build-plugin` no longer writes outside this repository.** It compiled
+  a plugin and then copied the artifact into a hard-coded directory in a sibling
+  checkout, naming it. Building is this repo's business; installing the result
+  wherever a host loads plugins from is that host's. The recipe now builds and
+  prints the artifact path.
+
+  It also now fails when the expected artifact is missing rather than assuming
+  the build produced one. The sector plugins share a single Cargo workspace, so
+  cargo writes to `plugins/target` — never to `plugins/sector-<name>/target`,
+  which earlier layouts populated and which stale copies still sit in. Anything
+  globbing the per-crate path for `*.wasm` finds a months-old binary and
+  succeeds.
+
 ## [0.18.0] - 2026-08-18
 
 ### Added
