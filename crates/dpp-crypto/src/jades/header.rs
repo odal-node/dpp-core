@@ -66,7 +66,39 @@ pub enum CertificateRef {
     /// signature. For a passport that has to stay verifiable for years, this is
     /// usually the one worth the bytes — the alternative assumes a certificate
     /// is still retrievable from somewhere when it matters.
+    ///
+    /// **On its own this is not enough for a baseline signature.** See
+    /// [`Self::ChainWithThumbprint`].
     Chain(Vec<String>),
+    /// `x5c` **and** `x5t#S256` together — the chain, plus a digest reference
+    /// to the signing certificate. **The form to use.**
+    ///
+    /// # Why both, when clause 5.1.7 says one is enough
+    ///
+    /// Because 5.1.7 and Table 1 are answering different questions, and only
+    /// reading both makes the difference visible.
+    ///
+    /// Clause 5.1.7 states the minimum for *a JAdES signature*: at least one of
+    /// `x5t#S256`, `x5c`, `sigX5ts` or `x5t#o`. Table 1 states what a *baseline*
+    /// signature requires, and there the service "signing a reference of the
+    /// signing certificate" has cardinality **1** with only the three digest
+    /// forms as its options — `x5c` is a separate row entirely.
+    ///
+    /// So a signature carrying `x5c` alone satisfies 5.1.7 and is still not
+    /// B-B. The European Commission's DSS says so directly: it reported such a
+    /// signature as form JAdES at level **`JSON-NOT-ETSI`**, warning that *"the
+    /// signed attribute: 'signing-certificate' is absent"*.
+    ///
+    /// That was found by an outside implementation, not by reading — which is
+    /// what an oracle is for. Clause 5.1.7 NOTE 1 explicitly contemplates the
+    /// simultaneous presence of these parameters, so carrying both is
+    /// conformant and gets the self-containment of the chain as well.
+    ChainWithThumbprint {
+        /// Base64 DER certificates, signing certificate first (RFC 7515 4.1.6).
+        chain: Vec<String>,
+        /// Base64url SHA-256 of the signing certificate's DER (RFC 7515 4.1.8).
+        thumbprint: String,
+    },
 }
 
 impl CertificateRef {
@@ -80,18 +112,47 @@ impl CertificateRef {
         Self::Thumbprint(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest))
     }
 
+    /// Both parameters, derived from the DER of the chain.
+    ///
+    /// The signing certificate is the first entry, per RFC 7515 clause 4.1.6,
+    /// and the thumbprint is taken over it.
+    ///
+    /// # Errors
+    ///
+    /// [`JadesError::EmptyCertificateChain`] for an empty chain — there would be
+    /// no signing certificate to digest.
+    pub fn chain_of_der(chain: &[Vec<u8>]) -> Result<Self, JadesError> {
+        let signing = chain.first().ok_or(JadesError::EmptyCertificateChain)?;
+        let Self::Thumbprint(thumbprint) = Self::thumbprint_of_der(signing) else {
+            unreachable!("thumbprint_of_der always yields a Thumbprint");
+        };
+        Ok(Self::ChainWithThumbprint {
+            chain: chain
+                .iter()
+                .map(|der| base64::engine::general_purpose::STANDARD.encode(der))
+                .collect(),
+            thumbprint,
+        })
+    }
+
     fn insert_into(&self, map: &mut Map<String, Value>) -> Result<(), JadesError> {
+        let chain_value =
+            |chain: &Vec<String>| Value::Array(chain.iter().cloned().map(Value::String).collect());
         match self {
             Self::Thumbprint(t) => {
                 map.insert("x5t#S256".to_owned(), Value::String(t.clone()));
                 Ok(())
             }
-            Self::Chain(chain) if chain.is_empty() => Err(JadesError::EmptyCertificateChain),
+            Self::Chain(chain) | Self::ChainWithThumbprint { chain, .. } if chain.is_empty() => {
+                Err(JadesError::EmptyCertificateChain)
+            }
             Self::Chain(chain) => {
-                map.insert(
-                    "x5c".to_owned(),
-                    Value::Array(chain.iter().cloned().map(Value::String).collect()),
-                );
+                map.insert("x5c".to_owned(), chain_value(chain));
+                Ok(())
+            }
+            Self::ChainWithThumbprint { chain, thumbprint } => {
+                map.insert("x5c".to_owned(), chain_value(chain));
+                map.insert("x5t#S256".to_owned(), Value::String(thumbprint.clone()));
                 Ok(())
             }
         }

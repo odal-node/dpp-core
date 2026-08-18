@@ -44,3 +44,5 @@ proptest      = { workspace = true }
 # from ed25519-dalek) used only to cross-verify a golden JWS vector in tests —
 # never used in production signing/verification code.
 ring          = "0.17"
+rcgen = { version = "0.14.9", default-features = false, features = ["ring", "pem"] }
+x509-parser = "0.18.1"
