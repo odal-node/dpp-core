@@ -559,3 +559,60 @@ fn no_segment_carries_base64_padding() {
         "base64url in JWS is unpadded (RFC 7515 clause 2): {compact}"
     );
 }
+
+/// The combined form emits both `x5c` and `x5t#S256`.
+///
+/// Clause 5.1.7 permits either alone; Table 1's "signing a reference of the
+/// signing certificate" service admits only the digest forms. A signature with
+/// `x5c` alone therefore satisfies 5.1.7 and is still not baseline — the
+/// European Commission's DSS reported exactly that as `JSON-NOT-ETSI`, warning
+/// that the signing-certificate attribute was absent.
+///
+/// Found by an outside implementation rather than by reading, which is the
+/// whole reason the oracle exists.
+#[test]
+fn the_combined_form_carries_the_chain_and_the_digest() {
+    let der = FAKE_DER.to_vec();
+    let cert = CertificateRef::chain_of_der(&[der.clone()]).expect("one certificate");
+    let h = JadesHeader {
+        certificate: cert,
+        ..header()
+    };
+    let decoded = decode_header(
+        prepare(&h, b"payload")
+            .expect("prepares")
+            .assemble(&[0u8; 64])
+            .as_str(),
+    );
+
+    assert!(
+        decoded.get("x5c").is_some(),
+        "the chain travels with the signature"
+    );
+    let CertificateRef::Thumbprint(expected) = CertificateRef::thumbprint_of_der(&der) else {
+        unreachable!()
+    };
+    assert_eq!(
+        decoded["x5t#S256"],
+        serde_json::json!(expected),
+        "and the digest reference Table 1 requires for baseline"
+    );
+    assert!(
+        table_1_b_b_violations(
+            prepare(&h, b"payload")
+                .expect("prepares")
+                .assemble(&[0u8; 64])
+                .as_str()
+        )
+        .is_empty()
+    );
+}
+
+/// An empty chain is refused by the combined constructor too.
+#[test]
+fn the_combined_constructor_refuses_an_empty_chain() {
+    assert_eq!(
+        CertificateRef::chain_of_der(&[]).unwrap_err(),
+        JadesError::EmptyCertificateChain
+    );
+}
