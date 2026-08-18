@@ -673,6 +673,56 @@ mod tests {
         assert!(!SealFormat::Xades.admits(SealEnvelope::Parallel));
     }
 
+    /// A defaulted PAdES request is unsatisfiable, and that is on purpose.
+    ///
+    /// `envelope` defaults to [`SealEnvelope::Detached`] for every format,
+    /// because a request built from a payload hash means the caller already
+    /// holds the bytes. PAdES defines only `Certification` and `Revision`, so a
+    /// PAdES request that takes the default asks for a shape PAdES does not
+    /// have, and **no** advertisement can satisfy it.
+    ///
+    /// The refusal is correct — a detached PAdES signature is not a thing — but
+    /// it is reached by a default rather than by anything the caller wrote, so
+    /// it is pinned here rather than left to be discovered. A format-aware
+    /// default would need a hand-written `Deserialize`, which is a large amount
+    /// of machinery for a format this crate does not otherwise use.
+    #[test]
+    fn a_defaulted_pades_request_cannot_be_satisfied() {
+        // Everything advertised, including both packagings PAdES defines.
+        let everything = SealCapabilities {
+            supported_formats: SealFormat::ALL.to_vec(),
+            supported_modes: SealMode::ALL.to_vec(),
+            supported_levels: SealConformanceLevel::ALL.to_vec(),
+            supported_envelopes: SealEnvelope::ALL.to_vec(),
+        };
+
+        let wire = r#"{
+            "payloadHash": "abababababababababababababababababababababababababababababababab",
+            "mode": "provider_seal",
+            "keyRef": { "qtspId": "q", "credentialId": "c" },
+            "sigFormat": "PADES"
+        }"#;
+        let defaulted: SealRequest = serde_json::from_str(wire).expect("defaults fill the rest");
+
+        assert_eq!(
+            defaulted.envelope,
+            SealEnvelope::Detached,
+            "the default is format-blind, which is the premise of this test"
+        );
+        assert!(
+            !everything.can_produce(&defaulted),
+            "PAdES does not define Detached, so nothing can produce this request"
+        );
+
+        // Naming a packaging PAdES actually defines is satisfiable, so the
+        // refusal is about the default and not about PAdES.
+        let named = SealRequest {
+            envelope: SealEnvelope::Certification,
+            ..defaulted
+        };
+        assert!(everything.can_produce(&named));
+    }
+
     /// A pair no format defines is refused however generous the advertisement.
     ///
     /// The defect this pins: an adapter listing `Jades` and `Enveloping`
