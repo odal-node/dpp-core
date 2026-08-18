@@ -13,6 +13,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **`dpp_crypto::jades` — JAdES-B-B signature construction (ETSI TS 119 182-1
+  V1.2.1).** JAdES is an AdES format built on JWS, and its scope covers
+  **qualified electronic seals** under Regulation (EU) No 910/2014. So a
+  qualified seal does not have to be a document-format container over bytes — it
+  can be a JWS, and this builds one.
+
+  **Two-phase, because the signer is somewhere else.** `prepare()` yields the
+  signing input (and a SHA-256 of it); a remote provider signs; `assemble()`
+  produces the compact form. That seam is what makes the sealing provider
+  replaceable: asking a provider to *produce* a JAdES only works with providers
+  that sell JAdES, whereas asking for a signature over a digest works with
+  essentially all of them, because signing a hash is the one operation every
+  remote signing service exposes.
+
+  **It does not make a signature qualified**, and says so. Art. 3(27) makes
+  qualified status a conjunction of certificate, creation device and trust
+  service provider; none is a property of the assembled bytes. This produces a
+  structurally conformant JAdES-B-B signature, and what it is worth depends on
+  whose key signed it.
+
+  Scope is B-B with an attached payload. Higher levels need a timestamp
+  authority, revocation material or archival timestamps — external services, not
+  format work. An attached payload forbids `sigD` (clause 5.2.8.1), and `sigD` is
+  the only thing that forces `crit` (clause 5.1.9), so the output carries neither
+  and **stays parseable by a plain RFC 7515 library** — V1.2.1 suppressed
+  V1.1.1's blanket `crit` requirement for exactly that reason.
+
 ### Breaking
 
 - **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
