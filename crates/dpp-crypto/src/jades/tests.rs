@@ -573,7 +573,7 @@ fn no_segment_carries_base64_padding() {
 #[test]
 fn the_combined_form_carries_the_chain_and_the_digest() {
     let der = FAKE_DER.to_vec();
-    let cert = CertificateRef::chain_of_der(&[der.clone()]).expect("one certificate");
+    let cert = CertificateRef::chain_of_der(std::slice::from_ref(&der)).expect("one certificate");
     let h = JadesHeader {
         certificate: cert,
         ..header()

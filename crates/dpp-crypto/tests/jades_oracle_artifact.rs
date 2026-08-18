@@ -41,8 +41,6 @@ use ed25519_dalek::{Signer, SigningKey};
 
 const B64URL: base64::engine::general_purpose::GeneralPurpose =
     base64::engine::general_purpose::URL_SAFE_NO_PAD;
-const B64STD: base64::engine::general_purpose::GeneralPurpose =
-    base64::engine::general_purpose::STANDARD;
 
 /// The PKCS#8 v1 prefix for an Ed25519 private key, per RFC 8410 clause 7.
 ///
@@ -115,7 +113,7 @@ fn emit_and_self_check_a_jades_artifact() {
     let header = JadesHeader {
         alg: "EdDSA".into(),
         iat: chrono::Utc::now().timestamp(),
-        certificate: CertificateRef::chain_of_der(&[cert_der.clone()])
+        certificate: CertificateRef::chain_of_der(std::slice::from_ref(&cert_der))
             .expect("a one-certificate chain"),
         content_type: Some("json".into()),
     };
