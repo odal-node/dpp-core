@@ -23,6 +23,7 @@ jobs:
       # the least reversible consequence. It reads every text file in the tree,
       # including the prose and JSON data fields that every recorded instance of
       # this leak has lived in.
+      #
       # ODAL_PARTY_NAMES carries the party-name list, newline-separated. It is a
       # secret because the list itself is the sensitive thing — a denylist of
       # names that must stay unpublished cannot live in the repository it
@@ -30,12 +31,16 @@ jobs:
       # because these logs are public: a check that printed what it found would
       # publish it on the very commit that tried to.
       #
-      # An absent secret fails this job rather than skipping it. A check that
-      # quietly does nothing is worse than no check, because it reports success.
+      # ODAL_PARTY_NAMES_REQUIRED marks this as the job that owns the scan, so an
+      # absent secret fails *here* rather than skipping. The test also runs under
+      # the workspace test job, which has no business holding the secret and
+      # skips instead. A check that quietly does nothing is worse than no check,
+      # because it reports success — but only one job should be the one to say so.
       - name: Scan for private material
         run: cargo test -p dpp-tests --test private_refs
         env:
           ODAL_PARTY_NAMES: ${{ secrets.ODAL_PARTY_NAMES }}
+          ODAL_PARTY_NAMES_REQUIRED: "1"
 
   fmt:
     name: Format check

@@ -344,11 +344,14 @@ fn the_matcher_separates_severe_from_premature() {
 /// skipping loudly rather than silently.
 const PARTY_NAMES_VAR: &str = "ODAL_PARTY_NAMES";
 
-/// Whether this is a CI run, where an absent list is a failure rather than a
-/// skip. GitHub Actions sets `CI=true`, as does essentially every other runner.
-fn is_ci() -> bool {
-    std::env::var("CI").is_ok_and(|v| !v.is_empty() && v != "false")
-}
+/// Set by the one CI job that owns this check, to say the list must be present.
+///
+/// Not a `CI` heuristic. This test lives in `dpp-tests`, so it also runs under
+/// the ordinary workspace test job — which has no business holding the secret,
+/// and would have failed there for the right reason in the wrong place. The flag
+/// makes exactly one job responsible, and lets anyone opt into strictness
+/// locally.
+const PARTY_NAMES_REQUIRED_VAR: &str = "ODAL_PARTY_NAMES_REQUIRED";
 
 /// No file in this public repository names a client, operator, manufacturer or
 /// collaborating party.
@@ -366,31 +369,30 @@ fn is_ci() -> bool {
 /// or was renamed — and the honest response is red, not green.
 #[test]
 fn no_public_file_names_a_private_party() {
-    let Ok(raw) = std::env::var(PARTY_NAMES_VAR) else {
-        assert!(
-            !is_ci(),
-            "{PARTY_NAMES_VAR} is not set in CI. The party-name scan cannot run, and \
-             passing without it would report a clean tree that was never checked. \
-             Set the repository secret this job injects."
-        );
-        eprintln!(
-            "note: {PARTY_NAMES_VAR} is unset, so no party-name scan ran. \
-             The structural rules in this file still did."
-        );
-        return;
-    };
-
+    // An unset variable and one carrying an undefined secret are the same
+    // situation — GitHub substitutes the empty string for a secret that does not
+    // exist — so both take the one path rather than tripping different rules.
+    let raw = std::env::var(PARTY_NAMES_VAR).unwrap_or_default();
     let names: Vec<String> = raw
         .lines()
         .map(|l| l.split('#').next().unwrap_or("").trim().to_lowercase())
         .filter(|l| !l.is_empty())
         .collect();
 
-    assert!(
-        !names.is_empty(),
-        "{PARTY_NAMES_VAR} is set but holds no names — a scan with nothing to \
-         find always passes, which is indistinguishable from a clean tree"
-    );
+    if names.is_empty() {
+        assert!(
+            std::env::var_os(PARTY_NAMES_REQUIRED_VAR).is_none(),
+            "{PARTY_NAMES_REQUIRED_VAR} is set but {PARTY_NAMES_VAR} holds no names. \
+             The party-name scan cannot run, and passing without it would report a \
+             clean tree that was never checked — most likely the repository secret \
+             this job injects does not exist or was renamed."
+        );
+        eprintln!(
+            "note: {PARTY_NAMES_VAR} holds no names, so no party-name scan ran. \
+             The structural rules in this file still did."
+        );
+        return;
+    }
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
