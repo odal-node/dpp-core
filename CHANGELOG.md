@@ -100,6 +100,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   than `valid: false`: nothing about a placeholder is checked, so a negative
   verdict was one it had not reached either.
 
+- **`dpp-registry`'s modules moved to the crate root**, so the paths are
+  `dpp_registry::payload` rather than `dpp_registry::registry::payload`. The
+  crate's `src/` held exactly one directory, named for the crate, and every path
+  through it stuttered. A `src/` subdirectory is named for a concern that could
+  have a sibling; a single-concern crate puts its modules at the root with only
+  `lib.rs` above them.
+
+  **Most consumers are unaffected.** Every type was already re-exported at the
+  crate root and the root re-exports are unchanged, so `use dpp_registry::
+  RegistryStatusCode` — the form the README documents — is untouched. Only an
+  import naming the `registry` module explicitly needs the segment dropped.
+
+  Deferred once on the grounds that a path rename should not spend a breaking
+  release of its own. It is not spending one here: the release was already
+  breaking.
+
+  Detected by `cargo semver-checks` as `module_missing`, `enum_missing` and
+  `struct_missing` — all three naming the old nested path, none naming a type
+  that stopped existing.
+
 ### Added
 
 - **`domain_concerns` — a drift tripwire over `dpp-domain`'s top-level modules.**
