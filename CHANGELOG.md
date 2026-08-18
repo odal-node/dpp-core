@@ -102,6 +102,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A GS1 syntax oracle over every Digital Link we build.** We wrote this GS1
+  Digital Link implementation, and every test of it was written by whoever wrote
+  the parser — so a shared misreading of the standard passes both. GS1 publishes
+  the **GS1 Barcode Syntax Engine** (Apache-2.0), which implements the GS1
+  Barcode Syntax Dictionary; a new job runs our URIs through it.
+
+  `dpp-digital-link`'s `gs1_oracle_corpus` test emits 66 entries — every
+  qualifier combination the builder produces (`01`, `22`, `10`, `21`, `235`),
+  across four GTINs and both a bare and a path-prefixed resolver base, plus a
+  `linkType` query string and a deliberately corrupted check digit — each
+  carrying **our** accept/reject verdict. The oracle asserts agreement in both
+  directions, because they fail differently: a link we accept and GS1 rejects is
+  one we print on a product, and a link we reject and GS1 accepts is a
+  conformant partner we refuse with no error ever logged.
+
+  **CI-only, and never in a published crate's dependency graph.** The engine is
+  a pinned npm package under `.github/scripts/`; no `Cargo.toml` changed, and
+  `cargo build --workspace` still needs no Node and no native toolchain. `just
+  gs1-oracle` runs it locally and skips the engine cleanly when npm is absent,
+  so the Rust half still checks our builder against our own parser.
+
+  Proves syntax, not semantics: it says nothing about whether a GTIN is
+  allocated or a resolver answers, and supports no claim of GS1 certification.
+
 - **`domain_concerns` — a drift tripwire over `dpp-domain`'s top-level modules.**
   It is the largest crate in the workspace, roughly three and a half times the
   next, and the hub everything else depends on — so it is the one most able to

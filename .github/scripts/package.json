@@ -1,0 +1,9 @@
+{
+  "name": "gs1-syntax-oracle",
+  "private": true,
+  "type": "module",
+  "description": "CI-only. Pins the GS1 Barcode Syntax Engine used to judge our Digital Link corpus. Never a dependency of any published crate.",
+  "dependencies": {
+    "gs1encoder": "1.4.1"
+  }
+}

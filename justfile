@@ -229,3 +229,25 @@ build-plugin PLUGIN:
 # Clean build artefacts
 clean:
     cargo clean
+
+# Judge the Digital Link URIs we build with GS1's own syntax tooling.
+#
+# Deliberately outside `check`: it needs Node, and `cargo build --workspace`
+# succeeding with no native toolchain is a property this project states
+# publicly. The engine is pinned in .github/scripts/package.json — it is a
+# CI-only dependency and never enters any published crate's graph.
+#
+# Skips cleanly when npm is absent, so a machine without Node still runs the
+# Rust half (which checks our builder against our own parser) rather than
+# failing on a missing tool.
+gs1-oracle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    EMIT_GS1_CORPUS=1 cargo test -p dpp-digital-link --test gs1_oracle_corpus
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "npm not found — corpus built and self-checked, GS1 engine skipped."
+        exit 0
+    fi
+    npm install --no-audit --no-fund --prefix .github/scripts
+    NODE_PATH=.github/scripts/node_modules \
+        node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl
