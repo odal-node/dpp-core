@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-crypto"
-description = "Ed25519 key management, JWS signing/verification, and an encrypted keystore"
+description = "Ed25519 key management, JWS signing/verification, JAdES baseline construction, and an encrypted keystore"
 keywords    = ["dpp", "ed25519", "jws", "keystore", "cryptography"]
 categories  = ["cryptography", "authentication"]
 version.workspace     = true
@@ -44,3 +44,5 @@ proptest      = { workspace = true }
 # from ed25519-dalek) used only to cross-verify a golden JWS vector in tests —
 # never used in production signing/verification code.
 ring          = "0.17"
+rcgen = { version = "0.14.9", default-features = false, features = ["ring", "pem"] }
+x509-parser = "0.18.1"

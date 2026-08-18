@@ -6,8 +6,8 @@
 
 Cryptographic primitives for the [Odal Node](https://odal-node.io) Digital
 Product Passport system: Ed25519 key management, JWS signing and verification,
-JCS canonicalisation, and an AES-256-GCM encrypted keystore with Argon2id key
-derivation and rotation.
+JCS canonicalisation, JAdES baseline signature construction, and an AES-256-GCM
+encrypted keystore with Argon2id key derivation and rotation.
 
 Pure Rust, no I/O beyond the keystore file. Not a `wasm32-unknown-unknown`
 target — the RNG requires a platform entropy source.
@@ -24,6 +24,10 @@ needs a domain type to do its job.
   before signing.
 - You are managing signing keys at rest — generation, rotation, revocation,
   archival — with encryption and integrity protection.
+- You need to build an **ETSI TS 119 182-1 JAdES-B-B** signature whose signature
+  value comes from somewhere else — a remote signing service, typically. The
+  `jades` module derives the signing input and assembles the compact form; it
+  never signs.
 
 ## Example
 
@@ -60,6 +64,12 @@ cargo run -p dpp-crypto --example sign_and_verify
   in `dpp-vc` can read public key material and revocation state. Neither exposes
   private key material.
 - Signing uses `alg: "EdDSA"` with curve `Ed25519`, per RFC 8037.
+- The `jades` module produces a **structurally conformant** JAdES-B-B signature.
+  It does not make one *qualified* — under Regulation (EU) No 910/2014 that
+  requires a qualified certificate, a qualified creation device and the trust
+  service provider behind them, none of which is a property of the bytes
+  assembled here. Nor does it validate: AdES validation is ETSI EN 319 102-1 and
+  needs trust anchors, certificate paths and revocation data.
 
 ## Relationship to other crates
 
