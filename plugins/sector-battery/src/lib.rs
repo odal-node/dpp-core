@@ -15,6 +15,10 @@
 //! never interchangeable as dispatch keys.
 
 use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::rules::batteries::degradation::{
+    Annex7ParameterSet, annex_vii_parameter_set_for,
+};
+use dpp_plugin_sdk::rules::batteries::passport_content::{fields_not_applicable, mandatory_fields};
 use dpp_plugin_sdk::rules::batteries::recycled_content::{
     Art8Category, Art8Phase, RecycledContentInput, art8_category_for, art8_phase_for,
     art8_shortfalls_2031, art8_shortfalls_2036, chemistry_regulated_metals,
@@ -22,8 +26,8 @@ use dpp_plugin_sdk::rules::batteries::recycled_content::{
 };
 use dpp_plugin_sdk::rules::common::date::CalendarDate;
 use dpp_plugin_sdk::traits::{
-    DppSectorPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus,
-    PluginError, PluginFinding, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+    DppSectorPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus, PluginError, PluginFinding,
+    PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::{Value, json};
@@ -115,6 +119,9 @@ impl DppSectorPlugin for BatteryPlugin {
 
         let mut warnings: Vec<PluginFinding> = Vec::new();
 
+        warnings.extend(annex_xiii_content_findings(input, battery_type));
+        warnings.extend(annex_vii_state_of_health_finding(input, battery_type));
+
         // Data integrity: recycled content declared for a metal the chemistry
         // does not contain (e.g. cobalt on an LFP cell) is a contradiction —
         // surface it as an advisory rather than folding it into the mean silently.
@@ -150,8 +157,7 @@ impl DppSectorPlugin for BatteryPlugin {
         // manufacturing plant". A percentage without both anchors is not that
         // declaration — it is an unattributed number, and no reader can tell
         // which production run it describes.
-        let declared_any_share =
-            [cobalt, lithium, nickel, lead].iter().any(Option::is_some);
+        let declared_any_share = [cobalt, lithium, nickel, lead].iter().any(Option::is_some);
         if declared_any_share
             && art8_category != Art8Category::NotCovered
             && input.get("recycledContentReportingYear").is_none()
@@ -293,6 +299,97 @@ impl DppSectorPlugin for BatteryPlugin {
         self.validate_input(&input)?;
         Ok(input)
     }
+}
+
+/// Annex XIII content the battery's category owes, and content it must not
+/// carry — the Commission's per-category data-point table, read at create time.
+///
+/// The binding check is the host's, at first publish. Repeating it here is not
+/// duplication of the *rule* — the table has one home in `dpp-rules` and both
+/// callers read it — but of the *moment*: a passport that will be refused at
+/// publish should not have to reach publish to discover why, and a field the
+/// guidance says must not be filled is never mentioned there at all.
+///
+/// Missing content is reported as **one** finding rather than one per field.
+/// An EV battery owes 38 mandatory fields and a fresh draft carries almost
+/// none, so per-field advisories would put dozens of findings into a document
+/// that is stored, signed and served. The publish refusal names them
+/// individually, which is where per-field precision is worth its size.
+///
+/// Portable and SLI batteries produce nothing here: the guidance does not cover
+/// them, and `dpp-rules` answers `Unknown` rather than guessing.
+fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<PluginFinding> {
+    let mut out = Vec::new();
+
+    let missing: Vec<&str> = mandatory_fields(battery_type)
+        .filter(|f| input.get(*f).is_none_or(Value::is_null))
+        .collect();
+    if !missing.is_empty() {
+        out.push(PluginFinding::new(
+            "battery.annex_xiii.mandatory_content_incomplete",
+            "/",
+            format!(
+                "{} field(s) the Commission's data-point guidance makes mandatory for a \
+                 '{battery_type}' battery are absent, and publishing will be refused until \
+                 they are supplied: {}",
+                missing.len(),
+                missing.join(", ")
+            ),
+        ));
+    }
+
+    // The other half of the table, which nothing checked before: a field the
+    // guidance marks "not to be filled/displayed" is not merely surplus. A
+    // mandatory-fields check can never notice one, because it is looking for
+    // absence.
+    let present: Vec<&str> = input
+        .as_object()
+        .map(|o| o.keys().map(String::as_str).collect())
+        .unwrap_or_default();
+    for field in fields_not_applicable(&present, battery_type) {
+        out.push(PluginFinding::new(
+            format!("battery.annex_xiii.{field}_not_applicable"),
+            format!("/{field}"),
+            format!(
+                "'{field}' is declared, but the Commission's data-point guidance marks it \
+                 'not to be filled/displayed' for a '{battery_type}' battery — for several \
+                 fields because the implementing act that will specify their format has not \
+                 been adopted, so a value filed today cannot be the one it will ask for."
+            ),
+        ));
+    }
+
+    out
+}
+
+/// Whether the declared state-of-health block is the one Annex VII Part A asks
+/// of this battery's category.
+///
+/// The two lists are disjoint and the asymmetry is easy to get backwards: an
+/// electric-vehicle battery reports state of certified energy and nothing else,
+/// while stationary storage and LMT batteries report a five-parameter list.
+/// Declaring the wrong one is not a missing field — it is the wrong parameter
+/// set, which a completeness check cannot see.
+fn annex_vii_state_of_health_finding(
+    input: &PluginInput,
+    battery_type: &str,
+) -> Option<PluginFinding> {
+    let declared = input.get("stateOfHealth")?.get("parameterSet")?.as_str()?;
+    let expected = match annex_vii_parameter_set_for(battery_type)? {
+        Annex7ParameterSet::ElectricVehicle => "electricVehicle",
+        Annex7ParameterSet::StationaryOrLmt => "stationaryOrLmt",
+    };
+    if declared == expected {
+        return None;
+    }
+    Some(PluginFinding::new(
+        "battery.annex_vii.wrong_state_of_health_parameter_set",
+        "/stateOfHealth/parameterSet",
+        format!(
+            "state of health is declared as '{declared}', but Annex VII Part A asks a \
+             '{battery_type}' battery for '{expected}'."
+        ),
+    ))
 }
 
 export_plugin!(BatteryPlugin);
@@ -573,7 +670,12 @@ mod tests {
             .warnings
             .iter()
             .find(|w| w.code.contains("cobalt"))
-            .unwrap_or_else(|| panic!("expected forward-looking advisory, got: {:?}", result.warnings));
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected forward-looking advisory, got: {:?}",
+                    result.warnings
+                )
+            });
         assert!(
             cobalt.message.contains("not binding for this battery"),
             "a battery placed on the market in 2030 is outside Art. 8(2); got: {}",
@@ -733,6 +835,123 @@ mod tests {
             result.warnings
         );
     }
+    // ── Annex XIII per-category content ──────────────────────────────────────
+
+    fn codes(result: &PluginResult) -> Vec<&str> {
+        result.warnings.iter().map(|w| w.code.as_str()).collect()
+    }
+
+    /// A category the guidance covers gets told what it still owes — once.
+    #[test]
+    fn a_covered_category_is_warned_about_missing_mandatory_content() {
+        let mut data = valid_battery();
+        data["batteryType"] = json!("ev");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+
+        let hits = codes(&result)
+            .into_iter()
+            .filter(|c| *c == "battery.annex_xiii.mandatory_content_incomplete")
+            .count();
+        assert_eq!(
+            hits,
+            1,
+            "one summary finding, not one per field: {:?}",
+            codes(&result)
+        );
+
+        let msg = &result
+            .warnings
+            .iter()
+            .find(|w| w.code == "battery.annex_xiii.mandatory_content_incomplete")
+            .unwrap()
+            .message;
+        assert!(
+            msg.contains("batteryPassportNumber") && msg.contains("manufacturingDate"),
+            "the finding must name what is missing: {msg}"
+        );
+    }
+
+    /// The guidance covers EV, LMT and industrial batteries and says nothing
+    /// about portable or SLI ones. Silence is not a requirement to invent.
+    #[test]
+    fn an_uncovered_category_is_not_warned() {
+        let mut data = valid_battery();
+        data["batteryType"] = json!("portable");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !codes(&result).contains(&"battery.annex_xiii.mandatory_content_incomplete"),
+            "got: {:?}",
+            codes(&result)
+        );
+    }
+
+    /// The half of the table a completeness check can never see: a field the
+    /// guidance says must not be filled, that has been.
+    #[test]
+    fn a_field_the_guidance_bars_is_flagged_when_present() {
+        let mut data = valid_battery();
+        data["batteryType"] = json!("lmt");
+        data["carbonFootprintClass"] = json!("B");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            codes(&result).contains(&"battery.annex_xiii.carbonFootprintClass_not_applicable"),
+            "got: {:?}",
+            codes(&result)
+        );
+
+        // Absent, it is not mentioned — the finding is about the value, not the key.
+        data.as_object_mut().unwrap().remove("carbonFootprintClass");
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !codes(&result).contains(&"battery.annex_xiii.carbonFootprintClass_not_applicable"),
+            "got: {:?}",
+            codes(&result)
+        );
+    }
+
+    // ── Annex VII state of health ────────────────────────────────────────────
+
+    /// Part A's two lists are disjoint, and an EV battery reports the one-item
+    /// one. Declaring the five-parameter list is the wrong set, not a gap.
+    #[test]
+    fn an_ev_battery_declaring_the_stationary_parameter_set_is_flagged() {
+        let mut data = valid_battery();
+        data["batteryType"] = json!("ev");
+        data["stateOfHealth"] = json!({
+            "parameterSet": "stationaryOrLmt",
+            "remainingCapacityPct": 88.0,
+            "selfDischargeRatePctPerMonth": 1.5
+        });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            codes(&result).contains(&"battery.annex_vii.wrong_state_of_health_parameter_set"),
+            "got: {:?}",
+            codes(&result)
+        );
+
+        data["stateOfHealth"] = json!({ "parameterSet": "electricVehicle", "socePct": 97.0 });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !codes(&result).contains(&"battery.annex_vii.wrong_state_of_health_parameter_set"),
+            "the set Annex VII Part A actually asks of an EV battery: {:?}",
+            codes(&result)
+        );
+    }
+
+    /// Part A does not reach portable or SLI batteries, so there is no set to
+    /// be wrong about.
+    #[test]
+    fn a_battery_outside_annex_vii_part_a_is_not_flagged() {
+        let mut data = valid_battery();
+        data["batteryType"] = json!("portable");
+        data["stateOfHealth"] = json!({ "parameterSet": "electricVehicle", "socePct": 97.0 });
+        let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        assert!(
+            !codes(&result).contains(&"battery.annex_vii.wrong_state_of_health_parameter_set"),
+            "got: {:?}",
+            codes(&result)
+        );
+    }
 }
 
 #[cfg(test)]
@@ -754,7 +973,9 @@ mod art8_declaration_tests {
 
     #[test]
     fn shares_without_a_reporting_year_are_flagged() {
-        let result = BatteryPlugin.calculate_metrics(&shares_without_year()).unwrap();
+        let result = BatteryPlugin
+            .calculate_metrics(&shares_without_year())
+            .unwrap();
         assert!(
             result
                 .warnings

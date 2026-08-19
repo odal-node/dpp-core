@@ -87,6 +87,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   That is the correct answer rather than a gap, and it is derived from each
   ruleset's own `Effectivity`, so it turns over on its own when the date arrives.
 
+- **`sector-battery` now reads the two `dpp-rules` battery modules it never
+  called.** Both were already reachable through `dpp-plugin-sdk`, which
+  re-exports all of `dpp-rules`, and neither needed a new dependency.
+
+  **The Commission's per-category data-point table.** A passport missing content
+  its category makes mandatory is refused at first publish, by a gate private to
+  `dpp-domain`. Nothing said so earlier, so an operator learned it by being
+  refused. The plugin now reports it at create as **one** summary finding naming
+  the absent fields — one per field would put dozens of advisories into a
+  document that is stored, signed and served, and the publish refusal is where
+  per-field precision is worth its size.
+
+  **And the half of that table nothing checked at all.** `fields_not_applicable`
+  had no callers anywhere: a field the guidance marks *"not to be
+  filled/displayed"* — `carbonFootprintClass`, `dueDiligenceUrl`,
+  `ratedCapacityAh`, and `capacityThresholdForExhaustionPct` on LMT and
+  industrial batteries — published cleanly. A mandatory-fields check can never
+  notice one, because it is looking for absence.
+
+  **Annex VII Part A's two disjoint parameter sets.** `degradation.rs` had no
+  callers either. An electric-vehicle battery reports state of certified energy
+  and nothing else; stationary storage and LMT batteries report a five-parameter
+  list. Declaring the wrong one is not a missing field, so nothing saw it.
+
+  Portable and SLI batteries produce none of these findings: the guidance covers
+  three categories and `dpp-rules` answers `Unknown` for the others rather than
+  guessing. That hole stays open and stays deliberate.
+
 ### Fixed
 
 - **`sector-battery` no longer reports a mean recycled-content percentage.**
