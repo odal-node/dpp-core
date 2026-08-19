@@ -1,8 +1,15 @@
 //! Machine-readable calculator status map.
 //!
 //! The authoritative answer to "which sector–methodology metrics can be computed
-//! today vs. which are awaiting a delegated act?" — consumed by the CLI
-//! `odal calc status` view and by integrations doing compliance-readiness checks.
+//! today vs. which are awaiting a delegated act?", for a compliance-readiness
+//! view or an integration asking what this build can determine.
+//!
+//! **Nothing in either repository calls it yet.** It previously claimed to be
+//! "consumed by the CLI `odal calc status` view", and there is no such command —
+//! a reader deciding whether this map was load-bearing would have concluded it
+//! was. Its only callers are the drift guards in `tests.rs`, which is worth
+//! having on its own (they are what keep this table and the `resolve_*` row
+//! tables from disagreeing), but it is not yet wired to a surface.
 //!
 //! **Status is derived, never declared.** Each entry names the ruleset that
 //! implements it; whether that ruleset is in force comes from the ruleset's own

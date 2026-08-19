@@ -15,13 +15,19 @@ by the operator. That split is the licensing rationale for this crate.
 
 ## When to use this crate
 
-- You are a sector plugin (`sector-battery`, `sector-electronics`, …) and need to call an EU calculator
-  to fill `PluginResult.repairability_index` or `co2e_score`.
+- You are a **host** running a determination for a sector and need it to carry a ruleset id,
+  an effective period, a legal citation and a receipt.
 - You are writing an integration test and need golden-vector inputs and expected outputs.
 - You are adding a new EU methodology or product category (see [Adding a sector calculator](#adding-a-sector-calculator) below).
 
 ## When NOT to use this crate
 
+- You are a **Wasm sector plugin**. This crate is not reachable from one, deliberately:
+  the plugins are a separate workspace targeting `wasm32-wasip1`, and pulling `chrono`,
+  `uuid`, `sha2` and `serde_jcs` into every plugin binary to mint a receipt inside a
+  sandbox — one that would have to be recompiled and re-signed for every threshold
+  change — is the arrangement the signed ruleset channel exists to avoid. Plugins reach
+  thresholds through `dpp-rules`, which is `no_std` and re-exported by `dpp-plugin-sdk`.
 - You need the DPP data model or port traits → `dpp-domain`.
 - You need the Wasm plugin ABI → `dpp-plugin-traits` / `dpp-plugin-sdk`.
 - You need field-level validation rules (REACH, fibre percentages, voltage ranges) → `dpp-rules`.
@@ -325,7 +331,7 @@ step-by-step guide. Short version:
 |---|---|
 | `dpp-domain` | Domain types and port traits; `dpp-calc` does not depend on it |
 | `dpp-rules` | Field-level validation rules and regulatory thresholds (`no_std`, zero-dep). **`dpp-calc` depends on it**, never the reverse: a threshold like the Art. 8 minimum shares has one home, and it is there, because the Wasm sector plugins reach it too and cannot reach this crate. What `dpp-calc` adds on top is the ruleset identity, the effective period and the receipt — none of which a `no_std` crate can produce |
-| `dpp-plugin-sdk` | Sector plugins import `dpp-calc` for calculator functions (Phase 2) |
+| `dpp-plugin-sdk` | Does **not** re-export this crate, and is not planned to — see "When NOT to use this crate". Plugins reach regulatory thresholds through `dpp-rules` |
 | `dpp-engine` (BSL-1.1) | Stores `CalculationReceipt`, serves the verification endpoint, manages `FactorProvider` lifecycle |
 
 ---

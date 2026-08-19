@@ -142,6 +142,20 @@ impl CalculationReceipt {
     /// Pass these bytes to the vault's signing infrastructure, then call
     /// [`seal_with_jws`](CalculationReceipt::seal_with_jws) with the resulting
     /// JWS to produce the final sealed receipt.
+    ///
+    /// # What is reproducible, and what is not
+    ///
+    /// These bytes include `receipt_id`, which is a UUIDv7 minted from the wall
+    /// clock — so **re-running a calculation does not reproduce these bytes**,
+    /// and two receipts for the same determination will not carry the same
+    /// signature.
+    ///
+    /// That is not what an auditor checks. Re-verification compares
+    /// `input_hash`, `output_hash`, `ruleset_id`, `ruleset_version`,
+    /// `assessed_as_of` and the factor-dataset fields — all of which are
+    /// functions of the determination and reproduce exactly. The signature
+    /// attests that *this* receipt was issued by the operator, not that the
+    /// determination is the only one that could have been issued.
     pub fn canonical_bytes_for_signing(&self) -> Result<Vec<u8>, CalcError> {
         let mut v =
             serde_json::to_value(self).map_err(|e| CalcError::CanonicalizeError(e.to_string()))?;

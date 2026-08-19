@@ -1,6 +1,12 @@
 //! Benchmarks for the dpp-calc compute kernels: cradle-to-gate CO₂e and the
-//! simplified repairability heuristic. These are the hot paths invoked on every
-//! passport publish that requests a calculated metric.
+//! simplified repairability heuristic.
+//!
+//! These are **not** on any hot path — nothing in either repository invokes
+//! them. This file previously described them as "the hot paths invoked on every
+//! passport publish that requests a calculated metric", which would have told a
+//! reader looking for the wiring that it existed. The benchmarks are still worth
+//! keeping: they bound the cost of a bill-of-materials walk before a caller
+//! commits to one on a publish path.
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_calc::co2e::{self, Co2eInputs, CradleToGateRuleset, MaterialFootprint};
