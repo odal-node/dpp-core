@@ -42,6 +42,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         published_at: None,
+        placed_on_market_date: None,
         // Derived from the sector, not hardcoded. Disclosure is sourced from the
         // declared schema version, so a fixture claiming a version that never
         // held its fields would classify none of them — which is a fixture

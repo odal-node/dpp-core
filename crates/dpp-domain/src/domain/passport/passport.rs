@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -93,6 +93,28 @@ pub struct Passport {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
+    /// The date this product was placed on the EU market — the regulated
+    /// triggering event that fixes **which law governs it**.
+    ///
+    /// Distinct from every other date on this struct, all of which describe
+    /// what *this record* did: `created_at`, `updated_at` and `published_at`
+    /// are passport lifecycle, and none of them selects a rule. Staged EU
+    /// obligations attach at placing on the market and do not move afterwards —
+    /// a product lawfully placed on the market in 2030 does not acquire a 2031
+    /// minimum by being reassessed in 2033 — so a determination made against
+    /// today's date is wrong for every product not placed on the market today.
+    ///
+    /// Envelope-level rather than per-sector because the triggering event is
+    /// not sector-specific: ESPR attaches its duties at placing on the market
+    /// for every product group, as do Regulation (EU) 2023/1542 Art. 7, 8 and
+    /// 10 for batteries. It lived only on `BatteryData` before, which made the
+    /// governing law underivable for the other eleven sectors.
+    ///
+    /// `None` means the date was not declared, which is **not** a licence to
+    /// substitute the current date. A determination that depends on it has no
+    /// answer, and saying so is the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed_on_market_date: Option<NaiveDate>,
     /// Semantic version of the *sector* schema used to validate this record.
     ///
     /// Scoped to `sector_data` only — there is no equivalent version for the
@@ -360,6 +382,32 @@ impl Passport {
             errors.push(FieldError {
                 field: "/sector".to_owned(),
                 message: "sector must match sector_data's sector".to_owned(),
+            });
+        }
+
+        // Two fields carry the placing-on-market date: this envelope one, which
+        // every sector has and which a determination reads, and battery's own,
+        // which shipped first and is in released schemas. They must not
+        // disagree — the date selects which law binds the product, so two
+        // answers is two different sets of obligations, and nothing downstream
+        // can tell which was meant.
+        //
+        // Not a duplicated *regulated* field: `placedOnMarketDate` is absent
+        // from the Commission's battery data-point guidance. It was added to
+        // drive the Art. 8 phase determination, which is why promoting it here
+        // costs no Annex XIII coverage.
+        if let Some(SectorData::Battery(battery)) = &self.sector_data
+            && let (Some(envelope), Some(sector)) =
+                (self.placed_on_market_date, battery.placed_on_market_date)
+            && envelope != sector
+        {
+            errors.push(FieldError {
+                field: "/sectorData/placedOnMarketDate".to_owned(),
+                message: format!(
+                    "placed_on_market_date disagrees with the passport's own \
+                     ({sector} vs {envelope}); the date fixes which law governs \
+                     this battery, so it cannot have two values"
+                ),
             });
         }
 

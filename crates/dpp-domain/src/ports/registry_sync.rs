@@ -330,6 +330,7 @@ mod tests {
             qr_code_url: Some("https://id.odal-node.io/01/09506000134352".into()),
             jws_signature: Some("eyJ0eXAiOiJKV1QifQ.payload.sig".into()),
             published_at: Some(Utc::now()),
+            placed_on_market_date: None,
             schema_version: "1.1.0".into(),
             retention_locked: true,
             operator_identifier: Some("did:web:acme.example.com".into()),

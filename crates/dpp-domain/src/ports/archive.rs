@@ -256,6 +256,7 @@ mod tests {
             status: PassportStatus::Published,
             jws_signature: Some("eyJ0eXAiOiJKV1QifQ.test.signature".into()),
             published_at: Some(Utc::now()),
+            placed_on_market_date: None,
             retention_locked: true,
             ..crate::test_support::sample_passport()
         }

@@ -67,6 +67,7 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
         created_at: now,
         updated_at: now,
         published_at: None,
+        placed_on_market_date: None,
         schema_version: schema_version.into(),
         retention_locked: false,
         version: 1,
