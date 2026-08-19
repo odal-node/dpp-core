@@ -12,6 +12,8 @@
 //! are domain values, not ports, and live in [`crate::domain::compliance`].
 //! They are re-exported here so existing paths keep resolving.
 
+use chrono::NaiveDate;
+
 use crate::domain::sector::SectorData;
 
 pub use crate::domain::compliance::{
@@ -44,6 +46,22 @@ pub use crate::domain::compliance::{
 /// must return [`ComplianceErrorKind::InvalidInput`] rather than panicking if
 /// handed another's — a routing mistake in a host should be reportable, not
 /// fatal.
+///
+/// # The governing-law date
+///
+/// `compute` takes the date the product was placed on the EU market, because a
+/// strategy that computes anything must first decide *which rule applies*, and
+/// that is a function of this date and never of today's. A strategy given only
+/// the payload would have to read a clock to answer, and would then answer
+/// differently on a Tuesday in 2031 than it did the day before, for a product
+/// that had not changed.
+///
+/// It is `Option` because the date is a declaration a passport may omit, and
+/// `None` is a real answer with a real consequence: the governing rule is
+/// undetermined. It is **not** an invitation to substitute the current date.
+///
+/// The passthrough strategies ignore it, correctly — they compute nothing, so
+/// there is no rule for them to select.
 pub trait ComplianceStrategy: Send + Sync {
     /// The catalog key of the sector this strategy handles.
     ///
@@ -52,11 +70,16 @@ pub trait ComplianceStrategy: Send + Sync {
     /// case the open sector axis exists to allow.
     fn sector_key(&self) -> &str;
 
-    /// Compute a `ComplianceResult` from raw sector data.
+    /// Compute a `ComplianceResult` from raw sector data, under the law in
+    /// force on `law_in_force_on`.
     ///
     /// The passthrough implementation returns manufacturer-supplied values verbatim.
     /// A premium implementation runs calculations against EU methodology databases.
-    fn compute(&self, data: &SectorData) -> Result<ComplianceResult, ComplianceError>;
+    fn compute(
+        &self,
+        data: &SectorData,
+        law_in_force_on: Option<NaiveDate>,
+    ) -> Result<ComplianceResult, ComplianceError>;
 }
 
 /// Registry that dispatches to the correct `ComplianceStrategy` by sector.
@@ -67,7 +90,9 @@ pub trait ComplianceStrategy: Send + Sync {
 /// No `dpp-domain` code changes are required to swap implementations —
 /// simply wire a different `Arc<dyn ComplianceRegistry>` at startup.
 pub trait ComplianceRegistry: Send + Sync {
-    /// Run compliance calculation for the given sector and data.
+    /// Run compliance calculation for the given sector and data, under the law
+    /// in force on `law_in_force_on` — see [`ComplianceStrategy::compute`],
+    /// whose contract for that date this passes through unchanged.
     ///
     /// Returns `ComplianceErrorKind::UnknownSector` if no strategy is registered
     /// for the requested sector.
@@ -75,5 +100,6 @@ pub trait ComplianceRegistry: Send + Sync {
         &self,
         sector_key: &str,
         data: &SectorData,
+        law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError>;
 }

@@ -13,6 +13,8 @@
 
 use std::collections::HashMap;
 
+use chrono::NaiveDate;
+
 use super::passthrough_strategies::{PassthroughBatteryStrategy, PassthroughTextileStrategy};
 use crate::{
     domain::sector::SectorData,
@@ -101,9 +103,10 @@ impl ComplianceRegistry for PassthroughRegistry {
         &self,
         sector_key: &str,
         data: &SectorData,
+        law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError> {
         match self.strategies.get(sector_key) {
-            Some(strategy) => strategy.compute(data),
+            Some(strategy) => strategy.compute(data, law_in_force_on),
             None => Ok(ComplianceResult::passthrough()),
         }
     }
@@ -164,7 +167,7 @@ mod tests {
             // now it takes the bare-passthrough fallback.
             (Sector::Electronics, battery_data()),
         ] {
-            let result = registry.compute(sector.catalog_key(), &data).unwrap();
+            let result = registry.compute(sector.catalog_key(), &data, None).unwrap();
             assert_eq!(
                 result.compliance_status,
                 ComplianceStatus::PassthroughNoValidation,
@@ -194,13 +197,15 @@ mod tests {
         assert_eq!(registry.registered_sectors(), vec!["battery", "textile"]);
 
         // Textile has a strategy: its declared metrics are lifted.
-        let textile = registry.compute("textile", &textile_data()).unwrap();
+        let textile = registry.compute("textile", &textile_data(), None).unwrap();
         assert_eq!(textile.co2e_score, Some(8.5));
         assert_eq!(textile.recycled_content_pct, Some(30.0));
         assert_eq!(textile.repairability_index, Some(7.5));
 
         // Electronics has none: served, with nothing lifted.
-        let electronics = registry.compute("electronics", &battery_data()).unwrap();
+        let electronics = registry
+            .compute("electronics", &battery_data(), None)
+            .unwrap();
         assert_eq!(electronics.co2e_score, None);
         assert_eq!(
             electronics.compliance_status,
@@ -208,7 +213,7 @@ mod tests {
         );
 
         // A sector this build has never heard of is served too.
-        let unknown = registry.compute("quantum-widget", &battery_data());
+        let unknown = registry.compute("quantum-widget", &battery_data(), None);
         assert!(
             unknown.is_ok(),
             "an unmodelled sector must not be an error here"
@@ -227,7 +232,11 @@ mod tests {
             fn sector_key(&self) -> &str {
                 "textile"
             }
-            fn compute(&self, _: &SectorData) -> Result<ComplianceResult, ComplianceError> {
+            fn compute(
+                &self,
+                _: &SectorData,
+                _: Option<NaiveDate>,
+            ) -> Result<ComplianceResult, ComplianceError> {
                 Ok(ComplianceResult {
                     co2e_score: Some(42.0),
                     ..ComplianceResult::passthrough()
@@ -239,7 +248,7 @@ mod tests {
         registry.register(Box::new(AlwaysFortyTwo));
         assert_eq!(
             registry
-                .compute("textile", &textile_data())
+                .compute("textile", &textile_data(), None)
                 .unwrap()
                 .co2e_score,
             Some(42.0),
@@ -257,7 +266,7 @@ mod tests {
     fn an_empty_registry_falls_back_for_everything() {
         let registry = PassthroughRegistry::empty();
         assert!(registry.registered_sectors().is_empty());
-        let result = registry.compute("textile", &textile_data()).unwrap();
+        let result = registry.compute("textile", &textile_data(), None).unwrap();
         assert_eq!(result.co2e_score, None);
         assert_eq!(
             result.compliance_status,
