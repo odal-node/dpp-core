@@ -23,6 +23,7 @@ use dpp_rules::batteries::recycled_content::RecycledContentInput;
 /// averaged into one — see the note on `ComplianceResult::recycled_content_pct`
 /// in the domain crate for what that produces.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecycledContentInputs {
     /// Share of recycled cobalt in the active materials, percent.
     pub cobalt_pct: Option<f64>,

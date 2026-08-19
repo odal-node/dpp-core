@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// `0` = criterion not met, `1` = criterion partially met, `2` = criterion
 /// fully met. Values outside `[0, 2]` are rejected at calculation time.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityInputs {
     /// Ease of product disassembly (fastener types, tools required, destructive entry).
     /// 0 = non-destructive entry not possible; 1 = possible with non-standard tools;

@@ -31,7 +31,7 @@ use crate::receipt::{CalculationReceipt, jcs_hash};
 /// Use [`Co2eResult::declared_stages`] to understand which stages a result covers.
 /// The cradle-to-gate [`calculate`] covers `RawMaterials` + `Production`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum LifecycleStage {
     /// Extraction and processing of raw materials (cradle).
     RawMaterials,
@@ -47,6 +47,7 @@ pub enum LifecycleStage {
 
 /// CO₂e contribution for one material line — the audit breakdown that backs the total.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MaterialLineResult {
     /// Mass of this material, in kg (echoed from input for self-documenting receipts).
     pub mass_kg: f64,
@@ -58,6 +59,7 @@ pub struct MaterialLineResult {
 
 /// Transparent breakdown of the footprint plus a proof-of-calculation receipt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Co2eResult {
     /// Embodied emissions from materials, kg CO₂e.
     pub material_co2e_kg: f64,

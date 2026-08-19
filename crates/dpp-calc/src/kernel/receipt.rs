@@ -24,6 +24,7 @@ pub use super::hashing::{input_hash, jcs_hash};
 ///
 /// Intended to be stored alongside the computed value in the proof-bound store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CalculationReceipt {
     /// Unique receipt identifier (UUIDv7, time-sortable).
     pub receipt_id: Uuid,

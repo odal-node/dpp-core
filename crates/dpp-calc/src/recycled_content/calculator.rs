@@ -10,6 +10,7 @@ use crate::receipt::{CalculationReceipt, jcs_hash};
 
 /// One metal whose declared share is below the governing minimum.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MetalShortfall {
     /// `"cobalt"`, `"lithium"`, `"nickel"` or `"lead"`.
     pub metal: String,
@@ -21,6 +22,7 @@ pub struct MetalShortfall {
 
 /// The determination, plus the receipt that makes it re-checkable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecycledContentResult {
     /// Metals below the governing minimum. Empty means every **declared** share
     /// meets it — not that every share was declared. An undeclared share is a

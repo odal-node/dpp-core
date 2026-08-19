@@ -103,7 +103,7 @@ When a product undergoes remanufacturing, repurposing, or preparation for reuse,
 
 ### Evidence Dossiers
 
-A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a `dpp-engine` feature: dossiers are generated and persisted by the node, and checked via its API or the `odal verify` CLI command. Core contributes the primitives this depends on — `dpp-crypto`'s Ed25519/JWS, `dpp-vc`'s credentials and DID documents, and the domain types the dossier snapshots.
+A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a hosting-side feature, not part of this library: generating a dossier needs persistence and an audit trail, and checking one needs to fetch. What this crate contributes are the primitives that make either possible — `dpp-crypto`'s Ed25519/JWS, `dpp-vc`'s credentials and DID documents, and the domain types a dossier snapshots.
 
 ### Schema Validation
 

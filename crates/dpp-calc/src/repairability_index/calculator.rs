@@ -18,6 +18,7 @@ pub enum RepairabilityClass {
 
 /// Result of an index calculation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityIndexResult {
     /// The index R, on the regulation's 1,00–5,00 scale.
     pub index: f64,

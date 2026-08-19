@@ -15,6 +15,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **Every serialisable type in `dpp-calc` now uses camelCase on the wire.**
+  Field names change across the crate; `LifecycleStage`'s *values* move with them
+  (`raw_materials` → `rawMaterials`), and `Effectivity`'s struct-variant fields
+  via `rename_all_fields`.
+
+  The crate was snake_case throughout, against a house convention of camelCase
+  everywhere a value reaches a database column, an API response or an event
+  envelope. The sharpest case is `CalculationReceipt`: it is embedded into
+  `ComplianceResult::receipt`, which lands inside the passport document — itself
+  camelCase, persisted to JSONB, signed and served — so a receipt would have been
+  a snake_case island inside it.
+
+  This had to change now rather than later. The field names feed `input_hash`,
+  `output_hash` and `canonical_bytes_for_signing`, so the shape locks the moment
+  the first receipt is issued. None has been.
+
 - **`ComplianceStrategy::compute` and `ComplianceRegistry::compute` now take the
   governing-law date.** Both gain a trailing `law_in_force_on: Option<NaiveDate>`.
 

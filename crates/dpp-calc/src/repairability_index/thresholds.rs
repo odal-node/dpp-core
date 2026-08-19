@@ -8,6 +8,7 @@ use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVe
 /// Parameter weights for the index. Annex IV point 5:
 /// `R = SDD*0,25 + SF*0,15 + ST*0,15 + SSP*0,15 + SSU*0,15 + SRI*0,15`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IndexWeights {
     pub disassembly_depth: f64,
     pub fasteners: f64,
@@ -22,6 +23,7 @@ pub struct IndexWeights {
 /// Annex IV point 5 gives two sets: one for products without a hinge or
 /// mechanical display folding mechanism, one for products with. Each sums to 1.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PartWeights {
     pub battery: f64,
     pub display_assembly: f64,
@@ -34,6 +36,7 @@ pub struct PartWeights {
 
 /// Minimum index value for each repairability class. Annex II, Table 4.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IndexClassBoundaries {
     /// A: R ≥ 4,00.
     pub a: f64,
