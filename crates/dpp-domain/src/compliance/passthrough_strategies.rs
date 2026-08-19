@@ -35,6 +35,8 @@
 //! | `recycled_content_pct` | — see below | `recycledContentPct` |
 //! | `repairability_index` | not modelled | `repairScore` |
 
+use chrono::NaiveDate;
+
 use crate::domain::sector::SectorData;
 use crate::ports::compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceResult, ComplianceStrategy,
@@ -68,7 +70,14 @@ impl ComplianceStrategy for PassthroughBatteryStrategy {
         "battery"
     }
 
-    fn compute(&self, data: &SectorData) -> Result<ComplianceResult, ComplianceError> {
+    /// The governing-law date is ignored, and that is the correct behaviour for
+    /// a passthrough: selecting a rule is what the date is for, and this
+    /// selects none.
+    fn compute(
+        &self,
+        data: &SectorData,
+        _law_in_force_on: Option<NaiveDate>,
+    ) -> Result<ComplianceResult, ComplianceError> {
         let SectorData::Battery(battery) = data else {
             return Err(wrong_sector("battery", data));
         };
@@ -103,7 +112,13 @@ impl ComplianceStrategy for PassthroughTextileStrategy {
         "textile"
     }
 
-    fn compute(&self, data: &SectorData) -> Result<ComplianceResult, ComplianceError> {
+    /// Ignores the governing-law date, for the reason given on
+    /// [`PassthroughBatteryStrategy::compute`].
+    fn compute(
+        &self,
+        data: &SectorData,
+        _law_in_force_on: Option<NaiveDate>,
+    ) -> Result<ComplianceResult, ComplianceError> {
         let SectorData::Textile(textile) = data else {
             return Err(wrong_sector("textile", data));
         };
@@ -158,7 +173,7 @@ mod tests {
     #[test]
     fn textile_passthrough_lifts_declared_metrics_verbatim() {
         let result = PassthroughTextileStrategy
-            .compute(&textile())
+            .compute(&textile(), None)
             .expect("textile data");
         assert_eq!(result.co2e_score, Some(8.5));
         assert_eq!(result.recycled_content_pct, Some(42.0));
@@ -182,7 +197,7 @@ mod tests {
     #[test]
     fn battery_passthrough_leaves_recycled_content_unset() {
         let result = PassthroughBatteryStrategy
-            .compute(&battery())
+            .compute(&battery(), None)
             .expect("battery data");
         assert!(
             result.recycled_content_pct.is_none(),
@@ -205,7 +220,7 @@ mod tests {
     #[test]
     fn a_strategy_refuses_another_sectors_data() {
         let err = PassthroughBatteryStrategy
-            .compute(&textile())
+            .compute(&textile(), None)
             .expect_err("battery strategy must refuse textile data");
         assert_eq!(err.kind, ComplianceErrorKind::InvalidInput);
         assert!(err.message.contains("textile"), "{}", err.message);

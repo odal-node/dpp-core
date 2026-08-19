@@ -4,6 +4,7 @@ use chrono::NaiveDate;
 
 use crate::assessability::Assessability;
 use crate::co2e::CradleToGateRuleset;
+use crate::recycled_content::{Art8Phase1Ruleset, Art8Phase2Ruleset, RecycledContentRuleset};
 use crate::repairability::thresholds::{
     DisplaysRuleset, LaptopRuleset, RepairabilityRuleset, SimplifiedRepairabilityHeuristic,
     WashingMachineRuleset,
@@ -24,7 +25,65 @@ pub fn all_rulesets() -> &'static [&'static dyn Ruleset] {
         &WashingMachineRuleset,
         &CradleToGateRuleset,
         &Eu2023_1669Ruleset,
+        &Art8Phase1Ruleset,
+        &Art8Phase2Ruleset,
     ]
+}
+
+/// Return the Art. 8 recycled-content ruleset governing `product_category` for a
+/// battery placed on the EU market on `law_in_force_on`, or the reason there
+/// isn't one.
+///
+/// `product_category` is the Art. 8 scope bucket, not the passport's
+/// `batteryType`: map one to the other with
+/// [`art8_category_for`](dpp_rules::batteries::recycled_content::art8_category_for),
+/// which needs the energy capacity as well as the type because the industrial
+/// limb is scoped at 2 kWh. The two keys this table answers are
+/// `"industrial-ev-sli"` and `"lmt"`; a portable battery is
+/// [`OutOfScope`](Assessability::OutOfScope), which Art. 8 genuinely is for it.
+///
+/// The LMT rows are the reason this cannot be a date comparison alone. Art. 8(2)
+/// does not name LMT batteries, so an LMT battery placed on the market in 2032
+/// resolves to `NotYetInForce { applies_from: 2036-08-18 }` — not to Art. 8(2)
+/// with an empty shortfall list, which would report a rule as satisfied that
+/// never applied.
+pub fn resolve_recycled_content(
+    product_category: &str,
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static dyn RecycledContentRuleset> {
+    let all: &[(&str, &'static dyn RecycledContentRuleset)] = &[
+        ("industrial-ev-sli", &Art8Phase1Ruleset),
+        ("industrial-ev-sli", &Art8Phase2Ruleset),
+        // Art. 8(3) is the first provision to reach LMT batteries — there is
+        // deliberately no Phase 1 row here.
+        ("lmt", &Art8Phase2Ruleset),
+    ];
+
+    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
+
+    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
+        return Assessability::Assessed(*r);
+    }
+
+    // Before any phase binds, the actionable answer is the soonest start date;
+    // after the last one there is none, because Phase 2 is open-ended.
+    let mut soonest: Option<(&'static str, NaiveDate)> = None;
+    for (_, r) in rows() {
+        if let Effectivity::InForce { from, .. } = r.effectivity()
+            && law_in_force_on < *from
+            && soonest.is_none_or(|(_, best)| *from < best)
+        {
+            soonest = Some((r.id().0, *from));
+        }
+    }
+
+    match soonest {
+        Some((ruleset_id, applies_from)) => Assessability::NotYetInForce {
+            ruleset_id,
+            applies_from,
+        },
+        None => Assessability::OutOfScope,
+    }
 }
 
 /// Return the repairability ruleset governing `product_category` for a product

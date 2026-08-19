@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// One material line of the bill of materials, with its embodied-emissions factor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MaterialFootprint {
     /// Mass of this material in the finished product, in kilograms.
     pub mass_kg: f64,
@@ -14,6 +15,7 @@ pub struct MaterialFootprint {
 
 /// Inputs for a single product's cradle-to-gate footprint.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Co2eInputs {
     /// Bill of materials with per-material emission factors.
     pub materials: Vec<MaterialFootprint>,

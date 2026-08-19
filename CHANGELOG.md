@@ -13,6 +13,158 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Every serialisable type in `dpp-calc` now uses camelCase on the wire.**
+  Field names change across the crate; `LifecycleStage`'s *values* move with them
+  (`raw_materials` → `rawMaterials`), and `Effectivity`'s struct-variant fields
+  via `rename_all_fields`.
+
+  The crate was snake_case throughout, against a house convention of camelCase
+  everywhere a value reaches a database column, an API response or an event
+  envelope. The sharpest case is `CalculationReceipt`: it is embedded into
+  `ComplianceResult::receipt`, which lands inside the passport document — itself
+  camelCase, persisted to JSONB, signed and served — so a receipt would have been
+  a snake_case island inside it.
+
+  This had to change now rather than later. The field names feed `input_hash`,
+  `output_hash` and `canonical_bytes_for_signing`, so the shape locks the moment
+  the first receipt is issued. None has been.
+
+- **`ComplianceStrategy::compute` and `ComplianceRegistry::compute` now take the
+  governing-law date.** Both gain a trailing `law_in_force_on: Option<NaiveDate>`.
+
+  A strategy that computes anything must first decide *which rule applies*, and
+  that is a function of the date the product was placed on the EU market — never
+  of today's. Given only the payload, a strategy would have to read a clock, and
+  would then answer differently on a Tuesday in 2031 than it did the day before,
+  for a product that had not changed. Every determination this crate can make is
+  phased: Art. 8(2) from 2031, Art. 8(3) from 2036, Art. 10(5) from a date that
+  does not exist yet.
+
+  `Option`, because the date is a declaration a passport may omit, and `None` is
+  a real answer with a real consequence — the governing rule is undetermined. It
+  is not licence to substitute the current date.
+
+  **Migration:** pass `passport.placed_on_market_date` at each call site. Both
+  passthrough strategies ignore the parameter and are unaffected in behaviour;
+  they compute nothing, so there is no rule for them to select.
+
+- **`Passport` carries `placed_on_market_date: Option<NaiveDate>`.** Additive on
+  the wire (`skip_serializing_if`), but `Passport` is not `#[non_exhaustive]`, so
+  **every struct literal must be updated**.
+
+  It lived only on `BatteryData`, which made the governing law underivable for
+  the other eleven sectors — and the triggering event is not sector-specific:
+  ESPR attaches its duties at placing on the market for every product group, as
+  do Regulation (EU) 2023/1542 Art. 7, 8 and 10 for batteries. It is envelope
+  lifecycle data, like `published_at`, and unlike `published_at` it selects a
+  rule.
+
+  `BatteryData.placedOnMarketDate` stays — it is in released schemas — and
+  `Passport::validate` now **refuses a passport whose two values disagree**. The
+  date decides which law binds the product, so two answers is two different sets
+  of obligations and nothing downstream could tell which was meant. It is not a
+  duplicated *regulated* field: `placedOnMarketDate` is absent from the
+  Commission's battery data-point guidance, so promoting it costs no Annex XIII
+  coverage.
+
+### Added
+
+- **`dpp_calc::recycled_content` — the Art. 8 minimum-recycled-share
+  determination, with a ruleset and a receipt.**
+
+  `dpp-rules` already held the thresholds, the phase dates and the comparison,
+  and the battery plugin already called them. What it cannot produce — being
+  `no_std` and zero-dependency by contract — is the part a notified body reads:
+  a ruleset id and version, an `Effectivity`, a `RegulatoryBasis`, and a
+  `CalculationReceipt`. Until now those four were available only to a two-term
+  CO₂e sum that nothing calls, while the Art. 8 finding, which runs on real
+  data, carried none of them.
+
+  Two rulesets, and the difference between them is not only a date.
+  `Art8Phase1Ruleset` (Art. 8(2), from 18 Aug 2031) is `closed` the day
+  `Art8Phase2Ruleset` (Art. 8(3), from 18 Aug 2036) opens, so exactly one governs
+  any date rather than the answer depending on table order — asserted by a test
+  over five dates. And **Art. 8(2) never names LMT batteries**, so
+  `resolve_recycled_content` gives them no Phase 1 row at all: an LMT battery
+  placed on the market in 2032 resolves to `NotYetInForce { applies_from:
+  2036-08-18 }`, not to Art. 8(2) with an empty shortfall list, which would
+  report a rule as satisfied that never applied to it.
+
+  The comparison is **not** reimplemented. `dpp-calc` now depends on `dpp-rules`
+  and each ruleset delegates to that crate's phase function, so a threshold has
+  one home whether it is reached from a Wasm plugin or from here — guarded by a
+  test that runs both paths over a matrix of declared shares and asserts they
+  agree, because a divergence would otherwise be invisible and would make an
+  operator's finding depend on which door it came through.
+
+  Both phases are `NotYetEffective` for a battery placed on the market today.
+  That is the correct answer rather than a gap, and it is derived from each
+  ruleset's own `Effectivity`, so it turns over on its own when the date arrives.
+
+- **`sector-battery` now reads the two `dpp-rules` battery modules it never
+  called.** Both were already reachable through `dpp-plugin-sdk`, which
+  re-exports all of `dpp-rules`, and neither needed a new dependency.
+
+  **The Commission's per-category data-point table.** A passport missing content
+  its category makes mandatory is refused at first publish, by a gate private to
+  `dpp-domain`. Nothing said so earlier, so an operator learned it by being
+  refused. The plugin now reports it at create as **one** summary finding naming
+  the absent fields — one per field would put dozens of advisories into a
+  document that is stored, signed and served, and the publish refusal is where
+  per-field precision is worth its size.
+
+  **And the half of that table nothing checked at all.** `fields_not_applicable`
+  had no callers anywhere: a field the guidance marks *"not to be
+  filled/displayed"* — `carbonFootprintClass`, `dueDiligenceUrl`,
+  `ratedCapacityAh`, and `capacityThresholdForExhaustionPct` on LMT and
+  industrial batteries — published cleanly. A mandatory-fields check can never
+  notice one, because it is looking for absence.
+
+  **Annex VII Part A's two disjoint parameter sets.** `degradation.rs` had no
+  callers either. An electric-vehicle battery reports state of certified energy
+  and nothing else; stationary storage and LMT batteries report a five-parameter
+  list. Declaring the wrong one is not a missing field, so nothing saw it.
+
+  Portable and SLI batteries produce none of these findings: the guidance covers
+  three categories and `dpp-rules` answers `Unknown` for the others rather than
+  guessing. That hole stays open and stays deliberate.
+
+### Fixed
+
+- **`sector-battery` no longer reports a mean recycled-content percentage.**
+  The plugin averaged whichever of cobalt, lithium, nickel and lead were
+  declared and emitted the result as the flat `recycledContentPct` metric.
+  Art. 8(2) and 8(3) set a **separate minimum per metal**, over two different
+  measurement bases — for cobalt, lithium and nickel the share is measured "in
+  active materials"; for lead it is the share "present in the battery". A mean
+  conflates four thresholds and two denominators into one figure the regulation
+  never asks for, and a reader takes it for a compliance number.
+
+  `PassthroughBatteryStrategy` already declined to compute this figure, for
+  these reasons, in a doc comment on the type. The two Apache-2.0 paths
+  therefore disagreed about the same field — and because the plugin path wins
+  wherever a battery plugin is loaded, the considered answer was the one that
+  never ran. The metric is now unset on both paths; the four per-metal values
+  continue to travel under `extra.recycledContentByMetal`, where they keep their
+  own thresholds.
+
+- **`just build-plugin` no longer writes outside this repository.** It compiled
+  a plugin and then copied the artifact into a hard-coded directory in a sibling
+  checkout, naming it. Building is this repo's business; installing the result
+  wherever a host loads plugins from is that host's. The recipe now builds and
+  prints the artifact path.
+
+  It also now fails when the expected artifact is missing rather than assuming
+  the build produced one. The sector plugins share a single Cargo workspace, so
+  cargo writes to `plugins/target` — never to `plugins/sector-<name>/target`,
+  which earlier layouts populated and which stale copies still sit in. Anything
+  globbing the per-crate path for `*.wasm` finds a months-old binary and
+  succeeds.
+
+## [0.18.0] - 2026-08-18
+
 ### Added
 
 - **A JAdES conformance oracle.** `just jades-oracle` (and the `jades-oracle.yml`
@@ -69,114 +221,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and **stays parseable by a plain RFC 7515 library** — V1.2.1 suppressed
   V1.1.1's blanket `crit` requirement for exactly that reason.
 
-### Breaking
 
-- **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
-  now, so `PassthroughRegistry` as a literal no longer compiles — use
-  `PassthroughRegistry::new()` (the two Apache-2.0 strategies registered) or
-  `::empty()` (none, everything on the fallback). It also stops being
-  `UnwindSafe`, because `Box<dyn ComplianceStrategy>` is not; a caller that held
-  one across `catch_unwind` needs `AssertUnwindSafe`.
-
-  Detected by `cargo semver-checks` as `unit_struct_changed_kind` and
-  `auto_trait_impl_removed`.
-
-- **`SealRequest` and `SealCapabilities` gain fields**, which breaks exhaustive
-  struct literals. `SealRequest` adds `conformance_level` and `envelope`;
-  `SealCapabilities` adds `supported_levels` and `supported_envelopes`. Both new
-  `SealRequest` fields have serde defaults, so **the wire format is
-  backward-compatible** — only Rust construction changes. Adding `..Default` is
-  not available here; name the fields.
-
-  Detected by `cargo semver-checks` as `constructible_struct_adds_field`.
-
-- **`KeyStore::open` refuses a store that predates a current security property.**
-  It previously accepted every legacy shape silently, which meant an attacker who
-  could write the file could *choose* the weaker shape and be opened without
-  complaint. The three shapes, each now named in the error:
-
-  - **legacy SHA-256 KDF** — no salt, no iterations;
-  - **no envelope HMAC** — every plaintext field unauthenticated, including
-    `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
-    from the published DID document. A store in this shape could have a
-    revocation flipped back and a revoked key republished, undetected;
-  - **unbound records** (pre-V4) — see below.
-
-  **Nothing is stranded and nothing was removed.** `KeyStore::open_and_migrate`
-  opens all three, upgrades them in place, and then re-opens *strictly* — so a
-  migration that did not finish the job is reported rather than papered over. The
-  legacy KDF is still there and still readable; what changed is that reaching it
-  now requires a caller who asked for the migration door by name.
-
-  Both production entry points in the platform already call `open_and_migrate`.
-  Every remaining `KeyStore::open` call site creates a fresh store, which is
-  written in the current format by construction.
-
-- **Store format V4 binds each record's ciphertext to its own fingerprint** via
-  AES-GCM associated data. Records previously carried no AAD, so a record's
-  encrypted private key could be grafted onto another record's plaintext —
-  its `verifying_key_hex`, its `fingerprint`, its `revoked` flag — and would
-  decrypt cleanly. The envelope HMAC also catches that, and both are wanted: the
-  HMAC covers the map in aggregate, the binding covers each record on its own,
-  and a control that only works in aggregate fails differently from one that
-  works per record.
-
-  Bound to the **fingerprint**, not the map key. `archive_key` and
-  `rotate_inner` copy a record to a new map key *without re-encrypting it*, so
-  associated data derived from the map key would make every archived key
-  undecryptable the moment it was archived.
-
-
-- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
-  validation has three outcomes, not two: a seal passes, fails, or is
-  **indeterminate** — verification did not fail, but there was not enough
-  information to decide. That is the ordinary answer whenever material has to be
-  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
-  anchor unresolvable), and it is the one carrying the most operational meaning:
-  *ask again later*, not *reject this passport*.
-
-  A boolean could not hold it, and both collapses are wrong. Indeterminate
-  reported as invalid marks a sound passport non-compliant; reported as valid
-  claims a check that never completed.
-
-  `SealIndication` names the three after the status indications in **ETSI EN 319
-  102-1**, so a verdict maps onto one from any conformant validator without a
-  translation step that could lose its meaning. `SealChecks` records *what was
-  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
-  and previously `valid: true` from either was one value.
-
-  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
-  question is "may a compliance decision rest on this", which is almost always
-  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
-  placeholder — a named method because the easy mistake is reading a pass over a
-  bare signature check against a self-signed certificate as a qualified seal.
-  Match on `indication` directly only where the three outcomes genuinely differ.
-
-  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
-  than `valid: false`: nothing about a placeholder is checked, so a negative
-  verdict was one it had not reached either.
-
-- **`dpp-registry`'s modules moved to the crate root**, so the paths are
-  `dpp_registry::payload` rather than `dpp_registry::registry::payload`. The
-  crate's `src/` held exactly one directory, named for the crate, and every path
-  through it stuttered. A `src/` subdirectory is named for a concern that could
-  have a sibling; a single-concern crate puts its modules at the root with only
-  `lib.rs` above them.
-
-  **Most consumers are unaffected.** Every type was already re-exported at the
-  crate root and the root re-exports are unchanged, so `use dpp_registry::
-  RegistryStatusCode` — the form the README documents — is untouched. Only an
-  import naming the `registry` module explicitly needs the segment dropped.
-
-  Deferred once on the grounds that a path rename should not spend a breaking
-  release of its own. It is not spending one here: the release was already
-  breaking.
-
-  Detected by `cargo semver-checks` as `module_missing`, `enum_missing` and
-  `struct_missing` — all three naming the old nested path, none naming a type
-  that stopped existing.
-
-### Added
 
 - **A GS1 syntax oracle over every Digital Link we build.** We wrote this GS1
   Digital Link implementation, and every test of it was written by whoever wrote
@@ -434,6 +479,113 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so a consumer cannot enumerate them — and the conformance kit must, in order
   to ask an adapter for a profile it does *not* advertise. A variant added later
   is deliberately not covered until it is added here on purpose.
+
+### Breaking
+
+- **`PassthroughRegistry` is no longer a unit struct.** It holds a strategy map
+  now, so `PassthroughRegistry` as a literal no longer compiles — use
+  `PassthroughRegistry::new()` (the two Apache-2.0 strategies registered) or
+  `::empty()` (none, everything on the fallback). It also stops being
+  `UnwindSafe`, because `Box<dyn ComplianceStrategy>` is not; a caller that held
+  one across `catch_unwind` needs `AssertUnwindSafe`.
+
+  Detected by `cargo semver-checks` as `unit_struct_changed_kind` and
+  `auto_trait_impl_removed`.
+
+- **`SealRequest` and `SealCapabilities` gain fields**, which breaks exhaustive
+  struct literals. `SealRequest` adds `conformance_level` and `envelope`;
+  `SealCapabilities` adds `supported_levels` and `supported_envelopes`. Both new
+  `SealRequest` fields have serde defaults, so **the wire format is
+  backward-compatible** — only Rust construction changes. Adding `..Default` is
+  not available here; name the fields.
+
+  Detected by `cargo semver-checks` as `constructible_struct_adds_field`.
+
+- **`KeyStore::open` refuses a store that predates a current security property.**
+  It previously accepted every legacy shape silently, which meant an attacker who
+  could write the file could *choose* the weaker shape and be opened without
+  complaint. The three shapes, each now named in the error:
+
+  - **legacy SHA-256 KDF** — no salt, no iterations;
+  - **no envelope HMAC** — every plaintext field unauthenticated, including
+    `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
+    from the published DID document. A store in this shape could have a
+    revocation flipped back and a revoked key republished, undetected;
+  - **unbound records** (pre-V4) — see below.
+
+  **Nothing is stranded and nothing was removed.** `KeyStore::open_and_migrate`
+  opens all three, upgrades them in place, and then re-opens *strictly* — so a
+  migration that did not finish the job is reported rather than papered over. The
+  legacy KDF is still there and still readable; what changed is that reaching it
+  now requires a caller who asked for the migration door by name.
+
+  Both production entry points in the platform already call `open_and_migrate`.
+  Every remaining `KeyStore::open` call site creates a fresh store, which is
+  written in the current format by construction.
+
+- **Store format V4 binds each record's ciphertext to its own fingerprint** via
+  AES-GCM associated data. Records previously carried no AAD, so a record's
+  encrypted private key could be grafted onto another record's plaintext —
+  its `verifying_key_hex`, its `fingerprint`, its `revoked` flag — and would
+  decrypt cleanly. The envelope HMAC also catches that, and both are wanted: the
+  HMAC covers the map in aggregate, the binding covers each record on its own,
+  and a control that only works in aggregate fails differently from one that
+  works per record.
+
+  Bound to the **fingerprint**, not the map key. `archive_key` and
+  `rotate_inner` copy a record to a new map key *without re-encrypting it*, so
+  associated data derived from the map key would make every archived key
+  undecryptable the moment it was archived.
+
+
+- **`SealVerification` reports a three-valued verdict, not `valid: bool`.** AdES
+  validation has three outcomes, not two: a seal passes, fails, or is
+  **indeterminate** — verification did not fail, but there was not enough
+  information to decide. That is the ordinary answer whenever material has to be
+  fetched (revocation data unreachable, a timestamp not yet corroborated, a trust
+  anchor unresolvable), and it is the one carrying the most operational meaning:
+  *ask again later*, not *reject this passport*.
+
+  A boolean could not hold it, and both collapses are wrong. Indeterminate
+  reported as invalid marks a sound passport non-compliant; reported as valid
+  claims a check that never completed.
+
+  `SealIndication` names the three after the status indications in **ETSI EN 319
+  102-1**, so a verdict maps onto one from any conformant validator without a
+  translation step that could lose its meaning. `SealChecks` records *what was
+  actually checked* — `SignatureOnly` and `FullValidation` are different claims,
+  and previously `valid: true` from either was one value.
+
+  **Migration.** Replace `v.valid` with `v.is_qualified_pass()` where the
+  question is "may a compliance decision rest on this", which is almost always
+  the question. It requires `TotalPassed` **and** `FullValidation` **and** not a
+  placeholder — a named method because the easy mistake is reading a pass over a
+  bare signature check against a self-signed certificate as a qualified seal.
+  Match on `indication` directly only where the three outcomes genuinely differ.
+
+  `GhostSeal::verify` now returns `Indeterminate` with `SealChecks::None` rather
+  than `valid: false`: nothing about a placeholder is checked, so a negative
+  verdict was one it had not reached either.
+
+- **`dpp-registry`'s modules moved to the crate root**, so the paths are
+  `dpp_registry::payload` rather than `dpp_registry::registry::payload`. The
+  crate's `src/` held exactly one directory, named for the crate, and every path
+  through it stuttered. A `src/` subdirectory is named for a concern that could
+  have a sibling; a single-concern crate puts its modules at the root with only
+  `lib.rs` above them.
+
+  **Most consumers are unaffected.** Every type was already re-exported at the
+  crate root and the root re-exports are unchanged, so `use dpp_registry::
+  RegistryStatusCode` — the form the README documents — is untouched. Only an
+  import naming the `registry` module explicitly needs the segment dropped.
+
+  Deferred once on the grounds that a path rename should not spend a breaking
+  release of its own. It is not spending one here: the release was already
+  breaking.
+
+  Detected by `cargo semver-checks` as `module_missing`, `enum_missing` and
+  `struct_missing` — all three naming the old nested path, none naming a type
+  that stopped existing.
 
 ### Changed
 

@@ -40,6 +40,7 @@ pub trait CfbRuleset: Ruleset {
 ///
 /// Field names follow the Annex XIII data attribute names from the regulation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CfbInputs {
     /// Battery model identifier (used in the receipt for traceability).
     pub model_id: String,
@@ -55,6 +56,7 @@ pub struct CfbInputs {
 
 /// Output of the CFB calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CfbResult {
     /// Total cradle-to-grave carbon footprint in kg CO₂e per kWh of capacity.
     pub cfb_kg_co2e_per_kwh: f64,

@@ -40,6 +40,7 @@ pub(crate) fn sample_passport() -> Passport {
         created_at: now,
         updated_at: now,
         published_at: None,
+        placed_on_market_date: None,
         schema_version: "1.0.0".into(),
         retention_locked: false,
         version: 1,

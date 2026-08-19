@@ -22,6 +22,7 @@ pub const MAX_SCORE: u8 = 5;
 /// - if a priority part is **not present** in the product, supply the highest
 ///   point level ([`MAX_SCORE`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PriorityPartScores {
     /// BAT — battery.
     pub battery: u8,
@@ -76,6 +77,7 @@ impl PriorityPartScores {
 /// The three part-level parameters carry per-part scores; the three
 /// product-level parameters are single 1–5 scores.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityIndexInputs {
     /// SDD — disassembly depth, scored per part from the number of steps.
     pub disassembly_depth: PriorityPartScores,

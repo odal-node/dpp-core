@@ -55,6 +55,7 @@ impl std::fmt::Display for RepairabilityClass {
 /// equals [`RepairabilityResult::numeric_score`], allowing an auditor to trace
 /// any individual parameter's share of the band without re-running the calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ParameterContributions {
     pub disassembly: f64,
     pub spare_parts: f64,
@@ -66,6 +67,7 @@ pub struct ParameterContributions {
 
 /// Output of the simplified repairability heuristic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityResult {
     /// A–E heuristic band (not a regulatory class).
     pub class: RepairabilityClass,

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Weights must sum to 1.0. Each parameter score (0–2) is multiplied by its
 /// weight and by 5.0 to produce a contribution to the 0–10 numeric score.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityWeights {
     pub disassembly: f64,
     pub spare_parts: f64,
@@ -20,6 +21,7 @@ pub struct RepairabilityWeights {
 ///
 /// Grade E is assigned when the score is below `d`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepairabilityThresholds {
     /// Minimum score for grade A (highest).
     pub a: f64,

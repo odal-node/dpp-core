@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// let every determination silently re-derive the governing law from whichever
 /// day the calculation happened to run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AssessmentClock {
     /// Which law applies. Derived from the regulated triggering event — never
     /// from today's date.

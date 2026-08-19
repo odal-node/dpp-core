@@ -271,6 +271,37 @@ fn validate_empty_product_name() {
     assert!(err.contains("product_name"), "got: {err}");
 }
 
+/// The placing-on-market date has two homes and they may not contradict.
+///
+/// It selects which law binds the product, so two answers is two different sets
+/// of obligations and nothing downstream can tell which was meant. The envelope
+/// field is the one a determination reads; battery's own predates it and is in
+/// released schemas.
+#[test]
+fn validate_rejects_two_disagreeing_placing_on_market_dates() {
+    let day = |d: u32| chrono::NaiveDate::from_ymd_opt(2031, 8, d).expect("valid date");
+    let mut p = make_passport();
+    p.sector = Sector::Battery;
+    p.sector_data = Some(SectorData::Battery(Box::new(BatteryData {
+        placed_on_market_date: Some(day(18)),
+        ..crate::test_support::sample_battery_data()
+    })));
+
+    p.placed_on_market_date = Some(day(17));
+    let err = p.validate().unwrap_err().to_string();
+    assert!(
+        err.contains("placed_on_market_date") && err.contains("two values"),
+        "got: {err}"
+    );
+
+    // Agreeing is fine, and so is either one being absent — the envelope field
+    // is optional and a passport that declares neither has simply not said.
+    p.placed_on_market_date = Some(day(18));
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+    p.placed_on_market_date = None;
+    assert!(p.validate().is_ok(), "{:?}", p.validate());
+}
+
 #[test]
 fn validate_empty_manufacturer_name() {
     let mut p = make_passport();

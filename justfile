@@ -211,9 +211,13 @@ build-plugins:
     done
     echo "All plugins built."
 
-# Build a single sector plugin and copy it to the engine plugins dir.
+# Build a single sector plugin and print the artifact path.
 # Usage: just build-plugin sector-battery   or just build-plugin battery
-# Experimental Note: This is a temporary workaround until we have a proper plugin build system.
+#
+# Builds only. Installing the artifact wherever a host loads plugins from is
+# that host's business, not this repo's — a build recipe here that wrote into a
+# directory outside this checkout made this repo depend on a layout it cannot
+# see, and named it in the process.
 build-plugin PLUGIN:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -232,14 +236,15 @@ build-plugin PLUGIN:
     fi
     echo "Building $PLUGIN_DIR"
     (cd "$PLUGIN_DIR" && cargo build --target wasm32-wasip1 --release)
-    # Copy artifact to sibling dpp-engine/plugins as sector-<name>.wasm.
-    # All 10 plugins share one workspace (plugins/Cargo.toml), so the build
-    # output lands in plugins/target, not plugins/sector-<name>/target.
-    DEST_DIR="${ROOT_DIR}/../dpp-engine/plugins"
-    mkdir -p "$DEST_DIR"
+    # The sector plugins share one workspace (plugins/Cargo.toml), so cargo
+    # writes here — not to plugins/sector-<name>/target, which older layouts
+    # left behind and which a consumer globbing for *.wasm will happily find.
     ART="${ROOT_DIR}/plugins/target/wasm32-wasip1/release/sector_${PLUGIN_NAME}.wasm"
-    cp "$ART" "${DEST_DIR}/sector-${PLUGIN_NAME}.wasm"
-    echo "Copied $ART → ${DEST_DIR}/sector-${PLUGIN_NAME}.wasm"
+    if [ ! -f "$ART" ]; then
+        echo "ERROR: cargo reported success but $ART does not exist."
+        exit 3
+    fi
+    echo "Built $ART"
 
 # ---------------------------------------------------------------------------
 # Cleanup

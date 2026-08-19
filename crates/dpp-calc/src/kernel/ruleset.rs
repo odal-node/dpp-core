@@ -28,6 +28,7 @@ pub struct RulesetVersion(pub &'static str);
 /// force the application date is genuinely unknown, and asserting one anyway
 /// (a far-future sentinel, say) states a fact the regulation does not.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all_fields = "camelCase")]
 pub enum Effectivity {
     /// In force from a known calendar date, until an optional end date.
     InForce {
@@ -131,6 +132,7 @@ impl Effectivity {
 /// be located programmatically — without reading source comments or external docs.
 /// This is the primary audit anchor for notified bodies.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RegulatoryBasis {
     /// EU regulation or directive number (e.g. `"EU 2023/1669"`).
     pub regulation: &'static str,

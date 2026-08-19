@@ -1,8 +1,15 @@
 //! Machine-readable calculator status map.
 //!
 //! The authoritative answer to "which sector–methodology metrics can be computed
-//! today vs. which are awaiting a delegated act?" — consumed by the CLI
-//! `odal calc status` view and by integrations doing compliance-readiness checks.
+//! today vs. which are awaiting a delegated act?", for a compliance-readiness
+//! view or an integration asking what this build can determine.
+//!
+//! **Nothing in either repository calls it yet.** It previously claimed to be
+//! "consumed by the CLI `odal calc status` view", and there is no such command —
+//! a reader deciding whether this map was load-bearing would have concluded it
+//! was. Its only callers are the drift guards in `tests.rs`, which is worth
+//! having on its own (they are what keep this table and the `resolve_*` row
+//! tables from disagreeing), but it is not yet wired to a surface.
 //!
 //! **Status is derived, never declared.** Each entry names the ruleset that
 //! implements it; whether that ruleset is in force comes from the ruleset's own
@@ -166,6 +173,25 @@ pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
             // No CfbRuleset impl exists — gated on the Art. 7(1) methodology
             // delegated act and a licensed factor dataset. See co2e::cfb.
             implementation: CalculatorImpl::NotImplemented,
+        },
+        // Art. 8 minimum recycled shares. The product category is the Art. 8
+        // scope bucket, not `batteryType` — see `resolve_recycled_content`.
+        // Both phases are `NotYetEffective` today and will stay so for years;
+        // that is derived from each ruleset's own `Effectivity`, not asserted
+        // here, so it turns over on its own when the date arrives.
+        SectorCalculatorEntry {
+            sector_key: "battery",
+            product_category: "industrial-ev-sli",
+            methodology: "recycled-content-art8",
+            implementation: CalculatorImpl::Ruleset("battery-recycled-content-art8-2"),
+        },
+        SectorCalculatorEntry {
+            sector_key: "battery",
+            product_category: "lmt",
+            // Art. 8(2) never reaches LMT batteries, so their first — and only —
+            // phase is Art. 8(3).
+            methodology: "recycled-content-art8",
+            implementation: CalculatorImpl::Ruleset("battery-recycled-content-art8-3"),
         },
         // ── Unsold goods ─────────────────────────────────────────────────────
         SectorCalculatorEntry {

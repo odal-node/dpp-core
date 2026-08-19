@@ -51,5 +51,7 @@ mod status;
 #[cfg(test)]
 mod tests;
 
-pub use resolve::{all_rulesets, resolve_repairability, resolve_repairability_index};
+pub use resolve::{
+    all_rulesets, resolve_recycled_content, resolve_repairability, resolve_repairability_index,
+};
 pub use status::{CalculatorImpl, CalculatorStatus, SectorCalculatorEntry, sector_calculator_map};
