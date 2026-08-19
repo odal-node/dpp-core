@@ -49,9 +49,11 @@ No HTTP framework. No database. No async runtime (except where port traits requi
                                                 +---------------------+
 
 +---------------------+
-|      dpp-calc       |  EU-methodology calculators (CO2e,
-| pure, FactorProvider|  repairability); receipts; pure
-+---------------------+
+|      dpp-calc       |  EU-methodology determinations (Art. 8 recycled
+| pure, FactorProvider|  content, CO2e, repairability); ruleset identity,
++---------------------+  effective periods, receipts; pure.
+          |              Depends on dpp-rules for thresholds — never the
+          +-> dpp-rules  reverse, since the plugins reach dpp-rules too.
 
 dpp-tests — cross-crate integration tests (not published)
 ```

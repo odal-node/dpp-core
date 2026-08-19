@@ -225,6 +225,37 @@ fn status_map_agrees_with_resolve_repairability_today() {
     }
 }
 
+/// The same drift guard for the Art. 8 entries.
+///
+/// These two tables are hand-maintained independently, and the LMT row is the
+/// one most able to go wrong quietly: Art. 8(2) does not reach LMT batteries, so
+/// a map entry pointing them at the Phase 1 ruleset would report a status for a
+/// rule the resolver will never hand them.
+#[test]
+fn status_map_agrees_with_resolve_recycled_content_today() {
+    let today = Utc::now().date_naive();
+    for entry in sector_calculator_map() {
+        if entry.methodology != "recycled-content-art8" {
+            continue;
+        }
+        let resolves_today =
+            crate::ruleset_registry::resolve_recycled_content(entry.product_category, today)
+                .is_assessed();
+        match entry.status_on(today) {
+            CalculatorStatus::Active { .. } => assert!(
+                resolves_today,
+                "map derives Active for '{}', but resolve_recycled_content finds nothing",
+                entry.product_category
+            ),
+            other => assert!(
+                !resolves_today,
+                "map derives {other:?} for '{}', but resolve_recycled_content already resolves one",
+                entry.product_category
+            ),
+        }
+    }
+}
+
 /// Every `Active` map entry must reference a `ruleset_id` that actually exists
 /// in `all_rulesets()`. Guards against the map and the concrete `Ruleset::id()`
 /// drifting apart (e.g. map saying `"cradle-to-gate-pef"` while the impl returns

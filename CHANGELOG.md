@@ -13,6 +13,80 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`ComplianceStrategy::compute` and `ComplianceRegistry::compute` now take the
+  governing-law date.** Both gain a trailing `law_in_force_on: Option<NaiveDate>`.
+
+  A strategy that computes anything must first decide *which rule applies*, and
+  that is a function of the date the product was placed on the EU market — never
+  of today's. Given only the payload, a strategy would have to read a clock, and
+  would then answer differently on a Tuesday in 2031 than it did the day before,
+  for a product that had not changed. Every determination this crate can make is
+  phased: Art. 8(2) from 2031, Art. 8(3) from 2036, Art. 10(5) from a date that
+  does not exist yet.
+
+  `Option`, because the date is a declaration a passport may omit, and `None` is
+  a real answer with a real consequence — the governing rule is undetermined. It
+  is not licence to substitute the current date.
+
+  **Migration:** pass `passport.placed_on_market_date` at each call site. Both
+  passthrough strategies ignore the parameter and are unaffected in behaviour;
+  they compute nothing, so there is no rule for them to select.
+
+- **`Passport` carries `placed_on_market_date: Option<NaiveDate>`.** Additive on
+  the wire (`skip_serializing_if`), but `Passport` is not `#[non_exhaustive]`, so
+  **every struct literal must be updated**.
+
+  It lived only on `BatteryData`, which made the governing law underivable for
+  the other eleven sectors — and the triggering event is not sector-specific:
+  ESPR attaches its duties at placing on the market for every product group, as
+  do Regulation (EU) 2023/1542 Art. 7, 8 and 10 for batteries. It is envelope
+  lifecycle data, like `published_at`, and unlike `published_at` it selects a
+  rule.
+
+  `BatteryData.placedOnMarketDate` stays — it is in released schemas — and
+  `Passport::validate` now **refuses a passport whose two values disagree**. The
+  date decides which law binds the product, so two answers is two different sets
+  of obligations and nothing downstream could tell which was meant. It is not a
+  duplicated *regulated* field: `placedOnMarketDate` is absent from the
+  Commission's battery data-point guidance, so promoting it costs no Annex XIII
+  coverage.
+
+### Added
+
+- **`dpp_calc::recycled_content` — the Art. 8 minimum-recycled-share
+  determination, with a ruleset and a receipt.**
+
+  `dpp-rules` already held the thresholds, the phase dates and the comparison,
+  and the battery plugin already called them. What it cannot produce — being
+  `no_std` and zero-dependency by contract — is the part a notified body reads:
+  a ruleset id and version, an `Effectivity`, a `RegulatoryBasis`, and a
+  `CalculationReceipt`. Until now those four were available only to a two-term
+  CO₂e sum that nothing calls, while the Art. 8 finding, which runs on real
+  data, carried none of them.
+
+  Two rulesets, and the difference between them is not only a date.
+  `Art8Phase1Ruleset` (Art. 8(2), from 18 Aug 2031) is `closed` the day
+  `Art8Phase2Ruleset` (Art. 8(3), from 18 Aug 2036) opens, so exactly one governs
+  any date rather than the answer depending on table order — asserted by a test
+  over five dates. And **Art. 8(2) never names LMT batteries**, so
+  `resolve_recycled_content` gives them no Phase 1 row at all: an LMT battery
+  placed on the market in 2032 resolves to `NotYetInForce { applies_from:
+  2036-08-18 }`, not to Art. 8(2) with an empty shortfall list, which would
+  report a rule as satisfied that never applied to it.
+
+  The comparison is **not** reimplemented. `dpp-calc` now depends on `dpp-rules`
+  and each ruleset delegates to that crate's phase function, so a threshold has
+  one home whether it is reached from a Wasm plugin or from here — guarded by a
+  test that runs both paths over a matrix of declared shares and asserts they
+  agree, because a divergence would otherwise be invisible and would make an
+  operator's finding depend on which door it came through.
+
+  Both phases are `NotYetEffective` for a battery placed on the market today.
+  That is the correct answer rather than a gap, and it is derived from each
+  ruleset's own `Effectivity`, so it turns over on its own when the date arrives.
+
 ### Fixed
 
 - **`sector-battery` no longer reports a mean recycled-content percentage.**

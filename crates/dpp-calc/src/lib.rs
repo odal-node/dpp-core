@@ -16,6 +16,7 @@
 //! ┌──────────────────────────────────────────────────────────────────────┐
 //! │  dpp-calc (Apache-2.0, open)                                         │
 //! │                                                                      │
+//! │  recycled_content::calculate() — EU 2023/1542 Art. 8 minimum shares  │
 //! │  co2e::calculate()          — cradle-to-gate, operator-supplied EFs  │
 //! │  repairability::calculate() — non-regulatory heuristic → A–E band    │
 //! │  co2e::cfb::calculate_cfb() — STUB → CalcError::NotImplemented       │
@@ -26,6 +27,21 @@
 //! │  CalculationReceipt         — proof-of-calculation envelope          │
 //! └──────────────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! # What this crate is actually for
+//!
+//! Read the spine before the calculators. `Ruleset`, `Effectivity`,
+//! `RegulatoryBasis`, [`clock::AssessmentClock`],
+//! [`assessability::Assessability`] and [`receipt::CalculationReceipt`] are
+//! methodology-agnostic, and they are what this crate exists to supply: the
+//! answer to *which rule governed this product, on whose authority, on what
+//! date, and can you prove the answer came from that rule*.
+//!
+//! A "calculator" here is any determination that wants those four. It need not
+//! compute a number — [`recycled_content`] performs a threshold comparison whose
+//! arithmetic lives in `dpp-rules`, and takes from this crate only the ruleset
+//! identity, the effective period and the receipt. That is the normal shape, not
+//! an exception to it.
 //!
 //! Every calculator emits a [`receipt::CalculationReceipt`] that records the
 //! input hash, ruleset id + version, factor dataset version and table hash —
@@ -90,6 +106,7 @@
 mod kernel;
 
 pub mod co2e;
+pub mod recycled_content;
 pub mod repairability;
 pub mod repairability_index;
 pub mod ruleset_registry;

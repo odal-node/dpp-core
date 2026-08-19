@@ -48,6 +48,12 @@ src/
 │
 ├── ruleset_registry/         date-based ruleset resolution; all_rulesets() CI iterator
 │
+├── recycled_content/         EU 2023/1542 Art. 8 minimum recycled shares
+│   ├── calculator.rs         calculate(inputs, ruleset, clock) → RecycledContentResult
+│   ├── parameters.rs         RecycledContentInputs — the four declared shares
+│   ├── thresholds.rs         RecycledContentRuleset + Art8Phase1Ruleset / Art8Phase2Ruleset
+│   └── golden_vectors.rs     #[cfg(test)], incl. a guard that this agrees with dpp-rules
+│
 ├── repairability_index/      The enacted EU 2023/1669 Annex IV index
 │   ├── calculator.rs         calculate(inputs, ruleset) → RepairabilityIndexResult
 │   ├── parameters.rs         RepairabilityIndexInputs — 3 part-level parameters over the
@@ -76,6 +82,7 @@ src/
 
 | Module | Status |
 |---|---|
+| `recycled_content` | ✅ Enacted — Reg. (EU) 2023/1542 Art. 8(2) (from 2031-08-18) and Art. 8(3) (from 2036-08-18); both resolve as `NotYetInForce` for a battery placed on the market today, which is the correct answer, not a gap |
 | `repairability_index` | ✅ Enacted — Reg. (EU) 2023/1669 Annex IV point 5, smartphones and slate tablets |
 | `repairability` | ✅ Available — non-regulatory six-parameter heuristic; **not** the enacted index |
 | `co2e::calculate` | ✅ Baseline — operator-supplied emission factors |
@@ -317,7 +324,7 @@ step-by-step guide. Short version:
 | Crate | Role |
 |---|---|
 | `dpp-domain` | Domain types and port traits; `dpp-calc` does not depend on it |
-| `dpp-rules` | Field-level validation rules (`no_std`); repairability **scoring** belongs here, not there |
+| `dpp-rules` | Field-level validation rules and regulatory thresholds (`no_std`, zero-dep). **`dpp-calc` depends on it**, never the reverse: a threshold like the Art. 8 minimum shares has one home, and it is there, because the Wasm sector plugins reach it too and cannot reach this crate. What `dpp-calc` adds on top is the ruleset identity, the effective period and the receipt — none of which a `no_std` crate can produce |
 | `dpp-plugin-sdk` | Sector plugins import `dpp-calc` for calculator functions (Phase 2) |
 | `dpp-engine` (BSL-1.1) | Stores `CalculationReceipt`, serves the verification endpoint, manages `FactorProvider` lifecycle |
 
