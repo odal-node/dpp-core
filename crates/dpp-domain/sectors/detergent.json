@@ -4,6 +4,7 @@
   "status": "provisional",
   "regime": "detergents",
   "legalBasis": ["Regulation (EU) 2026/405 (Detergents)"],
+  "dppAppliesFrom": "2029-09-23",
   "retentionYears": 10,
   "retentionYearsBasis": "sourced",
   "schemaVersions": ["1.0.0", "1.1.0"],
