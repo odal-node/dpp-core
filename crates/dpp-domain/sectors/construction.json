@@ -4,6 +4,7 @@
   "status": "provisional",
   "regime": "cpr",
   "legalBasis": ["Regulation (EU) 2024/3110 (CPR)"],
+  "dppAppliesFrom": "2027-01-08",
   "retentionYears": 10,
   "retentionYearsBasis": "sourced",
   "schemaVersions": ["1.0.0", "1.1.0"],
@@ -11,5 +12,5 @@
   "productCategories": ["cement", "concrete", "structural-steel", "glass"],
   "disclosure": { "epdUrl": "restricted" },
   "plugin": "sector-construction",
-  "notes": "CPR adopted; DPP requirements phased ~2028-2032. No binding determination yet. retentionYears sourced: Reg. (EU) 2024/3110 imposes 10 years on the economic operator."
+  "notes": "CPR adopted; DPP applies from 2027-01-08, verified against the OJ text on 2026-07-28 (an earlier note here said 'phased ~2028-2032', which was unsourced and was copied onward into published documentation). No binding determination yet. retentionYears sourced: Reg. (EU) 2024/3110 imposes 10 years on the economic operator."
 }
