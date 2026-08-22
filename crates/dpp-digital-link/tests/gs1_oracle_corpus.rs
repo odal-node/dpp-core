@@ -155,6 +155,36 @@ fn corpus() -> Vec<Entry> {
             format!("{base}/01/{broken}"),
             "corrupted check digit",
         ));
+
+        // ── Cases our own builder cannot produce ────────────────────────────
+        //
+        // Everything above is `DigitalLink::build()` output, so the corpus can
+        // only ever contain links we already emit. That proves what we emit is
+        // valid GS1 and says nothing about valid GS1 we refuse — the quiet
+        // failure direction. These are written by hand for that reason, and the
+        // oracle, not us, decides who is right.
+        let gtin = VALID_GTINS[0];
+
+        // AI 01 declares `dlpkey=22,10,21|235`, which the dictionary's header
+        // defines as *alternative* sequences. We refuse a path mixing them.
+        out.push(entry(
+            format!("{base}/01/{gtin}/21/SN001/235/TPX01"),
+            "serial and third-party serial from different alternative sequences",
+        ));
+
+        // A data attribute the hand-written table did not know: AI 99 is
+        // INTERNAL in GS1's dictionary and used to be refused as unknown.
+        out.push(entry(
+            format!("{base}/01/{gtin}/21/SN001/99/INTERNALDATA"),
+            "known data attribute after a qualifier",
+        ));
+
+        // Genuinely unassigned: `04` is in no GS1 entry, so refusing it is
+        // correct and the oracle should agree.
+        out.push(entry(
+            format!("{base}/01/{gtin}/04/NOSUCHAI"),
+            "unassigned application identifier",
+        ));
     }
 
     out
@@ -164,15 +194,23 @@ fn corpus() -> Vec<Entry> {
 ///
 /// If a URI we *built* does not parse back, the disagreement is ours and the
 /// oracle would be reporting our bug as an interoperability failure.
+///
+/// The hand-written cases are exempt: they exist precisely to carry a verdict
+/// the builder cannot produce, and their expected verdict is named here so a
+/// change in what we accept shows up as a failing assertion rather than as a
+/// silently different corpus.
 #[test]
 fn every_built_link_round_trips_through_our_own_parser() {
+    // note → the verdict we must give it.
+    const EXPECTED_REJECTS: &[&str] = &[
+        "corrupted check digit",
+        "serial and third-party serial from different alternative sequences",
+        "unassigned application identifier",
+    ];
+
     for e in corpus() {
-        if e.note == "corrupted check digit" {
-            assert!(
-                !e.accepted,
-                "a broken check digit must be refused: {}",
-                e.uri
-            );
+        if EXPECTED_REJECTS.contains(&e.note) {
+            assert!(!e.accepted, "this must be refused ({}): {}", e.note, e.uri);
         } else {
             assert!(
                 e.accepted,

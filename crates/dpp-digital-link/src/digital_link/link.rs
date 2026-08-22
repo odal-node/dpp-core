@@ -2,9 +2,13 @@
 
 use dpp_domain::Gtin;
 
-use super::ai::{AiRole, ai_descriptor};
 use super::codec::{normalize_gtin_to_14, percent_decode, percent_encode};
 use super::error::DigitalLinkError;
+use super::syntax_dictionary::{ai_spec, qualifier_position};
+
+/// The GS1 primary key this type models. Every qualifier rule is read from
+/// the dictionary relative to it.
+const GTIN_AI: &str = "01";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DigitalLink {
@@ -72,12 +76,12 @@ impl DigitalLink {
         let mut batch: Option<String> = None;
         let mut serial: Option<String> = None;
         let mut tpcsn: Option<String> = None;
-        let mut last_qualifier_order: u8 = 0;
-        let mut last_qualifier_code: &str = "";
+        // The qualifier last seen: its alternative-sequence index and its AI.
+        let mut last_qualifier: Option<(usize, &str)> = None;
 
         while i + 1 < ai_segments.len() {
             let code = ai_segments[i];
-            let desc = ai_descriptor(code)
+            let spec = ai_spec(code)
                 .ok_or_else(|| DigitalLinkError::UnknownApplicationIdentifier(code.to_owned()))?;
 
             let raw_value = ai_segments[i + 1];
@@ -86,48 +90,58 @@ impl DigitalLink {
             // GS1 mandates a maximum length per AI; enforce it so an untrusted
             // URI cannot smuggle an unbounded value downstream.
             let value_len = value.chars().count();
-            if value_len > desc.max_len {
+            if value_len > spec.max_len {
                 return Err(DigitalLinkError::ValueTooLong {
                     code: code.to_owned(),
-                    max_len: desc.max_len,
+                    max_len: spec.max_len,
                     actual: value_len,
                 });
             }
 
-            match desc.role {
-                AiRole::PrimaryKey => {
-                    // A second '01' segment must not silently overwrite the
-                    // GTIN parsed from the first.
-                    if gtin.is_some() {
-                        return Err(DigitalLinkError::DuplicatePrimaryKey);
-                    }
-                    let padded = normalize_gtin_to_14(&value)?;
-                    gtin = Some(Gtin::parse(&padded)?);
+            if spec.dl_primary_key {
+                // A second primary key must not silently overwrite the GTIN
+                // parsed from the first — whether it is another `01` or one of
+                // GS1's fifteen other primary keys.
+                if gtin.is_some() {
+                    return Err(DigitalLinkError::DuplicatePrimaryKey);
                 }
-                AiRole::Qualifier => {
-                    let order = desc.qualifier_order.unwrap_or(0);
-                    if order <= last_qualifier_order && last_qualifier_order > 0 {
-                        return Err(DigitalLinkError::QualifiersOutOfOrder {
-                            before: last_qualifier_code.to_owned(),
-                            before_ord: last_qualifier_order,
-                            after: code.to_owned(),
-                            after_ord: order,
-                        });
-                    }
-                    last_qualifier_order = order;
-                    last_qualifier_code = code;
-                    match code {
-                        "22" => variant = Some(value),
-                        "10" => batch = Some(value),
-                        "21" => serial = Some(value),
-                        "235" => tpcsn = Some(value),
-                        _ => {}
-                    }
+                let padded = normalize_gtin_to_14(&value)?;
+                gtin = Some(Gtin::parse(&padded)?);
+            } else if let Some((seq, order)) = qualifier_position(GTIN_AI, code) {
+                // Alternatives first: two qualifiers from different sequences
+                // describe no link GS1 defines, and the order check below would
+                // otherwise compare positions that are not comparable.
+                if let Some((last_seq, last_code)) = last_qualifier
+                    && last_seq != seq
+                {
+                    return Err(DigitalLinkError::MixedQualifierSequences {
+                        primary_key: GTIN_AI.to_owned(),
+                        first: last_code.to_owned(),
+                        second: code.to_owned(),
+                    });
                 }
-                AiRole::DataAttribute => {
-                    // Informational only; silently accepted.
+                if let Some((_, last_code)) = last_qualifier
+                    && let Some((_, last_ord)) = qualifier_position(GTIN_AI, last_code)
+                    && order <= last_ord
+                {
+                    return Err(DigitalLinkError::QualifiersOutOfOrder {
+                        before: last_code.to_owned(),
+                        before_ord: last_ord,
+                        after: code.to_owned(),
+                        after_ord: order,
+                    });
+                }
+                last_qualifier = Some((seq, code));
+                match code {
+                    "22" => variant = Some(value),
+                    "10" => batch = Some(value),
+                    "21" => serial = Some(value),
+                    "235" => tpcsn = Some(value),
+                    _ => {}
                 }
             }
+            // Anything else the dictionary knows is a data attribute:
+            // informational within a Digital Link path, and silently accepted.
 
             i += 2;
         }
