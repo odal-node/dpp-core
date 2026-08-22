@@ -23,7 +23,7 @@ use crate::domain::sector::Sector;
 /// { "sector": "battery", "gtin": "09506000134352", "nominalVoltageV": 3.2, ... }
 /// ```
 /// ```json
-/// { "sector": "textile", "fibreComposition": [...], "countryOfManufacturing": "BD" }
+/// { "sector": "textile", "fibreComposition": [...], "countryOfOrigin": "BD" }
 /// ```
 /// An unknown `sector` tag deserialises to [`SectorData::Other`], which keeps
 /// both the tag and the payload verbatim — see the hand-written `Deserialize`
