@@ -42,6 +42,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `Ok(None)` for the published variant can do the same here unless the suite
   exercises GTIN lookup.
 
+- **`Gtin::parse` accepts the shorter GS1 forms and normalises them to
+  GTIN-14.** *(Breaking: `parse` accepts inputs it previously rejected, and
+  `as_str` may now differ from the string that was parsed.)*
+
+  It accepted exactly 14 digits and rejected everything else as
+  `InvalidFormat` — including a well-formed GTIN-13, which GS1 treats as the
+  *same identifier*. A retail EAN-13 is the form an operator actually has in
+  their product data, and feeding one to an importer produced an error reading
+  as "your data is malformed" for a perfectly valid GTIN.
+
+  GS1 defines GTIN-8/12/13 as right-aligned within a 14-digit field, zero-filled
+  on the left, so `3801234567898` and `03801234567898` name one trade item.
+  Padding is lossless for the check digit — it is computed from the right with
+  alternating weights, so a leading zero contributes nothing. `parse` now
+  accepts 8, 12, 13 and 14 digits and stores the canonical 14.
+
+  Lengths GS1 does not define (9, 10, 11, 15+) are still refused: padding one
+  would invent an identifier rather than restate a known one. A wrong check
+  digit or a non-digit character is refused exactly as before — normalisation is
+  not leniency.
+
+  Migration: `as_str` now always returns 14 digits, so downstream comparisons
+  stay exact and callers can drop their own padding. Note that `PartialEq<str>`
+  compares against the **canonical** form — `Gtin::parse("3801234567898")` is
+  equal to `"03801234567898"`, not to `"3801234567898"`. Compare two `Gtin`
+  values rather than a `Gtin` against a raw input string.
+
+  `Gln::parse` is unchanged: a GLN has no shorter forms, so its exact-13 rule is
+  already right.
+
 ### Added
 
 - **The mandatory-content publish gate can be previewed.**

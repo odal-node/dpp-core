@@ -25,7 +25,7 @@ pub fn gs1_check_digit(data_digits: &[u8]) -> u8 {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum GtinError {
-    #[error("GTIN must be exactly 14 ASCII digits, got '{0}'")]
+    #[error("GTIN must be 8, 12, 13 or 14 ASCII digits, got '{0}'")]
     InvalidFormat(String),
     #[error("GTIN check digit invalid for '{gtin}': expected {expected}, got {actual}")]
     InvalidCheckDigit {
@@ -78,14 +78,32 @@ fn check_gs1_key(s: &str, len: usize) -> Result<(), Gs1KeyCheck> {
 pub struct Gtin(String);
 
 impl Gtin {
-    /// Parse and validate a GTIN-14 string.
+    /// Parse and validate a GTIN, normalising the shorter GS1 forms to GTIN-14.
     ///
-    /// Accepts exactly 14 ASCII digits with a correct GS1 modulo-10 check digit
-    /// (alternating weights 3,1,3,1,… from left). Returns `Err` for wrong length,
-    /// non-digit characters, or a bad check digit.
+    /// Accepts 8, 12, 13 or 14 ASCII digits — the four lengths GS1 defines —
+    /// and stores the canonical 14-digit form, so [`as_str`](Gtin::as_str)
+    /// always returns 14 digits and downstream comparisons stay exact.
+    ///
+    /// # Why padding is safe
+    ///
+    /// GS1 defines GTIN-8/12/13 as right-aligned within a 14-digit field,
+    /// zero-filled on the left: `03801234567898` and `3801234567898` are the
+    /// same trade item. The check digit is computed from the right with
+    /// alternating weights, so a leading zero contributes nothing and the
+    /// padded form validates identically. Normalising here rather than in every
+    /// caller is what keeps a retail EAN-13 — the form an operator actually has
+    /// in their product data — from reading as malformed input.
+    ///
+    /// Lengths GS1 does not define (9, 10, 11, 15+) are still refused: padding
+    /// one would invent an identifier rather than restate a known one. A wrong
+    /// check digit and a non-digit character are refused as before.
     pub fn parse(s: &str) -> Result<Self, GtinError> {
-        match check_gs1_key(s, 14) {
-            Ok(()) => Ok(Self(s.to_owned())),
+        if !matches!(s.len(), 8 | 12 | 13 | 14) || !s.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(GtinError::InvalidFormat(s.to_owned()));
+        }
+        let canonical = format!("{s:0>14}");
+        match check_gs1_key(&canonical, 14) {
+            Ok(()) => Ok(Self(canonical)),
             Err(Gs1KeyCheck::InvalidFormat) => Err(GtinError::InvalidFormat(s.to_owned())),
             Err(Gs1KeyCheck::InvalidCheckDigit { expected, actual }) => {
                 Err(GtinError::InvalidCheckDigit {
@@ -97,6 +115,7 @@ impl Gtin {
         }
     }
 
+    /// The canonical 14-digit form, whatever length was parsed.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -108,6 +127,9 @@ impl std::fmt::Display for Gtin {
     }
 }
 
+/// Compares against the **canonical 14-digit** form, not the string that was
+/// parsed: `Gtin::parse("3801234567898")` equals `"03801234567898"`, not
+/// `"3801234567898"`. Compare two `Gtin`s where the input spelling is unknown.
 impl PartialEq<str> for Gtin {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
@@ -182,10 +204,50 @@ mod tests {
     }
 
     #[test]
-    fn wrong_length_rejected() {
+    fn undefined_length_rejected() {
+        // 11 digits is not a GTIN in any form, so it is refused rather than
+        // padded — padding it would invent an identifier.
         assert!(matches!(
-            Gtin::parse("095060001343"),
+            Gtin::parse("09506000134"),
             Err(GtinError::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            Gtin::parse("095060001343526"),
+            Err(GtinError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn shorter_gs1_forms_normalise_to_fourteen() {
+        // GS1 defines GTIN-8/12/13 as right-aligned in a 14-digit field, so all
+        // three name a trade item the 14-digit form also names.
+        for (input, canonical) in [
+            ("3801234567898", "03801234567898"), // GTIN-13 (retail EAN-13)
+            ("036000291452", "00036000291452"),  // GTIN-12 (UPC-A)
+            ("12345670", "00000012345670"),      // GTIN-8
+        ] {
+            let g = Gtin::parse(input).unwrap_or_else(|e| panic!("{input} must parse: {e}"));
+            assert_eq!(g.as_str(), canonical, "{input} must normalise");
+        }
+    }
+
+    #[test]
+    fn a_short_form_and_its_padded_form_are_the_same_value() {
+        // The point of normalising on parse: two spellings of one identifier
+        // compare equal, so downstream lookups cannot miss on formatting alone.
+        assert_eq!(
+            Gtin::parse("3801234567898").unwrap(),
+            Gtin::parse("03801234567898").unwrap()
+        );
+    }
+
+    #[test]
+    fn a_short_form_with_a_bad_check_digit_is_still_refused() {
+        // Normalisation is not leniency. Padding is lossless for the check
+        // digit, so a wrong one stays wrong.
+        assert!(matches!(
+            Gtin::parse("3801234567890"),
+            Err(GtinError::InvalidCheckDigit { .. })
         ));
     }
 
