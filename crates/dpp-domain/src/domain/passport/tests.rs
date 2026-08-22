@@ -717,21 +717,24 @@ fn from_stored_upcasts_a_legacy_country_field() {
 
 #[test]
 fn from_stored_refuses_a_gap_no_lens_bridges() {
-    // Textile's current version is 1.2.0, and today's registry only bridges
-    // 1.1.0 -> 1.2.0 — nothing leaves 1.0.0. A document honestly recorded at
-    // 1.0.0 (old country key, so the direct read genuinely fails) cannot be
-    // upgraded, and must fail loudly and typed, not panic or silently pass
-    // through as if it were current.
+    // A document recorded at a version no lens leaves must fail loudly and
+    // typed — not panic, and not silently pass through as if it were current.
+    //
+    // The version is one this build has never served. Pointing this at a real
+    // unbridged version instead couples a test about refusal semantics to the
+    // registry's lens coverage, so legitimately bridging that version fails a
+    // test that was never about it — which is what happened when textile
+    // 1.0.0 -> 1.1.0 was added and this test still named 1.0.0.
     let passport = textile_passport();
     let mut doc = serde_json::to_value(&passport).expect("serialise");
-    doc["schemaVersion"] = "1.0.0".into();
+    doc["schemaVersion"] = "0.9.0".into();
     let country = doc["sectorData"]["countryOfOrigin"].take();
     doc["sectorData"]["countryOfManufacturing"] = country;
 
     let lenses = LensRegistry::new();
     let catalog = SectorCatalog::new();
     let err = Passport::from_stored(doc, &lenses, &catalog)
-        .expect_err("no lens chain reaches 1.2.0 from 1.0.0");
+        .expect_err("no lens chain reaches the current version from 0.9.0");
     assert!(
         matches!(err, DppError::SchemaIncompatible(_)),
         "expected a typed SchemaIncompatible refusal, got: {err}"

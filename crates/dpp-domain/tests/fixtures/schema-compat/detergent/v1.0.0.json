@@ -1,0 +1,13 @@
+{
+  "countryOfManufacture": "DE",
+  "format": "liquid",
+  "gtin": "09506000134352",
+  "productType": "laundry",
+  "surfactants": [
+    {
+      "biodegradable": false,
+      "concentrationBand": "<5%",
+      "name": "x"
+    }
+  ]
+}

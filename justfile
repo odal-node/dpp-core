@@ -275,3 +275,17 @@ gs1-oracle:
     npm install --no-audit --no-fund --prefix .github/scripts
     NODE_PATH=.github/scripts/node_modules \
         node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl
+
+# Freeze a sector-data fixture for any declared schema version that lacks one.
+#
+# `tests/schema_compat.rs` asserts that every version the catalog claims to
+# support still reads through `Passport::from_stored`. That only works if each
+# version has a frozen document to test with, so adding a schema version fails
+# the suite until this has been run and the new fixture committed.
+#
+# It never overwrites: a fixture regenerated from the current schema would agree
+# with the current schema by construction and could not catch anything. If it
+# cannot build a valid document — a pattern it has no representative value for —
+# it says so and writes nothing, and that fixture is authored by hand.
+freeze-schema-fixtures:
+    FREEZE_SCHEMA_FIXTURES=1 cargo test -p dpp-domain --test schema_compat freeze_missing_fixtures -- --nocapture
