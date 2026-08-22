@@ -452,6 +452,20 @@ fn builtin_lenses() -> Vec<Lens> {
         ),
         Lens::new(
             "textile",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "v1.1.0 adds sixteen optional fields (SCIP/SVHC disclosure, per-fibre \
+             origin, durability, microplastic shedding) and changes nothing that \
+             already existed: the two versions declare identical `required` lists \
+             and v1.1.0 removes no property. Purely additive, so the document \
+             passes through untouched — but the lens must exist, because a chain \
+             cannot cross a gap, and without it a v1.0.0 document has no path to \
+             the current version and cannot be read at all.",
+            identity,
+        ),
+        Lens::new(
+            "textile",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),
             false,
@@ -460,6 +474,16 @@ fn builtin_lenses() -> Vec<Lens> {
             rename_country_of_manufacturing,
         ),
     ]
+}
+
+/// A schema step that added only optional fields: the document is already valid
+/// under the later version, so it passes through untouched.
+///
+/// Not redundant. `upcast_str_toward` walks a chain of lenses, and a missing
+/// step breaks the whole chain — a document two versions behind cannot reach the
+/// current version through a gap, even when the gap itself requires no change.
+fn identity(v: &Value) -> Result<Value, LensError> {
+    Ok(v.clone())
 }
 
 /// Renames a top-level JSON key to `countryOfOrigin`, leaving every other
@@ -844,13 +868,25 @@ mod tests {
     fn toward_still_refuses_a_gap_no_lens_touches_at_all() {
         // Making progress optional would turn every unbridgeable gap into a
         // silent identity, which is the one thing this module refuses to do.
-        let reg = LensRegistry::new();
+        //
+        // The gap is synthetic on purpose. This asserts a property of the
+        // registry, not a fact about any sector's lens coverage — pointing it at
+        // a real gap makes it fail the day someone legitimately bridges that gap,
+        // which is what happened when textile 1.0.0 → 1.1.0 was added.
+        let reg = LensRegistry::from_lenses(vec![Lens::new(
+            "demo",
+            v("2.0.0"),
+            v("3.0.0"),
+            false,
+            "add b",
+            add_b_lossy,
+        )]);
         let err = reg
-            .upcast_toward("textile", &serde_json::json!({}), &v("1.0.0"), &v("1.2.0"))
+            .upcast_toward("demo", &serde_json::json!({}), &v("1.0.0"), &v("3.0.0"))
             .unwrap_err();
         assert!(
             matches!(err, UpcastError::NoPath { .. }),
-            "nothing leaves textile 1.0.0, so this must stay a typed refusal"
+            "nothing leaves demo 1.0.0, so this must stay a typed refusal"
         );
     }
 

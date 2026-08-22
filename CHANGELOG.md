@@ -13,6 +13,54 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **Every schema version this crate claims to support now has a frozen document
+  proving it is still readable.** `tests/schema_compat.rs` holds one minimal
+  sector-data fixture per `(sector, version)` the registry serves — 28 today —
+  and asserts each still reads through `Passport::from_stored`, the path a node
+  actually reads stored documents by.
+
+  `Passport` and every `SectorData` variant are the literal on-disk shape of
+  every passport a node has ever stored. A non-additive change to one does not
+  break a consumer at compile time; it makes every already-written document of
+  that shape undeserialisable the moment a node upgrades its pin — a runtime
+  failure against data, per request, with no compile-time signal anywhere. That
+  has happened, and downstream it took out reads for 244 of 276 passports.
+
+  Three properties are checked: every declared version has a fixture (so adding
+  a schema version fails until one is frozen), every fixture validates against
+  the schema it was frozen for, and every fixture still reads today. Fixtures are
+  written once by `just freeze-schema-fixtures` and never regenerated — one
+  regenerated from the current schema would agree with it by construction.
+
+  The gate was verified to fail: adding a required field to `TyreData` produced
+  `tyre v1.0.0: missing field ...`.
+
+### Fixed
+
+- **A textile passport stored under schema v1.0.0 could not be read at all.**
+  The lens chain had no `1.0.0 → 1.1.0` step, so `upcast_str_toward` refused with
+  `NoPath` and every such document was unreadable — while the catalog went on
+  declaring v1.0.0 a supported version.
+
+  The step needs no transformation: v1.0.0 and v1.1.0 declare identical
+  `required` lists, v1.1.0 removes no property, and its sixteen additions are all
+  optional. But a chain cannot cross a gap, so a document two versions behind
+  could not reach the current version through a step that required no change.
+  An identity lens closes it, and `1.0.0 → 1.1.0 → 1.2.0` now carries the
+  document through the `countryOfManufacturing` rename that was always waiting
+  for it.
+
+  Found by the compatibility gate above, on its first run. Textile is the sector
+  whose rename caused the original incident.
+
+  `toward_still_refuses_a_gap_no_lens_touches_at_all` now builds its own
+  synthetic gap. It had used textile 1.0.0 as a convenient example of an
+  unbridged one, which coupled a test about the registry's refusal semantics to a
+  gap in production data — so legitimately fixing that gap failed a test that was
+  never about textile.
+
 ### Breaking
 
 - **The Digital Link URI parser reads GS1's dictionary, and the hand-written AI
