@@ -42,6 +42,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `Ok(None)` for the published variant can do the same here unless the suite
   exercises GTIN lookup.
 
+### Added
+
+- **The mandatory-content publish gate can be previewed.**
+  `Passport::check_mandatory_content` is now public, so a caller can ask whether
+  a passport would clear the gate without attempting the transition.
+
+  It was reachable only through `transition_to`, which meant the only way to
+  learn the answer was to try. A dry-run consumer therefore reported on the
+  checks it could reach and stayed silent about the one that most often refuses.
+
+  `transition_to` calls the same function, so the preview and the refusal it
+  predicts cannot drift, and it returns the same `DppError` — a consumer can
+  render the preview byte-identically to the eventual refusal. A failure names
+  every missing field at once, so one call is a complete answer.
+
+  Being able to ask is not being able to decline: the gate still runs inside
+  `transition_to`, and `status`/`published_at` remain unsettable by hand, so no
+  path to publishing skips it. That property was the reason it was private, and
+  it is unchanged.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
