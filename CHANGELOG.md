@@ -13,6 +13,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`PassportRepository` gains `find_by_gtin_any_status`.** *(Breaking: every
+  implementor must add the method.)* The by-GTIN counterpart of the existing
+  `find_by_id_any_status`, and it closes the same gap on the other public route.
+
+  `find_published_by_gtin` folds a publication-policy decision into a lookup:
+  its `None` means "no such GTIN" and "that GTIN resolves to a passport that is
+  not published" at the same time, so a caller has nothing to branch on. That
+  lookup backs the GS1 Digital Link route — the one a consumer reaches by
+  **scanning the code on a product** — which therefore answers `404 Not Found`
+  for a withdrawn passport where `410 Gone` is the recall signal. The by-id
+  route already answers correctly, because it receives the passport and decides
+  for itself, so the two public routes disagreed about the same passport and the
+  disagreement fell on the consumer-facing one.
+
+  The port describes storage; which lifecycle states are publicly visible is
+  domain policy belonging to whoever answers the request. The new method returns
+  the passport and lets the caller read `status`.
+
+  `find_published_by_gtin` is kept rather than widened — it has non-public
+  callers, and changing what it returns would silently alter them. Its doc now
+  says a public route must not use it and points at the sibling.
+
+  Migration: implementors add the method. `PgPassportRepo` drops the
+  `status = 'active'` clause from the existing query; test doubles that return
+  `Ok(None)` for the published variant can do the same here unless the suite
+  exercises GTIN lookup.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
