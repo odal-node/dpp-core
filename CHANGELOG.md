@@ -36,12 +36,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   called it "the canonical ascending qualifier order"; `build()` emitted it
   whenever both fields were set. New error: `MixedQualifierSequences`.
 
-  **AIs the dictionary knows are no longer refused as unknown.** The table held
-  5 of 224 AIs, so a conformant link carrying any other — AI 99 `INTERNAL`, a
-  net-weight attribute, anything — was rejected with
-  `UnknownApplicationIdentifier`. Known data attributes are now accepted and
-  ignored, as a Digital Link path allows. Genuinely unassigned AIs are still
-  refused.
+  **A known data attribute in the path is refused as such, not as unknown.**
+  The table held 5 of 224 AIs, so any other AI was rejected with
+  `UnknownApplicationIdentifier` — including AI 99 `INTERNAL`, which is a real
+  GS1 AI. It is still refused in a path, because GS1's grammar carries only the
+  primary key and its qualifiers there and a data attribute belongs in the query
+  string, but now with `DataAttributeInPath`, which says the true thing. An AI
+  that is genuinely unassigned is still `UnknownApplicationIdentifier`.
+
+  The distinction was adjudicated by GS1's engine rather than by us: an earlier
+  revision accepted a path attribute and the oracle reported "we ACCEPT, GS1
+  REJECTS" against a corpus entry added in this same change.
 
   A second primary key in one path is still `DuplicatePrimaryKey`, and now
   correctly so for all sixteen of GS1's primary keys rather than only a repeated

@@ -310,6 +310,20 @@ fn unknown_ai_rejected() {
 }
 
 #[test]
+fn a_data_attribute_in_the_path_is_rejected() {
+    // AI 99 (INTERNAL) is a real GS1 AI, so this is not "unknown". But GS1's
+    // Digital Link grammar puts only the primary key and its qualifiers in the
+    // path — a data attribute belongs in the query string. Adjudicated by the
+    // GS1 Barcode Syntax Engine, which rejected this URI when an earlier
+    // revision of the parser accepted it.
+    let uri = "https://id.odal-node.io/01/09506000134352/21/SN1/99/INTERNALDATA";
+    assert!(matches!(
+        DigitalLink::parse(uri),
+        Err(DigitalLinkError::DataAttributeInPath(_))
+    ));
+}
+
+#[test]
 fn misordered_qualifiers_rejected() {
     // AI 21 (order 3) before AI 10 (order 2) violates canonical order.
     let uri = "https://id.odal-node.io/01/09506000134352/21/SN1/10/BATCH1";

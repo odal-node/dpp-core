@@ -139,9 +139,14 @@ impl DigitalLink {
                     "235" => tpcsn = Some(value),
                     _ => {}
                 }
+            } else {
+                // Known to the dictionary, but neither this primary key nor one
+                // of its qualifiers. GS1's Digital Link grammar puts only the
+                // primary key and its qualifiers in the path; a data attribute
+                // belongs in the query string. Confirmed against the GS1
+                // Barcode Syntax Engine, which rejects `/21/SN001/99/…`.
+                return Err(DigitalLinkError::DataAttributeInPath(code.to_owned()));
             }
-            // Anything else the dictionary knows is a data attribute:
-            // informational within a Digital Link path, and silently accepted.
 
             i += 2;
         }

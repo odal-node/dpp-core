@@ -172,11 +172,14 @@ fn corpus() -> Vec<Entry> {
             "serial and third-party serial from different alternative sequences",
         ));
 
-        // A data attribute the hand-written table did not know: AI 99 is
-        // INTERNAL in GS1's dictionary and used to be refused as unknown.
+        // AI 99 is INTERNAL in GS1's dictionary — a real AI, but a data
+        // attribute. GS1's grammar puts only the primary key and its qualifiers
+        // in the path, so this is refused despite being a known AI. The engine
+        // adjudicated this: an earlier revision accepted it and the oracle
+        // reported "we ACCEPT, GS1 REJECTS".
         out.push(entry(
             format!("{base}/01/{gtin}/21/SN001/99/INTERNALDATA"),
-            "known data attribute after a qualifier",
+            "data attribute in the path rather than the query string",
         ));
 
         // Genuinely unassigned: `04` is in no GS1 entry, so refusing it is
@@ -206,6 +209,7 @@ fn every_built_link_round_trips_through_our_own_parser() {
         "corrupted check digit",
         "serial and third-party serial from different alternative sequences",
         "unassigned application identifier",
+        "data attribute in the path rather than the query string",
     ];
 
     for e in corpus() {
