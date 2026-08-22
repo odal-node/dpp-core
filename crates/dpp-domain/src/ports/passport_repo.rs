@@ -88,7 +88,28 @@ pub trait PassportRepository: Send + Sync {
 
     /// Find the first published passport whose GS1 Digital Link QR URL contains
     /// the given 14-digit GTIN. Used by the `GET /01/{gtin}` resolver route.
+    ///
+    /// Folds a publication-policy decision into a lookup: `None` means both "no
+    /// such GTIN" and "that GTIN resolves to a passport that is not published",
+    /// and a caller has nothing to branch on. A **public route must not use
+    /// this** — it cannot then tell a withdrawn passport from an unregistered
+    /// one, and so cannot serve `410 Gone`, which is the recall signal a
+    /// consumer scanning a product needs to see. Use
+    /// [`find_by_gtin_any_status`](PassportRepository::find_by_gtin_any_status)
+    /// there and branch on `status`, the way the by-id route already does.
     async fn find_published_by_gtin(&self, gtin: &str) -> Result<Option<Passport>, DppError>;
+
+    /// Find the first passport whose GS1 Digital Link QR URL contains the given
+    /// 14-digit GTIN, regardless of status.
+    ///
+    /// The by-GTIN counterpart of
+    /// [`find_by_id_any_status`](PassportRepository::find_by_id_any_status),
+    /// and it exists for the same reason: a public endpoint has to distinguish
+    /// 404 from 410 (suspended), and it can only do that if the lookup hands
+    /// back the passport and leaves the lifecycle decision to whoever is
+    /// answering the request. Storage describes what is stored; which statuses
+    /// are publicly visible is domain policy and does not belong here.
+    async fn find_by_gtin_any_status(&self, gtin: &str) -> Result<Option<Passport>, DppError>;
 
     /// Fetch a passport by ID regardless of status.
     /// Used by public endpoints to distinguish between 404 and 410 (suspended).
@@ -275,6 +296,26 @@ mod tests {
         }
         async fn find_published_by_gtin(&self, _gtin: &str) -> Result<Option<Passport>, DppError> {
             Ok(None)
+        }
+        async fn find_by_gtin_any_status(&self, gtin: &str) -> Result<Option<Passport>, DppError> {
+            // Mirrors the indexed query: match the GS1 Digital Link path
+            // segment rather than a bare substring, and refuse a non-numeric
+            // value so a `LIKE` metacharacter cannot widen the match.
+            if gtin.is_empty() || !gtin.bytes().all(|b| b.is_ascii_digit()) {
+                return Ok(None);
+            }
+            let needle = format!("/01/{gtin}/");
+            Ok(self
+                .store
+                .lock()
+                .unwrap()
+                .values()
+                .find(|p| {
+                    p.qr_code_url
+                        .as_deref()
+                        .is_some_and(|u| u.contains(&needle))
+                })
+                .cloned())
         }
         async fn find_by_id_any_status(
             &self,
@@ -472,6 +513,46 @@ mod tests {
             batch_id: None,
         };
         assert!(repo.find_by_identity(&no_match).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn any_status_gtin_lookup_still_finds_a_suspended_passport() {
+        // The distinction this method exists for: a withdrawn passport must stay
+        // reachable by GTIN so the scanned-code route can answer `410 Gone`
+        // rather than `404`. `find_published_by_gtin` cannot express it — its
+        // `None` means "unknown GTIN" and "withdrawn" at once.
+        let repo = InMemoryRepo::default();
+        let mut p = draft_passport("Suspended battery");
+        p.qr_code_url = Some("https://id.example/01/09506000134352/21/ABC123".into());
+        p.status = PassportStatus::Suspended;
+        let created = repo.create(p).await.unwrap();
+
+        let found = repo
+            .find_by_gtin_any_status("09506000134352")
+            .await
+            .unwrap();
+        assert_eq!(
+            found.map(|p| p.status),
+            Some(PassportStatus::Suspended),
+            "a suspended passport must remain findable by GTIN, and carry its status"
+        );
+        assert_eq!(
+            repo.find_by_gtin_any_status("09506000134352")
+                .await
+                .unwrap()
+                .map(|p| p.id),
+            Some(created.id)
+        );
+
+        // An unknown GTIN is the genuine `None` — the case 404 is for.
+        assert!(
+            repo.find_by_gtin_any_status("00000000000000")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        // A non-numeric value is refused before it can act as a LIKE pattern.
+        assert!(repo.find_by_gtin_any_status("%").await.unwrap().is_none());
     }
 
     #[tokio::test]
