@@ -876,6 +876,43 @@ fn a_missing_mandatory_field_blocks_names_it_and_leaves_no_lock() {
     assert_eq!(p.status, PassportStatus::Draft);
 }
 
+#[test]
+fn the_preview_gives_the_same_answer_as_the_attempt_and_changes_nothing() {
+    // The gate is reachable without attempting the transition, and asking is
+    // not declining: the preview returns the refusal verbatim, and the passport
+    // is untouched either way.
+    let mut p = publishable_battery(crate::domain::sector::BatteryType::Ev);
+    battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
+
+    let previewed = p
+        .check_mandatory_content()
+        .expect_err("the preview must refuse what the transition refuses");
+
+    // Asking left no trace.
+    assert_eq!(p.status, PassportStatus::Draft);
+    assert!(!p.retention_locked);
+    assert!(p.published_at.is_none());
+
+    let attempted = p
+        .transition_to(PassportStatus::Published)
+        .expect_err("the transition must still refuse");
+    assert_eq!(
+        previewed.to_string(),
+        attempted.to_string(),
+        "a preview that does not render identically to the refusal is a second \
+         opinion, and the two would drift"
+    );
+}
+
+#[test]
+fn the_preview_passes_for_a_passport_that_publishes() {
+    let mut p = publishable_battery(crate::domain::sector::BatteryType::Ev);
+    p.check_mandatory_content()
+        .expect("a complete passport must preview clean");
+    p.transition_to(PassportStatus::Published)
+        .expect("and must then actually publish");
+}
+
 /// The four identity data points the guidance marks mandatory for every
 /// covered category each block a publish on their own.
 ///

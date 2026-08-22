@@ -506,6 +506,24 @@ impl Passport {
     /// Refuse a first publish that omits content the battery's category makes
     /// mandatory.
     ///
+    /// # Asking without attempting
+    ///
+    /// Public so a caller can *preview* the gate. [`transition_to`] runs this
+    /// same function, so a preview and the refusal it predicts cannot drift —
+    /// and because it takes `&self` and returns the same [`DppError`], a
+    /// consumer can ask the question without a state change and render the
+    /// answer byte-identically.
+    ///
+    /// Being able to ask is not being able to decline: the gate still runs
+    /// inside `transition_to`, and `status`/`published_at` remain unsettable by
+    /// hand, so there is no path to publishing that skips it.
+    ///
+    /// A failure names **every** missing field at once rather than the first,
+    /// so one call is a complete answer.
+    ///
+    /// [`transition_to`]: Passport::transition_to
+    /// [`DppError`]: crate::domain::error::DppError
+    ///
     /// # Why this is a hard gate and not a lint
     ///
     /// A passport missing content the law requires is not a passport with a
@@ -530,7 +548,7 @@ impl Passport {
     /// would be the defect this crate exists to avoid. That is a real hole and
     /// it is deliberate; it closes when a source covering those categories
     /// exists.
-    fn check_mandatory_content(&self) -> Result<(), crate::domain::error::DppError> {
+    pub fn check_mandatory_content(&self) -> Result<(), crate::domain::error::DppError> {
         use crate::domain::field_error::{FieldError, ValidationErrors};
 
         if self.sector != crate::domain::sector::Sector::Battery {
