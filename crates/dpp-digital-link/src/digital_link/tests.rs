@@ -20,17 +20,40 @@ fn non_https_scheme_is_rejected() {
 }
 
 #[test]
-fn round_trips_all_qualifiers_in_canonical_order() {
-    // 22 (variant) → 10 (batch) → 21 (serial) → 235 (third-party serial),
-    // the canonical ascending qualifier order.
-    let uri = "https://id.odal-node.io/01/09506000134352/22/VAR-1/10/LOT-9/21/SN-7/235/TPX-3";
+fn round_trips_the_first_qualifier_sequence() {
+    // 22 (variant) → 10 (batch) → 21 (serial): the first of the two alternative
+    // sequences AI 01 declares as `dlpkey=22,10,21|235`.
+    let uri = "https://id.odal-node.io/01/09506000134352/22/VAR-1/10/LOT-9/21/SN-7";
     let dl = DigitalLink::parse(uri).unwrap();
     assert_eq!(dl.variant.as_deref(), Some("VAR-1"));
     assert_eq!(dl.batch.as_deref(), Some("LOT-9"));
     assert_eq!(dl.serial.as_deref(), Some("SN-7"));
-    assert_eq!(dl.tpcsn.as_deref(), Some("TPX-3"));
-    // build() emits the variant (22) and tpcsn (235) branches too.
+    assert_eq!(dl.tpcsn, None);
     assert_eq!(dl.build(), uri);
+}
+
+#[test]
+fn round_trips_the_alternative_qualifier_sequence() {
+    // 235 is the *other* alternative, used on its own.
+    let uri = "https://id.odal-node.io/01/09506000134352/235/TPX-3";
+    let dl = DigitalLink::parse(uri).unwrap();
+    assert_eq!(dl.tpcsn.as_deref(), Some("TPX-3"));
+    assert_eq!(dl.serial, None);
+    assert_eq!(dl.build(), uri);
+}
+
+#[test]
+fn qualifiers_from_two_alternative_sequences_are_rejected() {
+    // GS1 writes AI 01's qualifiers as `dlpkey=22,10,21|235`, and the
+    // dictionary's own header defines `|` as *alternative* sequences: a path
+    // uses "22,10,21" or "235", never both. A hand-written table that ordered
+    // them 22→1, 10→2, 21→3, 235→4 turned two alternatives into one ladder and
+    // accepted a link GS1 does not define.
+    let uri = "https://id.odal-node.io/01/09506000134352/21/SN-7/235/TPX-3";
+    assert!(matches!(
+        DigitalLink::parse(uri),
+        Err(DigitalLinkError::MixedQualifierSequences { .. })
+    ));
 }
 
 #[test]
@@ -276,10 +299,27 @@ fn gtin_of_invalid_length_rejected() {
 
 #[test]
 fn unknown_ai_rejected() {
-    let uri = "https://id.odal-node.io/01/09506000134352/99/unknown/21/SN1";
+    // `04` is unassigned in GS1's dictionary. `99` is not — it is INTERNAL, and
+    // the hand-written table used to refuse it, which is the quiet failure:
+    // refusing a link a conformant partner may legitimately send.
+    let uri = "https://id.odal-node.io/01/09506000134352/04/unknown/21/SN1";
     assert!(matches!(
         DigitalLink::parse(uri),
         Err(DigitalLinkError::UnknownApplicationIdentifier(_))
+    ));
+}
+
+#[test]
+fn a_data_attribute_in_the_path_is_rejected() {
+    // AI 99 (INTERNAL) is a real GS1 AI, so this is not "unknown". But GS1's
+    // Digital Link grammar puts only the primary key and its qualifiers in the
+    // path — a data attribute belongs in the query string. Adjudicated by the
+    // GS1 Barcode Syntax Engine, which rejected this URI when an earlier
+    // revision of the parser accepted it.
+    let uri = "https://id.odal-node.io/01/09506000134352/21/SN1/99/INTERNALDATA";
+    assert!(matches!(
+        DigitalLink::parse(uri),
+        Err(DigitalLinkError::DataAttributeInPath(_))
     ));
 }
 

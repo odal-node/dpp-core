@@ -18,9 +18,11 @@
 //!
 //! ## Module layout
 //!
-//! - `ai`    — the recognised Application Identifier table for URI paths.
-//! - `syntax_dictionary` — GS1's published Syntax Dictionary, parsed. The
-//!   authority for every AI's length and whether it is pre-defined length.
+//! - `syntax_dictionary` — GS1's published Syntax Dictionary, parsed. The single
+//!   authority for every AI's length, its pre-defined-length flag, and which
+//!   qualifier sequences a primary key accepts. Both the URI parser and the
+//!   element-string reader derive from it; there is no second, hand-written
+//!   table beside it.
 //! - `element_string` — [`ElementString`], the AI data a scanner emits.
 //! - `error` — [`DigitalLinkError`].
 //! - `codec`   — percent-encode/decode and GTIN normalisation (private helpers).
@@ -28,7 +30,6 @@
 //! - `gtin`   — [`validate_gtin`].
 //! - `qr`     — [`build_qr_url`].
 
-mod ai;
 mod codec;
 mod element_string;
 mod error;
@@ -39,10 +40,9 @@ mod syntax_dictionary;
 #[cfg(test)]
 mod tests;
 
-pub use ai::{AI_TABLE, AiDescriptor, AiRole, ai_descriptor};
 pub use element_string::ElementString;
 pub use error::DigitalLinkError;
 pub use gtin::validate_gtin;
 pub use link::DigitalLink;
 pub use qr::{build_qr_url, short_serial};
-pub use syntax_dictionary::{AiSpec, ai_len_for_prefix, ai_spec, dictionary};
+pub use syntax_dictionary::{AiSpec, ai_len_for_prefix, ai_spec, dictionary, qualifier_position};

@@ -15,6 +15,57 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The Digital Link URI parser reads GS1's dictionary, and the hand-written AI
+  table is gone.** *(Breaking: `AI_TABLE`, `AiDescriptor`, `AiRole` and
+  `ai_descriptor` are removed; two link shapes change verdict.)*
+
+  Decoding element strings added a dictionary-derived AI table and left the
+  five-entry hand-written one beside it, feeding the URI parser. Two tables for
+  one fact drift; this removes the second. `qualifier_position` replaces
+  `ai_descriptor` for the one thing the parser needed that the dictionary did
+  not yet expose — where a qualifier sits among a primary key's sequences.
+
+  Two verdicts change, both because the hand-written table was wrong:
+
+  **Qualifiers from different alternative sequences are now refused.** GS1
+  writes AI 01's qualifiers as `dlpkey=22,10,21|235`, and the dictionary's own
+  header defines `|` as alternative sequences — a path uses `22,10,21` **or**
+  `235`, never both. The hand-written table ordered them `22→1, 10→2, 21→3,
+  235→4`, turning two alternatives into one ladder, so
+  `/01/…/21/SN/235/TPX` parsed and round-tripped. A test asserted that URI and
+  called it "the canonical ascending qualifier order"; `build()` emitted it
+  whenever both fields were set. New error: `MixedQualifierSequences`.
+
+  **A known data attribute in the path is refused as such, not as unknown.**
+  The table held 5 of 224 AIs, so any other AI was rejected with
+  `UnknownApplicationIdentifier` — including AI 99 `INTERNAL`, which is a real
+  GS1 AI. It is still refused in a path, because GS1's grammar carries only the
+  primary key and its qualifiers there and a data attribute belongs in the query
+  string, but now with `DataAttributeInPath`, which says the true thing. An AI
+  that is genuinely unassigned is still `UnknownApplicationIdentifier`.
+
+  The distinction was adjudicated by GS1's engine rather than by us: an earlier
+  revision accepted a path attribute and the oracle reported "we ACCEPT, GS1
+  REJECTS" against a corpus entry added in this same change.
+
+  A second primary key in one path is still `DuplicatePrimaryKey`, and now
+  correctly so for all sixteen of GS1's primary keys rather than only a repeated
+  `01`.
+
+### Added
+
+- **The GS1 oracle corpus carries cases our own builder cannot produce.** It was
+  generated entirely from `DigitalLink::build()` output, so it could only ever
+  contain links we already emit — proving what we emit is valid GS1 while saying
+  nothing about valid GS1 we refuse. That is the failure direction the corpus's
+  own header names as the quiet one, and it was structurally invisible.
+
+  Three hand-written entries now carry our verdict for GS1's engine to
+  adjudicate: a path mixing two alternative qualifier sequences, a known data
+  attribute following a qualifier, and a genuinely unassigned AI.
+
+### Breaking
+
 - **`PassportRepository` gains `find_by_gtin_any_status`.** *(Breaking: every
   implementor must add the method.)* The by-GTIN counterpart of the existing
   `find_by_id_any_status`, and it closes the same gap on the other public route.

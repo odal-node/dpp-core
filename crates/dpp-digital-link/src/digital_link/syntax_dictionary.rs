@@ -59,6 +59,16 @@ pub struct AiSpec {
     pub dl_attribute: bool,
     /// `dlpkey`: this AI may open a Digital Link path.
     pub dl_primary_key: bool,
+    /// The qualifier sequences this primary key accepts, from `dlpkey=`.
+    ///
+    /// Each inner `Vec` is one **alternative** sequence, in the order the
+    /// qualifiers must appear. GS1 writes alternatives with `|`, so AI 01's
+    /// `dlpkey=22,10,21|235` parses to `[[22, 10, 21], [235]]` — a path may
+    /// use qualifiers from one sequence or the other, never a mix.
+    ///
+    /// Empty when the AI is not a primary key, or is a bare `dlpkey` that
+    /// accepts no qualifiers at all.
+    pub dl_qualifiers: Vec<Vec<String>>,
     /// Shortest legal value, summing the mandatory components.
     pub min_len: usize,
     /// Longest legal value, summing every component including optional ones.
@@ -77,6 +87,30 @@ pub fn dictionary() -> &'static HashMap<String, AiSpec> {
 #[must_use]
 pub fn ai_spec(ai: &str) -> Option<&'static AiSpec> {
     dictionary().get(ai)
+}
+
+/// Where `qualifier` sits among `primary_key`'s qualifier sequences.
+///
+/// Returns `(sequence, position)` — the index of the alternative sequence it
+/// belongs to, and its 1-based position within that sequence.
+///
+/// Both halves are load-bearing. Position orders qualifiers within a sequence;
+/// the sequence index is what makes GS1's `|` alternatives real, because two
+/// qualifiers drawn from **different** sequences may not appear in one path.
+/// AI 01 declares `dlpkey=22,10,21|235`, so `/21/…/235/…` is not a longer
+/// version of `/21/…` — it mixes two alternatives, and GS1 defines no such
+/// link.
+#[must_use]
+pub fn qualifier_position(primary_key: &str, qualifier: &str) -> Option<(usize, u8)> {
+    let spec = ai_spec(primary_key)?;
+    spec.dl_qualifiers
+        .iter()
+        .enumerate()
+        .find_map(|(seq, ais)| {
+            ais.iter()
+                .position(|a| a == qualifier)
+                .map(|pos| (seq, u8::try_from(pos + 1).unwrap_or(u8::MAX)))
+        })
 }
 
 /// How long an AI beginning with `prefix` (its first two characters) is.
@@ -152,6 +186,7 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
         let mut min_len = 0usize;
         let mut max_len = 0usize;
         let mut dl_primary_key = false;
+        let mut dl_qualifiers: Vec<Vec<String>> = Vec::new();
         for field in &rest[spec_start..] {
             if field.starts_with(COMPONENT_START) {
                 let optional = field.starts_with('[');
@@ -162,8 +197,16 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
                     }
                     max_len += hi;
                 }
-            } else if *field == "dlpkey" || field.starts_with("dlpkey=") {
+            } else if *field == "dlpkey" {
                 dl_primary_key = true;
+            } else if let Some(value) = field.strip_prefix("dlpkey=") {
+                dl_primary_key = true;
+                // `22,10,21|235` — alternative sequences separated by `|`,
+                // each an ordered, optional qualifier list.
+                dl_qualifiers = value
+                    .split('|')
+                    .map(|seq| seq.split(',').map(str::to_owned).collect())
+                    .collect();
             }
         }
 
@@ -179,6 +222,7 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
                     predefined_length,
                     dl_attribute,
                     dl_primary_key,
+                    dl_qualifiers: dl_qualifiers.clone(),
                     min_len,
                     max_len,
                     title: title.clone(),

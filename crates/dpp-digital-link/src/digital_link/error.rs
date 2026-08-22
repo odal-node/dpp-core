@@ -30,6 +30,18 @@ pub enum DigitalLinkError {
     },
     #[error("URI contains more than one '/01/' GTIN (primary key) segment")]
     DuplicatePrimaryKey,
+    #[error(
+        "Application Identifier '{0}' is a data attribute; a Digital Link path carries only the primary key and its qualifiers, so it belongs in the query string"
+    )]
+    DataAttributeInPath(String),
+    #[error(
+        "Qualifiers '{first}' and '{second}' belong to different alternative sequences for primary key '{primary_key}'; GS1 defines no link using both"
+    )]
+    MixedQualifierSequences {
+        primary_key: String,
+        first: String,
+        second: String,
+    },
     #[error("URI has a trailing Application Identifier '{0}' with no value")]
     TrailingUnpairedSegment(String),
     #[error(
