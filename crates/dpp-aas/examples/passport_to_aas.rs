@@ -7,7 +7,7 @@ use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
 use dpp_domain::Audience;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
-    PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
+    PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
 };
 
 fn main() {
@@ -16,7 +16,9 @@ fn main() {
         id: PassportId::new(),
         batch_id: Some("LOT-Q2-2026".into()),
         product_name: "EcoWear Organic T-Shirt".into(),
-        sector: Sector::Textile,
+        product_group: ProductGroup::Textile,
+        applicable_instruments: vec![dpp_domain::InstrumentRef::from_catalog("espr")],
+        granularity: Some(dpp_domain::Granularity::Item),
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Berlin, DE".into(),
@@ -40,7 +42,7 @@ fn main() {
         repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: Some(SectorData::Textile(Box::new(TextileData {
+        product_group_data: Some(ProductGroupData::Textile(Box::new(TextileData {
             gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
             fibre_composition: vec![
                 FibreEntry {

@@ -1,10 +1,10 @@
-# Odal Node Sector Plugins
+# Odal Node Product group Plugins
 
-Wasm sector plugins implementing the EU ESPR compliance logic per **sector**.
+Wasm product group plugins implementing the EU ESPR compliance logic per **product group**.
 
-## Sector vs. product category
+## Product group vs. product category
 
-A **sector** is the EU delegated-act bucket the host dispatches on (`battery`, `textile`, `steel`, …) — it selects both the schema version and the plugin. A **product category** (e.g. `ev`/`portable` for batteries, `smartphone` for electronics) is *sector data* a plugin may branch on internally; it is **never** a dispatch key. One sector → one plugin → many product categories. See `docs/architecture/DATA-MODEL.md` §3.4.
+A **product group** is the EU delegated-act bucket the host dispatches on (`battery`, `textile`, `steel`, …) — it selects both the schema version and the plugin. A **product category** (e.g. `ev`/`portable` for batteries, `smartphone` for electronics) is *product group data* a plugin may branch on internally; it is **never** a dispatch key. One product group → one plugin → many product categories. See `docs/architecture/DATA-MODEL.md` §3.4.
 
 ## Building
 
@@ -13,18 +13,18 @@ A **sector** is the EU delegated-act bucket the host dispatches on (`battery`, `
 rustup target add wasm32-wasip1
 
 # Build one plugin:
-cd plugins/sector-battery && cargo build --target wasm32-wasip1 --release
-# Output: target/wasm32-wasip1/release/sector_battery.wasm
+cd plugins/product-group-battery && cargo build --target wasm32-wasip1 --release
+# Output: target/wasm32-wasip1/release/product_group_battery.wasm
 
 # Or build all at once from the repo root:
 just build-plugins
 ```
 
-Copy the `.wasm` into the node's `PLUGINS_DIR` (default: `./plugins/`). The sector key is the filename stem stripped of the `sector-` prefix.
+Copy the `.wasm` into the node's `PLUGINS_DIR` (default: `./plugins/`). The product group key is the filename stem stripped of the `product group-` prefix.
 
 ## Writing a plugin (SDK)
 
-Plugins implement the `DppSectorPlugin` trait from `dpp-plugin-traits` and call `export_plugin!` once. The `dpp-plugin-sdk` macro generates the entire Wasm ABI — authors never hand-roll `alloc`/`dealloc` or output structs.
+Plugins implement the `DppProductGroupPlugin` trait from `dpp-plugin-traits` and call `export_plugin!` once. The `dpp-plugin-sdk` macro generates the entire Wasm ABI — authors never hand-roll `alloc`/`dealloc` or output structs.
 
 ```rust
 use dpp_plugin_sdk::{export_plugin, traits::*};
@@ -33,8 +33,8 @@ use serde_json::Value;
 #[derive(Default)]
 struct MyPlugin;
 
-impl DppSectorPlugin for MyPlugin {
-    fn plugin_identity(&self) -> PluginIdentity { /* sector key, name, version, description */ }
+impl DppProductGroupPlugin for MyPlugin {
+    fn plugin_identity(&self) -> PluginIdentity { /* product group key, name, version, description */ }
     fn schema_version_range(&self) -> SchemaVersionRange { /* supported schema versions */ }
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> { /* field checks */ }
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> { /* metrics */ }
@@ -52,7 +52,7 @@ export_plugin!(MyPlugin);
 [workspace]            # detach from the dpp-core workspace
 
 [package]
-name = "sector-myname"
+name = "product group-myname"
 version = "0.1.0"
 edition = "2024"
 
@@ -64,7 +64,7 @@ dpp-plugin-sdk = { path = "../../crates/dpp-plugin-sdk" }
 serde_json     = "1"
 ```
 
-Add the JSON schema at `crates/dpp-domain/schemas/{sector}/v1.0.0.json` — the `VersionedSchemaRegistry` embeds it at compile time. **`sector-battery` is the reference implementation.**
+Add the JSON schema at `crates/dpp-domain/schemas/{product-group}/v1.0.0.json` — the `VersionedSchemaRegistry` embeds it at compile time. **`product-group-battery` is the reference implementation.**
 
 ## Generated ABI
 
@@ -82,4 +82,4 @@ Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is U
 
 ## SDK status
 
-All ten plugins run on the SDK: each depends on `dpp-plugin-sdk`, implements `DppSectorPlugin`, and calls `export_plugin!` once — `sector-battery`, `textile`, `steel`, `electronics`, `construction`, `tyre`, `toy`, `aluminium`, `furniture`, and `detergent`. None hand-roll the legacy 3-symbol ABI. `sector-battery` is the reference implementation.
+All ten plugins run on the SDK: each depends on `dpp-plugin-sdk`, implements `DppProductGroupPlugin`, and calls `export_plugin!` once — `product-group-battery`, `textile`, `steel`, `electronics`, `construction`, `tyre`, `toy`, `aluminium`, `furniture`, and `detergent`. None hand-roll the legacy 3-symbol ABI. `product-group-battery` is the reference implementation.

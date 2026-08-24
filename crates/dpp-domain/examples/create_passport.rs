@@ -5,11 +5,11 @@
 use chrono::Utc;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
-    PassportStatus, RepairabilityScore, Sector, SectorData, TextileData,
+    PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
 };
 
 fn main() {
-    // 1. Build sector-specific data (Textile DPP)
+    // 1. Build product group-specific data (Textile DPP)
     let textile_data = TextileData {
         gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
         fibre_composition: vec![
@@ -56,7 +56,13 @@ fn main() {
         id: PassportId::new(),
         batch_id: Some("BATCH-2026-Q2-001".into()),
         product_name: "EcoWear Organic T-Shirt".into(),
-        sector: Sector::Textile,
+        product_group: ProductGroup::Textile,
+        // Recorded once, from the catalog, at the moment of issuance — never
+        // recomputed. See `InstrumentRef`.
+        applicable_instruments: dpp_domain::InstrumentCatalog::new().instrument_refs_for("textile"),
+        // No adopted act fixes a level for textiles yet, so there is nothing
+        // honest to put here.
+        granularity: None,
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Torstrasse 12, 10119 Berlin, DE".into(),
@@ -80,7 +86,7 @@ fn main() {
         repairability_score: Some(RepairabilityScore::from_scalar(7.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: Some(SectorData::Textile(Box::new(textile_data))),
+        product_group_data: Some(ProductGroupData::Textile(Box::new(textile_data))),
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,
@@ -109,13 +115,13 @@ fn main() {
     println!("Manufacturer: {}", passport.manufacturer.name);
     println!("Status: {}", passport.status);
 
-    // 3. Validate sector data against the embedded JSON schema
+    // 3. Validate product group data against the embedded JSON schema
     #[cfg(not(target_arch = "wasm32"))]
     {
-        use dpp_domain::validate_sector_data;
+        use dpp_domain::validate_product_group_data;
 
-        match validate_sector_data(passport.sector_data.as_ref().unwrap()) {
-            Ok(()) => println!("✓ Sector data validates against textile v1.1.0 schema"),
+        match validate_product_group_data(passport.product_group_data.as_ref().unwrap()) {
+            Ok(()) => println!("✓ ProductGroup data validates against textile v1.1.0 schema"),
             Err(errors) => {
                 eprintln!("✗ Validation failed:");
                 for e in &errors.errors {

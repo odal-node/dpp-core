@@ -12,7 +12,7 @@
 //! A bundle is `{ manifestJws, content }` ([`SignedBundle`]):
 //! - `manifestJws` — a compact EdDSA JWS whose payload is the
 //!   [`RulesetManifest`] (bundle version, effective date, EU-act citations,
-//!   sector schema versions, and the SHA-256 of `content`), signed by the
+//!   product group schema versions, and the SHA-256 of `content`), signed by the
 //!   publisher key.
 //! - `content` — the ruleset payload the manifest commits to (thresholds,
 //!   tables, schema references).

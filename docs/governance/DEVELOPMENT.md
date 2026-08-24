@@ -21,7 +21,7 @@ Optional but recommended:
 
 ```sh
 just build          # Release build, all workspace crates
-just build-plugins  # Compile Wasm sector plugins (wasm32-wasip1)
+just build-plugins  # Compile Wasm product group plugins (wasm32-wasip1)
 ```
 
 The build must succeed with **zero infrastructure running** — no database, no
@@ -115,7 +115,7 @@ the PR title:
 
 ## Adding a New Schema
 
-1. Create `schemas/{sector}/v{N}.json` with the JSON Schema.
+1. Create `schemas/{product-group}/v{N}.json` with the JSON Schema.
 2. Register it in `VersionedSchemaRegistry` (the `include_str!()` macro
    embeds it at compile time).
 3. Add a test in `dpp-domain` that validates a sample document against the

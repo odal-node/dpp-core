@@ -11,7 +11,7 @@ use super::{SchemaEntry, SchemaOrigin, SchemaRegistrationError};
 /// Thread-safe (via external `RwLock`) versioned JSON schema registry.
 ///
 /// Starts pre-loaded with compile-time embedded schemas and accepts runtime
-/// registrations for new sector versions or entirely new sectors.
+/// registrations for new product group versions or entirely new product groups.
 ///
 /// # Hot-reload workflow
 ///
@@ -31,7 +31,7 @@ use super::{SchemaEntry, SchemaOrigin, SchemaRegistrationError};
 /// ```
 pub struct VersionedSchemaRegistry {
     entries: Vec<SchemaEntry>,
-    /// Lazily-populated cache of compiled schemas, keyed by `(sector, version)`.
+    /// Lazily-populated cache of compiled schemas, keyed by `(product group, version)`.
     /// Interior mutability keeps [`Self::validate`] `&self` and thread-safe; the
     /// `&mut self` mutators evict the affected key.
     #[cfg(not(target_arch = "wasm32"))]
@@ -70,28 +70,28 @@ impl VersionedSchemaRegistry {
         Ok(())
     }
 
-    /// Drop the cached compiled schema for a `(sector, version)`.
+    /// Drop the cached compiled schema for a `(product group, version)`.
     #[cfg(not(target_arch = "wasm32"))]
-    fn evict(&mut self, sector: &str, version: &Version) {
+    fn evict(&mut self, product_group: &str, version: &Version) {
         if let Some(inner) = self
             .compiled
             .get_mut()
             .expect("schema cache not poisoned")
-            .get_mut(sector)
+            .get_mut(product_group)
         {
             inner.remove(version);
         }
     }
     #[cfg(target_arch = "wasm32")]
-    fn evict(&mut self, _sector: &str, _version: &Version) {}
+    fn evict(&mut self, _product_group: &str, _version: &Version) {}
 
     /// Register a new schema at runtime.
     ///
-    /// Returns `Err(AlreadyExists)` if a schema for this (sector, version)
+    /// Returns `Err(AlreadyExists)` if a schema for this (product group, version)
     /// already exists. Use [`Self::register_or_replace`] to overwrite.
     pub fn register(
         &mut self,
-        sector: &str,
+        product_group: &str,
         version_str: &str,
         json: String,
     ) -> Result<(), SchemaRegistrationError> {
@@ -105,16 +105,16 @@ impl VersionedSchemaRegistry {
         if self
             .entries
             .iter()
-            .any(|e| e.sector == sector && e.version == version)
+            .any(|e| e.product_group == product_group && e.version == version)
         {
             return Err(SchemaRegistrationError::AlreadyExists {
-                sector: sector.to_owned(),
+                product_group: product_group.to_owned(),
                 version,
             });
         }
 
         self.entries.push(SchemaEntry {
-            sector: sector.to_owned(),
+            product_group: product_group.to_owned(),
             version,
             json,
             origin: SchemaOrigin::Runtime,
@@ -123,12 +123,12 @@ impl VersionedSchemaRegistry {
         Ok(())
     }
 
-    /// Register a schema, replacing any existing entry for the same (sector, version).
+    /// Register a schema, replacing any existing entry for the same (product group, version).
     ///
     /// Returns `true` if an existing entry was replaced, `false` if this is new.
     pub fn register_or_replace(
         &mut self,
-        sector: &str,
+        product_group: &str,
         version_str: &str,
         json: String,
     ) -> Result<bool, SchemaRegistrationError> {
@@ -141,14 +141,14 @@ impl VersionedSchemaRegistry {
         let replaced = if let Some(existing) = self
             .entries
             .iter_mut()
-            .find(|e| e.sector == sector && e.version == version)
+            .find(|e| e.product_group == product_group && e.version == version)
         {
             existing.json = json;
             existing.origin = SchemaOrigin::Runtime;
             true
         } else {
             self.entries.push(SchemaEntry {
-                sector: sector.to_owned(),
+                product_group: product_group.to_owned(),
                 version: version.clone(),
                 json,
                 origin: SchemaOrigin::Runtime,
@@ -158,7 +158,7 @@ impl VersionedSchemaRegistry {
 
         // A replaced schema invalidates its compiled cache entry.
         if replaced {
-            self.evict(sector, &version);
+            self.evict(product_group, &version);
         }
 
         Ok(replaced)
@@ -168,68 +168,74 @@ impl VersionedSchemaRegistry {
     ///
     /// Returns `true` if the entry was found and removed. Embedded schemas
     /// cannot be removed (returns `false`).
-    pub fn unregister(&mut self, sector: &str, version: &Version) -> bool {
+    pub fn unregister(&mut self, product_group: &str, version: &Version) -> bool {
         let before = self.entries.len();
         self.entries.retain(|e| {
-            !(e.sector == sector && e.version == *version && e.origin == SchemaOrigin::Runtime)
+            !(e.product_group == product_group
+                && e.version == *version
+                && e.origin == SchemaOrigin::Runtime)
         });
         let removed = self.entries.len() < before;
         if removed {
-            self.evict(sector, version);
+            self.evict(product_group, version);
         }
         removed
     }
 
-    /// Get the schema JSON for a sector at a specific version.
-    pub fn get(&self, sector: &str, version: &Version) -> Option<&str> {
+    /// Get the schema JSON for a product group at a specific version.
+    pub fn get(&self, product_group: &str, version: &Version) -> Option<&str> {
         self.entries
             .iter()
-            .find(|e| e.sector == sector && e.version == *version)
+            .find(|e| e.product_group == product_group && e.version == *version)
             .map(|e| e.json.as_str())
     }
 
-    /// Get the full schema entry (including origin) for a sector at a specific version.
-    pub fn get_entry(&self, sector: &str, version: &Version) -> Option<&SchemaEntry> {
+    /// Get the full schema entry (including origin) for a product group at a specific version.
+    pub fn get_entry(&self, product_group: &str, version: &Version) -> Option<&SchemaEntry> {
         self.entries
             .iter()
-            .find(|e| e.sector == sector && e.version == *version)
+            .find(|e| e.product_group == product_group && e.version == *version)
     }
 
-    /// Get the latest schema for a sector.
-    pub fn latest(&self, sector: &str) -> Option<(&Version, &str)> {
+    /// Get the latest schema for a product group.
+    pub fn latest(&self, product_group: &str) -> Option<(&Version, &str)> {
         self.entries
             .iter()
-            .filter(|e| e.sector == sector)
+            .filter(|e| e.product_group == product_group)
             .max_by(|a, b| a.version.cmp(&b.version))
             .map(|e| (&e.version, e.json.as_str()))
     }
 
-    /// List all available (sector, version) pairs.
+    /// List all available (product group, version) pairs.
     pub fn list(&self) -> Vec<(&str, &Version)> {
         self.entries
             .iter()
-            .map(|e| (e.sector.as_str(), &e.version))
+            .map(|e| (e.product_group.as_str(), &e.version))
             .collect()
     }
 
-    /// List all versions for a specific sector, sorted ascending.
-    pub fn versions_for(&self, sector: &str) -> Vec<&Version> {
+    /// List all versions for a specific product group, sorted ascending.
+    pub fn versions_for(&self, product_group: &str) -> Vec<&Version> {
         let mut versions: Vec<&Version> = self
             .entries
             .iter()
-            .filter(|e| e.sector == sector)
+            .filter(|e| e.product_group == product_group)
             .map(|e| &e.version)
             .collect();
         versions.sort();
         versions
     }
 
-    /// List all unique sector names.
-    pub fn sectors(&self) -> Vec<&str> {
-        let mut sectors: Vec<&str> = self.entries.iter().map(|e| e.sector.as_str()).collect();
-        sectors.sort();
-        sectors.dedup();
-        sectors
+    /// List all unique product group names.
+    pub fn product_groups(&self) -> Vec<&str> {
+        let mut product_groups: Vec<&str> = self
+            .entries
+            .iter()
+            .map(|e| e.product_group.as_str())
+            .collect();
+        product_groups.sort();
+        product_groups.dedup();
+        product_groups
     }
 
     /// Count total schema entries (embedded + runtime).
@@ -242,9 +248,9 @@ impl VersionedSchemaRegistry {
         self.entries.is_empty()
     }
 
-    /// Validate `data` against the schema for `(sector, version)`, failing closed
+    /// Validate `data` against the schema for `(product group, version)`, failing closed
     /// when the version string is unparseable or no schema is registered for that
-    /// sector/version pair.
+    /// product group/version pair.
     ///
     /// Use this on write paths where silently skipping validation is not acceptable.
     /// For optional validation that skips when no schema is registered, use
@@ -252,7 +258,7 @@ impl VersionedSchemaRegistry {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn validate_strict(
         &self,
-        sector: &str,
+        product_group: &str,
         version: &str,
         data: &serde_json::Value,
     ) -> Result<(), crate::domain::field_error::ValidationErrors> {
@@ -264,52 +270,54 @@ impl VersionedSchemaRegistry {
                 message: format!("schema version '{version}' is not a valid semver string"),
             }],
         })?;
-        self.validate(sector, &version, data)
+        self.validate(product_group, &version, data)
     }
 
-    /// Validate against the schema for `sector` at the given version *string*,
+    /// Validate against the schema for `product_group` at the given version *string*,
     /// **skipping** (returning `Ok`) when the version is unparseable or no such
     /// schema is registered.
     ///
     /// This is the write-path convenience: callers enforce a JSON schema only
-    /// when one actually exists for the sector/version, without depending on
-    /// `semver` themselves. Sectors with no embedded schema fall through to the
+    /// when one actually exists for the product group/version, without depending on
+    /// `semver` themselves. ProductGroups with no embedded schema fall through to the
     /// caller's typed validation.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn validate_if_present(
         &self,
-        sector: &str,
+        product_group: &str,
         version: &str,
         data: &serde_json::Value,
     ) -> Result<(), crate::domain::field_error::ValidationErrors> {
         let Ok(version) = version.parse::<Version>() else {
             return Ok(());
         };
-        if self.get(sector, &version).is_none() {
+        if self.get(product_group, &version).is_none() {
             return Ok(());
         }
-        self.validate(sector, &version, data)
+        self.validate(product_group, &version, data)
     }
 
-    /// Validate data against the schema for the given sector and version.
+    /// Validate data against the schema for the given product group and version.
     ///
-    /// The compiled schema is cached per `(sector, version)` on first use, so
+    /// The compiled schema is cached per `(product group, version)` on first use, so
     /// repeated validations do not recompile. `&self` and thread-safe.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn validate(
         &self,
-        sector: &str,
+        product_group: &str,
         version: &Version,
         data: &serde_json::Value,
     ) -> Result<(), crate::domain::field_error::ValidationErrors> {
         use crate::domain::field_error::{FieldError, ValidationErrors};
 
         let compiled = self
-            .compiled_schema(sector, version)
+            .compiled_schema(product_group, version)
             .ok_or_else(|| ValidationErrors {
                 errors: vec![FieldError {
                     field: "/".to_owned(),
-                    message: format!("no schema found for sector '{sector}' version '{version}'"),
+                    message: format!(
+                        "no schema found for product_group '{product_group}' version '{version}'"
+                    ),
                 }],
             })?;
 
@@ -327,24 +335,24 @@ impl VersionedSchemaRegistry {
         }
     }
 
-    /// Get the compiled schema for `(sector, version)`, compiling and caching it
+    /// Get the compiled schema for `(product group, version)`, compiling and caching it
     /// on first use. Returns `None` if no such schema is registered.
     #[cfg(not(target_arch = "wasm32"))]
     fn compiled_schema(
         &self,
-        sector: &str,
+        product_group: &str,
         version: &Version,
     ) -> Option<std::sync::Arc<jsonschema::Validator>> {
         if let Some(cached) = self
             .compiled
             .read()
             .expect("schema cache not poisoned")
-            .get(sector)
+            .get(product_group)
             .and_then(|inner| inner.get(version))
         {
             return Some(cached.clone());
         }
-        let json = self.get(sector, version)?;
+        let json = self.get(product_group, version)?;
         // Embedded schemas are valid JSON by construction; runtime schemas are
         // compile-checked at registration. Use ok()? instead of expect() so
         // a future broken schema returns None (→ "no schema found" error) rather
@@ -354,7 +362,7 @@ impl VersionedSchemaRegistry {
         self.compiled
             .write()
             .expect("schema cache not poisoned")
-            .entry(sector.to_owned())
+            .entry(product_group.to_owned())
             .or_default()
             .insert(version.clone(), compiled.clone());
         Some(compiled)

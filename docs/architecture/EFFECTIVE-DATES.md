@@ -53,7 +53,7 @@ calendar date for an act that does not exist — a fact the regulation does not
 state — and it made "pending" indistinguishable from "starts a long time from
 now". It also forced a second, hand-maintained copy of the same fact in the
 calculator status map, free to drift from the rulesets themselves.
-`SectorCalculatorEntry::status_on` now derives status from `Effectivity`.
+`ProductGroupCalculatorEntry::status_on` now derives status from `Effectivity`.
 
 `adoption_deadline` is the Commission's own deadline **from the regulation
 text**, where one exists. It is not an application date: several have already

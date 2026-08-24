@@ -4,7 +4,7 @@
 //! across multiple dpp-core crates:
 //!
 //! 1. Create a Passport with TextileData (dpp-domain)
-//! 2. Validate sector data against the v1.1.0 textile schema (dpp-domain::schemas)
+//! 2. Validate product group data against the v1.1.0 textile schema (dpp-domain::schemas)
 //! 3. Parse a GS1 Digital Link for the product (dpp-digital-link)
 //! 4. Map the passport to an AAS submodel (dpp-digital-link::aas)
 //! 5. Issue a Verifiable Credential for a repairer (dpp-crypto)
@@ -14,10 +14,10 @@
 use chrono::Utc;
 use dpp_aas::map_dpp_to_aas_submodel;
 use dpp_digital_link::DigitalLink;
-use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
 use dpp_domain::{
-    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport,
-    RepairabilityScore, Sector, SectorData, SvhcSubstance, TextileData,
+    CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, ProductGroup,
+    ProductGroupData, RepairabilityScore, SvhcSubstance, TextileData,
 };
 use dpp_tests::fixtures::base_passport;
 use dpp_vc::credential::verify_credential_claims;
@@ -53,8 +53,8 @@ fn make_textile_passport() -> Passport {
         created_at: now,
         updated_at: now,
         ..base_passport(
-            Sector::Textile,
-            SectorData::Textile(Box::new(TextileData {
+            ProductGroup::Textile,
+            ProductGroupData::Textile(Box::new(TextileData {
                 gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
                 fibre_composition: vec![
                     FibreEntry {
@@ -114,10 +114,10 @@ fn textile_passport_serialisation_round_trip() {
 
     assert_eq!(back.id, passport.id);
     assert_eq!(back.product_name, "EcoWeave Organic Cotton T-Shirt");
-    assert_eq!(back.sector, Sector::Textile);
+    assert_eq!(back.product_group, ProductGroup::Textile);
 
-    // Sector data survived round-trip
-    if let Some(SectorData::Textile(td)) = &back.sector_data {
+    // ProductGroup data survived round-trip
+    if let Some(ProductGroupData::Textile(td)) = &back.product_group_data {
         assert_eq!(td.fibre_composition.len(), 2);
         assert_eq!(td.country_of_origin, "BD");
         assert!(td.svhc_substances.as_ref().unwrap().len() == 1);
@@ -161,19 +161,22 @@ fn gs1_digital_link_parsing_for_textile() {
 fn credential_issuance_and_audience_filtering() {
     let passport = make_textile_passport();
 
-    // Extract just the sector data as a flat JSON for access filtering
-    let sector_json = serde_json::to_value(passport.sector_data.as_ref().unwrap()).unwrap();
+    // Extract just the product group data as a flat JSON for access filtering
+    let product_group_json =
+        serde_json::to_value(passport.product_group_data.as_ref().unwrap()).unwrap();
     // For the access policy engine, we need the inner textile fields
-    let textile_fields = match &sector_json {
+    let textile_fields = match &product_group_json {
         serde_json::Value::Object(map) => {
-            // SectorData::Textile serialises with a tag; grab the inner object
-            map.get("Textile").cloned().unwrap_or(sector_json.clone())
+            // ProductGroupData::Textile serialises with a tag; grab the inner object
+            map.get("Textile")
+                .cloned()
+                .unwrap_or(product_group_json.clone())
         }
-        _ => sector_json.clone(),
+        _ => product_group_json.clone(),
     };
 
-    let policy =
-        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
+    let policy = ProductGroupAccessPolicy::for_schema_version("textile", "1.2.0")
+        .expect("textile in catalog");
 
     // ── Public audience ────────────────────────────────────────────────────
     let public_decision = filter_by_audience(&textile_fields, &policy, Audience::Public);
@@ -207,7 +210,7 @@ fn credential_issuance_and_audience_filtering() {
         name: "GreenFix Textile Repair".into(),
         role: CredentialRole::AuthorisedRepairer,
         country: "DE".into(),
-        sectors: vec!["textile".into()],
+        product_groups: vec!["textile".into()],
         product_categories: vec![],
     };
     let credential = CredentialBuilder::new("did:web:authority.example.com".into(), subject)
@@ -247,7 +250,7 @@ fn expired_credential_denied_access() {
         name: "Expired Repair Co".into(),
         role: CredentialRole::AuthorisedRepairer,
         country: "FR".into(),
-        sectors: vec!["textile".into()],
+        product_groups: vec!["textile".into()],
         product_categories: vec![],
     };
     let mut credential =
@@ -266,13 +269,13 @@ fn expired_credential_denied_access() {
 }
 
 #[test]
-fn wrong_sector_credential_out_of_scope() {
+fn wrong_product_group_credential_out_of_scope() {
     let subject = DppCredentialSubject {
         id: "did:web:battery-shop.example.com".into(),
         name: "BatteryFix Ltd".into(),
         role: CredentialRole::Recycler,
         country: "NL".into(),
-        sectors: vec!["battery".into()],
+        product_groups: vec!["battery".into()],
         product_categories: vec![],
     };
     let credential =

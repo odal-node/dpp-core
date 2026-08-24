@@ -6,7 +6,7 @@
 
 Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules for the [Odal Node](https://odal-node.io) Digital Product Passport system.
 
-These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm sector plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.
+These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm product group plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.
 
 Keeping them in a standalone `no_std`, zero-dependency crate is what makes that
 possible: `dpp-domain` and the Wasm plugins can both depend on it without either
@@ -18,7 +18,7 @@ depending on the other.
 
 - You need a cross-field regulatory check that JSON Schema cannot express — a
   sum constraint, a conditional disclosure trigger, an enumerated band.
-- You are writing a Wasm sector plugin and need the same rule the host applies,
+- You are writing a Wasm product group plugin and need the same rule the host applies,
   compiled into the guest.
 - You are adding a rule and need it to exist exactly once, reachable from both
   `dpp-domain` and the plugins.
@@ -44,7 +44,7 @@ assert!(validate_fibre_composition(&fibres).is_ok());
 
 ## No-std constraint
 
-This crate **must remain `#![no_std]` + `alloc` with zero dependencies.** That is the whole reason C1 extracted it from `dpp-domain`: sector plugins compile to `wasm32-wasip1` and cannot pull in the heavier domain crate. If a rule needs `std` or an external crate, the rule is in the wrong place.
+This crate **must remain `#![no_std]` + `alloc` with zero dependencies.** That is the whole reason C1 extracted it from `dpp-domain`: product group plugins compile to `wasm32-wasip1` and cannot pull in the heavier domain crate. If a rule needs `std` or an external crate, the rule is in the wrong place.
 
 The CI `cargo check` target verifies this. Do not break it.
 
@@ -61,11 +61,11 @@ src/
 │   ├── numeric.rs            percentage helpers, sum checks      (placeholder)
 │   └── units.rs              unit conversion helpers              (placeholder)
 │
-├── chemicals/                REACH / RoHS / EU 2026/405  (cross-sector — never under one sector)
+├── chemicals/                REACH / RoHS / EU 2026/405  (cross-product group — never under one product group)
 │   ├── svhc.rs               REACH Art. 33 concentration validation ✅
 │   └── surfactants.rs        EU 2026/405 band validation ✅
 │
-├── textiles/                 EU ESPR textile sector
+├── textiles/                 EU ESPR textile product group
 │   ├── fibre.rs              fibre_sum_ok, validate_fibre_composition ✅
 │   └── care.rs               ISO 3758 care symbols                (placeholder)
 │
@@ -86,13 +86,13 @@ src/
 └── toys/                     EN 71 / REACH / EU 2025/2509         (placeholder)
 ```
 
-Active sectors are batteries, textiles, and electronics. All others have placeholder modules with field documentation; rules will be added as the delegated acts finalise and the sector plugins mature.
+Active product groups are batteries, textiles, and electronics. All others have placeholder modules with field documentation; rules will be added as the delegated acts finalise and the product group plugins mature.
 
 ---
 
 ## Adding a rule
 
-1. Find the right module (sector + sub-concern). If the rule applies to more than one sector, it belongs in `chemicals/` or `common/`, not under any single sector.
+1. Find the right module (product group + sub-concern). If the rule applies to more than one product group, it belongs in `chemicals/` or `common/`, not under any single product group.
 2. Write a pure function with primitive borrowing inputs (`&str`, `f64`, `&[T]`). No owned allocations in function arguments.
 3. Return `Result<(), String>` for validators, `bool` for predicates.
 4. Add a `#[cfg(test)] mod tests` block in the same file.
@@ -105,13 +105,13 @@ Active sectors are batteries, textiles, and electronics. All others have placeho
 
 | Rule | Rationale |
 |---|---|
-| `#![no_std]` + `alloc` only | Wasm sector plugins consume this crate; std is unavailable in `wasm32-wasip1` |
+| `#![no_std]` + `alloc` only | Wasm product group plugins consume this crate; std is unavailable in `wasm32-wasip1` |
 | Zero `[dependencies]` in `Cargo.toml` | Keeps the plugin graph lean; any dep here becomes a dep of every plugin |
 | Primitive borrowing inputs | Callers adapt their own types; this crate depends on neither `dpp-domain` structs nor `serde_json::Value` |
 | One implementation per rule | The only acceptable duplication is a `pub use` re-export in `lib.rs` |
 | Repairability scoring → `dpp-calc` | EN 45554 A–E grade calculation belongs to the calculator crate; only field-level validations live here |
-| SVHC → `chemicals/` | REACH Art. 33 is cross-sector; it must never be placed under a single sector module |
-| `common/` threshold | A helper belongs in `common/` only if it is used by ≥ 2 sector modules and has no sector-specific meaning |
+| SVHC → `chemicals/` | REACH Art. 33 is cross-product group; it must never be placed under a single product group module |
+| `common/` threshold | A helper belongs in `common/` only if it is used by ≥ 2 product group modules and has no product-group-specific meaning |
 
 ---
 
@@ -120,7 +120,7 @@ Active sectors are batteries, textiles, and electronics. All others have placeho
 | Crate | Role |
 |---|---|
 | `dpp-domain` | Consumes these rules for standalone validation; this crate does **not** depend on it |
-| `dpp-plugin-sdk` | Re-exports these rules to Wasm sector plugins via `dpp_plugin_sdk::rules` |
+| `dpp-plugin-sdk` | Re-exports these rules to Wasm product group plugins via `dpp_plugin_sdk::rules` |
 | `dpp-calc` | Holds scoring and calculation; field-level validation belongs here, not there |
 
 ## Minimum Rust version

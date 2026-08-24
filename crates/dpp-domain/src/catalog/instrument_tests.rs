@@ -50,12 +50,12 @@ fn only_delegated_acts_carry_a_parent() {
 #[test]
 fn an_act_may_reach_a_product_group_that_has_no_manifest() {
     let instruments = InstrumentCatalog::new();
-    let sectors = SectorCatalog::new();
+    let product_groups = ProductGroupCatalog::new();
 
     let unmodelled: Vec<&str> = instruments
         .product_group_keys()
         .into_iter()
-        .filter(|key| sectors.get(key).is_none())
+        .filter(|key| product_groups.get(key).is_none())
         .collect();
 
     assert!(

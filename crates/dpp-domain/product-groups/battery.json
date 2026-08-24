@@ -1,0 +1,40 @@
+{
+  "key": "battery",
+  "title": "Batteries",
+  "schemaVersions": [
+    "1.0.0",
+    "2.0.0",
+    "2.1.0",
+    "2.2.0",
+    "2.3.0",
+    "2.4.0",
+    "2.5.0",
+    "2.6.0"
+  ],
+  "currentSchemaVersion": "2.6.0",
+  "productCategories": [
+    "portable",
+    "industrial",
+    "ev",
+    "lmt",
+    "starting-lighting-ignition"
+  ],
+  "disclosure": {
+    "disassemblyInstructionsUrl": "restricted",
+    "cathodeMaterial": "restricted",
+    "anodeMaterial": "restricted",
+    "electrolyteMaterial": "restricted",
+    "sohMethodology": "restricted",
+    "stateOfHealth": "individual",
+    "stateOfHealthPct": "individual",
+    "expectedLifetime": "individual",
+    "dynamicPerformance": "individual",
+    "batteryStatus": "individual",
+    "usageHistory": "individual",
+    "componentPartNumbers": "restricted",
+    "sparePartsContacts": "restricted",
+    "safetyMeasures": "restricted",
+    "testReportResults": "conformity"
+  },
+  "plugin": "product-group-battery"
+}

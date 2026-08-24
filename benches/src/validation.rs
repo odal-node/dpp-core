@@ -1,12 +1,14 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_domain::domain::gtin::Gtin;
-use dpp_domain::domain::sector::{
-    BatteryChemistry, BatteryData, BatteryType, FibreEntry, SectorData, TextileData,
+use dpp_domain::domain::product_group::{
+    BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };
-use dpp_domain::domain::validation::{validate_sector_data, validate_sector_data_batch};
+use dpp_domain::domain::validation::{
+    validate_product_group_data, validate_product_group_data_batch,
+};
 
-fn valid_battery() -> SectorData {
-    SectorData::Battery(Box::new(BatteryData {
+fn valid_battery() -> ProductGroupData {
+    ProductGroupData::Battery(Box::new(BatteryData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 48.0,
@@ -78,8 +80,8 @@ fn valid_battery() -> SectorData {
     }))
 }
 
-fn valid_textile() -> SectorData {
-    SectorData::Textile(Box::new(TextileData {
+fn valid_textile() -> ProductGroupData {
+    ProductGroupData::Textile(Box::new(TextileData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
@@ -122,21 +124,21 @@ fn valid_textile() -> SectorData {
 
 fn validation_benchmarks(c: &mut Criterion) {
     // Warm the OnceLock validators so compilation cost isn't measured.
-    let _ = validate_sector_data(&valid_battery());
-    let _ = validate_sector_data(&valid_textile());
+    let _ = validate_product_group_data(&valid_battery());
+    let _ = validate_product_group_data(&valid_textile());
 
     let battery = valid_battery();
     let textile = valid_textile();
 
     c.bench_function("validate_battery", |b| {
-        b.iter(|| validate_sector_data(&battery).unwrap());
+        b.iter(|| validate_product_group_data(&battery).unwrap());
     });
 
     c.bench_function("validate_textile", |b| {
-        b.iter(|| validate_sector_data(&textile).unwrap());
+        b.iter(|| validate_product_group_data(&textile).unwrap());
     });
 
-    let batch: Vec<SectorData> = (0..100)
+    let batch: Vec<ProductGroupData> = (0..100)
         .map(|i| {
             if i % 2 == 0 {
                 valid_battery()
@@ -147,7 +149,7 @@ fn validation_benchmarks(c: &mut Criterion) {
         .collect();
 
     c.bench_function("validate_batch_100", |b| {
-        b.iter(|| validate_sector_data_batch(&batch));
+        b.iter(|| validate_product_group_data_batch(&batch));
     });
 }
 

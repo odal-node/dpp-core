@@ -1,9 +1,9 @@
-﻿//! Sector access policy types and disclosure-class lookup.
+﻿//! ProductGroup access policy types and disclosure-class lookup.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
+use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, ProductGroupCatalog};
 
 /// Maps JSON field names to their disclosure class.
 ///
@@ -33,15 +33,15 @@ use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, SectorCatalog};
 /// expression rather than a hole in enforcement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SectorAccessPolicy {
+pub struct ProductGroupAccessPolicy {
     /// Human-readable policy name (e.g., `"textile-v1.1"`).
     pub name: String,
-    /// The sector this policy applies to.
-    pub sector: String,
+    /// The product group this policy applies to.
+    pub product_group: String,
     /// Map of JSON field name → disclosure class. A listed field is matched
     /// wherever it appears in the document (any nesting depth), by normalized key.
     pub field_disclosure: HashMap<String, Disclosure>,
-    // NOTE: `SectorAccessPolicy::from_schema` below reads the same classes out
+    // NOTE: `ProductGroupAccessPolicy::from_schema` below reads the same classes out
     // of a *versioned* schema. Prefer it — see its doc comment.
     /// Class applied to fields **not** listed in `field_disclosure`. Defaults
     /// to `Public` (backward-compatible: only restricted fields need listing).
@@ -58,7 +58,7 @@ fn disclosure_public() -> Disclosure {
 /// Whether `a` and `b` are equal for field-matching purposes once both are
 /// normalized — non-alphanumerics (`_`, `-`) dropped, case-folded, so
 /// `disassemblyInstructions` == `disassembly_instructions` — without
-/// allocating a `String` for either side. [`SectorAccessPolicy::disclosure_for_field`]
+/// allocating a `String` for either side. [`ProductGroupAccessPolicy::disclosure_for_field`]
 /// runs this once per classified field, per document key, at every
 /// recursion depth of [`super::filter::filter_by_audience`], so avoiding an
 /// allocation per comparison matters there.
@@ -75,7 +75,7 @@ fn keys_match_normalized(a: &str, b: &str) -> bool {
 }
 
 /// Universal conformity-evidence fields present on every published passport
-/// payload (signatures, audit trails). Folded into each sector's policy so they
+/// payload (signatures, audit trails). Folded into each product group's policy so they
 /// are not repeated in every manifest.
 const COMMON_CONFORMITY: &[&str] = &[
     "jwsSignature",
@@ -153,7 +153,7 @@ fn collect_disclosures(node: &serde_json::Value, out: &mut HashMap<String, Discl
     }
 }
 
-impl SectorAccessPolicy {
+impl ProductGroupAccessPolicy {
     /// The policy for the schema version a passport was validated against.
     ///
     /// **The constructor to reach for.** A passport stores its
@@ -162,18 +162,18 @@ impl SectorAccessPolicy {
     /// passport, whatever the current version later says. See
     /// [`Self::from_schema`] for why that matters.
     ///
-    /// Returns `None` when the sector or version is unknown to the registry, so
+    /// Returns `None` when the product group or version is unknown to the registry, so
     /// an unrecognised pair fails closed rather than serving an all-public view.
     /// Takes the version as a string so a caller holding a `Passport` can pass
     /// `passport.schema_version` directly, and so consumers need no `semver`
     /// dependency of their own. An unparseable version yields `None`, the same
     /// as an unknown one — both fail closed.
     #[must_use]
-    pub fn for_schema_version(sector_key: &str, version: &str) -> Option<Self> {
+    pub fn for_schema_version(product_group_key: &str, version: &str) -> Option<Self> {
         let parsed: semver::Version = version.parse().ok()?;
         let registry = crate::schemas::VersionedSchemaRegistry::new();
-        let json = registry.get(sector_key, &parsed)?;
-        Self::from_schema(sector_key, version, json)
+        let json = registry.get(product_group_key, &parsed)?;
+        Self::from_schema(product_group_key, version, json)
     }
 
     /// Build the policy from the catalog's single, unversioned disclosure map.
@@ -193,8 +193,8 @@ impl SectorAccessPolicy {
         note = "use `for_schema_version` — the catalog map is unversioned, so it \
                 filters published passports by rules that may postdate their signatures"
     )]
-    pub fn from_catalog(catalog: &SectorCatalog, sector_key: &str) -> Option<Self> {
-        let descriptor = catalog.get(sector_key)?;
+    pub fn from_catalog(catalog: &ProductGroupCatalog, product_group_key: &str) -> Option<Self> {
+        let descriptor = catalog.get(product_group_key)?;
         let mut field_disclosure: HashMap<String, Disclosure> = descriptor.disclosure.clone();
         for field in COMMON_CONFORMITY {
             field_disclosure
@@ -202,8 +202,8 @@ impl SectorAccessPolicy {
                 .or_insert(Disclosure::Conformity);
         }
         Some(Self {
-            name: format!("{sector_key}-{}", descriptor.current_schema_version),
-            sector: sector_key.to_owned(),
+            name: format!("{product_group_key}-{}", descriptor.current_schema_version),
+            product_group: product_group_key.to_owned(),
             field_disclosure,
             default_disclosure: Disclosure::Public,
         })
@@ -259,11 +259,11 @@ impl SectorAccessPolicy {
     /// `properties`. An unparseable schema must not silently produce an
     /// all-public policy.
     #[must_use]
-    pub fn from_schema(sector_key: &str, version: &str, schema_json: &str) -> Option<Self> {
+    pub fn from_schema(product_group_key: &str, version: &str, schema_json: &str) -> Option<Self> {
         let schema: serde_json::Value = serde_json::from_str(schema_json).ok()?;
         // The root `properties` map is still required: a schema without one is
         // not a shape this policy can describe, and guessing is how an
-        // unparseable sector ends up all-public.
+        // unparseable product group ends up all-public.
         schema.get("properties")?.as_object()?;
 
         let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
@@ -276,14 +276,14 @@ impl SectorAccessPolicy {
         }
 
         Some(Self {
-            name: format!("{sector_key}-{version}"),
-            sector: sector_key.to_owned(),
+            name: format!("{product_group_key}-{version}"),
+            product_group: product_group_key.to_owned(),
             field_disclosure,
             default_disclosure: Disclosure::Public,
         })
     }
 
-    /// Default access policy for top-level passport fields (sector-agnostic).
+    /// Default access policy for top-level passport fields (product group-agnostic).
     ///
     /// **Invariant — no mutable-after-publish *compliance content* may sit at
     /// `Public`.** The public view is what a passport's public signature is
@@ -307,7 +307,7 @@ impl SectorAccessPolicy {
         }
         Self {
             name: "passport-v1.0".into(),
-            sector: "passport".into(),
+            product_group: "passport".into(),
             field_disclosure,
             default_disclosure: Disclosure::Public,
         }

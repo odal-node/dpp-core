@@ -19,7 +19,7 @@ use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVe
 ///
 /// The comparison itself is **not** reimplemented here. The thresholds and the
 /// check against them live in `dpp-rules`, so the rule has one implementation
-/// whether it is reached from a Wasm sector plugin or from this crate; each
+/// whether it is reached from a Wasm product group plugin or from this crate; each
 /// implementation below only says *which* of them its phase means. What this
 /// crate adds is the ruleset identity, the effective period, and the receipt.
 pub trait RecycledContentRuleset: Ruleset {

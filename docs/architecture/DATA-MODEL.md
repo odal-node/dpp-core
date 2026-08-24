@@ -12,7 +12,7 @@ This document defines the canonical data structures for all Digital Product Pass
 
 1. **Regulation-anchored**: Every mandatory field maps to a specific article in a delegated act or the ESPR framework. Non-regulatory fields are labelled `internal`.
 2. **Schema-versioned**: Every passport record carries a `schema_version` field. Migrating to a new regulatory schema does not invalidate old passports.
-3. **Sector-extensible**: A base `Passport` struct holds cross-sector fields. Sector-specific data is stored as a typed enum variant (`SectorData`). Adding a new sector requires a new variant and a new JSON schema — no changes to the base type.
+3. **Product group-extensible**: A base `Passport` struct holds cross-product group fields. Product group-specific data is stored as a typed enum variant (`ProductGroupData`). Adding a new product group requires a new variant and a new JSON schema — no changes to the base type.
 4. **Provisional vs. Strict**: Fields derived from adopted delegated acts are **strict** (legally mandatory). Fields from working group drafts are **provisional** and may change when the delegated act is finalised.
 5. **Append-only lifecycle**: No DPP record is ever deleted. State transitions are append-only audit log entries. Archival is a state, not deletion.
 
@@ -35,7 +35,7 @@ Draft  -->  Published (Active)  -->  Suspended  -->  Archived
 | `Archived` | `"archived"` | Read-only | Product end-of-life; retained for regulatory record-keeping; immutable |
 
 **Transition rules:**
-- `Draft -> Published`: Requires all `strict` fields for the declared sector to be present and valid.
+- `Draft -> Published`: Requires all `strict` fields for the declared product group to be present and valid.
 - `Published -> Suspended`: Requires an authenticated action with a stated reason.
 - `Suspended -> Published`: Requires re-validation of all `strict` fields.
 - `Any -> Archived`: Irreversible.
@@ -48,26 +48,26 @@ Custom serde: domain `Published` serialises to wire `"active"` (and back). This 
 
 ### 3.1 Base Passport (`Passport` struct)
 
-All DPPs — regardless of sector — carry these fields. Source: `dpp-domain/src/domain/passport.rs`.
+All DPPs — regardless of product group — carry these fields. Source: `dpp-domain/src/domain/passport.rs`.
 
 | Field | Rust Type | JSON name | Description |
 |---|---|---|---|
 | `id` | `PassportId` (UUID v4) | `"id"` | Unique passport identifier |
 | `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9) |
 | `product_name` | `String` | `"productName"` | Human-readable product name (ESPR Art. 9) |
-| `sector` | `Sector` enum | `"sector"` | EU ESPR sector — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
+| `product group` | `ProductGroup` enum | `"product group"` | EU ESPR product group — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill of materials entries |
 | `co2e_per_unit` | `Option<f64>` | `"co2ePerUnit"` | CO₂e per unit in kg — may be set by compliance engine |
 | `repairability_score` | `Option<f64>` | `"repairabilityScore"` | Repairability score (0.0–10.0) |
-| `sector_data` | `Option<SectorData>` | `"sectorData"` | Typed sector-specific data (tagged enum) |
+| `product_group_data` | `Option<ProductGroupData>` | `"productGroupData"` | Typed product-group-specific data (tagged enum) |
 | `status` | `PassportStatus` | `"status"` | Lifecycle state (see §2) |
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over canonical payload (Ed25519) |
 | `created_at` | `DateTime<Utc>` | `"createdAt"` | Record creation timestamp |
 | `updated_at` | `DateTime<Utc>` | `"updatedAt"` | Last modification timestamp |
 | `published_at` | `Option<DateTime>` | `"publishedAt"` | First publish timestamp |
-| `schema_version` | `String` | `"schemaVersion"` | Semver of the sector schema used for validation |
+| `schema_version` | `String` | `"schemaVersion"` | Semver of the product group schema used for validation |
 | `retention_locked` | `bool` | `"retentionLocked"` | Set permanently on first publish; prevents deletion |
 | `parent_passport_ref` | `Option<PassportRef>` | `"parentPassportRef"` | Cross-operator predecessor this record derives from (second-life lineage). Omitted when absent. |
 | `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports — the bill of materials. Omitted when empty. |
@@ -93,11 +93,11 @@ Elements of `Passport.materials` — bill of materials entries.
 | `recycled_pct` | `Option<f64>` | `"recycledPct"` | Recycled content percentage (0–100) |
 | `country_of_origin` | `Option<String>` | `"countryOfOrigin"` | ISO 3166-1 alpha-2 country of origin |
 
-### 3.4 Sector vs. product-group sub-classification
+### 3.4 Product group vs. product-group sub-classification
 
-`Sector` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-sector sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers in either this repo or the engine, and every sector that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
+`ProductGroup` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-product group sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers in either this repo or the engine, and every product group that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
 
-| Sector | Field | Source |
+| Product group | Field | Source |
 |---|---|---|
 | `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
 | `steel` | `product_category` | `"flat"` / `"long"` / … |
@@ -107,21 +107,21 @@ Elements of `Passport.materials` — bill of materials entries.
 | `tyre` | `tyre_class` | `"C1"` / … |
 
 **Rules:**
-1. The host dispatches compliance **only** on `Sector`. A plugin is selected by sector, never by a sector-internal field.
-2. These fields are plain sector data. A plugin *may* read one to choose an internal rule path, but it does not change which plugin runs.
-3. The names and shapes are deliberately uneven — they track what each sector's own act defines, not a normalised cross-sector vocabulary. Only `battery_type` is a closed, required, typed enum; that follows from Art. 1(3) being a named enumeration in law, which is not true of the others.
+1. The host dispatches compliance **only** on `ProductGroup`. A plugin is selected by product group, never by a product group-internal field.
+2. These fields are plain product group data. A plugin *may* read one to choose an internal rule path, but it does not change which plugin runs.
+3. The names and shapes are deliberately uneven — they track what each product group's own act defines, not a normalised cross-product group vocabulary. Only `battery_type` is a closed, required, typed enum; that follows from Art. 1(3) being a named enumeration in law, which is not true of the others.
 
-`Passport::validate()` enforces that `sector` matches `sector_data`'s sector when the latter is present.
+`Passport::validate()` enforces that `product group` matches `product_group_data`'s product group when the latter is present.
 
 ---
 
-## 4. Sector Extensions
+## 4. Product group Extensions
 
-Sector-specific data is stored in `SectorData`, a tagged enum. Each variant has its own struct and corresponding JSON schema at `schemas/{sector}/v{version}.json`.
+Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each variant has its own struct and corresponding JSON schema at `schemas/{product-group}/v{version}.json`.
 
-**Serde**: `SectorData` uses `rename_all = "camelCase"` with internally-tagged format.
+**Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Sector (`BatteryData`) — v2.6.0
+### 4.1 Battery Product group (`BatteryData`) — v2.6.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
@@ -131,7 +131,7 @@ Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 Annex VI Part A fields sit in the type for seven schema versions with no schema
 property to validate against. The authoritative pair is:
 
-- `crates/dpp-domain/src/domain/sector/data/battery.rs` — the type, with a
+- `crates/dpp-domain/src/domain/product group/data/battery.rs` — the type, with a
   per-field regulatory citation on each doc comment.
 - `crates/dpp-domain/schemas/battery/v2.6.0.json` — the wire contract, with an
   `x-disclosure` class on every property. `additionalProperties` is `false`, and
@@ -178,7 +178,7 @@ carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.
 
 
-### 4.2 Textile Sector (`TextileData`) — v1.2.0
+### 4.2 Textile Product group (`TextileData`) — v1.2.0
 
 Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2027, compliance ~2028–2029.
 
@@ -197,7 +197,7 @@ Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2
 
 Schemas: `schemas/textile/v1.0.0.json`, `schemas/textile/v1.1.0.json`
 
-### 4.3 Steel Sector — PROVISIONAL
+### 4.3 Steel Product group — PROVISIONAL
 
 CBAM-aligned. Schema at `schemas/steel/v1.0.0.json`.
 
@@ -207,7 +207,7 @@ ESPR Art. 25 / Annex VII destruction-ban reporting for unsold consumer products.
 
 ### 4.5 Electronics, Other
 
-`SectorData::Electronics` and `SectorData::Other` variants exist but have no sector-specific struct yet.
+`ProductGroupData::Electronics` and `ProductGroupData::Other` variants exist but have no product-group-specific struct yet.
 
 ---
 
@@ -235,7 +235,7 @@ When a DPP transitions to `Published`, it is wrapped in a W3C Verifiable Credent
     "schemaVersion": "2.0.0",
     "productName": "EcoCell Pro 48V",
     "manufacturer": { "name": "EcoTech", "address": "DE" },
-    "sectorData": { "batteryChemistry": "LFP", "nominalVoltageV": 48.0 }
+    "productGroupData": { "batteryChemistry": "LFP", "nominalVoltageV": 48.0 }
   },
   "proof": {
     "type": "JsonWebSignature2020",
@@ -258,7 +258,7 @@ Schemas follow semver. The `VersionedSchemaRegistry` in `dpp-domain` discovers a
 | Minor (`1.x.0`) | New optional fields; provisional -> strict | Yes |
 | Major (`x.0.0`) | Field renamed, type changed, or removed | No |
 
-Current schemas: 28 embedded versions across 11 sectors — see
+Current schemas: 28 embedded versions across 11 product groups — see
 `crates/dpp-domain/src/schemas/embedded.rs` for the registered list. Every one
 is reachable at runtime; a passport is validated against the version it
 declares, not against the newest.

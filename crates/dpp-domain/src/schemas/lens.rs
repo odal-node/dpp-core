@@ -1,10 +1,10 @@
 //! Schema upcast lenses: pure, versioned, deterministic `v_n → v_m` transforms
 //! applied at *read time*.
 //!
-//! Signed passports are immutable; delegated acts are not. When a sector schema
+//! Signed passports are immutable; delegated acts are not. When a product group schema
 //! gains a new version, existing signed records must stay byte-identical (their
 //! signatures depend on it) yet remain consumable by new-version readers. A lens
-//! transforms a record's sector data from the version it was written against up
+//! transforms a record's product group data from the version it was written against up
 //! to a newer one, **without touching the canonical signed original** — the
 //! derived view carries honest provenance (`derived`, `lens_chain`, `lossy`) and
 //! is never presented as the original signature.
@@ -19,10 +19,10 @@ use std::collections::{HashMap, VecDeque};
 use semver::Version;
 use serde_json::Value;
 
-/// A single-hop, pure upcast transform between two versions of one sector's
+/// A single-hop, pure upcast transform between two versions of one product group's
 /// schema.
 pub struct Lens {
-    pub sector: String,
+    pub product_group: String,
     pub from: Version,
     pub to: Version,
     /// Whether the transform may drop or default source information. An honest
@@ -38,7 +38,7 @@ pub struct Lens {
 impl Lens {
     #[must_use]
     pub fn new(
-        sector: impl Into<String>,
+        product_group: impl Into<String>,
         from: Version,
         to: Version,
         lossy: bool,
@@ -46,7 +46,7 @@ impl Lens {
         transform: fn(&Value) -> Result<Value, LensError>,
     ) -> Self {
         Self {
-            sector: sector.into(),
+            product_group: product_group.into(),
             from,
             to,
             lossy,
@@ -68,12 +68,12 @@ impl std::fmt::Display for LensError {
     }
 }
 
-/// A derived (upcast) view of sector data, with honest provenance. Never the
+/// A derived (upcast) view of product group data, with honest provenance. Never the
 /// canonical signed original — `derived` is always `true`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivedView {
-    /// The transformed sector data, conforming to the `to` schema.
+    /// The transformed product group data, conforming to the `to` schema.
     pub data: Value,
     /// Always `true`: this is a read-time derivation, not signed source.
     pub derived: bool,
@@ -89,9 +89,9 @@ pub struct DerivedView {
 /// Why an upcast could not be produced. Never a silent identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpcastError {
-    /// No chain of registered lenses bridges `from` → `to` for this sector.
+    /// No chain of registered lenses bridges `from` → `to` for this product group.
     NoPath {
-        sector: String,
+        product_group: String,
         from: Version,
         to: Version,
     },
@@ -106,8 +106,12 @@ pub enum UpcastError {
 impl std::fmt::Display for UpcastError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoPath { sector, from, to } => {
-                write!(f, "no lens path for {sector} {from} → {to}")
+            Self::NoPath {
+                product_group,
+                from,
+                to,
+            } => {
+                write!(f, "no lens path for {product_group} {from} → {to}")
             }
             Self::NotAnUpcast { from, to } => {
                 write!(
@@ -144,7 +148,7 @@ impl LensRegistry {
         Self { lenses }
     }
 
-    /// Upcast `data` for `sector` from `from` up to `to`, composing single-hop
+    /// Upcast `data` for `product_group` from `from` up to `to`, composing single-hop
     /// lenses along the fewest-hop path.
     ///
     /// `from == to` is the identity (a no-loss derived view of the same version).
@@ -153,7 +157,7 @@ impl LensRegistry {
     /// identity.
     pub fn upcast(
         &self,
-        sector: &str,
+        product_group: &str,
         data: &Value,
         from: &Version,
         to: &Version,
@@ -179,9 +183,9 @@ impl LensRegistry {
         }
 
         let path = self
-            .path(sector, from, to)
+            .path(product_group, from, to)
             .ok_or_else(|| UpcastError::NoPath {
-                sector: sector.to_owned(),
+                product_group: product_group.to_owned(),
                 from: from.clone(),
                 to: to.clone(),
             })?;
@@ -189,7 +193,7 @@ impl LensRegistry {
         self.apply(data, from, to, &path)
     }
 
-    /// Upcast `data` for `sector` as far toward `to` as the registered lenses
+    /// Upcast `data` for `product_group` as far toward `to` as the registered lenses
     /// reach, stopping at the newest reachable version no newer than `to`.
     ///
     /// [`Self::upcast`] demands a path to exactly `to` and refuses anything
@@ -211,7 +215,7 @@ impl LensRegistry {
     /// [`Self::upcast`] — there is no gap, so there is no progress to require.
     pub fn upcast_toward(
         &self,
-        sector: &str,
+        product_group: &str,
         data: &Value,
         from: &Version,
         to: &Version,
@@ -232,12 +236,12 @@ impl LensRegistry {
         // The newest version reachable that `to` does not precede — fewest hops
         // is already guaranteed per destination by the breadth-first search.
         let (reached, path) = self
-            .reachable(sector, from)
+            .reachable(product_group, from)
             .into_iter()
             .filter(|(v, _)| v <= to)
             .max_by(|(a, _), (b, _)| a.cmp(b))
             .ok_or_else(|| UpcastError::NoPath {
-                sector: sector.to_owned(),
+                product_group: product_group.to_owned(),
                 from: from.clone(),
                 to: to.clone(),
             })?;
@@ -249,12 +253,17 @@ impl LensRegistry {
     /// [`Self::upcast_str`].
     pub fn upcast_str_toward(
         &self,
-        sector: &str,
+        product_group: &str,
         data: &Value,
         from: &str,
         to: &str,
     ) -> Result<DerivedView, UpcastError> {
-        self.upcast_toward(sector, data, &parse_version(from)?, &parse_version(to)?)
+        self.upcast_toward(
+            product_group,
+            data,
+            &parse_version(from)?,
+            &parse_version(to)?,
+        )
     }
 
     /// Run `path`'s hops over `data`, recording the chain and whether any hop
@@ -292,24 +301,29 @@ impl LensRegistry {
     /// tolerated (`v2.0.0`); an unparseable version is a typed refusal.
     pub fn upcast_str(
         &self,
-        sector: &str,
+        product_group: &str,
         data: &Value,
         from: &str,
         to: &str,
     ) -> Result<DerivedView, UpcastError> {
-        self.upcast(sector, data, &parse_version(from)?, &parse_version(to)?)
+        self.upcast(
+            product_group,
+            data,
+            &parse_version(from)?,
+            &parse_version(to)?,
+        )
     }
 
-    /// Fewest-hop lens path (as lens indices) from `from` to `to` for `sector`.
+    /// Fewest-hop lens path (as lens indices) from `from` to `to` for `product_group`.
     /// `None` if no path.
-    fn path(&self, sector: &str, from: &Version, to: &Version) -> Option<Vec<usize>> {
-        self.reachable(sector, from).remove(to)
+    fn path(&self, product_group: &str, from: &Version, to: &Version) -> Option<Vec<usize>> {
+        self.reachable(product_group, from).remove(to)
     }
 
-    /// Every version reachable from `from` for `sector`, each mapped to the
+    /// Every version reachable from `from` for `product_group`, each mapped to the
     /// fewest-hop lens path that reaches it, via breadth-first search over the
-    /// sector's lens graph. Excludes `from` itself: the identity is not a path.
-    fn reachable(&self, sector: &str, from: &Version) -> HashMap<Version, Vec<usize>> {
+    /// product group's lens graph. Excludes `from` itself: the identity is not a path.
+    fn reachable(&self, product_group: &str, from: &Version) -> HashMap<Version, Vec<usize>> {
         let mut queue: VecDeque<Version> = VecDeque::from([from.clone()]);
         let mut paths: HashMap<Version, Vec<usize>> = HashMap::from([(from.clone(), Vec::new())]);
 
@@ -318,7 +332,10 @@ impl LensRegistry {
             // one and later arrivals at it are ignored.
             let so_far = paths[&v].clone();
             for (i, lens) in self.lenses.iter().enumerate() {
-                if lens.sector == sector && lens.from == v && !paths.contains_key(&lens.to) {
+                if lens.product_group == product_group
+                    && lens.from == v
+                    && !paths.contains_key(&lens.to)
+                {
                     let mut path = so_far.clone();
                     path.push(i);
                     paths.insert(lens.to.clone(), path);
@@ -401,7 +418,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfProduction to \
+            "Cross-product_group naming consistency: renames countryOfProduction to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_production,
         ),
@@ -410,7 +427,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfProduction to \
+            "Cross-product_group naming consistency: renames countryOfProduction to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_production,
         ),
@@ -419,7 +436,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfManufacture to \
+            "Cross-product_group naming consistency: renames countryOfManufacture to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacture,
         ),
@@ -428,7 +445,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfManufacture to \
+            "Cross-product_group naming consistency: renames countryOfManufacture to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacture,
         ),
@@ -437,7 +454,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfManufacture to \
+            "Cross-product_group naming consistency: renames countryOfManufacture to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacture,
         ),
@@ -446,7 +463,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfManufacture to \
+            "Cross-product_group naming consistency: renames countryOfManufacture to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacture,
         ),
@@ -469,7 +486,7 @@ fn builtin_lenses() -> Vec<Lens> {
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),
             false,
-            "Cross-sector naming consistency: renames countryOfManufacturing to \
+            "Cross-product_group naming consistency: renames countryOfManufacturing to \
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacturing,
         ),
@@ -488,12 +505,12 @@ fn identity(v: &Value) -> Result<Value, LensError> {
 
 /// Renames a top-level JSON key to `countryOfOrigin`, leaving every other
 /// field untouched. Shared by the country-of-origin naming-unification lenses
-/// above — each sector's old key differs, so the key name is a parameter.
+/// above — each product group's old key differs, so the key name is a parameter.
 fn rename_country_field(v: &Value, old_key: &str) -> Result<Value, LensError> {
     let mut out = v.clone();
     let obj = out
         .as_object_mut()
-        .ok_or_else(|| LensError("sector data must be a JSON object".to_owned()))?;
+        .ok_or_else(|| LensError("product_group data must be a JSON object".to_owned()))?;
     if let Some(val) = obj.remove(old_key) {
         obj.insert("countryOfOrigin".to_owned(), val);
     }
@@ -520,7 +537,7 @@ fn battery_v1_to_v2(v1: &Value) -> Result<Value, LensError> {
     let mut out = v1.clone();
     let obj = out
         .as_object_mut()
-        .ok_or_else(|| LensError("battery sector data must be a JSON object".to_owned()))?;
+        .ok_or_else(|| LensError("battery product_group data must be a JSON object".to_owned()))?;
     if let Some(kwh) = obj.get("ratedCapacityKwh").and_then(Value::as_f64)
         && !obj.contains_key("ratedEnergyWh")
     {
@@ -540,7 +557,7 @@ fn battery_v1_to_v2(v1: &Value) -> Result<Value, LensError> {
 fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
     let obj = v
         .as_object()
-        .ok_or_else(|| LensError("battery sector data must be a JSON object".to_owned()))?;
+        .ok_or_else(|| LensError("battery product_group data must be a JSON object".to_owned()))?;
     match obj.get("batteryType") {
         Some(Value::String(_)) => Ok(v.clone()),
         _ => Err(LensError(
@@ -573,7 +590,7 @@ fn battery_v2_4_to_v2_5(v: &Value) -> Result<Value, LensError> {
 fn battery_v2_5_to_v2_6(v: &Value) -> Result<Value, LensError> {
     if !v.is_object() {
         return Err(LensError(
-            "battery sector data must be a JSON object".to_owned(),
+            "battery product_group data must be a JSON object".to_owned(),
         ));
     }
     Ok(v.clone())
@@ -584,7 +601,7 @@ fn battery_v2_5_to_v2_6(v: &Value) -> Result<Value, LensError> {
 /// when `productCategory` is not one of the four device types Regulation
 /// (EU) 2023/1670 Art. 1(1) actually enumerates — a record declaring
 /// `laptop`, `tv`, or any of the other removed values was written against a
-/// category this sector never had a lawful basis for, and there is no value
+/// category this product group never had a lawful basis for, and there is no value
 /// to substitute that would not misdescribe the product.
 fn electronics_v1_1_to_v1_2(v: &Value) -> Result<Value, LensError> {
     const VALID: [&str; 4] = [
@@ -593,9 +610,9 @@ fn electronics_v1_1_to_v1_2(v: &Value) -> Result<Value, LensError> {
         "cordless-phone",
         "tablet",
     ];
-    let obj = v
-        .as_object()
-        .ok_or_else(|| LensError("electronics sector data must be a JSON object".to_owned()))?;
+    let obj = v.as_object().ok_or_else(|| {
+        LensError("electronics product_group data must be a JSON object".to_owned())
+    })?;
     match obj.get("productCategory") {
         Some(Value::String(s)) if VALID.contains(&s.as_str()) => Ok(v.clone()),
         _ => Err(LensError(
@@ -816,7 +833,7 @@ mod tests {
         // none should have to: `upcast` refuses the gap outright, and a reader
         // that only needs the data readable must not inherit that refusal.
         let reg = LensRegistry::new();
-        let current: Version = crate::catalog::SectorCatalog::new()
+        let current: Version = crate::catalog::ProductGroupCatalog::new()
             .current_schema_version("battery")
             .expect("battery is in the catalog")
             .parse()
@@ -870,7 +887,7 @@ mod tests {
         // silent identity, which is the one thing this module refuses to do.
         //
         // The gap is synthetic on purpose. This asserts a property of the
-        // registry, not a fact about any sector's lens coverage — pointing it at
+        // registry, not a fact about any product group's lens coverage — pointing it at
         // a real gap makes it fail the day someone legitimately bridges that gap,
         // which is what happened when textile 1.0.0 → 1.1.0 was added.
         let reg = LensRegistry::from_lenses(vec![Lens::new(
@@ -902,7 +919,7 @@ mod tests {
     #[test]
     fn toward_is_the_identity_for_the_same_version() {
         // No gap means no progress to require — refusing here would make a
-        // sector with no lenses at all unreadable at its own current version.
+        // product group with no lenses at all unreadable at its own current version.
         let reg = LensRegistry::new();
         let data = battery_v1();
         let derived = reg

@@ -1,4 +1,4 @@
-//! [`DppSectorPlugin`] — the trait every sector plugin implements.
+//! [`DppProductGroupPlugin`] — the trait every product group plugin implements.
 
 use crate::error::PluginError;
 use crate::meta::{PluginCapabilities, PluginCapability, PluginMeta};
@@ -10,10 +10,10 @@ pub type PluginInput = serde_json::Value;
 
 /// The identity fields that genuinely vary per plugin — everything else in
 /// [`PluginMeta`] (`license`, `author`, `homepage`) is a fixed Odal Node
-/// convention supplied by the default [`DppSectorPlugin::meta`].
+/// convention supplied by the default [`DppProductGroupPlugin::meta`].
 pub struct PluginIdentity {
-    /// Sector key this plugin handles, e.g. `"textile"`, `"steel"`, `"battery"`.
-    pub sector: &'static str,
+    /// ProductGroup key this plugin handles, e.g. `"textile"`, `"steel"`, `"battery"`.
+    pub product_group: &'static str,
     /// Human-readable plugin name.
     pub name: &'static str,
     /// SemVer version string of the plugin itself, typically
@@ -23,15 +23,15 @@ pub struct PluginIdentity {
     pub description: &'static str,
 }
 
-/// The entry points every sector plugin must export.
+/// The entry points every product group plugin must export.
 ///
-/// The Wasm host calls these after deserialising JSON sector data from the
+/// The Wasm host calls these after deserialising JSON product group data from the
 /// passport payload. Implementations must be deterministic and free of I/O.
-pub trait DppSectorPlugin: Send + Sync {
+pub trait DppProductGroupPlugin: Send + Sync {
     /// The fields that distinguish this plugin's identity (see [`PluginIdentity`]).
     fn plugin_identity(&self) -> PluginIdentity;
 
-    /// The sector schema version range this plugin supports.
+    /// The product group schema version range this plugin supports.
     fn schema_version_range(&self) -> SchemaVersionRange;
 
     /// Returns static metadata about this plugin.
@@ -42,7 +42,7 @@ pub trait DppSectorPlugin: Send + Sync {
     fn meta(&self) -> PluginMeta {
         let id = self.plugin_identity();
         PluginMeta {
-            sector: id.sector.to_owned(),
+            product_group: id.product_group.to_owned(),
             name: id.name.to_owned(),
             version: id.version.to_owned(),
             license: "Apache-2.0".to_owned(),
@@ -73,7 +73,7 @@ pub trait DppSectorPlugin: Send + Sync {
         }
     }
 
-    /// Validate the structure and field constraints of the sector input.
+    /// Validate the structure and field constraints of the product group input.
     ///
     /// Returns `Ok(())` if the input is structurally valid, or a descriptive
     /// error if a required field is missing or out of range. Prefer
@@ -81,14 +81,14 @@ pub trait DppSectorPlugin: Send + Sync {
     /// `PluginError::InvalidInput` for better error reporting.
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError>;
 
-    /// Compute compliance metrics from the sector input.
+    /// Compute compliance metrics from the product group input.
     ///
-    /// May return `None` for fields that do not apply to this sector.
+    /// May return `None` for fields that do not apply to this product group.
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError>;
 
-    /// Generate a passport-ready sector data JSON payload.
+    /// Generate a passport-ready product group data JSON payload.
     ///
-    /// Applies any normalisation or enrichment required by the sector schema
+    /// Applies any normalisation or enrichment required by the product group schema
     /// (e.g. rounding, unit conversion). The output is stored verbatim in the DPP.
     /// Takes `input` by value — a pass-through implementation returns it
     /// directly instead of cloning.

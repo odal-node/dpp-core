@@ -26,7 +26,7 @@ While any crate is below 1.0.0 the following rules apply:
   behind a feature flag named `unstable-*`.
 
 The goal is to reach 1.0.0 for each crate once the EU ESPR delegated acts
-for the first sector (batteries, February 2027) are finalised and the public
+for the first product group (batteries, February 2027) are finalised and the public
 API has been validated against real-world integrations.
 
 ## Workspace Version Lockstep
@@ -66,7 +66,7 @@ check and requires the author to either:
 
 ## Schema Versioning
 
-JSON schemas under `schemas/{sector}/v{N}.json` are versioned independently
+JSON schemas under `schemas/{product-group}/v{N}.json` are versioned independently
 from crate versions. Adding a new schema version is always a minor crate
 change. Removing or altering an existing schema version is a breaking change.
 See [COMPLIANCE.md](../regulatory/COMPLIANCE.md) for details on the schema-to-regulation

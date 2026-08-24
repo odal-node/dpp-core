@@ -2,7 +2,7 @@
 
 Each file describes **one** upstream vocabulary: who publishes it, where its
 terms live, under what licence, and what a person here has actually verified
-about it. One authority per file, mirroring `dpp-domain/sectors/*.json`.
+about it. One authority per file, mirroring `dpp-domain/product groups/*.json`.
 
 ## The rule this directory exists to enforce
 

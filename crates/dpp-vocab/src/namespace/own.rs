@@ -29,7 +29,7 @@ pub const OWN_NAMESPACE: &str = "urn:odal-node:";
 /// A second form of the same ownership claim, in the syntax JSON-LD requires.
 /// [`OWN_NAMESPACE`] is a URN and cannot serve here: a JSON-LD prefix IRI is
 /// concatenated with the term to form an absolute IRI, and `urn:odal-node:` +
-/// `sector` is not one a consumer can do anything with.
+/// `product_group` is not one a consumer can do anything with.
 ///
 /// # Why `is_own` deliberately does not cover this
 ///

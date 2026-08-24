@@ -9,10 +9,11 @@ use uuid::Uuid;
 use super::{
     FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
 };
+use crate::catalog::{Granularity, InstrumentRef};
 use crate::domain::{
     identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     lint::LintResult,
-    sector::{CarbonFootprint, RepairabilityScore, Sector, SectorData},
+    product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore},
     status::PassportStatus,
 };
 use crate::ports::compliance::ComplianceResult;
@@ -26,10 +27,36 @@ pub struct Passport {
     /// Optional batch or lot identifier.
     pub batch_id: Option<String>,
     pub product_name: String,
-    /// EU ESPR sector — the delegated-act bucket that selects the applicable
+    /// EU ESPR product group — the delegated-act bucket that selects the applicable
     /// schema and plugin. (Replaces the former misnamed `product_category`
-    /// field, which actually held a sector.)
-    pub sector: Sector,
+    /// field, which actually held a product group.)
+    pub product_group: ProductGroup,
+    /// The legal instruments recorded as applicable to this product, fixed when
+    /// it was placed on the market.
+    ///
+    /// **Recorded, never recomputed** — see [`InstrumentRef`]. ESPR Art. 5(7)
+    /// lets acts overlap with no precedence rule between them, so this is a set
+    /// and the governing law is the union of its members' requirements; and
+    /// because a horizontal act can reach a product whose product group no
+    /// catalog models, the set cannot be derived from
+    /// [`Self::product_group`] at all. That is why it is stored rather than
+    /// looked up, and why it is protected from patching: re-deriving it would
+    /// silently drop every entry a human had to supply.
+    ///
+    /// Empty on a record issued before this field existed, which is a statement
+    /// that nothing was recorded — not that nothing applies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub applicable_instruments: Vec<InstrumentRef>,
+    /// The level this passport describes: one model, one batch, or one item.
+    ///
+    /// ESPR Art. 9(2)(d) makes this a **delegated-act decision**, so it is a
+    /// property of the applicable law rather than an implementer's choice, and
+    /// `None` is the honest answer while no adopted act has fixed a level —
+    /// which is every product group today. Do not default it: the EU registry
+    /// registers batteries at item level, but that is the registry's operational
+    /// position and not a level any act has set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
     /// CO₂ equivalent per unit — manufacturer-supplied or engine-calculated.
@@ -40,7 +67,7 @@ pub struct Passport {
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
     /// receipt. Attached by the engine's `apply_compliance` at create/update.
     /// Part of the signed payload and immutable after retention lock. `None`
-    /// until a determination is computed (e.g. a sector with no plugin loaded).
+    /// until a determination is computed (e.g. a product group with no plugin loaded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compliance_result: Option<ComplianceResult>,
     /// Non-binding plausibility findings from the `dpp-rules` lint pack —
@@ -51,11 +78,11 @@ pub struct Passport {
     /// pass has run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lint_result: Option<LintResult>,
-    /// Typed, sector-specific DPP data (EU Battery Regulation, Textile DPP, etc.).
+    /// Typed, product group-specific DPP data (EU Battery Regulation, Textile DPP, etc.).
     ///
-    /// `None` for passports where sector-specific data has not yet been supplied.
+    /// `None` for passports where product group-specific data has not yet been supplied.
     /// Set this field when publishing to ensure regulatory compliance validation.
-    pub sector_data: Option<SectorData>,
+    pub product_group_data: Option<ProductGroupData>,
     pub status: PassportStatus,
     /// The publicly accessible QR code URL for this passport.
     pub qr_code_url: Option<String>,
@@ -104,27 +131,27 @@ pub struct Passport {
     /// minimum by being reassessed in 2033 — so a determination made against
     /// today's date is wrong for every product not placed on the market today.
     ///
-    /// Envelope-level rather than per-sector because the triggering event is
-    /// not sector-specific: ESPR attaches its duties at placing on the market
+    /// Envelope-level rather than per-product group because the triggering event is
+    /// not product group-specific: ESPR attaches its duties at placing on the market
     /// for every product group, as do Regulation (EU) 2023/1542 Art. 7, 8 and
     /// 10 for batteries. It lived only on `BatteryData` before, which made the
-    /// governing law underivable for the other eleven sectors.
+    /// governing law underivable for the other eleven product groups.
     ///
     /// `None` means the date was not declared, which is **not** a licence to
     /// substitute the current date. A determination that depends on it has no
     /// answer, and saying so is the answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub placed_on_market_date: Option<NaiveDate>,
-    /// Semantic version of the *sector* schema used to validate this record.
+    /// Semantic version of the *product group* schema used to validate this record.
     ///
-    /// Scoped to `sector_data` only — there is no equivalent version for the
+    /// Scoped to `product_group_data` only — there is no equivalent version for the
     /// envelope fields on this struct. [`Passport::from_stored`] uses this to
-    /// decide whether `sector_data` needs upcasting through a lens before
+    /// decide whether `product_group_data` needs upcasting through a lens before
     /// this record can be re-read. Envelope fields have no such escape hatch
-    /// and never will: a lens transforms one sector's sub-object, but an
-    /// envelope field is shared by every sector's stored documents, so a
+    /// and never will: a lens transforms one product group's sub-object, but an
+    /// envelope field is shared by every product group's stored documents, so a
     /// non-additive envelope change would need a transform over the whole
-    /// document — one mistake there corrupts every sector at once, not one.
+    /// document — one mistake there corrupts every product group at once, not one.
     /// The envelope's rule is therefore additive-only, permanently, with no
     /// exception path: `Option<T>` + `#[serde(default)]`, or a rename that
     /// keeps accepting the old key, never a bare requirement added to an
@@ -167,8 +194,8 @@ pub struct Passport {
     /// liquidation or a cessation of activity" of the responsible operator. The
     /// separate back-up-copy obligation (via a DPP service provider) is **Art.
     /// 10(4)**, not the retention period itself.
-    /// Computed at publish time from `SectorCatalog::retention_years` for the
-    /// sector — the single source of the retention obligation.
+    /// Computed at publish time from `ProductGroupCatalog::retention_years` for the
+    /// product group — the single source of the retention obligation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention_until: Option<DateTime<Utc>>,
     /// Opaque link to an internal product-template record. Not a legal identifier.
@@ -242,14 +269,16 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "id",
     "batchId",
     "productName",
-    "sector",
+    "productGroup",
+    "applicableInstruments",
+    "granularity",
     "manufacturer",
     "materials",
     "co2ePerUnit",
     "repairabilityScore",
     "complianceResult",
     "lintResult",
-    "sectorData",
+    "productGroupData",
     "status",
     "qrCodeUrl",
     "jwsSignature",
@@ -316,17 +345,17 @@ pub const RETENTION_MUTABLE_FIELDS: &[&str] = &[
     "lintResult",
 ];
 
-/// The catalog sector key and recorded schema version a stored document's
-/// `sectorData` was written under, read without assuming the document
+/// The catalog product group key and recorded schema version a stored document's
+/// `productGroupData` was written under, read without assuming the document
 /// deserializes into the current shape. `None` if either is absent or
 /// malformed — [`Passport::from_stored`] then skips upcasting and lets the
 /// final deserialize surface whatever is actually wrong.
-fn stored_sector_version(doc: &serde_json::Value) -> Option<(String, String)> {
-    let sector_data = doc.get("sectorData")?;
-    let tag = sector_data.get("sector")?.as_str()?;
-    let sector_key = Sector::from_wire_tag(tag).catalog_key().to_owned();
+fn stored_product_group_version(doc: &serde_json::Value) -> Option<(String, String)> {
+    let product_group_data = doc.get("productGroupData")?;
+    let tag = product_group_data.get("productGroup")?.as_str()?;
+    let product_group_key = ProductGroup::from_wire_tag(tag).catalog_key().to_owned();
     let recorded = doc.get("schemaVersion")?.as_str()?.to_owned();
-    Some((sector_key, recorded))
+    Some((product_group_key, recorded))
 }
 
 impl Passport {
@@ -334,27 +363,27 @@ impl Passport {
     /// current-shape deserialize first — most schema evolution is additive
     /// and a document written under an older `schemaVersion` reads directly
     /// with no transform needed, exactly as before this method existed. Only
-    /// on failure does it fall back to upcasting `sectorData` through the
+    /// on failure does it fall back to upcasting `productGroupData` through the
     /// registered lens chain and retrying, so a version gap that needs no
     /// lens (the common case) never pays for one.
     ///
-    /// The fallback upcasts as far toward the sector's current version as the
+    /// The fallback upcasts as far toward the product group's current version as the
     /// registered lenses reach ([`crate::schemas::lens::LensRegistry::upcast_toward`]),
-    /// not to a chain landing on it exactly. A sector whose schema has moved on
+    /// not to a chain landing on it exactly. A product group whose schema has moved on
     /// additively since its last lens has no hop ending at the current version,
     /// and requiring one would refuse every document the lenses it *does* have
     /// would have made readable. The additive remainder needs no transform by
     /// definition, so the deserialize below closes it.
     ///
-    /// **Envelope fields (everything outside `sectorData`) are not lensed —
-    /// deliberately, not an oversight.** A lens transforms one sector's
-    /// sub-object; an envelope field is shared by every sector's documents, so
+    /// **Envelope fields (everything outside `productGroupData`) are not lensed —
+    /// deliberately, not an oversight.** A lens transforms one product group's
+    /// sub-object; an envelope field is shared by every product group's documents, so
     /// a non-additive envelope change would need a transform over the *whole*
-    /// document, and getting that wrong silently corrupts every sector at
+    /// document, and getting that wrong silently corrupts every product group at
     /// once rather than one. The envelope's compatibility rule is simpler and
     /// stricter instead: additive only, permanently, no exceptions — see
     /// [`Passport::schema_version`]'s doc comment. A stored document that
-    /// still fails to deserialize after its `sectorData` has been upcast is
+    /// still fails to deserialize after its `productGroupData` has been upcast is
     /// therefore either genuinely malformed or violates that rule, and this
     /// method does not try to guess which.
     ///
@@ -366,13 +395,13 @@ impl Passport {
     ///   it from) has no honest transform, and this crate will not synthesize
     ///   one.
     /// - [`crate::domain::error::DppError::Serialisation`] — the direct attempt failed for a reason
-    ///   unrelated to a bridgeable version gap (no sector data, sector
+    ///   unrelated to a bridgeable version gap (no product group data, product group
     ///   unknown to the catalog, already at the current version, or the
     ///   upcast document still does not match the current shape).
     pub fn from_stored(
         doc: serde_json::Value,
         lenses: &crate::schemas::lens::LensRegistry,
-        catalog: &crate::catalog::SectorCatalog,
+        catalog: &crate::catalog::ProductGroupCatalog,
     ) -> Result<Self, crate::domain::error::DppError> {
         use crate::domain::error::DppError;
         use serde::Deserialize as _;
@@ -382,25 +411,30 @@ impl Passport {
             Err(e) => e,
         };
 
-        let Some((sector_key, recorded)) = stored_sector_version(&doc) else {
+        let Some((product_group_key, recorded)) = stored_product_group_version(&doc) else {
             return Err(DppError::Serialisation(direct_err.to_string()));
         };
-        let Some(current) = catalog.current_schema_version(&sector_key) else {
+        let Some(current) = catalog.current_schema_version(&product_group_key) else {
             return Err(DppError::Serialisation(direct_err.to_string()));
         };
         if recorded == current {
             return Err(DppError::Serialisation(direct_err.to_string()));
         }
 
-        let sector_data = doc["sectorData"].clone();
-        let derived = lenses.upcast_str_toward(&sector_key, &sector_data, &recorded, current)?;
+        let product_group_data = doc["productGroupData"].clone();
+        let derived = lenses.upcast_str_toward(
+            &product_group_key,
+            &product_group_data,
+            &recorded,
+            current,
+        )?;
         let mut doc = doc;
-        doc["sectorData"] = derived.data;
+        doc["productGroupData"] = derived.data;
 
         serde_json::from_value(doc).map_err(|e| DppError::Serialisation(e.to_string()))
     }
 
-    /// Validate passport fields for structural correctness and sector-data integrity.
+    /// Validate passport fields for structural correctness and product group-data integrity.
     ///
     /// Checks:
     /// - `product_name` is non-empty
@@ -409,13 +443,13 @@ impl Passport {
     /// - `schema_version` follows semver pattern (x.y.z)
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
-    /// - `sector_data.sector()` matches `self.sector` if present
-    /// - for `Sector::UnsoldGoods`, `commodity_code` is present and within
+    /// - `product_group_data.product group()` matches `self.product_group` if present
+    /// - for `ProductGroup::UnsoldGoods`, `commodity_code` is present and within
     ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear),
-    ///   and `sector_data.product_category` (when present) agrees with the
+    ///   and `product_group_data.product_category` (when present) agrees with the
     ///   Annex VII heading the commodity code falls under
-    /// - `sector_data` passes JSON Schema + cross-field rules via
-    ///   [`crate::domain::validation::validate_sector_data`] (non-wasm32 only)
+    /// - `product_group_data` passes JSON Schema + cross-field rules via
+    ///   [`crate::domain::validation::validate_product_group_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
         use crate::domain::field_error::{FieldError, ValidationErrors};
 
@@ -470,18 +504,18 @@ impl Passport {
             });
         }
 
-        // The declared sector must match the sector of the typed data, if present.
-        if let Some(ref data) = self.sector_data
-            && data.sector() != self.sector
+        // The declared product group must match the product group of the typed data, if present.
+        if let Some(ref data) = self.product_group_data
+            && data.product_group() != self.product_group
         {
             errors.push(FieldError {
-                field: "/sector".to_owned(),
-                message: "sector must match sector_data's sector".to_owned(),
+                field: "/product_group".to_owned(),
+                message: "product_group must match product_group_data's product_group".to_owned(),
             });
         }
 
         // Two fields carry the placing-on-market date: this envelope one, which
-        // every sector has and which a determination reads, and battery's own,
+        // every product group has and which a determination reads, and battery's own,
         // which shipped first and is in released schemas. They must not
         // disagree — the date selects which law binds the product, so two
         // answers is two different sets of obligations, and nothing downstream
@@ -491,16 +525,16 @@ impl Passport {
         // from the Commission's battery data-point guidance. It was added to
         // drive the Art. 8 phase determination, which is why promoting it here
         // costs no Annex XIII coverage.
-        if let Some(SectorData::Battery(battery)) = &self.sector_data
-            && let (Some(envelope), Some(sector)) =
+        if let Some(ProductGroupData::Battery(battery)) = &self.product_group_data
+            && let (Some(envelope), Some(product_group)) =
                 (self.placed_on_market_date, battery.placed_on_market_date)
-            && envelope != sector
+            && envelope != product_group
         {
             errors.push(FieldError {
-                field: "/sectorData/placedOnMarketDate".to_owned(),
+                field: "/productGroupData/placedOnMarketDate".to_owned(),
                 message: format!(
                     "placed_on_market_date disagrees with the passport's own \
-                     ({sector} vs {envelope}); the date fixes which law governs \
+                     ({product_group} vs {envelope}); the date fixes which law governs \
                      this battery, so it cannot have two values"
                 ),
             });
@@ -508,31 +542,31 @@ impl Passport {
 
         // ESPR Annex VII eligibility: an unsold-goods passport must declare a
         // commodity code within Annex VII's two headings (apparel & clothing
-        // accessories, or footwear) — a passport cannot claim this sector for
-        // a product the destruction ban does not cover. When sector_data is
+        // accessories, or footwear) — a passport cannot claim this product group for
+        // a product the destruction ban does not cover. When product_group_data is
         // also present, its own product_category word must agree with the
         // heading the commodity code actually falls under — two fields
         // describing the same product must not contradict each other.
-        if self.sector == Sector::UnsoldGoods {
+        if self.product_group == ProductGroup::UnsoldGoods {
             match &self.commodity_code {
                 None => errors.push(FieldError {
                     field: "/commodityCode".to_owned(),
-                    message: "commodity_code is required for sector unsoldGoods (ESPR Annex VII scope check)".to_owned(),
+                    message: "commodity_code is required for product_group unsoldGoods (ESPR Annex VII scope check)".to_owned(),
                 }),
-                Some(code) => match crate::domain::sector::unsold_goods_annex_vii_heading(code.as_str()) {
+                Some(code) => match crate::domain::product_group::unsold_goods_annex_vii_heading(code.as_str()) {
                     None => errors.push(FieldError {
                         field: "/commodityCode".to_owned(),
                         message: "commodity_code is not within ESPR Annex VII scope (apparel/clothing accessories or footwear)".to_owned(),
                     }),
                     Some(heading) => {
-                        if let Some(SectorData::UnsoldGoods(report)) = &self.sector_data
-                            && !crate::domain::sector::unsold_goods_category_matches_heading(
+                        if let Some(ProductGroupData::UnsoldGoods(report)) = &self.product_group_data
+                            && !crate::domain::product_group::unsold_goods_category_matches_heading(
                                 &report.product_category,
                                 heading,
                             )
                         {
                             errors.push(FieldError {
-                                field: "/sectorData/productCategory".to_owned(),
+                                field: "/productGroupData/productCategory".to_owned(),
                                 message: "product_category does not match the Annex VII heading commodity_code falls under".to_owned(),
                             });
                         }
@@ -541,11 +575,11 @@ impl Passport {
             }
         }
 
-        // Sector-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).
+        // ProductGroup-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).
         // Excluded from wasm32 builds because jsonschema depends on reqwest's blocking API.
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(ref data) = self.sector_data
-            && let Err(ve) = crate::domain::validation::validate_sector_data(data)
+        if let Some(ref data) = self.product_group_data
+            && let Err(ve) = crate::domain::validation::validate_product_group_data(data)
         {
             errors.extend(ve.errors);
         }
@@ -646,16 +680,17 @@ impl Passport {
     pub fn check_mandatory_content(&self) -> Result<(), crate::domain::error::DppError> {
         use crate::domain::field_error::{FieldError, ValidationErrors};
 
-        if self.sector != crate::domain::sector::Sector::Battery {
+        if self.product_group != crate::domain::product_group::ProductGroup::Battery {
             return Ok(());
         }
-        let Some(data) = self.sector_data.as_ref() else {
+        let Some(data) = self.product_group_data.as_ref() else {
             return Err(crate::domain::error::DppError::Validation(
                 ValidationErrors {
                     errors: vec![FieldError {
-                        field: "/sectorData".to_owned(),
-                        message: "a battery passport cannot be published without sector data"
-                            .to_owned(),
+                        field: "/productGroupData".to_owned(),
+                        message:
+                            "a battery passport cannot be published without product_group data"
+                                .to_owned(),
                     }],
                 },
             ));
@@ -677,7 +712,7 @@ impl Passport {
             dpp_rules::batteries::passport_content::mandatory_fields(battery_type)
                 .filter(|f| value.get(*f).is_none_or(serde_json::Value::is_null))
                 .map(|f| FieldError {
-                    field: format!("/sectorData/{f}"),
+                    field: format!("/productGroupData/{f}"),
                     message: format!(
                         "'{f}' is mandatory for a '{battery_type}' battery and is absent; \
                          a passport omitting it does not carry the content the Battery \
@@ -700,28 +735,28 @@ impl Passport {
     /// NOTE: this is a self-contained domain convenience, **not** the authoritative
     /// public view. The payload that is signed (`publicJwsSignature`) and served on
     /// the public route is produced by the `dpp-crypto` policy engine (vault
-    /// `public_view`), which fails closed on unknown sectors. Do not wire this into
+    /// `public_view`), which fails closed on unknown product groups. Do not wire this into
     /// the public-serving path expecting byte-parity with the signed view.
     ///
     /// Top-level fields are removed according to
     /// [`PASSPORT_FIELD_DISCLOSURE`]
     /// — the single source for this fact, shared with the crypto layer's
-    /// `SectorAccessPolicy::passport_default()`. At present:
+    /// `ProductGroupAccessPolicy::passport_default()`. At present:
     /// - `Restricted`: `batchId`, `lintResult`
     /// - `Conformity`: `jwsSignature`, `retentionLocked`
     ///
     /// Anything absent from that table is `Public`.
     ///
-    /// `sectorData`, when present, is independently redacted via
-    /// [`crate::domain::sector::redact_sector_data`] against the sector descriptor
-    /// from `catalog`. If the sector is not in the catalog, sector data is
+    /// `productGroupData`, when present, is independently redacted via
+    /// [`crate::domain::product group::redact_product_group_data`] against the product group descriptor
+    /// from `catalog`. If the product group is not in the catalog, product group data is
     /// **withheld** from every audience except `Authority` (fail-closed): without
     /// the descriptor's per-field disclosure classes the domain layer cannot tell
     /// which fields are safe to expose, so it exposes none.
     pub fn redact(
         &self,
         audience: Audience,
-        catalog: &crate::catalog::SectorCatalog,
+        catalog: &crate::catalog::ProductGroupCatalog,
     ) -> PassportView {
         let mut value = match serde_json::to_value(self) {
             Ok(v) => v,
@@ -736,25 +771,27 @@ impl Passport {
                     obj.remove(*field);
                 }
             }
-            // Re-redact sectorData using the catalog's per-field disclosure map.
-            if let Some(ref sd) = self.sector_data {
-                let sector = sd.sector();
-                let key = sector.catalog_key();
+            // Re-redact productGroupData using the catalog's per-field disclosure map.
+            if let Some(ref sd) = self.product_group_data {
+                let product_group = sd.product_group();
+                let key = product_group.catalog_key();
                 let redacted = if let Some(descriptor) = catalog.get(key) {
-                    crate::domain::sector::redact_sector_data(sd, audience, descriptor)
+                    crate::domain::product_group::redact_product_group_data(
+                        sd, audience, descriptor,
+                    )
                 } else if audience.may_see(Disclosure::Conformity) {
-                    // Unknown sector: the full payload is only safe for the
+                    // Unknown product group: the full payload is only safe for the
                     // audience that already sees conformity evidence.
                     serde_json::to_value(sd).unwrap_or(serde_json::Value::Null)
                 } else {
                     // Fail closed: without per-field classes we cannot tell
-                    // which fields are restricted, so withhold sector data
+                    // which fields are restricted, so withhold product group data
                     // entirely rather than leak it.
                     serde_json::Value::Null
                 };
-                obj.insert("sectorData".into(), redacted);
+                obj.insert("productGroupData".into(), redacted);
             } else {
-                obj.remove("sectorData");
+                obj.remove("productGroupData");
             }
         }
 
@@ -844,6 +881,29 @@ mod retention_mutable_fields_tests {
             "the overlap between system-writable-after-publish and \
              not-user-patchable changed; confirm the new shape is intended"
         );
+    }
+
+    /// The recorded legal basis is immutable, and it must be immutable in both
+    /// senses at once.
+    ///
+    /// It is protected from patching, so no caller can edit which acts a
+    /// published passport was issued under; and it is *not* retention-mutable,
+    /// so it cannot change after the record is frozen either. A correction is a
+    /// new version that supersedes this one — the law at placing on the market
+    /// did not change, so a record claiming otherwise is a different record.
+    #[test]
+    fn the_recorded_legal_basis_can_never_be_edited_in_place() {
+        assert!(
+            crate::ports::passport_repo::PROTECTED_PATCH_FIELDS.contains(&"applicableInstruments"),
+            "applicableInstruments must not be patchable"
+        );
+        assert!(
+            !RETENTION_MUTABLE_FIELDS.contains(&"applicableInstruments"),
+            "applicableInstruments must not change after retention lock"
+        );
+        // Granularity is set by the applicable delegated act, so it is fixed for
+        // the same reason and by the same route.
+        assert!(!RETENTION_MUTABLE_FIELDS.contains(&"granularity"));
     }
 }
 

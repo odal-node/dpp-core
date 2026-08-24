@@ -45,7 +45,7 @@ Every transition is recorded by the platform layer (audit logging is a platform 
 WRITE PATH
 ----------
 1. Manufacturer submits product data (JSON or CSV)
-2. Data validated against sector JSON Schema (VersionedSchemaRegistry)
+2. Data validated against product group JSON Schema (VersionedSchemaRegistry)
 3. Compliance checks run via ComplianceRegistry (Wasm plugin or passthrough)
 4. Validated data persisted via PassportRepository
 5. On publish: signed with Ed25519 via IdentityPort -> JWS compact serialisation
@@ -96,17 +96,17 @@ This means a manufacturer can rotate keys without invalidating any previously pu
 
 ## 6. Compliance Model
 
-The `ComplianceRegistry` trait is the determination seam. The library ships the sector-agnostic `PassthroughRegistry`:
+The `ComplianceRegistry` trait is the determination seam. The library ships the product group-agnostic `PassthroughRegistry`:
 
 ```
 ComplianceRegistry
   |
-  +-- PassthroughRegistry (dpp-core, Apache) -> PassthroughNoValidation for every sector
-  +-- plugin-backed registry (platform)      -> Wasm sector plugins (real metrics)
+  +-- PassthroughRegistry (dpp-core, Apache) -> PassthroughNoValidation for every product group
+  +-- plugin-backed registry (platform)      -> Wasm product group plugins (real metrics)
   +-- maintained-ruleset registry (Compliance Current) -> warranted, methodology-current rulesets
 ```
 
-`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every sector. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm sector plugins via a plugin-backed registry in the platform. A computed determination is passed through `gate_determination(catalog.is_in_force(sector), …)` so a provisional sector can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
+`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every product group. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm product group plugins via a plugin-backed registry in the platform. A computed determination is passed through `gate_determination(catalog.is_in_force(product group), …)` so a provisional product group can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
 
 This trait is the extension seam. Any implementation — open Wasm plugins, the platform's calculators, or third-party modules — can replace or extend it without touching any other code. It is a technical boundary, not a commercial one.
 
@@ -146,8 +146,8 @@ These traits define the boundary between the standard and any implementation:
 trait PassportRepository    // CRUD for DPP records
 
 // Compliance
-trait ComplianceRegistry    // Route to sector strategy
-trait ComplianceStrategy    // Sector-specific validation
+trait ComplianceRegistry    // Route to product group strategy
+trait ComplianceStrategy    // Product group-specific validation
 
 // Identity
 trait IdentityPort          // Sign and verify JWS

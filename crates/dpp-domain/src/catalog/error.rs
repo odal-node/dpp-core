@@ -15,14 +15,14 @@ pub enum CatalogError {
 impl std::fmt::Display for CatalogError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlreadyExists(key) => write!(f, "sector '{key}' already in catalog"),
+            Self::AlreadyExists(key) => write!(f, "product_group '{key}' already in catalog"),
             Self::InvalidSchemaVersion { key, version } => write!(
                 f,
-                "sector '{key}' currentSchemaVersion '{version}' is not valid semver"
+                "product_group '{key}' currentSchemaVersion '{version}' is not valid semver"
             ),
             Self::CurrentVersionNotListed { key, version } => write!(
                 f,
-                "sector '{key}' currentSchemaVersion '{version}' is not in its schemaVersions list"
+                "product_group '{key}' currentSchemaVersion '{version}' is not in its schemaVersions list"
             ),
         }
     }

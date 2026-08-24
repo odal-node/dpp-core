@@ -31,7 +31,7 @@ pub enum CredentialRole {
     CustomsAuthority,
     /// Notified body — conformity assessment.
     NotifiedBody,
-    /// Custom role (extension point for sector-specific roles).
+    /// Custom role (extension point for product group-specific roles).
     Custom(String),
 }
 
@@ -67,12 +67,12 @@ pub struct DppCredentialSubject {
     pub role: CredentialRole,
     /// ISO 3166-1 alpha-2 country code of the holder's registration.
     pub country: String,
-    /// Sector(s) this credential applies to (e.g., `["textile"]`).
-    /// Empty means all sectors.
+    /// ProductGroup(s) this credential applies to (e.g., `["textile"]`).
+    /// Empty means all product groups.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub sectors: Vec<String>,
+    pub product_groups: Vec<String>,
     /// Specific product categories this credential covers.
-    /// Empty means all categories within the sectors.
+    /// Empty means all categories within the product groups.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub product_categories: Vec<String>,
 }

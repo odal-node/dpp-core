@@ -10,7 +10,7 @@ This document is the single reference for why a rule module contains real logic 
 
 **Pending** — the regulation is in force but the specific threshold/methodology is in a delegated act that has not yet been adopted. The module exists with constants or stubs and a placeholder comment citing this document.
 
-**Not mandated** — there is no EU DPP requirement yet for this sector. Placeholder module exists so the directory structure is explicit about what will be needed.
+**Not mandated** — there is no EU DPP requirement yet for this product group. Placeholder module exists so the directory structure is explicit about what will be needed.
 
 ---
 
@@ -174,13 +174,13 @@ At that point, implement `validate_spare_parts_period(years: u32, category: &str
 | Secondary-recycled route | ≤ 1 000 | CBAM benchmark — **not** a DPP mandate |
 | Mixed route | ≤ 5 000 | CBAM benchmark — **not** a DPP mandate |
 
-CBAM (EU 2023/956) covers embedded-carbon reporting for aluminium imports but does not set production-level CO₂e thresholds that create a DPP compliance obligation. The thresholds above are industry/CBAM reference values used by the `sector-aluminium` plugin.
+CBAM (EU 2023/956) covers embedded-carbon reporting for aluminium imports but does not set production-level CO₂e thresholds that create a DPP compliance obligation. The thresholds above are industry/CBAM reference values used by the `product-group-aluminium` plugin.
 
 The aluminium DPP mandate is expected around 2030.
 
 `co2e_within_route_threshold` exists today so the plugin has a single source of truth and does not hardcode the values. The plugin returns `NOT_ASSESSED`. When the DPP mandate is finalized, update the constants here and update the plugin to return a real determination — the function call site stays the same.
 
-**When to update:** When an ESPR delegated act specifies mandatory CO₂e thresholds for the aluminium sector DPP.
+**When to update:** When an ESPR delegated act specifies mandatory CO₂e thresholds for the aluminium product group DPP.
 
 ---
 
@@ -196,13 +196,13 @@ Reference CO₂e intensities per route (worldsteel / IEA, not mandated threshold
 | `electric-arc` (EAF, scrap-based) | 0.3 – 0.7 |
 | `direct-reduction` (DRI-EAF) | 0.1 – 1.4 |
 
-The `sector-steel` plugin exists and validates structure + records metrics, but `dpp-rules` carries no steel compliance-checking function yet (only the reference constants above). The plugin returns `NOT_ASSESSED` for the determination, mirroring aluminium.
+The `product-group-steel` plugin exists and validates structure + records metrics, but `dpp-rules` carries no steel compliance-checking function yet (only the reference constants above). The plugin returns `NOT_ASSESSED` for the determination, mirroring aluminium.
 
-**When to update:** When an ESPR delegated act specifies mandatory CO₂e thresholds for the steel sector DPP. At that point, implement `co2e_within_route_threshold` here (modelled on the aluminium equivalent) and switch the `sector-steel` plugin from `NOT_ASSESSED` to a real determination — the plugin already exists, so only the rule function and the plugin's determination call change.
+**When to update:** When an ESPR delegated act specifies mandatory CO₂e thresholds for the steel product group DPP. At that point, implement `co2e_within_route_threshold` here (modelled on the aluminium equivalent) and switch the `product-group-steel` plugin from `NOT_ASSESSED` to a real determination — the plugin already exists, so only the rule function and the plugin's determination call change.
 
 ---
 
-## Placeholder sectors
+## Placeholder product groups
 
 ### Construction — `construction/mod.rs`
 
@@ -222,7 +222,7 @@ No cross-field rules are implementable until the delegated acts under CPR 2024/3
 |---|---|---|
 | EU Toy Safety Regulation 2025/2509 | In force | ~2030 |
 
-The CE marking check (one hard rule that is available today) lives in the `sector-toy` plugin, not in `dpp-rules`, because it is a single-field boolean check that JSON Schema can enforce directly. There are no cross-field regulatory rules to implement in `dpp-rules` until the DPP delegated act is published.
+The CE marking check (one hard rule that is available today) lives in the `product-group-toy` plugin, not in `dpp-rules`, because it is a single-field boolean check that JSON Schema can enforce directly. There are no cross-field regulatory rules to implement in `dpp-rules` until the DPP delegated act is published.
 
 **When to update:** When the EU 2025/2509 delegated act specifying toy DPP data requirements is published.
 

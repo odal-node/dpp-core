@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 pub enum RetentionBasis {
     /// An adopted legal text states this figure for passport availability.
-    /// See the sector's `notes` for the citation.
+    /// See the product group's `notes` for the citation.
     Sourced,
     /// No adopted legal text fixes this figure for passport availability yet.
     /// `retentionYears` is carried as a placeholder until one exists and must

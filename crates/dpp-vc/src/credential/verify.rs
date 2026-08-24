@@ -46,7 +46,7 @@ impl VerificationResult {
 /// level checks: type, expiration, and scope.
 pub fn verify_credential_claims(
     credential: &DppAccessCredential,
-    required_sector: Option<&str>,
+    required_product_group: Option<&str>,
     now: DateTime<Utc>,
 ) -> VerificationResult {
     if !credential
@@ -70,13 +70,15 @@ pub fn verify_credential_claims(
         );
     }
 
-    if let Some(sector) = required_sector {
-        let subjects_sectors = &credential.credential_subject.sectors;
-        if !subjects_sectors.is_empty() && !subjects_sectors.iter().any(|s| s == sector) {
+    if let Some(product_group) = required_product_group {
+        let subjects_product_groups = &credential.credential_subject.product_groups;
+        if !subjects_product_groups.is_empty()
+            && !subjects_product_groups.iter().any(|s| s == product_group)
+        {
             return VerificationResult::OutOfScope {
                 reason: format!(
-                    "Credential covers sectors {:?}, but '{}' was requested",
-                    subjects_sectors, sector
+                    "Credential covers product_groups {:?}, but '{}' was requested",
+                    subjects_product_groups, product_group
                 ),
             };
         }
@@ -102,11 +104,11 @@ pub fn verify_credential_claims(
 /// is unavailable or unresolvable is treated as `Revoked`.
 pub fn verify_credential_with_revocation(
     credential: &DppAccessCredential,
-    required_sector: Option<&str>,
+    required_product_group: Option<&str>,
     now: DateTime<Utc>,
     status_list: Option<&StatusList>,
 ) -> VerificationResult {
-    let base = verify_credential_claims(credential, required_sector, now);
+    let base = verify_credential_claims(credential, required_product_group, now);
     if !base.is_valid() {
         return base;
     }
@@ -142,12 +144,12 @@ fn apply_revocation_check(
 /// (no signature check — that is the JWS verifier's responsibility).
 pub fn verify_credential_claims_with_trust(
     credential: &DppAccessCredential,
-    required_sector: Option<&str>,
+    required_product_group: Option<&str>,
     required_product_category: Option<&str>,
     now: DateTime<Utc>,
     trusted_issuers: &dyn TrustedIssuerRegistry,
 ) -> VerificationResult {
-    let base = verify_credential_claims(credential, required_sector, now);
+    let base = verify_credential_claims(credential, required_product_group, now);
     if !base.is_valid() {
         return base;
     }
@@ -178,7 +180,7 @@ pub fn verify_credential_claims_with_trust(
 /// with a fail-closed policy.
 pub fn verify_credential_with_revocation_and_trust(
     credential: &DppAccessCredential,
-    required_sector: Option<&str>,
+    required_product_group: Option<&str>,
     required_product_category: Option<&str>,
     now: DateTime<Utc>,
     status_list: Option<&StatusList>,
@@ -186,7 +188,7 @@ pub fn verify_credential_with_revocation_and_trust(
 ) -> VerificationResult {
     let base = verify_credential_claims_with_trust(
         credential,
-        required_sector,
+        required_product_group,
         required_product_category,
         now,
         trusted_issuers,

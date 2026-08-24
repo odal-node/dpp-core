@@ -40,7 +40,7 @@ fn latest_textile_returns_v1_2() {
 }
 
 #[test]
-fn get_nonexistent_sector_returns_none() {
+fn get_nonexistent_product_group_returns_none() {
     let reg = VersionedSchemaRegistry::new();
     let v1: Version = "1.0.0".parse().unwrap();
     assert!(reg.get("plastics", &v1).is_none());
@@ -54,11 +54,11 @@ fn get_nonexistent_version_returns_none() {
 }
 
 #[test]
-fn sectors_returns_unique_sorted_list() {
+fn product_groups_returns_unique_sorted_list() {
     let reg = VersionedSchemaRegistry::new();
-    let sectors = reg.sectors();
+    let product_groups = reg.product_groups();
     assert_eq!(
-        sectors,
+        product_groups,
         vec![
             "aluminium",
             "battery",
@@ -139,7 +139,7 @@ fn schema_registration_error_display() {
     );
 
     let exists = SchemaRegistrationError::AlreadyExists {
-        sector: "battery".into(),
+        product_group: "battery".into(),
         version: "1.0.0".parse().unwrap(),
     };
     assert_eq!(
@@ -267,9 +267,9 @@ fn validate_if_present_enforces_existing_schema_and_skips_absent() {
         reg.validate_if_present("battery", "1.0.0", &invalid)
             .is_err()
     );
-    // Unknown sector or unregistered version → skipped (Ok), not an error.
+    // Unknown product group or unregistered version → skipped (Ok), not an error.
     assert!(
-        reg.validate_if_present("no-such-sector", "1.0.0", &invalid)
+        reg.validate_if_present("no-such-product_group", "1.0.0", &invalid)
             .is_ok()
     );
     assert!(
@@ -306,12 +306,12 @@ fn validate_strict_is_fail_closed_unlike_validate_if_present() {
     // Existing schema + invalid data → Err, same as validate_if_present.
     assert!(reg.validate_strict("battery", "1.0.0", &invalid).is_err());
 
-    // Unknown sector → Err (validate_if_present would skip this as Ok).
+    // Unknown product group → Err (validate_if_present would skip this as Ok).
     assert!(
-        reg.validate_strict("no-such-sector", "1.0.0", &invalid)
+        reg.validate_strict("no-such-product_group", "1.0.0", &invalid)
             .is_err()
     );
-    // Known sector, unregistered version → Err (validate_if_present skips).
+    // Known product group, unregistered version → Err (validate_if_present skips).
     assert!(reg.validate_strict("battery", "9.9.9", &invalid).is_err());
     // Unparseable version string → Err (validate_if_present skips).
     assert!(
@@ -368,12 +368,12 @@ fn validate_textile_v1_1_rejects_invalid_fibre_country() {
     assert!(reg.validate("textile", &v11, &data).is_err());
 }
 
-// ── G-8: Per-sector conformance fixtures ──────────────────────────────────────
+// ── G-8: Per-product group conformance fixtures ──────────────────────────────────────
 //
-// Each embedded sector schema gets one valid fixture (all required fields) and
+// Each embedded product group schema gets one valid fixture (all required fields) and
 // one invalid fixture (a targeted schema constraint that the Rust types alone
 // do not enforce). Battery v1 and textile v1.1 are already covered above; these
-// tests cover all remaining sector/version pairs.
+// tests cover all remaining product group/version pairs.
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
@@ -751,7 +751,7 @@ fn carbon_footprint_class_bound_matches_the_schema() {
     // two statements of one fact. If they disagree, a value can pass schema
     // validation and fail typed deserialization (or the reverse), and the
     // failure surfaces far from either declaration.
-    use crate::domain::sector::CarbonFootprintClass;
+    use crate::domain::product_group::CarbonFootprintClass;
 
     let reg = VersionedSchemaRegistry::new();
     let json = reg
@@ -838,7 +838,7 @@ fn schema_rejects_a_state_of_health_mixing_both_annex_vii_lists() {
 #[test]
 fn a_fully_populated_battery_serialises_into_the_current_schema() {
     use crate::domain::gtin::Gtin;
-    use crate::domain::sector::{
+    use crate::domain::product_group::{
         BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprintClass,
         CriticalRawMaterial, DynamicPerformance, EnvironmentalReading, ExpectedLifetime,
         HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, StateOfChargeReading,
@@ -988,20 +988,20 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
 
 /// The same completeness guard as the battery one above, for textile.
 ///
-/// Battery is not special — it was only the sector where the drift happened to
-/// exist. Any sector whose schema sets `additionalProperties: false` can grow a
+/// Battery is not special — it was only the product group where the drift happened to
+/// exist. Any product group whose schema sets `additionalProperties: false` can grow a
 /// struct field with no schema property and reject its own data at validation
 /// time, and textile is the other product group with a real model rather than a
 /// stub. Its literal is exhaustive for the same reason: **do not add `..base`.**
 ///
-/// The eight remaining sectors are stubs of seven to ten fields; when one grows
+/// The eight remaining product groups are stubs of seven to ten fields; when one grows
 /// a real model it should gain a fixture like this rather than rely on the
 /// mechanical parity sweep that found the battery gap.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_fully_populated_textile_serialises_into_the_current_schema() {
     use crate::domain::gtin::Gtin;
-    use crate::domain::sector::{FibreEntry, SvhcSubstance, TextileData};
+    use crate::domain::product_group::{FibreEntry, SvhcSubstance, TextileData};
 
     let data = TextileData {
         gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),

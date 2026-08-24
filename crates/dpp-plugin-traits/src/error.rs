@@ -23,8 +23,8 @@ pub enum PluginError {
     ValidationErrors(Vec<PluginFieldError>),
     #[error("calculation failed: {0}")]
     Calculation(String),
-    #[error("sector not supported by this plugin: {0}")]
-    UnsupportedSector(String),
+    #[error("product_group not supported by this plugin: {0}")]
+    UnsupportedProductGroup(String),
     #[error("schema version not supported: {0}")]
     UnsupportedSchemaVersion(String),
     #[error("capability not available: {0}")]

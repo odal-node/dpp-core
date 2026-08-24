@@ -123,7 +123,7 @@ mod tests {
     #[tokio::test]
     async fn signs_then_verifies_round_trip() {
         let svc = service();
-        let payload = serde_json::json!({ "productName": "Widget", "sector": "battery" });
+        let payload = serde_json::json!({ "productName": "Widget", "productGroup": "battery" });
         let signed = svc
             .sign_passport(PassportId::new(), &payload)
             .await

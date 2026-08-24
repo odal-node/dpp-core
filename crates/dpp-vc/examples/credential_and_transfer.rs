@@ -23,7 +23,7 @@ fn main() {
         name: "GreenFix Textile Repair GmbH".into(),
         role: CredentialRole::AuthorisedRepairer,
         country: "DE".into(),
-        sectors: vec!["textile".into()],
+        product_groups: vec!["textile".into()],
         product_categories: vec![],
     };
 
@@ -43,7 +43,7 @@ fn main() {
     println!("\nVerification: {:?}", result);
     assert!(result.is_valid());
 
-    // 3. Verify wrong sector is rejected
+    // 3. Verify wrong product group is rejected
     let out_of_scope = verify_credential_claims(&credential, Some("battery"), Utc::now());
     println!("Out-of-scope check: {:?}", out_of_scope);
     assert!(!out_of_scope.is_valid());

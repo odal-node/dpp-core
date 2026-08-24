@@ -113,7 +113,7 @@
         },
         {
           "modelType": "Property",
-          "idShort": "sector",
+          "idShort": "productGroup",
           "valueType": "xs:string",
           "value": "battery"
         },

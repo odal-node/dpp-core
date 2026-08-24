@@ -12,7 +12,7 @@ The goal is a single, well-audited implementation of the regulatory standard in 
 
 ### 1. Proof-Bound Architecture
 
-Raw production data never enters Odal's systems. The library validates product data against the sector schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
+Raw production data never enters Odal's systems. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
 
 This is an architectural constraint, not a feature.
 

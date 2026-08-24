@@ -4,20 +4,22 @@ use dpp_domain::Audience;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
-    PassportStatus, RepairabilityScore, Sector, SectorData, TextileData, UnsoldGoodsDestination,
-    UnsoldGoodsReason, UnsoldGoodsReport,
+    PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
+    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use serde_json::json;
 
-fn minimal_passport(sector: Sector) -> Passport {
-    let schema_version = dpp_domain::SectorCatalog::new()
-        .get(sector.catalog_key())
+fn minimal_passport(product_group: ProductGroup) -> Passport {
+    let schema_version = dpp_domain::ProductGroupCatalog::new()
+        .get(product_group.catalog_key())
         .map_or_else(|| "1.0.0".to_owned(), |d| d.current_schema_version.clone());
     Passport {
         id: PassportId::new(),
         batch_id: Some("BATCH-001".into()),
         product_name: "Test Product".into(),
-        sector,
+        product_group,
+        applicable_instruments: Vec::new(),
+        granularity: None,
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".into(),
             address: "123 Main St, Berlin, DE".into(),
@@ -33,7 +35,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         repairability_score: Some(RepairabilityScore::from_scalar(8.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: None,
+        product_group_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,
@@ -43,7 +45,7 @@ fn minimal_passport(sector: Sector) -> Passport {
         updated_at: Utc::now(),
         published_at: None,
         placed_on_market_date: None,
-        // Derived from the sector, not hardcoded. Disclosure is sourced from the
+        // Derived from the product group, not hardcoded. Disclosure is sourced from the
         // declared schema version, so a fixture claiming a version that never
         // held its fields would classify none of them — which is a fixture
         // defect that used to be invisible because the catalog map ignored
@@ -155,7 +157,7 @@ fn reference_element_round_trip() {
 
 #[test]
 fn build_aas_produces_five_core_submodels() {
-    let passport = minimal_passport(Sector::Electronics);
+    let passport = minimal_passport(ProductGroup::Electronics);
     let (shell, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert_eq!(submodels.len(), 5);
@@ -170,7 +172,7 @@ fn build_aas_produces_five_core_submodels() {
 
 #[test]
 fn shell_submodel_refs_match_submodel_ids() {
-    let passport = minimal_passport(Sector::Battery);
+    let passport = minimal_passport(ProductGroup::Battery);
     let (shell, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let submodel_ids: Vec<&str> = submodels.iter().map(|s| s.id.as_str()).collect();
@@ -190,7 +192,7 @@ fn shell_submodel_refs_match_submodel_ids() {
 
 #[test]
 fn shell_has_correct_asset_information() {
-    let passport = minimal_passport(Sector::Textile);
+    let passport = minimal_passport(ProductGroup::Textile);
     let (shell, _) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     assert_eq!(
@@ -213,7 +215,7 @@ fn shell_has_correct_asset_information() {
 
 #[test]
 fn shell_id_contains_passport_id() {
-    let passport = minimal_passport(Sector::Battery);
+    let passport = minimal_passport(ProductGroup::Battery);
     let id_str = passport.id.to_string();
     let (shell, _) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
@@ -302,9 +304,9 @@ fn battery_data_with_due_diligence() -> BatteryData {
 }
 
 #[test]
-fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(
+fn build_aas_with_battery_product_group_data_adds_sixth_submodel() {
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
         battery_data_with_due_diligence(),
     )));
 
@@ -313,7 +315,7 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
     assert_eq!(
         submodels.len(),
         6,
-        "battery sector data should add a 6th submodel"
+        "battery product_group data should add a 6th submodel"
     );
     assert_eq!(shell.submodels.len(), 6);
 
@@ -363,8 +365,8 @@ fn build_aas_with_battery_sector_data_adds_sixth_submodel() {
 /// per-audience rather than a blanket strip of everything non-public.
 #[test]
 fn restricted_audience_receives_the_restricted_battery_field() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
         battery_data_with_due_diligence(),
     )));
 
@@ -391,8 +393,8 @@ fn restricted_audience_receives_the_restricted_battery_field() {
 
 #[test]
 fn build_aas_textile_has_fibre_composition_collection() {
-    let mut passport = minimal_passport(Sector::Textile);
-    passport.sector_data = Some(SectorData::Textile(Box::new(TextileData {
+    let mut passport = minimal_passport(ProductGroup::Textile);
+    passport.product_group_data = Some(ProductGroupData::Textile(Box::new(TextileData {
         gtin: Gtin::parse("09506000134352").unwrap(),
         fibre_composition: vec![
             FibreEntry {
@@ -460,7 +462,7 @@ fn build_aas_textile_has_fibre_composition_collection() {
 
 #[test]
 fn material_composition_entries_have_unit() {
-    let passport = minimal_passport(Sector::Electronics);
+    let passport = minimal_passport(ProductGroup::Electronics);
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let mat_sub = submodels
@@ -482,7 +484,7 @@ fn material_composition_entries_have_unit() {
 
 #[test]
 fn environmental_impact_co2e_has_unit() {
-    let passport = minimal_passport(Sector::Battery);
+    let passport = minimal_passport(ProductGroup::Battery);
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let env_sub = submodels
@@ -499,7 +501,7 @@ fn environmental_impact_co2e_has_unit() {
 
 #[test]
 fn manufacturer_submodel_has_did_reference() {
-    let passport = minimal_passport(Sector::Battery);
+    let passport = minimal_passport(ProductGroup::Battery);
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let mfr_sub = submodels
@@ -579,7 +581,7 @@ fn map_array_becomes_indexed_collection() {
 
 #[test]
 fn submodel_round_trip() {
-    let dpp = json!({ "sector": "textile", "carbonFootprintKgCo2e": 8.5 });
+    let dpp = json!({ "productGroup": "textile", "carbonFootprintKgCo2e": 8.5 });
     let submodel = map_dpp_to_aas_submodel("urn:test", &dpp);
     let json = serde_json::to_value(&submodel).unwrap();
     let back: AasSubmodel = serde_json::from_value(json).unwrap();
@@ -598,12 +600,12 @@ fn non_object_input_produces_empty_submodel() {
     assert!(submodel.submodel_elements.is_empty());
 }
 
-// ── New sector builder tests ──────────────────────────────────────────────
+// ── New product group builder tests ──────────────────────────────────────────────
 
 #[test]
-fn build_aas_unsold_goods_produces_sector_submodel() {
-    let mut passport = minimal_passport(Sector::UnsoldGoods);
-    passport.sector_data = Some(SectorData::UnsoldGoods(UnsoldGoodsReport {
+fn build_aas_unsold_goods_produces_product_group_submodel() {
+    let mut passport = minimal_passport(ProductGroup::UnsoldGoods);
+    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(UnsoldGoodsReport {
         reporting_period: "2026-Q2".into(),
         volume_kg: 1500.0,
         product_category: "apparel".into(),
@@ -624,18 +626,18 @@ fn build_aas_unsold_goods_produces_sector_submodel() {
     assert!(has_volume, "volumeKg property missing");
 }
 
-/// A sector whose typed mapper was removed still ships its data — the
+/// A product group whose typed mapper was removed still ships its data — the
 /// projection loses its *shape*, not its *content*.
 ///
 /// This is the property that makes removing a typed lane safe rather than
 /// lossy: the generic builder renders the variant's serialised fields, minus
-/// the `sector` discriminant, so a consumer still receives every value. What it
+/// the `product_group` discriminant, so a consumer still receives every value. What it
 /// no longer receives is a submodel named for a template that no standards body
 /// has ratified, which was never a claim we could support.
 #[test]
-fn a_sector_without_a_typed_mapper_still_carries_its_data() {
-    let mut passport = minimal_passport(Sector::Steel);
-    passport.sector_data = Some(SectorData::Steel(dpp_domain::SteelData {
+fn a_product_group_without_a_typed_mapper_still_carries_its_data() {
+    let mut passport = minimal_passport(ProductGroup::Steel);
+    passport.product_group_data = Some(ProductGroupData::Steel(dpp_domain::SteelData {
         gtin: dpp_domain::Gtin::parse("09506000134352").expect("valid gtin"),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 62.0,
@@ -647,17 +649,17 @@ fn a_sector_without_a_typed_mapper_still_carries_its_data() {
 
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
-    let sector_submodel = submodels
+    let product_group_submodel = submodels
         .iter()
-        .find(|s| s.id_short == "SectorData")
-        .expect("a provisional sector renders through the generic builder");
+        .find(|s| s.id_short == "ProductGroupData")
+        .expect("a provisional product_group renders through the generic builder");
 
     assert!(
-        !sector_submodel.submodel_elements.is_empty(),
-        "the generic projection must carry the sector's fields, not drop them"
+        !product_group_submodel.submodel_elements.is_empty(),
+        "the generic projection must carry the product_group's fields, not drop them"
     );
     assert!(
-        sector_submodel.semantic_id.is_none(),
+        product_group_submodel.semantic_id.is_none(),
         "a generic projection asserts no semanticId — there is no ratified \
          template for it to name"
     );
@@ -667,8 +669,8 @@ fn a_sector_without_a_typed_mapper_still_carries_its_data() {
 
 #[test]
 fn environment_carries_the_shell_and_every_submodel() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
         battery_data_with_due_diligence(),
     )));
 
@@ -692,8 +694,8 @@ fn environment_carries_the_shell_and_every_submodel() {
 
 #[test]
 fn environment_is_masked_for_its_audience() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
         battery_data_with_due_diligence(),
     )));
 
@@ -733,7 +735,7 @@ fn environment_is_masked_for_its_audience() {
 
 #[test]
 fn environment_serialises_with_idta_field_names() {
-    let passport = minimal_passport(Sector::Battery);
+    let passport = minimal_passport(ProductGroup::Battery);
     let env =
         build_aas_environment(&passport, "09506000134352", Audience::Public).expect("buildable");
     let value = serde_json::to_value(&env).expect("serialises");
@@ -755,7 +757,7 @@ fn environment_serialises_with_idta_field_names() {
     );
 }
 
-/// A sector-data key the passport's declared schema version does not know about
+/// A product group-data key the passport's declared schema version does not know about
 /// is dropped, for every audience.
 ///
 /// Disclosure is sourced from the declared version, so an undeclared key is
@@ -763,20 +765,20 @@ fn environment_serialises_with_idta_field_names() {
 /// makes the version-sourced policy *less* safe than the catalog map in exactly
 /// one direction, and this is the guard that closes it.
 ///
-/// Reaching this needs an invalid passport: every sector schema sets
+/// Reaching this needs an invalid passport: every product group schema sets
 /// `additionalProperties: false`, so validation already rejects such a
 /// document. Defence in depth, and asserted for the credentialed audience too —
 /// an unclassified field is not more disclosable to a repairer than to anyone
 /// else.
 #[test]
-fn a_sector_field_the_declared_version_does_not_know_is_dropped() {
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(
+fn a_product_group_field_the_declared_version_does_not_know_is_dropped() {
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
         battery_data_with_due_diligence(),
     )));
 
     let mut document = serde_json::to_value(&passport).expect("serialises");
-    document["sectorData"]["smuggledField"] = serde_json::json!("should not survive");
+    document["productGroupData"]["smuggledField"] = serde_json::json!("should not survive");
     let smuggled: Passport = serde_json::from_value(document).expect("round-trips via Other keys");
 
     for audience in [
@@ -789,7 +791,7 @@ fn a_sector_field_the_declared_version_does_not_know_is_dropped() {
         let serialised = serde_json::to_string(&submodels).expect("serialises");
         assert!(
             !serialised.contains("smuggledField"),
-            "{audience:?}: an unclassified sector field reached the projection"
+            "{audience:?}: an unclassified product_group field reached the projection"
         );
     }
 }
@@ -814,8 +816,8 @@ fn a_carbon_footprint_class_projects_with_its_ruleset() {
     data.carbon_footprint_class_ruleset_id = Some("eu-battery-cfb".into());
     data.carbon_footprint_class_ruleset_version = Some("2026.1".into());
 
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(data)));
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(data)));
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let json = serde_json::to_string(&submodels).expect("serialises");
@@ -864,8 +866,8 @@ fn the_point_1_conditions_and_safety_data_project() {
     data.battery_model_id = Some("LFP-64-A".into());
     data.manufacturing_place = Some("PL:Wroclaw".into());
 
-    let mut passport = minimal_passport(Sector::Battery);
-    passport.sector_data = Some(SectorData::Battery(Box::new(data)));
+    let mut passport = minimal_passport(ProductGroup::Battery);
+    passport.product_group_data = Some(ProductGroupData::Battery(Box::new(data)));
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let json = serde_json::to_string(&submodels).expect("serialises");

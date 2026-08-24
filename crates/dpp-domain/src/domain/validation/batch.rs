@@ -1,8 +1,8 @@
-//! Batch validation of multiple sector-data items in one pass.
+//! Batch validation of multiple product group-data items in one pass.
 
-use super::functions::validate_sector_data;
+use super::functions::validate_product_group_data;
 use crate::domain::field_error::ValidationErrors;
-use crate::domain::sector::SectorData;
+use crate::domain::product_group::ProductGroupData;
 
 /// Result of validating a single item in a batch.
 #[derive(Debug, Clone)]
@@ -13,16 +13,16 @@ pub struct BatchValidationItem {
     pub result: Result<(), ValidationErrors>,
 }
 
-/// Validate a batch of sector data items, collecting all errors per item.
+/// Validate a batch of product group data items, collecting all errors per item.
 ///
 /// The returned `Vec` has the same length and order as the input.
-pub fn validate_sector_data_batch(items: &[SectorData]) -> Vec<BatchValidationItem> {
+pub fn validate_product_group_data_batch(items: &[ProductGroupData]) -> Vec<BatchValidationItem> {
     items
         .iter()
         .enumerate()
         .map(|(index, data)| BatchValidationItem {
             index,
-            result: validate_sector_data(data),
+            result: validate_product_group_data(data),
         })
         .collect()
 }

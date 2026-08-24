@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/battery-v2.5.0.json",
-  "title": "Odal Node — Battery Sector Data (v2.5.0)",
+  "title": "Odal Node — Battery Product Group Data (v2.5.0)",
   "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.5.0 makes batteryType required and closed: Annex VI Part A point 2, made public by Annex XIII point 1(a), lists the battery category as mandatory content of the publicly accessible tier, and Art. 1(3)'s strictest-requirements tie-break only functions over a closed set, so an unrecognised value is no longer accepted as null.",
   "type": "object",
   "required": [

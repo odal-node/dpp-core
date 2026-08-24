@@ -136,7 +136,7 @@ The carrier (QR or Data Matrix) on a physical product encodes a **GS1 Digital Li
 - The GTIN and identifier come from the **verified** passport fields — the resolver checks the JWS before building the URI and never trusts a stored `qrCodeUrl` value.
 - The `/21/` serial segment carries a GS1-conformant 20-character serial derived from the passport id — a raw 36-character UUID exceeds the GS1 AI 21 limit.
 
-The carrier **fails closed**: if the passport does not verify, no URI is produced; if the sector data has no GTIN (for example an unsold-goods report), resolution returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital Link, any conformant resolver serving the same path answers the same scan — re-homing a passport is a DNS or registry change, not a reprint.
+The carrier **fails closed**: if the passport does not verify, no URI is produced; if the product group data has no GTIN (for example an unsold-goods report), resolution returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital Link, any conformant resolver serving the same path answers the same scan — re-homing a passport is a DNS or registry change, not a reprint.
 
 ---
 

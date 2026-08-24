@@ -1,7 +1,7 @@
-//! [`SectorCatalog`] — the open, data-driven sector catalog, pre-loaded from
+//! [`ProductGroupCatalog`] — the open, data-driven product group catalog, pre-loaded from
 //! embedded manifests and extensible at runtime.
 
-use super::descriptor::SectorDescriptor;
+use super::descriptor::ProductGroupDescriptor;
 use super::error::CatalogError;
 
 struct EmbeddedManifest {
@@ -9,56 +9,56 @@ struct EmbeddedManifest {
     json: &'static str,
 }
 
-/// One manifest per sector. Adding a sector at compile time is a single entry +
-/// a JSON file; adding one at runtime is [`SectorCatalog::register`].
+/// One manifest per product group. Adding a product group at compile time is a single entry +
+/// a JSON file; adding one at runtime is [`ProductGroupCatalog::register`].
 const EMBEDDED: &[EmbeddedManifest] = &[
     EmbeddedManifest {
         key: "battery",
-        json: include_str!("../../sectors/battery.json"),
+        json: include_str!("../../product-groups/battery.json"),
     },
     EmbeddedManifest {
         key: "electronics",
-        json: include_str!("../../sectors/electronics.json"),
+        json: include_str!("../../product-groups/electronics.json"),
     },
     EmbeddedManifest {
         key: "unsold-goods",
-        json: include_str!("../../sectors/unsold-goods.json"),
+        json: include_str!("../../product-groups/unsold-goods.json"),
     },
     EmbeddedManifest {
         key: "textile",
-        json: include_str!("../../sectors/textile.json"),
+        json: include_str!("../../product-groups/textile.json"),
     },
     EmbeddedManifest {
         key: "steel",
-        json: include_str!("../../sectors/steel.json"),
+        json: include_str!("../../product-groups/steel.json"),
     },
     EmbeddedManifest {
         key: "construction",
-        json: include_str!("../../sectors/construction.json"),
+        json: include_str!("../../product-groups/construction.json"),
     },
     EmbeddedManifest {
         key: "tyre",
-        json: include_str!("../../sectors/tyre.json"),
+        json: include_str!("../../product-groups/tyre.json"),
     },
     EmbeddedManifest {
         key: "toy",
-        json: include_str!("../../sectors/toy.json"),
+        json: include_str!("../../product-groups/toy.json"),
     },
     EmbeddedManifest {
         key: "aluminium",
-        json: include_str!("../../sectors/aluminium.json"),
+        json: include_str!("../../product-groups/aluminium.json"),
     },
     EmbeddedManifest {
         key: "furniture",
-        json: include_str!("../../sectors/furniture.json"),
+        json: include_str!("../../product-groups/furniture.json"),
     },
     EmbeddedManifest {
         key: "detergent",
-        json: include_str!("../../sectors/detergent.json"),
+        json: include_str!("../../product-groups/detergent.json"),
     },
     EmbeddedManifest {
         key: "mattress",
-        json: include_str!("../../sectors/mattress.json"),
+        json: include_str!("../../product-groups/mattress.json"),
     },
 ];
 
@@ -70,20 +70,23 @@ const EMBEDDED: &[EmbeddedManifest] = &[
 /// a record must be kept, at what level — comes from
 /// [`InstrumentCatalog`](super::InstrumentCatalog), because each of those is a
 /// property of an act reaching this group and a group may be reached by several.
-pub struct SectorCatalog {
-    entries: Vec<SectorDescriptor>,
+pub struct ProductGroupCatalog {
+    entries: Vec<ProductGroupDescriptor>,
 }
 
-impl SectorCatalog {
-    /// Create a catalog pre-loaded with all embedded sector manifests.
+impl ProductGroupCatalog {
+    /// Create a catalog pre-loaded with all embedded product group manifests.
     #[must_use]
     pub fn new() -> Self {
         let entries = EMBEDDED
             .iter()
             .map(|m| {
-                let descriptor: SectorDescriptor =
-                    serde_json::from_str(m.json).unwrap_or_else(|e| {
-                        panic!("embedded sector manifest '{}' is invalid: {e}", m.key)
+                let descriptor: ProductGroupDescriptor = serde_json::from_str(m.json)
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "embedded product_group manifest '{}' is invalid: {e}",
+                            m.key
+                        )
                     });
                 assert_eq!(
                     descriptor.key, m.key,
@@ -96,15 +99,15 @@ impl SectorCatalog {
         Self { entries }
     }
 
-    /// Look up a sector by canonical key.
+    /// Look up a product group by canonical key.
     #[must_use]
-    pub fn get(&self, key: &str) -> Option<&SectorDescriptor> {
+    pub fn get(&self, key: &str) -> Option<&ProductGroupDescriptor> {
         self.entries.iter().find(|d| d.key == key)
     }
 
-    /// All sector descriptors.
+    /// All product group descriptors.
     #[must_use]
-    pub fn all(&self) -> &[SectorDescriptor] {
+    pub fn all(&self) -> &[ProductGroupDescriptor] {
         &self.entries
     }
 
@@ -120,10 +123,10 @@ impl SectorCatalog {
     /// - `stored = Some(v)` (an *existing* passport): that version is
     ///   authoritative — a record is always re-validated against the version it
     ///   was published under, for immutability and audit. Returned as-is.
-    /// - `stored = None` (a *new* passport): the sector's current version from
+    /// - `stored = None` (a *new* passport): the product group's current version from
     ///   the catalog is used.
     ///
-    /// Returns `None` only if `stored` is `None` and the sector is unknown.
+    /// Returns `None` only if `stored` is `None` and the product group is unknown.
     #[must_use]
     pub fn resolve_schema_version(&self, key: &str, stored: Option<&str>) -> Option<String> {
         match stored {
@@ -132,7 +135,7 @@ impl SectorCatalog {
         }
     }
 
-    /// All sector keys, sorted.
+    /// All product group keys, sorted.
     #[must_use]
     pub fn keys(&self) -> Vec<&str> {
         let mut keys: Vec<&str> = self.entries.iter().map(|d| d.key.as_str()).collect();
@@ -140,13 +143,13 @@ impl SectorCatalog {
         keys
     }
 
-    /// Register a new sector at runtime.
+    /// Register a new product group at runtime.
     ///
     /// Enforces the descriptor invariant the schema-resolution path relies on:
     /// `current_schema_version` must be valid semver **and** one of
     /// `schema_versions`. A descriptor violating either would otherwise let a
-    /// caller register a sector whose version fails to parse downstream, which
-    /// silently skips JSON-Schema validation for every passport in that sector.
+    /// caller register a product group whose version fails to parse downstream, which
+    /// silently skips JSON-Schema validation for every passport in that product group.
     ///
     /// # Errors
     /// - [`CatalogError::AlreadyExists`] if the key is already taken.
@@ -154,7 +157,7 @@ impl SectorCatalog {
     ///   not valid semver.
     /// - [`CatalogError::CurrentVersionNotListed`] if `current_schema_version`
     ///   is not present in `schema_versions`.
-    pub fn register(&mut self, descriptor: SectorDescriptor) -> Result<(), CatalogError> {
+    pub fn register(&mut self, descriptor: ProductGroupDescriptor) -> Result<(), CatalogError> {
         if self.get(&descriptor.key).is_some() {
             return Err(CatalogError::AlreadyExists(descriptor.key));
         }
@@ -181,7 +184,7 @@ impl SectorCatalog {
         Ok(())
     }
 
-    /// Number of sectors in the catalog.
+    /// Number of product groups in the catalog.
     #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -194,7 +197,7 @@ impl SectorCatalog {
     }
 }
 
-impl Default for SectorCatalog {
+impl Default for ProductGroupCatalog {
     fn default() -> Self {
         Self::new()
     }

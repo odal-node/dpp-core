@@ -1,6 +1,6 @@
-//! Guest-side SDK for Odal Node Wasm sector plugins.
+//! Guest-side SDK for Odal Node Wasm product group plugins.
 //!
-//! A sector plugin author implements the [`DppSectorPlugin`](dpp_plugin_traits::DppSectorPlugin) trait from
+//! A product group plugin author implements the [`DppProductGroupPlugin`](dpp_plugin_traits::DppProductGroupPlugin) trait from
 //! `dpp-plugin-traits` and invokes [`export_plugin!`] once. The macro generates
 //! the full low-level Wasm ABI (`alloc`, `dealloc`, `metadata`, `describe`,
 //! `validate`, `calculate_metrics`, `generate_passport`) and wires each export
@@ -54,7 +54,7 @@ mod tests;
 pub mod validate;
 
 #[cfg(test)]
-use dpp_plugin_traits::{AbiResult, DppSectorPlugin, PluginError, PluginInput};
+use dpp_plugin_traits::{AbiResult, DppProductGroupPlugin, PluginError, PluginInput};
 pub use dpp_plugin_traits::{
     METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
     PluginComplianceStatus,
@@ -70,9 +70,9 @@ pub use entry::{
 
 // ─── Export macro ─────────────────────────────────────────────────────────────
 
-/// Generate the full Wasm ABI for a sector plugin.
+/// Generate the full Wasm ABI for a product group plugin.
 ///
-/// `$plugin` must implement [`DppSectorPlugin`](dpp_plugin_traits::DppSectorPlugin)
+/// `$plugin` must implement [`DppProductGroupPlugin`](dpp_plugin_traits::DppProductGroupPlugin)
 /// and [`Default`] (plugins are deterministic and stateless, so the instance is
 /// constructed per call). Invoke once at the crate root:
 ///
@@ -81,7 +81,7 @@ pub use entry::{
 ///
 /// #[derive(Default)]
 /// struct BatteryPlugin;
-/// impl DppSectorPlugin for BatteryPlugin { /* ... */ }
+/// impl DppProductGroupPlugin for BatteryPlugin { /* ... */ }
 ///
 /// export_plugin!(BatteryPlugin);
 /// ```

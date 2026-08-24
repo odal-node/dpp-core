@@ -1,22 +1,22 @@
-//! `SectorCatalog` load, gating, registration, and cross-artifact parity tests.
+//! `ProductGroupCatalog` load, gating, registration, and cross-artifact parity tests.
 
 use super::*;
 
 #[test]
 fn loads_all_embedded_manifests() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     assert_eq!(catalog.len(), 12);
 }
 
 /// Determinability is a property of an act reaching a product group, so it is
 /// asked of the instrument catalog. The three answers are unchanged from when
-/// this was a per-sector flag — what changed is that each now names the act it
+/// this was a per-product group flag — what changed is that each now names the act it
 /// comes from.
 #[test]
 fn exactly_three_product_groups_have_a_binding_act() {
     let instruments = InstrumentCatalog::new();
-    let sectors = SectorCatalog::new();
-    let mut in_force: Vec<&str> = sectors
+    let product_groups = ProductGroupCatalog::new();
+    let mut in_force: Vec<&str> = product_groups
         .all()
         .iter()
         .map(|d| d.key.as_str())
@@ -28,7 +28,7 @@ fn exactly_three_product_groups_have_a_binding_act() {
 
 #[test]
 fn product_groups_with_no_binding_act_are_flagged_not_dropped() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let instruments = InstrumentCatalog::new();
     // All eight not-yet-adopted product groups are still present, just flagged.
     assert_eq!(catalog.len(), 12);
@@ -43,7 +43,7 @@ fn product_groups_with_no_binding_act_are_flagged_not_dropped() {
 
 #[test]
 fn battery_descriptor_is_complete() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let battery = catalog.get("battery").expect("battery in catalog");
     assert!(battery.schema_versions.contains(&"2.0.0".to_string()));
     assert!(battery.schema_versions.contains(&"2.1.0".to_string()));
@@ -57,12 +57,12 @@ fn battery_descriptor_is_complete() {
     // required. Older versions stay registered so passports already validated
     // against them remain verifiable.
     assert_eq!(battery.current_schema_version, "2.6.0");
-    assert_eq!(battery.plugin.as_deref(), Some("sector-battery"));
+    assert_eq!(battery.plugin.as_deref(), Some("product-group-battery"));
 }
 
 #[test]
 fn resolve_schema_version_new_vs_existing() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     // New passport (stored = None) → catalog current version.
     assert_eq!(
         catalog.resolve_schema_version("battery", None).as_deref(),
@@ -75,7 +75,7 @@ fn resolve_schema_version_new_vs_existing() {
             .as_deref(),
         Some("1.0.0")
     );
-    // Unknown sector, new passport → None.
+    // Unknown product group, new passport → None.
     assert_eq!(catalog.resolve_schema_version("unknown", None), None);
 }
 
@@ -97,9 +97,9 @@ fn allows_determination_matches_status() {
 }
 
 #[test]
-fn register_runtime_sector() {
-    let mut catalog = SectorCatalog::new();
-    let descriptor = SectorDescriptor {
+fn register_runtime_product_group() {
+    let mut catalog = ProductGroupCatalog::new();
+    let descriptor = ProductGroupDescriptor {
         key: "plastics".into(),
         title: "Plastics".into(),
         schema_versions: vec!["1.0.0".into()],
@@ -117,8 +117,8 @@ fn register_runtime_sector() {
     ));
 }
 
-fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescriptor {
-    SectorDescriptor {
+fn provisional_descriptor(current: &str, versions: Vec<String>) -> ProductGroupDescriptor {
+    ProductGroupDescriptor {
         key: "plastics".into(),
         title: "Plastics".into(),
         schema_versions: versions,
@@ -132,20 +132,20 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
 
 #[test]
 fn register_rejects_invalid_current_schema_version() {
-    let mut catalog = SectorCatalog::new();
+    let mut catalog = ProductGroupCatalog::new();
     let descriptor = provisional_descriptor("not-semver", vec!["not-semver".into()]);
     assert!(matches!(
         catalog.register(descriptor),
         Err(CatalogError::InvalidSchemaVersion { .. })
     ));
     // A rejected descriptor must never reach the catalog — otherwise every
-    // passport in that sector silently skips schema validation.
+    // passport in that product group silently skips schema validation.
     assert_eq!(catalog.len(), 12);
 }
 
 #[test]
 fn register_rejects_current_version_not_in_list() {
-    let mut catalog = SectorCatalog::new();
+    let mut catalog = ProductGroupCatalog::new();
     // Valid semver, but not one of the declared schema_versions.
     let descriptor = provisional_descriptor("2.0.0", vec!["1.0.0".into()]);
     assert!(matches!(
@@ -155,49 +155,49 @@ fn register_rejects_current_version_not_in_list() {
     assert_eq!(catalog.len(), 12);
 }
 
-/// Parity guard: the closed [`Sector`](crate::domain::sector::Sector) enum
-/// and the open [`SectorCatalog`] must describe the same set of
-/// *compile-time* sectors. Runtime-registered sectors degrade to
-/// `SectorData::Other`, but every typed `Sector` variant (except `Other`)
+/// Parity guard: the closed [`ProductGroup`](crate::domain::product_group::ProductGroup) enum
+/// and the open [`ProductGroupCatalog`] must describe the same set of
+/// *compile-time* product groups. Runtime-registered product groups degrade to
+/// `ProductGroupData::Other`, but every typed `ProductGroup` variant (except `Other`)
 /// must have an embedded catalog entry, and the embedded catalog must not
 /// carry a key with no corresponding variant. This stops the "four spellings
-/// of a sector" drift from reappearing across the enum ↔ catalog boundary.
+/// of a product group" drift from reappearing across the enum ↔ catalog boundary.
 #[test]
-fn sector_enum_and_catalog_agree() {
-    use crate::domain::sector::Sector;
+fn product_group_enum_and_catalog_agree() {
+    use crate::domain::product_group::ProductGroup;
 
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
 
-    // Every typed Sector variant (except Other) must be in the catalog.
+    // Every typed ProductGroup variant (except Other) must be in the catalog.
     let typed = [
-        Sector::Battery,
-        Sector::Textile,
-        Sector::UnsoldGoods,
-        Sector::Steel,
-        Sector::Electronics,
-        Sector::Construction,
-        Sector::Tyre,
-        Sector::Toy,
-        Sector::Aluminium,
-        Sector::Furniture,
-        Sector::Mattress,
-        Sector::Detergent,
+        ProductGroup::Battery,
+        ProductGroup::Textile,
+        ProductGroup::UnsoldGoods,
+        ProductGroup::Steel,
+        ProductGroup::Electronics,
+        ProductGroup::Construction,
+        ProductGroup::Tyre,
+        ProductGroup::Toy,
+        ProductGroup::Aluminium,
+        ProductGroup::Furniture,
+        ProductGroup::Mattress,
+        ProductGroup::Detergent,
     ];
-    for sector in &typed {
-        let key = sector.catalog_key();
+    for product_group in &typed {
+        let key = product_group.catalog_key();
         assert!(
             catalog.get(key).is_some(),
-            "Sector::{sector:?} (key '{key}') has no embedded catalog entry"
+            "ProductGroup::{product_group:?} (key '{key}') has no embedded catalog entry"
         );
     }
 
-    // No catalog entry without a typed Sector variant.
+    // No catalog entry without a typed ProductGroup variant.
     let typed_keys: std::collections::HashSet<&str> =
-        typed.iter().map(Sector::catalog_key).collect();
+        typed.iter().map(ProductGroup::catalog_key).collect();
     for key in catalog.keys() {
         assert!(
             typed_keys.contains(key),
-            "catalog key '{key}' has no corresponding typed Sector variant"
+            "catalog key '{key}' has no corresponding typed ProductGroup variant"
         );
     }
 }
@@ -205,7 +205,7 @@ fn sector_enum_and_catalog_agree() {
 /// Every product group we ship has a retention period some act imposes.
 ///
 /// Retention has moved twice now. It was once duplicated between a manifest
-/// field and a hardcoded match on the `Sector` enum, where the enum was what
+/// field and a hardcoded match on the `ProductGroup` enum, where the enum was what
 /// production applied while the field was documented as authoritative. It then
 /// sat on the descriptor alone, which assumed one act per product group. It now
 /// sits on the binding, with the act that imposes it, and the catalog folds the
@@ -217,7 +217,7 @@ fn sector_enum_and_catalog_agree() {
 /// else's legal duty.
 #[test]
 fn every_product_group_has_a_retention_period_from_some_act() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let instruments = InstrumentCatalog::new();
     for descriptor in catalog.all() {
         let key = descriptor.key.as_str();
@@ -266,7 +266,7 @@ fn unsold_goods_cites_espr_article_25() {
 
 #[test]
 fn descriptor_round_trips_camel_case() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let battery = catalog.get("battery").unwrap();
     let json = serde_json::to_value(battery).unwrap();
     assert_eq!(json["currentSchemaVersion"], "2.6.0");
@@ -278,18 +278,18 @@ fn descriptor_round_trips_camel_case() {
             "'{absent}' belongs on the instrument binding, not the product group"
         );
     }
-    let back: SectorDescriptor = serde_json::from_value(json).unwrap();
+    let back: ProductGroupDescriptor = serde_json::from_value(json).unwrap();
     assert_eq!(back.key, "battery");
 }
 
-// Drift guard: every key in a sector's disclosure manifest must correspond to
-// a real JSON field in that sector's current schema. A key that doesn't match any
+// Drift guard: every key in a product group's disclosure manifest must correspond to
+// a real JSON field in that product group's current schema. A key that doesn't match any
 // schema property silently fails to gate any field — the redaction is a no-op.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn disclosure_keys_match_schema_properties() {
     use crate::schemas::VersionedSchemaRegistry;
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
     for descriptor in catalog.all() {
@@ -302,13 +302,13 @@ fn disclosure_keys_match_schema_properties() {
                 .parse()
                 .unwrap_or_else(|_| {
                     panic!(
-                        "sector '{}' currentSchemaVersion '{}' is not valid semver",
+                        "product_group '{}' currentSchemaVersion '{}' is not valid semver",
                         descriptor.key, descriptor.current_schema_version
                     )
                 });
         let schema_json = registry.get(&descriptor.key, &version).unwrap_or_else(|| {
             panic!(
-                "schema not found for sector '{}' v{}",
+                "schema not found for product_group '{}' v{}",
                 descriptor.key, descriptor.current_schema_version
             )
         });
@@ -319,7 +319,7 @@ fn disclosure_keys_match_schema_properties() {
             .and_then(|p| p.as_object())
             .unwrap_or_else(|| {
                 panic!(
-                    "schema for sector '{}' has no top-level 'properties' object",
+                    "schema for product_group '{}' has no top-level 'properties' object",
                     descriptor.key
                 )
             });
@@ -327,7 +327,7 @@ fn disclosure_keys_match_schema_properties() {
         for key in descriptor.disclosure.keys() {
             assert!(
                 properties.contains_key(key),
-                "disclosure key '{}' in sector '{}' does not match any property in schema v{} \
+                "disclosure key '{}' in product_group '{}' does not match any property in schema v{} \
                  (properties: {:?}). Either rename the key to match the serialised field name, \
                  or remove it — a mismatched key silently fails to gate the field.",
                 key,
@@ -340,15 +340,15 @@ fn disclosure_keys_match_schema_properties() {
 }
 
 // The key enforcement: catalog ↔ schema registry must agree, so the
-// "four spellings of a sector" problem cannot silently reappear.
+// "four spellings of a product group" problem cannot silently reappear.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn catalog_agrees_with_schema_registry() {
     use crate::schemas::VersionedSchemaRegistry;
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
-    // Every schema version a sector declares must exist in the registry,
+    // Every schema version a product group declares must exist in the registry,
     // and its current version must be one of them.
     for d in catalog.all() {
         let reg_versions: Vec<String> = registry
@@ -359,24 +359,24 @@ fn catalog_agrees_with_schema_registry() {
         for v in &d.schema_versions {
             assert!(
                 reg_versions.contains(v),
-                "catalog sector '{}' declares schema {v} not embedded in the registry (registry has {reg_versions:?})",
+                "catalog product_group '{}' declares schema {v} not embedded in the registry (registry has {reg_versions:?})",
                 d.key
             );
         }
         assert!(
             d.schema_versions.contains(&d.current_schema_version),
-            "catalog sector '{}' currentSchemaVersion {} is not in its schemaVersions {:?}",
+            "catalog product_group '{}' currentSchemaVersion {} is not in its schemaVersions {:?}",
             d.key,
             d.current_schema_version,
             d.schema_versions
         );
     }
 
-    // No orphan schemas: every registry sector must have a catalog entry.
-    for sector in registry.sectors() {
+    // No orphan schemas: every registry product group must have a catalog entry.
+    for product_group in registry.product_groups() {
         assert!(
-            catalog.get(sector).is_some(),
-            "schema registry has sector '{sector}' with no catalog entry"
+            catalog.get(product_group).is_some(),
+            "schema registry has product_group '{product_group}' with no catalog entry"
         );
     }
 
@@ -402,7 +402,7 @@ fn catalog_agrees_with_schema_registry() {
 #[test]
 fn most_product_groups_are_not_reached_by_espr() {
     let instruments = InstrumentCatalog::new();
-    let non_espr = SectorCatalog::new()
+    let non_espr = ProductGroupCatalog::new()
         .all()
         .iter()
         .filter(|d| {
@@ -464,28 +464,28 @@ fn in_force_with_future_passport_date_still_determines() {
 
 #[test]
 fn every_manifest_round_trips() {
-    for d in SectorCatalog::new().all().iter() {
+    for d in ProductGroupCatalog::new().all().iter() {
         let json = serde_json::to_string(d).expect("serialise");
-        let back: SectorDescriptor = serde_json::from_str(&json).expect("deserialise");
-        // SectorDescriptor is not PartialEq, and `disclosure` is a HashMap whose
+        let back: ProductGroupDescriptor = serde_json::from_str(&json).expect("deserialise");
+        // ProductGroupDescriptor is not PartialEq, and `disclosure` is a HashMap whose
         // serialised key order is not stable — compare as Value, which is
         // order-insensitive for maps.
         assert_eq!(
             serde_json::to_value(&back).expect("re-serialise"),
             serde_json::to_value(d).expect("serialise"),
-            "round-trip changed sector '{}'",
+            "round-trip changed product_group '{}'",
             d.key
         );
     }
 }
 
-/// Sectors whose catalog `productCategories` mirror a schema enum, and the
+/// ProductGroups whose catalog `productCategories` mirror a schema enum, and the
 /// property that enumerates them.
 ///
-/// The correspondence is **not derivable** from the data — depending on sector
+/// The correspondence is **not derivable** from the data — depending on product group
 /// the categories live under `productCategory`, `productType`, `batteryType`,
 /// `productFamily`, `productionRoute` or `tyreClass` — so it is declared here.
-/// A sector absent from this table is simply not cross-checked; `textile`, for
+/// A product group absent from this table is simply not cross-checked; `textile`, for
 /// example, declares categories but its schema has no enum for them.
 const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
     ("aluminium", "productionRoute"),
@@ -505,33 +505,33 @@ const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
 /// This existed as two spellings of one concept — the catalog said `sli` and
 /// `clothing_accessories` where the schemas said `starting-lighting-ignition`
 /// and `accessories`. Neither was load-bearing, because
-/// `SectorDescriptor::product_categories` has no reader in Rust today; both
+/// `ProductGroupDescriptor::product_categories` has no reader in Rust today; both
 /// would have become load-bearing the moment one appeared.
 #[test]
 fn product_categories_are_legal_values_of_their_schema_enum() {
     use crate::schemas::VersionedSchemaRegistry;
 
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let registry = VersionedSchemaRegistry::new();
 
-    for (sector_key, property) in CATEGORY_ENUM_PROPERTY {
-        let descriptor = catalog
-            .get(sector_key)
-            .unwrap_or_else(|| panic!("sector '{sector_key}' is in the table but not the catalog"));
+    for (product_group_key, property) in CATEGORY_ENUM_PROPERTY {
+        let descriptor = catalog.get(product_group_key).unwrap_or_else(|| {
+            panic!("product_group '{product_group_key}' is in the table but not the catalog")
+        });
         let version: semver::Version = descriptor
             .current_schema_version
             .parse()
             .expect("currentSchemaVersion is valid semver");
         let schema_json = registry
-            .get(sector_key, &version)
-            .unwrap_or_else(|| panic!("no schema for '{sector_key}' v{version}"));
+            .get(product_group_key, &version)
+            .unwrap_or_else(|| panic!("no schema for '{product_group_key}' v{version}"));
         let schema: serde_json::Value =
             serde_json::from_str(schema_json).expect("schema is valid JSON");
 
         let allowed: Vec<&str> = schema["properties"][property]["enum"]
             .as_array()
             .unwrap_or_else(|| {
-                panic!("'{sector_key}' schema property '{property}' has no enum — stale table row")
+                panic!("'{product_group_key}' schema property '{property}' has no enum — stale table row")
             })
             .iter()
             .filter_map(serde_json::Value::as_str)
@@ -540,7 +540,7 @@ fn product_categories_are_legal_values_of_their_schema_enum() {
         for category in &descriptor.product_categories {
             assert!(
                 allowed.contains(&category.as_str()),
-                "sector '{sector_key}' lists product category '{category}', which is not a legal \
+                "product_group '{product_group_key}' lists product category '{category}', which is not a legal \
                  value of schema property '{property}' ({allowed:?})"
             );
         }

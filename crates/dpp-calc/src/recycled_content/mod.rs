@@ -6,7 +6,7 @@
 //! ## What this adds over `dpp-rules`
 //!
 //! `dpp_rules::batteries::recycled_content` already holds the thresholds, the
-//! phase dates and the comparison, and the Wasm sector plugin already calls
+//! phase dates and the comparison, and the Wasm product group plugin already calls
 //! them. What it cannot produce — because it is `no_std` and zero-dependency by
 //! contract — is the part a notified body reads:
 //!

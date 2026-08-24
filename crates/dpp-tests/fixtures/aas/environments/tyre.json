@@ -73,7 +73,7 @@
           "keys": [
             {
               "type": "Submodel",
-              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:sector-data"
+              "value": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:product_group-data"
             }
           ]
         }
@@ -113,7 +113,7 @@
         },
         {
           "modelType": "Property",
-          "idShort": "sector",
+          "idShort": "productGroup",
           "valueType": "xs:string",
           "value": "tyre"
         },
@@ -300,8 +300,8 @@
       ]
     },
     {
-      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:sector-data",
-      "idShort": "SectorData",
+      "id": "urn:odal-node:dpp:01234567-89ab-7cde-8f01-23456789abcd:product_group-data",
+      "idShort": "ProductGroupData",
       "modelType": "Submodel",
       "kind": "Instance",
       "submodelElements": [

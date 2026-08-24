@@ -82,11 +82,11 @@ pub struct RegistrationRequest {
     /// the passport was published without a facility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facility: Option<crate::domain::passport::FacilitySnapshot>,
-    /// Product category for sector routing within the registry.
+    /// Product category for product group routing within the registry.
     pub product_category: String,
     /// GS1 Digital Link URI or DID URI resolving to the DPP data.
     pub data_carrier_uri: String,
-    /// The schema version used for this passport's sector data.
+    /// The schema version used for this passport's product group data.
     pub schema_version: String,
     /// JWS signature of the DPP payload, for registry integrity binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -192,7 +192,7 @@ impl RegistrationRequest {
         operator: RegisteringOperator<'_>,
         granularity: RegistrationGranularity,
     ) -> Self {
-        let product_category = passport.sector.wire_str().to_owned();
+        let product_category = passport.product_group.wire_str().to_owned();
         Self {
             // Minted here, at the one moment a registration comes into
             // existence, and never again — see the field's docs.
@@ -216,9 +216,9 @@ impl RegistrationRequest {
             granularity,
             // Linked where the product group carries one — Art. 8(4)/(5). An
             // absent model identifier is the lawful "no model design exists",
-            // so it is read from the sector data rather than assumed.
+            // so it is read from the product group data rather than assumed.
             model_id: passport
-                .sector_data
+                .product_group_data
                 .as_ref()
                 .and_then(|d| d.model_identifier())
                 .map(ToOwned::to_owned),
@@ -456,11 +456,11 @@ mod tests {
     /// carry it rather than claiming the product has none.
     #[test]
     fn the_model_identifier_reaches_the_registration() {
-        use crate::domain::sector::SectorData;
+        use crate::domain::product_group::ProductGroupData;
 
         let mut passport = make_published_passport();
-        passport.sector_data = Some(SectorData::Battery(Box::new(
-            crate::domain::sector::BatteryData {
+        passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
+            crate::domain::product_group::BatteryData {
                 battery_model_id: Some("BM-4815".into()),
                 ..crate::test_support::sample_battery_data()
             },
@@ -479,7 +479,7 @@ mod tests {
     #[test]
     fn a_product_group_without_a_model_identifier_reports_none() {
         let mut passport = make_published_passport();
-        passport.sector_data = None;
+        passport.product_group_data = None;
         assert!(
             RegistrationRequest::from_published_passport(
                 &passport,

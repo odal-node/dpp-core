@@ -34,7 +34,7 @@ static CTG_STAGES: [LifecycleStage; 2] = [LifecycleStage::RawMaterials, Lifecycl
 /// Generic cradle-to-gate CO₂e ruleset (raw materials + production stages).
 ///
 /// Use this when the delegated act does not mandate a specific lifecycle model.
-/// Battery CFB and other full-lifecycle calculations use their own sector ruleset.
+/// Battery CFB and other full-lifecycle calculations use their own product group ruleset.
 pub struct CradleToGateRuleset;
 
 impl Ruleset for CradleToGateRuleset {

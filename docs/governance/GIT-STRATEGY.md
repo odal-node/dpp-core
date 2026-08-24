@@ -26,7 +26,7 @@ When you're ready to push, structure the history into clean logical commits:
 
 ```
 1. feat: foundation — workspace, Cargo.toml, schemas, justfile, CI
-2. feat(dpp-domain): domain types, passport, sector data, port traits
+2. feat(dpp-domain): domain types, passport, product group data, port traits
 3. feat(dpp-domain): transfer of responsibility model
 4. feat(dpp-domain): versioned schema registry with hot-reload
 5. feat(dpp-crypto): Ed25519 key management, JWS, encrypted keystore
@@ -78,7 +78,7 @@ ci: split unit and integration test steps
 ```
 v0.1.0    ← first public release (current state)
 v0.1.1    ← patch: bug fixes, formatting
-v0.2.0    ← minor: new sector schemas, additional port traits
+v0.2.0    ← minor: new product group schemas, additional port traits
 v1.0.0    ← major: stable API after textile delegated act is finalised
 ```
 
@@ -187,4 +187,4 @@ cargo publish -p dpp-calc           # depends on dpp-domain
 cargo publish -p dpp-plugin-sdk     # depends on dpp-plugin-traits + dpp-rules
 ```
 
-Publish order matters — dependencies first. `dpp-tests` is `publish = false` and is never published. Sector plugins are released as `.wasm` artefacts, not to crates.io.
+Publish order matters — dependencies first. `dpp-tests` is `publish = false` and is never published. Product group plugins are released as `.wasm` artefacts, not to crates.io.

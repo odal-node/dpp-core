@@ -10,7 +10,7 @@ fn sample_subject() -> DppCredentialSubject {
         name: "GreenFix Textile Repair".into(),
         role: CredentialRole::AuthorisedRepairer,
         country: "DE".into(),
-        sectors: vec!["textile".into()],
+        product_groups: vec!["textile".into()],
         product_categories: vec![],
     }
 }
@@ -80,16 +80,16 @@ fn verify_future_issuance_rejected() {
 }
 
 #[test]
-fn verify_wrong_sector_out_of_scope() {
+fn verify_wrong_product_group_out_of_scope() {
     let cred = sample_credential();
     let result = verify_credential_claims(&cred, Some("battery"), Utc::now());
     assert!(matches!(result, VerificationResult::OutOfScope { .. }));
 }
 
 #[test]
-fn verify_empty_sectors_matches_all() {
+fn verify_empty_product_groups_matches_all() {
     let mut subject = sample_subject();
-    subject.sectors = vec![];
+    subject.product_groups = vec![];
     let cred = CredentialBuilder::new("did:web:authority.example.com".into(), subject).build();
     let result = verify_credential_claims(&cred, Some("battery"), Utc::now());
     assert!(result.is_valid());
@@ -99,7 +99,7 @@ fn verify_empty_sectors_matches_all() {
 fn authority_role_grants_confidential_tier() {
     let mut subject = sample_subject();
     subject.role = CredentialRole::MarketSurveillanceAuthority;
-    subject.sectors = vec![];
+    subject.product_groups = vec![];
     let cred = CredentialBuilder::new("did:web:surveillance.europa.eu".into(), subject).build();
     let result = verify_credential_claims(&cred, None, Utc::now());
     if let VerificationResult::Valid { audience, .. } = result {
@@ -275,7 +275,7 @@ fn allow_all_issuers_accepts_any_did() {
 fn professional_only_issuer_cannot_grant_confidential_tier() {
     let mut subject = sample_subject();
     subject.role = CredentialRole::MarketSurveillanceAuthority;
-    subject.sectors = vec![];
+    subject.product_groups = vec![];
     let issuer_did = "did:web:national-authority.example.com";
     let cred = CredentialBuilder::new(issuer_did.into(), subject).build();
 
