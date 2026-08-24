@@ -1,0 +1,16 @@
+{
+  "key": "detergent",
+  "title": "Detergents & Surfactants",
+  "schemaVersions": [
+    "1.0.0",
+    "1.1.0"
+  ],
+  "currentSchemaVersion": "1.1.0",
+  "productCategories": [
+    "laundry",
+    "dishwashing",
+    "surface-cleaner",
+    "personal-care"
+  ],
+  "plugin": "product-group-detergent"
+}

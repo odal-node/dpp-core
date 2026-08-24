@@ -138,11 +138,11 @@ fn washing_machine_not_active_today() {
     );
 }
 
-// ── sector_calculator_map ─────────────────────────────────────────────
+// ── product_group_calculator_map ─────────────────────────────────────────────
 
 #[test]
-fn sector_calculator_map_has_at_least_one_active_entry() {
-    let map = sector_calculator_map();
+fn product_group_calculator_map_has_at_least_one_active_entry() {
+    let map = product_group_calculator_map();
     assert!(
         map.iter()
             .any(|e| matches!(e.status_on(today()), CalculatorStatus::Active { .. })),
@@ -152,7 +152,7 @@ fn sector_calculator_map_has_at_least_one_active_entry() {
 
 #[test]
 fn smartphone_tablet_is_active_in_map() {
-    let map = sector_calculator_map();
+    let map = product_group_calculator_map();
     let entry = map
         .iter()
         .find(|e| e.product_category == "smartphone-tablet")
@@ -171,10 +171,10 @@ fn smartphone_tablet_is_active_in_map() {
 
 #[test]
 fn battery_pef_is_active_in_map() {
-    let map = sector_calculator_map();
+    let map = product_group_calculator_map();
     let entry = map
         .iter()
-        .find(|e| e.sector_key == "battery" && e.methodology == "co2e-pef")
+        .find(|e| e.product_group_key == "battery" && e.methodology == "co2e-pef")
         .expect("battery co2e-pef must appear in the map");
     assert!(matches!(
         entry.status_on(today()),
@@ -183,9 +183,12 @@ fn battery_pef_is_active_in_map() {
 }
 
 #[test]
-fn all_sector_calculator_entries_have_non_empty_strings() {
-    for entry in sector_calculator_map() {
-        assert!(!entry.sector_key.is_empty(), "sector_key is empty");
+fn all_product_group_calculator_entries_have_non_empty_strings() {
+    for entry in product_group_calculator_map() {
+        assert!(
+            !entry.product_group_key.is_empty(),
+            "product_group_key is empty"
+        );
         assert!(
             !entry.product_category.is_empty(),
             "product_category is empty"
@@ -194,7 +197,7 @@ fn all_sector_calculator_entries_have_non_empty_strings() {
     }
 }
 
-/// Drift guard: `sector_calculator_map()` and `resolve_repairability`'s
+/// Drift guard: `product_group_calculator_map()` and `resolve_repairability`'s
 /// internal category table are hand-maintained independently, with nothing
 /// else tying them together — a category added to one and forgotten in the
 /// other fails silently (the status view is simply wrong, not a crash). For
@@ -203,7 +206,7 @@ fn all_sector_calculator_entries_have_non_empty_strings() {
 #[test]
 fn status_map_agrees_with_resolve_repairability_today() {
     let today = Utc::now().date_naive();
-    for entry in sector_calculator_map() {
+    for entry in product_group_calculator_map() {
         if entry.methodology != "repairability-heuristic" {
             continue;
         }
@@ -211,13 +214,13 @@ fn status_map_agrees_with_resolve_repairability_today() {
         match entry.status_on(today) {
             CalculatorStatus::Active { .. } => assert!(
                 resolves_today,
-                "sector_calculator_map derives Active for '{}', but resolve_repairability \
+                "product_group_calculator_map derives Active for '{}', but resolve_repairability \
                  finds no ruleset for it today",
                 entry.product_category
             ),
             other => assert!(
                 !resolves_today,
-                "sector_calculator_map derives {other:?} for '{}', but resolve_repairability \
+                "product_group_calculator_map derives {other:?} for '{}', but resolve_repairability \
                  already resolves a ruleset for it today",
                 entry.product_category
             ),
@@ -234,7 +237,7 @@ fn status_map_agrees_with_resolve_repairability_today() {
 #[test]
 fn status_map_agrees_with_resolve_recycled_content_today() {
     let today = Utc::now().date_naive();
-    for entry in sector_calculator_map() {
+    for entry in product_group_calculator_map() {
         if entry.methodology != "recycled-content-art8" {
             continue;
         }
@@ -263,12 +266,12 @@ fn status_map_agrees_with_resolve_recycled_content_today() {
 #[test]
 fn active_map_entries_reference_real_rulesets() {
     let known: std::collections::HashSet<&str> = all_rulesets().iter().map(|r| r.id().0).collect();
-    for entry in sector_calculator_map() {
+    for entry in product_group_calculator_map() {
         if let CalculatorImpl::Ruleset(ruleset_id) = &entry.implementation {
             assert!(
                 known.contains(ruleset_id),
                 "map entry ({}/{}) references ruleset_id '{ruleset_id}' not present in all_rulesets()",
-                entry.sector_key,
+                entry.product_group_key,
                 entry.product_category,
             );
         }

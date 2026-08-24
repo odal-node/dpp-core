@@ -1,4 +1,4 @@
-//! Passport plausibility lint dispatch — maps [`SectorData`] onto the
+//! Passport plausibility lint dispatch — maps [`ProductGroupData`] onto the
 //! `dpp-rules::lint` pack and carries the owned, serialisable wire types the
 //! engine persists on [`crate::domain::passport::Passport::lint_result`].
 //!
@@ -8,7 +8,7 @@
 use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::sector::{SectorData, UnsoldGoodsDestination};
+use super::product_group::{ProductGroupData, UnsoldGoodsDestination};
 
 /// How strongly a lint finding should be read. Neither variant blocks
 /// publish — the distinction is tone, not gating. Mirrors
@@ -32,7 +32,7 @@ pub struct LintFinding {
 }
 
 /// The result of running the plausibility lint pack against a passport's
-/// sector data. Never gates publish — see
+/// product group data. Never gates publish — see
 /// [`crate::domain::passport::Passport::lint_result`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,11 +48,11 @@ impl LintResult {
     /// Run the plausibility lint pack against `data`, stamping `assessed_at`
     /// as `Utc::now()`.
     #[must_use]
-    pub fn compute(data: &SectorData) -> Self {
+    pub fn compute(data: &ProductGroupData) -> Self {
         let now = Utc::now();
         Self {
             pack_version: dpp_rules::lint::LINT_PACK_VERSION.to_owned(),
-            findings: lint_sector_data(data, now),
+            findings: lint_product_group_data(data, now),
             assessed_at: now,
         }
     }
@@ -80,13 +80,13 @@ fn unsold_goods_destination_code(d: &UnsoldGoodsDestination) -> &'static str {
     }
 }
 
-/// Dispatch to the sector-specific lint pack. Sectors with no lint pack yet
+/// Dispatch to the product group-specific lint pack. ProductGroups with no lint pack yet
 /// (everything but battery/textile/unsold-goods in the first ruleset)
 /// produce no findings.
 #[must_use]
-pub fn lint_sector_data(data: &SectorData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
+pub fn lint_product_group_data(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
     match data {
-        SectorData::Battery(b) => {
+        ProductGroupData::Battery(b) => {
             let cathode: Vec<f64> = b
                 .cathode_material
                 .as_deref()
@@ -126,7 +126,7 @@ pub fn lint_sector_data(data: &SectorData, as_of: DateTime<Utc>) -> Vec<LintFind
                 .map(convert)
                 .collect()
         }
-        SectorData::Textile(t) => {
+        ProductGroupData::Textile(t) => {
             let fibres: Vec<&str> = t
                 .fibre_composition
                 .iter()
@@ -150,7 +150,7 @@ pub fn lint_sector_data(data: &SectorData, as_of: DateTime<Utc>) -> Vec<LintFind
                 .map(convert)
                 .collect()
         }
-        SectorData::UnsoldGoods(u) => {
+        ProductGroupData::UnsoldGoods(u) => {
             let input = dpp_rules::lint::unsold_goods::UnsoldGoodsLintInput {
                 reporting_period: &u.reporting_period,
                 volume_kg: u.volume_kg,
@@ -172,7 +172,7 @@ pub fn lint_sector_data(data: &SectorData, as_of: DateTime<Utc>) -> Vec<LintFind
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sector::{BatteryData, UnsoldGoodsReason, UnsoldGoodsReport};
+    use crate::domain::product_group::{BatteryData, UnsoldGoodsReason, UnsoldGoodsReport};
 
     fn battery() -> BatteryData {
         BatteryData {
@@ -187,16 +187,16 @@ mod tests {
 
     #[test]
     fn clean_battery_produces_no_findings() {
-        let data = SectorData::Battery(Box::new(battery()));
-        assert!(lint_sector_data(&data, Utc::now()).is_empty());
+        let data = ProductGroupData::Battery(Box::new(battery()));
+        assert!(lint_product_group_data(&data, Utc::now()).is_empty());
     }
 
     #[test]
     fn battery_energy_mismatch_surfaces_as_domain_finding() {
         let mut b = battery();
         b.rated_energy_wh = Some(500.0); // 3.7 * 10.0 = 37.0 expected
-        let data = SectorData::Battery(Box::new(b));
-        let findings = lint_sector_data(&data, Utc::now());
+        let data = ProductGroupData::Battery(Box::new(b));
+        let findings = lint_product_group_data(&data, Utc::now());
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].code, "battery.energy_capacity_mismatch");
         assert_eq!(findings[0].severity, LintSeverity::Notice);
@@ -214,8 +214,8 @@ mod tests {
             country_of_disposal: "MK".into(),
             operator_name: None,
         };
-        let data = SectorData::UnsoldGoods(report);
-        let findings = lint_sector_data(&data, Utc::now());
+        let data = ProductGroupData::UnsoldGoods(report);
+        let findings = lint_product_group_data(&data, Utc::now());
         assert!(
             findings
                 .iter()
@@ -224,15 +224,15 @@ mod tests {
     }
 
     #[test]
-    fn other_sector_produces_no_findings() {
-        let data = SectorData::other(serde_json::json!({"sector": "packaging"}))
+    fn other_product_group_produces_no_findings() {
+        let data = ProductGroupData::other(serde_json::json!({"productGroup": "packaging"}))
             .expect("packaging has no typed variant");
-        assert!(lint_sector_data(&data, Utc::now()).is_empty());
+        assert!(lint_product_group_data(&data, Utc::now()).is_empty());
     }
 
     #[test]
     fn lint_result_compute_stamps_pack_version_and_timestamp() {
-        let data = SectorData::Battery(Box::new(battery()));
+        let data = ProductGroupData::Battery(Box::new(battery()));
         let result = LintResult::compute(&data);
         assert_eq!(result.pack_version, dpp_rules::lint::LINT_PACK_VERSION);
         assert!(result.findings.is_empty());
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn lint_result_serde_round_trip() {
-        let data = SectorData::Battery(Box::new(battery()));
+        let data = ProductGroupData::Battery(Box::new(battery()));
         let result = LintResult::compute(&data);
         let json = serde_json::to_value(&result).unwrap();
         let back: LintResult = serde_json::from_value(json).unwrap();

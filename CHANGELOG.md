@@ -107,6 +107,69 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A passport records the acts it was issued under.** *(Breaking: two new
+  `Passport` fields, `applicableInstruments` and `granularity`;
+  `PASSPORT_WIRE_KEYS` goes 32 → 34. Both default on deserialise, so a stored
+  document without them still reads.)*
+
+  `applicableInstruments` is a `Vec<InstrumentRef>` — each entry naming an
+  instrument and whether it was resolved from the catalog or asserted by the
+  operator. It is **recorded at issuance and never recomputed**, for two
+  reasons: the law that governs a product is the law at placing on the market,
+  and there is no function to recompute the set with. A horizontal act can reach
+  a product whose product group no catalog models, so any "refresh" would
+  silently narrow the set to whatever the catalog happens to know — dropping
+  exactly the entries a human had to supply. It is therefore in
+  `PROTECTED_PATCH_FIELDS` and absent from `RETENTION_MUTABLE_FIELDS`;
+  corrections go through supersession.
+
+  `granularity` is `Option<Granularity>`, and `None` is the honest value for
+  every product group today: ESPR Art. 9(2)(d) delegates model/batch/item to
+  acts that do not exist yet. It is deliberately not defaulted to `Item` — that
+  is the EU registry's operational position, not a level any act has set — and
+  it finally gives the long-orphaned `granularity` column a writer.
+
+  ⚠️ **Found while building this, and worth knowing independently:** the access
+  filter classifies nested keys **by name, not by path**, against a policy built
+  from the *product group's* schema. `InstrumentRef` first carried a
+  `recordedAt`; battery's schema declares its own `recordedAt` as
+  individual-tier data, so the envelope field inherited that class and was
+  redacted out of every public battery projection, leaving a document that no
+  longer deserialised. The field was redundant — the set is written once, at
+  issuance, so every entry's timestamp equalled the passport's own `createdAt` —
+  and is gone. A test now asserts no key `InstrumentRef` emits collides with any
+  product-group schema. The underlying name-vs-path weakness is untouched and
+  applies to any envelope field with nested keys.
+
+- **`sector` is gone. The concept is `product group`, which is what EU law calls
+  it.** *(Breaking: every public name and both wire keys change. `Sector` →
+  `ProductGroup`, `SectorData` → `ProductGroupData`, `SectorDescriptor` →
+  `ProductGroupDescriptor`, `SectorCatalog` → `ProductGroupCatalog`,
+  `SectorAccessPolicy` → `ProductGroupAccessPolicy`, `DppSectorPlugin` →
+  `DppProductGroupPlugin`, `validate_sector_data` →
+  `validate_product_group_data`, `redact_sector_data` →
+  `redact_product_group_data`, and so on for every `sector`-bearing item.
+  Module `domain::sector` → `domain::product_group`. Manifests move from
+  `sectors/` to `product-groups/`. The ten plugin crates are renamed
+  `sector-*` → `product-group-*`, changing their Wasm artifact names and the
+  `plugin` binding in every manifest.)*
+
+  **Wire format:** the passport key `sector` becomes `productGroup` and
+  `sectorData` becomes `productGroupData`; the `ProductGroupData` discriminant
+  tag changes from `"sector"` to `"productGroup"`. Frozen schema-compat fixtures
+  are unaffected — they store the untagged payload.
+
+  ESPR defines **product group** (Art. 2(5)) and uses it throughout; "sector" is
+  not a term of art anywhere in the Regulation, and the mismatch was the root of
+  a catalog that mixed product groups with horizontal obligations, a
+  classification axis borrowed from a different regulation, and an entry
+  asserting an obligation that does not exist. No deprecated aliases: two
+  spellings in circulation is the exact problem the catalog exists to prevent.
+
+  One survivor, deliberately: `dpp-vocab`'s `Layer::Sectoral` keeps its name. It
+  describes an *external standards body's* scope — GS1 Rail is a sectoral
+  vocabulary — which is a different sense of the word and not an ESPR concept.
+
 - **`SectorDescriptor` no longer carries any law.** *(Breaking: `status`,
   `regime`, `legalBasis`, `dppAppliesFrom`, `retentionYears` and
   `retentionYearsBasis` are removed from the descriptor and from every sector
@@ -458,7 +521,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   one hostname away from being classified as ours — in the check whose whole job
   is to refuse exactly that.
 - **Disclosure classes are now read from every depth of a schema, not only the
-  top level.** `SectorAccessPolicy::from_schema` walked the root `properties`
+  top level.** `ProductGroupAccessPolicy::from_schema` walked the root `properties`
   map and stopped, while `filter_by_audience` classifies keys at **every**
   nesting depth. A property annotated `"x-disclosure": "restricted"` inside an
   object, an array's `items`, or a `definitions` block was therefore not in the
@@ -506,7 +569,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   Expressing a restricted nested leaf whose name is shared needs a path-aware
   matcher. That is a larger change and is deliberately not here; the limit is
-  now documented on `SectorAccessPolicy` and enforced by a gate rather than
+  now documented on `ProductGroupAccessPolicy` and enforced by a gate rather than
   left to be rediscovered.
 
 - **Both disclosure gates walk the whole schema**, and a third rejects
@@ -1108,7 +1171,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   obsolete-but-honest field costs a doc comment.
 
 - **Disclosure is now sourced from the passport's own schema version, and
-  `SectorAccessPolicy::from_catalog` is deprecated.** `for_schema_version` reads
+  `ProductGroupAccessPolicy::from_catalog` is deprecated.** `for_schema_version` reads
   a field's access class from the schema the passport was validated against, so
   a published passport stays filtered by the classes that produced its frozen
   signatures — permanently, and with no new passport field. `from_catalog` is
@@ -1272,7 +1335,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   release rather than the commit.
 
 - **Disclosure classes now live in the schema version, via `x-disclosure`.**
-  `SectorAccessPolicy::from_schema` reads a field's access class from the schema
+  `ProductGroupAccessPolicy::from_schema` reads a field's access class from the schema
   it was validated against, instead of from the catalog's single unversioned map.
 
   The map is the problem it solves. A passport's signatures are frozen at
@@ -1545,7 +1608,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   at exact parity.
 
 - **A misspelt `x-disclosure` class published the field it was meant to
-  withhold.** `SectorAccessPolicy::from_schema` matches four known tokens and
+  withhold.** `ProductGroupAccessPolicy::from_schema` matches four known tokens and
   drops anything else, so `"restrcted"` produced no map entry and the field fell
   through to the `Public` default. One transposed character was enough, and the
   coverage tests could not catch it because they asserted only that *some*
@@ -2171,7 +2234,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   referencing `dpp_domain`, so **`dpp-crypto` now has no workspace dependencies
   at all.**
 
-  *Migration:* `dpp_crypto::access::{SectorAccessPolicy, filter_by_audience,
+  *Migration:* `dpp_crypto::access::{ProductGroupAccessPolicy, filter_by_audience,
   PolicyDecision}` and the flat `dpp_crypto::{…}` re-exports of the same three
   → `dpp_domain::access::`.
 
@@ -2327,7 +2390,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   neither audience contains the other. Any `>=` comparison necessarily either
   hands authorities data the regulation withholds or hides point-2 data from
   someone entitled to it. *Migration:* `filter_by_access_tier` →
-  `filter_by_audience`; `SectorAccessPolicy::{field_tiers, default_tier,
+  `filter_by_audience`; `ProductGroupAccessPolicy::{field_tiers, default_tier,
   tier_for_field}` → `{field_disclosure, default_disclosure,
   disclosure_for_field}`; `SectorDescriptor::access_tiers` → `disclosure`, and
   the manifest key `accessTiers` → `disclosure` with values `professional` →
@@ -2461,7 +2524,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 ### Fixed
 
 - **`lintResult` leaked into the public passport view.** `Passport::redact` and
-  `SectorAccessPolicy::passport_default()` each carried their own copy of the
+  `ProductGroupAccessPolicy::passport_default()` each carried their own copy of the
   field classification and had drifted: the policy classified `lintResult` as
   restricted, `redact` never removed it. Both now read
   `PASSPORT_FIELD_DISCLOSURE`. This completes the 0.10.0 change that moved
@@ -2519,7 +2582,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 ### Breaking
 
 - **`lintResult` is no longer served at the `Public` access tier.**
-  `SectorAccessPolicy::passport_default()` now maps it to
+  `ProductGroupAccessPolicy::passport_default()` now maps it to
   `AccessTier::Professional`. The lint result is deliberately re-computable
   after publish and every re-run restamps `assessedAt`, so serving it `Public`
   placed a guaranteed-to-change field inside the payload the public signature

@@ -239,7 +239,7 @@ mod tests {
     use super::stub::InMemoryArchive;
     use super::*;
     use crate::domain::passport::*;
-    use crate::domain::sector::{CarbonFootprint, RepairabilityScore};
+    use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::domain::status::PassportStatus;
     use chrono::Utc;
 

@@ -27,10 +27,10 @@
 //!
 //! Always produces five core submodels: `ProductIdentification`,
 //! `ManufacturerInformation`, `EnvironmentalImpact`, `MaterialComposition`,
-//! `Repairability`. If `passport.sector_data` is `Some`, a sixth
-//! sector-specific submodel is appended (`BatteryTechnicalData`,
+//! `Repairability`. If `passport.product_group_data` is `Some`, a sixth
+//! product group-specific submodel is appended (`BatteryTechnicalData`,
 //! `TextileMaterialDeclaration`, `ElectronicsProductData`, or a generic
-//! `SectorData` fallback for sectors without a dedicated template yet).
+//! `ProductGroupData` fallback for product groups without a dedicated template yet).
 //!
 //! The lower-level [`map_dpp_to_aas_submodel`] remains available as a generic
 //! JSON-to-submodel escape hatch.
@@ -57,8 +57,8 @@ pub mod semantic_ids;
 mod builder;
 mod mapper;
 mod model;
+mod product_groups;
 mod property;
-mod sectors;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -70,7 +70,7 @@ pub use model::{
     AasShell, AasSubmodel, AasSubmodelElement, AssetInformation, SpecificAssetId,
 };
 pub use property::{boolean_property, double_property, integer_property, string_property};
-pub use templates::{SubmodelTemplate, placeholder_templates, sector_submodel_template};
+pub use templates::{SubmodelTemplate, placeholder_templates, product_group_submodel_template};
 
 /// Compile-checks this crate's README examples.
 ///

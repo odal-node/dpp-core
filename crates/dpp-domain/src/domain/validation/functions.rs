@@ -1,15 +1,15 @@
-//! Sector-data validation: JSON Schema (via the versioned registry) plus
+//! ProductGroup-data validation: JSON Schema (via the versioned registry) plus
 //! cross-field regulatory rules that JSON Schema cannot express.
 
 use std::sync::OnceLock;
 
 use semver::Version;
 
-use super::validator::SectorValidatorRegistry;
-use crate::catalog::SectorCatalog;
+use super::validator::ProductGroupValidatorRegistry;
+use crate::catalog::ProductGroupCatalog;
 use crate::domain::field_error::{FieldError, ValidationErrors};
-use crate::domain::sector::{
-    SectorData, SvhcSubstance, battery_recycled_chemistry_conflicts,
+use crate::domain::product_group::{
+    ProductGroupData, SvhcSubstance, battery_recycled_chemistry_conflicts,
     validate_battery_operating_temp, validate_fibre_composition, validate_surfactants,
     validate_svhc_substances,
 };
@@ -21,14 +21,14 @@ fn default_registry() -> &'static VersionedSchemaRegistry {
     REGISTRY.get_or_init(VersionedSchemaRegistry::new)
 }
 
-/// The embedded sector catalog, built once.
-fn default_catalog() -> &'static SectorCatalog {
-    static CATALOG: OnceLock<SectorCatalog> = OnceLock::new();
-    CATALOG.get_or_init(SectorCatalog::new)
+/// The embedded product group catalog, built once.
+fn default_catalog() -> &'static ProductGroupCatalog {
+    static CATALOG: OnceLock<ProductGroupCatalog> = OnceLock::new();
+    CATALOG.get_or_init(ProductGroupCatalog::new)
 }
 
-/// Validate `sector_data` against the appropriate JSON Schema and any
-/// sector-specific cross-field rules (e.g. fibre composition sum).
+/// Validate `product_group_data` against the appropriate JSON Schema and any
+/// product group-specific cross-field rules (e.g. fibre composition sum).
 ///
 /// The JSON-Schema step resolves against the crate's **embedded** schema
 /// registry and catalog (built once at first use). Schemas registered at
@@ -36,56 +36,63 @@ fn default_catalog() -> &'static SectorCatalog {
 /// validate those through that registry directly (its fail-closed
 /// `validate_strict`).
 ///
-/// A sector with no typed variant in this build is still validated against its
+/// A product group with no typed variant in this build is still validated against its
 /// embedded schema if the catalog has one. It is a **hard error** only when the
-/// sector is unknown to the catalog too — pass a [`SectorValidatorRegistry`]
-/// via [`validate_sector_data_with_registry`] to handle sectors added after
+/// product group is unknown to the catalog too — pass a [`ProductGroupValidatorRegistry`]
+/// via [`validate_product_group_data_with_registry`] to handle product groups added after
 /// this crate was released.
 ///
 /// # Errors
 ///
 /// Returns `ValidationErrors` listing every failing field when validation
 /// fails. The `Ok(())` path means the data is structurally valid.
-pub fn validate_sector_data(sector_data: &SectorData) -> Result<(), ValidationErrors> {
-    validate_sector_data_with_registry(sector_data, &SectorValidatorRegistry::default())
+pub fn validate_product_group_data(
+    product_group_data: &ProductGroupData,
+) -> Result<(), ValidationErrors> {
+    validate_product_group_data_with_registry(
+        product_group_data,
+        &ProductGroupValidatorRegistry::default(),
+    )
 }
 
-/// Like [`validate_sector_data`] but accepts a runtime validator registry.
+/// Like [`validate_product_group_data`] but accepts a runtime validator registry.
 ///
-/// For an untyped sector, validates against the embedded schema for **that
-/// sector's own key** when the catalog has one, and additionally against any
+/// For an untyped product group, validates against the embedded schema for **that
+/// product group's own key** when the catalog has one, and additionally against any
 /// validator registered under the same key in `registry`. The key is preserved
 /// through deserialization, so dispatch is by name rather than by a literal
 /// `"other"`.
 ///
-/// A hard error only when there is **neither** — a sector this build has never
+/// A hard error only when there is **neither** — a product group this build has never
 /// heard of, with nothing to check it against.
-pub fn validate_sector_data_with_registry(
-    sector_data: &SectorData,
-    registry: &SectorValidatorRegistry,
+pub fn validate_product_group_data_with_registry(
+    product_group_data: &ProductGroupData,
+    registry: &ProductGroupValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
-    if let SectorData::Other { sector, .. } = sector_data {
-        // Dispatch by the sector's own key, not by a literal "other": the key
-        // survives deserialization precisely so a sector with no typed variant
+    if let ProductGroupData::Other { product_group, .. } = product_group_data {
+        // Dispatch by the product group's own key, not by a literal "other": the key
+        // survives deserialization precisely so a product group with no typed variant
         // in this build can still be handled by name.
         //
-        // Delegated to `validate_raw_sector_data` rather than going straight to
-        // `registry`, so an untyped sector still gets the **embedded** schema
+        // Delegated to `validate_raw_product_group_data` rather than going straight to
+        // `registry`, so an untyped product group still gets the **embedded** schema
         // when the catalog has one. Those two facts are independent: a schema
-        // ships as a data file, a typed variant is Rust code, and a sector can
+        // ships as a data file, a typed variant is Rust code, and a product group can
         // have the first without the second. Checking only `registry` rejected
-        // every such sector outright — which is the opposite of what the open
-        // sector lane is for, and would have turned removing a typed lane into
-        // a hard regression for any sector whose schema we already ship.
-        if let Err(ve) =
-            validate_raw_sector_data(sector, &sector_data_instance(sector_data), registry)
-        {
+        // every such product group outright — which is the opposite of what the open
+        // product group lane is for, and would have turned removing a typed lane into
+        // a hard regression for any product group whose schema we already ship.
+        if let Err(ve) = validate_raw_product_group_data(
+            product_group,
+            &product_group_data_instance(product_group_data),
+            registry,
+        ) {
             errors.extend(ve.errors);
         }
     } else {
-        schema_errors(sector_data, &mut errors);
-        cross_field_errors(sector_data, &mut errors);
+        schema_errors(product_group_data, &mut errors);
+        cross_field_errors(product_group_data, &mut errors);
     }
     if errors.is_empty() {
         Ok(())
@@ -94,48 +101,48 @@ pub fn validate_sector_data_with_registry(
     }
 }
 
-/// Validate raw sector JSON using the embedded schema registry and any
+/// Validate raw product group JSON using the embedded schema registry and any
 /// runtime cross-field validator.
 ///
 /// This is the extension point for the plugin host: when a plugin produces a
-/// DPP with a sector key not present in the compile-time `SectorData` enum,
+/// DPP with a product group key not present in the compile-time `ProductGroupData` enum,
 /// pass the raw JSON through this function with an appropriate
-/// `SectorValidatorRegistry`.
+/// `ProductGroupValidatorRegistry`.
 ///
 /// Validation steps:
-/// 1. JSON Schema — resolved via the embedded [`SectorCatalog`] and
-///    [`VersionedSchemaRegistry`] (for sectors with a registered schema).
-/// 2. Cross-field — dispatched to `registry.get(sector_key)` when present.
+/// 1. JSON Schema — resolved via the embedded [`ProductGroupCatalog`] and
+///    [`VersionedSchemaRegistry`] (for product groups with a registered schema).
+/// 2. Cross-field — dispatched to `registry.get(product_group_key)` when present.
 /// 3. Hard error — if neither a schema nor a registered validator exists for
-///    `sector_key`.
-pub fn validate_raw_sector_data(
-    sector_key: &str,
+///    `product_group_key`.
+pub fn validate_raw_product_group_data(
+    product_group_key: &str,
     data: &serde_json::Value,
-    registry: &SectorValidatorRegistry,
+    registry: &ProductGroupValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
     let catalog = default_catalog();
-    let has_schema = catalog.current_schema_version(sector_key).is_some();
+    let has_schema = catalog.current_schema_version(product_group_key).is_some();
 
-    if let Some(version_str) = catalog.current_schema_version(sector_key) {
+    if let Some(version_str) = catalog.current_schema_version(product_group_key) {
         match version_str.parse::<semver::Version>() {
             Ok(version) => {
-                if let Err(ve) = default_registry().validate(sector_key, &version, data) {
+                if let Err(ve) = default_registry().validate(product_group_key, &version, data) {
                     errors.extend(ve.errors);
                 }
             }
-            // Fail closed: a registered sector with an unparseable current
+            // Fail closed: a registered product group with an unparseable current
             // version must not silently skip schema validation.
             Err(_) => errors.push(FieldError {
                 field: "/schemaVersion".to_owned(),
                 message: format!(
-                    "sector '{sector_key}' has an invalid current schema version '{version_str}'"
+                    "product_group '{product_group_key}' has an invalid current schema version '{version_str}'"
                 ),
             }),
         }
     }
 
-    match registry.get(sector_key) {
+    match registry.get(product_group_key) {
         Some(v) => {
             if let Err(field_errors) = v.validate(data) {
                 errors.extend(field_errors);
@@ -143,9 +150,9 @@ pub fn validate_raw_sector_data(
         }
         None if !has_schema => {
             errors.push(FieldError {
-                field: "/sector".to_owned(),
+                field: "/product_group".to_owned(),
                 message: format!(
-                    "unknown sector \"{sector_key}\": no JSON schema or cross-field validator registered"
+                    "unknown product_group \"{product_group_key}\": no JSON schema or cross-field validator registered"
                 ),
             });
         }
@@ -160,9 +167,9 @@ pub fn validate_raw_sector_data(
 }
 
 /// Schema validation via the registry at the catalog-resolved current version.
-fn schema_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
-    let sector = sector_data.sector();
-    let key = sector.catalog_key();
+fn schema_errors(product_group_data: &ProductGroupData, errors: &mut Vec<FieldError>) {
+    let product_group = product_group_data.product_group();
+    let key = product_group.catalog_key();
     // No catalog entry (e.g. `Other`) → no schema to validate against.
     let Some(version_str) = default_catalog().current_schema_version(key) else {
         return;
@@ -175,33 +182,34 @@ fn schema_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
             errors.push(FieldError {
                 field: "/schemaVersion".to_owned(),
                 message: format!(
-                    "sector '{key}' has an invalid current schema version '{version_str}'"
+                    "product_group '{key}' has an invalid current schema version '{version_str}'"
                 ),
             });
             return;
         }
     };
-    let instance = sector_data_instance(sector_data);
+    let instance = product_group_data_instance(product_group_data);
     if let Err(ve) = default_registry().validate(key, &version, &instance) {
         errors.extend(ve.errors);
     }
 }
 
-/// The JSON the schema expects: the inner sector fields without the `"sector"`
-/// discriminant tag that `SectorData` serialises (schemas forbid extra props).
-fn sector_data_instance(sector_data: &SectorData) -> serde_json::Value {
-    let mut value = serde_json::to_value(sector_data).expect("SectorData serializes to Value");
+/// The JSON the schema expects: the inner product group fields without the `"productGroup"`
+/// discriminant tag that `ProductGroupData` serialises (schemas forbid extra props).
+fn product_group_data_instance(product_group_data: &ProductGroupData) -> serde_json::Value {
+    let mut value =
+        serde_json::to_value(product_group_data).expect("ProductGroupData serializes to Value");
     if let Some(obj) = value.as_object_mut() {
-        obj.remove("sector");
+        obj.remove("productGroup");
     }
     value
 }
 
 /// Cross-field regulatory rules that JSON Schema cannot express, delegated to
 /// `dpp-rules` through the `dpp-domain` adapters.
-fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
-    match sector_data {
-        SectorData::Battery(d) => {
+fn cross_field_errors(product_group_data: &ProductGroupData, errors: &mut Vec<FieldError>) {
+    match product_group_data {
+        ProductGroupData::Battery(d) => {
             // Operating temperature range must be physically coherent (min < max).
             if let Err(msg) =
                 validate_battery_operating_temp(d.operating_temp_min_c, d.operating_temp_max_c)
@@ -237,7 +245,7 @@ fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
                 });
             }
         }
-        SectorData::Textile(d) => {
+        ProductGroupData::Textile(d) => {
             if let Err(msg) = validate_fibre_composition(&d.fibre_composition) {
                 errors.push(FieldError {
                     field: "/fibreComposition".to_owned(),
@@ -254,11 +262,11 @@ fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
                 });
             }
         }
-        SectorData::Electronics(d) => push_svhc(d.svhc_substances.as_deref(), errors),
-        SectorData::Toy(d) => push_svhc(d.svhc_substances.as_deref(), errors),
-        SectorData::Furniture(d) => push_svhc(d.svhc_substances.as_deref(), errors),
-        SectorData::Mattress(d) => push_svhc(d.svhc_substances.as_deref(), errors),
-        SectorData::Detergent(d) => {
+        ProductGroupData::Electronics(d) => push_svhc(d.svhc_substances.as_deref(), errors),
+        ProductGroupData::Toy(d) => push_svhc(d.svhc_substances.as_deref(), errors),
+        ProductGroupData::Furniture(d) => push_svhc(d.svhc_substances.as_deref(), errors),
+        ProductGroupData::Mattress(d) => push_svhc(d.svhc_substances.as_deref(), errors),
+        ProductGroupData::Detergent(d) => {
             if let Err(msg) = validate_surfactants(&d.surfactants) {
                 errors.push(FieldError {
                     field: "/surfactants".to_owned(),

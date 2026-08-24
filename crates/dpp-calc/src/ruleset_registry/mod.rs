@@ -54,4 +54,6 @@ mod tests;
 pub use resolve::{
     all_rulesets, resolve_recycled_content, resolve_repairability, resolve_repairability_index,
 };
-pub use status::{CalculatorImpl, CalculatorStatus, SectorCalculatorEntry, sector_calculator_map};
+pub use status::{
+    CalculatorImpl, CalculatorStatus, ProductGroupCalculatorEntry, product_group_calculator_map,
+};

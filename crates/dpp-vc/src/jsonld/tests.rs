@@ -6,7 +6,7 @@ use super::*;
 
 #[test]
 fn frame_and_strip_round_trip() {
-    let passport = json!({ "passportId": "abc", "sector": "battery" });
+    let passport = json!({ "passportId": "abc", "productGroup": "battery" });
     let framed = frame_passport(passport.clone());
     let stripped = strip_context(framed);
     assert_eq!(stripped["passportId"], "abc");

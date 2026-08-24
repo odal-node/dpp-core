@@ -9,8 +9,8 @@ use crate::version::{AbiVersion, SchemaVersionRange};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginMeta {
-    /// Sector key this plugin handles, e.g. `"textile"`, `"steel"`, `"battery"`.
-    pub sector: String,
+    /// ProductGroup key this plugin handles, e.g. `"textile"`, `"steel"`, `"battery"`.
+    pub product_group: String,
     /// Human-readable plugin name.
     pub name: String,
     /// SemVer version string of the plugin itself.
@@ -32,7 +32,7 @@ pub struct PluginMeta {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum PluginCapability {
-    /// Can validate sector-specific data against the schema.
+    /// Can validate product group-specific data against the schema.
     Validate,
     /// Can compute compliance metrics (CO2e, repairability, etc.).
     ComputeMetrics,
@@ -57,7 +57,7 @@ pub enum PluginCapability {
 pub struct PluginCapabilities {
     /// The ABI version this plugin was compiled against.
     pub abi_version: AbiVersion,
-    /// The sector schemas this plugin can handle.
+    /// The product group schemas this plugin can handle.
     pub supported_schemas: Vec<SchemaVersionRange>,
     /// Feature capabilities this plugin provides.
     pub capabilities: Vec<PluginCapability>,

@@ -48,7 +48,7 @@ the other's rule unenforced.
 
 That matters here more than it would elsewhere. `idShort` is the one constraint
 whose satisfaction depends on a passport's *contents* rather than on our code:
-the generic sector mapper builds names from operator-supplied JSON keys. A
+the generic product group mapper builds names from operator-supplied JSON keys. A
 one-character key produces a one-character `idShort`, which 3.0 accepts and 3.1
 tooling rejects. Pinning 3.0 alone would have shipped that gap.
 
@@ -124,7 +124,7 @@ member equally.
 
 Re-download from the tag, record the new tag, commit date, retrieval date, size
 and hash above, and state why the revision moved. Update the per-revision
-UTF-16 pattern count in `VENDORED_SCHEMAS` (`tests/all_sectors_aas.rs`) — the
+UTF-16 pattern count in `VENDORED_SCHEMAS` (`tests/all_product_groups_aas.rs`) — the
 suite asserts each count exactly, so a changed schema fails loudly rather than
 dropping more constraints than intended.
 

@@ -46,11 +46,11 @@ All adapter implementations live downstream. The domain is testable with in-memo
 
 ## 2. Open-Core Boundary
 
-The `ComplianceRegistry` trait in `dpp-domain::ports` is the **extension seam** — the single point where sector-specific compliance logic plugs in. It is a *technical* boundary: compliance calculation is open (Apache-2.0 Wasm plugins and the engine's calculators).
+The `ComplianceRegistry` trait in `dpp-domain::ports` is the **extension seam** — the single point where product-group-specific compliance logic plugs in. It is a *technical* boundary: compliance calculation is open (Apache-2.0 Wasm plugins and the engine's calculators).
 
 ```rust
 pub trait ComplianceRegistry: Send + Sync {
-    fn get_strategy(&self, sector: &str) -> Option<&dyn ComplianceStrategy>;
+    fn get_strategy(&self, product_group: &str) -> Option<&dyn ComplianceStrategy>;
 }
 
 pub trait ComplianceStrategy: Send + Sync {
@@ -58,7 +58,7 @@ pub trait ComplianceStrategy: Send + Sync {
 }
 ```
 
-dpp-domain ships with `PassthroughNoValidation` — it accepts manufacturer-supplied compliance values verbatim. Wasm sector plugins or the platform's calculators provide real compliance validation.
+dpp-domain ships with `PassthroughNoValidation` — it accepts manufacturer-supplied compliance values verbatim. Wasm product group plugins or the platform's calculators provide real compliance validation.
 
 Any compliance engine implementing this trait can be injected at startup via dynamic dispatch without any changes to the domain code.
 
@@ -87,11 +87,11 @@ When the EU publishes the EUDPP API specification, `dpp-registry` gets a real im
 
 ## 4. Schema-as-Code
 
-Versioned JSON schemas are embedded at compile time via `include_str!()`. The `VersionedSchemaRegistry` discovers all schemas in `schemas/{sector}/v{version}.json` and provides:
+Versioned JSON schemas are embedded at compile time via `include_str!()`. The `VersionedSchemaRegistry` discovers all schemas in `schemas/{product-group}/v{version}.json` and provides:
 
-- `get(sector, version)` — retrieve a specific schema
-- `latest(sector)` — retrieve the newest version for a sector
-- `validate(sector, version, data)` — validate passport data
+- `get(product group, version)` — retrieve a specific schema
+- `latest(product group)` — retrieve the newest version for a product group
+- `validate(product group, version, data)` — validate passport data
 
 Adding a new schema version is a single file addition. No code changes required — the registry discovers all embedded versions automatically.
 
@@ -106,8 +106,8 @@ The port traits in `dpp-domain::ports` form the complete contract between the st
 | Trait | Async | Purpose |
 |---|---|---|
 | `PassportRepository` | yes | CRUD for DPP records |
-| `ComplianceRegistry` | no | Route to sector strategy |
-| `ComplianceStrategy` | no | Sector-specific validation |
+| `ComplianceRegistry` | no | Route to product group strategy |
+| `ComplianceStrategy` | no | Product group-specific validation |
 | `IdentityPort` | yes | Sign and verify JWS |
 | `PluginHost` | no | Dispatch to Wasm plugins |
 

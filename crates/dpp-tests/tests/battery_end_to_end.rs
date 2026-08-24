@@ -1,6 +1,6 @@
 //! End-to-end integration test: Battery DPP lifecycle.
 //!
-//! The battery passport is the highest-stakes sector — mandatory from
+//! The battery passport is the highest-stakes product group — mandatory from
 //! 18 Feb 2027 under the EU Battery Regulation (2023/1542), Annex XIII. This
 //! test mirrors `textile_end_to_end.rs` for battery and exercises the full
 //! lifecycle across multiple dpp-core crates:
@@ -11,17 +11,17 @@
 //! 4. Parse a GS1 Digital Link for the battery (dpp-digital-link)
 //! 5. Issue a Verifiable Credential for a recycler (dpp-crypto)
 //! 6. Verify the credential and apply audience filtering (dpp-crypto)
-//! 7. Redact sector data through the catalog descriptor (dpp-domain)
+//! 7. Redact product group data through the catalog descriptor (dpp-domain)
 
 use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
 use dpp_digital_link::DigitalLink;
-use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
-use dpp_domain::domain::sector::CriticalRawMaterial;
+use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
-    ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, RepairabilityScore, Sector,
-    SectorCatalog, SectorData, redact_sector_data,
+    ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, ProductGroup,
+    ProductGroupCatalog, ProductGroupData, RepairabilityScore, redact_product_group_data,
 };
 use dpp_tests::fixtures::base_passport;
 use dpp_vc::credential::{
@@ -63,8 +63,8 @@ fn make_battery_passport() -> Passport {
         created_at: now,
         updated_at: now,
         ..base_passport(
-            Sector::Battery,
-            SectorData::Battery(Box::new(BatteryData {
+            ProductGroup::Battery,
+            ProductGroupData::Battery(Box::new(BatteryData {
                 gtin: Gtin::parse(VALID_GTIN).unwrap(),
                 battery_chemistry: BatteryChemistry::Lfp,
                 nominal_voltage_v: 3.2,
@@ -166,12 +166,12 @@ fn battery_passport_serialisation_round_trip() {
 
     assert_eq!(back.id, passport.id);
     assert_eq!(back.product_name, "PowerCell EV Module 4680");
-    assert_eq!(back.sector, Sector::Battery);
+    assert_eq!(back.product_group, ProductGroup::Battery);
     // Compared against the source rather than a literal: this asserts the
     // round trip, and the fixture now takes its version from the catalog.
     assert_eq!(back.schema_version, passport.schema_version);
 
-    if let Some(SectorData::Battery(bd)) = &back.sector_data {
+    if let Some(ProductGroupData::Battery(bd)) = &back.product_group_data {
         assert_eq!(bd.battery_chemistry, BatteryChemistry::Lfp);
         assert_eq!(bd.expected_lifetime_cycles, Some(6000));
         assert_eq!(bd.battery_type, BatteryType::Ev);
@@ -200,14 +200,14 @@ fn battery_passport_maps_to_aas_shell() {
             .any(|a| a.name == "batchId" && a.value == "LOT-2027-B-0917")
     );
 
-    // Five core submodels + one battery sector submodel.
+    // Five core submodels + one battery product group submodel.
     assert_eq!(submodels.len(), 6);
     assert_eq!(shell.submodels.len(), 6);
 
     let battery = submodels
         .iter()
         .find(|s| s.id_short == "BatteryTechnicalData")
-        .expect("battery sector submodel present");
+        .expect("battery product_group submodel present");
 
     // Fully-populated battery has the 6 mandatory + many optional elements.
     assert!(
@@ -238,10 +238,11 @@ fn gs1_digital_link_parsing_for_battery() {
 #[test]
 fn recycler_credential_unlocks_professional_battery_fields() {
     let passport = make_battery_passport();
-    let battery_fields = serde_json::to_value(passport.sector_data.as_ref().unwrap()).unwrap();
+    let battery_fields =
+        serde_json::to_value(passport.product_group_data.as_ref().unwrap()).unwrap();
 
-    let policy =
-        SectorAccessPolicy::for_schema_version("battery", "2.6.0").expect("battery in catalog");
+    let policy = ProductGroupAccessPolicy::for_schema_version("battery", "2.6.0")
+        .expect("battery in catalog");
 
     // ── Public audience ─────────────────────────────────────────────────────
     let public = filter_by_audience(&battery_fields, &policy, Audience::Public);
@@ -273,7 +274,7 @@ fn recycler_credential_unlocks_professional_battery_fields() {
         name: "CellRecycle B.V.".into(),
         role: CredentialRole::Recycler,
         country: "NL".into(),
-        sectors: vec!["battery".into()],
+        product_groups: vec!["battery".into()],
         product_categories: vec![],
     };
     let credential = CredentialBuilder::new("did:web:battery-authority.eu".into(), subject)
@@ -296,17 +297,17 @@ fn recycler_credential_unlocks_professional_battery_fields() {
 }
 
 #[test]
-fn redact_sector_data_strips_professional_fields_at_public_tier() {
+fn redact_product_group_data_strips_professional_fields_at_public_tier() {
     let passport = make_battery_passport();
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let descriptor = catalog.get("battery").expect("battery in catalog");
-    let data = passport.sector_data.as_ref().unwrap();
+    let data = passport.product_group_data.as_ref().unwrap();
 
     // Public viewer: point 2 stripped, point 1 retained. `dueDiligenceUrl`
     // (point 1(d)) and `criticalRawMaterials` (point 1(b), and Annex VI Part A
     // point 10 via point 1(a)) are on the public tier — this test asserted the
     // opposite until the annex was read against it.
-    let public = redact_sector_data(data, Audience::Public, descriptor);
+    let public = redact_product_group_data(data, Audience::Public, descriptor);
     let public_obj = public.as_object().expect("redacted data is an object");
     assert!(public_obj.contains_key("gtin"));
     assert!(public_obj.contains_key("dueDiligenceUrl"));
@@ -316,7 +317,7 @@ fn redact_sector_data_strips_professional_fields_at_public_tier() {
     // Authority sees Restricted and Conformity fields. It does *not* see
     // `Individual` ones — Annex XIII point 4 is legitimate-interest-only, which
     // is why this is a lattice and not a ranking.
-    let authority = redact_sector_data(data, Audience::Authority, descriptor);
+    let authority = redact_product_group_data(data, Audience::Authority, descriptor);
     let conf_obj = authority.as_object().unwrap();
     assert!(conf_obj.contains_key("disassemblyInstructionsUrl"));
     assert!(conf_obj.contains_key("dueDiligenceUrl"));
@@ -329,7 +330,7 @@ fn expired_battery_credential_denied() {
         name: "Expired Recycler".into(),
         role: CredentialRole::Recycler,
         country: "DE".into(),
-        sectors: vec!["battery".into()],
+        product_groups: vec!["battery".into()],
         product_categories: vec![],
     };
     let mut credential =
@@ -350,7 +351,7 @@ fn textile_credential_out_of_scope_for_battery() {
         name: "Textile Repair Co".into(),
         role: CredentialRole::AuthorisedRepairer,
         country: "FR".into(),
-        sectors: vec!["textile".into()],
+        product_groups: vec!["textile".into()],
         product_categories: vec![],
     };
     let credential =

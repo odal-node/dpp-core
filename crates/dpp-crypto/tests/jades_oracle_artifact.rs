@@ -67,7 +67,7 @@ fn pkcs8_der(signing_key: &SigningKey) -> Vec<u8> {
 fn payload() -> Vec<u8> {
     serde_json::to_vec(&serde_json::json!({
         "passportId": "01937f4e-0000-7000-8000-000000000001",
-        "sector": "battery",
+        "productGroup": "battery",
         "schemaVersion": "2.6.0",
         "gtin": "09506000134352",
         "status": "published",

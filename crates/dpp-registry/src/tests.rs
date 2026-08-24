@@ -50,7 +50,7 @@ fn sample_payload() -> RegistrationPayload {
         item_id: Some(sample_item_id()),
         facility_id: sample_facility_id(),
         operator_id: sample_operator_id(),
-        sector: "textile".into(),
+        product_group: "textile".into(),
         schema_version: "1.1.0".into(),
         digital_link_url: "https://id.ecotextile.de/01/09506000134352/21/ABC123".into(),
         published_at: Utc::now(),
@@ -64,7 +64,7 @@ fn sample_payload() -> RegistrationPayload {
 fn registration_payload_round_trip() {
     let payload = sample_payload();
     let json = serde_json::to_value(&payload).unwrap();
-    assert_eq!(json["sector"], "textile");
+    assert_eq!(json["productGroup"], "textile");
     assert_eq!(json["productId"]["scheme"], "gtin");
     assert_eq!(json["operatorId"]["country"], "DE");
     let back: RegistrationPayload = serde_json::from_value(json).unwrap();
@@ -411,9 +411,9 @@ fn empty_item_id_rejected() {
 }
 
 #[test]
-fn empty_sector_or_schema_version_rejected() {
+fn empty_product_group_or_schema_version_rejected() {
     let mut payload = sample_payload();
-    payload.sector = String::new();
+    payload.product_group = String::new();
     assert!(matches!(
         payload.validate(),
         Err(RegistryValidationError::MissingRequiredField(_))

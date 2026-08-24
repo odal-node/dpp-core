@@ -1,25 +1,27 @@
 use std::collections::HashMap;
 
-use crate::{Audience, Disclosure, SectorCatalog};
+use crate::{Audience, Disclosure, ProductGroupCatalog};
 use serde_json::json;
 
 use super::filter::filter_by_audience;
-use super::policy::SectorAccessPolicy;
+use super::policy::ProductGroupAccessPolicy;
 
-/// The policy for a sector's current schema version — the path a served
+/// The policy for a product group's current schema version — the path a served
 /// passport actually takes.
-fn current_policy(sector: &str) -> SectorAccessPolicy {
+fn current_policy(product_group: &str) -> ProductGroupAccessPolicy {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
-    let (version, _) = reg.latest(sector).expect("sector has a schema");
-    SectorAccessPolicy::for_schema_version(sector, &version.to_string())
+    let (version, _) = reg
+        .latest(product_group)
+        .expect("product_group has a schema");
+    ProductGroupAccessPolicy::for_schema_version(product_group, &version.to_string())
         .expect("current version yields a policy")
 }
 
-fn textile_policy() -> SectorAccessPolicy {
+fn textile_policy() -> ProductGroupAccessPolicy {
     current_policy("textile")
 }
 
-fn battery_policy() -> SectorAccessPolicy {
+fn battery_policy() -> ProductGroupAccessPolicy {
     current_policy("battery")
 }
 
@@ -179,7 +181,7 @@ fn battery_policy_public_keeps_point_1_and_drops_point_2() {
 
 #[test]
 fn passport_policy_public_redacts_jws() {
-    let policy = SectorAccessPolicy::passport_default();
+    let policy = ProductGroupAccessPolicy::passport_default();
     let data = json!({
         "id": "abc-123",
         "productName": "Widget",
@@ -202,7 +204,7 @@ fn passport_policy_public_redacts_jws() {
 /// design: they are lifecycle metadata, not compliance content.
 #[test]
 fn passport_default_keeps_lint_result_out_of_public_view() {
-    let policy = SectorAccessPolicy::passport_default();
+    let policy = ProductGroupAccessPolicy::passport_default();
     let data = json!({
         "id": "abc-123",
         "productName": "Widget",
@@ -245,9 +247,9 @@ fn non_object_input_returned_unchanged() {
 fn policy_round_trip() {
     let policy = textile_policy();
     let json = serde_json::to_value(&policy).unwrap();
-    let back: SectorAccessPolicy = serde_json::from_value(json).unwrap();
+    let back: ProductGroupAccessPolicy = serde_json::from_value(json).unwrap();
     assert_eq!(back.name, "textile-1.2.0");
-    assert_eq!(back.sector, "textile");
+    assert_eq!(back.product_group, "textile");
     assert_eq!(
         back.disclosure_for_field("svhcSubstances"),
         Disclosure::Restricted
@@ -273,12 +275,12 @@ fn custom_policy_overrides_defaults() {
 
 // ── crypto Gap 6: path-aware, fail-closed redaction ──────────────────────────
 
-fn policy_with(name: &str, class: Disclosure) -> SectorAccessPolicy {
+fn policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPolicy {
     let mut field_disclosure = HashMap::new();
     field_disclosure.insert(name.to_owned(), class);
-    SectorAccessPolicy {
+    ProductGroupAccessPolicy {
         name: "test".into(),
-        sector: "test".into(),
+        product_group: "test".into(),
         field_disclosure,
         default_disclosure: Disclosure::Public,
     }
@@ -289,12 +291,12 @@ fn policy_with(name: &str, class: Disclosure) -> SectorAccessPolicy {
 fn nested_confidential_field_is_redacted() {
     let policy = policy_with("jwsSignature", Disclosure::Conformity);
     let data = json!({
-        "sectorData": { "ok": 1, "jwsSignature": "leak-me" }
+        "productGroupData": { "ok": 1, "jwsSignature": "leak-me" }
     });
     let decision = filter_by_audience(&data, &policy, Audience::Public);
-    assert_eq!(decision.filtered_data["sectorData"]["ok"], json!(1));
+    assert_eq!(decision.filtered_data["productGroupData"]["ok"], json!(1));
     assert!(
-        decision.filtered_data["sectorData"]
+        decision.filtered_data["productGroupData"]
             .get("jwsSignature")
             .is_none(),
         "nested confidential field must be redacted, got {}",
@@ -303,7 +305,7 @@ fn nested_confidential_field_is_redacted() {
     assert!(
         decision
             .redacted_fields
-            .contains(&"sectorData.jwsSignature".to_owned())
+            .contains(&"productGroupData.jwsSignature".to_owned())
     );
 }
 
@@ -362,7 +364,7 @@ fn fail_closed_default_disclosure_redacts_unlisted() {
 /// Annex III facility + operator identity stay public (no requirement to redact).
 #[test]
 fn passport_default_keeps_facility_and_manufacturer_public() {
-    let policy = SectorAccessPolicy::passport_default();
+    let policy = ProductGroupAccessPolicy::passport_default();
     let data = json!({
         "id": "x",
         "manufacturer": { "name": "GreenCell GmbH", "address": "Berlin, DE" },
@@ -384,7 +386,7 @@ fn passport_default_keeps_facility_and_manufacturer_public() {
 /// isolation without a path-aware matcher. Guards against a naive future edit.
 #[test]
 fn generic_leaf_key_collides_across_objects() {
-    let mut policy = SectorAccessPolicy::passport_default();
+    let mut policy = ProductGroupAccessPolicy::passport_default();
     policy
         .field_disclosure
         .insert("address".into(), Disclosure::Restricted);
@@ -417,7 +419,7 @@ fn generic_leaf_key_collides_across_objects() {
 /// the gap visible in the same diff; this test makes it fail the build.
 ///
 /// **A misspelt class is checked too, not just a missing one.**
-/// `SectorAccessPolicy::from_schema` matches the four known tokens and drops
+/// `ProductGroupAccessPolicy::from_schema` matches the four known tokens and drops
 /// anything else, so `"restrcted"` produces no map entry and the field falls to
 /// `default_disclosure` — `Public`. A typo in one character therefore publishes
 /// a restricted field, and asserting only that *some* string is present would
@@ -443,13 +445,13 @@ fn every_property_declares_a_valid_disclosure_class() {
     );
 }
 
-/// The four tokens `SectorAccessPolicy::from_schema` recognises. Anything else
+/// The four tokens `ProductGroupAccessPolicy::from_schema` recognises. Anything else
 /// is dropped by that constructor and falls through to the public default.
 const VALID_DISCLOSURE_TOKENS: [&str; 4] = ["public", "restricted", "conformity", "individual"];
 
 /// Every property in `schema`, at any depth, that declares no usable class.
 ///
-/// Mirrors the traversal `SectorAccessPolicy::from_schema` performs, for the
+/// Mirrors the traversal `ProductGroupAccessPolicy::from_schema` performs, for the
 /// same reason the two are described together: a gate that walks a different
 /// tree from the constructor is a gate over a different schema.
 fn undeclared_properties(schema: &serde_json::Value) -> Vec<(String, String)> {
@@ -524,9 +526,9 @@ fn no_schema_declares_one_field_name_in_two_classes() {
     use std::collections::HashMap;
 
     let reg = crate::schemas::VersionedSchemaRegistry::new();
-    for sector in reg.sectors() {
-        for version in reg.versions_for(sector) {
-            let json = reg.get(sector, version).expect("registry listed it");
+    for product_group in reg.product_groups() {
+        for version in reg.versions_for(product_group) {
+            let json = reg.get(product_group, version).expect("registry listed it");
             let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
 
             let mut seen: HashMap<String, (String, Disclosure)> = HashMap::new();
@@ -550,7 +552,7 @@ fn no_schema_declares_one_field_name_in_two_classes() {
 
             assert!(
                 clashes.is_empty(),
-                "{sector} v{version}: one field name declared in two classes, so the policy \
+                "{product_group} v{version}: one field name declared in two classes, so the policy \
                  cannot express both: {clashes:?}"
             );
         }
@@ -610,7 +612,7 @@ fn collect_declared(
     }
 }
 
-/// Every schema version of every sector yields a policy, and every property in
+/// Every schema version of every product group yields a policy, and every property in
 /// each declares a class.
 ///
 /// The backfill guarantee. `for_schema_version` fails closed, so a schema
@@ -619,12 +621,12 @@ fn collect_declared(
 /// passport has ever been published under any of them; there is no historical
 /// map to preserve, and this is the last moment that is true.
 #[test]
-fn every_sector_version_yields_a_fully_classified_policy() {
+fn every_product_group_version_yields_a_fully_classified_policy() {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
     let mut checked = 0usize;
-    for sector in reg.sectors() {
-        for version in reg.versions_for(sector) {
-            let json = reg.get(sector, version).expect("registry listed it");
+    for product_group in reg.product_groups() {
+        for version in reg.versions_for(product_group) {
+            let json = reg.get(product_group, version).expect("registry listed it");
             let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
             let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) else {
                 continue;
@@ -637,11 +639,12 @@ fn every_sector_version_yields_a_fully_classified_policy() {
             let undeclared = undeclared_properties(&schema);
             assert!(
                 undeclared.is_empty(),
-                "{sector} v{version}: unclassified properties {undeclared:?}"
+                "{product_group} v{version}: unclassified properties {undeclared:?}"
             );
             assert!(
-                SectorAccessPolicy::for_schema_version(sector, &version.to_string()).is_some(),
-                "{sector} v{version} yields no policy"
+                ProductGroupAccessPolicy::for_schema_version(product_group, &version.to_string())
+                    .is_some(),
+                "{product_group} v{version} yields no policy"
             );
             checked += 1;
         }
@@ -662,10 +665,11 @@ fn every_sector_version_yields_a_fully_classified_policy() {
 fn the_schema_policy_matches_the_catalog_policy_today() {
     let reg = crate::schemas::VersionedSchemaRegistry::new();
     let (version, json) = reg.latest("battery").expect("battery schema exists");
-    let from_schema = SectorAccessPolicy::from_schema("battery", &version.to_string(), json)
+    let from_schema = ProductGroupAccessPolicy::from_schema("battery", &version.to_string(), json)
         .expect("the current schema yields a policy");
     let from_catalog =
-        SectorAccessPolicy::from_catalog(&SectorCatalog::new(), "battery").expect("in catalog");
+        ProductGroupAccessPolicy::from_catalog(&ProductGroupCatalog::new(), "battery")
+            .expect("in catalog");
 
     for (field, class) in &from_catalog.field_disclosure {
         assert_eq!(
@@ -678,13 +682,15 @@ fn the_schema_policy_matches_the_catalog_policy_today() {
 
 /// A schema with no `properties` yields no policy rather than an all-public one.
 ///
-/// Failing open here would serve every field of an unparseable sector to
+/// Failing open here would serve every field of an unparseable product group to
 /// anyone, which is the fail-open class this project already fixed once at the
-/// unknown-sector boundary.
+/// unknown-product group boundary.
 #[test]
 fn an_unusable_schema_yields_no_policy() {
-    assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", "not json").is_none());
-    assert!(SectorAccessPolicy::from_schema("battery", "9.9.9", r#"{"type":"object"}"#).is_none());
+    assert!(ProductGroupAccessPolicy::from_schema("battery", "9.9.9", "not json").is_none());
+    assert!(
+        ProductGroupAccessPolicy::from_schema("battery", "9.9.9", r#"{"type":"object"}"#).is_none()
+    );
 }
 
 /// An unrecognised `x-disclosure` token fails **open**, and this pins that.
@@ -696,10 +702,10 @@ fn an_unusable_schema_yields_no_policy() {
 /// consumes the policy.
 ///
 /// Raising the default instead does not work: the policy is applied to the whole
-/// document and the passport envelope's public fields are declared in no sector
+/// document and the passport envelope's public fields are declared in no product group
 /// schema, so a non-public default would erase them. The containment is
 /// therefore build-time —
-/// [`every_property_declares_a_valid_disclosure_class`] and its all-sector
+/// [`every_property_declares_a_valid_disclosure_class`] and its all-product group
 /// counterpart reject a schema carrying a token this constructor cannot read.
 ///
 /// This test exists so that behaviour is *recorded* rather than assumed. If
@@ -714,7 +720,7 @@ fn an_unrecognised_disclosure_token_falls_through_to_public() {
         }
     }"#;
     let policy =
-        SectorAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
+        ProductGroupAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
 
     assert!(
         !policy.field_disclosure.contains_key("safetyMeasures"),
@@ -778,7 +784,7 @@ fn a_nested_property_is_classified_by_its_own_annotation() {
         }
     }"#;
     let policy =
-        SectorAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
+        ProductGroupAccessPolicy::from_schema("battery", "9.9.9", schema).expect("has properties");
 
     assert_eq!(
         policy.disclosure_for_field("internalContact"),
@@ -840,7 +846,7 @@ fn an_ambiguous_field_name_resolves_the_same_way_every_time() {
     // `Audience`'s doc comment exists to prevent.
     let mut answers = std::collections::HashSet::new();
     for _ in 0..512 {
-        let mut policy = SectorAccessPolicy::passport_default();
+        let mut policy = ProductGroupAccessPolicy::passport_default();
         policy
             .field_disclosure
             .insert("jws_signature".into(), Disclosure::Public);
@@ -857,7 +863,7 @@ fn an_ambiguous_field_name_resolves_the_same_way_every_time() {
     );
 }
 
-/// The version axis is live: two versions of one sector yield different maps.
+/// The version axis is live: two versions of one product group yield different maps.
 ///
 /// Without this, `for_schema_version` could be reading the current version for
 /// every input and nothing would notice — every version currently carries
@@ -867,11 +873,11 @@ fn an_ambiguous_field_name_resolves_the_same_way_every_time() {
 ///
 /// A field the declared version does not know is not thereby restricted — it
 /// falls to the public default, which is exactly why `dpp-aas` carries a
-/// structural backstop that drops `sectorData` keys the version does not
+/// structural backstop that drops `productGroupData` keys the version does not
 /// declare. Both halves are asserted here so the pair cannot drift apart.
 #[test]
 fn an_older_version_classifies_only_the_fields_it_declared() {
-    let old = SectorAccessPolicy::for_schema_version("battery", "1.0.0")
+    let old = ProductGroupAccessPolicy::for_schema_version("battery", "1.0.0")
         .expect("v1.0.0 is a registered battery version");
     let current = battery_policy();
 
@@ -905,7 +911,7 @@ fn an_older_version_classifies_only_the_fields_it_declared() {
 /// passport, breaking verification for every affected passport at once with
 /// nothing to detect it.
 ///
-/// That is fixed: `SectorAccessPolicy::for_schema_version` reads the classes
+/// That is fixed: `ProductGroupAccessPolicy::for_schema_version` reads the classes
 /// from the schema version a passport declares, so a passport carries its
 /// classification with it and a newer version cannot move its bytes.
 ///
@@ -968,7 +974,7 @@ fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
 
 #[test]
 fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {
-    // Not a hand-built policy: this reads sectors/battery.json, so it fails if
+    // Not a hand-built policy: this reads product-groups/battery.json, so it fails if
     // a point-4 field is added to the type and its disclosure entry is
     // forgotten — which would publish measured, per-battery data to anyone
     // scanning the QR code.
@@ -1015,9 +1021,9 @@ fn individual_item_data_is_withheld_from_authorities() {
     field_disclosure.insert("dismantlingInfo".into(), Disclosure::Restricted);
     field_disclosure.insert("testReport".into(), Disclosure::Conformity);
     field_disclosure.insert("cycleHistory".into(), Disclosure::Individual);
-    let policy = SectorAccessPolicy {
+    let policy = ProductGroupAccessPolicy {
         name: "lattice-test".into(),
-        sector: "battery".into(),
+        product_group: "battery".into(),
         field_disclosure,
         default_disclosure: Disclosure::Public,
     };

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/battery-v2.2.0.json",
-  "title": "Odal Node — Battery Sector Data (v2.2.0)",
+  "title": "Odal Node — Battery Product Group Data (v2.2.0)",
   "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.2.0 adds stateOfHealth, the Annex VII Part A parameter set: state of certified energy for electric-vehicle batteries, and a five-parameter list for stationary battery energy storage systems and LMT batteries. The flat stateOfHealthPct is retained for compatibility but cannot represent either set. Annex XIII point 4(b) makes state of health accessible only to persons with a legitimate interest, so both fields carry the individual disclosure class.",
   "type": "object",
   "required": [

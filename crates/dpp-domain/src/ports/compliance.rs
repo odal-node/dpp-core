@@ -14,7 +14,7 @@
 
 use chrono::NaiveDate;
 
-use crate::domain::sector::SectorData;
+use crate::domain::product_group::ProductGroupData;
 
 pub use crate::domain::compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
@@ -23,7 +23,7 @@ pub use crate::domain::compliance::{
 
 // ─── Traits ───────────────────────────────────────────────────────────────
 
-/// Per-sector compliance calculation strategy.
+/// Per-product group compliance calculation strategy.
 ///
 /// The Apache-2.0 build ships
 /// [`PassthroughBatteryStrategy`](crate::compliance::PassthroughBatteryStrategy)
@@ -31,18 +31,18 @@ pub use crate::domain::compliance::{
 /// [`PassthroughTextileStrategy`](crate::compliance::PassthroughTextileStrategy),
 /// both registered in
 /// [`PassthroughRegistry::new`](crate::compliance::PassthroughRegistry::new). A
-/// proprietary tier registers its own for the sectors it models and leaves the
+/// proprietary tier registers its own for the product groups it models and leaves the
 /// rest on passthrough.
 ///
-/// This is the **per-sector** seam;
+/// This is the **per-product group** seam;
 /// [`ComplianceRegistry`] is the whole-registry one. The distinction is the
 /// useful granularity: a tier that computes a real battery determination still
-/// wants passthrough for the sectors it does not model, and swapping the
-/// registry to get one sector means reimplementing dispatch for all of them.
+/// wants passthrough for the product groups it does not model, and swapping the
+/// registry to get one product group means reimplementing dispatch for all of them.
 ///
 /// # Contract
 ///
-/// An implementation receives the [`SectorData`] for **its own** sector and
+/// An implementation receives the [`ProductGroupData`] for **its own** product group and
 /// must return [`ComplianceErrorKind::InvalidInput`] rather than panicking if
 /// handed another's — a routing mistake in a host should be reportable, not
 /// fatal.
@@ -63,26 +63,26 @@ pub use crate::domain::compliance::{
 /// The passthrough strategies ignore it, correctly — they compute nothing, so
 /// there is no rule for them to select.
 pub trait ComplianceStrategy: Send + Sync {
-    /// The catalog key of the sector this strategy handles.
+    /// The catalog key of the product group this strategy handles.
     ///
-    /// A key rather than the `Sector` enum: sector identity is catalog data,
-    /// and a strategy for a sector this build has no variant for is exactly the
-    /// case the open sector axis exists to allow.
-    fn sector_key(&self) -> &str;
+    /// A key rather than the `ProductGroup` enum: product group identity is catalog data,
+    /// and a strategy for a product group this build has no variant for is exactly the
+    /// case the open product group axis exists to allow.
+    fn product_group_key(&self) -> &str;
 
-    /// Compute a `ComplianceResult` from raw sector data, under the law in
+    /// Compute a `ComplianceResult` from raw product group data, under the law in
     /// force on `law_in_force_on`.
     ///
     /// The passthrough implementation returns manufacturer-supplied values verbatim.
     /// A premium implementation runs calculations against EU methodology databases.
     fn compute(
         &self,
-        data: &SectorData,
+        data: &ProductGroupData,
         law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError>;
 }
 
-/// Registry that dispatches to the correct `ComplianceStrategy` by sector.
+/// Registry that dispatches to the correct `ComplianceStrategy` by product group.
 ///
 /// The open-source default is `PassthroughRegistry`.
 /// A proprietary binary can wire `PremiumComplianceRegistry` instead.
@@ -90,16 +90,16 @@ pub trait ComplianceStrategy: Send + Sync {
 /// No `dpp-domain` code changes are required to swap implementations —
 /// simply wire a different `Arc<dyn ComplianceRegistry>` at startup.
 pub trait ComplianceRegistry: Send + Sync {
-    /// Run compliance calculation for the given sector and data, under the law
+    /// Run compliance calculation for the given product group and data, under the law
     /// in force on `law_in_force_on` — see [`ComplianceStrategy::compute`],
     /// whose contract for that date this passes through unchanged.
     ///
-    /// Returns `ComplianceErrorKind::UnknownSector` if no strategy is registered
-    /// for the requested sector.
+    /// Returns `ComplianceErrorKind::UnknownProductGroup` if no strategy is registered
+    /// for the requested product group.
     fn compute(
         &self,
-        sector_key: &str,
-        data: &SectorData,
+        product_group_key: &str,
+        data: &ProductGroupData,
         law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError>;
 }

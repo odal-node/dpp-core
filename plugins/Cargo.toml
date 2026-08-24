@@ -1,20 +1,20 @@
-# Shared workspace for the 10 sector plugins. Deliberately separate from the
+# Shared workspace for the 10 product-group plugins. Deliberately separate from the
 # parent dpp-core workspace (excluded there via `exclude = ["plugins/*"]`)
 # because these compile to a different target (`wasm32-wasip1`) via
 # `just build-plugins` / `just build-plugin <name>`.
 [workspace]
 resolver = "2"
 members = [
-    "sector-aluminium",
-    "sector-battery",
-    "sector-construction",
-    "sector-detergent",
-    "sector-electronics",
-    "sector-furniture",
-    "sector-steel",
-    "sector-textile",
-    "sector-toy",
-    "sector-tyre",
+    "product-group-aluminium",
+    "product-group-battery",
+    "product-group-construction",
+    "product-group-detergent",
+    "product-group-electronics",
+    "product-group-furniture",
+    "product-group-steel",
+    "product-group-textile",
+    "product-group-toy",
+    "product-group-tyre",
 ]
 
 [workspace.package]

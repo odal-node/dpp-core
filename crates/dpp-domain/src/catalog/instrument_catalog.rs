@@ -4,6 +4,7 @@ use super::binding::InstrumentBinding;
 use super::error::CatalogError;
 use super::granularity::Granularity;
 use super::instrument::Instrument;
+use super::instrument_ref::InstrumentRef;
 use super::passport_obligation::ObligationDate;
 use super::retention::RetentionBasis;
 
@@ -72,7 +73,7 @@ const EMBEDDED: &[EmbeddedInstrument] = &[
 ///
 /// # Status
 ///
-/// Additive and not yet wired: [`SectorCatalog`](super::SectorCatalog) remains
+/// Additive and not yet wired: [`ProductGroupCatalog`](super::ProductGroupCatalog) remains
 /// the record every component resolves against. Where the two disagree today,
 /// the disagreement is pinned by test, so a new divergence fails rather than
 /// accumulating silently.
@@ -213,6 +214,32 @@ impl InstrumentCatalog {
             .iter()
             .filter_map(|i| i.granularity_for(product_group))
             .reduce(Granularity::most_granular)
+    }
+
+    /// The instrument references to record on a passport being issued for
+    /// `product_group` at `at`.
+    ///
+    /// This is the **only** moment the catalog is consulted for a passport's
+    /// applicable set: what it returns is written onto the record and never
+    /// recomputed. See [`InstrumentRef`] for why re-deriving it later would be
+    /// both legally wrong and lossy.
+    ///
+    /// Returns every act reaching the group, whatever its status — a passport
+    /// issued today for a group whose act applies in 2027 is still governed by
+    /// that act, and dropping it here would leave the record unable to say so.
+    /// Filtering by status is a question for whoever renders or determines, and
+    /// they have the binding to filter with.
+    ///
+    /// ⚠️ **Not exhaustive, and callers must not treat it as such.** An act may
+    /// apply to a product while reaching no product group we model, so an
+    /// operator-supplied set is merged with this one rather than validated
+    /// against it.
+    #[must_use]
+    pub fn instrument_refs_for(&self, product_group: &str) -> Vec<InstrumentRef> {
+        self.bindings_for(product_group)
+            .into_iter()
+            .map(|(instrument, _)| InstrumentRef::from_catalog(instrument.id.clone()))
+            .collect()
     }
 
     /// Every product-group key any recorded act reaches, sorted and deduplicated.

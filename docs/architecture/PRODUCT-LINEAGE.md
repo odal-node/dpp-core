@@ -92,9 +92,9 @@ its own. What it does carry, and what therefore still binds every edge here:
   liquidation, or cessation of activity of the responsible operator.
 
 Consequence for lineage: an edge that points at a passport whose operator has
-since vanished must still resolve. Per-sector delegated acts are where BOM
-granularity will actually be specified; none is in force for our sectors yet, so
-**core must not hard-code a sector's notion of "component".**
+since vanished must still resolve. Per-product group delegated acts are where BOM
+granularity will actually be specified; none is in force for our product groups yet, so
+**core must not hard-code a product group's notion of "component".**
 
 ---
 
@@ -162,12 +162,12 @@ For BOM this is mostly benign (over-claiming a supplier is a commercial problem)
 For second life it is not: R3 moves regulatory responsibility, and responsibility
 must not be assignable by unilateral assertion.
 
-### G8 — "Component" is undefined across sectors
+### G8 — "Component" is undefined across product groups
 
 Left open deliberately, and it should stay open: a battery module, a fibre lot,
 and an electronics sub-assembly are not the same kind of thing, and no delegated
-act yet defines granularity for our in-force sectors. Core's job is to carry a
-pinned reference plus sector-neutral qualifiers, and let sector plugins interpret.
+act yet defines granularity for our in-force product groups. Core's job is to carry a
+pinned reference plus product group-neutral qualifiers, and let product group plugins interpret.
 
 ---
 
@@ -223,10 +223,10 @@ pub enum SecondLifeOperation {
 /// Downward: one constituent in the bill of materials.
 pub struct ComponentRef {
     pub reference: PassportRef,
-    /// Sector-neutral quantity ("2", "1.4 kg"). Interpreted by sector plugins,
+    /// Product group-neutral quantity ("2", "1.4 kg"). Interpreted by product group plugins,
     /// never by core.
     pub quantity: Option<Quantity>,
-    /// Sector-defined role of this constituent ("cell", "outer shell").
+    /// Product group-defined role of this constituent ("cell", "outer shell").
     pub role: Option<String>,
 }
 ```
@@ -265,7 +265,7 @@ it cannot be tampered with, and `verify_tree` already reports exactly that.
 
 ### 5.2 What stays out of core
 
-- Any sector's definition of "component" or its granularity (G8).
+- Any product group's definition of "component" or its granularity (G8).
 - Fetching, resolving, and walking edges — engine-side, already correct.
 - The Annex XIII status value list, until pinned to the OJ text.
 
@@ -273,9 +273,9 @@ it cannot be tampered with, and `verify_tree` already reports exactly that.
 
 ## 6. Open questions
 
-1. **Is `life_status` core or sector data?** It is battery-regulation-derived, but
+1. **Is `life_status` core or product group data?** It is battery-regulation-derived, but
    ESPR delegated acts may generalise it. Recommendation: model it in core as an
-   optional, sector-agnostic enum; do not gate compliance on it until pinned.
+   optional, product group-agnostic enum; do not gate compliance on it until pinned.
 2. **Does a second-life passport inherit its predecessors' BOM?** Art. 77 requires
    linkage, not re-declaration. Recommendation: no inheritance — linkage is
    sufficient, and copying would duplicate data that can go stale.

@@ -1,4 +1,4 @@
-//! Reusable field validation for sector plugins.
+//! Reusable field validation for product group plugins.
 //!
 //! [`Validator`] is a fluent collector: each `require_*` / `optional_*` method
 //! records a [`PluginFieldError`] when a check fails and is chainable, so a

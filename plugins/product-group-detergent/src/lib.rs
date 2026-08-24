@@ -1,0 +1,157 @@
+//! Detergent & surfactant product group plugin — EU Regulation 2026/405.
+//!
+//! Hard check available today: all surfactants must be readily biodegradable.
+//! Any surfactant declaring `biodegradable: false` makes the product
+//! `NON_COMPLIANT`. Full DPP thresholds (mandate 2029) are pending.
+
+use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::traits::{
+    DppProductGroupPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus, PluginError, PluginFieldError,
+    PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+};
+use dpp_plugin_sdk::validate::{Validator, num};
+use serde_json::Value;
+
+#[derive(Default)]
+struct DetergentPlugin;
+
+impl DppProductGroupPlugin for DetergentPlugin {
+    fn plugin_identity(&self) -> PluginIdentity {
+        PluginIdentity {
+            product_group: "detergent",
+            name: "Odal Node Detergent Plugin",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "EU 2026/405 detergent biodegradability validation",
+        }
+    }
+
+    fn schema_version_range(&self) -> SchemaVersionRange {
+        SchemaVersionRange {
+            min_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
+        }
+    }
+
+    fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
+        Validator::new(input)
+            .require_gtin("gtin")
+            .require_str("productType")
+            .require_str("format")
+            .require_non_empty_array("surfactants")
+            .require_country("countryOfOrigin")
+            .optional_non_negative("co2ePerUnitKg")
+            .finish()?;
+
+        // Each surfactant must declare biodegradability as a boolean. The
+        // product group's one hard check ("all surfactants readily biodegradable") is
+        // only meaningful if the field is actually present — an omitted, null,
+        // or non-boolean value must be rejected, not silently pass as
+        // NotAssessed.
+        let mut errors = Vec::new();
+        if let Some(arr) = input.get("surfactants").and_then(Value::as_array) {
+            for (i, s) in arr.iter().enumerate() {
+                if s.get("biodegradable").and_then(Value::as_bool).is_none() {
+                    errors.push(PluginFieldError {
+                        field: format!("/surfactants/{i}/biodegradable"),
+                        code: "missing".into(),
+                        message: "each surfactant must declare biodegradable as a boolean".into(),
+                    });
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(PluginError::ValidationErrors(errors))
+        }
+    }
+
+    fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
+        self.validate_input(input)?;
+        let has_non_biodegradable = input
+            .get("surfactants")
+            .and_then(Value::as_array)
+            .is_some_and(|arr| {
+                arr.iter()
+                    .any(|s| s.get("biodegradable").and_then(Value::as_bool) == Some(false))
+            });
+        let status = if has_non_biodegradable {
+            PluginComplianceStatus::NonCompliant
+        } else {
+            PluginComplianceStatus::NotAssessed
+        };
+        Ok(PluginResult::new(status).maybe_metric(METRIC_CO2E_SCORE, num(input, "co2ePerUnitKg")))
+    }
+
+    fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> {
+        self.validate_input(&input)?;
+        Ok(input)
+    }
+}
+
+export_plugin!(DetergentPlugin);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn valid() -> Value {
+        json!({
+            "gtin": "12345678901231",
+            "productType": "laundry",
+            "format": "liquid",
+            "surfactants": [
+                { "name": "LAS", "biodegradable": true, "concentrationBand": "5-15%" }
+            ],
+            "countryOfOrigin": "DE",
+            "co2ePerUnitKg": 1.2
+        })
+    }
+
+    #[test]
+    fn all_biodegradable_is_not_assessed() {
+        assert_eq!(
+            DetergentPlugin
+                .calculate_metrics(&valid())
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NotAssessed
+        );
+    }
+
+    #[test]
+    fn non_biodegradable_surfactant_is_non_compliant() {
+        let mut d = valid();
+        d["surfactants"][0]["biodegradable"] = json!(false);
+        assert_eq!(
+            DetergentPlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    #[test]
+    fn empty_surfactants_fails_validation() {
+        let mut d = valid();
+        d["surfactants"] = json!([]);
+        assert!(DetergentPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn undeclared_biodegradable_fails_validation() {
+        // biodegradable omitted must be rejected, not silently NotAssessed.
+        let mut d = valid();
+        d["surfactants"] = json!([{ "name": "LAS", "concentrationBand": "5-15%" }]);
+        assert!(DetergentPlugin.validate_input(&d).is_err());
+    }
+
+    #[test]
+    fn negative_co2e_fails_validation() {
+        let mut d = valid();
+        d["co2ePerUnitKg"] = json!(-999.0);
+        assert!(DetergentPlugin.validate_input(&d).is_err());
+    }
+}

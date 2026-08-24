@@ -34,8 +34,8 @@ pub struct RegistrationPayload {
     pub facility_id: FacilityIdentifier,
     /// The responsible economic operator identifier.
     pub operator_id: OperatorIdentifier,
-    /// EU ESPR sector code (e.g. `"textile"`, `"battery"`).
-    pub sector: String,
+    /// EU ESPR product group code (e.g. `"textile"`, `"battery"`).
+    pub product_group: String,
     /// Schema version of the DPP data (e.g. `"1.1.0"`).
     pub schema_version: String,
     /// The GS1 Digital Link URL resolving to this DPP.
@@ -104,7 +104,7 @@ impl RegistrationPayload {
             return Err(RegistryValidationError::InsecureBackupUrl { value: url.clone() });
         }
         for (name, value) in [
-            ("sector", &self.sector),
+            ("productGroup", &self.product_group),
             ("schemaVersion", &self.schema_version),
             ("digitalLinkUrl", &self.digital_link_url),
         ] {

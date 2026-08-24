@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/steel-v1.1.0.json",
   "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
-  "title": "Odal Node — Iron & Steel Sector Data (v1.1.0)",
+  "title": "Odal Node — Iron & Steel Product Group Data (v1.1.0)",
   "description": "Iron and Steel sector fields for EU ESPR carbon intensity and recycled content reporting. v1.1.0 renames countryOfProduction to countryOfOrigin for cross-sector naming consistency.",
   "type": "object",
   "required": [

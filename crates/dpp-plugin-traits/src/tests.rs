@@ -147,7 +147,7 @@ fn compatibility_check_no_schema_constraint() {
 #[test]
 fn plugin_meta_round_trip() {
     let meta = PluginMeta {
-        sector: "textile".into(),
+        product_group: "textile".into(),
         name: "Textile Compliance Plugin".into(),
         version: "0.2.0".into(),
         license: "Apache-2.0".into(),
@@ -156,7 +156,7 @@ fn plugin_meta_round_trip() {
         homepage: Some("https://github.com/odal-node".into()),
     };
     let json = serde_json::to_value(&meta).unwrap();
-    assert_eq!(json["sector"], "textile");
+    assert_eq!(json["productGroup"], "textile");
     assert_eq!(json["description"], "Validates textile DPP data");
     let back: PluginMeta = serde_json::from_value(json).unwrap();
     assert_eq!(meta.name, back.name);

@@ -1,23 +1,27 @@
 //! Shared fixture builders for the integration tests in `tests/` (and the
 //! `dpp-benches` crate, which depends on this library as a dev-dependency).
 //!
-//! These are the sector-agnostic envelope / actor shapes that were hand-rolled
+//! These are the product group-agnostic envelope / actor shapes that were hand-rolled
 //! at multiple call sites before this module existed.
 
 use chrono::Utc;
 use dpp_domain::{
     CarbonFootprint, ManufacturerInfo, MaterialEntry, OperatorRole, Passport, PassportId,
-    PassportStatus, RepairabilityScore, ResponsibleOperator, Sector, SectorData,
+    PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, ResponsibleOperator,
 };
 use dpp_vc::{CredentialRole, DppCredentialSubject};
 
-/// A base passport with the sector-agnostic fields populated so the five core
+/// A base passport with the product group-agnostic fields populated so the five core
 /// AAS submodels (identification, manufacturer, environmental, materials,
 /// repairability) all exercise their optional branches. Callers override
 /// individual fields via struct-update syntax for scenario-specific values.
-pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &str) -> Passport {
+pub fn base_passport(
+    product_group: ProductGroup,
+    product_group_data: ProductGroupData,
+    schema_version: &str,
+) -> Passport {
     // A caller-supplied version is honoured only if it is one this build knows;
-    // otherwise the sector's current version is used.
+    // otherwise the product group's current version is used.
     //
     // Disclosure classes are now sourced from the declared schema version, so a
     // fixture that declares an older version while carrying data built from the
@@ -25,8 +29,8 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
     // masking backstop strips them, leaving a submodel with nothing in it. That
     // is the fixture being wrong rather than the code, and it was invisible
     // while the catalog's disclosure map ignored versions entirely.
-    let catalog = dpp_domain::SectorCatalog::new();
-    let schema_version = catalog.get(sector.catalog_key()).map_or_else(
+    let catalog = dpp_domain::ProductGroupCatalog::new();
+    let schema_version = catalog.get(product_group.catalog_key()).map_or_else(
         || schema_version.to_owned(),
         |d| {
             if d.schema_versions.iter().any(|v| v == schema_version) {
@@ -41,8 +45,11 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
     Passport {
         id: PassportId::new(),
         batch_id: Some("LOT-X-0001".into()),
-        product_name: format!("{} reference product", sector.catalog_key()),
-        sector,
+        product_name: format!("{} reference product", product_group.catalog_key()),
+        applicable_instruments: dpp_domain::InstrumentCatalog::new()
+            .instrument_refs_for(product_group.catalog_key()),
+        granularity: None,
+        product_group,
         manufacturer: ManufacturerInfo {
             name: "Acme Manufacturing GmbH".into(),
             address: "Hauptstraße 1, 10115 Berlin, DE".into(),
@@ -58,7 +65,7 @@ pub fn base_passport(sector: Sector, sector_data: SectorData, schema_version: &s
         repairability_score: Some(RepairabilityScore::from_scalar(6.0)),
         compliance_result: None,
         lint_result: None,
-        sector_data: Some(sector_data),
+        product_group_data: Some(product_group_data),
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,
@@ -105,14 +112,14 @@ pub fn make_subject(
     did: &str,
     name: &str,
     role: CredentialRole,
-    sectors: Vec<String>,
+    product_groups: Vec<String>,
 ) -> DppCredentialSubject {
     DppCredentialSubject {
         id: did.into(),
         name: name.into(),
         role,
         country: "DE".into(),
-        sectors,
+        product_groups,
         product_categories: vec![],
     }
 }

@@ -1,0 +1,19 @@
+{
+  "key": "unsold-goods",
+  "title": "Unsold Textiles (destruction ban)",
+  "schemaVersions": [
+    "1.0.0"
+  ],
+  "currentSchemaVersion": "1.0.0",
+  "productCategories": [
+    "apparel",
+    "footwear",
+    "accessories"
+  ],
+  "disclosure": {
+    "operatorName": "restricted",
+    "destructionJustification": "restricted"
+  },
+  "plugin": "product-group-textile",
+  "notes": "Currently handled by the product-group-textile plugin via in-payload dispatch; candidate to split into its own crate (see DATA-MODEL.md §3.4)."
+}

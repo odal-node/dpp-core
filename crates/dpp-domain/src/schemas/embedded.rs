@@ -3,159 +3,159 @@ use semver::Version;
 use super::{SchemaEntry, SchemaOrigin};
 
 struct EmbeddedSchema {
-    sector: &'static str,
+    product_group: &'static str,
     version: &'static str,
     json: &'static str,
 }
 
 const EMBEDDED: &[EmbeddedSchema] = &[
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "1.0.0",
         json: include_str!("../../schemas/battery/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.0.0",
         json: include_str!("../../schemas/battery/v2.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.1.0",
         json: include_str!("../../schemas/battery/v2.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.2.0",
         json: include_str!("../../schemas/battery/v2.2.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.3.0",
         json: include_str!("../../schemas/battery/v2.3.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.4.0",
         json: include_str!("../../schemas/battery/v2.4.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.5.0",
         json: include_str!("../../schemas/battery/v2.5.0.json"),
     },
     EmbeddedSchema {
-        sector: "battery",
+        product_group: "battery",
         version: "2.6.0",
         json: include_str!("../../schemas/battery/v2.6.0.json"),
     },
     EmbeddedSchema {
-        sector: "textile",
+        product_group: "textile",
         version: "1.0.0",
         json: include_str!("../../schemas/textile/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "textile",
+        product_group: "textile",
         version: "1.1.0",
         json: include_str!("../../schemas/textile/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "textile",
+        product_group: "textile",
         version: "1.2.0",
         json: include_str!("../../schemas/textile/v1.2.0.json"),
     },
     EmbeddedSchema {
-        sector: "unsold-goods",
+        product_group: "unsold-goods",
         version: "1.0.0",
         json: include_str!("../../schemas/unsold-goods/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "steel",
+        product_group: "steel",
         version: "1.0.0",
         json: include_str!("../../schemas/steel/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "steel",
+        product_group: "steel",
         version: "1.1.0",
         json: include_str!("../../schemas/steel/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "electronics",
+        product_group: "electronics",
         version: "1.0.0",
         json: include_str!("../../schemas/electronics/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "electronics",
+        product_group: "electronics",
         version: "1.1.0",
         json: include_str!("../../schemas/electronics/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "electronics",
+        product_group: "electronics",
         version: "1.2.0",
         json: include_str!("../../schemas/electronics/v1.2.0.json"),
     },
     EmbeddedSchema {
-        sector: "construction",
+        product_group: "construction",
         version: "1.0.0",
         json: include_str!("../../schemas/construction/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "construction",
+        product_group: "construction",
         version: "1.1.0",
         json: include_str!("../../schemas/construction/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "tyre",
+        product_group: "tyre",
         version: "1.0.0",
         json: include_str!("../../schemas/tyre/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "toy",
+        product_group: "toy",
         version: "1.0.0",
         json: include_str!("../../schemas/toy/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "toy",
+        product_group: "toy",
         version: "1.1.0",
         json: include_str!("../../schemas/toy/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "aluminium",
+        product_group: "aluminium",
         version: "1.0.0",
         json: include_str!("../../schemas/aluminium/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "aluminium",
+        product_group: "aluminium",
         version: "1.1.0",
         json: include_str!("../../schemas/aluminium/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "furniture",
+        product_group: "furniture",
         version: "1.0.0",
         json: include_str!("../../schemas/furniture/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "furniture",
+        product_group: "furniture",
         version: "1.1.0",
         json: include_str!("../../schemas/furniture/v1.1.0.json"),
     },
     EmbeddedSchema {
-        sector: "furniture",
+        product_group: "furniture",
         version: "1.2.0",
         json: include_str!("../../schemas/furniture/v1.2.0.json"),
     },
     EmbeddedSchema {
-        sector: "mattress",
+        product_group: "mattress",
         version: "1.0.0",
         json: include_str!("../../schemas/mattress/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "detergent",
+        product_group: "detergent",
         version: "1.0.0",
         json: include_str!("../../schemas/detergent/v1.0.0.json"),
     },
     EmbeddedSchema {
-        sector: "detergent",
+        product_group: "detergent",
         version: "1.1.0",
         json: include_str!("../../schemas/detergent/v1.1.0.json"),
     },
@@ -165,7 +165,7 @@ pub(super) fn initial_entries() -> Vec<SchemaEntry> {
     EMBEDDED
         .iter()
         .map(|e| SchemaEntry {
-            sector: e.sector.to_owned(),
+            product_group: e.product_group.to_owned(),
             version: e
                 .version
                 .parse::<Version>()

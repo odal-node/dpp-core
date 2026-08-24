@@ -1,7 +1,7 @@
 //! `dpp-rules` — pure EU ESPR cross-field regulatory rules.
 //!
-//! Rules are grouped by sector module. Batteries, textiles, and electronics are
-//! the active sectors; all others have placeholder modules and will be populated
+//! Rules are grouped by product group module. Batteries, textiles, and electronics are
+//! the active product groups; all others have placeholder modules and will be populated
 //! in a later phase.
 //!
 //! Inputs are primitive borrowing views so each caller adapts its own
@@ -24,15 +24,15 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
-// Shared helpers (cross-sector utilities).
+// Shared helpers (cross-product group utilities).
 pub mod common;
 
 // Chemical substance rules — REACH, RoHS, EU 2026/405.
-// SVHC lives here rather than under any single sector because REACH Art. 33
+// SVHC lives here rather than under any single product group because REACH Art. 33
 // applies across textiles, electronics, toys, construction, and more.
 pub mod chemicals;
 
-// Active sectors.
+// Active product groups.
 pub mod batteries;
 pub mod electronics;
 pub mod textiles;
@@ -41,7 +41,7 @@ pub mod unsold_goods;
 // Plausibility lints — non-binding findings, never a compliance gate.
 pub mod lint;
 
-// Placeholder sectors — rules to be implemented in a later phase.
+// Placeholder product groups — rules to be implemented in a later phase.
 pub mod construction;
 pub mod metals;
 pub mod toys;

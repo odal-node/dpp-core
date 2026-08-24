@@ -1,4 +1,4 @@
-﻿//! Integration test: schema shape and field-set regression.
+//! Integration test: schema shape and field-set regression.
 //!
 //! Validates that:
 //! 1. All JSON schemas are syntactically valid and loadable.
@@ -43,12 +43,15 @@
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use semver::Version;
 
-/// Load an embedded schema by (sector, version) through the public registry.
-fn schema(sector: &str, version: &str) -> serde_json::Value {
+/// Load an embedded schema by (product group, version) through the public registry.
+fn schema(product_group: &str, version: &str) -> serde_json::Value {
     let reg = VersionedSchemaRegistry::new();
     let json = reg
-        .get(sector, &Version::parse(version).expect("valid semver"))
-        .unwrap_or_else(|| panic!("schema {sector} v{version} not embedded in registry"));
+        .get(
+            product_group,
+            &Version::parse(version).expect("valid semver"),
+        )
+        .unwrap_or_else(|| panic!("schema {product_group} v{version} not embedded in registry"));
     serde_json::from_str(json).expect("embedded schema must be valid JSON")
 }
 

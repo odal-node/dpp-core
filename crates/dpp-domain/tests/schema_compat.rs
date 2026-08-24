@@ -1,9 +1,9 @@
-//! Frozen sector-data documents, one per schema version this crate claims to
+//! Frozen product group-data documents, one per schema version this crate claims to
 //! support, asserted to still be readable.
 //!
 //! # Why this exists
 //!
-//! `Passport` and every `SectorData` variant are the literal on-disk shape of
+//! `Passport` and every `ProductGroupData` variant are the literal on-disk shape of
 //! every passport a node has ever stored. A non-additive change to one of them
 //! — a field gaining a requirement, a wire key being renamed — does not break a
 //! consumer at compile time. It makes every already-written document of that
@@ -15,19 +15,19 @@
 //! `countryOfManufacturing` was renamed to `countryOfOrigin`, and downstream
 //! that took out reads for 244 of 276 passports the instant the node upgraded.
 //!
-//! `SectorCatalog` declares which versions each sector supports. This crate is
+//! `ProductGroupCatalog` declares which versions each product group supports. This crate is
 //! the one in a position to check that its own types still parse everything it
 //! claims — rather than leaving each consumer to discover otherwise.
 //!
 //! # What a fixture is
 //!
-//! One minimal document per `(sector, version)`, holding exactly the fields the
+//! One minimal document per `(product group, version)`, holding exactly the fields the
 //! schema makes required. It is **frozen**: written once and never regenerated,
 //! because a fixture regenerated from the current schema would agree with the
 //! current schema by construction and could not catch anything.
 //!
-//! Fixtures are stored schema-shaped, without the `sector` discriminant. Every
-//! schema sets `additionalProperties: false` and none declares `sector`, so a
+//! Fixtures are stored schema-shaped, without the `product_group` discriminant. Every
+//! schema sets `additionalProperties: false` and none declares `product_group`, so a
 //! document carrying the tag could not validate; the tag is injected here for
 //! the deserialisation half.
 //!
@@ -38,9 +38,9 @@
 //! not validate — a pattern-constrained field it cannot invent a value for — it
 //! says so and writes nothing, and the fixture is authored by hand.
 
-use dpp_domain::catalog::SectorCatalog;
+use dpp_domain::catalog::ProductGroupCatalog;
 use dpp_domain::domain::passport::Passport;
-use dpp_domain::domain::sector::Sector;
+use dpp_domain::domain::product_group::ProductGroup;
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_domain::schemas::lens::LensRegistry;
 use serde_json::{Map, Value};
@@ -48,27 +48,27 @@ use serde_json::{Map, Value};
 /// Where frozen fixtures live, relative to this crate's root.
 const FIXTURE_DIR: &str = "tests/fixtures/schema-compat";
 
-fn fixture_path(sector: &str, version: &str) -> std::path::PathBuf {
+fn fixture_path(product_group: &str, version: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join(FIXTURE_DIR)
-        .join(sector)
+        .join(product_group)
         .join(format!("v{version}.json"))
 }
 
-/// Every `(sector, version)` the registry serves, as owned strings.
+/// Every `(product group, version)` the registry serves, as owned strings.
 fn declared_versions() -> Vec<(String, String)> {
     let registry = VersionedSchemaRegistry::new();
     let mut out: Vec<(String, String)> = registry
         .list()
         .into_iter()
-        .map(|(sector, version)| (sector.to_owned(), version.to_string()))
+        .map(|(product_group, version)| (product_group.to_owned(), version.to_string()))
         .collect();
     out.sort();
     out
 }
 
-fn load_fixture(sector: &str, version: &str) -> Option<Value> {
-    let raw = std::fs::read_to_string(fixture_path(sector, version)).ok()?;
+fn load_fixture(product_group: &str, version: &str) -> Option<Value> {
+    let raw = std::fs::read_to_string(fixture_path(product_group, version)).ok()?;
     Some(serde_json::from_str(&raw).expect("a frozen fixture must be valid JSON"))
 }
 
@@ -82,8 +82,8 @@ fn load_fixture(sector: &str, version: &str) -> Option<Value> {
 fn every_declared_schema_version_has_a_frozen_fixture() {
     let missing: Vec<String> = declared_versions()
         .into_iter()
-        .filter(|(sector, version)| load_fixture(sector, version).is_none())
-        .map(|(sector, version)| format!("{sector} v{version}"))
+        .filter(|(product_group, version)| load_fixture(product_group, version).is_none())
+        .map(|(product_group, version)| format!("{product_group} v{version}"))
         .collect();
 
     assert!(
@@ -102,14 +102,14 @@ fn every_declared_schema_version_has_a_frozen_fixture() {
 fn every_frozen_fixture_validates_against_its_own_schema() {
     let registry = VersionedSchemaRegistry::new();
 
-    for (sector, version) in declared_versions() {
-        let Some(fixture) = load_fixture(&sector, &version) else {
+    for (product_group, version) in declared_versions() {
+        let Some(fixture) = load_fixture(&product_group, &version) else {
             continue; // reported by the fixture-presence test
         };
-        let result = registry.validate_strict(&sector, &version, &fixture);
+        let result = registry.validate_strict(&product_group, &version, &fixture);
         assert!(
             result.is_ok(),
-            "the frozen fixture for {sector} v{version} does not validate against \
+            "the frozen fixture for {product_group} v{version} does not validate against \
              the schema it was frozen for: {:?}",
             result.err()
         );
@@ -121,32 +121,36 @@ fn every_frozen_fixture_validates_against_its_own_schema() {
 /// This is the half that catches a non-additive change. A field gaining a
 /// requirement, or a wire key being renamed without an alias, fails here — at
 /// the commit that introduces it, rather than in a node's logs after an upgrade.
-/// A stored passport document wrapping `sector_data`, as a node would hold it.
+/// A stored passport document wrapping `product_group_data`, as a node would hold it.
 ///
 /// Built as raw JSON rather than from a Rust value on purpose: the thing under
 /// test is whether a *document* still reads, and constructing it from today's
 /// types would bake today's shape into the fixture.
-fn stored_passport(sector: &str, version: &str, mut sector_data: Value) -> Value {
-    // `SectorData` is tagged by an inner `sector` key, which the schemas do not
+fn stored_passport(product_group: &str, version: &str, mut product_group_data: Value) -> Value {
+    // `ProductGroupData` is tagged by an inner `product_group` key, which the schemas do not
     // declare (they are all `additionalProperties: false`), so the fixture is
     // stored without it and it is added here.
-    sector_data
+    product_group_data
         .as_object_mut()
         .expect("a fixture is a JSON object")
         .insert(
-            "sector".to_owned(),
-            Value::String(Sector::from_wire_tag(sector).wire_str().to_owned()),
+            "productGroup".to_owned(),
+            Value::String(
+                ProductGroup::from_wire_tag(product_group)
+                    .wire_str()
+                    .to_owned(),
+            ),
         );
     serde_json::json!({
         "id": "01926b7e-0000-7000-8000-000000000000",
         "batchId": null,
         "productName": "Compatibility fixture",
-        "sector": Sector::from_wire_tag(sector).wire_str(),
+        "productGroup": ProductGroup::from_wire_tag(product_group).wire_str(),
         "manufacturer": { "name": "Example GmbH", "address": "Example Str. 1, Berlin" },
         "materials": [],
         "co2ePerUnit": null,
         "repairabilityScore": null,
-        "sectorData": sector_data,
+        "productGroupData": product_group_data,
         "status": "draft",
         "qrCodeUrl": null,
         "jwsSignature": null,
@@ -163,29 +167,29 @@ fn stored_passport(sector: &str, version: &str, mut sector_data: Value) -> Value
 ///
 /// That path is `Passport::from_stored`: deserialise directly, and on failure
 /// upcast from the document's recorded `schemaVersion` to the catalog's current
-/// version through the lens registry. Testing the bare `SectorData` instead
+/// version through the lens registry. Testing the bare `ProductGroupData` instead
 /// would assert a contract that does not exist — old documents are *meant* to
-/// arrive through a lens, and a sector whose rename ships one is not broken.
+/// arrive through a lens, and a product group whose rename ships one is not broken.
 ///
 /// So this fails for exactly one reason: a stored document that no longer reads
 /// and has no lens carrying it forward.
 #[test]
 fn every_frozen_document_still_reads_through_from_stored() {
     let lenses = LensRegistry::new();
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
 
     // Collected rather than asserted per version: the interesting question is
     // how much stored data a change orphans, and stopping at the first hides
-    // that one rename swept several sectors at once.
+    // that one rename swept several product groups at once.
     let mut broken: Vec<String> = Vec::new();
 
-    for (sector, version) in declared_versions() {
-        let Some(fixture) = load_fixture(&sector, &version) else {
+    for (product_group, version) in declared_versions() {
+        let Some(fixture) = load_fixture(&product_group, &version) else {
             continue; // reported by the fixture-presence test
         };
-        let doc = stored_passport(&sector, &version, fixture);
+        let doc = stored_passport(&product_group, &version, fixture);
         if let Err(e) = Passport::from_stored(doc, &lenses, &catalog) {
-            broken.push(format!("{sector} v{version}: {e}"));
+            broken.push(format!("{product_group} v{version}: {e}"));
         }
     }
 
@@ -253,15 +257,15 @@ fn freeze_missing_fixtures() {
     let mut wrote = 0usize;
     let mut refused: Vec<String> = Vec::new();
 
-    for (sector, version) in declared_versions() {
-        let path = fixture_path(&sector, &version);
+    for (product_group, version) in declared_versions() {
+        let path = fixture_path(&product_group, &version);
         if path.exists() {
             continue;
         }
         let parsed: semver::Version = version.parse().expect("registry versions are semver");
         let schema: Value = serde_json::from_str(
             registry
-                .get(&sector, &parsed)
+                .get(&product_group, &parsed)
                 .expect("the registry just listed this version"),
         )
         .expect("an embedded schema is valid JSON");
@@ -271,8 +275,8 @@ fn freeze_missing_fixtures() {
         // Refuse to write a fixture that does not validate. A fixture that was
         // never legal proves nothing, and a silently wrong one is worse than a
         // missing one that fails loudly.
-        if let Err(e) = registry.validate_strict(&sector, &version, &candidate) {
-            refused.push(format!("{sector} v{version}: {e:?}"));
+        if let Err(e) = registry.validate_strict(&product_group, &version, &candidate) {
+            refused.push(format!("{product_group} v{version}: {e:?}"));
             continue;
         }
 

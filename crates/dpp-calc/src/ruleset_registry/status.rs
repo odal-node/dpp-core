@@ -1,6 +1,6 @@
 //! Machine-readable calculator status map.
 //!
-//! The authoritative answer to "which sector–methodology metrics can be computed
+//! The authoritative answer to "which product group–methodology metrics can be computed
 //! today vs. which are awaiting a delegated act?", for a compliance-readiness
 //! view or an integration asking what this build can determine.
 //!
@@ -22,7 +22,7 @@ use chrono::NaiveDate;
 use super::resolve::all_rulesets;
 use crate::ruleset::Effectivity;
 
-/// What implements a sector–methodology pair, if anything.
+/// What implements a product group–methodology pair, if anything.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CalculatorImpl {
     /// Implemented by the ruleset with this id. Whether it is in force is read
@@ -68,10 +68,10 @@ pub enum CalculatorStatus {
     UnknownRuleset { ruleset_id: &'static str },
 }
 
-pub struct SectorCalculatorEntry {
-    /// Sector key from the `SectorCatalog` (e.g. `"electronics"`, `"battery"`).
-    pub sector_key: &'static str,
-    /// Product category within the sector (e.g. `"smartphone-tablet"`).
+pub struct ProductGroupCalculatorEntry {
+    /// ProductGroup key from the `ProductGroupCatalog` (e.g. `"electronics"`, `"battery"`).
+    pub product_group_key: &'static str,
+    /// Product category within the product group (e.g. `"smartphone-tablet"`).
     pub product_category: &'static str,
     /// Methodology identifier (e.g. `"repairability-heuristic"`, `"co2e-pef"`).
     pub methodology: &'static str,
@@ -79,7 +79,7 @@ pub struct SectorCalculatorEntry {
     pub implementation: CalculatorImpl,
 }
 
-impl SectorCalculatorEntry {
+impl ProductGroupCalculatorEntry {
     /// Status for a product whose governing law was fixed on `law_in_force_on`.
     ///
     /// Takes the date rather than reading the clock: a readiness view for
@@ -123,17 +123,17 @@ impl SectorCalculatorEntry {
     }
 }
 
-/// Complete map of all sector–methodology–implementation triples known to this
+/// Complete map of all product group–methodology–implementation triples known to this
 /// build.
 ///
 /// Suitable for CLI status displays, API responses, and automated
-/// compliance-readiness checks. Call [`SectorCalculatorEntry::status_on`] to
+/// compliance-readiness checks. Call [`ProductGroupCalculatorEntry::status_on`] to
 /// resolve an entry against a date.
-pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
+pub fn product_group_calculator_map() -> &'static [ProductGroupCalculatorEntry] {
     &[
         // ── Electronics ──────────────────────────────────────────────────────
-        SectorCalculatorEntry {
-            sector_key: "electronics",
+        ProductGroupCalculatorEntry {
+            product_group_key: "electronics",
             product_category: "smartphone-tablet",
             // Non-regulatory: a simplified repairability heuristic is available,
             // NOT the enacted EU 2023/1669 Annex IV index, which is not
@@ -141,33 +141,33 @@ pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
             methodology: "repairability-heuristic",
             implementation: CalculatorImpl::Ruleset("repairability-heuristic-v1"),
         },
-        SectorCalculatorEntry {
-            sector_key: "electronics",
+        ProductGroupCalculatorEntry {
+            product_group_key: "electronics",
             product_category: "laptop",
             methodology: "repairability-heuristic",
             implementation: CalculatorImpl::Ruleset("laptop-repairability"),
         },
-        SectorCalculatorEntry {
-            sector_key: "electronics",
+        ProductGroupCalculatorEntry {
+            product_group_key: "electronics",
             product_category: "displays",
             methodology: "repairability-heuristic",
             implementation: CalculatorImpl::Ruleset("displays-repairability"),
         },
-        SectorCalculatorEntry {
-            sector_key: "electronics",
+        ProductGroupCalculatorEntry {
+            product_group_key: "electronics",
             product_category: "washing-machine",
             methodology: "repairability-heuristic",
             implementation: CalculatorImpl::Ruleset("washing-machine-repairability"),
         },
         // ── Battery ──────────────────────────────────────────────────────────
-        SectorCalculatorEntry {
-            sector_key: "battery",
+        ProductGroupCalculatorEntry {
+            product_group_key: "battery",
             product_category: "all",
             methodology: "co2e-pef",
             implementation: CalculatorImpl::Ruleset("co2e-cradle-to-gate"),
         },
-        SectorCalculatorEntry {
-            sector_key: "battery",
+        ProductGroupCalculatorEntry {
+            product_group_key: "battery",
             product_category: "all",
             methodology: "co2e-battery-regulation-art7",
             // No CfbRuleset impl exists — gated on the Art. 7(1) methodology
@@ -179,14 +179,14 @@ pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
         // Both phases are `NotYetEffective` today and will stay so for years;
         // that is derived from each ruleset's own `Effectivity`, not asserted
         // here, so it turns over on its own when the date arrives.
-        SectorCalculatorEntry {
-            sector_key: "battery",
+        ProductGroupCalculatorEntry {
+            product_group_key: "battery",
             product_category: "industrial-ev-sli",
             methodology: "recycled-content-art8",
             implementation: CalculatorImpl::Ruleset("battery-recycled-content-art8-2"),
         },
-        SectorCalculatorEntry {
-            sector_key: "battery",
+        ProductGroupCalculatorEntry {
+            product_group_key: "battery",
             product_category: "lmt",
             // Art. 8(2) never reaches LMT batteries, so their first — and only —
             // phase is Art. 8(3).
@@ -194,8 +194,8 @@ pub fn sector_calculator_map() -> &'static [SectorCalculatorEntry] {
             implementation: CalculatorImpl::Ruleset("battery-recycled-content-art8-3"),
         },
         // ── Unsold goods ─────────────────────────────────────────────────────
-        SectorCalculatorEntry {
-            sector_key: "unsoldGoods",
+        ProductGroupCalculatorEntry {
+            product_group_key: "unsoldGoods",
             product_category: "all",
             methodology: "unsold-goods-reporting",
             // ESPR Art. 25 imposes reporting/prohibition obligations only.

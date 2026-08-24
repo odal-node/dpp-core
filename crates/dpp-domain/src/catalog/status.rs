@@ -1,4 +1,4 @@
-//! [`RegulatoryStatus`] — where a sector's DPP obligation stands in the EU
+//! [`RegulatoryStatus`] — where a product group's DPP obligation stands in the EU
 //! regulatory pipeline.
 
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ pub enum RegulatoryStatus {
     /// **now**. Plugins may emit binding compliance determinations.
     ///
     /// A future applicability date is **not** grounds for this status — mark a
-    /// sector `InForce` only when something about it is legally determinable
+    /// product group `InForce` only when something about it is legally determinable
     /// today.
     InForce,
     /// An instrument exists or is anticipated, but nothing is bindingly
@@ -49,7 +49,7 @@ pub enum RegulatoryStatus {
 }
 
 impl RegulatoryStatus {
-    /// Whether a sector with this status may carry a *binding* compliance
+    /// Whether a product group with this status may carry a *binding* compliance
     /// determination (vs. structural validation only).
     ///
     /// `Watch` inherits the safe answer by construction rather than by a branch

@@ -5,7 +5,7 @@
 //! *non-compliant* data a [`crate::batteries`]/[`crate::textiles`]-style rule
 //! catches. A lint finding never blocks publish — see [`LintSeverity`].
 //!
-//! Each lint cites the physics or arithmetic behind it, the way the sector
+//! Each lint cites the physics or arithmetic behind it, the way the product group
 //! rule modules cite the regulatory article behind a binding rule. Findings
 //! are phrased as questions ("intended?"), never verdicts.
 

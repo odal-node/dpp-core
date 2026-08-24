@@ -77,7 +77,7 @@ fn every_context_array_the_workspace_can_emit_is_verified_resolvable() {
             name: "Test Holder".into(),
             role: CredentialRole::AuthorisedRepairer,
             country: "DE".into(),
-            sectors: vec!["textile".into()],
+            product_groups: vec!["textile".into()],
             product_categories: vec![],
         },
     )
@@ -117,7 +117,7 @@ fn the_passport_vocabulary_is_inlined() {
         .find(|e| e.is_object())
         .expect("the context carries an inline term map");
 
-    for term in ["dpp", "gtin", "sector", "passportId"] {
+    for term in ["dpp", "gtin", "productGroup", "passportId"] {
         assert!(
             inline.get(term).is_some(),
             "term '{term}' is not defined inline — a consumer would have to \
@@ -143,7 +143,7 @@ fn the_withdrawn_context_urls_stay_out() {
             name: "Test Holder".into(),
             role: CredentialRole::AuthorisedRepairer,
             country: "DE".into(),
-            sectors: vec!["textile".into()],
+            product_groups: vec!["textile".into()],
             product_categories: vec![],
         },
     )

@@ -1,6 +1,6 @@
 //! Example: pure EU ESPR cross-field regulatory rules (no I/O, no allocation
 //! beyond the inputs). These are the same rule kernels shared by `dpp-domain`
-//! validators and the Wasm sector plugins.
+//! validators and the Wasm product group plugins.
 //!
 //! Run with: `cargo run --example regulatory_rules -p dpp-rules`
 

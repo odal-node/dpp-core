@@ -120,7 +120,7 @@ fn an_attached_payload_emits_neither_sigd_nor_crit() {
 #[test]
 fn the_output_verifies_as_an_ordinary_jws() {
     let key = SigningKey::generate(&mut crate::os_rng());
-    let payload = br#"{"passportId":"abc","sector":"battery"}"#;
+    let payload = br#"{"passportId":"abc","productGroup":"battery"}"#;
 
     let prepared = prepare(&header(), payload).expect("prepares");
     let signature = key.sign(prepared.signing_input());
@@ -370,7 +370,7 @@ fn every_producible_shape_satisfies_table_1() {
         b"".to_vec(),
         b"{}".to_vec(),
         vec![0x00, 0xff, 0xfe, 0x80, 0x7f],
-        "sector: electrique — battery".as_bytes().to_vec(),
+        "product_group: electrique — battery".as_bytes().to_vec(),
         vec![b'x'; 64 * 1024],
     ];
     let headers = vec![

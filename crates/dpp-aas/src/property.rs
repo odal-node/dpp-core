@@ -2,7 +2,7 @@ use super::model::{AasCollection, AasDataType, AasProperty, AasSemId, AasSubmode
 
 /// The serde wire string for `value` — factors out the
 /// `serde_json::to_value(...).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default()`
-/// idiom repeated across the sector builders to read an enum's serde-rename
+/// idiom repeated across the product group builders to read an enum's serde-rename
 /// tag as a `String` for embedding in an AAS property.
 pub fn enum_wire_str<T: serde::Serialize>(value: &T) -> String {
     serde_json::to_value(value)
@@ -20,7 +20,7 @@ pub fn opt_enum_wire_str<T: serde::Serialize>(value: &Option<T>) -> Option<Strin
     serde_json::to_value(v).ok()?.as_str().map(String::from)
 }
 
-/// The `svhc_{index}` collection shape shared by every sector that reports
+/// The `svhc_{index}` collection shape shared by every product group that reports
 /// SVHC declarations: `casNumber`/`substanceName`/`concentrationPct` plus an
 /// optional `locationInProduct`. Returned as a bare [`AasCollection`] (not yet
 /// wrapped in [`AasSubmodelElement::SubmodelElementCollection`]) so a caller

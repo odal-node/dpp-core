@@ -14,7 +14,7 @@ No HTTP framework. No database. No async runtime (except where port traits requi
 +--------------------------------------------------+
 |                  dpp-domain                       |
 |  Domain types, port traits, schema validation     |
-|  VersionedSchemaRegistry, SectorCatalog,          |
+|  VersionedSchemaRegistry, ProductGroupCatalog,          |
 |  ComplianceRegistry                               |
 +--------------------------------------------------+
         ^            ^             ^
@@ -73,10 +73,10 @@ compares this list against `lib.rs` and fails the build in either direction.
 
 | Concern | What it holds |
 |---|---|
-| `access` | The per-field disclosure contract — `SectorAccessPolicy`, `filter_by_audience` |
-| `catalog` | Sector manifests: regulatory status, regime, retention, schema versions |
-| `compliance` | The Apache-2.0 passthrough registry and its per-sector strategies |
-| `domain` | The passport aggregate, sector data, lifecycle, transfer, validation |
+| `access` | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
+| `catalog` | Product group manifests: regulatory status, regime, retention, schema versions |
+| `compliance` | The Apache-2.0 passthrough registry and its per-product group strategies |
+| `domain` | The passport aggregate, product group data, lifecycle, transfer, validation |
 | `ports` | The core↔platform trait boundary (see [PORTS.md](PORTS.md)) |
 | `schemas` | `VersionedSchemaRegistry`, the embedded JSON Schemas, and version lenses |
 
@@ -105,10 +105,10 @@ Trait definitions that downstream projects implement against their own infrastru
 | Trait | Async | Purpose |
 |---|---|---|
 | `PassportRepository` | yes | CRUD for DPP records |
-| `ComplianceRegistry` | no | Route sector data to the correct compliance strategy |
-| `ComplianceStrategy` | no | Validate sector-specific compliance rules |
+| `ComplianceRegistry` | no | Route product group data to the correct compliance strategy |
+| `ComplianceStrategy` | no | Validate product-group-specific compliance rules |
 | `IdentityPort` | yes | Sign and verify passport JWS |
-| `PluginHost` | no | Dispatch to Wasm sector plugins |
+| `PluginHost` | no | Dispatch to Wasm product group plugins |
 | `ArchivePort` | yes | Immutable DPP archival with retention guarantees |
 | `RegistrySyncPort` | yes | EU Central Registry registration and status sync |
 | `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
@@ -119,12 +119,12 @@ The async traits use `async-trait`. The sync traits are plain Rust traits — co
 
 ### VersionedSchemaRegistry
 
-Embeds all JSON schemas from `crates/dpp-domain/schemas/{sector}/v{version}.json` via `include_str!()` (inside the crate so they publish with it). Provides:
+Embeds all JSON schemas from `crates/dpp-domain/schemas/{product-group}/v{version}.json` via `include_str!()` (inside the crate so they publish with it). Provides:
 
-- `get(sector, version)` — retrieve a specific schema
-- `latest(sector)` — retrieve the newest version for a sector
-- `validate(sector, version, data)` — validate passport data against a schema
-- `list()` — enumerate all available (sector, version) pairs
+- `get(product group, version)` — retrieve a specific schema
+- `latest(product group)` — retrieve the newest version for a product group
+- `validate(product group, version, data)` — validate passport data against a schema
+- `list()` — enumerate all available (product group, version) pairs
 
 Schema validation is gated behind `#[cfg(not(target_arch = "wasm32"))]` because the `jsonschema` crate is not wasm32-compatible.
 
@@ -214,8 +214,8 @@ Pure, stateless — no I/O or network dependencies. Compiles to `std` and
 ## dpp-aas — Asset Administration Shell
 
 Maps a `Passport` to AAS shells and submodels (`build_aas_from_passport`) —
-the sector-agnostic core submodels (identification, manufacturer,
-environmental, materials, repairability) plus one sector submodel.
+the product group-agnostic core submodels (identification, manufacturer,
+environmental, materials, repairability) plus one product group submodel.
 
 **Masked before mapping.** The builder takes an `Audience` and filters the
 passport through the same disclosure seam the public view uses, at the entry
@@ -225,9 +225,9 @@ misspelled one would emit a restricted field the filter could not recognise.
 
 **Typed mappers only where an act is in force** — `battery`, `electronics`,
 `unsold_goods`, plus `textile` as a named carve-out. Every other product group
-renders through the generic sector projection, because a hand-written mapper
+renders through the generic product group projection, because a hand-written mapper
 asserts an AAS submodel template that no standards body has ratified. A CI gate
-asserts this directly: a provisional sector gaining a typed mapper fails the
+asserts this directly: a provisional product group gaining a typed mapper fails the
 build.
 
 **AAS-shaped output carrying our own semantics.** Every emitted `semanticId` is
@@ -239,7 +239,7 @@ currently emits no third-party identifiers, so no IDTA conformance is claimed.
 
 ## dpp-plugin-traits — Wasm Plugin ABI
 
-Types for the host/guest contract. Uses `std` types (`String`, `Vec`, `HashMap`) — not `no_std`. Sector plugins compiled to `wasm32-wasip1` implement this ABI (generated by `dpp-plugin-sdk`'s `export_plugin!` macro — authors do not hand-write it):
+Types for the host/guest contract. Uses `std` types (`String`, `Vec`, `HashMap`) — not `no_std`. Product group plugins compiled to `wasm32-wasip1` implement this ABI (generated by `dpp-plugin-sdk`'s `export_plugin!` macro — authors do not hand-write it):
 
 - `alloc(len: u32) -> u32` — allocate `len` bytes, return ptr
 - `dealloc(ptr: u32, len: u32)` — matching dealloc
@@ -255,7 +255,7 @@ Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is U
 
 ## Proof-Bound Architecture
 
-Odal never stores raw production data. The library validates product data against the sector schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
+Odal never stores raw production data. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
 
 This satisfies GDPR data minimisation and the EU ESPR trust architecture.
 
@@ -268,6 +268,6 @@ Two wasm32 targets are supported:
 | Target | Crates | Purpose |
 |---|---|---|
 | `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas | Browser/Cloudflare Workers (JS-hosted). Not `dpp-crypto`/`dpp-vc` — the RNG needs a platform entropy source |
-| `wasm32-wasip1` | sector plugins | wasmtime sandbox (WASI P1 syscall interface) |
+| `wasm32-wasip1` | product group plugins | wasmtime sandbox (WASI P1 syscall interface) |
 
 `getrandom` uses the JS backend for `wasm32-unknown-unknown` (configured in `.cargo/config.toml`).

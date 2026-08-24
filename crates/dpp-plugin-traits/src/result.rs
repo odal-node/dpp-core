@@ -31,7 +31,7 @@ pub const METRIC_RECYCLED_CONTENT_PCT: &str = "recycled_content_pct";
 /// A single determination finding emitted by a plugin's `calculate_metrics`.
 ///
 /// Findings split into [`PluginResult::violations`] (binding — the host blocks
-/// publish for an in-force sector) and [`PluginResult::warnings`]
+/// publish for an in-force product group) and [`PluginResult::warnings`]
 /// (advisory/experimental — surfaced, never blocks). The vec encodes severity,
 /// so there is no separate severity field. Maps 1:1 onto the host's
 /// `ComplianceFinding`.
@@ -87,9 +87,9 @@ where
 
 /// Compliance result returned by the plugin.
 ///
-/// `metrics` is a sector-extensible map of named numeric values. Use the
+/// `metrics` is a product group-extensible map of named numeric values. Use the
 /// `METRIC_*` constants for the three well-known fields; plugins may add
-/// sector-specific keys (`"water_use_litres"`, `"pef_score"`, …).
+/// product group-specific keys (`"water_use_litres"`, `"pef_score"`, …).
 ///
 /// ## Aligning with `ComplianceResult` on the host
 ///
@@ -105,7 +105,7 @@ where
 pub struct PluginResult {
     /// Typed compliance determination.
     pub compliance_status: PluginComplianceStatus,
-    /// Sector-extensible keyed metric map (all values finite f64).
+    /// ProductGroup-extensible keyed metric map (all values finite f64).
     ///
     /// Serialisation **fails** on a non-finite value (`NaN`/`Infinity`) rather
     /// than silently coercing it to JSON `null`, so a metric inserted directly
@@ -113,10 +113,10 @@ pub struct PluginResult {
     /// through the ABI envelope as a spurious success.
     #[serde(default, serialize_with = "serialize_finite_metrics")]
     pub metrics: std::collections::HashMap<String, f64>,
-    /// Non-numeric sector-specific data (free-form; stored verbatim in extra).
+    /// Non-numeric product group-specific data (free-form; stored verbatim in extra).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<serde_json::Value>,
-    /// Binding findings — the host blocks publish for an in-force sector. Empty
+    /// Binding findings — the host blocks publish for an in-force product group. Empty
     /// for passthrough / not-assessed determinations. (ABI 1.1+)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub violations: Vec<PluginFinding>,
@@ -162,7 +162,7 @@ impl PluginResult {
         self
     }
 
-    /// Append a binding violation (host blocks publish for an in-force sector).
+    /// Append a binding violation (host blocks publish for an in-force product group).
     pub fn with_violation(mut self, finding: PluginFinding) -> Self {
         self.violations.push(finding);
         self

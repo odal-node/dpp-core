@@ -22,7 +22,7 @@ moved a number.
 | Target | Source | What it measures |
 |---|---|---|
 | `crypto` | [src/crypto.rs](src/crypto.rs) | Ed25519 + JWS: signing a payload, verifying via the keystore, and standalone verification against a raw public key |
-| `validation` | [src/validation.rs](src/validation.rs) | JSON Schema sector validation — single battery, single textile, and a 100-record mixed batch (validators are warmed first so schema compilation isn't measured) |
+| `validation` | [src/validation.rs](src/validation.rs) | JSON Schema product group validation — single battery, single textile, and a 100-record mixed batch (validators are warmed first so schema compilation isn't measured) |
 | `gs1` | [src/gs1.rs](src/gs1.rs) | GS1 Digital Link parsing (AI 01/21 and full 01/10/21 URIs) |
 | `calc` | [src/calc.rs](src/calc.rs) | EU-methodology calculators: cradle-to-gate CO₂e (small + 50-material bill) and the simplified repairability heuristic |
 | `aas` | [src/aas.rs](src/aas.rs) | AAS submodel mapping (`build_aas_from_passport`) and the build-and-serialise path used on Catena-X / IDTA export |
@@ -33,7 +33,7 @@ moved a number.
   `[[bench]]` in [Cargo.toml](Cargo.toml).
 - Setup work (key generation, validator warm-up, fixture construction) is done
   **outside** the `b.iter(...)` closure so only the operation under test is timed.
-- Fixtures use realistic sector data (a battery passport with Annex XIII fields, a
+- Fixtures use realistic product group data (a battery passport with Annex XIII fields, a
   60/40 cotton/polyester textile) rather than minimal stubs, so the numbers reflect
   production-shaped inputs.
 

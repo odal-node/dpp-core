@@ -2,7 +2,7 @@
 //!
 //! No physical delete is exposed by design: ESPR retention obligations prohibit
 //! removing published passports for the applicable retention period (typically
-//! 10–15 years per sector delegated act).
+//! 10–15 years per product group delegated act).
 //!
 //! # Art. 78(d) — what an implementor may do with this data
 //!
@@ -85,6 +85,10 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     "facility",
     "parentPassportRef",
     "componentRefs",
+    // The applicable law at placing on the market does not change. A
+    // mis-recorded set is corrected by superseding the passport, never by
+    // patching a published record's legal basis.
+    "applicableInstruments",
 ];
 
 /// Port trait for all DPP persistence operations.
@@ -138,7 +142,7 @@ pub trait PassportRepository: Send + Sync {
     /// Used by public endpoints to distinguish between 404 and 410 (suspended).
     async fn find_by_id_any_status(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
 
-    /// Find a passport by exact compound identity — sector, GTIN, and batch —
+    /// Find a passport by exact compound identity — product group, GTIN, and batch —
     /// across `Draft` and `Published`. Used by the import delta-matcher to
     /// classify a row as create/update_draft/conflict_published before any
     /// write. Returns `None` on no match; `batch_id: None` matches only
@@ -290,7 +294,7 @@ pub trait PassportRepository: Send + Sync {
 mod tests {
     use super::*;
     use crate::domain::passport::ManufacturerInfo;
-    use crate::domain::sector::Sector;
+    use crate::domain::product_group::ProductGroup;
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -511,19 +515,19 @@ mod tests {
 
     #[tokio::test]
     async fn default_find_by_identity_matches_across_draft_and_published() {
-        use crate::domain::sector::SectorData;
+        use crate::domain::product_group::ProductGroupData;
 
         let repo = InMemoryRepo::default();
         let mut p = draft_passport("Battery A");
-        p.sector = Sector::Battery;
-        p.sector_data = Some(SectorData::Battery(Box::new(
+        p.product_group = ProductGroup::Battery;
+        p.product_group_data = Some(ProductGroupData::Battery(Box::new(
             crate::test_support::sample_battery_data(),
         )));
         p.batch_id = Some("BATCH-1".into());
         let created = repo.create(p).await.unwrap();
 
         let identity = ProductIdentity {
-            sector: Sector::Battery,
+            product_group: ProductGroup::Battery,
             gtin: "09506000134352".into(),
             batch_id: Some("BATCH-1".into()),
         };
@@ -531,7 +535,7 @@ mod tests {
         assert_eq!(found.map(|p| p.id), Some(created.id));
 
         let no_match = ProductIdentity {
-            sector: Sector::Battery,
+            product_group: ProductGroup::Battery,
             gtin: "00000000000000".into(),
             batch_id: None,
         };

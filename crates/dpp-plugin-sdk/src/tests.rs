@@ -12,10 +12,10 @@ use serde_json::{Value, json};
 #[derive(Default)]
 struct DummyPlugin;
 
-impl DppSectorPlugin for DummyPlugin {
+impl DppProductGroupPlugin for DummyPlugin {
     fn plugin_identity(&self) -> PluginIdentity {
         PluginIdentity {
-            sector: "dummy",
+            product_group: "dummy",
             name: "Dummy",
             version: "0.1.0",
             description: "Minimal plugin exercising every glue path",
@@ -70,7 +70,7 @@ fn describe_emits_capabilities() {
 #[test]
 fn metadata_emits_meta() {
     let json = parse(&metadata_bytes(&DummyPlugin));
-    assert_eq!(json["sector"], "dummy");
+    assert_eq!(json["productGroup"], "dummy");
 }
 
 #[test]

@@ -49,7 +49,7 @@ pub const MATERIAL_COMPOSITION: &str =
 pub const REPAIRABILITY: &str = "urn:odal-node:aas:submodel-template:repairability:1.0";
 
 /// Odal Node generic passport template, for payloads mapped without a typed
-/// sector builder.
+/// product group builder.
 pub const DIGITAL_PRODUCT_PASSPORT: &str =
     "urn:odal-node:aas:submodel-template:digital-product-passport:1.0";
 

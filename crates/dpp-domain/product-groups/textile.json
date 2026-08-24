@@ -1,0 +1,22 @@
+{
+  "key": "textile",
+  "title": "Textiles (fibre DPP)",
+  "schemaVersions": [
+    "1.0.0",
+    "1.1.0",
+    "1.2.0"
+  ],
+  "currentSchemaVersion": "1.2.0",
+  "productCategories": [
+    "apparel",
+    "footwear",
+    "home_textile"
+  ],
+  "disclosure": {
+    "svhcSubstances": "restricted",
+    "disassemblyInstructions": "restricted",
+    "sparePartsAvailable": "restricted"
+  },
+  "plugin": "product-group-textile",
+  "notes": "Fields are provisional and may change without a migration path."
+}

@@ -38,7 +38,7 @@ pub enum Audience {
 /// How restricted a field is — the counterpart to [`Audience`].
 ///
 /// Named for the Annex XIII point each class corresponds to, and kept
-/// sector-agnostic so non-battery sectors reuse the same vocabulary.
+/// product group-agnostic so non-battery product groups reuse the same vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -60,7 +60,7 @@ pub enum Disclosure {
 /// Disclosure class of every top-level passport field that is not public.
 ///
 /// **The single source for this fact.** `Passport::redact` and the crypto
-/// layer's `SectorAccessPolicy::passport_default()` both read it, because they
+/// layer's `ProductGroupAccessPolicy::passport_default()` both read it, because they
 /// previously each carried their own copy and drifted: the policy classified
 /// `lintResult` as restricted while `redact` never removed it, so a public view
 /// built through the domain path disclosed it.
@@ -97,7 +97,7 @@ impl Disclosure {
     ///
     /// Exists so that an ambiguous lookup resolves the safe way and resolves it
     /// **identically every time**. Used by
-    /// [`SectorAccessPolicy::disclosure_for_field`](crate::access::SectorAccessPolicy::disclosure_for_field)
+    /// [`ProductGroupAccessPolicy::disclosure_for_field`](crate::access::ProductGroupAccessPolicy::disclosure_for_field)
     /// when two normalized-equal keys both match.
     ///
     /// `Conformity` and `Individual` are genuinely incomparable — Art. 77(2)

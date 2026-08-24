@@ -45,7 +45,7 @@ let subject = DppCredentialSubject {
     name: "GreenFix Repair GmbH".into(),
     role: CredentialRole::AuthorisedRepairer,
     country: "DE".into(),
-    sectors: vec!["textile".into()],
+    product_groups: vec!["textile".into()],
     product_categories: vec![],
 };
 

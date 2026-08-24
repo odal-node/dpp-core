@@ -41,7 +41,7 @@ fn render_aas(passport: &Passport, gtin: &str) {
     assert_eq!(shell.id_short, "DigitalProductPassport");
     assert!(shell.asset_information.global_asset_id.contains(gtin));
 
-    // Five core submodels, plus one per-sector submodel when sector_data is set
+    // Five core submodels, plus one per-product group submodel when product_group_data is set
     for submodel in &submodels {
         println!(
             "{} ({} elements)",
@@ -84,7 +84,7 @@ field on faith.
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `Passport`, `SectorData` and the sector catalog — required by this crate |
+| `dpp-domain` | Provides `Passport`, `ProductGroupData` and the product group catalog — required by this crate |
 | `dpp-digital-link` | Supplies the GTIN that becomes `globalAssetId`; no dependency in either direction |
 
 ## Minimum Rust version

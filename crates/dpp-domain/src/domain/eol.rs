@@ -72,7 +72,7 @@ pub struct EolEvent {
     pub declared_at: DateTime<Utc>,
     /// Optional recovered-material summary for circularity reporting
     /// (recovered-content shares etc.; Battery Annex XIII). Free-form here; a
-    /// sector schema constrains it where the act demands.
+    /// product group schema constrains it where the act demands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material_recovery: Option<serde_json::Value>,
     /// Free-text notes (conditions, references).

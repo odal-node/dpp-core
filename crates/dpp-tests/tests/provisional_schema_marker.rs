@@ -27,7 +27,7 @@
 use std::fs;
 use std::path::Path;
 
-use dpp_domain::{InstrumentCatalog, SectorCatalog};
+use dpp_domain::{InstrumentCatalog, ProductGroupCatalog};
 
 /// No act binding this product group is in force.
 const DRAFT: &str = "DRAFT — NOT IN FORCE";
@@ -81,7 +81,7 @@ fn comment(path: &Path) -> String {
 
 #[test]
 fn schema_marker_matches_what_the_acts_say() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let instruments = InstrumentCatalog::new();
     let mut checked = 0;
 
@@ -122,7 +122,7 @@ fn schema_marker_matches_what_the_acts_say() {
 /// compliance, and where the thing that would change that lives.
 #[test]
 fn the_marker_states_its_consequences() {
-    let catalog = SectorCatalog::new();
+    let catalog = ProductGroupCatalog::new();
     let instruments = InstrumentCatalog::new();
 
     for descriptor in catalog.all() {

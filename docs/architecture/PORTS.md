@@ -11,10 +11,10 @@ drifts the moment another port lands). CI enforces agreement: the test
 | Module | Trait(s) | Concern |
 |---|---|---|
 | `archive` | `ArchivePort` | Immutable third-party archival with retention guarantees (ESPR Art. 13). |
-| `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Sector dispatch + per-sector compliance strategy (**two traits**). |
+| `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity_port` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
-| `plugin_host_port` | `PluginHost` | Wasm sector-plugin dispatch. |
+| `plugin_host_port` | `PluginHost` | Wasm product group-plugin dispatch. |
 | `registry_sync` | `RegistrySyncPort` | EU Central Registry registration/status sync (ESPR Art. 13). |
 | `seal` | `SealPort` | eIDAS qualified electronic seal (eIDAS 910/2014). |
 
@@ -24,7 +24,7 @@ naming the modules over asserting a count.
 ### Adjacent seams (deliberately *not* in `ports/`)
 
 - `FactorProvider` — the licensing firewall trait, lives in `dpp-calc` (licensed LCI data injected at runtime, never bundled).
-- `DppSectorPlugin` — the Wasm guest/host ABI trait, lives in `dpp-plugin-traits`.
+- `DppProductGroupPlugin` — the Wasm guest/host ABI trait, lives in `dpp-plugin-traits`.
 
 These are real extension seams but not core↔platform ports; they are listed here
 so the inventory is complete, and are excluded from the machine block below.

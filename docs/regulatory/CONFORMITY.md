@@ -4,7 +4,7 @@
 
 This document records the regulatory alignment of `dpp-core` with the EU
 Ecodesign for Sustainable Products Regulation (ESPR, Regulation (EU)
-2024/1781) and the anticipated sector delegated acts. It is intended for
+2024/1781) and the anticipated product group delegated acts. It is intended for
 conformity assessment bodies, GS1 Solution Partner reviewers, and pilot
 programme evaluators.
 
@@ -55,7 +55,7 @@ text of Regulation (EU) 2024/1781, three provisions carry the point:
   out in the applicable delegated act".
 
 So the access lattice is set per product group, not by ESPR itself. Non-battery
-sectors therefore reuse this same vocabulary through each sector manifest's
+product groups therefore reuse this same vocabulary through each product group manifest's
 `disclosure` map rather than inheriting a hardcoded ladder.
 
 > **Superseded.** Releases up to and including 0.10.0 implemented an ordered
@@ -72,10 +72,10 @@ sectors therefore reuse this same vocabulary through each sector manifest's
   role to an `Audience`. A credential establishes *which* audience a caller
   holds.
 - `dpp_domain::access::{policy, filter}` — stateless policy engine that filters
-  JSON fields against the caller's `Audience` and a `SectorAccessPolicy`. This
+  JSON fields against the caller's `Audience` and a `ProductGroupAccessPolicy`. This
   maps an audience to fields, which is a separate question from proving the
   audience, and lives with the passport because the disclosure classes are
-  declared as data in the sector manifests.
+  declared as data in the product group manifests.
 - Integration test: `crates/dpp-tests/tests/access_gatekeeping.rs` exercises all
   three audiences with realistic credentials.
 
@@ -101,11 +101,11 @@ reuse, the new economic operator assumes full DPP responsibility. The
 
 ### Versioned Schemas
 
-All sector schemas reside in `schemas/{sector}/v{version}.json` and follow
+All product group schemas reside in `schemas/{product-group}/v{version}.json` and follow
 JSON Schema Draft-07. The `VersionedSchemaRegistry` embeds them at compile
 time via `include_str!()`.
 
-| Sector | Versions | Fields Covered |
+| Product group | Versions | Fields Covered |
 |---|---|---|
 | textile | v1.0.0, v1.1.0 | Fibre composition, SVHC, durability, microplastics |
 | battery | v1.0.0 | Chemistry, capacity, recycled content, SoH |
@@ -227,7 +227,7 @@ and infrastructure concern and is not evidenced here.
 
 ## Wasm Plugin Architecture
 
-Sector-specific compliance logic runs as sandboxed Wasm modules
+Product group-specific compliance logic runs as sandboxed Wasm modules
 (`wasm32-wasip1`) loaded by the platform. The plugin ABI includes:
 
 - Capability negotiation (plugins declare supported operations).
