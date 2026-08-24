@@ -44,6 +44,20 @@ pub enum DeactivationReason {
     Lost,
 }
 
+impl DeactivationReason {
+    /// Every `kind` discriminator this build models, for exhaustive iteration.
+    ///
+    /// Discriminator strings rather than `&[Self]` because `Destroyed` carries a
+    /// [`DerogationRef`] and so has no value-free form — the tag is the part a
+    /// consumer needs to enumerate.
+    ///
+    /// `DeactivationReason` is `#[non_exhaustive]`, so a consumer outside this
+    /// crate cannot enumerate it, and one publishing an API description has to.
+    /// See [`crate::domain::seal::SealFormat::ALL`] for the same contract: a
+    /// reason added later is deliberately not covered until it is added here.
+    pub const KINDS: &'static [&'static str] = &["recycled", "destroyed", "exported", "lost"];
+}
+
 /// The end-of-life event attached to a passport when it is deactivated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,5 +135,55 @@ mod tests {
         let v = serde_json::to_value(&e).unwrap();
         assert_eq!(v["reason"]["kind"], "destroyed");
         assert_eq!(v["reason"]["derogation"]["category"], "health-and-safety");
+    }
+}
+
+#[cfg(test)]
+mod deactivation_reason_kinds_tests {
+    use super::{DeactivationReason, DerogationRef};
+
+    /// `KINDS` must list every discriminator.
+    ///
+    /// The match is exhaustive with no catch-all, so a new reason stops this
+    /// compiling; the length assertion then fails until `KINDS` is updated.
+    #[test]
+    fn kinds_lists_every_discriminator() {
+        let all = [
+            DeactivationReason::Recycled,
+            DeactivationReason::Destroyed {
+                derogation: DerogationRef {
+                    category: "safety".to_owned(),
+                    act_citation: None,
+                },
+            },
+            DeactivationReason::Exported,
+            DeactivationReason::Lost,
+        ];
+        for reason in &all {
+            match reason {
+                DeactivationReason::Recycled
+                | DeactivationReason::Destroyed { .. }
+                | DeactivationReason::Exported
+                | DeactivationReason::Lost => {}
+            }
+        }
+        assert_eq!(
+            DeactivationReason::KINDS.len(),
+            all.len(),
+            "a variant was added to the match above but not to KINDS"
+        );
+
+        // The strings must be the ones serde actually emits, not a second
+        // transcription of them.
+        for reason in &all {
+            let tag = serde_json::to_value(reason).expect("serialises")["kind"]
+                .as_str()
+                .expect("has a kind discriminator")
+                .to_owned();
+            assert!(
+                DeactivationReason::KINDS.contains(&tag.as_str()),
+                "serde emits `{tag}`, which KINDS does not list"
+            );
+        }
     }
 }

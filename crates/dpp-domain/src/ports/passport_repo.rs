@@ -45,13 +45,36 @@ use crate::domain::{
 /// `facility` is likewise excluded: it is a point-in-time snapshot copied at
 /// create time by design, not a field any flow updates in place. Serialized
 /// (camelCase) field names, matching the `Passport` JSON representation.
-const PROTECTED_PATCH_FIELDS: [&str; 16] = [
+///
+/// # Why this is `pub`
+///
+/// It is part of this trait's documented behaviour — the `patch_fields` doc
+/// below tells a caller which keys are refused — and a backend that overrides
+/// the default implementation still owes callers that contract. Keeping it
+/// private meant an implementor had no way to honour it except by retyping the
+/// list, and a retyped list drifts: the PostgreSQL backend's copy fell three
+/// entries short (`operatorIdentifier`, `facility`, `parentPassportRef`), which
+/// on the only backend that ships made those fields writable through a
+/// user-facing field patch and carried them into the signed publish payload.
+///
+/// An implementation that must differ should derive its list *from this value*
+/// — adding or removing named entries with the reason stated — never restate it.
+///
+/// A slice rather than a fixed-size array on purpose: the length is not part of
+/// the type, so adding an entry here does not break a consumer that annotated
+/// one.
+pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     "id",
     "status",
     "retentionLocked",
     "retentionUntil",
     "jwsSignature",
     "publicJwsSignature",
+    // The fourth proof field, alongside the two signatures and the seal. It was
+    // the only one of the four missing here while the PostgreSQL backend's copy
+    // protected it — so this list, the one every other implementation inherits,
+    // was the weaker of the two.
+    "disclosureSignatures",
     "seal",
     "version",
     "publishedAt",
@@ -569,5 +592,84 @@ mod tests {
         let updated = repo.update_batch(vec![a]).await;
         assert_eq!(updated.len(), 1);
         assert_eq!(updated[0].as_ref().unwrap().product_name, "A2");
+    }
+}
+
+#[cfg(test)]
+mod protected_patch_fields_tests {
+    use super::PROTECTED_PATCH_FIELDS;
+    use crate::domain::passport::{FacilitySnapshot, PassportId, PassportRef};
+    use crate::domain::seal::{SealFormat, SealedEnvelope};
+    use crate::test_support::sample_passport;
+    use chrono::Utc;
+
+    /// Every protected key must be a key `Passport` actually serialises to.
+    ///
+    /// The list is strings, and nothing else ties them to the struct. A renamed
+    /// field — or a typo — leaves an entry protecting a key that no longer
+    /// exists, and the field it was meant to protect silently becomes patchable.
+    /// That failure is invisible: the guard still runs, still finds nothing, and
+    /// still reports success.
+    ///
+    /// The instance below sets every `skip_serializing_if` field, because a
+    /// field that is `None` does not appear in the JSON at all and would look
+    /// exactly like a stale entry.
+    #[test]
+    fn every_protected_key_is_a_real_passport_field() {
+        let now = Utc::now();
+        let reference = PassportRef {
+            uri: "https://id.example/dpp/1".to_owned(),
+            public_jws_hash: "0".repeat(64),
+        };
+        let mut passport = sample_passport();
+        passport.public_jws_signature = Some("eyJ..a".to_owned());
+        passport
+            .disclosure_signatures
+            .insert("public+restricted".to_owned(), "eyJ..b".to_owned());
+        passport.retention_until = Some(now);
+        passport.supersedes_id = Some(PassportId::new());
+        passport.parent_passport_ref = Some(reference.clone());
+        passport.component_refs = vec![reference];
+        passport.operator_identifier = Some("DE123456789".to_owned());
+        passport.facility = Some(FacilitySnapshot {
+            scheme: "gln".to_owned(),
+            value: "4012345000009".to_owned(),
+            name: "Werk Nord".to_owned(),
+            country: "DE".to_owned(),
+            address: None,
+        });
+        passport.seal = Some(SealedEnvelope {
+            format: SealFormat::Cades,
+            seal_value: "MIIB".to_owned(),
+            signing_cert_ref: None,
+            sealed_at: now,
+            placeholder: true,
+        });
+
+        let json = serde_json::to_value(&passport).expect("passport serialises");
+        let obj = json.as_object().expect("passport is a JSON object");
+
+        let stale: Vec<&str> = PROTECTED_PATCH_FIELDS
+            .iter()
+            .copied()
+            .filter(|k| !obj.contains_key(*k))
+            .collect();
+
+        assert!(
+            stale.is_empty(),
+            "PROTECTED_PATCH_FIELDS names keys `Passport` does not serialise to: {stale:?}\n\
+             Either the field was renamed and this list was not, or the instance above \
+             does not populate it. Both mean the field is unprotected."
+        );
+    }
+
+    /// No duplicates — a repeated entry is a sign the list was edited by hand in
+    /// two places, which is the failure mode this list exists to end.
+    #[test]
+    fn protected_keys_are_unique() {
+        let mut seen = std::collections::BTreeSet::new();
+        for key in PROTECTED_PATCH_FIELDS {
+            assert!(seen.insert(*key), "duplicate protected key: {key}");
+        }
     }
 }

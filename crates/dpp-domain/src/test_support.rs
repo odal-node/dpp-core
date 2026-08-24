@@ -163,3 +163,67 @@ pub(crate) fn sample_textile_data() -> TextileData {
         pef_score: None,
     }
 }
+
+/// A `Passport` with **every** optional field populated, so serialising it
+/// yields every key the type is capable of emitting.
+///
+/// `sample_passport` is minimal on purpose, and most fields here are
+/// `skip_serializing_if` — a minimal instance simply omits them, so a test
+/// asserting something about the wire shape would silently be asserting it
+/// about a subset. Anything reasoning over `Passport`'s JSON keys must build
+/// from this.
+pub(crate) fn fully_populated_passport() -> Passport {
+    use crate::domain::commodity_code::CommodityCode;
+    use crate::domain::lint::LintResult;
+    use crate::domain::passport::{FacilitySnapshot, PassportRef};
+    use crate::domain::seal::{SealFormat, SealedEnvelope};
+    use crate::domain::sector::{CarbonFootprint, RepairabilityScore};
+    use crate::ports::compliance::ComplianceResult;
+
+    let now = Utc::now();
+    let reference = PassportRef {
+        uri: "https://id.example/dpp/1".to_owned(),
+        public_jws_hash: "0".repeat(64),
+    };
+
+    let mut passport = sample_passport();
+    passport.batch_id = Some("LOT-2026-001".to_owned());
+    passport.co2e_per_unit = Some(CarbonFootprint::from_kg(45.2));
+    passport.repairability_score = Some(RepairabilityScore::from_scalar(7.5));
+    passport.compliance_result = Some(ComplianceResult::default());
+    passport.lint_result = Some(LintResult {
+        pack_version: "1.0.0".to_owned(),
+        findings: Vec::new(),
+        assessed_at: now,
+    });
+    passport.qr_code_url = Some("https://id.example/01/09506000134352/21/A".to_owned());
+    passport.jws_signature = Some("eyJ..a".to_owned());
+    passport.public_jws_signature = Some("eyJ..b".to_owned());
+    passport
+        .disclosure_signatures
+        .insert("public+restricted".to_owned(), "eyJ..c".to_owned());
+    passport.published_at = Some(now);
+    passport.placed_on_market_date = Some(now.date_naive());
+    passport.supersedes_id = Some(PassportId::new());
+    passport.parent_passport_ref = Some(reference.clone());
+    passport.component_refs = vec![reference];
+    passport.retention_until = Some(now);
+    passport.product_id = Some(uuid::Uuid::nil());
+    passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));
+    passport.operator_identifier = Some("DE123456789".to_owned());
+    passport.facility = Some(FacilitySnapshot {
+        scheme: "gln".to_owned(),
+        value: "4012345000009".to_owned(),
+        name: "Werk Nord".to_owned(),
+        country: "DE".to_owned(),
+        address: Some("Werkstrasse 4, 21079 Hamburg, DE".to_owned()),
+    });
+    passport.seal = Some(SealedEnvelope {
+        format: SealFormat::Cades,
+        seal_value: "MIIB".to_owned(),
+        signing_cert_ref: Some("urn:cert:1".to_owned()),
+        sealed_at: now,
+        placeholder: false,
+    });
+    passport
+}
