@@ -1,0 +1,19 @@
+{
+  "id": "cpr-2024-3110",
+  "title": "Construction Products Regulation (EU) 2024/3110",
+  "celex": "32024R3110",
+  "kind": "direct",
+  "status": "adopted",
+  "passport": { "obligation": "required" },
+  "productGroups": [
+    {
+      "productGroup": "construction",
+      "status": "provisional",
+      "legalBasis": ["Regulation (EU) 2024/3110 Art. 75"],
+      "retentionYears": 10,
+      "retentionYearsBasis": "sourced",
+      "notes": "retentionYears is sourced: the Regulation imposes 10 years on the economic operator. In force since 2025-01-07 and applicable in stages from 2026-01-08, but the per-product duty depends on harmonised technical specifications plus delegated and implementing acts, so nothing is determinable. The DPP system is expected to be implemented in principle by end 2027 with the obligation applying some 18 months later — both figures secondary-sourced, which is why the instrument carries no passport date at all rather than an invented one. WRONG AXIS, to be re-homed: the CPR uses 'product group' zero times and defines product family, then product category, then product type, with its own Annex VII family list. This binding keeps the existing catalog key so nothing breaks; re-homing it is a later step and needs CPR Annex VII read first."
+    }
+  ],
+  "notes": "A real passport instrument, unlike the electronics pair — Art. 75 creates a construction DPP outright. Its first expected product families are rebar, cement, doors and windows with their hardware, and thermal insulation, of which our existing product-category list carries only cement."
+}

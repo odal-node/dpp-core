@@ -1,7 +1,7 @@
 ﻿//! Redaction, validation, and serde round-trip tests for sector data.
 
 use super::*;
-use crate::catalog::{Regime, RegulatoryStatus, RetentionBasis, SectorCatalog, SectorDescriptor};
+use crate::catalog::{SectorCatalog, SectorDescriptor};
 use crate::domain::gtin::Gtin;
 use crate::domain::identity::Audience;
 use crate::domain::identity::Disclosure;
@@ -18,12 +18,6 @@ fn battery_descriptor_with_tiers() -> SectorDescriptor {
     SectorDescriptor {
         key: "battery".into(),
         title: "Battery".into(),
-        status: RegulatoryStatus::InForce,
-        regime: Regime::BatteryRegulation,
-        legal_basis: vec!["EU 2023/1542".into()],
-        dpp_applies_from: None,
-        retention_years: 10,
-        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],
@@ -80,12 +74,6 @@ fn empty_disclosure_retains_all_fields() {
     let descriptor = SectorDescriptor {
         key: "battery".into(),
         title: "Battery".into(),
-        status: RegulatoryStatus::InForce,
-        regime: Regime::BatteryRegulation,
-        legal_basis: vec!["EU 2023/1542".into()],
-        dpp_applies_from: None,
-        retention_years: 10,
-        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["2.0.0".into()],
         current_schema_version: "2.0.0".into(),
         product_categories: vec![],
@@ -457,9 +445,9 @@ fn textile_v1_data_deserializes_with_defaults() {
 #[test]
 fn every_sector_declares_a_catalog_key() {
     // Every variant's catalog_key() must be total — every match arm exercised.
-    // Retention is deliberately absent here: it lives in the catalog manifests
-    // alongside the act that imposes it, and `SectorCatalog::retention_years`
-    // is its only accessor.
+    // Retention is deliberately absent here: it lives on the binding between an
+    // act and a product group, and `InstrumentCatalog::retention_for` is its only
+    // accessor.
     let all = [
         (Sector::Battery, "battery"),
         (Sector::Textile, "textile"),

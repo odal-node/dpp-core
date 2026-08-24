@@ -140,6 +140,24 @@ pub enum RegistrationGranularity {
     Item,
 }
 
+impl From<crate::catalog::Granularity> for RegistrationGranularity {
+    /// The registry registers at the level the applicable act fixed.
+    ///
+    /// Direction matters: [`Granularity`](crate::catalog::Granularity) is the
+    /// act's decision under ESPR Art. 9(2)(d), and this type is one consumer of
+    /// it. A conversion the other way would let a registry default answer a
+    /// question only a delegated act can answer, which is why none exists — and
+    /// why this type's `#[default]` of `Item` must never travel back up into the
+    /// catalog.
+    fn from(granularity: crate::catalog::Granularity) -> Self {
+        match granularity {
+            crate::catalog::Granularity::Model => Self::Model,
+            crate::catalog::Granularity::Batch => Self::Batch,
+            crate::catalog::Granularity::Item => Self::Item,
+        }
+    }
+}
+
 /// The registering operator's own details, which the passport does not carry.
 ///
 /// A struct rather than loose arguments because `legal_name` and `country` are

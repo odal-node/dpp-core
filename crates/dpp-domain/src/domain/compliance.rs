@@ -143,13 +143,35 @@ pub enum ComplianceStatus {
     NotImplemented,
 }
 
+impl ComplianceStatus {
+    /// Every determination this build models, for exhaustive iteration.
+    ///
+    /// `ComplianceStatus` is `#[non_exhaustive]`, so a consumer outside this
+    /// crate cannot enumerate it, and one publishing an API description has to.
+    /// See [`crate::domain::seal::SealFormat::ALL`] for the same contract: a
+    /// status added later is deliberately not covered until it is added here.
+    pub const ALL: &'static [Self] = &[
+        Self::PassthroughNoValidation,
+        Self::Compliant,
+        Self::NonCompliant,
+        Self::NotAssessed,
+        Self::NotImplemented,
+    ];
+}
+
 /// Enforce regulatory status on a raw determination.
 ///
-/// A sector whose DPP obligation is **not in force** (provisional) may never
-/// surface a *binding* `Compliant` / `NonCompliant` — there is no legal basis
-/// for the determination, so it is downgraded to [`ComplianceStatus::NotAssessed`].
-/// In-force sectors pass through unchanged, as do non-binding statuses. Callers
-/// obtain `in_force` from [`crate::catalog::SectorCatalog::is_in_force`].
+/// A product group no in-force act reaches may never surface a *binding*
+/// `Compliant` / `NonCompliant` — there is no legal basis for the determination,
+/// so it is downgraded to [`ComplianceStatus::NotAssessed`]. Groups an in-force
+/// act does reach pass through unchanged, as do non-binding statuses.
+///
+/// Callers obtain `in_force` from
+/// [`InstrumentCatalog::determinable_for`](crate::catalog::InstrumentCatalog::determinable_for),
+/// which returns the (act, binding) pairs rather than a boolean. Pass the act
+/// through to whatever records the result: a determination is always made under
+/// a named instrument, and a caller that only learns "yes" cannot say which act
+/// it is asserting against.
 #[must_use]
 pub fn gate_determination(in_force: bool, raw: ComplianceStatus) -> ComplianceStatus {
     if in_force {
@@ -234,5 +256,29 @@ mod tests {
                 ComplianceStatus::NotAssessed
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod compliance_status_all_tests {
+    use super::ComplianceStatus;
+
+    /// `ALL` must list every variant — see `PassportStatus`'s equivalent test.
+    #[test]
+    fn all_lists_every_variant() {
+        for status in ComplianceStatus::ALL {
+            match status {
+                ComplianceStatus::PassthroughNoValidation
+                | ComplianceStatus::Compliant
+                | ComplianceStatus::NonCompliant
+                | ComplianceStatus::NotAssessed
+                | ComplianceStatus::NotImplemented => {}
+            }
+        }
+        assert_eq!(
+            ComplianceStatus::ALL.len(),
+            5,
+            "a variant was added to the match above but not to ALL"
+        );
     }
 }

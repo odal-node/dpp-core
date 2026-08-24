@@ -3,8 +3,6 @@
 
 use super::descriptor::SectorDescriptor;
 use super::error::CatalogError;
-use super::retention::RetentionBasis;
-use super::status::RegulatoryStatus;
 
 struct EmbeddedManifest {
     key: &'static str,
@@ -58,10 +56,20 @@ const EMBEDDED: &[EmbeddedManifest] = &[
         key: "detergent",
         json: include_str!("../../sectors/detergent.json"),
     },
+    EmbeddedManifest {
+        key: "mattress",
+        json: include_str!("../../sectors/mattress.json"),
+    },
 ];
 
-/// Open, data-driven sector catalog. Pre-loaded with embedded manifests and
-/// extensible at runtime.
+/// Open, data-driven product-group catalog. Pre-loaded with embedded manifests
+/// and extensible at runtime.
+///
+/// Identity and scope only. Anything a caller wants to know about the **law** —
+/// whether obligations bind, whether a passport is owed and from when, how long
+/// a record must be kept, at what level — comes from
+/// [`InstrumentCatalog`](super::InstrumentCatalog), because each of those is a
+/// property of an act reaching this group and a group may be reached by several.
 pub struct SectorCatalog {
     entries: Vec<SectorDescriptor>,
 }
@@ -98,54 +106,6 @@ impl SectorCatalog {
     #[must_use]
     pub fn all(&self) -> &[SectorDescriptor] {
         &self.entries
-    }
-
-    /// Sectors whose DPP obligation is in force (determinations are binding).
-    #[must_use]
-    pub fn in_force(&self) -> Vec<&SectorDescriptor> {
-        self.entries
-            .iter()
-            .filter(|d| d.status == RegulatoryStatus::InForce)
-            .collect()
-    }
-
-    /// Sectors that are flagged provisional (no binding determinations).
-    #[must_use]
-    pub fn provisional(&self) -> Vec<&SectorDescriptor> {
-        self.entries
-            .iter()
-            .filter(|d| d.status == RegulatoryStatus::Provisional)
-            .collect()
-    }
-
-    /// Whether the sector exists and may carry a binding determination.
-    #[must_use]
-    pub fn is_in_force(&self, key: &str) -> bool {
-        self.get(key)
-            .is_some_and(|d| d.status.allows_determination())
-    }
-
-    /// Statutory minimum retention for a sector, in years.
-    ///
-    /// **This is the only source of retention.** It was previously duplicated
-    /// on the `Sector` enum as a hardcoded match, which is what production
-    /// actually applied while two doc comments claimed the catalog was
-    /// authoritative — a retention period is a legal obligation that varies by
-    /// instrument, so it belongs in the manifests with the act that imposes it.
-    ///
-    /// `None` for a sector with no catalog entry. Callers must fail closed:
-    /// there is no safe default for an obligation whose length is unknown.
-    #[must_use]
-    pub fn retention_years(&self, key: &str) -> Option<u32> {
-        self.get(key).map(|d| d.retention_years)
-    }
-
-    /// Whether [`Self::retention_years`] for `key` is sourced from an adopted
-    /// legal text or carried as an assumption. `None` for a sector with no
-    /// catalog entry.
-    #[must_use]
-    pub fn retention_years_basis(&self, key: &str) -> Option<RetentionBasis> {
-        self.get(key).map(|d| d.retention_years_basis)
     }
 
     /// The schema version applicable to *new* passports in `key`.

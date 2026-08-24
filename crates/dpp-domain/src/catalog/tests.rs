@@ -1,37 +1,50 @@
-﻿//! `SectorCatalog` load, gating, registration, and cross-artifact parity tests.
+//! `SectorCatalog` load, gating, registration, and cross-artifact parity tests.
 
 use super::*;
 
 #[test]
 fn loads_all_embedded_manifests() {
     let catalog = SectorCatalog::new();
-    assert_eq!(catalog.len(), 11);
+    assert_eq!(catalog.len(), 12);
 }
 
+/// Determinability is a property of an act reaching a product group, so it is
+/// asked of the instrument catalog. The three answers are unchanged from when
+/// this was a per-sector flag — what changed is that each now names the act it
+/// comes from.
 #[test]
-fn exactly_three_sectors_are_in_force() {
-    let catalog = SectorCatalog::new();
-    let mut in_force: Vec<&str> = catalog.in_force().iter().map(|d| d.key.as_str()).collect();
+fn exactly_three_product_groups_have_a_binding_act() {
+    let instruments = InstrumentCatalog::new();
+    let sectors = SectorCatalog::new();
+    let mut in_force: Vec<&str> = sectors
+        .all()
+        .iter()
+        .map(|d| d.key.as_str())
+        .filter(|key| !instruments.determinable_for(key).is_empty())
+        .collect();
     in_force.sort_unstable();
     assert_eq!(in_force, vec!["battery", "electronics", "unsold-goods"]);
 }
 
 #[test]
-fn provisional_sectors_are_flagged_not_dropped() {
+fn product_groups_with_no_binding_act_are_flagged_not_dropped() {
     let catalog = SectorCatalog::new();
-    // All eight not-yet-adopted sectors are still present, just flagged.
-    assert_eq!(catalog.provisional().len(), 8);
-    assert!(!catalog.is_in_force("textile"));
-    assert!(!catalog.is_in_force("steel"));
+    let instruments = InstrumentCatalog::new();
+    // All eight not-yet-adopted product groups are still present, just flagged.
+    assert_eq!(catalog.len(), 12);
+    for key in ["textile", "steel"] {
+        assert!(catalog.get(key).is_some(), "'{key}' must still be listed");
+        assert!(
+            instruments.determinable_for(key).is_empty(),
+            "'{key}' has no act binding it yet"
+        );
+    }
 }
 
 #[test]
 fn battery_descriptor_is_complete() {
     let catalog = SectorCatalog::new();
     let battery = catalog.get("battery").expect("battery in catalog");
-    assert_eq!(battery.status, RegulatoryStatus::InForce);
-    assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
-    assert_eq!(battery.retention_years, 10);
     assert!(battery.schema_versions.contains(&"2.0.0".to_string()));
     assert!(battery.schema_versions.contains(&"2.1.0".to_string()));
     assert!(battery.schema_versions.contains(&"2.2.0".to_string()));
@@ -67,13 +80,14 @@ fn resolve_schema_version_new_vs_existing() {
 }
 
 #[test]
-fn in_force_gating_is_status_driven() {
-    let catalog = SectorCatalog::new();
-    assert!(catalog.is_in_force("battery"));
-    assert!(catalog.is_in_force("unsold-goods"));
-    assert!(catalog.is_in_force("electronics"));
-    assert!(!catalog.is_in_force("detergent")); // partial → flagged
-    assert!(!catalog.is_in_force("nonexistent"));
+fn determination_gating_is_status_driven() {
+    let catalog = InstrumentCatalog::new();
+    for key in ["battery", "unsold-goods", "electronics"] {
+        assert!(!catalog.determinable_for(key).is_empty(), "'{key}'");
+    }
+    // Adopted but not yet applicable → flagged, and unknown keys reach nothing.
+    assert!(catalog.determinable_for("detergent").is_empty());
+    assert!(catalog.determinable_for("nonexistent").is_empty());
 }
 
 #[test]
@@ -88,12 +102,6 @@ fn register_runtime_sector() {
     let descriptor = SectorDescriptor {
         key: "plastics".into(),
         title: "Plastics".into(),
-        status: RegulatoryStatus::Provisional,
-        regime: Regime::Espr,
-        legal_basis: vec!["ESPR Working Plan".into()],
-        dpp_applies_from: None,
-        retention_years: 10,
-        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: vec!["1.0.0".into()],
         current_schema_version: "1.0.0".into(),
         product_categories: vec![],
@@ -102,7 +110,7 @@ fn register_runtime_sector() {
         notes: None,
     };
     assert!(catalog.register(descriptor.clone()).is_ok());
-    assert_eq!(catalog.len(), 12);
+    assert_eq!(catalog.len(), 13);
     assert!(matches!(
         catalog.register(descriptor),
         Err(CatalogError::AlreadyExists(_))
@@ -113,12 +121,6 @@ fn provisional_descriptor(current: &str, versions: Vec<String>) -> SectorDescrip
     SectorDescriptor {
         key: "plastics".into(),
         title: "Plastics".into(),
-        status: RegulatoryStatus::Provisional,
-        regime: Regime::Espr,
-        legal_basis: vec!["ESPR Working Plan".into()],
-        dpp_applies_from: None,
-        retention_years: 10,
-        retention_years_basis: RetentionBasis::Assumed,
         schema_versions: versions,
         current_schema_version: current.into(),
         product_categories: vec![],
@@ -138,7 +140,7 @@ fn register_rejects_invalid_current_schema_version() {
     ));
     // A rejected descriptor must never reach the catalog — otherwise every
     // passport in that sector silently skips schema validation.
-    assert_eq!(catalog.len(), 11);
+    assert_eq!(catalog.len(), 12);
 }
 
 #[test]
@@ -150,7 +152,7 @@ fn register_rejects_current_version_not_in_list() {
         catalog.register(descriptor),
         Err(CatalogError::CurrentVersionNotListed { .. })
     ));
-    assert_eq!(catalog.len(), 11);
+    assert_eq!(catalog.len(), 12);
 }
 
 /// Parity guard: the closed [`Sector`](crate::domain::sector::Sector) enum
@@ -178,6 +180,7 @@ fn sector_enum_and_catalog_agree() {
         Sector::Toy,
         Sector::Aluminium,
         Sector::Furniture,
+        Sector::Mattress,
         Sector::Detergent,
     ];
     for sector in &typed {
@@ -199,56 +202,64 @@ fn sector_enum_and_catalog_agree() {
     }
 }
 
-/// Every catalog entry declares a retention period.
+/// Every product group we ship has a retention period some act imposes.
 ///
-/// Retention used to have two homes — this field and a hardcoded match on the
-/// `Sector` enum — kept in step by a drift-guard test. The enum method was what
-/// production actually applied, while this field was documented as
-/// authoritative. The enum method is gone and this is the only source, so what
-/// needs guarding is no longer agreement between two values but that the one
-/// remaining value is always present: a sector that reaches publish without a
-/// retention period has no obligation the code can enforce.
+/// Retention has moved twice now. It was once duplicated between a manifest
+/// field and a hardcoded match on the `Sector` enum, where the enum was what
+/// production applied while the field was documented as authoritative. It then
+/// sat on the descriptor alone, which assumed one act per product group. It now
+/// sits on the binding, with the act that imposes it, and the catalog folds the
+/// applicable set to a maximum.
+///
+/// What still needs guarding is that the figure is always *there*: a product
+/// group that reaches publish with no retention period has no obligation the
+/// code can enforce, and there is no safe default for the length of someone
+/// else's legal duty.
 #[test]
-fn every_sector_declares_a_retention_period() {
+fn every_product_group_has_a_retention_period_from_some_act() {
     let catalog = SectorCatalog::new();
+    let instruments = InstrumentCatalog::new();
     for descriptor in catalog.all() {
         let key = descriptor.key.as_str();
-        assert_eq!(
-            catalog.retention_years(key),
-            Some(descriptor.retention_years),
-            "retention_years() disagrees with the descriptor for '{key}'"
-        );
+        let (years, _basis) = instruments
+            .retention_for(key)
+            .unwrap_or_else(|| panic!("no act imposes a retention period on '{key}'"));
         assert!(
-            descriptor.retention_years > 0,
-            "sector '{key}' declares no retention period"
-        );
-        assert_eq!(
-            catalog.retention_years_basis(key),
-            Some(descriptor.retention_years_basis),
-            "retention_years_basis() disagrees with the descriptor for '{key}'"
+            years > 0,
+            "product group '{key}' declares no retention period"
         );
     }
 
-    // A sector with no catalog entry yields None, so callers must fail closed
+    // A product group no act reaches yields None, so callers must fail closed
     // rather than substitute a default for an unknown legal obligation.
-    assert_eq!(catalog.retention_years("packaging"), None);
+    assert_eq!(instruments.retention_for("packaging"), None);
 }
 
-/// Compliance citation (domain Gap / watchlist 🔴): the ESPR unsold-goods
-/// destruction ban is **Article 25 / Annex VII**, not Article 22. A wrong
-/// citation in a compliance artifact erodes auditor trust.
+/// Compliance citation: the ESPR unsold-goods destruction ban is **Article 25 /
+/// Annex VII**, not Article 22. A wrong citation in a compliance artifact erodes
+/// auditor trust. The citation now lives on the binding that rests on it, so
+/// this asks the instrument catalog rather than the product group.
 /// Source: Regulation (EU) 2024/1781 (ESPR) Article 25, Annex VII.
 #[test]
 fn unsold_goods_cites_espr_article_25() {
-    let catalog = SectorCatalog::new();
-    let textile = catalog.get("unsold-goods").expect("unsold-goods present");
-    let basis = textile.legal_basis.join(" ");
+    let instruments = InstrumentCatalog::new();
+    let bindings = instruments.bindings_for("unsold-goods");
     assert!(
-        basis.contains("Article 25"),
+        !bindings.is_empty(),
+        "unsold-goods must be reached by an act"
+    );
+    let basis: String = bindings
+        .iter()
+        .flat_map(|(_, b)| b.legal_basis.iter())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        basis.contains("Art. 25"),
         "unsold-goods legal basis must cite ESPR Article 25, got: {basis}"
     );
     assert!(
-        !basis.contains("Article 22"),
+        !basis.contains("Art. 22"),
         "the incorrect Article 22 citation must be gone, got: {basis}"
     );
 }
@@ -258,8 +269,15 @@ fn descriptor_round_trips_camel_case() {
     let catalog = SectorCatalog::new();
     let battery = catalog.get("battery").unwrap();
     let json = serde_json::to_value(battery).unwrap();
-    assert_eq!(json["dppAppliesFrom"], "2027-02-18");
-    assert_eq!(json["status"], "in_force");
+    assert_eq!(json["currentSchemaVersion"], "2.6.0");
+    // The law is not here and must not come back: a descriptor carrying its own
+    // status or date is a descriptor asserting that one act governs it.
+    for absent in ["status", "regime", "dppAppliesFrom", "retentionYears"] {
+        assert!(
+            json.get(absent).is_none(),
+            "'{absent}' belongs on the instrument binding, not the product group"
+        );
+    }
     let back: SectorDescriptor = serde_json::from_value(json).unwrap();
     assert_eq!(back.key, "battery");
 }
@@ -362,100 +380,63 @@ fn catalog_agrees_with_schema_registry() {
         );
     }
 
-    // Every in-force sector must declare a plugin binding.
-    for d in catalog.in_force() {
+    // Every product group with a binding act must declare a plugin binding.
+    let instruments = InstrumentCatalog::new();
+    for d in catalog.all() {
+        if instruments.determinable_for(&d.key).is_empty() {
+            continue;
+        }
         assert!(
             d.plugin.is_some(),
-            "in-force sector '{}' must declare a plugin binding",
+            "product group '{}' has a binding act and must declare a plugin",
             d.key
         );
     }
 }
 
-// ── Regime axis ──────────────────────────────────────────────────────────────
+// ── The instrument axis ──────────────────────────────────────────────────────
 
+/// Guards the assumption that ESPR is the only source of a DPP obligation.
+/// Battery, toy, detergent, construction and electronics each derive from their
+/// own act; if this ever collapses to all-ESPR, something has been flattened.
 #[test]
-fn every_manifest_declares_a_regime() {
-    for d in SectorCatalog::new().all().iter() {
-        // `Regime::None` is documented as pairing with `RegulatoryStatus::Watch`
-        // — a sector tracked before any DPP instrument exists. Forbidding it
-        // outright contradicted the enum it was guarding, and would have blocked
-        // the first Watch sector from ever being added.
-        if d.status == RegulatoryStatus::Watch {
-            continue;
-        }
-        assert_ne!(
-            d.regime,
-            Regime::None,
-            "sector '{}' has status {:?} but no regime; Regime::None is reserved for              Watch sectors with no DPP instrument",
-            d.key,
-            d.status
-        );
-    }
-}
-
-#[test]
-fn a_watch_sector_may_declare_no_regime() {
-    // The pairing the guard above must allow. Asserted on a constructed
-    // descriptor rather than a shipped manifest, so it holds whether or not any
-    // sector is currently in Watch.
-    let watch = r#"{
-        "key": "w", "title": "W", "status": "watch", "regime": "none",
-        "legalBasis": [], "retentionYears": 10, "retentionYearsBasis": "assumed",
-        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
-    }"#;
-    let d: SectorDescriptor = serde_json::from_str(watch).expect("watch + none must parse");
-    assert_eq!(d.regime, Regime::None);
-    assert_eq!(d.status, RegulatoryStatus::Watch);
-}
-
-#[test]
-fn manifest_without_regime_is_rejected() {
-    // `regime` is required — a manifest omitting it must fail to deserialise
-    // rather than silently defaulting to some instrument.
-    let no_regime = r#"{
-        "key": "x", "title": "X", "status": "provisional",
-        "legalBasis": [], "retentionYears": 10,
-        "schemaVersions": ["1.0.0"], "currentSchemaVersion": "1.0.0"
-    }"#;
-    assert!(serde_json::from_str::<SectorDescriptor>(no_regime).is_err());
-}
-
-#[test]
-fn most_sectors_are_not_espr() {
-    // Guards the assumption that ESPR is the only source of a DPP obligation.
-    // Battery, toy, detergent, construction and electronics each derive from
-    // their own instrument; if this ever collapses to all-ESPR, something has
-    // been flattened wrongly.
-    let catalog = SectorCatalog::new();
-    let non_espr = catalog
+fn most_product_groups_are_not_reached_by_espr() {
+    let instruments = InstrumentCatalog::new();
+    let non_espr = SectorCatalog::new()
         .all()
         .iter()
-        .filter(|d| d.regime != Regime::Espr)
+        .filter(|d| {
+            instruments
+                .bindings_for(&d.key)
+                .iter()
+                .all(|(i, _)| i.id != "espr")
+        })
         .count();
     assert_eq!(
         non_espr, 5,
-        "expected 5 non-ESPR sectors (battery, toy, detergent, construction, electronics)"
+        "expected 5 product groups reached by something other than ESPR \
+         (battery, toy, detergent, construction, electronics)"
     );
 }
 
+/// The two axes must stay orthogonal: a binding that is not in force gates
+/// identically whatever kind of act it comes from. If this fails, the kind of
+/// instrument has leaked into the determination path.
 #[test]
-fn regime_does_not_affect_determination_gating() {
-    // The two axes must be orthogonal: a Provisional sector gates identically
-    // whatever instrument it derives from. If this fails, regime has leaked
-    // into the determination path.
-    let catalog = SectorCatalog::new();
-    for d in catalog
-        .all()
-        .iter()
-        .filter(|d| d.status == RegulatoryStatus::Provisional)
-    {
-        assert!(
-            !d.status.allows_determination(),
-            "provisional sector '{}' (regime {:?}) must not allow determinations",
-            d.key,
-            d.regime
-        );
+fn instrument_kind_does_not_affect_determination_gating() {
+    for instrument in InstrumentCatalog::new().all() {
+        for binding in &instrument.product_groups {
+            if binding.status == RegulatoryStatus::InForce {
+                continue;
+            }
+            assert!(
+                !binding.allows_determination(),
+                "'{}' under '{}' (kind {:?}) must not allow determinations",
+                binding.product_group,
+                instrument.id,
+                instrument.kind
+            );
+        }
     }
 }
 
@@ -471,13 +452,14 @@ fn in_force_with_future_passport_date_still_determines() {
     // Regression guard. `dppAppliesFrom` is the passport-obligation date and is
     // NOT the determination gate. Battery's passport is required from
     // 2027-02-18, but its Art. 9 mercury/cadmium prohibitions have applied
-    // since 2008 and are determinable today. Gating determinations on
-    // `dppAppliesFrom` would suppress a legally valid non-compliance finding.
-    let catalog = SectorCatalog::new();
-    let battery = catalog.get("battery").expect("battery in catalog");
-    assert_eq!(battery.status, RegulatoryStatus::InForce);
-    assert_eq!(battery.dpp_applies_from.as_deref(), Some("2027-02-18"));
-    assert!(battery.status.allows_determination());
+    // since 2008 and are determinable today. Gating determinations on the
+    // passport date would suppress a legally valid non-compliance finding.
+    let catalog = InstrumentCatalog::new();
+    let due = catalog.passport_due_for("battery").expect("a fixed date");
+    assert_eq!(due.date, "2027-02-18");
+    let determinable = catalog.determinable_for("battery");
+    assert_eq!(determinable.len(), 1);
+    assert_eq!(determinable[0].0.id, "battery-reg-2023-1542");
 }
 
 #[test]

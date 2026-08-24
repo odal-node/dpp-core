@@ -24,7 +24,9 @@ pub mod schemas;
 mod test_support;
 
 pub use catalog::{
-    CatalogError, RegulatoryStatus, RetentionBasis, SectorCatalog, SectorDescriptor,
+    CatalogError, DateBasis, Granularity, Instrument, InstrumentBinding, InstrumentCatalog,
+    InstrumentKind, InstrumentStatus, ObligationDate, PassportObligation, RegulatoryStatus,
+    RetentionBasis, SectorCatalog, SectorDescriptor,
 };
 
 pub use domain::{
@@ -37,7 +39,8 @@ pub use domain::{
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_sector_data},
     passport::{
-        FacilitySnapshot, ManufacturerInfo, MaterialEntry, Passport, PassportId, PassportView,
+        FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_WIRE_KEYS, Passport,
+        PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
     product_identity::ProductIdentity,
     sector::{
@@ -45,12 +48,12 @@ pub use domain::{
         CarbonFootprintClass, CarbonFootprintClassError, ConstructionData, DetergentData,
         DeviceType, DynamicPerformance, ElectronicsData, EnergyEfficiencyClass,
         EnvironmentalReading, ExpectedLifetime, FibreEntry, FurnitureData, HarmfulEvents,
-        HazardSymbol, HazardousSubstance, LifecycleStage, MaterialComposition, ProductionRoute,
-        RepairCriterion, RepairabilityScore, Sector, SectorData, StateOfChargeReading,
-        StateOfHealth, SteelData, SurfactantEntry, SvhcSubstance, SystemBoundary, TemperatureRange,
-        TextileData, ToyData, TyreData, UnsoldGoodsDestination, UnsoldGoodsReason,
-        UnsoldGoodsReport, UsageHistory, redact_sector_data, validate_fibre_composition,
-        validate_surfactants, validate_svhc_substances,
+        HazardSymbol, HazardousSubstance, LifecycleStage, MaterialComposition, MattressData,
+        ProductionRoute, RepairCriterion, RepairabilityScore, Sector, SectorData,
+        StateOfChargeReading, StateOfHealth, SteelData, SurfactantEntry, SvhcSubstance,
+        SystemBoundary, TemperatureRange, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
+        UnsoldGoodsReason, UnsoldGoodsReport, UsageHistory, redact_sector_data,
+        validate_fibre_composition, validate_surfactants, validate_svhc_substances,
     },
     status::PassportStatus,
     transfer::{
@@ -75,6 +78,7 @@ pub use ports::compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceRegistry, ComplianceResult,
     ComplianceStatus, ComplianceStrategy, gate_determination,
 };
+pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus,
     RegistrySyncPort,

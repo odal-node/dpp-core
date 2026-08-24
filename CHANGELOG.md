@@ -15,6 +15,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A catalog of the legal instruments themselves, so a product group can be
+  governed by more than one.** `InstrumentCatalog` holds one manifest per act —
+  ten today, from ESPR and the Batteries Regulation to the two horizontal
+  ecodesign acts that are still only announced — each carrying an
+  `InstrumentKind`, an `InstrumentStatus`, the `PassportObligation` it imposes,
+  and one `InstrumentBinding` per product group it reaches.
+
+  `SectorDescriptor` carries a single `regime`, `status`, `dppAppliesFrom` and
+  `retentionYears`, which asserts that exactly one act governs a sector. ESPR
+  Art. 5(7) says otherwise: one delegated act may cover many product groups, a
+  group-specific act may supplement a horizontal one, and the Regulation
+  contains no precedence rule anywhere — so overlapping acts accumulate and
+  each of those fields is a property of an *(act, product group)* pair.
+
+  Bindings are held on the act rather than on the product group because an act
+  can reach a group for which no manifest exists at all. That is not
+  hypothetical: the Commission's preparatory analysis states that the horizontal
+  requirements cover sets of products never shortlisted as product groups, and
+  names light means of transport. There is therefore no total function from a
+  product group to its applicable acts, and the catalog offers lookup over what
+  has been recorded, never a derivation.
+
+  `PassportObligation` is the state the previous model could not express:
+  `Required` with an optional dated `ObligationDate`, `NotRequired` for an act
+  that binds but has no passport article, and `DisplacedBy` for one whose
+  information duty is discharged through another system under ESPR Art. 9(4)(b).
+  With it, "these obligations bind today" and "no passport is owed" are
+  separately representable, which they were not before. `DateBasis` marks every
+  date `sourced` or `assumed`, generalising the `RetentionBasis` distinction —
+  a date inferred from an ecodesign application date had been shipped as a
+  passport date with nothing in the record saying so.
+
+  Folds across an applicable set are unions, never precedence choices: retention
+  is the maximum with assumption contagious, a passport is due on the earliest
+  date any act fixes, and granularity is the most granular any act sets.
+  `Granularity` is new and lives with the act, per ESPR Art. 9(2)(d), with
+  `RegistrationGranularity` now converting from it rather than standing alone.
+
+  **Additive and not yet wired** — `SectorCatalog` remains the record every
+  component resolves against. Where the two disagree, a test pins the divergence
+  set exactly, so a new one fails the build. It names four today, of which two
+  are sector manifests asserting a passport date for an obligation no act
+  imposes.
+
 - **Every schema version this crate claims to support now has a frozen document
   proving it is still readable.** `tests/schema_compat.rs` holds one minimal
   sector-data fixture per `(sector, version)` the registry serves — 28 today —
@@ -62,6 +106,59 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   never about textile.
 
 ### Breaking
+
+- **`SectorDescriptor` no longer carries any law.** *(Breaking: `status`,
+  `regime`, `legalBasis`, `dppAppliesFrom`, `retentionYears` and
+  `retentionYearsBasis` are removed from the descriptor and from every sector
+  manifest; `Regime` is deleted; `SectorCatalog::in_force`, `provisional`,
+  `is_in_force`, `retention_years` and `retention_years_basis` are gone.)*
+
+  Migrate to `InstrumentCatalog`: `is_in_force(key)` becomes
+  `determinable_for(key)`, which returns the `(act, binding)` pairs a
+  determination may be made under rather than a boolean — a determination is
+  always made under a named act, and a caller that only learns "yes" cannot say
+  which act it is asserting against. `retention_years(key)` becomes
+  `retention_for(key)`, returning the maximum across applicable acts with its
+  provenance. There is no replacement for `dppAppliesFrom` on a product group:
+  ask `passport_required_for(key)` and `passport_due_for(key)`, which can now
+  answer "an act binds this, and no act asks it for a passport".
+
+  Every one of the removed fields was singular, which asserts that exactly one
+  act governs a product group. ESPR Art. 5(7) says otherwise and the Regulation
+  has no precedence rule, so acts accumulate.
+
+- **`electronics` and `unsold-goods` no longer claim a passport date, and their
+  schemas say so in the file.** *(Breaking: both manifests lose
+  `dppAppliesFrom`; their schemas gain a `NO PASSPORT OBLIGATION` marker.)*
+
+  `electronics` carried `2025-06-20`, which is Reg. (EU) 2023/1670's
+  **ecodesign** application date under Directive 2009/125/EC — neither that
+  Regulation nor 2023/1669 contains the phrase "digital product passport", and
+  their mechanism is EPREL, which ESPR Art. 9(4)(b) treats as an alternative
+  *to* a passport. `unsold-goods` carried `2026-07-19`, the ESPR Art. 25
+  destruction-ban date for large operators, from two articles containing no
+  passport at all. Because `in_force` gated binding determinations, a node could
+  assert compliance against an obligation that does not exist.
+
+  The schema draft-marker gate asked only "is it in force", which for both of
+  these is *yes*, so neither was flagged. It now asks two questions and has two
+  markers: `DRAFT — NOT IN FORCE` where no act binds the product group, and
+  `NO PASSPORT OBLIGATION` where an act binds it and none requires a passport.
+
+- **Mattresses are their own product group.** *(Breaking: `mattress` is no
+  longer a `productType` value in furniture v1.2.0, nor a furniture
+  `productCategory`; new `Sector::Mattress`, `SectorData::Mattress` and
+  `MattressData`.)*
+
+  ESPR Art. 18 reads "furniture, including mattresses", and the 2025-2030
+  working plan then selects the two separately, with different rankings and
+  different indicative adoption years — so they will be regulated by different
+  delegated acts on different timetables, and a passport cannot be governed by
+  half of furniture's act. Furniture v1.1.0 is kept and still accepts
+  `mattress`, so passports already validated against it remain readable. The new
+  schema is furniture's field set with `productType` removed and **nothing
+  added**: no delegated act exists, so any mattress-specific field would be
+  invented rather than read.
 
 - **The Digital Link URI parser reads GS1's dictionary, and the hand-written AI
   table is gone.** *(Breaking: `AI_TABLE`, `AiDescriptor`, `AiRole` and

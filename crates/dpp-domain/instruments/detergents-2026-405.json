@@ -1,0 +1,22 @@
+{
+  "id": "detergents-2026-405",
+  "title": "Detergents Regulation (EU) 2026/405",
+  "celex": "32026R0405",
+  "kind": "direct",
+  "status": "adopted",
+  "passport": {
+    "obligation": "required",
+    "from": { "date": "2029-09-23", "basis": "assumed" }
+  },
+  "productGroups": [
+    {
+      "productGroup": "detergent",
+      "status": "provisional",
+      "legalBasis": ["Regulation (EU) 2026/405"],
+      "retentionYears": 10,
+      "retentionYearsBasis": "sourced",
+      "notes": "Adopted 2026-02-11, published in the OJ 2026-03-02. Nothing determinable yet. retentionYears is sourced: the Regulation requires 10 years after placing on the market, including in cases of insolvency."
+    }
+  ],
+  "notes": "Two things worth keeping straight. First, the passport date is marked assumed rather than sourced: 2029-09-23 comes from a secondary source and has not been read out of the primary text (CELEX 32026R0405), and until it has it must not be presented as a legal deadline. Second, detergents is a direct instrument, not an ESPR delegated act — it appears in the ESPR Art. 18 statutory priority list but was NOT selected into the 2025-2030 working plan, so no ESPR act is coming for it and this Regulation is the whole of its passport obligation. Consequential difference from every other instrument here: under this Regulation the passport replaces the EU declaration of conformity as the primary means of demonstrating compliance, so a defective passport costs an operator its conformity route rather than one disclosure among several."
+}
