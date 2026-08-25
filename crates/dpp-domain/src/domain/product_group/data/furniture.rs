@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
 
-use super::shared::SvhcSubstance;
+use super::common::SvhcSubstance;
 
 /// Furniture product group data for EU ESPR DPP compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

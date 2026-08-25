@@ -76,9 +76,15 @@ A type has gravity when it has its own `impl` blocks, serde derives beyond a
 plain derive line, or runs to roughly 40 lines including docs. Such a type gets
 its own file, named for it in snake_case: `FacilitySnapshot` → `facility_snapshot.rs`.
 
-A type and its own error enum are *one* concept and belong together. Three or
-more public types in a file is the point at which the file has stopped being
-about one thing.
+A type and its own error enum are *one concept*, so the tripwire does not fire at
+two. Three or more public types in a file is the point at which the file has
+stopped being about one thing.
+
+**That is a statement about counting, not about placement.** Where the error
+actually lives is rule 14's question, and rule 14 wins: once the module has an
+`error.rs`, the error goes there and the two are no longer in one file at all.
+The clause survives for the case where the module has no `error.rs` — a single
+type whose error rides along with it, which is common and fine.
 
 ### Rule 2 — `mod.rs` is a pure index
 

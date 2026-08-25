@@ -8,8 +8,8 @@
 //! ## Module layout
 //!
 //! - [`group`] — the [`ProductGroup`] discriminant.
-//! - [`enums`]   — cross-product group typed enumerations (chemistry, classes, routes).
-//! - [`carbon_footprint`] and [`repairability_score`] — structured environmental metrics.
+//! - [`carbon_footprint`] — the CO₂e declaration and the vocabulary it is stated in.
+//! - [`repairability_score`] — the non-regulatory repairability heuristic.
 //! - [`data`]    — one file per product group + the [`ProductGroupData`] union and `redact_product_group_data`.
 //! - [`validation`] — thin adapters onto `dpp-rules` cross-field validators.
 //!
@@ -18,7 +18,6 @@
 
 pub mod carbon_footprint;
 pub mod data;
-pub mod enums;
 
 pub mod group;
 #[cfg(test)]
@@ -35,22 +34,22 @@ mod serde_tests;
 #[cfg(test)]
 mod tests;
 
-pub use carbon_footprint::CarbonFootprint;
+pub use carbon_footprint::{
+    CarbonFootprint, CarbonFootprintClass, CarbonFootprintClassError, LifecycleStage,
+    SystemBoundary,
+};
 pub use data::unsold_goods::{
     CnCategory, CnCategoryError, DiscardReason, DiscardedProductLine, DiscardedQuantity,
     DisclosingEntity, DisclosureScope, FinancialYear, LegalEntityIdentifier, WasteTreatmentSplit,
 };
 pub use data::{
-    AluminiumData, BatteryData, ConstructionData, CriticalRawMaterial, DetergentData,
-    DynamicPerformance, ElectronicsData, EnvironmentalReading, ExpectedLifetime, FibreEntry,
-    FurnitureData, HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition,
-    MattressData, ProductGroupData, StateOfChargeReading, StateOfHealth, SteelData,
+    AluminiumData, BatteryChemistry, BatteryData, BatteryStatus, BatteryType, ConstructionData,
+    CriticalRawMaterial, DetergentData, DeviceType, DynamicPerformance, ElectronicsData,
+    EnergyEfficiencyClass, EnvironmentalReading, ExpectedLifetime, FibreEntry, FurnitureData,
+    HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, MattressData,
+    ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth, SteelData,
     SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
     UnsoldGoodsReport, UsageHistory, redact_product_group_data,
-};
-pub use enums::{
-    BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
-    DeviceType, EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
 };
 pub use group::ProductGroup;
 pub use repairability_score::{RepairCriterion, RepairabilityScore};

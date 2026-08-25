@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
 
-use super::shared::SvhcSubstance;
+use super::common::SvhcSubstance;
 
 /// Mattress product-group data for EU ESPR DPP compliance.
 ///

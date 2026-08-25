@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::product_group::enums::{CarbonFootprintClass, LifecycleStage, SystemBoundary};
+use super::{CarbonFootprintClass, LifecycleStage, SystemBoundary};
 
 /// Structured carbon footprint declaration — replaces bare `co2e_per_unit: f64`
 /// on [`Passport`](crate::domain::passport::Passport) with provenance-aware,

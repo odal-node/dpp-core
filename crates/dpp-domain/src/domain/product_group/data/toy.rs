@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
 
-use super::shared::SvhcSubstance;
+use super::common::SvhcSubstance;
 
 /// Toy product group data for EU Toy Safety Directive and 2025/2509 DPP compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

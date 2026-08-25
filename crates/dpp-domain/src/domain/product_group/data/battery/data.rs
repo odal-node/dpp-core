@@ -3,7 +3,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::super::shared::CriticalRawMaterial;
+use super::super::common::CriticalRawMaterial;
 use super::dynamic_performance::DynamicPerformance;
 use super::expected_lifetime::ExpectedLifetime;
 use super::hazardous_substance::{HazardSymbol, HazardousSubstance};
@@ -12,7 +12,7 @@ use super::state_of_health::StateOfHealth;
 use super::temperature_range::TemperatureRange;
 use super::usage_history::UsageHistory;
 use crate::domain::gtin::Gtin;
-use crate::domain::product_group::enums::{
+use crate::domain::product_group::{
     BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass,
 };
 

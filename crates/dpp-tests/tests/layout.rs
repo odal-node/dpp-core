@@ -879,7 +879,6 @@ const ERROR_PLACEMENT_BASELINE: &[&str] = &[
     "crates/dpp-domain/src/domain/gtin/gln.rs",
     "crates/dpp-domain/src/domain/gtin/gtin.rs",
     "crates/dpp-domain/src/domain/product_group/data/unsold_goods/cn_category.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/carbon_footprint_class.rs",
     "crates/dpp-domain/src/schemas/lens/transform.rs",
     "crates/dpp-domain/src/schemas/lens/upcast_error.rs",
     "crates/dpp-domain/src/schemas/registration_error.rs",
@@ -894,9 +893,9 @@ const ERROR_PLACEMENT_BASELINE: &[&str] = &[
 ///
 /// A roster, unlike the crate discovery elsewhere in this file, because the claim
 /// is *semantic*: no directory listing reveals that a module is meant to be
-/// shared. `enums` is on it because it is the legacy bucket this rule was drawn
-/// from, and it comes off the day that bucket is dissolved.
-const SHARED_BUCKETS: &[&str] = &["common", "shared", "enums"];
+/// shared. `enums` was on it until that bucket was dissolved on 2026-08-26 —
+/// nine enums, of which one was actually shared.
+const SHARED_BUCKETS: &[&str] = &["common", "shared"];
 
 #[test]
 fn rule_15_shared_means_shared() {
@@ -992,15 +991,4 @@ fn rule_15_shared_means_shared() {
     );
 }
 
-const SHARED_BUCKET_BASELINE: &[&str] = &[
-    "crates/dpp-domain/src/domain/product_group/enums/battery_chemistry.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/battery_status.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/battery_type.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/carbon_footprint_class.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/device_type.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/energy_efficiency_class.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/lifecycle_stage.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/production_route.rs",
-    "crates/dpp-domain/src/domain/product_group/enums/system_boundary.rs",
-    "crates/dpp-rules/src/common/date.rs",
-];
+const SHARED_BUCKET_BASELINE: &[&str] = &["crates/dpp-rules/src/common/date.rs"];

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
 
-use super::shared::SvhcSubstance;
+use super::common::SvhcSubstance;
 
 /// A single fibre entry in a textile product's composition list.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
