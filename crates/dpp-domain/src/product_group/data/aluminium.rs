@@ -25,3 +25,14 @@ pub struct AluminiumData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annual_production_tonnes: Option<f64>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for AluminiumData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// This act defines no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

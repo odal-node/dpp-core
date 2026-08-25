@@ -458,3 +458,15 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_history: Option<Box<UsageHistory>>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for BatteryData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// Annex XIII §1 — the manufacturer's battery model identifier, as it
+    /// appears on the label or in the technical documentation.
+    fn model_identifier(&self) -> Option<&str> {
+        self.battery_model_id.as_deref()
+    }
+}

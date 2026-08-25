@@ -38,3 +38,14 @@ pub struct TyreData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub co2e_per_tyre_kg: Option<f64>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for TyreData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// This act defines no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

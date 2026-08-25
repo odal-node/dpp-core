@@ -93,3 +93,16 @@ impl UnsoldGoodsReport {
             .any(|l| l.units_discarded.estimated || l.weight_kg.estimated)
     }
 }
+
+impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
+    /// A disclosure covers a financial year across many products, so there is no
+    /// single trade item number. The CN categories are on the lines.
+    fn gtin(&self) -> Option<&str> {
+        None
+    }
+
+    /// Arts. 24–25 define no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

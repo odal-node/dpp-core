@@ -24,6 +24,7 @@ pub mod data;
 pub mod group;
 #[cfg(test)]
 mod group_tests;
+pub mod payload;
 pub mod repairability_score;
 
 #[cfg(test)]
@@ -53,4 +54,5 @@ pub use data::{
     UnsoldGoodsReport, UsageHistory, redact_product_group_data,
 };
 pub use group::ProductGroup;
+pub use payload::ProductGroupPayload;
 pub use repairability_score::{RepairCriterion, RepairabilityScore};

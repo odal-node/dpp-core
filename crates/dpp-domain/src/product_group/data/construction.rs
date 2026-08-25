@@ -29,3 +29,14 @@ pub struct ConstructionData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ce_marking: Option<bool>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for ConstructionData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// This act defines no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

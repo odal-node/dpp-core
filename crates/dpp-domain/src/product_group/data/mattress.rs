@@ -58,3 +58,14 @@ pub struct MattressData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_of_life_instructions: Option<String>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for MattressData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// This act defines no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

@@ -31,3 +31,14 @@ pub struct ToyData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repairability_info: Option<String>,
 }
+
+impl crate::product_group::payload::ProductGroupPayload for ToyData {
+    fn gtin(&self) -> Option<&str> {
+        Some(self.gtin.as_str())
+    }
+
+    /// This act defines no model identifier.
+    fn model_identifier(&self) -> Option<&str> {
+        None
+    }
+}

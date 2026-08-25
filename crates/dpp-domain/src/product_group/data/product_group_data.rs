@@ -15,6 +15,7 @@ use super::toy::ToyData;
 use super::tyre::TyreData;
 use super::unsold_goods::UnsoldGoodsReport;
 use crate::product_group::ProductGroup;
+use crate::product_group::payload::ProductGroupPayload;
 
 /// Typed, product group-specific DPP data — replaces the opaque `compliance_data: Value`.
 ///
@@ -253,27 +254,35 @@ impl ProductGroupData {
     /// object for a product group this build has no variant for, so nothing here
     /// can say which of its keys is a model identifier.
     #[must_use]
+    /// Each group answers this in its own file, and
+    /// [`ProductGroupPayload`] gives it no default — so adding a product group
+    /// is still a compile error until someone has read the act and written the
+    /// answer down. That was the exhaustive match's whole purpose; it is now
+    /// enforced next to the data instead of three matches away from it.
     pub fn model_identifier(&self) -> Option<&str> {
+        self.payload()?.model_identifier()
+    }
+
+    /// The payload behind this variant, as the questions it can answer.
+    ///
+    /// One `match` where there were three. [`ProductGroupData::Other`] has no
+    /// typed payload — it is an untyped object for a group this build has no
+    /// variant for — so it answers nothing by having nothing to ask.
+    fn payload(&self) -> Option<&dyn ProductGroupPayload> {
         match self {
-            // Annex XIII §1 — the manufacturer's battery model identifier, as it
-            // appears on the label or in the technical documentation.
-            ProductGroupData::Battery(d) => d.battery_model_id.as_deref(),
-            // No other product group models a model identifier yet. Listed
-            // rather than wildcarded so adding a product group that does is a compile
-            // error here, not a silent "no model design exists" told to a
-            // registry.
-            ProductGroupData::Textile(_)
-            | ProductGroupData::UnsoldGoods(_)
-            | ProductGroupData::Steel(_)
-            | ProductGroupData::Electronics(_)
-            | ProductGroupData::Construction(_)
-            | ProductGroupData::Tyre(_)
-            | ProductGroupData::Toy(_)
-            | ProductGroupData::Aluminium(_)
-            | ProductGroupData::Furniture(_)
-            | ProductGroupData::Mattress(_)
-            | ProductGroupData::Detergent(_)
-            | ProductGroupData::Other { .. } => None,
+            Self::Battery(d) => Some(&**d),
+            Self::Textile(d) => Some(&**d),
+            Self::UnsoldGoods(d) => Some(d),
+            Self::Steel(d) => Some(d),
+            Self::Electronics(d) => Some(d),
+            Self::Construction(d) => Some(d),
+            Self::Tyre(d) => Some(d),
+            Self::Toy(d) => Some(d),
+            Self::Aluminium(d) => Some(d),
+            Self::Furniture(d) => Some(d),
+            Self::Mattress(d) => Some(d),
+            Self::Detergent(d) => Some(d),
+            Self::Other { .. } => None,
         }
     }
 
@@ -283,20 +292,7 @@ impl ProductGroupData {
     /// and an untyped catch-all respectively, neither of which identifies a
     /// trade item the way every other product group does.
     pub fn gtin(&self) -> Option<&str> {
-        match self {
-            ProductGroupData::Battery(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Textile(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Steel(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Electronics(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Construction(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Tyre(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Toy(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Aluminium(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Furniture(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Mattress(d) => Some(d.gtin.as_str()),
-            ProductGroupData::Detergent(d) => Some(d.gtin.as_str()),
-            ProductGroupData::UnsoldGoods(_) | ProductGroupData::Other { .. } => None,
-        }
+        self.payload()?.gtin()
     }
 }
 
