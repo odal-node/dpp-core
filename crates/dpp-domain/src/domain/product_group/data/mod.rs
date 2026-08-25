@@ -10,7 +10,6 @@ pub mod detergent;
 pub mod electronics;
 pub mod furniture;
 pub mod mattress;
-#[allow(clippy::module_inception)]
 pub mod product_group_data;
 pub mod shared;
 pub mod steel;
