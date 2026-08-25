@@ -33,7 +33,7 @@ jobs:
       # toolchain by itself — an action here would add a third-party dependency
       # to a job whose entire purpose is running somebody else's tool, and
       # `@stable` would name a channel this repo does not build against.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
