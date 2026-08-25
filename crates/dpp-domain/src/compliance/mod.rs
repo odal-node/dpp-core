@@ -19,3 +19,8 @@ pub mod passthrough_strategies;
 
 pub use passthrough_registry::PassthroughRegistry;
 pub use passthrough_strategies::{PassthroughBatteryStrategy, PassthroughTextileStrategy};
+
+#[cfg(test)]
+mod passthrough_registry_tests;
+#[cfg(test)]
+mod passthrough_strategies_tests;
