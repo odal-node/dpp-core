@@ -39,14 +39,27 @@ assert_eq!(battery.key, "battery");
 let policy = ProductGroupAccessPolicy::for_schema_version("battery", &battery.current_schema_version)
     .expect("the current battery schema classifies every property");
 
-let full = json!({ "productName": "EcoCell", "stateOfHealthPct": 87.5 });
+// A passport: envelope fields, with the product group's own data nested under
+// `productGroupData`. The nesting is not decoration — a product group's schema
+// classifies its own payload and has no authority over the envelope around it.
+let full = json!({
+    "productName": "EcoCell",
+    "productGroupData": { "productGroup": "battery", "stateOfHealthPct": 87.5 }
+});
 let public = filter_by_audience(&full, &policy, Audience::Public);
 
 // State of health is Annex XIII point 4 — data about one individual battery,
 // reserved to holders of a legitimate interest and withheld from the public.
 assert_eq!(public.filtered_data["productName"], "EcoCell");
-assert!(public.filtered_data.get("stateOfHealthPct").is_none());
+assert!(public.filtered_data["productGroupData"].get("stateOfHealthPct").is_none());
 ```
+
+To filter a bare product-group payload — a document already inside
+`productGroupData`, which is how a two-pass caller handles the two halves
+separately — use `filter_by_audience_in_scope` and pass
+`DocumentScope::ProductGroupData`. Filtering a payload as an envelope applies
+none of the product group's classes, so every restricted field in it would be
+served.
 
 ## Relationship to other crates
 

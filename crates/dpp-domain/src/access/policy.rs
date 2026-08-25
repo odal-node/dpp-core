@@ -13,13 +13,19 @@ use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, ProductGroupCatalog};
 /// `disassembly_instructions` — closing the casing/nesting drift that let
 /// restricted fields leak to the public audience.
 ///
-/// **Caution — leaf matching is path-insensitive.** A policy key matches that
-/// leaf *wherever* it appears, at any depth. Do **not** restrict a generic leaf
-/// name shared across objects (e.g. `name`, `value`, `country`, `address`): such
-/// a key would redact `facility.address` *and* `manufacturer.address` alike,
-/// over-redacting Annex III public fields. Use only specific, unambiguous field
-/// names (e.g. `dueDiligenceUrl`, `svhcSubstances`). Gating a shared leaf on a
-/// single path would require making the matcher path-aware first.
+/// **Caution — leaf matching is path-insensitive *within a scope*.** A policy
+/// key matches that leaf wherever it appears at any depth of the scope it
+/// governs. Do **not** restrict a generic leaf name shared across objects (e.g.
+/// `name`, `value`, `country`, `address`): such a key would redact
+/// `facility.address` *and* `manufacturer.address` alike, over-redacting Annex
+/// III public fields. Use only specific, unambiguous field names (e.g.
+/// `dueDiligenceUrl`, `svhcSubstances`).
+///
+/// What *is* bounded is the scope: a class drawn from a product group's schema
+/// no longer reaches the passport envelope, so a product group cannot reclassify
+/// an envelope field by declaring a property of the same name. See
+/// [`DocumentScope`]. Gating a shared leaf on a single **path** would still
+/// require a path matcher, which this is not.
 ///
 /// A schema cannot get this wrong quietly: `access::tests`'
 /// `no_schema_declares_one_field_name_in_two_classes` fails the build if one
@@ -38,9 +44,30 @@ pub struct ProductGroupAccessPolicy {
     pub name: String,
     /// The product group this policy applies to.
     pub product_group: String,
-    /// Map of JSON field name → disclosure class. A listed field is matched
-    /// wherever it appears in the document (any nesting depth), by normalized key.
+    /// Map of JSON field name → disclosure class, **scoped to the product
+    /// group's own data**.
+    ///
+    /// Built from the product group's schema, so its keys describe the contents
+    /// of `productGroupData` and nothing else. It is consulted only for keys at
+    /// or below that field — see [`DocumentScope`].
+    ///
+    /// It used to be consulted for *every* key at every depth, which meant a
+    /// product group's classes were applied to the passport envelope as well.
+    /// A field on the envelope whose nested key name happened to match a schema
+    /// property inherited that property's class: an envelope timestamp named
+    /// `recordedAt` was stripped from every public battery projection, because
+    /// the battery schema declares its own `recordedAt` as individual-tier data.
+    /// The names come from a schema that never described the envelope, so
+    /// applying them there was never right.
     pub field_disclosure: HashMap<String, Disclosure>,
+    /// Map of JSON field name → disclosure class that applies **anywhere** in
+    /// the document.
+    ///
+    /// Envelope fields and universal conformity evidence: names that are not a
+    /// product group's to define, and that mean the same thing wherever they
+    /// appear. A signature is conformity evidence at any depth.
+    #[serde(default)]
+    pub envelope_disclosure: HashMap<String, Disclosure>,
     // NOTE: `ProductGroupAccessPolicy::from_schema` below reads the same classes out
     // of a *versioned* schema. Prefer it — see its doc comment.
     /// Class applied to fields **not** listed in `field_disclosure`. Defaults
@@ -53,6 +80,34 @@ pub struct ProductGroupAccessPolicy {
 
 fn disclosure_public() -> Disclosure {
     Disclosure::Public
+}
+
+/// Where in a passport document a key sits, which decides whose classes apply.
+///
+/// A passport is two documents in one envelope: the fields every passport has,
+/// and one product group's payload under `productGroupData`. Their field names
+/// come from different places and are governed by different authorities — the
+/// envelope's by this crate, the payload's by that product group's schema — and
+/// nothing stops the two from choosing the same word.
+///
+/// They did. A schema-derived class was applied to any key of that name at any
+/// depth, so an envelope field called `recordedAt` was withheld from the public
+/// because *battery* declares a `recordedAt` as individual-tier data. The
+/// document was then unreadable, which is how it was noticed; the same collision
+/// on a field the reader does not immediately need would simply have gone
+/// missing.
+///
+/// Deliberately a two-value scope rather than a full path matcher. The claim
+/// being enforced is only that a product group's vocabulary stops at its own
+/// payload — which is where the schema's authority stops — and a boundary
+/// nobody has to write paths for cannot be written wrongly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DocumentScope {
+    /// A passport envelope field. Only universally-scoped classes apply.
+    Envelope,
+    /// At or below `productGroupData`, where the product group's schema governs.
+    ProductGroupData,
 }
 
 /// Whether `a` and `b` are equal for field-matching purposes once both are
@@ -83,6 +138,14 @@ const COMMON_CONFORMITY: &[&str] = &[
     "auditHistory",
     "supplyChainTrace",
 ];
+
+/// [`COMMON_CONFORMITY`] as a map, for the universally-scoped half of a policy.
+fn common_conformity() -> HashMap<String, Disclosure> {
+    COMMON_CONFORMITY
+        .iter()
+        .map(|field| ((*field).to_owned(), Disclosure::Conformity))
+        .collect()
+}
 
 /// Parse one `x-disclosure` token. `None` for anything outside the four classes.
 fn parse_disclosure(token: &str) -> Option<Disclosure> {
@@ -195,16 +258,12 @@ impl ProductGroupAccessPolicy {
     )]
     pub fn from_catalog(catalog: &ProductGroupCatalog, product_group_key: &str) -> Option<Self> {
         let descriptor = catalog.get(product_group_key)?;
-        let mut field_disclosure: HashMap<String, Disclosure> = descriptor.disclosure.clone();
-        for field in COMMON_CONFORMITY {
-            field_disclosure
-                .entry((*field).to_owned())
-                .or_insert(Disclosure::Conformity);
-        }
+        let field_disclosure: HashMap<String, Disclosure> = descriptor.disclosure.clone();
         Some(Self {
             name: format!("{product_group_key}-{}", descriptor.current_schema_version),
             product_group: product_group_key.to_owned(),
             field_disclosure,
+            envelope_disclosure: common_conformity(),
             default_disclosure: Disclosure::Public,
         })
     }
@@ -269,16 +328,11 @@ impl ProductGroupAccessPolicy {
         let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
         collect_disclosures(&schema, &mut field_disclosure);
 
-        for field in COMMON_CONFORMITY {
-            field_disclosure
-                .entry((*field).to_owned())
-                .or_insert(Disclosure::Conformity);
-        }
-
         Some(Self {
             name: format!("{product_group_key}-{version}"),
             product_group: product_group_key.to_owned(),
             field_disclosure,
+            envelope_disclosure: common_conformity(),
             default_disclosure: Disclosure::Public,
         })
     }
@@ -301,21 +355,56 @@ impl ProductGroupAccessPolicy {
     /// attaches the publish-time proof to it reintroduces exactly the divergence
     /// this invariant exists to prevent, for these fields and any future one.
     pub fn passport_default() -> Self {
-        let mut field_disclosure = HashMap::new();
+        let mut envelope_disclosure = common_conformity();
         for (field, class) in PASSPORT_FIELD_DISCLOSURE {
-            field_disclosure.insert((*field).to_owned(), *class);
+            envelope_disclosure.insert((*field).to_owned(), *class);
         }
         Self {
             name: "passport-v1.0".into(),
             product_group: "passport".into(),
-            field_disclosure,
+            // No product group's schema is in play here, so there is nothing
+            // this policy could say about a payload it cannot identify.
+            field_disclosure: HashMap::new(),
+            envelope_disclosure,
             default_disclosure: Disclosure::Public,
         }
+    }
+
+    /// Get the disclosure class for a key, given where in the document it sits.
+    ///
+    /// The scope decides which map is consulted, and that is the whole point:
+    /// [`DocumentScope::Envelope`] never reaches the product group's schema
+    /// classes, because those names describe `productGroupData` and were only
+    /// ever meaningful there.
+    ///
+    /// Both scopes consult [`Self::envelope_disclosure`]. Those names — a
+    /// signature, an audit trail — are not a product group's to define and mean
+    /// the same thing at any depth, so a product-group payload cannot reclassify
+    /// one by declaring a property with the same name.
+    #[must_use]
+    pub fn disclosure_for_key(&self, key: &str, scope: DocumentScope) -> Disclosure {
+        let scoped = match scope {
+            DocumentScope::ProductGroupData => Some(&self.field_disclosure),
+            DocumentScope::Envelope => None,
+        };
+        scoped
+            .into_iter()
+            .chain(std::iter::once(&self.envelope_disclosure))
+            .flat_map(|map| map.iter())
+            .filter(|(k, _)| keys_match_normalized(k, key))
+            .map(|(_, d)| *d)
+            .reduce(Disclosure::most_restrictive)
+            .unwrap_or(self.default_disclosure)
     }
 
     /// Get the disclosure class for a field, matched by normalized key name
     /// (case/separator-insensitive). Unlisted fields fall back to
     /// `default_disclosure`.
+    ///
+    /// Answers for a key **inside the product group's data**, which is the scope
+    /// its classes were written for. Prefer [`Self::disclosure_for_key`] and say
+    /// which scope you mean; this is kept because asking "what class does this
+    /// product group give this field" is a legitimate question on its own.
     ///
     /// **Deterministic when more than one key matches.** `field_disclosure` is
     /// keyed by the literal name but matched after normalization, so two
@@ -329,12 +418,8 @@ impl ProductGroupAccessPolicy {
     ///
     /// So every match is considered and the **most restrictive** wins. Ambiguity
     /// resolves the safe way, and it resolves the same way every time.
+    #[must_use]
     pub fn disclosure_for_field(&self, field_name: &str) -> Disclosure {
-        self.field_disclosure
-            .iter()
-            .filter(|(k, _)| keys_match_normalized(k, field_name))
-            .map(|(_, d)| *d)
-            .reduce(Disclosure::most_restrictive)
-            .unwrap_or(self.default_disclosure)
+        self.disclosure_for_key(field_name, DocumentScope::ProductGroupData)
     }
 }
