@@ -64,13 +64,24 @@ pub mod instrument_catalog;
 pub mod instrument_kind;
 pub mod instrument_ref;
 pub mod instrument_status;
+pub mod obligation_date;
 pub mod passport_obligation;
 
 pub mod retention;
 pub mod status;
 
 #[cfg(test)]
+mod instrument_axis_tests;
+#[cfg(test)]
+mod instrument_kind_tests;
+#[cfg(test)]
+mod instrument_ref_tests;
+#[cfg(test)]
 mod instrument_tests;
+#[cfg(test)]
+mod parity_tests;
+#[cfg(test)]
+mod passport_obligation_tests;
 #[cfg(test)]
 mod tests;
 
@@ -84,7 +95,8 @@ pub use instrument_catalog::InstrumentCatalog;
 pub use instrument_kind::InstrumentKind;
 pub use instrument_ref::{InstrumentRef, RecordedBasis};
 pub use instrument_status::InstrumentStatus;
-pub use passport_obligation::{DateBasis, ObligationDate, PassportObligation};
+pub use obligation_date::{DateBasis, ObligationDate};
+pub use passport_obligation::PassportObligation;
 
 pub use retention::RetentionBasis;
 pub use status::RegulatoryStatus;

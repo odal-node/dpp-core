@@ -5,7 +5,7 @@ use super::error::CatalogError;
 use super::granularity::Granularity;
 use super::instrument::Instrument;
 use super::instrument_ref::InstrumentRef;
-use super::passport_obligation::ObligationDate;
+use super::obligation_date::ObligationDate;
 use super::retention::RetentionBasis;
 
 struct EmbeddedInstrument {
