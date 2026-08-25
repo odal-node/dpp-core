@@ -289,7 +289,11 @@ fn fail_closed_default_disclosure_blocks_unlisted_fields() {
     let policy = ProductGroupAccessPolicy {
         name: "strict-policy".into(),
         product_group: "test".into(),
-        field_disclosure: {
+        // `productName` and `co2ePerUnit` are passport envelope fields, so they
+        // are classified in the envelope scope — the one the flat document below
+        // sits in. A product group's schema has no say over either.
+        field_disclosure: HashMap::new(),
+        envelope_disclosure: {
             let mut m = HashMap::new();
             m.insert("productName".into(), Disclosure::Public);
             m.insert("co2ePerUnit".into(), Disclosure::Public);

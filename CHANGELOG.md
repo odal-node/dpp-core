@@ -107,6 +107,37 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A product group's disclosure classes stop at its own payload.** *(Breaking:
+  `ProductGroupAccessPolicy` gains `envelope_disclosure` and the schema-derived
+  `field_disclosure` is now scoped; `disclosure_for_key` takes a
+  `DocumentScope`; `filter_by_audience` filters a **whole passport**, and a bare
+  product-group payload needs `filter_by_audience_in_scope`.)*
+
+  The filter classified every key by bare name at every depth, against a policy
+  built from the product group's schema. Those names describe the contents of
+  `productGroupData`, so applying them to the passport envelope meant a product
+  group could reclassify an envelope field by declaring a property of the same
+  name. It did: an envelope timestamp called `recordedAt` was stripped from every
+  public battery projection, because the battery schema declares its own
+  `recordedAt` as individual-tier data (Annex XIII point 4). The redacted
+  document then failed to deserialise, which is the only reason anyone noticed —
+  the same collision on a field the reader does not immediately need would have
+  gone missing in silence.
+
+  **Verified against every product group and audience before and after.** The set
+  of redacted paths is byte-identical across all thirteen product groups and all
+  three audiences, except the one envelope path that should never have been
+  redacted. Leaf matching *within* a scope is unchanged and still
+  path-insensitive, so a generic name is still a poor thing to restrict.
+
+  ⚠️ **Callers filtering a bare payload must say so.** The root scope cannot be
+  inferred — a payload and an envelope are both JSON objects — and filtering a
+  payload as an envelope applies none of its product group's classes, serving
+  every restricted field in it. That failure compiles and returns a plausible
+  body, so it is guarded by a test that asserts an Annex XIII point 2 field is
+  absent from the public bytes, and that test was confirmed to fail when the
+  scope is wrong.
+
 - **A passport records the acts it was issued under.** *(Breaking: two new
   `Passport` fields, `applicableInstruments` and `granularity`;
   `PASSPORT_WIRE_KEYS` goes 32 → 34. Both default on deserialise, so a stored
