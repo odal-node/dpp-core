@@ -73,10 +73,11 @@ const EMBEDDED: &[EmbeddedInstrument] = &[
 ///
 /// # Status
 ///
-/// Additive and not yet wired: [`ProductGroupCatalog`](super::ProductGroupCatalog) remains
-/// the record every component resolves against. Where the two disagree today,
-/// the disagreement is pinned by test, so a new divergence fails rather than
-/// accumulating silently.
+/// Wired and authoritative for law. Status, legal basis, passport obligation,
+/// dates, retention and granularity left
+/// [`ProductGroupDescriptor`](super::ProductGroupDescriptor) entirely, so there
+/// is no second copy to drift from — a question about what binds a product group
+/// has exactly one place to be asked.
 pub struct InstrumentCatalog {
     entries: Vec<Instrument>,
 }

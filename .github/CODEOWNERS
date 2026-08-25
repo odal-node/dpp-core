@@ -35,7 +35,7 @@ crates/dpp-domain/                  @odal-node/maintainers
 crates/dpp-plugin-traits/           @odal-node/maintainers
 
 # -----------------------------------------------------------------------------
-# Schemas — versioned sector schemas are a public contract
+# Schemas — versioned product-group schemas are a public contract
 # -----------------------------------------------------------------------------
 crates/dpp-domain/schemas/          @odal-node/maintainers
 

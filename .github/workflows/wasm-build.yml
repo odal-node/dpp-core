@@ -53,42 +53,22 @@ jobs:
         with:
           key: wasm-plugins
 
-      - name: Build sector-textile
-        working-directory: plugins/sector-textile
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-steel
-        working-directory: plugins/sector-steel
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-battery
-        working-directory: plugins/sector-battery
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-electronics
-        working-directory: plugins/sector-electronics
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-construction
-        working-directory: plugins/sector-construction
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-tyre
-        working-directory: plugins/sector-tyre
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-toy
-        working-directory: plugins/sector-toy
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-aluminium
-        working-directory: plugins/sector-aluminium
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-furniture
-        working-directory: plugins/sector-furniture
-        run: cargo build --target wasm32-wasip1 --release
-
-      - name: Build sector-detergent
-        working-directory: plugins/sector-detergent
-        run: cargo build --target wasm32-wasip1 --release
+      # Discovered rather than listed. The ten steps that used to stand here
+      # named `plugins/sector-*` and went stale the moment the directories were
+      # renamed — and because this workflow only runs against `main`/`develop`,
+      # nothing on a feature branch could notice. Mirrors `just test-plugins`.
+      - name: Build every plugin (wasm32-wasip1)
+        run: |
+          set -euo pipefail
+          built=0
+          for plugin in plugins/product-group-*; do
+            [ -f "$plugin/Cargo.toml" ] || continue
+            echo "::group::$plugin"
+            (cd "$plugin" && cargo build --target wasm32-wasip1 --release)
+            echo "::endgroup::"
+            built=$((built + 1))
+          done
+          # A glob that matches nothing would leave this job green having built
+          # nothing at all, which is the failure this step replaced.
+          [ "$built" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+          echo "Built $built plugins."
