@@ -4,11 +4,71 @@ Where code goes in this repository, and what enforces it.
 
 This is a standard, not a plan. Every rule below is either **enforced** by a
 tripwire in `crates/dpp-tests/tests/` or explicitly marked **guidance**. There is
-no third category, on purpose — see §4.
+no third category, on purpose — see §5.
+
+§1 says which module a thing belongs in. §2 says how that module is arranged
+internally. They answer different questions and a file has to satisfy both.
 
 ---
 
-## 1. The rules
+## 1. The scope law
+
+Every module sits in exactly one of four tiers. A module's tier is a property of
+**what it does**, not of what it contains, and **imports may only point up the
+ladder**.
+
+| Tier | Name | Does | May import |
+|---|---|---|---|
+| 1 | vocabulary | Names things. Decides nothing. | nothing in this crate |
+| 2 | model | Records what is true. | tier 1, and tier 2 acyclically |
+| 3 | policy | Decides something. | tiers 1–2 |
+| 4 | ports | States what the outside must provide. | tiers 1–3 |
+
+**Nothing may import tier 4.** Adapters live in the platform repository and are
+already outside this crate; every `impl …Port for` in the workspace is there.
+
+`error/` sits **above** the ladder rather than inside it. It is the one module
+that may name a type from any tier, because a crate-wide error has to be able to
+carry any of them.
+
+### Why a ladder and not a diagram
+
+The tiers exist to make one question answerable without argument: *when two
+modules refer to each other, which direction is the mistake?* Undirected cycles
+cannot answer it — every cycle has a wrong edge and a right one, and with no law
+you can only report that a cycle exists. That is why an earlier review of this
+crate concluded a module split was unavailable: it measured cycles without a rule
+for which way they should have run.
+
+With the ladder, the wrong direction is named and the count is small. Measured
+against `main` on 2026-08-25: 129 production import edges between top-level
+modules, **five illegal**, four of them on one type.
+
+### Rule 0 — a type lives under `ports/<x>/` only if that port is its sole consumer
+
+This is the test for whether something is really tier 4.
+
+`ArchiveReceipt` passes: nothing but `ArchivePort` touches it, so it belongs
+beside the trait. `SealedEnvelope` and `ComplianceResult` fail — both are fields
+on `Passport`, so filing them under `ports/` puts a tier-2 aggregate in the
+position of importing tier 4. They are model values that were misfiled, and
+moving the *types* fixes it without touching the aggregate.
+
+**An aggregate keeps its own invariants.** Enforcing them is what an aggregate is
+for, and moving that logic out to satisfy a layer diagram produces an anaemic
+model — a worse fault than the one being fixed, and an invisible one, because
+everything still compiles. What an aggregate may not do is depend on a *service*:
+a registry, a repository, a client. So the cut is at the dependency, never at the
+method.
+
+**Factories are exempt.** An associated function that constructs the type may
+consult a tier-3 service — `Passport::from_stored(doc, &LensRegistry, &Catalog)`
+applies schema lenses to rehydrate a stored record, and that is construction, not
+behaviour. The exemption is written down because a naive tripwire would flag it.
+
+---
+
+## 2. The rules
 
 ### Rule 1 — one public type per file, when the type has gravity
 
@@ -29,7 +89,7 @@ a new type into its own named file as a module grows.
 ### Rule 3 — free functions group by verb-domain *(guidance)*
 
 `validation/batch.rs`, not one file per three-line helper. **Not enforced**, and
-deliberately so — see §4.
+deliberately so — see §5.
 
 ### Rule 4 — a `tests.rs` splits when it passes 400 lines
 
@@ -87,9 +147,62 @@ is wrong.
 > not run because someone forgot an entry is a worse failure than a flat
 > directory. Auto-discovery is the safer property; the name does the grouping.
 
+### Rule 11 — one file for a concept; two files means a directory
+
+A concept that fits in one file is a file. The moment it needs a second — an
+error type, a test file, a helper — it becomes a directory:
+
+```
+<concept>/
+├── mod.rs        pure index (rule 2)
+├── error.rs      its errors (rule 14), present iff it has any
+├── tests.rs      or tests/ once it passes 400 lines (rule 4)
+└── <part>.rs     one file per public type with gravity (rule 1)
+```
+
+**The rule then applies to that directory too, at every depth.** `identifier/` is
+not a folder of loose files: `gtin/`, `gln/` and `commodity_code/` are each their
+own module in this shape, and `gtin/` holds `check_digit.rs` inside it.
+
+This is the shape `regex-automata/src/meta/` and `tokio/src/sync/` both use, and
+it is what makes a module skimmable without opening it: the same four names
+appear in every directory, so anything else in the listing is the actual subject.
+
+### Rule 12 — a file never repeats the name of its directory
+
+The path is already the namespace. `battery/data.rs` reads `battery::data` at
+every call site; `battery/battery_data.rs` reads `battery::battery_data` and says
+the word twice forever.
+
+Applies to directories too: `ghosts/archive.rs`, not `ghosts/ghost_archive.rs`.
+
+### Rule 13 — hyphens outside module paths, underscores inside
+
+Crate directories, plugin directories and data directories take `-`
+(`crates/dpp-domain/`, `product-groups/`, `schemas/unsold-goods/`), as do data
+files (`unsold-goods.json`). Module directories and every `.rs` file take `_`.
+
+The split is not taste. A directory under `src/` **is** a Rust identifier, and
+identifiers cannot contain a hyphen — `mod product-group;` does not parse.
+Reaching a hyphenated directory needs `#[path = "…"]` on every module, which
+breaks editor navigation for no gain.
+
+So the same concept is correctly spelled two ways, and both are already in the
+tree: `dpp-domain/product-groups/` is data on disk, `dpp-aas/src/product_groups/`
+is a module path.
+
+### Rule 14 — a module's errors live in its `error.rs`
+
+Not in the type's own file, and not in a crate-wide error bucket. A module's
+failure modes are part of its contract and should be readable in one file without
+reading the module.
+
+The single exception is the crate-wide `error/`, which sits above the tiers (§1)
+and carries `DppError` and the field-error types.
+
 ---
 
-## 2. Deviations are legal, and counted
+## 3. Deviations are legal, and counted
 
 Any file that knowingly breaks an enforced rule carries a marker on its own line:
 
@@ -106,7 +219,7 @@ with a *counted* escape hatch survives.
 
 ---
 
-## 3. What enforces what
+## 4. What enforces what
 
 Every enforced rule but rule 2 lives in `crates/dpp-tests/tests/layout.rs`, one
 `#[test]` each, sharing one directory walk. Rule 2 keeps its own file because it
@@ -122,10 +235,27 @@ predates the rest and works.
 | 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
 | 10 | — | *guidance only* |
+| 0 | `layout::tier_imports_point_up` | a module imports a higher tier |
+| 11 | `layout::rule_11_an_outgrown_concept_is_a_directory` | two files in one directory share a stem prefix (`gtin.rs` beside `gtin_check_digit.rs`) |
+| 12 | `layout::rule_12_no_name_repeats_its_directory` | a filename begins with its parent directory's name |
+| 13 | `layout::rule_13_hyphens_outside_module_paths` | a `-` appears under `src/`, or a `_` in a crate or data directory |
+| 14 | `layout::rule_14_errors_live_in_error_rs` | a `pub enum …Error` is declared outside an `error.rs` |
 
 The set of crates and plugins each one scans is **discovered from the directory
 tree**, not listed. A hardcoded roster is how a new crate ends up silently
 unchecked, which is the failure these tests exist to prevent.
+
+> **Rules 0 and 11–14 are new in this pull request and their tests land in the
+> next commit on the same branch.** Until they do, this document names five gates
+> that do not exist, which is exactly the third category §5 says must not exist.
+> **This branch does not merge in that state** — the rules and their tripwires
+> arrive together or the rules come back out.
+>
+> Rule 11's gate is a proxy, in the same sense rule 1's is. A test cannot tell
+> whether two files are one concept; it can tell that `gtin.rs` sits beside
+> `gtin_check_digit.rs`, which is what an outgrown concept looks like from the
+> outside. The rule is larger than the gate and the document says so rather than
+> pretending otherwise.
 
 **Rule 1's tripwire is a proxy, not the rule.** It fires at three public types
 because a type plus its error is idiomatic and should not need a marker. Two
@@ -146,7 +276,7 @@ entry a marker has to state a reason.
 
 ---
 
-## 4. Why every rule is either enforced or labelled guidance
+## 5. Why every rule is either enforced or labelled guidance
 
 This standard existed before this document, in five numbered rules. Exactly one
 of them had a test. That rule had **zero** violations. Every other rule had
@@ -172,9 +302,29 @@ nobody knows is wired up.
 
 ---
 
-## 5. Scope
+## 6. Scope
 
-These rules govern `crates/*/src/`, `plugins/*/src/`, and
-`crates/dpp-tests/tests/`. They are invisible to consumers: every move is
-internal, with `pub use` in `lib.rs` preserving public paths. A layout change
-that alters the public API is not a layout change.
+§2's rules govern `crates/*/src/`, `plugins/*/src/`, and
+`crates/dpp-tests/tests/`. §1's scope law governs the same trees. Rule 13 reaches
+wider than either, because it is about directory names rather than code: it also
+governs `crates/`, `plugins/`, and the data directories beside them.
+
+### Most layout changes are invisible. The scope law is not.
+
+A move within a module is internal, and `pub use` in `lib.rs` keeps the public
+path steady. That holds for rules 1–14 and it is the normal case.
+
+**§1 is the exception, and deliberately so.** Placing a module in its tier can
+mean it stops being where it was — dissolving a wrapper module renames every path
+beneath it, and `dpp-engine` reaches 98 distinct paths into this crate, most of
+them deep. Those break.
+
+That is a real cost and it is accepted rather than hidden. Compatibility
+re-exports would keep it quiet, and they are refused on purpose: two ways to
+reach the same type is the condition this standard exists to end, and a shim
+outlives its migration by years. The crate has no external users, so the break is
+paid once, mechanically, with the consumer updated in the same change.
+
+**A tier move is therefore a breaking change and is versioned as one.** A layout
+change that alters the public API for any *other* reason is still not a layout
+change.
