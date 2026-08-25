@@ -13,5 +13,5 @@ pub mod policy;
 #[cfg(test)]
 mod tests;
 
-pub use filter::{PolicyDecision, filter_by_audience};
-pub use policy::ProductGroupAccessPolicy;
+pub use filter::{PolicyDecision, filter_by_audience, filter_by_audience_in_scope};
+pub use policy::{DocumentScope, ProductGroupAccessPolicy};

@@ -12,7 +12,20 @@
 
 use chrono::Utc;
 use dpp_domain::Disclosure;
-use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
+
+/// Every case here filters a **bare textile payload** — a document already
+/// inside `productGroupData`, which is the second of the two passes the resolver
+/// makes. Said explicitly: a payload filtered as an envelope would have none of
+/// the product group's classes applied and would serve every restricted field.
+fn filter_by_audience(
+    data: &serde_json::Value,
+    policy: &ProductGroupAccessPolicy,
+    audience: dpp_domain::Audience,
+) -> dpp_domain::access::PolicyDecision {
+    filter_by_audience_in_scope(data, policy, audience, DocumentScope::ProductGroupData)
+}
+
 use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::{
     Audience, CredentialBuilder, CredentialRole, CredentialStatus, VerificationResult,

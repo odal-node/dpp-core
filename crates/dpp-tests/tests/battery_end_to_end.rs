@@ -16,7 +16,7 @@
 use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
 use dpp_digital_link::DigitalLink;
-use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
 use dpp_domain::domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
@@ -238,6 +238,8 @@ fn gs1_digital_link_parsing_for_battery() {
 #[test]
 fn recycler_credential_unlocks_professional_battery_fields() {
     let passport = make_battery_passport();
+    // The battery *payload*, extracted from the passport — so it is filtered in
+    // the product-group scope, which is where its schema's classes apply.
     let battery_fields =
         serde_json::to_value(passport.product_group_data.as_ref().unwrap()).unwrap();
 
@@ -245,7 +247,12 @@ fn recycler_credential_unlocks_professional_battery_fields() {
         .expect("battery in catalog");
 
     // ── Public audience ─────────────────────────────────────────────────────
-    let public = filter_by_audience(&battery_fields, &policy, Audience::Public);
+    let public = filter_by_audience_in_scope(
+        &battery_fields,
+        &policy,
+        Audience::Public,
+        DocumentScope::ProductGroupData,
+    );
     // Public sees the basics...
     assert!(public.filtered_data.get("gtin").is_some());
     assert!(public.filtered_data.get("batteryChemistry").is_some());
@@ -286,7 +293,12 @@ fn recycler_credential_unlocks_professional_battery_fields() {
 
     if let VerificationResult::Valid { audience, .. } = &result {
         assert_eq!(*audience, Audience::LegitimateInterest);
-        let pro = filter_by_audience(&battery_fields, &policy, *audience);
+        let pro = filter_by_audience_in_scope(
+            &battery_fields,
+            &policy,
+            *audience,
+            DocumentScope::ProductGroupData,
+        );
         assert!(pro.filtered_data.get("dueDiligenceUrl").is_some());
         assert!(pro.filtered_data.get("criticalRawMaterials").is_some());
         assert!(pro.filtered_data.get("cathodeMaterial").is_some());
