@@ -1,5 +1,5 @@
 name: Feature / regulatory request
-description: Propose a change to dpp-core (new sector, schema, standard, or API)
+description: Propose a change to dpp-core (new product group, schema, standard, or API)
 labels: [enhancement]
 body:
   - type: markdown

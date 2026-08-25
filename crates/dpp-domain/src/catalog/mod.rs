@@ -7,7 +7,7 @@
 //!
 //! [`ProductGroupCatalog`] is the single source of truth for *what product groups
 //! exist*. Unlike a closed `enum` they are described by **data** — one embedded
-//! manifest per group at `crates/dpp-domain/product groups/{key}.json` — and new ones
+//! manifest per group at `crates/dpp-domain/product-groups/{key}.json` — and new ones
 //! can be added at runtime via [`ProductGroupCatalog::register`] without recompiling.
 //!
 //! Each [`ProductGroupDescriptor`] ties together a group's canonical key, schema
@@ -33,13 +33,16 @@
 //! It exists because a product group's law does not fit on the product group. ESPR Art. 5(7)
 //! lets acts overlap with no precedence rule between them, so the applicable set
 //! is a set; and an act may reach a product group we hold no manifest for, so
-//! the reach has to be recorded on the act. `ProductGroupDescriptor`'s singular
-//! `regime`, `status`, `dppAppliesFrom` and `retentionYears` each assume one act
-//! governs one product group, which is what this catalog stops assuming.
+//! the reach has to be recorded on the act. `ProductGroupDescriptor` used to
+//! carry a singular `regime`, `status`, `dppAppliesFrom` and `retentionYears`,
+//! each of which assumes one act governs one product group — which is what this
+//! catalog stops assuming.
 //!
-//! **Not yet wired.** [`ProductGroupCatalog`] remains the record every component
-//! resolves against. Where the two disagree, the divergence is pinned by test so
-//! a new one fails rather than accumulating quietly.
+//! **This is where the law lives.** Those fields are gone from
+//! [`ProductGroupDescriptor`], so the two catalogs no longer overlap and cannot
+//! disagree: the product-group catalog answers *what groups exist and how we
+//! serve them*, this one answers *what binds them*. Anything asking whether an
+//! obligation applies must come here.
 //!
 //! - [`granularity`] — [`Granularity`], the model/batch/item level an act fixes.
 //! - [`instrument_kind`] — [`InstrumentKind`], *what kind* of act.
