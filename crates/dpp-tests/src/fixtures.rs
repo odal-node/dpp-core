@@ -123,3 +123,50 @@ pub fn make_subject(
         product_categories: vec![],
     }
 }
+
+/// A minimal, well-formed unsold-goods disclosure in the Annex I shape of
+/// Commission Implementing Regulation (EU) 2026/2.
+///
+/// One line, a treatment split totalling 100, and a CN heading outside Annex II
+/// so the depth lint stays quiet.
+#[must_use]
+pub fn unsold_goods_report() -> dpp_domain::UnsoldGoodsReport {
+    use chrono::NaiveDate;
+    use dpp_domain::{
+        CnCategory, DiscardReason, DiscardedProductLine, DiscardedQuantity, DisclosingEntity,
+        DisclosureScope, FinancialYear, LegalEntityIdentifier, UnsoldGoodsReport,
+        WasteTreatmentSplit,
+    };
+
+    UnsoldGoodsReport {
+        entity: DisclosingEntity {
+            name: "Example Retail Group SA".into(),
+            identifier: LegalEntityIdentifier::Euid {
+                value: "LUB123456789".into(),
+            },
+            scope: DisclosureScope::Standalone,
+        },
+        financial_year: FinancialYear {
+            start: NaiveDate::from_ymd_opt(2027, 1, 1).expect("valid date"),
+            end: NaiveDate::from_ymd_opt(2027, 12, 31).expect("valid date"),
+        },
+        lines: vec![DiscardedProductLine {
+            cn_categories: vec![CnCategory::parse("6203").expect("valid CN heading")],
+            description: "Men's suits, ensembles, jackets and trousers".into(),
+            units_discarded: DiscardedQuantity::measured(1_200),
+            weight_kg: DiscardedQuantity::estimated(430),
+            packaging_included: false,
+            reason: DiscardReason::DamagedOrContaminated,
+            reason_detail: None,
+            treatment: WasteTreatmentSplit {
+                preparing_for_reuse_pct: 20,
+                recycling_pct: 50,
+                other_recovery_pct: 20,
+                disposal_pct: 5,
+                unknown_pct: 5,
+            },
+        }],
+        measures_taken: "Introduced pre-season demand forecasting across all lines.".into(),
+        measures_planned: "Extending the donation offer window to twelve weeks.".into(),
+    }
+}

@@ -231,3 +231,46 @@ pub(crate) fn fully_populated_passport() -> Passport {
     });
     passport
 }
+
+/// A minimal, well-formed unsold-goods disclosure.
+///
+/// One line, a treatment split totalling 100, and a CN heading outside Annex II
+/// so the depth lint stays quiet — tests that want a finding should reach in and
+/// break one thing rather than build a whole second fixture.
+pub(crate) fn sample_unsold_goods_report()
+-> crate::domain::product_group::data::unsold_goods::UnsoldGoodsReport {
+    use crate::domain::product_group::data::unsold_goods::*;
+    use chrono::NaiveDate;
+
+    UnsoldGoodsReport {
+        entity: DisclosingEntity {
+            name: "Example Retail Group SA".to_owned(),
+            identifier: LegalEntityIdentifier::Euid {
+                value: "LUB123456789".to_owned(),
+            },
+            scope: DisclosureScope::Standalone,
+        },
+        financial_year: FinancialYear {
+            start: NaiveDate::from_ymd_opt(2027, 1, 1).expect("valid date"),
+            end: NaiveDate::from_ymd_opt(2027, 12, 31).expect("valid date"),
+        },
+        lines: vec![DiscardedProductLine {
+            cn_categories: vec![CnCategory::parse("6203").expect("valid CN heading")],
+            description: "Men's suits, ensembles, jackets and trousers".to_owned(),
+            units_discarded: DiscardedQuantity::measured(1_200),
+            weight_kg: DiscardedQuantity::estimated(430),
+            packaging_included: false,
+            reason: DiscardReason::DamagedOrContaminated,
+            reason_detail: None,
+            treatment: WasteTreatmentSplit {
+                preparing_for_reuse_pct: 20,
+                recycling_pct: 50,
+                other_recovery_pct: 20,
+                disposal_pct: 5,
+                unknown_pct: 5,
+            },
+        }],
+        measures_taken: "Introduced pre-season demand forecasting across all lines.".to_owned(),
+        measures_planned: "Extending the donation offer window to twelve weeks.".to_owned(),
+    }
+}

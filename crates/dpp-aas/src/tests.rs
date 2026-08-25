@@ -5,9 +5,50 @@ use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
     PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
-    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
+    UnsoldGoodsReport,
 };
 use serde_json::json;
+
+/// A minimal Annex I disclosure — one line, split totalling 100.
+fn sample_unsold_goods_report() -> UnsoldGoodsReport {
+    use chrono::NaiveDate;
+    use dpp_domain::{
+        CnCategory, DiscardReason, DiscardedProductLine, DiscardedQuantity, DisclosingEntity,
+        DisclosureScope, FinancialYear, LegalEntityIdentifier, WasteTreatmentSplit,
+    };
+
+    UnsoldGoodsReport {
+        entity: DisclosingEntity {
+            name: "Example Retail Group SA".into(),
+            identifier: LegalEntityIdentifier::Euid {
+                value: "LUB123456789".into(),
+            },
+            scope: DisclosureScope::Standalone,
+        },
+        financial_year: FinancialYear {
+            start: NaiveDate::from_ymd_opt(2027, 1, 1).expect("valid date"),
+            end: NaiveDate::from_ymd_opt(2027, 12, 31).expect("valid date"),
+        },
+        lines: vec![DiscardedProductLine {
+            cn_categories: vec![CnCategory::parse("6203").expect("valid CN heading")],
+            description: "Men's suits and trousers".into(),
+            units_discarded: DiscardedQuantity::measured(1_200),
+            weight_kg: DiscardedQuantity::estimated(430),
+            packaging_included: false,
+            reason: DiscardReason::DamagedOrContaminated,
+            reason_detail: None,
+            treatment: WasteTreatmentSplit {
+                preparing_for_reuse_pct: 20,
+                recycling_pct: 50,
+                other_recovery_pct: 20,
+                disposal_pct: 5,
+                unknown_pct: 5,
+            },
+        }],
+        measures_taken: "Introduced pre-season demand forecasting.".into(),
+        measures_planned: "Extending the donation window to twelve weeks.".into(),
+    }
+}
 
 fn minimal_passport(product_group: ProductGroup) -> Passport {
     let schema_version = dpp_domain::ProductGroupCatalog::new()
@@ -605,25 +646,38 @@ fn non_object_input_produces_empty_submodel() {
 #[test]
 fn build_aas_unsold_goods_produces_product_group_submodel() {
     let mut passport = minimal_passport(ProductGroup::UnsoldGoods);
-    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(UnsoldGoodsReport {
-        reporting_period: "2026-Q2".into(),
-        volume_kg: 1500.0,
-        product_category: "apparel".into(),
-        reason: UnsoldGoodsReason::EndOfSeason,
-        destination: UnsoldGoodsDestination::Donation,
-        destruction_justification: None,
-        country_of_disposal: "DE".into(),
-        operator_name: Some("GoodWill e.V.".into()),
-    }));
+    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(sample_unsold_goods_report()));
     let (_, submodels) =
         build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
     let sub = submodels.iter().find(|s| s.id_short == "UnsoldGoods");
     assert!(sub.is_some(), "UnsoldGoods submodel missing");
-    let has_volume = sub.unwrap().submodel_elements.iter().any(|e| match e {
-        AasSubmodelElement::Property(p) => p.id_short == "volumeKg",
-        _ => false,
-    });
-    assert!(has_volume, "volumeKg property missing");
+
+    let id_shorts: Vec<&str> = sub
+        .unwrap()
+        .submodel_elements
+        .iter()
+        .filter_map(|e| match e {
+            AasSubmodelElement::Property(p) => Some(p.id_short.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    // The Annex I header, the flattened line, and the two narrative rows.
+    for expected in [
+        "entityName",
+        "financialYearStart",
+        "financialYearEnd",
+        "totalWeightKg",
+        "line0CnCategories",
+        "line0TotalDestructionPct",
+        "measuresTaken",
+        "measuresPlanned",
+    ] {
+        assert!(
+            id_shorts.contains(&expected),
+            "{expected} missing from {id_shorts:?}"
+        );
+    }
 }
 
 /// A product group whose typed mapper was removed still ships its data — the

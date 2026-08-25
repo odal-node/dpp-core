@@ -2,10 +2,15 @@
 
 use super::*;
 
+/// Every embedded manifest parses and lands in the catalog.
+///
+/// Asserted against the embedded table rather than a literal, which went stale
+/// the first time an act was added — the same defect this file exists to catch
+/// in the manifests themselves.
 #[test]
 fn loads_all_embedded_manifests() {
     let catalog = InstrumentCatalog::new();
-    assert_eq!(catalog.len(), 10);
+    assert_eq!(catalog.len(), instrument_catalog::EMBEDDED_COUNT);
 }
 
 /// Every instrument claiming a text must name it. An `Adopted` record with no
@@ -26,12 +31,19 @@ fn a_claim_to_have_a_text_is_backed_by_a_celex() {
     }
 }
 
-/// A delegated act must say what it was adopted under; a framework or a direct
-/// instrument has nothing above it to name.
+/// An act adopted **under** a framework must say which one; a framework or a
+/// direct instrument has nothing above it to name.
+///
+/// Both delegated and implementing acts are adopted under a basic act, so both
+/// carry a parent. The Treaty distinction between them is about what they may
+/// do, not about whether they have one.
 #[test]
-fn only_delegated_acts_carry_a_parent() {
+fn acts_adopted_under_a_framework_carry_a_parent() {
     for instrument in InstrumentCatalog::new().all() {
-        let expects_parent = instrument.kind == InstrumentKind::Delegated;
+        let expects_parent = matches!(
+            instrument.kind,
+            InstrumentKind::Delegated | InstrumentKind::Implementing
+        );
         assert_eq!(
             instrument.parent.is_some(),
             expects_parent,

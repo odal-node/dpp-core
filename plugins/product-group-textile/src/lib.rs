@@ -49,13 +49,14 @@ impl DppProductGroupPlugin for TextilePlugin {
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         if is_unsold(input) {
+            // The Annex I header rows. The repeating body is checked in
+            // `unsold_goods::calculate`, which can see across lines — the two
+            // rules that matter (the treatment split, and point (h)'s
+            // subordination) are not answerable field by field.
             Validator::new(input)
-                .require_str("reportingPeriod")
-                .require_non_negative("volumeKg")
-                .require_str("productCategory")
-                .require_str("reason")
-                .require_str("destination")
-                .require_country("countryOfDisposal")
+                .require_non_empty_array("lines")
+                .require_str("measuresTaken")
+                .require_str("measuresPlanned")
                 .finish()
         } else {
             Validator::new(input)
@@ -106,15 +107,33 @@ mod tests {
         })
     }
 
+    /// A disclosure in the Annex I shape of Impl. Reg. (EU) 2026/2.
     fn unsold() -> Value {
         json!({
             "productGroup": "unsoldGoods",
-            "reportingPeriod": "2026-Q2",
-            "volumeKg": 120.0,
-            "productCategory": "apparel",
-            "reason": "end_of_season",
-            "destination": "donation",
-            "countryOfDisposal": "MK"
+            "entity": {
+                "name": "Example Retail Group SA",
+                "identifier": { "type": "euid", "value": "LUB123456789" },
+                "scope": { "type": "standalone" }
+            },
+            "financialYear": { "start": "2027-01-01", "end": "2027-12-31" },
+            "lines": [{
+                "cnCategories": ["6203"],
+                "description": "Men's suits and trousers",
+                "unitsDiscarded": { "value": 1200, "estimated": false },
+                "weightKg": { "value": 430, "estimated": true },
+                "packagingIncluded": false,
+                "reason": "damagedOrContaminated",
+                "treatment": {
+                    "preparingForReusePct": 20,
+                    "recyclingPct": 50,
+                    "otherRecoveryPct": 20,
+                    "disposalPct": 5,
+                    "unknownPct": 5
+                }
+            }],
+            "measuresTaken": "Introduced pre-season demand forecasting.",
+            "measuresPlanned": "Extending the donation window to twelve weeks."
         })
     }
 
@@ -146,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn unsold_donation_is_compliant() {
+    fn a_consistent_disclosure_is_compliant() {
         assert_eq!(
             TextilePlugin
                 .calculate_metrics(&unsold())
@@ -156,10 +175,12 @@ mod tests {
         );
     }
 
+    /// Annex I note (i) provides `unknown` for the share that could not be
+    /// established, so nothing is left over and the split must reach 100.
     #[test]
-    fn unsold_exempt_without_justification_is_non_compliant() {
+    fn a_treatment_split_that_misses_100_is_non_compliant() {
         let mut d = unsold();
-        d["destination"] = json!("exempt_destruction");
+        d["lines"][0]["treatment"]["disposalPct"] = json!(1);
         assert_eq!(
             TextilePlugin
                 .calculate_metrics(&d)
@@ -167,6 +188,33 @@ mod tests {
                 .compliance_status,
             PluginComplianceStatus::NonCompliant
         );
+    }
+
+    /// Del. Reg. (EU) 2026/296 Art. 2 point (h) applies "only where none of the
+    /// circumstances referred to in points (a) to (g) are applicable".
+    #[test]
+    fn donation_claimed_beside_a_stronger_reason_is_non_compliant() {
+        let mut d = unsold();
+        let mut second = d["lines"][0].clone();
+        second["reason"] = json!("offeredForDonationNotAccepted");
+        d["lines"].as_array_mut().unwrap().push(second);
+        assert_eq!(
+            TextilePlugin
+                .calculate_metrics(&d)
+                .unwrap()
+                .compliance_status,
+            PluginComplianceStatus::NonCompliant
+        );
+    }
+
+    /// A disclosure with no lines is structurally invalid, not merely
+    /// non-compliant — it is rejected at validation before any determination is
+    /// reached.
+    #[test]
+    fn a_disclosure_with_no_lines_fails_validation() {
+        let mut d = unsold();
+        d["lines"] = json!([]);
+        assert!(TextilePlugin.validate_input(&d).is_err());
     }
 
     #[test]
@@ -210,17 +258,12 @@ mod tests {
         assert!(TextilePlugin.validate_input(&d).is_err());
     }
 
+    /// Annex I notes (i) and (j) ask for the measures themselves; a run of
+    /// whitespace is not one, and the validator treats it as absent.
     #[test]
-    fn whitespace_only_justification_is_non_compliant() {
+    fn whitespace_only_prevention_measures_fail_validation() {
         let mut d = unsold();
-        d["destination"] = json!("exempt_destruction");
-        d["destructionJustification"] = json!("          "); // 10 spaces
-        assert_eq!(
-            TextilePlugin
-                .calculate_metrics(&d)
-                .unwrap()
-                .compliance_status,
-            PluginComplianceStatus::NonCompliant
-        );
+        d["measuresPlanned"] = json!("          ");
+        assert!(TextilePlugin.validate_input(&d).is_err());
     }
 }

@@ -1,0 +1,24 @@
+{
+  "id": "unsold-goods-derogations-2026-296",
+  "title": "Derogations from the prohibition of destruction of unsold consumer products — Commission Delegated Regulation (EU) 2026/296",
+  "celex": "32026R0296",
+  "kind": "delegated",
+  "status": "adopted",
+  "parent": "espr",
+  "passport": { "obligation": "notRequired" },
+  "retentionYears": 5,
+  "retentionYearsBasis": "sourced",
+  "productGroups": [
+    {
+      "productGroup": "unsold-goods",
+      "status": "in_force",
+      "legalBasis": [
+        "Commission Delegated Regulation (EU) 2026/296 Art. 2",
+        "Commission Delegated Regulation (EU) 2026/296 Art. 3",
+        "Regulation (EU) 2024/1781 Art. 25(5)"
+      ],
+      "notes": "Adopted 2026-02-09, OJ 2026-04-22. Art. 2 is a CLOSED list of ten derogations, points (a) to (j), under which an Annex VII good may lawfully be destroyed. Point (h) — offered for donation and not accepted — is subordinate: it applies 'only where none of the circumstances referred to in points (a) to (g) are applicable', which is a condition over the whole set of reasons claimed for a category and cannot be checked on one line alone. Impl. Reg. (EU) 2026/2 Annex I note (h) makes this list the reason vocabulary of the disclosure, so the two acts interlock."
+    }
+  ],
+  "notes": "retentionYears is sourced and is NOT a passport retention figure: Art. 3 requires the economic operator to keep per-derogation documentation for five years after destruction, in electronic form, and produce it to a competent authority within 30 days of a request. It is evidence of a lawful destruction, not availability of a product record, and must not be folded into a passport availability period. Neither this act nor its implementing sibling creates a passport."
+}

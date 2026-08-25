@@ -57,33 +57,9 @@ pub fn is_within_annex_vii_scope(commodity_code: &str) -> bool {
     annex_vii_heading(commodity_code).is_some()
 }
 
-/// Whether a declared `UnsoldGoodsReport.product_category` word is
-/// consistent with the Annex VII heading a passport's `commodity_code`
-/// actually falls under.
-///
-/// `"accessories"` is part of heading 1 (apparel and clothing accessories),
-/// not a peer of `"apparel"` — Annex VII has two headings, not three, so
-/// both words are consistent with that one heading. `"home-textile"` and
-/// `"other"` correspond to **no** Annex VII heading (Annex VII does not
-/// cover home textiles at all), so they contradict any in-scope commodity
-/// code — there is no heading they could ever match.
-#[must_use]
-pub fn product_category_matches_heading(product_category: &str, heading: AnnexViiHeading) -> bool {
-    matches!(
-        (product_category, heading),
-        (
-            "apparel" | "accessories",
-            AnnexViiHeading::ApparelAndClothingAccessories
-        ) | ("footwear", AnnexViiHeading::Footwear)
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        AnnexViiHeading, annex_vii_heading, is_within_annex_vii_scope,
-        product_category_matches_heading,
-    };
+    use super::{AnnexViiHeading, annex_vii_heading, is_within_annex_vii_scope};
 
     #[test]
     fn apparel_heading_prefixes_are_in_scope() {
@@ -126,57 +102,5 @@ mod tests {
             Some(AnnexViiHeading::Footwear)
         );
         assert_eq!(annex_vii_heading("851712"), None);
-    }
-
-    #[test]
-    fn apparel_and_accessories_both_match_the_one_apparel_heading() {
-        assert!(product_category_matches_heading(
-            "apparel",
-            AnnexViiHeading::ApparelAndClothingAccessories
-        ));
-        assert!(product_category_matches_heading(
-            "accessories",
-            AnnexViiHeading::ApparelAndClothingAccessories
-        ));
-    }
-
-    #[test]
-    fn footwear_matches_only_the_footwear_heading() {
-        assert!(product_category_matches_heading(
-            "footwear",
-            AnnexViiHeading::Footwear
-        ));
-        assert!(!product_category_matches_heading(
-            "footwear",
-            AnnexViiHeading::ApparelAndClothingAccessories
-        ));
-    }
-
-    #[test]
-    fn crossed_categories_do_not_match() {
-        assert!(!product_category_matches_heading(
-            "apparel",
-            AnnexViiHeading::Footwear
-        ));
-        assert!(!product_category_matches_heading(
-            "accessories",
-            AnnexViiHeading::Footwear
-        ));
-    }
-
-    #[test]
-    fn home_textile_and_other_match_no_heading() {
-        // Annex VII has no home-textile heading at all, so these two words
-        // can never be consistent with an in-scope commodity code.
-        for category in ["home-textile", "other"] {
-            assert!(!product_category_matches_heading(
-                category,
-                AnnexViiHeading::ApparelAndClothingAccessories
-            ));
-            assert!(!product_category_matches_heading(
-                category,
-                AnnexViiHeading::Footwear
-            ));
-        }
     }
 }
