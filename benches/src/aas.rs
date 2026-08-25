@@ -6,7 +6,7 @@ use chrono::Utc;
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_aas::build_aas_from_passport;
 use dpp_domain::Audience;
-use dpp_domain::domain::gtin::Gtin;
+use dpp_domain::domain::identifier::Gtin;
 use dpp_domain::domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, ProductGroupData,
 };

@@ -1,16 +1,14 @@
 //! Core DPP domain types: passport, GTIN, identity, status, product group, validation,
 //! and transfer of responsibility.
 
-pub mod commodity_code;
-#[cfg(test)]
-mod commodity_code_tests;
 pub mod compliance;
 pub mod eol;
+pub mod identifier;
 
 pub mod graph;
 #[cfg(test)]
 mod graph_tests;
-pub mod gtin;
+
 pub mod identity;
 pub mod lint;
 pub mod passport;

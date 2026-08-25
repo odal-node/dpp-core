@@ -1,25 +1,10 @@
-//! [`Gln`] — a validated GS1 Global Location Number, and its error.
+//! [`Gln`] — a validated GS1 Global Location Number.
 
-use thiserror::Error;
-
-use super::check_digit::{Gs1KeyCheck, check_gs1_key};
-
-/// Error from constructing a [`Gln`].
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum GlnError {
-    #[error("GLN must be exactly 13 ASCII digits, got '{0}'")]
-    InvalidFormat(String),
-    #[error("GLN check digit invalid for '{gln}': expected {expected}, got {actual}")]
-    InvalidCheckDigit {
-        gln: String,
-        expected: u8,
-        actual: u8,
-    },
-}
+use super::super::check_digit::{Gs1KeyCheck, check_gs1_key};
+use super::error::GlnError;
 
 /// A validated GS1 GLN (13-digit Global Location Number) with its GS1 mod-10
-/// check digit verified — the same algorithm as [`Gtin`](crate::domain::gtin::Gtin).
+/// check digit verified — the same algorithm as [`Gtin`](crate::domain::identifier::Gtin).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Gln(String);
 

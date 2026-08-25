@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::catalog::ProductGroupCatalog;
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 use crate::schemas::VersionedSchemaRegistry;
 
 use super::tests::{minimal_battery_data, test_textile_data};

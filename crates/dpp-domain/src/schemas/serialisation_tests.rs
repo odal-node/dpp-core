@@ -27,7 +27,7 @@ use super::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_fully_populated_battery_serialises_into_the_current_schema() {
-    use crate::domain::gtin::Gtin;
+    use crate::domain::identifier::Gtin;
     use crate::domain::product_group::{
         BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprintClass,
         CriticalRawMaterial, DynamicPerformance, EnvironmentalReading, ExpectedLifetime,
@@ -190,7 +190,7 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_fully_populated_textile_serialises_into_the_current_schema() {
-    use crate::domain::gtin::Gtin;
+    use crate::domain::identifier::Gtin;
     use crate::domain::product_group::{FibreEntry, SvhcSubstance, TextileData};
 
     let data = TextileData {

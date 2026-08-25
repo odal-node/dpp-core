@@ -2,20 +2,9 @@
 //! product line is disclosed under.
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-/// Error from constructing a [`CnCategory`].
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum CnCategoryError {
-    /// Not 2 or 4 ASCII digits.
-    #[error("CN category must be 2 (chapter) or 4 (heading) ASCII digits, got '{0}'")]
-    InvalidFormat(String),
-}
+use super::error::CnCategoryError;
 
-/// A combined-nomenclature **chapter** (2 digits) or **heading** (4 digits).
-///
-/// # Not [`CommodityCode`](crate::domain::commodity_code::CommodityCode)
 ///
 /// The two are different levels of the same nomenclature and must not be
 /// substituted for one another. `CommodityCode` is a *product's own*

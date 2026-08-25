@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 
 /// Tyre product group data for EU tyre labelling compliance.
 ///

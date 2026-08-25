@@ -20,11 +20,13 @@
 //! - [`financial_year`] — the period, which is the undertaking's own.
 //! - [`mod@line`] — one row of the Annex I table, plus [`DiscardedQuantity`].
 //!   (Disambiguated: `line` is also `core`'s `line!` macro.)
-//! - [`cn_category`] — the CN chapter or heading a line is filed under.
 //! - [`reason`] — the Del. Reg. 2026/296 Art. 2 derogations.
 //! - [`treatment`] — the six-way percentage split, and the derived total.
+//!
+//! The CN category a line is filed under is
+//! [`CnCategory`], which lives in the
+//! identifier leaf: it is vocabulary, not unsold-goods data.
 
-pub mod cn_category;
 pub mod entity;
 pub mod financial_year;
 pub mod identifier;
@@ -37,7 +39,7 @@ pub mod treatment;
 #[cfg(test)]
 mod tests;
 
-pub use cn_category::{CnCategory, CnCategoryError};
+pub use crate::domain::identifier::{CnCategory, CnCategoryError};
 pub use entity::DisclosingEntity;
 pub use financial_year::FinancialYear;
 pub use identifier::LegalEntityIdentifier;

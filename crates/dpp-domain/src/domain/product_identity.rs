@@ -9,7 +9,7 @@ use super::product_group::ProductGroup;
 /// product group (dispatch key) + GTIN + optional batch.
 ///
 /// Not a validated GS1 type — `gtin` is whatever string the product group's typed
-/// data carries (only `Battery` validates it as a [`super::gtin::Gtin`]; the
+/// data carries (only `Battery` validates it as a [`super::identifier::Gtin`]; the
 /// rest store it unchecked, and `UnsoldGoods`/`Other` carry none at all —
 /// see [`super::product group::ProductGroupData::gtin`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

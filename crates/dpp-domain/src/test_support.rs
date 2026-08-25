@@ -8,7 +8,7 @@
 
 use chrono::Utc;
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 use crate::domain::passport::{ManufacturerInfo, Passport, PassportId};
 use crate::domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, ProductGroup, TextileData,
@@ -177,8 +177,8 @@ pub(crate) fn sample_textile_data() -> TextileData {
 /// about a subset. Anything reasoning over `Passport`'s JSON keys must build
 /// from this.
 pub(crate) fn fully_populated_passport() -> Passport {
-    use crate::domain::commodity_code::CommodityCode;
     use crate::domain::compliance::ComplianceResult;
+    use crate::domain::identifier::CommodityCode;
     use crate::domain::lint::LintResult;
     use crate::domain::passport::{FacilitySnapshot, PassportRef};
     use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};

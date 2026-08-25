@@ -26,16 +26,8 @@
 //! which checks the check digit and not whether the product exists.
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-/// Error from constructing a [`CommodityCode`].
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum CommodityCodeError {
-    /// Not 6, 8 or 10 ASCII digits.
-    #[error("commodity code must be 6 (HS), 8 (CN) or 10 (TARIC) ASCII digits, got '{0}'")]
-    InvalidFormat(String),
-}
+use super::error::CommodityCodeError;
 
 /// A validated customs tariff classification: HS-6, CN-8 or TARIC-10.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

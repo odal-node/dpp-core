@@ -11,7 +11,7 @@ use super::material_composition::MaterialComposition;
 use super::state_of_health::StateOfHealth;
 use super::temperature_range::TemperatureRange;
 use super::usage_history::UsageHistory;
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 use crate::domain::product_group::{
     BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass,
 };

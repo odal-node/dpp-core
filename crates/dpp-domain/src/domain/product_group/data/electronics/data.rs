@@ -7,7 +7,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 use crate::domain::product_group::repairability_score::RepairabilityScore;
 use crate::domain::product_group::{DeviceType, EnergyEfficiencyClass};
 

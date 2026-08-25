@@ -209,7 +209,7 @@ pub struct Passport {
     /// that requires it will refuse the registration rather than this node
     /// inventing a classification it cannot derive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub commodity_code: Option<crate::domain::commodity_code::CommodityCode>,
+    pub commodity_code: Option<crate::domain::identifier::CommodityCode>,
     /// EORI or national economic-operator identifier for the responsible party.
     /// Confirmed against the verbatim OJ text (Regulation (EU) 2024/1781):
     /// **Annex III, point (k)** is the data-content basis — "the name, contact

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 
 /// Construction products product group data for EU CPR 2024/3110 compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

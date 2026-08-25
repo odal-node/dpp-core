@@ -3,9 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::cn_category::CnCategory;
 use super::reason::DiscardReason;
 use super::treatment::WasteTreatmentSplit;
+use crate::domain::identifier::cn_category::CnCategory;
 
 /// A whole-number quantity, and whether it was counted or estimated.
 ///

@@ -1,8 +1,7 @@
-//! GS1 key parsing: which strings are accepted, and which are refused and why.
+//! GTIN parsing: which strings are accepted, and which are refused and why.
 
-use super::*;
+use super::{Gtin, GtinError};
 
-// 09506000134352 — verified valid GTIN-14 used throughout the test suite.
 const VALID: &str = "09506000134352";
 
 #[test]
@@ -111,42 +110,3 @@ fn prepend_zero_to_valid_ean13_gives_valid_gtin14() {
 }
 
 // ── GLN ──────────────────────────────────────────────────────────────────
-
-#[test]
-fn valid_gln_parses() {
-    // 4012345000009 — GS1 mod-10 check digit verified.
-    assert!(Gln::parse("4012345000009").is_ok());
-}
-
-#[test]
-fn gln_wrong_length_rejected() {
-    assert!(matches!(
-        Gln::parse("401234500000"),
-        Err(GlnError::InvalidFormat(_))
-    ));
-}
-
-#[test]
-fn gln_non_digits_rejected() {
-    assert!(matches!(
-        Gln::parse("401234500000X"),
-        Err(GlnError::InvalidFormat(_))
-    ));
-}
-
-#[test]
-fn gln_bad_check_digit_rejected() {
-    // 4000001000002 has a wrong check digit (should be …5).
-    assert!(matches!(
-        Gln::parse("4000001000002"),
-        Err(GlnError::InvalidCheckDigit { .. })
-    ));
-    assert!(Gln::parse("4000001000005").is_ok());
-}
-
-#[test]
-fn gs1_check_digit_matches_known_keys() {
-    // GTIN-14 and GLN both use the same mod-10 routine.
-    assert_eq!(gs1_check_digit(&[0, 9, 5, 0, 6, 0, 0, 0, 1, 3, 4, 3, 5]), 2);
-    assert_eq!(gs1_check_digit(&[4, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0]), 9);
-}

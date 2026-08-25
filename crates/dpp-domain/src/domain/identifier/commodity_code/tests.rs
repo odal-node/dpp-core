@@ -1,6 +1,6 @@
 //! Parsing and validity of a CN commodity code.
 
-use super::commodity_code::*;
+use super::CommodityCode;
 
 #[test]
 fn the_three_tariff_levels_parse() {

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 
 /// A single surfactant ingredient in a detergent product.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

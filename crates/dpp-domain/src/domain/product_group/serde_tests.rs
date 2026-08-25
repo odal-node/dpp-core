@@ -2,7 +2,7 @@
 //! declares.
 
 use super::*;
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 
 use super::tests::test_textile_data;
 

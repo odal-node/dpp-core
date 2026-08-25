@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 
 use super::common::SvhcSubstance;
 

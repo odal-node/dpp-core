@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use dpp_domain::domain::gtin::Gtin;
+use dpp_domain::domain::identifier::Gtin;
 use dpp_domain::domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };

@@ -741,13 +741,9 @@ fn rule_12_no_name_repeats_its_directory() {
     );
 }
 
-// Both are the exact-match form the widened rule now sees. `gtin/gtin.rs` goes
-// when that directory becomes `identifier/` and the file becomes `gtin.rs`
-// beside `gln.rs`; `dpp-vocab` is another crate and its own pass.
-const NAME_REPEATS_BASELINE: &[&str] = &[
-    "crates/dpp-domain/src/domain/gtin/gtin.rs",
-    "crates/dpp-vocab/src/register/register.rs",
-];
+// `dpp-vocab` is another crate and its own pass. `dpp-domain` cleared this rule
+// on 2026-08-26 when `gtin/` became the `identifier/` leaf.
+const NAME_REPEATS_BASELINE: &[&str] = &["crates/dpp-vocab/src/register/register.rs"];
 
 // ---------------------------------------------------------------------------
 // Rule 13 — hyphens outside module paths, underscores inside
@@ -875,10 +871,6 @@ fn rule_14_errors_live_in_error_rs() {
 const ERROR_PLACEMENT_BASELINE: &[&str] = &[
     "crates/dpp-aas/src/builder.rs",
     "crates/dpp-crypto/src/jades/header.rs",
-    "crates/dpp-domain/src/domain/commodity_code.rs",
-    "crates/dpp-domain/src/domain/gtin/gln.rs",
-    "crates/dpp-domain/src/domain/gtin/gtin.rs",
-    "crates/dpp-domain/src/domain/product_group/data/unsold_goods/cn_category.rs",
     "crates/dpp-domain/src/schemas/lens/transform.rs",
     "crates/dpp-domain/src/schemas/lens/upcast_error.rs",
     "crates/dpp-domain/src/schemas/registration_error.rs",

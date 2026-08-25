@@ -1,23 +1,9 @@
-//! [`Gtin`] — a validated GS1 GTIN-14, and the error refusing an invalid one.
+//! [`Gtin`] — a validated GS1 GTIN-14 trade item number.
 
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-use super::check_digit::{Gs1KeyCheck, check_gs1_key};
-
-/// Error from constructing a [`Gtin`].
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum GtinError {
-    #[error("GTIN must be 8, 12, 13 or 14 ASCII digits, got '{0}'")]
-    InvalidFormat(String),
-    #[error("GTIN check digit invalid for '{gtin}': expected {expected}, got {actual}")]
-    InvalidCheckDigit {
-        gtin: String,
-        expected: u8,
-        actual: u8,
-    },
-}
+use super::super::check_digit::{Gs1KeyCheck, check_gs1_key};
+use super::error::GtinError;
 
 /// A validated GS1 GTIN-14 (14-digit trade item number, GS1 mod-10 check digit verified).
 ///

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::gtin::Gtin;
+use crate::domain::identifier::Gtin;
 use crate::domain::product_group::ProductionRoute;
 
 /// Aluminium product group data for EU ESPR carbon intensity reporting.

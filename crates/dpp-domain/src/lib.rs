@@ -36,8 +36,10 @@ pub use catalog::{
 };
 
 pub use domain::{
-    commodity_code::{CommodityCode, CommodityCodeError},
-    gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
+    identifier::{
+        CnCategory, CnCategoryError, CommodityCode, CommodityCodeError, Gln, GlnError, Gtin,
+        GtinError, gs1_check_digit,
+    },
     identity::{
         Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
         PassportCredentialSubject, SignedCredential,
@@ -58,8 +60,6 @@ pub use domain::{
         CarbonFootprintClassError,
         // The unsold-goods disclosure, whose shape is fixed by Impl. Reg. (EU)
         // 2026/2 Annex I — see `domain::product_group::data::unsold_goods`.
-        CnCategory,
-        CnCategoryError,
         ConstructionData,
         DetergentData,
         DeviceType,
