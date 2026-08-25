@@ -10,11 +10,11 @@ use super::state_of_charge_reading::StateOfChargeReading;
 /// Every item in 4(d) is *"if applicable"* for all three battery categories,
 /// so nothing here is ever required by the schema.
 ///
-/// **`negativeEvents` deliberately does not duplicate [`HarmfulEvents`].**
+/// **`negativeEvents` deliberately does not duplicate [`HarmfulEvents`](crate::domain::product_group::HarmfulEvents).**
 /// Annex VII Part B item 4 already requires harmful-event tracking as part of
 /// the expected-lifetime parameter set, and this annex asks for the same
 /// underlying facts under a different heading. Where a battery reports Part B
-/// figures, [`ExpectedLifetime::harmful_events`] is the structured home and
+/// figures, [`ExpectedLifetime::harmful_events`](crate::domain::product_group::ExpectedLifetime::harmful_events) is the structured home and
 /// this field carries what does not fit it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]

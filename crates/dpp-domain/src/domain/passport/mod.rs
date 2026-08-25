@@ -12,7 +12,15 @@ mod reference_tests;
 pub mod view;
 
 #[cfg(test)]
+mod from_stored_tests;
+#[cfg(test)]
+mod publish_gate_tests;
+#[cfg(test)]
+mod redaction_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod validation_tests;
 
 pub use facility::FacilitySnapshot;
 pub use id::PassportId;

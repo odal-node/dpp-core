@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The annex spells the set out inline — *"the status of the battery, defined
 /// as 'original', 'repurposed', 're-used', 'remanufactured' or 'waste'"* — so
-/// this is a closed enumeration for the same reason [`BatteryType`] is: the
+/// this is a closed enumeration for the same reason [`BatteryType`](crate::domain::product_group::BatteryType) is: the
 /// legal text enumerates it and nothing else is a lawful value. No
 /// `#[serde(other)]`.
 ///

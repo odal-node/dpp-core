@@ -1,4 +1,4 @@
-//! [`BatteryType`] — the Regulation (EU) 2023/1542 Art. 3 battery category.
+//! [`BatteryType`](crate::domain::product_group::BatteryType) — the Regulation (EU) 2023/1542 Art. 3 battery category.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// tie-break rule — "the category to which the strictest requirements
 /// apply" — that only functions over a closed set. An unrecognised value is
 /// therefore a reason to reject the record, not to absorb and lose it: the
-/// same defect class already fixed for [`CarbonFootprintClass`], in a field
+/// same defect class already fixed for [`CarbonFootprintClass`](crate::domain::product_group::CarbonFootprintClass), in a field
 /// that Annex VI Part A point 2 (via Annex XIII point 1(a)) makes mandatory
 /// public passport content.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

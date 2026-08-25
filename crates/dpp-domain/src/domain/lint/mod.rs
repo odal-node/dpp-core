@@ -1,4 +1,4 @@
-//! Passport plausibility lint dispatch — maps [`ProductGroupData`] onto the
+//! Passport plausibility lint dispatch — maps [`ProductGroupData`](crate::domain::product_group::ProductGroupData) onto the
 //! `dpp-rules::lint` pack and carries the owned, serialisable wire types the
 //! engine persists on [`crate::domain::passport::Passport::lint_result`].
 //!

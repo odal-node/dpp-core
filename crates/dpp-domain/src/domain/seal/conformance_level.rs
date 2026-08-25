@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// retention outlives certificate lifetimes comfortably. The seal is bought once
 /// and the document it covers is retention-locked, so this cannot be corrected
 /// afterwards by re-sealing — the same irreversibility that makes the refusal
-/// rule on [`SealCapabilities::can_produce`] worth having.
+/// rule on [`SealCapabilities::can_produce`](crate::domain::seal::SealCapabilities::can_produce) worth having.
 ///
 /// Leaving it implicit meant a caller could not ask for long-term validity and
 /// could not tell they had not got it.
@@ -44,7 +44,7 @@ pub enum SealConformanceLevel {
 }
 
 impl SealConformanceLevel {
-    /// Every level this build models. Same reasoning as [`SealFormat::ALL`].
+    /// Every level this build models. Same reasoning as [`SealFormat::ALL`](crate::domain::seal::SealFormat::ALL).
     pub const ALL: &'static [Self] = &[
         Self::BaselineB,
         Self::BaselineT,

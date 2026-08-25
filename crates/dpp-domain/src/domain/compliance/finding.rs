@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 /// A single compliance finding (one rule outcome) attached to a determination.
 ///
-/// Findings are split into [`ComplianceResult::violations`] (binding — block
-/// publish for an in-force product group) and [`ComplianceResult::warnings`]
+/// Findings are split into [`ComplianceResult::violations`](crate::domain::compliance::ComplianceResult::violations) (binding — block
+/// publish for an in-force product group) and [`ComplianceResult::warnings`](crate::domain::compliance::ComplianceResult::warnings)
 /// (advisory/experimental — never block). The vec a finding lands in encodes its
 /// severity, so there is no separate severity field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

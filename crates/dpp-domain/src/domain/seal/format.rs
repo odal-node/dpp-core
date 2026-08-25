@@ -1,4 +1,4 @@
-//! [`SealFormat`] — the signature format a seal is produced in.
+//! [`SealFormat`](crate::domain::seal::SealFormat) — the signature format a seal is produced in.
 
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +72,7 @@ impl SealFormat {
 
     /// Whether this format defines `envelope` as one of its packagings.
     ///
-    /// Asked by [`SealCapabilities::can_produce`] so that a request naming a
+    /// Asked by [`SealCapabilities::can_produce`](crate::domain::seal::SealCapabilities::can_produce) so that a request naming a
     /// pair no format defines is refused before any adapter sees it.
     #[must_use]
     pub fn admits(&self, envelope: SealEnvelope) -> bool {

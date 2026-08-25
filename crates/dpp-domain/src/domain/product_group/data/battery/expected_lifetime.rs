@@ -1,4 +1,4 @@
-//! [`ExpectedLifetime`] — the declared lifetime figures under Annex XIII.
+//! [`ExpectedLifetime`](crate::domain::product_group::ExpectedLifetime) — the declared lifetime figures under Annex XIII.
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use super::harmful_events::HarmfulEvents;
 /// state of health under Part A but no expected-lifetime parameter set here —
 /// see `dpp_rules::batteries::degradation::annex_vii_part_b_applies_to`.
 ///
-/// **Not the same thing as [`BatteryData::expected_lifetime_cycles`].** That
+/// **Not the same thing as [`BatteryData::expected_lifetime_cycles`](crate::domain::product_group::BatteryData::expected_lifetime_cycles).** That
 /// field is the model-level design figure Annex XIII point 1(j) makes *public*
 /// ("expected battery lifetime expressed in cycles, and reference test used").
 /// These are *measured* values for one physical battery, which Annex XIII point
@@ -23,7 +23,7 @@ use super::harmful_events::HarmfulEvents;
 pub struct ExpectedLifetime {
     /// 1. Date of putting into service, *"where appropriate"* — the only
     ///    qualified item in Part B. The date of manufacture, the other half of
-    ///    item 1, is [`BatteryData::manufacturing_date`].
+    ///    item 1, is [`BatteryData::manufacturing_date`](crate::domain::product_group::BatteryData::manufacturing_date).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub put_into_service_date: Option<NaiveDate>,
     /// 2. The energy throughput, in kWh.

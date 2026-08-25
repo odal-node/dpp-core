@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Measured performance and durability of one physical battery — Annex XIII
 /// point 4(a).
 ///
-/// # Why this is a block and not ten more fields on [`BatteryData`]
+/// # Why this is a block and not ten more fields on [`BatteryData`](crate::domain::product_group::BatteryData)
 ///
 /// Point 4 describes **an individual battery**; points 1 to 3 describe a
 /// **model**. The Commission's own data-point guidance makes the pairing
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// side by side distinguished only by name, and would let a filer put a
 /// measured value in a declared field. Keeping the block separate makes the
 /// distinction structural, and lets one `individual` disclosure entry cover
-/// the whole set — the same shape [`StateOfHealth`] and [`ExpectedLifetime`]
+/// the whole set — the same shape [`StateOfHealth`](crate::domain::product_group::StateOfHealth) and [`ExpectedLifetime`](crate::domain::product_group::ExpectedLifetime)
 /// already use.
 ///
 /// # Optionality
@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 pub struct DynamicPerformance {
     /// Rated capacity in ampere-hours, measured. The dynamic counterpart of
-    /// [`BatteryData::nominal_capacity_ah`].
+    /// [`BatteryData::nominal_capacity_ah`](crate::domain::product_group::BatteryData::nominal_capacity_ah).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rated_capacity_ah: Option<f64>,
     /// Capacity fade, as a percentage of the original rated capacity.
@@ -59,7 +59,7 @@ pub struct DynamicPerformance {
     pub round_trip_efficiency_fade_pct: Option<f64>,
     /// Expected lifetime under the reference conditions the battery was
     /// designed for, in cycles — *"except for non-cycle applications"*. The
-    /// measured counterpart of [`BatteryData::expected_lifetime_cycles`].
+    /// measured counterpart of [`BatteryData::expected_lifetime_cycles`](crate::domain::product_group::BatteryData::expected_lifetime_cycles).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_lifetime_cycles: Option<u32>,
     /// The same expectation in **calendar years**, which the annex lists as a

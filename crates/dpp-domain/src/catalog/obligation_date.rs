@@ -26,7 +26,7 @@ pub enum DateBasis {
 /// The date a passport obligation begins, with the provenance of that date.
 ///
 /// A struct rather than two loose fields so a date cannot exist without its
-/// basis: [`PassportObligation::Required`] with no date at all is a legitimate
+/// basis: [`PassportObligation::Required`](crate::catalog::PassportObligation::Required) with no date at all is a legitimate
 /// state — the act mandates a passport and has not yet fixed when — and it
 /// leaves no orphaned basis behind.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

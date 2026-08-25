@@ -8,7 +8,7 @@ use super::credential_subject::PassportCredentialSubject;
 
 /// A W3C Verifiable Credential 2.0 envelope binding a DPP passport to its signed payload.
 ///
-/// The cryptographic proof is in [`SignedCredential::jws`]; this struct provides
+/// The cryptographic proof is in [`SignedCredential::jws`](crate::domain::identity::SignedCredential::jws); this struct provides
 /// the structured VC context required for EUDI/EBSI interoperability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

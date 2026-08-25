@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// How restricted a field is — the counterpart to [`Audience`].
+/// How restricted a field is — the counterpart to [`Audience`](crate::domain::identity::Audience).
 ///
 /// Named for the Annex XIII point each class corresponds to, and kept
 /// product group-agnostic so non-battery product groups reuse the same vocabulary.

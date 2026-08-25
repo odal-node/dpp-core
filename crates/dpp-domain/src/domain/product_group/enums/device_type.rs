@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Electronics device type per EU Regulation (EU) 2023/1670 Art. 1(1).
 ///
 /// **Deliberately no `#[serde(other)]` catch-all**, same reasoning as
-/// [`BatteryType`]. Art. 1(1) enumerates exactly four device types —
+/// [`BatteryType`](crate::domain::product_group::BatteryType). Art. 1(1) enumerates exactly four device types —
 /// smartphones, other mobile phones, cordless phones, and slate tablets —
 /// and no others are within this regulation's scope. `laptop`, `monitor`,
 /// `tv`, `server`, `charger`, `earphone`, `router` and `pcb` previously

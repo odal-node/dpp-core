@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// A hazardous substance declared under Annex VI Part A point 8.
 ///
-/// Deliberately **not** [`SvhcSubstance`](super::shared::SvhcSubstance), which
+/// Deliberately **not** [`SvhcSubstance`](crate::domain::product_group::SvhcSubstance), which
 /// this crate already carries for textile, electronics and furniture. That type
 /// is REACH-shaped — a concentration against the Art. 33 threshold, an ECHA
 /// SCIP reference — and point 8 is a different instrument naming a different

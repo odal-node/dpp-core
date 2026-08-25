@@ -27,6 +27,12 @@ pub mod repairability_score;
 pub mod validation;
 
 #[cfg(test)]
+mod annex_vii_tests;
+#[cfg(test)]
+mod conformance_tests;
+#[cfg(test)]
+mod serde_tests;
+#[cfg(test)]
 mod tests;
 
 pub use carbon_footprint::CarbonFootprint;

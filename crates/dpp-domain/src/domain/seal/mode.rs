@@ -33,6 +33,6 @@ pub enum SealMode {
 }
 
 impl SealMode {
-    /// Every mode this build models. Same reasoning as [`SealFormat::ALL`].
+    /// Every mode this build models. Same reasoning as [`SealFormat::ALL`](crate::domain::seal::SealFormat::ALL).
     pub const ALL: &'static [Self] = &[Self::ProviderSeal, Self::OperatorSeal];
 }

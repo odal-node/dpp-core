@@ -14,7 +14,7 @@
 pub enum SealIndication {
     /// The seal passed the validation that was performed.
     ///
-    /// What that is worth depends entirely on [`SealChecks`] — a pass over a
+    /// What that is worth depends entirely on [`SealChecks`](crate::domain::seal::SealChecks) — a pass over a
     /// signature check alone is a far smaller claim than a pass over a full
     /// validation, and the two must never be read as the same statement.
     TotalPassed,

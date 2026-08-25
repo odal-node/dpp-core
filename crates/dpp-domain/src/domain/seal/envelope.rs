@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// signature format**, and the sets barely overlap. `Enveloping` is an XAdES
 /// packaging; `Certification` and `Revision` are PAdES revisions and mean
 /// nothing elsewhere. Which ones a given format admits is
-/// [`SealFormat::envelopes`], and [`SealCapabilities::can_produce`] rejects a
+/// [`SealFormat::envelopes`](crate::domain::seal::SealFormat::envelopes), and [`SealCapabilities::can_produce`](crate::domain::seal::SealCapabilities::can_produce) rejects a
 /// pair no format defines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -55,10 +55,10 @@ pub enum SealEnvelope {
 }
 
 impl SealEnvelope {
-    /// Every packaging this build models. Same reasoning as [`SealFormat::ALL`].
+    /// Every packaging this build models. Same reasoning as [`SealFormat::ALL`](crate::domain::seal::SealFormat::ALL).
     ///
     /// The union across formats. To enumerate the packagings that are legal for
-    /// one format, use [`SealFormat::envelopes`].
+    /// one format, use [`SealFormat::envelopes`](crate::domain::seal::SealFormat::envelopes).
     pub const ALL: &'static [Self] = &[
         Self::Detached,
         Self::Enveloping,

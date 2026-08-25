@@ -19,7 +19,7 @@ pub enum GlnError {
 }
 
 /// A validated GS1 GLN (13-digit Global Location Number) with its GS1 mod-10
-/// check digit verified — the same algorithm as [`Gtin`].
+/// check digit verified — the same algorithm as [`Gtin`](crate::domain::gtin::Gtin).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Gln(String);
 
