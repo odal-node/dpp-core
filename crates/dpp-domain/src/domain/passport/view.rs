@@ -1,4 +1,4 @@
-﻿//! [`PassportView`] — an audience-filtered, serialisable view of a passport.
+//! [`PassportView`] — an audience-filtered, serialisable view of a passport.
 
 /// An audience-filtered, serialisable view of a
 /// [`Passport`](crate::domain::passport::Passport).

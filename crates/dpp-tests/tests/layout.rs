@@ -97,6 +97,21 @@ fn has_deviation_marker(src: &str) -> bool {
     src.contains(DEVIATION_MARKER)
 }
 
+/// Read a source file with any UTF-8 byte-order mark stripped.
+///
+/// U+FEFF is not whitespace, so `trim_start` leaves it in place and a file an
+/// editor saved with a BOM reads as `\u{feff}//! …`. Rule 8 then reports it as
+/// having no module doc when line 1 plainly is one. Two files in this workspace
+/// were baselined on exactly that misreading, and on Windows a BOM is one
+/// careless "save as" away — so it is stripped once, here, for every rule.
+fn read_source(path: &Path) -> Option<String> {
+    let src = fs::read_to_string(path).ok()?;
+    Some(match src.strip_prefix('\u{feff}') {
+        Some(stripped) => stripped.to_owned(),
+        None => src,
+    })
+}
+
 /// Compare found violations against the baseline and report both directions.
 ///
 /// Fails on a new violation *and* on a stale baseline entry, because a list that
@@ -144,30 +159,25 @@ fn assert_against_baseline(rule: &str, found: &BTreeMap<String, String>, baselin
     assert!(message.is_empty(), "{message}");
 }
 
-/// Strip `///` and `//!` doc comments, and the fenced code blocks inside them,
-/// so an illustrative `pub struct Foo` in an example is not counted as an item.
+/// Strip every comment line, so an illustrative `pub struct Foo` inside a doc
+/// example is not counted as an item.
 ///
 /// Shared by the rule 1 and rule 7 scanners. Mirrors the same handling in
 /// `mod_rs_is_pure_index.rs`, which needs it for the same reason: this crate's
 /// doc comments contain a lot of illustrative Rust.
+///
+/// No fence tracking, deliberately. Every line inside a ```` ``` ```` block in a
+/// doc comment is itself a `///` or `//!` line, so dropping comment lines
+/// already drops the examples. An earlier version carried an `in_doctest` flag
+/// that could never be observed on a code line — but an odd number of fences
+/// anywhere in a file latched it `true` and silently swallowed every remaining
+/// line, which would have taken rules 1 and 7 off duty for that file with
+/// nothing going red.
 fn code_lines(src: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut in_doctest = false;
-    for line in src.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-            let doc_text = trimmed.trim_start_matches("///").trim_start_matches("//!");
-            if doc_text.trim_start().starts_with("```") {
-                in_doctest = !in_doctest;
-            }
-            continue;
-        }
-        if in_doctest || trimmed.starts_with("//") {
-            continue;
-        }
-        out.push(trimmed);
-    }
-    out
+    src.lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with("//"))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +238,7 @@ fn rule_1_one_public_type_per_file() {
             if matches!(name, "mod.rs" | "lib.rs" | "tests.rs" | "golden_vectors.rs") {
                 continue;
             }
-            let Ok(src) = fs::read_to_string(&path) else {
+            let Some(src) = read_source(&path) else {
                 continue;
             };
             if has_deviation_marker(&src) {
@@ -284,7 +294,7 @@ fn rule_4_tests_files_are_navigable() {
             if !matches!(name, "tests.rs" | "golden_vectors.rs") && !name.ends_with("_tests.rs") {
                 continue;
             }
-            let Ok(src) = fs::read_to_string(&path) else {
+            let Some(src) = read_source(&path) else {
                 continue;
             };
             if has_deviation_marker(&src) {
@@ -361,7 +371,7 @@ fn rule_6_only_lib_rs_at_src_root() {
             if matches!(name, "lib.rs" | "main.rs" | "test_support.rs") {
                 continue;
             }
-            let src = fs::read_to_string(&path).unwrap_or_default();
+            let src = read_source(&path).unwrap_or_default();
             if has_deviation_marker(&src) {
                 continue;
             }
@@ -461,7 +471,7 @@ fn rule_7_tests_are_siblings_not_inline() {
         let mut files = Vec::new();
         find_rs_files(&dir, &mut files);
         for path in files {
-            let Ok(src) = fs::read_to_string(&path) else {
+            let Some(src) = read_source(&path) else {
                 continue;
             };
             if has_deviation_marker(&src) {
@@ -502,9 +512,7 @@ const MODULE_DOCS_BASELINE: &[&str] = &[
     "crates/dpp-crypto/src/keystore/migration.rs",
     "crates/dpp-crypto/src/keystore/rotation.rs",
     "crates/dpp-crypto/src/keystore/tests.rs",
-    "crates/dpp-domain/src/access/policy.rs",
     "crates/dpp-domain/src/access/tests.rs",
-    "crates/dpp-domain/src/domain/passport/view.rs",
     "crates/dpp-domain/src/schemas/embedded.rs",
     "crates/dpp-domain/src/schemas/tests.rs",
     "crates/dpp-rules/src/canonical/hash.rs",
@@ -526,7 +534,7 @@ fn rule_8_every_file_has_module_docs() {
         let mut files = Vec::new();
         find_rs_files(&dir, &mut files);
         for path in files {
-            let Ok(src) = fs::read_to_string(&path) else {
+            let Some(src) = read_source(&path) else {
                 continue;
             };
             if has_deviation_marker(&src) {

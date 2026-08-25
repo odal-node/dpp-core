@@ -1,4 +1,4 @@
-﻿//! ProductGroup access policy types and disclosure-class lookup.
+//! ProductGroup access policy types and disclosure-class lookup.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
