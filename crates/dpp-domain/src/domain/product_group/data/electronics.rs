@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::gtin::Gtin;
 use crate::domain::product_group::enums::{DeviceType, EnergyEfficiencyClass};
-use crate::domain::product_group::metrics::RepairabilityScore;
+use crate::domain::product_group::repairability_score::RepairabilityScore;
 
 use super::shared::{CriticalRawMaterial, SvhcSubstance};
 
