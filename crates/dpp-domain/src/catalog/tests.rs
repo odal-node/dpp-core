@@ -496,7 +496,10 @@ const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
     ("furniture", "productType"),
     ("steel", "productCategory"),
     ("tyre", "tyreClass"),
-    ("unsold-goods", "productCategory"),
+    // `unsold-goods` is deliberately absent. Impl. Reg. (EU) 2026/2 Art. 3
+    // delimits a disclosure by CN code, not by a category name, so v2.0.0 has
+    // no category enum for a catalog row to be checked against — and the
+    // descriptor's `productCategories` is empty for the same reason.
 ];
 
 /// Drift guard: a catalog product category that is not a legal value of the

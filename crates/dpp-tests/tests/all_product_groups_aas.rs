@@ -21,8 +21,7 @@ use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
     EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, MattressData, ProductGroup,
     ProductGroupData, ProductionRoute, RepairabilityScore, SteelData, SurfactantEntry,
-    SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsDestination, UnsoldGoodsReason,
-    UnsoldGoodsReport,
+    SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsReport,
 };
 use dpp_tests::fixtures::base_passport as base;
 
@@ -222,16 +221,7 @@ fn detergent_data() -> DetergentData {
 }
 
 fn unsold_goods_report() -> UnsoldGoodsReport {
-    UnsoldGoodsReport {
-        reporting_period: "2026-Q3".into(),
-        volume_kg: 420.0,
-        product_category: "apparel".into(),
-        reason: UnsoldGoodsReason::EndOfSeason,
-        destination: UnsoldGoodsDestination::Donation,
-        destruction_justification: None,
-        country_of_disposal: "DE".into(),
-        operator_name: Some("Charity Recipient e.V.".into()),
-    }
+    dpp_tests::fixtures::unsold_goods_report()
 }
 
 /// Every product group's data, paired with its schema version and the expected
@@ -304,7 +294,7 @@ fn all_product_group_cases() -> Vec<(ProductGroup, ProductGroupData, &'static st
         (
             ProductGroup::UnsoldGoods,
             ProductGroupData::UnsoldGoods(unsold_goods_report()),
-            "1.0.0",
+            "2.0.0",
             "UnsoldGoodsReport",
         ),
     ]

@@ -13,7 +13,75 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`UnsoldGoodsReport` is rebuilt to the format its implementing act
+  prescribes, and unsold-goods schema `v1.0.0` is removed.**
+
+  Two acts adopted on 9 February 2026 govern this disclosure, and the previous
+  model predated both. **Commission Implementing Regulation (EU) 2026/2** (CELEX
+  `32026R0002`), made under ESPR Art. 24(3), binds the disclosure's visual
+  presentation and content to its **Annex I** (Art. 2(1)) and delimits categories
+  by **CN code** — first two digits, or four for the products of its Annex II
+  (Art. 3). **Commission Delegated Regulation (EU) 2026/296** (CELEX
+  `32026R0296`), made under Art. 25(5), sets out the closed list of ten
+  derogations from the destruction prohibition, and Annex I note (h) makes that
+  list the disclosure's reason vocabulary.
+
+  Almost nothing survived. The period is a **financial year** with both endpoints
+  rather than a free-text quarter, because Art. 1 scopes the duty to the
+  undertaking's own financial year and gives it 12 months from the year's end.
+  Categories are CN chapters or headings rather than words like `"apparel"`. The
+  disclosure gained the Annex I header — legal-entity name, EUID or another
+  officially recognised identifier, and standalone versus consolidated with its
+  undertakings listed — a repeating body of lines with unit counts, a
+  packaging-included flag and per-figure estimate marking, a six-way waste
+  treatment split, and the two narrative rows for measures taken and planned.
+
+  `UnsoldGoodsReason` and `UnsoldGoodsDestination` are gone. The reason list is
+  now `DiscardReason`, whose ten variants are Art. 2 points (a) to (j); the old
+  variants were ours, and two of them — `EndOfSeason` and `OverProduction` —
+  named commercial circumstances that are not derogations at all, so a
+  disclosure using them asserted a lawful destruction the act does not permit.
+  The single destination is replaced by `WasteTreatmentSplit`, in which **total
+  destruction is derived and never stored**: Annex I note (i) defines it as
+  recycling plus other recovery plus disposal, which leaves preparing-for-reuse
+  and unknown outside it.
+
+  **Schema `unsold-goods/v1.0.0` is deleted rather than migrated.** No lens can
+  carry a document forward from it — a financial year is not derivable from
+  `"2026-Q2"`, a CN code is not derivable from `"apparel"`, a percentage split is
+  not derivable from one destination, and the reason lists share no member. Every
+  field would have had to be invented. This is safe only because nothing has ever
+  been stored under it.
+
+  Also changed as a consequence: a passport in the `unsold-goods` group no longer
+  requires an envelope `commodity_code` within ESPR Annex VII scope. **Art. 24's
+  disclosure duty and Art. 25's destruction ban have different scopes** — the ban
+  reaches Annex VII's apparel and footwear, the disclosure reaches discarded
+  unsold consumer products generally, as 2026/2's own Annex II shows across 45 CN
+  headings. The old check rejected every lawful disclosure outside those two.
+
 ### Added
+
+- **`InstrumentKind::Implementing`.** The catalog could name a delegated act but
+  not an implementing one, and Impl. Reg. (EU) 2026/2 is the second kind. The
+  Treaty distinction is real — a delegated act may supplement or amend
+  non-essential elements of the basic act, an implementing act only lays down
+  uniform conditions for implementing it — so recording one as the other would
+  assert a power it does not have. Both kinds carry a `parent`.
+
+- **`CnCategory`**, the combined-nomenclature chapter (2 digits) or heading (4)
+  a disclosure line is filed under. Deliberately *not* `CommodityCode`, which is
+  a product's own 6/8/10-digit classification: substituting one for the other
+  files a whole chapter's goods under a single article.
+
+- **Impl. Reg. (EU) 2026/2 and Del. Reg. (EU) 2026/296 in the instrument
+  catalog**, both bound to `unsold-goods`, both `notRequired` — neither creates a
+  passport. 2026/296 carries a **five-year** retention figure that is *not* a
+  passport availability period: Art. 3 requires per-derogation documentation to
+  be kept for five years after destruction and produced to a competent authority
+  within 30 days.
 
 - **A catalog of the legal instruments themselves, so a product group can be
   governed by more than one.** `InstrumentCatalog` holds one manifest per act —

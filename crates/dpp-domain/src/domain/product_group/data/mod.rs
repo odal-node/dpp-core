@@ -36,4 +36,8 @@ pub use steel::SteelData;
 pub use textile::{FibreEntry, TextileData};
 pub use toy::ToyData;
 pub use tyre::TyreData;
-pub use unsold_goods::{UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport};
+pub use unsold_goods::{
+    CnCategory, CnCategoryError, DiscardReason, DiscardedProductLine, DiscardedQuantity,
+    DisclosingEntity, DisclosureScope, FinancialYear, LegalEntityIdentifier, UnsoldGoodsReport,
+    WasteTreatmentSplit,
+};

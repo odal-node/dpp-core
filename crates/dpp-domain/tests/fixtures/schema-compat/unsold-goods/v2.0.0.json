@@ -1,0 +1,43 @@
+{
+  "entity": {
+    "identifier": {
+      "type": "euid",
+      "value": "LUB123456789"
+    },
+    "name": "Example Retail Group SA",
+    "scope": {
+      "type": "standalone"
+    }
+  },
+  "financialYear": {
+    "end": "2027-12-31",
+    "start": "2027-01-01"
+  },
+  "lines": [
+    {
+      "cnCategories": [
+        "6203"
+      ],
+      "description": "Men's suits, ensembles, jackets and trousers",
+      "packagingIncluded": false,
+      "reason": "damagedOrContaminated",
+      "treatment": {
+        "disposalPct": 5,
+        "otherRecoveryPct": 20,
+        "preparingForReusePct": 20,
+        "recyclingPct": 50,
+        "unknownPct": 5
+      },
+      "unitsDiscarded": {
+        "estimated": false,
+        "value": 1200
+      },
+      "weightKg": {
+        "estimated": true,
+        "value": 430
+      }
+    }
+  ],
+  "measuresPlanned": "Extending the donation offer window to twelve weeks.",
+  "measuresTaken": "Introduced pre-season demand forecasting across all lines."
+}

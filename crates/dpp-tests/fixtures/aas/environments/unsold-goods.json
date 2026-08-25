@@ -127,7 +127,7 @@
           "modelType": "Property",
           "idShort": "schemaVersion",
           "valueType": "xs:string",
-          "value": "1.0.0"
+          "value": "2.0.0"
         },
         {
           "modelType": "Property",
@@ -316,39 +316,93 @@
       "submodelElements": [
         {
           "modelType": "Property",
-          "idShort": "reportingPeriod",
+          "idShort": "entityName",
           "valueType": "xs:string",
-          "value": "2026-Q3"
+          "value": "Example Retail Group SA"
         },
         {
           "modelType": "Property",
-          "idShort": "volumeKg",
+          "idShort": "entityIdentifier",
+          "valueType": "xs:string",
+          "value": "LUB123456789"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "disclosureScope",
+          "valueType": "xs:string",
+          "value": "standalone"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "financialYearStart",
+          "valueType": "xs:string",
+          "value": "2027-01-01"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "financialYearEnd",
+          "valueType": "xs:string",
+          "value": "2027-12-31"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "totalWeightKg",
           "valueType": "xs:double",
-          "value": "420"
+          "value": "430"
         },
         {
           "modelType": "Property",
-          "idShort": "productCategory",
-          "valueType": "xs:string",
-          "value": "apparel"
+          "idShort": "totalUnits",
+          "valueType": "xs:double",
+          "value": "1200"
         },
         {
           "modelType": "Property",
-          "idShort": "reason",
+          "idShort": "line0CnCategories",
           "valueType": "xs:string",
-          "value": "end_of_season"
+          "value": "6203"
         },
         {
           "modelType": "Property",
-          "idShort": "destination",
+          "idShort": "line0Description",
           "valueType": "xs:string",
-          "value": "donation"
+          "value": "Men's suits, ensembles, jackets and trousers"
         },
         {
           "modelType": "Property",
-          "idShort": "countryOfDisposal",
+          "idShort": "line0WeightKg",
+          "valueType": "xs:double",
+          "value": "430"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "line0Units",
+          "valueType": "xs:double",
+          "value": "1200"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "line0Reason",
           "valueType": "xs:string",
-          "value": "DE"
+          "value": "damagedOrContaminated"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "line0TotalDestructionPct",
+          "valueType": "xs:double",
+          "value": "75"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "measuresTaken",
+          "valueType": "xs:string",
+          "value": "Introduced pre-season demand forecasting across all lines."
+        },
+        {
+          "modelType": "Property",
+          "idShort": "measuresPlanned",
+          "valueType": "xs:string",
+          "value": "Extending the donation offer window to twelve weeks."
         }
       ]
     }

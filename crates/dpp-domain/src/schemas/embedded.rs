@@ -2,13 +2,13 @@ use semver::Version;
 
 use super::{SchemaEntry, SchemaOrigin};
 
-struct EmbeddedSchema {
-    product_group: &'static str,
-    version: &'static str,
-    json: &'static str,
+pub(crate) struct EmbeddedSchema {
+    pub(crate) product_group: &'static str,
+    pub(crate) version: &'static str,
+    pub(crate) json: &'static str,
 }
 
-const EMBEDDED: &[EmbeddedSchema] = &[
+pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
     EmbeddedSchema {
         product_group: "battery",
         version: "1.0.0",
@@ -64,10 +64,17 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         version: "1.2.0",
         json: include_str!("../../schemas/textile/v1.2.0.json"),
     },
+    // No v1.0.0. It predated Impl. Reg. (EU) 2026/2 and nothing can carry a
+    // document forward from it: a financial year is not derivable from a
+    // quarter, a CN code is not derivable from the word "apparel", a six-way
+    // treatment split is not derivable from one destination, and its reason
+    // list has no member in common with the Art. 2 derogations. A lens would
+    // have to invent every one of those, so the version was removed rather than
+    // migrated. Safe only because nothing has ever been stored under it.
     EmbeddedSchema {
         product_group: "unsold-goods",
-        version: "1.0.0",
-        json: include_str!("../../schemas/unsold-goods/v1.0.0.json"),
+        version: "2.0.0",
+        json: include_str!("../../schemas/unsold-goods/v2.0.0.json"),
     },
     EmbeddedSchema {
         product_group: "steel",

@@ -26,14 +26,17 @@ pub mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use data::unsold_goods::{
+    CnCategory, CnCategoryError, DiscardReason, DiscardedProductLine, DiscardedQuantity,
+    DisclosingEntity, DisclosureScope, FinancialYear, LegalEntityIdentifier, WasteTreatmentSplit,
+};
 pub use data::{
     AluminiumData, BatteryData, ConstructionData, CriticalRawMaterial, DetergentData,
     DynamicPerformance, ElectronicsData, EnvironmentalReading, ExpectedLifetime, FibreEntry,
     FurnitureData, HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition,
     MattressData, ProductGroupData, StateOfChargeReading, StateOfHealth, SteelData,
     SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
-    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport, UsageHistory,
-    redact_product_group_data,
+    UnsoldGoodsReport, UsageHistory, redact_product_group_data,
 };
 pub use enums::{
     BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
@@ -43,6 +46,6 @@ pub use metrics::{CarbonFootprint, RepairCriterion, RepairabilityScore};
 pub use product_group::ProductGroup;
 pub use validation::{
     battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
-    unsold_goods_category_matches_heading, validate_battery_operating_temp,
-    validate_fibre_composition, validate_surfactants, validate_svhc_substances,
+    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
+    validate_surfactants, validate_svhc_substances,
 };

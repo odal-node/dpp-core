@@ -56,7 +56,21 @@ const EMBEDDED: &[EmbeddedInstrument] = &[
         id: "ppwr-2025-40",
         json: include_str!("../../instruments/ppwr-2025-40.json"),
     },
+    EmbeddedInstrument {
+        id: "unsold-goods-format-2026-2",
+        json: include_str!("../../instruments/unsold-goods-format-2026-2.json"),
+    },
+    EmbeddedInstrument {
+        id: "unsold-goods-derogations-2026-296",
+        json: include_str!("../../instruments/unsold-goods-derogations-2026-296.json"),
+    },
 ];
+
+/// How many instrument manifests ship embedded in this build.
+///
+/// Exposed so a test can assert the catalog loaded all of them without writing
+/// the number down twice.
+pub const EMBEDDED_COUNT: usize = EMBEDDED.len();
 
 /// Open, data-driven catalog of the legal instruments that reach our product
 /// groups, pre-loaded from embedded manifests and extensible at runtime.

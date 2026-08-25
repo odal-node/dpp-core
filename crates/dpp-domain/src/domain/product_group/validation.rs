@@ -71,15 +71,11 @@ pub fn unsold_goods_annex_vii_heading(
     dpp_rules::unsold_goods::annex_vii::annex_vii_heading(commodity_code)
 }
 
-/// Whether a declared `UnsoldGoodsReport.product_category` word is
-/// consistent with the Annex VII heading a passport's `commodity_code`
-/// falls under. Delegates to [`dpp_rules`].
+/// Whether a disclosure line's CN category is filed at the depth Impl. Reg.
+/// (EU) 2026/2 Art. 3 requires for it. Delegates to [`dpp_rules`].
 #[must_use]
-pub fn unsold_goods_category_matches_heading(
-    product_category: &str,
-    heading: dpp_rules::unsold_goods::annex_vii::AnnexViiHeading,
-) -> bool {
-    dpp_rules::unsold_goods::annex_vii::product_category_matches_heading(product_category, heading)
+pub fn unsold_goods_cn_depth_is_correct(cn_category: &str) -> bool {
+    dpp_rules::unsold_goods::disclosure::cn_depth_is_correct(cn_category)
 }
 
 /// Validate a detergent surfactant list. Delegates to [`dpp_rules`].

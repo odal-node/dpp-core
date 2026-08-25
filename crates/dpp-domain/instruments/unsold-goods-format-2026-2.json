@@ -1,0 +1,23 @@
+{
+  "id": "unsold-goods-format-2026-2",
+  "title": "Format for the disclosure of information on discarded unsold consumer products — Commission Implementing Regulation (EU) 2026/2",
+  "celex": "32026R0002",
+  "kind": "implementing",
+  "status": "adopted",
+  "parent": "espr",
+  "passport": { "obligation": "notRequired" },
+  "productGroups": [
+    {
+      "productGroup": "unsold-goods",
+      "status": "in_force",
+      "legalBasis": [
+        "Commission Implementing Regulation (EU) 2026/2 Art. 2(1)",
+        "Commission Implementing Regulation (EU) 2026/2 Art. 3",
+        "Commission Implementing Regulation (EU) 2026/2 Annex I",
+        "Regulation (EU) 2024/1781 Art. 24(3)"
+      ],
+      "notes": "Adopted 2026-02-09, OJ 2026-02-10. Creates no duty of its own — it prescribes the format of the disclosure ESPR Art. 24 already requires, which is why it is an implementing act and carries no passport obligation. Art. 2(1) binds the visual presentation and content to Annex I. Art. 3 delimits categories on the first two digits of the CN code, except for the products of its Annex II, which take four. Art. 1 scopes the duty to each financial year from the first full financial year after the date of application, disclosed within 12 months of that year's end; Art. 2(2) lets an operator publishing sustainability reporting under Directive 2013/34/EU Arts. 19a or 29a link to it instead of disclosing on its website directly. Annex I note (h) points the reason vocabulary at the derogations of the delegated act under Art. 25(5), which is Del. Reg. (EU) 2026/296 — the two acts interlock and neither is complete alone."
+    }
+  ],
+  "notes": "Scope worth keeping straight: this implements Art. 24's DISCLOSURE duty, which reaches discarded unsold consumer products generally, and is therefore much wider than Art. 25's destruction prohibition over the Annex VII goods. Its own Annex II runs to 45 CN headings from soap and tyres to refrigerators and toys, none of which are in ESPR Annex VII. Treating Annex VII as the scope of the disclosure drops every category outside apparel and footwear from a report required to carry them."
+}

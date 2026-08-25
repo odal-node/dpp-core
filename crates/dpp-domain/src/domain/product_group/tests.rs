@@ -624,16 +624,7 @@ fn sample_detergent_data() -> ProductGroupData {
 }
 
 fn sample_unsold_goods_data() -> ProductGroupData {
-    ProductGroupData::UnsoldGoods(UnsoldGoodsReport {
-        reporting_period: "2026-Q3".into(),
-        volume_kg: 120.0,
-        product_category: "apparel".into(),
-        reason: UnsoldGoodsReason::EndOfSeason,
-        destination: UnsoldGoodsDestination::Donation,
-        destruction_justification: None,
-        country_of_disposal: "DE".into(),
-        operator_name: Some("Caritas Berlin".into()),
-    })
+    ProductGroupData::UnsoldGoods(crate::test_support::sample_unsold_goods_report())
 }
 
 #[test]

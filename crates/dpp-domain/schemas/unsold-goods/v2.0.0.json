@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/unsold-goods-v2.0.0.json",
+  "title": "Odal Node — Discarded Unsold Consumer Products Disclosure (v2.0.0)",
+  "description": "The disclosure required by EU ESPR Article 24, in the format prescribed by Commission Implementing Regulation (EU) 2026/2 (CELEX 32026R0002), Article 2(1) and Annex I. Reason vocabulary is the derogation list of Commission Delegated Regulation (EU) 2026/296 (CELEX 32026R0296), Article 2. Numbers carry no separators and are rounded to the nearest whole number (Annex I, Section 2); an estimated figure is shown with a leading '±' by the renderer, which is what the `estimated` flag drives.",
+  "type": "object",
+  "required": [
+    "entity",
+    "financialYear",
+    "lines",
+    "measuresTaken",
+    "measuresPlanned"
+  ],
+  "properties": {
+    "entity": {
+      "type": "object",
+      "description": "Annex I header rows: who is disclosing, and for whom.",
+      "required": ["name", "identifier", "scope"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Annex I note (a). For a subsidiary in a consolidated disclosure this is the PARENT undertaking's name, not the subsidiary's.",
+          "x-disclosure": "public"
+        },
+        "identifier": {
+          "type": "object",
+          "description": "Annex I note (b): the EUID established by Directive (EU) 2017/1132, or — only where no EUID is available — an identifier from an officially recognised Member State scheme.",
+          "oneOf": [
+            {
+              "required": ["type", "value"],
+              "properties": {
+                "type": { "const": "euid", "x-disclosure": "public" },
+                "value": { "type": "string", "minLength": 1, "x-disclosure": "public" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["type", "scheme", "value"],
+              "properties": {
+                "type": { "const": "other", "x-disclosure": "public" },
+                "scheme": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Annex I's 'Other, namely:' blank. Without it the value cannot be resolved.",
+                  "x-disclosure": "public"
+                },
+                "value": { "type": "string", "minLength": 1, "x-disclosure": "public" }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "x-disclosure": "public"
+        },
+        "scope": {
+          "type": "object",
+          "description": "Annex I note (c). A consolidated disclosure must list the subsidiaries or member undertakings it covers.",
+          "oneOf": [
+            {
+              "required": ["type"],
+              "properties": {
+                "type": { "const": "standalone", "x-disclosure": "public" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["type", "undertakings"],
+              "properties": {
+                "type": { "const": "consolidated", "x-disclosure": "public" },
+                "undertakings": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 },
+                  "x-disclosure": "public"
+                }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "x-disclosure": "public"
+        }
+      },
+      "additionalProperties": false,
+      "x-disclosure": "public"
+    },
+    "financialYear": {
+      "type": "object",
+      "description": "Art. 1: the disclosure covers a financial year, which is the undertaking's own and need not be a calendar year. Due within 12 months of its end.",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "format": "date", "x-disclosure": "public" },
+        "end": { "type": "string", "format": "date", "x-disclosure": "public" }
+      },
+      "additionalProperties": false,
+      "x-disclosure": "public"
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The body of the Annex I table. 'Additional lines may be added as necessary'; note (h) requires a separate line per reason within a category.",
+      "items": {
+        "type": "object",
+        "required": [
+          "cnCategories",
+          "description",
+          "unitsDiscarded",
+          "weightKg",
+          "packagingIncluded",
+          "reason",
+          "treatment"
+        ],
+        "properties": {
+          "cnCategories": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Note (d) and Art. 3: the CN chapter (2 digits) or heading (4 digits) this line is filed under. Four digits are required for the products of Annex II. Note (f) allows more than one code where items sold together count as one unit.",
+            "items": {
+              "type": "string",
+              "pattern": "^([0-9]{2}|[0-9]{4})$"
+            },
+            "x-disclosure": "public"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Note (e): established on the basis of the combined nomenclature, or a more detailed description.",
+            "x-disclosure": "public"
+          },
+          "unitsDiscarded": {
+            "type": "object",
+            "description": "Note (f): total units discarded in the period for this category. May be estimated from an accurately determined weight, in which case `estimated` is true and the renderer shows '±'.",
+            "required": ["value"],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Section 2: no separators, rounded to the nearest whole number.",
+                "x-disclosure": "public"
+              },
+              "estimated": { "type": "boolean", "default": false, "x-disclosure": "public" }
+            },
+            "additionalProperties": false,
+            "x-disclosure": "public"
+          },
+          "weightKg": {
+            "type": "object",
+            "description": "Note (g): combined weight of the units discarded, in kilogrammes. May be estimated from an accurate count, in which case `estimated` is true.",
+            "required": ["value"],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Section 2: no separators, rounded to the nearest whole number.",
+                "x-disclosure": "public"
+              },
+              "estimated": { "type": "boolean", "default": false, "x-disclosure": "public" }
+            },
+            "additionalProperties": false,
+            "x-disclosure": "public"
+          },
+          "packagingIncluded": {
+            "type": "boolean",
+            "description": "Whether packaging is included in weightKg — its own Annex I column, because the answer changes what the weight means.",
+            "x-disclosure": "public"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Note (h): the reason must refer to the derogations of Del. Reg. (EU) 2026/296 Art. 2, points (a) to (j). 'offeredForDonationNotAccepted' is point (h) and applies ONLY where none of (a) to (g) does.",
+            "enum": [
+              "dangerousProduct",
+              "nonCompliantWithLaw",
+              "intellectualPropertyInfringement",
+              "licensedPeriodExpired",
+              "markingsCannotBeRemoved",
+              "damagedOrContaminated",
+              "defectiveBeyondRepair",
+              "offeredForDonationNotAccepted",
+              "donatedButNoRecipientFound",
+              "reusedButNoRecipientFound"
+            ],
+            "x-disclosure": "public"
+          },
+          "reasonDetail": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "description": "Note (h): 'A more detailed explanation may be added.'",
+            "x-disclosure": "public"
+          },
+          "treatment": {
+            "type": "object",
+            "description": "Note (i): the proportion of the line delivered to each waste treatment operation, as percentages OF WEIGHT. Total destruction is NOT a field — the act defines it as recycling + other recovery + disposal, so it is derived. 'unknown' is a real answer, for the share whose treatment could not be obtained from the waste treatment operator.",
+            "required": [
+              "preparingForReusePct",
+              "recyclingPct",
+              "otherRecoveryPct",
+              "disposalPct",
+              "unknownPct"
+            ],
+            "properties": {
+              "preparingForReusePct": {
+                "type": "integer", "minimum": 0, "maximum": 100, "x-disclosure": "public"
+              },
+              "recyclingPct": {
+                "type": "integer", "minimum": 0, "maximum": 100, "x-disclosure": "public"
+              },
+              "otherRecoveryPct": {
+                "type": "integer", "minimum": 0, "maximum": 100, "x-disclosure": "public"
+              },
+              "disposalPct": {
+                "type": "integer", "minimum": 0, "maximum": 100, "x-disclosure": "public"
+              },
+              "unknownPct": {
+                "type": "integer", "minimum": 0, "maximum": 100, "x-disclosure": "public"
+              }
+            },
+            "additionalProperties": false,
+            "x-disclosure": "public"
+          }
+        },
+        "additionalProperties": false
+      },
+      "x-disclosure": "public"
+    },
+    "measuresTaken": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Annex I note (i): measures taken to prevent destruction, including those taken in the PRECEDING financial year, based where relevant on what was destroyed in the past.",
+      "x-disclosure": "public"
+    },
+    "measuresPlanned": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Annex I note (j): measures planned for the future, in particular those necessary to prevent destruction of the categories destroyed in the preceding financial year for the same reasons, and how they are expected to achieve that.",
+      "x-disclosure": "public"
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "NO PASSPORT OBLIGATION. ESPR Arts. 24-25 bind an economic operator over a financial year and require no digital product passport at all — the disclosure is published on the operator's own website, or by a link to its sustainability reporting under Directive 2013/34/EU Arts. 19a/29a (Impl. Reg. (EU) 2026/2 Art. 2(2)). This schema therefore describes a disclosure we model, not a passport the law asks for. Structural validation against it is not evidence of compliance with any passport obligation, and no binding passport determination may be emitted here. Note also that the ban's scope and the disclosure's scope differ: Art. 25 prohibits destroying the Annex VII products (apparel, clothing accessories, footwear), while Art. 24's disclosure reaches discarded unsold consumer products generally."
+}

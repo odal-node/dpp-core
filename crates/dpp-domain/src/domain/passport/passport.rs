@@ -444,10 +444,9 @@ impl Passport {
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `product_group_data.product group()` matches `self.product_group` if present
-    /// - for `ProductGroup::UnsoldGoods`, `commodity_code` is present and within
-    ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear),
-    ///   and `product_group_data.product_category` (when present) agrees with the
-    ///   Annex VII heading the commodity code falls under
+    /// - for `ProductGroup::UnsoldGoods`, the disclosure carries at least one
+    ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
+    ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     /// - `product_group_data` passes JSON Schema + cross-field rules via
     ///   [`crate::domain::validation::validate_product_group_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
@@ -540,39 +539,28 @@ impl Passport {
             });
         }
 
-        // ESPR Annex VII eligibility: an unsold-goods passport must declare a
-        // commodity code within Annex VII's two headings (apparel & clothing
-        // accessories, or footwear) — a passport cannot claim this product group for
-        // a product the destruction ban does not cover. When product_group_data is
-        // also present, its own product_category word must agree with the
-        // heading the commodity code actually falls under — two fields
-        // describing the same product must not contradict each other.
-        if self.product_group == ProductGroup::UnsoldGoods {
-            match &self.commodity_code {
-                None => errors.push(FieldError {
-                    field: "/commodityCode".to_owned(),
-                    message: "commodity_code is required for product_group unsoldGoods (ESPR Annex VII scope check)".to_owned(),
-                }),
-                Some(code) => match crate::domain::product_group::unsold_goods_annex_vii_heading(code.as_str()) {
-                    None => errors.push(FieldError {
-                        field: "/commodityCode".to_owned(),
-                        message: "commodity_code is not within ESPR Annex VII scope (apparel/clothing accessories or footwear)".to_owned(),
-                    }),
-                    Some(heading) => {
-                        if let Some(ProductGroupData::UnsoldGoods(report)) = &self.product_group_data
-                            && !crate::domain::product_group::unsold_goods_category_matches_heading(
-                                &report.product_category,
-                                heading,
-                            )
-                        {
-                            errors.push(FieldError {
-                                field: "/productGroupData/productCategory".to_owned(),
-                                message: "product_category does not match the Annex VII heading commodity_code falls under".to_owned(),
-                            });
-                        }
-                    }
-                },
-            }
+        // An unsold-goods record is a disclosure by an undertaking over a
+        // financial year, not a product placed on the market, so the envelope's
+        // `commodity_code` has nothing to describe: the categories are on the
+        // lines, and there are many of them.
+        //
+        // This deliberately no longer requires Annex VII scope. **Art. 24
+        // (disclosure) and Art. 25 (destruction ban) have different scopes** —
+        // the ban reaches Annex VII's apparel and footwear, while the disclosure
+        // reaches discarded unsold *consumer products* generally, which Impl.
+        // Reg. (EU) 2026/2 Annex II illustrates across 45 CN headings from soap
+        // to refrigerators. Requiring Annex VII here rejected every lawful
+        // disclosure outside apparel and footwear.
+        if self.product_group == ProductGroup::UnsoldGoods
+            && let Some(ProductGroupData::UnsoldGoods(report)) = &self.product_group_data
+            && report.lines.is_empty()
+        {
+            errors.push(FieldError {
+                field: "/productGroupData/lines".to_owned(),
+                message: "an unsold-goods disclosure must carry at least one product line \
+                          (Impl. Reg. (EU) 2026/2 Annex I)"
+                    .to_owned(),
+            });
         }
 
         // ProductGroup-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).

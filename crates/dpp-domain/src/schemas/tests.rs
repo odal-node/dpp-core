@@ -6,13 +6,11 @@ use semver::Version;
 #[test]
 fn registry_loads_all_embedded_schemas() {
     let reg = VersionedSchemaRegistry::new();
-    // battery 1.0 + 2.0 + 2.1 + 2.2 + 2.3 + 2.4 + 2.5 + 2.6,
-    // textile 1.0 + 1.1 + 1.2, unsold-goods 1.0,
-    // steel 1.0 + 1.1, electronics 1.0 + 1.1 + 1.2, construction 1.0 + 1.1,
-    // tyre 1.0, toy 1.0 + 1.1, aluminium 1.0 + 1.1, furniture 1.0 + 1.1 + 1.2,
-    // mattress 1.0,
-    // detergent 1.0 + 1.1
-    assert_eq!(reg.len(), 30);
+    // Derived from the embedded table rather than written out. The count and
+    // the per-product-group list that used to sit here went stale the first
+    // time a schema version landed, which is the whole failure this asserts
+    // against: `new()` must load every embedded schema, whatever there are.
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len());
 }
 
 #[test]
@@ -93,7 +91,7 @@ fn register_new_schema_succeeds() {
     let mut reg = VersionedSchemaRegistry::new();
     let schema = r#"{"type": "object", "properties": {"gtin": {"type": "string"}}}"#;
     assert!(reg.register("plastics", "1.0.0", schema.to_owned()).is_ok());
-    assert_eq!(reg.len(), 31);
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
 
     let entry = reg
         .get_entry("plastics", &"1.0.0".parse().unwrap())
@@ -159,7 +157,7 @@ fn register_or_replace_new_returns_false() {
         .register_or_replace("plastics", "1.0.0", schema.to_owned())
         .unwrap();
     assert!(!replaced);
-    assert_eq!(reg.len(), 31);
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
 }
 
 #[test]
@@ -170,7 +168,7 @@ fn register_or_replace_existing_returns_true() {
         .register_or_replace("battery", "1.0.0", new_schema.to_owned())
         .unwrap();
     assert!(replaced);
-    assert_eq!(reg.len(), 30); // count unchanged
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len()); // count unchanged
     assert!(
         reg.get("battery", &"1.0.0".parse().unwrap())
             .unwrap()
@@ -195,11 +193,11 @@ fn unregister_runtime_schema_succeeds() {
     let schema = r#"{"type": "object"}"#;
     reg.register("plastics", "1.0.0", schema.to_owned())
         .unwrap();
-    assert_eq!(reg.len(), 31);
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
 
     let removed = reg.unregister("plastics", &"1.0.0".parse().unwrap());
     assert!(removed);
-    assert_eq!(reg.len(), 30);
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len());
     assert!(reg.get("plastics", &"1.0.0".parse().unwrap()).is_none());
 }
 
@@ -208,7 +206,7 @@ fn unregister_embedded_schema_does_nothing() {
     let mut reg = VersionedSchemaRegistry::new();
     let removed = reg.unregister("battery", &"1.0.0".parse().unwrap());
     assert!(!removed);
-    assert_eq!(reg.len(), 30); // still there
+    assert_eq!(reg.len(), super::embedded::EMBEDDED.len()); // still there
 }
 
 #[test]
@@ -440,34 +438,99 @@ fn conformance_textile_v1_invalid_country_pattern() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn conformance_unsold_goods_v1_valid() {
+fn conformance_unsold_goods_v2_valid() {
     let reg = VersionedSchemaRegistry::new();
-    let v: Version = "1.0.0".parse().unwrap();
+    let v: Version = "2.0.0".parse().unwrap();
     let data = serde_json::json!({
-        "reportingPeriod": "2026-Q2",
-        "volumeKg": 120.5,
-        "productCategory": "apparel",
-        "reason": "end_of_season",
-        "destination": "donation",
-        "countryOfDisposal": "DE"
+        "entity": {
+            "name": "Example Retail Group SA",
+            "identifier": { "type": "euid", "value": "LUB123456789" },
+            "scope": { "type": "standalone" }
+        },
+        "financialYear": { "start": "2027-01-01", "end": "2027-12-31" },
+        "lines": [{
+            "cnCategories": ["6203"],
+            "description": "Men's suits and trousers",
+            "unitsDiscarded": { "value": 1200 },
+            "weightKg": { "value": 430, "estimated": true },
+            "packagingIncluded": false,
+            "reason": "damagedOrContaminated",
+            "treatment": {
+                "preparingForReusePct": 20, "recyclingPct": 50,
+                "otherRecoveryPct": 20, "disposalPct": 5, "unknownPct": 5
+            }
+        }],
+        "measuresTaken": "Pre-season demand forecasting.",
+        "measuresPlanned": "Twelve-week donation window."
     });
     assert!(reg.validate("unsold-goods", &v, &data).is_ok());
 }
 
+/// The reason vocabulary is Del. Reg. (EU) 2026/296 Art. 2's derogation list.
+/// `end_of_season` was ours and is not a derogation at all — a disclosure using
+/// it claimed a lawful destruction the act does not permit.
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn conformance_unsold_goods_v1_invalid_destination_enum() {
+fn conformance_unsold_goods_v2_rejects_a_reason_outside_article_2() {
     let reg = VersionedSchemaRegistry::new();
-    let v: Version = "1.0.0".parse().unwrap();
-    // "incineration" is not a valid destination enum value.
-    let data = serde_json::json!({
-        "reportingPeriod": "2026-Q2",
-        "volumeKg": 50.0,
-        "productCategory": "apparel",
-        "reason": "end_of_season",
-        "destination": "incineration",
-        "countryOfDisposal": "DE"
+    let v: Version = "2.0.0".parse().unwrap();
+    let mut data = serde_json::json!({
+        "entity": {
+            "name": "Example Retail Group SA",
+            "identifier": { "type": "euid", "value": "LUB123456789" },
+            "scope": { "type": "standalone" }
+        },
+        "financialYear": { "start": "2027-01-01", "end": "2027-12-31" },
+        "lines": [{
+            "cnCategories": ["6203"],
+            "description": "Men's suits and trousers",
+            "unitsDiscarded": { "value": 1200 },
+            "weightKg": { "value": 430 },
+            "packagingIncluded": false,
+            "reason": "damagedOrContaminated",
+            "treatment": {
+                "preparingForReusePct": 20, "recyclingPct": 50,
+                "otherRecoveryPct": 20, "disposalPct": 5, "unknownPct": 5
+            }
+        }],
+        "measuresTaken": "Pre-season demand forecasting.",
+        "measuresPlanned": "Twelve-week donation window."
     });
+    data["lines"][0]["reason"] = serde_json::json!("end_of_season");
+    assert!(reg.validate("unsold-goods", &v, &data).is_err());
+}
+
+/// Art. 3 delimits by CN chapter or heading; a product's own 6/8/10-digit code
+/// is a different level of the nomenclature and files a whole chapter's goods
+/// under one article.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn conformance_unsold_goods_v2_rejects_a_full_commodity_code_as_a_category() {
+    let reg = VersionedSchemaRegistry::new();
+    let v: Version = "2.0.0".parse().unwrap();
+    let mut data = serde_json::json!({
+        "entity": {
+            "name": "Example Retail Group SA",
+            "identifier": { "type": "euid", "value": "LUB123456789" },
+            "scope": { "type": "standalone" }
+        },
+        "financialYear": { "start": "2027-01-01", "end": "2027-12-31" },
+        "lines": [{
+            "cnCategories": ["6203"],
+            "description": "Men's suits and trousers",
+            "unitsDiscarded": { "value": 1200 },
+            "weightKg": { "value": 430 },
+            "packagingIncluded": false,
+            "reason": "damagedOrContaminated",
+            "treatment": {
+                "preparingForReusePct": 20, "recyclingPct": 50,
+                "otherRecoveryPct": 20, "disposalPct": 5, "unknownPct": 5
+            }
+        }],
+        "measuresTaken": "Pre-season demand forecasting.",
+        "measuresPlanned": "Twelve-week donation window."
+    });
+    data["lines"][0]["cnCategories"] = serde_json::json!(["62034231"]);
     assert!(reg.validate("unsold-goods", &v, &data).is_err());
 }
 

@@ -5,10 +5,10 @@
 //! Unlike [`crate::ports::compliance`], there is no pluggable strategy here:
 //! the lint pack ships directly in `dpp-rules` and is not an extension seam.
 
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::product_group::{ProductGroupData, UnsoldGoodsDestination};
+use super::product_group::{DisclosureScope, ProductGroupData};
 
 /// How strongly a lint finding should be read. Neither variant blocks
 /// publish — the distinction is tone, not gating. Mirrors
@@ -67,16 +67,6 @@ fn convert(f: dpp_rules::lint::LintFinding) -> LintFinding {
             dpp_rules::lint::LintSeverity::Notice => LintSeverity::Notice,
         },
         message: f.message,
-    }
-}
-
-fn unsold_goods_destination_code(d: &UnsoldGoodsDestination) -> &'static str {
-    match d {
-        UnsoldGoodsDestination::Donation => "donation",
-        UnsoldGoodsDestination::Recycling => "recycling",
-        UnsoldGoodsDestination::Repurposing => "repurposing",
-        UnsoldGoodsDestination::SupplierReturn => "supplier_return",
-        UnsoldGoodsDestination::ExemptDestruction => "exempt_destruction",
     }
 }
 
@@ -151,14 +141,35 @@ pub fn lint_product_group_data(data: &ProductGroupData, as_of: DateTime<Utc>) ->
                 .collect()
         }
         ProductGroupData::UnsoldGoods(u) => {
+            let lines: Vec<dpp_rules::lint::unsold_goods::DisclosureLineInput<'_>> = u
+                .lines
+                .iter()
+                .map(|l| dpp_rules::lint::unsold_goods::DisclosureLineInput {
+                    // A line may carry several CN codes (Annex I note (f)); the
+                    // depth rule is about the first, which is the one the line
+                    // is filed under.
+                    cn_category: l
+                        .cn_categories
+                        .first()
+                        .map_or("", super::product_group::CnCategory::as_str),
+                    reason_point: l.reason.article_2_point(),
+                    units: l.units_discarded.value,
+                    weight_kg: l.weight_kg.value,
+                    preparing_for_reuse_pct: l.treatment.preparing_for_reuse_pct,
+                    recycling_pct: l.treatment.recycling_pct,
+                    other_recovery_pct: l.treatment.other_recovery_pct,
+                    disposal_pct: l.treatment.disposal_pct,
+                    unknown_pct: l.treatment.unknown_pct,
+                })
+                .collect();
             let input = dpp_rules::lint::unsold_goods::UnsoldGoodsLintInput {
-                reporting_period: &u.reporting_period,
-                volume_kg: u.volume_kg,
-                destination: unsold_goods_destination_code(&u.destination),
-                operator_name: u.operator_name.as_deref(),
-                destruction_justification: u.destruction_justification.as_deref(),
-                as_of_year: as_of.year().max(0) as u32,
-                as_of_month: as_of.month(),
+                lines: &lines,
+                consolidated_undertaking_count: match &u.entity.scope {
+                    DisclosureScope::Consolidated { undertakings } => Some(undertakings.len()),
+                    DisclosureScope::Standalone => None,
+                },
+                measures_taken_len: u.measures_taken.trim().chars().count(),
+                measures_planned_len: u.measures_planned.trim().chars().count(),
             };
             dpp_rules::lint::unsold_goods::lint_unsold_goods(&input)
                 .into_iter()
@@ -172,7 +183,8 @@ pub fn lint_product_group_data(data: &ProductGroupData, as_of: DateTime<Utc>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::product_group::{BatteryData, UnsoldGoodsReason, UnsoldGoodsReport};
+    use crate::domain::product_group::BatteryData;
+    use crate::domain::product_group::data::unsold_goods::{CnCategory, DiscardReason};
 
     fn battery() -> BatteryData {
         BatteryData {
@@ -203,23 +215,60 @@ mod tests {
     }
 
     #[test]
-    fn unsold_goods_third_party_without_operator_name_triggers() {
-        let report = UnsoldGoodsReport {
-            reporting_period: "2026-Q2".into(),
-            volume_kg: 500.0,
-            product_category: "apparel".into(),
-            reason: UnsoldGoodsReason::EndOfSeason,
-            destination: UnsoldGoodsDestination::Donation,
-            destruction_justification: None,
-            country_of_disposal: "MK".into(),
-            operator_name: None,
-        };
+    fn a_well_formed_disclosure_produces_no_findings() {
+        let data = ProductGroupData::UnsoldGoods(crate::test_support::sample_unsold_goods_report());
+        assert_eq!(lint_product_group_data(&data, Utc::now()), Vec::new());
+    }
+
+    /// Annex I note (i) provides `unknown` for the share that could not be
+    /// established, so a split that does not reach 100 has lost weight rather
+    /// than being unsure about it.
+    #[test]
+    fn a_treatment_split_that_misses_100_is_flagged() {
+        let mut report = crate::test_support::sample_unsold_goods_report();
+        report.lines[0].treatment.disposal_pct = 1;
         let data = ProductGroupData::UnsoldGoods(report);
         let findings = lint_product_group_data(&data, Utc::now());
         assert!(
             findings
                 .iter()
-                .any(|f| f.code == "unsold_goods.operator_name_missing_for_third_party_destination")
+                .any(|f| f.code == "unsold_goods.treatment_split_does_not_total_100"),
+            "{findings:?}"
+        );
+    }
+
+    /// Art. 3 requires four digits for Annex II products, and chapter 85 holds
+    /// several — so a chapter-level line there hides which heading applied.
+    #[test]
+    fn a_chapter_holding_annex_ii_headings_is_flagged() {
+        let mut report = crate::test_support::sample_unsold_goods_report();
+        report.lines[0].cn_categories = vec![CnCategory::parse("85").expect("valid chapter")];
+        let data = ProductGroupData::UnsoldGoods(report);
+        let findings = lint_product_group_data(&data, Utc::now());
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.code == "unsold_goods.cn_category_needs_four_digits"),
+            "{findings:?}"
+        );
+    }
+
+    /// Point (h) applies "only where none of the circumstances referred to in
+    /// points (a) to (g) are applicable", so it cannot sit beside one of them
+    /// for the same category.
+    #[test]
+    fn donation_claimed_beside_a_stronger_reason_is_flagged() {
+        let mut report = crate::test_support::sample_unsold_goods_report();
+        let mut second = report.lines[0].clone();
+        second.reason = DiscardReason::OfferedForDonationNotAccepted;
+        report.lines.push(second);
+        let data = ProductGroupData::UnsoldGoods(report);
+        let findings = lint_product_group_data(&data, Utc::now());
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.code == "unsold_goods.donation_reason_alongside_stronger_reason"),
+            "{findings:?}"
         );
     }
 

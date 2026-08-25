@@ -123,7 +123,7 @@ Elements of `Passport.materials` — bill of materials entries.
 | `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
 | `steel` | `product_category` | `"flat"` / `"long"` / … |
 | `electronics` | `product_category` | `"smartphone"` / `"other-mobile-phone"` / `"cordless-phone"` / `"tablet"` — closed, Reg. (EU) 2023/1670 Art. 1(1) |
-| `unsold-goods` | `product_category` | `"apparel"` / `"footwear"` / … — **ours, and superseded.** Impl. Reg. (EU) 2026/2 Art. 3 delimits by CN code. See §4.4 |
+| `unsold-goods` | *(none)* | Removed in schema v2.0.0. Impl. Reg. (EU) 2026/2 Art. 3 delimits a disclosure by **CN code**, so its lines carry `cnCategories`, not a category word of ours. See §4.4 |
 | `furniture` | `product_type` | — |
 | `tyre` | `tyre_class` | `"C1"` / … |
 
@@ -285,7 +285,7 @@ others are listed here rather than each getting a stub.
 | `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
 | `toy` | `ToyData` | v1.1.0 | Reg. (EU) 2025/2509 |
 | `tyre` | `TyreData` | v1.0.0 | |
-| `unsold-goods` | `UnsoldGoodsReport` | v1.0.0 | See §4.4 — **not a product group** and its model is out of date |
+| `unsold-goods` | `UnsoldGoodsReport` | v2.0.0 | See §4.4 — **not a product group**; built to Impl. Reg. (EU) 2026/2 Annex I |
 
 `ProductGroupData::Other` keeps the tag and payload of a product group this build
 has no typed variant for, verbatim, so an unknown group round-trips rather than
@@ -299,28 +299,45 @@ an operator over a financial year**, not a product placed on the market. It
 carries `PassportObligation::NotRequired`: the duty is real and binding today,
 and there is no passport anywhere in Arts. 24–25.
 
-⚠️ **`UnsoldGoodsReport` does not match the adopted format.** Two acts now govern
-this, both adopted 9 February 2026 and neither reflected in the type:
+Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` v2.0.0
+is built to them:
 
 - **Commission Implementing Regulation (EU) 2026/2** (CELEX `32026R0002`), under
-  Art. 24(3) — Art. 2(1) requires the disclosure to comply with the format in its
-  **Annex I**, and Art. 3 delimits categories by **CN code**, first two digits
-  (four for its Annex II list).
+  Art. 24(3) — Art. 2(1) binds the disclosure to the format in its **Annex I**,
+  and Art. 3 delimits categories by **CN code**, first two digits (four for the
+  products of its Annex II).
 - **Commission Delegated Regulation (EU) 2026/296** (CELEX `32026R0296`), under
-  Art. 25(5) — the **closed list of derogations** from the destruction ban.
-  Annex I note (h) of 2026/2 points its reason vocabulary at that list.
+  Art. 25(5) — the **closed list of ten derogations**, points (a) to (j). Annex I
+  note (h) of 2026/2 makes it the reason vocabulary, so the two interlock.
 
-Known divergences: the period is a **financial year** with start and end dates,
-not a free-text quarter; categories are **CN codes**, not names like `"apparel"`;
-the disclosure needs a legal-entity header and a standalone-vs-consolidated flag;
-unit counts and a packaging-included flag are absent; waste treatment is a
-**percentage split** across preparing-for-reuse, recycling, other recovery,
-disposal, total destruction and unknown — where *destruction is the sum of
-recycling, other recovery and disposal* — not a single destination; and the two
-"measures taken / planned to prevent destruction" fields have no representation.
-`UnsoldGoodsReason`'s variants are ours, not the Regulation's.
+The shape is Annex I's: an `entity` header (name, EUID-or-other identifier,
+standalone vs consolidated with its undertakings listed), a `financialYear` with
+both endpoints, a repeating body of `lines`, and the two narrative rows
+`measuresTaken` and `measuresPlanned`. Each line carries its CN categories —
+plural, because note (f) allows several where items sold together count as one
+unit — a description, unit and weight quantities each flagged `estimated` or not,
+a packaging-included flag, one `reason`, and a `treatment` split.
 
-Reuse `CommodityCode` for the CN axis when this is rebuilt.
+Three points that are easy to get wrong:
+
+- **Total destruction is derived, never stored.** Note (i) defines it as
+  *recycling + other recovery + disposal*. Preparing-for-reuse and unknown sit
+  outside it, which is not the intuitive reading. `WasteTreatmentSplit::total_destruction_pct`
+  computes it; the wire has no such field.
+- **`unknown` is an answer, not a gap.** Note (i) provides it for the share whose
+  treatment could not be obtained from the waste treatment operator, so a
+  well-formed split totals exactly 100 and nothing is left over.
+- **`CnCategory` is not `CommodityCode`.** Two digits or four, against six/eight/ten
+  — a product's own classification is a different level of the same nomenclature
+  and files a whole chapter's goods under one article if substituted.
+
+**There is no v1.0.0.** It predated both acts and nothing could carry a document
+forward from it: a financial year is not derivable from `"2026-Q2"`, a CN code is
+not derivable from `"apparel"`, a six-way split is not derivable from one
+destination, and its reason list shares no member with the Art. 2 derogations —
+two of its reasons named commercial circumstances that are not derogations at
+all. A lens would have had to invent every one of those, so the version was
+removed rather than migrated. Safe only because nothing was ever stored under it.
 
 ---
 

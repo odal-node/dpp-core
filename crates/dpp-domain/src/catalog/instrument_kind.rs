@@ -57,6 +57,23 @@ pub enum InstrumentKind {
     /// `electronics` defect lived: an adjacent act was recorded as though it
     /// created a passport obligation of its own.
     Adjacent,
+    /// An act adopted **under** a framework that fixes the *procedure or format*
+    /// by which an obligation is met, rather than the obligation itself — an EU
+    /// implementing act. Names its framework in
+    /// [`Instrument::parent`](crate::catalog::Instrument::parent).
+    ///
+    /// Distinct from [`Self::Delegated`] because the Treaty distinction is real
+    /// and the two do different work: a delegated act may supplement or amend
+    /// non-essential elements of the basic act, while an implementing act only
+    /// lays down uniform conditions for implementing it. Impl. Reg. (EU) 2026/2
+    /// is the clearest case in this catalog — it creates no duty at all, it
+    /// prescribes the format of a disclosure ESPR Art. 24 already required.
+    ///
+    /// Recorded as its own kind for the same reason `Delegated` was: forcing an
+    /// implementing act into `Delegated` would assert it can do something it
+    /// cannot, and forcing it into `Other` would drop a distinction the law
+    /// draws.
+    Implementing,
     /// A kind this build does not model, holding its manifest spelling verbatim.
     Other(String),
 }
@@ -71,6 +88,7 @@ impl InstrumentKind {
             Self::Delegated => "delegated",
             Self::Direct => "direct",
             Self::Adjacent => "adjacent",
+            Self::Implementing => "implementing",
             Self::Other(_) => return None,
         })
     }
@@ -83,6 +101,7 @@ impl From<String> for InstrumentKind {
             "delegated" => Self::Delegated,
             "direct" => Self::Direct,
             "adjacent" => Self::Adjacent,
+            "implementing" => Self::Implementing,
             _ => Self::Other(s),
         }
     }
@@ -111,6 +130,7 @@ mod tests {
             InstrumentKind::Delegated,
             InstrumentKind::Direct,
             InstrumentKind::Adjacent,
+            InstrumentKind::Implementing,
         ] {
             let json = serde_json::to_string(&kind).expect("serialise");
             assert!(
