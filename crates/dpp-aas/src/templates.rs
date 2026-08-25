@@ -3,8 +3,8 @@ use super::semantic_ids;
 /// Metadata for a single AAS submodel template binding.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmodelTemplate {
-    /// Catalog sector key this template applies to, e.g. `"battery"`.
-    pub sector_key: &'static str,
+    /// Catalog product group key this template applies to, e.g. `"battery"`.
+    pub product_group_key: &'static str,
     /// Semantic ID (IDTA URN, Catena-X URN, ECLASS IRDI, or odal-node placeholder).
     pub semantic_id: &'static str,
     /// Human-readable version string (from the source template / standard).
@@ -32,74 +32,76 @@ impl SubmodelTemplate {
 
 static SUBMODEL_TEMPLATES: &[SubmodelTemplate] = &[
     SubmodelTemplate {
-        sector_key: "battery",
+        product_group_key: "battery",
         semantic_id: semantic_ids::BATTERY_TECHNICAL_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "textile",
+        product_group_key: "textile",
         semantic_id: semantic_ids::TEXTILE_MATERIAL,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "electronics",
+        product_group_key: "electronics",
         semantic_id: semantic_ids::ELECTRONICS_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "steel",
+        product_group_key: "steel",
         semantic_id: semantic_ids::STEEL_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "construction",
+        product_group_key: "construction",
         semantic_id: semantic_ids::CONSTRUCTION_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "tyre",
+        product_group_key: "tyre",
         semantic_id: semantic_ids::TYRE_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "toy",
+        product_group_key: "toy",
         semantic_id: semantic_ids::TOY_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "aluminium",
+        product_group_key: "aluminium",
         semantic_id: semantic_ids::ALUMINIUM_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "furniture",
+        product_group_key: "furniture",
         semantic_id: semantic_ids::FURNITURE_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "detergent",
+        product_group_key: "detergent",
         semantic_id: semantic_ids::DETERGENT_PRODUCT_DATA,
         version: "1.0",
     },
     SubmodelTemplate {
-        sector_key: "unsold-goods",
+        product_group_key: "unsold-goods",
         semantic_id: semantic_ids::UNSOLD_GOODS_REPORT,
         version: "1.0",
     },
 ];
 
-/// Look up the AAS submodel template binding for a catalog sector key.
+/// Look up the AAS submodel template binding for a catalog product group key.
 ///
-/// Returns `None` for sectors that don't yet have a dedicated AAS template.
+/// Returns `None` for product groups that don't yet have a dedicated AAS template.
 /// Returns `Some(t)` where `t.is_placeholder()` is `true` when the semantic ID
 /// is a draft Odal Node placeholder, not a ratified IDTA standard.
-pub fn sector_submodel_template(sector_key: &str) -> Option<&'static SubmodelTemplate> {
+pub fn product_group_submodel_template(
+    product_group_key: &str,
+) -> Option<&'static SubmodelTemplate> {
     SUBMODEL_TEMPLATES
         .iter()
-        .find(|t| t.sector_key == sector_key)
+        .find(|t| t.product_group_key == product_group_key)
 }
 
-/// Returns every sector template whose semantic ID is still a placeholder.
+/// Returns every product group template whose semantic ID is still a placeholder.
 ///
 /// Use this in CI to gate placeholder IDs from being promoted as conformant.
 pub fn placeholder_templates() -> impl Iterator<Item = &'static SubmodelTemplate> {

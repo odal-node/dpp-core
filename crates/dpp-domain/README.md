@@ -12,7 +12,7 @@ It contains everything that changes when EU regulations change — and nothing e
 
 ## When to use this crate
 
-- You need the DPP data model: `Passport`, `SectorData`, `TransferChain`.
+- You need the DPP data model: `Passport`, `ProductGroupData`, `TransferChain`.
 - You are implementing a platform adapter (database, HTTP layer) and need the
   port trait interfaces: `PassportRepository`, `IdentityPort`, `PluginHost`, etc.
 - You want to validate passport data against embedded JSON schemas.
@@ -20,14 +20,14 @@ It contains everything that changes when EU regulations change — and nothing e
 ## Example
 
 ```rust
-use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
-use dpp_domain::catalog::SectorCatalog;
+use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::catalog::ProductGroupCatalog;
 use dpp_domain::Audience;
 use serde_json::json;
 
-// Sector metadata is data, not code: regime, status and retention all come
+// Product group metadata is data, not code: regime, status and retention all come
 // from the catalog manifests.
-let catalog = SectorCatalog::new();
+let catalog = ProductGroupCatalog::new();
 let battery = catalog.get("battery").expect("battery is in the catalog");
 assert_eq!(battery.key, "battery");
 
@@ -36,7 +36,7 @@ assert_eq!(battery.key, "battery");
 // the classification its signatures were taken under: reclassifying a field
 // is a new schema version, and an older passport goes on being filtered by
 // the version it was validated against.
-let policy = SectorAccessPolicy::for_schema_version("battery", &battery.current_schema_version)
+let policy = ProductGroupAccessPolicy::for_schema_version("battery", &battery.current_schema_version)
     .expect("the current battery schema classifies every property");
 
 let full = json!({ "productName": "EcoCell", "stateOfHealthPct": 87.5 });

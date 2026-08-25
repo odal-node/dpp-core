@@ -13,10 +13,10 @@ pub enum SchemaOrigin {
     Runtime,
 }
 
-/// A single (sector, version) → JSON schema mapping.
+/// A single (product group, version) → JSON schema mapping.
 #[derive(Debug, Clone)]
 pub struct SchemaEntry {
-    pub sector: String,
+    pub product_group: String,
     pub version: Version,
     pub json: String,
     pub origin: SchemaOrigin,
@@ -28,9 +28,12 @@ pub struct SchemaEntry {
 pub enum SchemaRegistrationError {
     /// The provided JSON string is not valid JSON.
     InvalidJson(String),
-    /// A schema for this (sector, version) already exists.
+    /// A schema for this (product group, version) already exists.
     /// Use `register_or_replace` to overwrite.
-    AlreadyExists { sector: String, version: Version },
+    AlreadyExists {
+        product_group: String,
+        version: Version,
+    },
     /// The version string is not valid semver.
     InvalidVersion(String),
 }
@@ -39,8 +42,11 @@ impl std::fmt::Display for SchemaRegistrationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidJson(msg) => write!(f, "invalid JSON schema: {msg}"),
-            Self::AlreadyExists { sector, version } => {
-                write!(f, "schema already exists for {sector} v{version}")
+            Self::AlreadyExists {
+                product_group,
+                version,
+            } => {
+                write!(f, "schema already exists for {product_group} v{version}")
             }
             Self::InvalidVersion(v) => write!(f, "invalid semver version: {v}"),
         }

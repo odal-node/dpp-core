@@ -21,7 +21,7 @@ fn dpp_terms() -> Value {
         "name": "dpp:name",
         "role": "dpp:role",
         "country": "dpp:country",
-        "sectors": "dpp:sectors",
+        "product_groups": "dpp:product_groups",
         "productCategories": "dpp:productCategories",
     })
 }

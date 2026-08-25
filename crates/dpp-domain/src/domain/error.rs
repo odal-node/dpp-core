@@ -25,7 +25,7 @@ pub enum DppError {
     #[error("serialisation error: {0}")]
     Serialisation(String),
 
-    /// A stored document's sector data predates the current schema by more
+    /// A stored document's product group data predates the current schema by more
     /// than the registered lens chain can bridge — e.g. a required field the
     /// document was written before, with no source data anywhere to derive it
     /// from. Not a bug to fix by writing a lens: some gaps have no honest

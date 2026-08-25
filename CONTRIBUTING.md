@@ -47,7 +47,7 @@ That's it. Everything compiles and tests with nothing else running.
 | `just fmt` | `cargo fmt --all` |
 | `just fmt-check` | CI-safe format check |
 | `just audit` | `cargo audit` |
-| `just build-plugins` | Compile all Wasm sector plugins (`wasm32-wasip1`) |
+| `just build-plugins` | Compile all Wasm product group plugins (`wasm32-wasip1`) |
 | `just clean` | `cargo clean` |
 
 ---
@@ -59,11 +59,11 @@ dpp-core/
   Cargo.toml              # Workspace root — 9 member crates + benches
   LICENSE                  # Apache-2.0
   crates/
-    dpp-domain/           # Domain types, port traits, SectorCatalog, VersionedSchemaRegistry
+    dpp-domain/           # Domain types, port traits, ProductGroupCatalog, VersionedSchemaRegistry
       schemas/            # Versioned JSON schemas, embedded via include_str! (the product):
                           #   aluminium, battery (v1+v2), construction, detergent,
                           #   electronics, furniture, steel, textile (v1+v2),
-                          #   unsold-goods, toy, tyre  — 11 sectors
+                          #   unsold-goods, toy, tyre  — 11 product groups
     dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
     dpp-crypto/           # Ed25519, AES-GCM, JWS, encrypted keystore
     dpp-vc/               # W3C VCs, did:web, status lists, LocalIdentityService, JSON-LD
@@ -75,10 +75,10 @@ dpp-core/
     dpp-registry/         # EU registry interface types (wasm32-safe)
     dpp-tests/            # Cross-crate integration tests (publish = false)
   benches/                 # Criterion benchmarks (workspace member)
-  plugins/                 # 10 sector Wasm plugins (excluded from workspace)
-    sector-battery/  sector-textile/  sector-steel/  sector-electronics/
-    sector-aluminium/  sector-construction/  sector-detergent/
-    sector-furniture/  sector-toy/  sector-tyre/
+  plugins/                 # 10 product group Wasm plugins (excluded from workspace)
+    product-group-battery/  product-group-textile/  product-group-steel/  product-group-electronics/
+    product-group-aluminium/  product-group-construction/  product-group-detergent/
+    product-group-furniture/  product-group-toy/  product-group-tyre/
   docs/                    # Architecture and design documentation
 ```
 
@@ -156,15 +156,15 @@ Domain entities provide `_fixture()` associated functions for test setup, gated 
 
 ## 6. Schema Contribution
 
-To add a new schema version for an existing sector:
+To add a new schema version for an existing product group:
 
-1. Add `schemas/{sector}/v{new_version}.json`
+1. Add `schemas/{product-group}/v{new_version}.json`
 2. The `VersionedSchemaRegistry` picks it up automatically via `include_str!()`
 3. No code changes required — the registry discovers all embedded versions at compile time
 
-To add a new sector:
+To add a new product group:
 
-1. Add `schemas/{sector}/v1.0.0.json`
+1. Add `schemas/{product-group}/v1.0.0.json`
 2. Register the `include_str!()` call in `dpp-core/src/schemas/mod.rs`
 3. Add the corresponding validation entry in `dpp-core/src/domain/validation.rs`
 
@@ -185,7 +185,7 @@ All commits follow [Conventional Commits](https://www.conventionalcommits.org/) 
 **Examples:**
 ```
 feat(crypto): add JWS verification for archived key rotation
-fix(core): handle empty sector string in VersionedSchemaRegistry
+fix(core): handle empty product group string in VersionedSchemaRegistry
 docs(schemas): add textile v1.1.0 schema for ESPR amendment
 chore(deps): upgrade ed25519-dalek to 2.2.1
 ```

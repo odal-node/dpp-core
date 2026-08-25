@@ -1,4 +1,4 @@
-//! Compliance determination value objects — the result of running a sector's
+//! Compliance determination value objects — the result of running a product group's
 //! rules against a passport, and the errors that stop one being produced.
 //!
 //! These are **persisted domain values**, not ports: they are serialised onto
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// A single compliance finding (one rule outcome) attached to a determination.
 ///
 /// Findings are split into [`ComplianceResult::violations`] (binding — block
-/// publish for an in-force sector) and [`ComplianceResult::warnings`]
+/// publish for an in-force product group) and [`ComplianceResult::warnings`]
 /// (advisory/experimental — never block). The vec a finding lands in encodes its
 /// severity, so there is no separate severity field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ pub struct ComplianceResult {
     pub recycled_content_pct: Option<f64>,
     /// Overall compliance determination.
     pub compliance_status: ComplianceStatus,
-    /// Binding findings — block publish when the sector is in force. Empty for
+    /// Binding findings — block publish when the product group is in force. Empty for
     /// passthrough / not-assessed determinations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub violations: Vec<ComplianceFinding>,
@@ -135,11 +135,11 @@ pub enum ComplianceStatus {
     Compliant,
     /// Calculated; one or more fields fall below regulatory thresholds.
     NonCompliant,
-    /// The sector's DPP obligation is not yet in force (provisional), so no
+    /// The product group's DPP obligation is not yet in force (provisional), so no
     /// binding determination is legally applicable — only structural validation
     /// was performed. See [`gate_determination`].
     NotAssessed,
-    /// Sector not yet implemented by this registry.
+    /// ProductGroup not yet implemented by this registry.
     NotImplemented,
 }
 
@@ -198,9 +198,9 @@ pub struct ComplianceError {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum ComplianceErrorKind {
-    /// No strategy registered for the requested sector.
-    UnknownSector,
-    /// Input sector data is structurally invalid for this strategy.
+    /// No strategy registered for the requested product group.
+    UnknownProductGroup,
+    /// Input product group data is structurally invalid for this strategy.
     InvalidInput,
     /// Internal error; should not propagate to the user.
     Internal,

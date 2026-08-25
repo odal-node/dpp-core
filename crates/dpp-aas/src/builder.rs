@@ -1,13 +1,13 @@
 //! [`build_aas_from_passport`] — the primary entry point mapping a passport to
 //! a complete AAS shell + submodels.
 
-use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
 use dpp_domain::{Audience, Passport};
 
 use super::model::{
     AasEnvironment, AasSemId, AasShell, AasSubmodel, AssetInformation, SpecificAssetId,
 };
-use super::sectors;
+use super::product_groups;
 
 /// Why an AAS projection could not be built.
 #[derive(Debug)]
@@ -51,12 +51,12 @@ impl std::error::Error for AasError {}
 /// optional on its typed struct, so a redacted document still deserialises with
 /// those fields absent and the mappers simply do not emit them.
 ///
-/// A sector the catalog does not describe has **no** field classified, so the
-/// filter alone would pass its whole payload through. Such a sector is reduced
-/// to its `sector` discriminant instead, before any mapper runs, for **every**
-/// audience — an unmodelled sector has no field policy for any of them, so a
+/// A product group the catalog does not describe has **no** field classified, so the
+/// filter alone would pass its whole payload through. Such a product group is reduced
+/// to its `product_group` discriminant instead, before any mapper runs, for **every**
+/// audience — an unmodelled product group has no field policy for any of them, so a
 /// credentialed reader must not receive more of it than an anonymous one. The
-/// sector stays identified: `ProductIdentification` carries the tag.
+/// product group stays identified: `ProductIdentification` carries the tag.
 ///
 /// That is a property of this function, not of any particular caller: handing it
 /// a complete, unredacted passport is safe.
@@ -92,14 +92,17 @@ pub fn build_aas_from_passport(
     }
 
     let mut submodels = vec![
-        sectors::build_product_identification_submodel(passport),
-        sectors::build_manufacturer_submodel(passport),
-        sectors::build_environmental_impact_submodel(passport),
-        sectors::build_material_composition_submodel(passport),
-        sectors::build_repairability_submodel(passport),
+        product_groups::build_product_identification_submodel(passport),
+        product_groups::build_manufacturer_submodel(passport),
+        product_groups::build_environmental_impact_submodel(passport),
+        product_groups::build_material_composition_submodel(passport),
+        product_groups::build_repairability_submodel(passport),
     ];
-    if let Some(sd) = &passport.sector_data {
-        submodels.push(sectors::build_sector_submodel(sd, &passport_id));
+    if let Some(sd) = &passport.product_group_data {
+        submodels.push(product_groups::build_product_group_submodel(
+            sd,
+            &passport_id,
+        ));
     }
 
     let shell = AasShell {
@@ -120,11 +123,11 @@ pub fn build_aas_from_passport(
     Ok((shell, submodels))
 }
 
-/// Apply the sector's disclosure policy to the whole passport document.
+/// Apply the product group's disclosure policy to the whole passport document.
 ///
-/// Policy resolution mirrors the public view: the sector's own classes from the
+/// Policy resolution mirrors the public view: the product group's own classes from the
 /// catalog when it has an entry, otherwise the passport-level defaults — so a
-/// sector this build has never seen is masked by the conservative default
+/// product group this build has never seen is masked by the conservative default
 /// rather than passed through unfiltered.
 fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
     // Sourced from the passport's *own* schema version, not the catalog's
@@ -132,32 +135,32 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
     // that were in force when this passport was signed, or a reclassification
     // would silently change what an already-published passport projects.
     //
-    // `None` covers both an unknown sector and an unparseable or unregistered
-    // version, so it still doubles as the unknown-sector test below — and an
+    // `None` covers both an unknown product group and an unparseable or unregistered
+    // version, so it still doubles as the unknown-product group test below — and an
     // unrecognised version now fails closed instead of borrowing whatever the
     // current map happens to say.
-    let sector_policy = SectorAccessPolicy::for_schema_version(
-        passport.sector.catalog_key(),
+    let product_group_policy = ProductGroupAccessPolicy::for_schema_version(
+        passport.product_group.catalog_key(),
         &passport.schema_version,
     );
-    let sector_is_unknown = sector_policy.is_none();
-    let policy = sector_policy.unwrap_or_else(SectorAccessPolicy::passport_default);
+    let product_group_is_unknown = product_group_policy.is_none();
+    let policy = product_group_policy.unwrap_or_else(ProductGroupAccessPolicy::passport_default);
 
     let document =
         serde_json::to_value(passport).map_err(|e| AasError::Masking(format!("serialise: {e}")))?;
     let mut filtered = filter_by_audience(&document, &policy, audience).filtered_data;
 
-    if sector_is_unknown {
-        redact_unknown_sector_data(&mut filtered);
+    if product_group_is_unknown {
+        redact_unknown_product_group_data(&mut filtered);
     } else {
-        redact_unclassified_sector_fields(&mut filtered, &policy);
+        redact_unclassified_product_group_fields(&mut filtered, &policy);
     }
 
     serde_json::from_value(filtered)
         .map_err(|e| AasError::Masking(format!("redacted document no longer valid: {e}")))
 }
 
-/// Drop any `sectorData` key the passport's **declared schema version** does not
+/// Drop any `productGroupData` key the passport's **declared schema version** does not
 /// declare.
 ///
 /// # Why this exists
@@ -174,75 +177,79 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
 ///
 /// Raising the default to `Restricted` does not work, because this policy is
 /// applied to the whole document and the passport envelope's public fields
-/// (`productName`, `status`, …) are not declared in any sector schema — they
+/// (`productName`, `status`, …) are not declared in any product group schema — they
 /// would all vanish. The guard therefore has to be structural and scoped to
-/// `sectorData`, which is the same shape as
-/// [`redact_unknown_sector_data`] one level down: where nobody has classified
+/// `productGroupData`, which is the same shape as
+/// [`redact_unknown_product_group_data`] one level down: where nobody has classified
 /// the content, keep only what is accounted for.
 ///
-/// Reaching this needs an *invalid* passport — every sector schema sets
+/// Reaching this needs an *invalid* passport — every product group schema sets
 /// `additionalProperties: false`, so validation already rejects a document
 /// carrying keys its version does not declare. This is defence in depth, and it
 /// runs for **every** audience: an unclassified field is not more disclosable to
 /// a credentialed reader than to an anonymous one.
-fn redact_unclassified_sector_fields(
+fn redact_unclassified_product_group_fields(
     document: &mut serde_json::Value,
-    policy: &SectorAccessPolicy,
+    policy: &ProductGroupAccessPolicy,
 ) {
-    let Some(sector_data) = document
+    let Some(product_group_data) = document
         .as_object_mut()
-        .and_then(|o| o.get_mut("sectorData"))
+        .and_then(|o| o.get_mut("productGroupData"))
         .and_then(serde_json::Value::as_object_mut)
     else {
         return;
     };
-    // `sector` is the variant tag, not a schema property, and the document must
-    // keep round-tripping through `SectorData`.
+    // `product_group` is the variant tag, not a schema property, and the document must
+    // keep round-tripping through `ProductGroupData`.
     // `field_disclosure` was built from this schema version's own properties,
     // so its keys are exactly what the version accounts for. Reusing it avoids a
     // second registry lookup that could disagree with the policy in force.
-    sector_data.retain(|key, _| key == "sector" || policy.field_disclosure.contains_key(key));
+    product_group_data
+        .retain(|key, _| key == "productGroup" || policy.field_disclosure.contains_key(key));
 }
 
-/// Reduce an unrecognised sector's `sectorData` to its `sector` tag alone.
+/// Reduce an unrecognised product group's `productGroupData` to its `product_group` tag alone.
 ///
 /// The filter above cannot help here. Both policies it can choose from carry
-/// `default_disclosure: Public`, which is safe only because a *listed* sector's
-/// non-public fields are listed — and an unlisted sector has nothing listed, so
+/// `default_disclosure: Public`, which is safe only because a *listed* product group's
+/// non-public fields are listed — and an unlisted product group has nothing listed, so
 /// every field it carries is unlisted, and every unlisted field is Public. The
 /// filter therefore passes the whole payload through, and the more unusual the
-/// sector, the more certain it is that nobody has classified its fields.
+/// product group, the more certain it is that nobody has classified its fields.
 ///
 /// So the backstop is structural rather than policy-driven: with no field
 /// policy, keep only the discriminant. Nothing is lost by dropping the tag from
-/// the sector submodel itself — `ProductIdentification` carries `sector`
+/// the product group submodel itself — `ProductIdentification` carries `product_group`
 /// independently — but it is kept here so the redacted document still
-/// round-trips through [`SectorData::Other`](dpp_domain::SectorData::Other),
+/// round-trips through [`ProductGroupData::Other`](dpp_domain::ProductGroupData::Other),
 /// which reads its variant from that key.
 ///
-/// **Applied for every audience, not just `Public`.** An unrecognised sector has
+/// **Applied for every audience, not just `Public`.** An unrecognised product group has
 /// no field policy for *any* audience, so a credentialed reader must not receive
 /// more of it than an anonymous one. This mirrors, deliberately and for the same
 /// stated reason, the backstop the platform applies when it renders a public
-/// view — the two must not disagree about what an unmodelled sector discloses.
-fn redact_unknown_sector_data(document: &mut serde_json::Value) {
+/// view — the two must not disagree about what an unmodelled product group discloses.
+fn redact_unknown_product_group_data(document: &mut serde_json::Value) {
     let Some(object) = document.as_object_mut() else {
         return;
     };
-    let Some(sector_data) = object.get("sectorData") else {
+    let Some(product_group_data) = object.get("productGroupData") else {
         return;
     };
-    // An untagged payload is a legacy record rather than an unknown sector, and
+    // An untagged payload is a legacy record rather than an unknown product group, and
     // is left to the filter — matching how the platform draws the same line.
-    let Some(tag) = sector_data
-        .get("sector")
+    let Some(tag) = product_group_data
+        .get("productGroup")
         .and_then(serde_json::Value::as_str)
         .filter(|tag| !tag.is_empty())
         .map(str::to_owned)
     else {
         return;
     };
-    object.insert("sectorData".into(), serde_json::json!({ "sector": tag }));
+    object.insert(
+        "productGroupData".into(),
+        serde_json::json!({ "productGroup": tag }),
+    );
 }
 
 /// Build a complete [`AasEnvironment`] — the self-contained document form,

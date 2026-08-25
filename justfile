@@ -82,7 +82,7 @@ doc:
 bench:
     cargo bench --package dpp-benches
 
-# Run each sector plugin's own test suite on the host target.
+# Run each product-group plugin's own test suite on the host target.
 #
 # The plugins are excluded from the workspace, so `just test` does not reach
 # them: a plugin can be broken while the workspace gate is green. Runs on the
@@ -91,7 +91,7 @@ bench:
 test-plugins:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in plugins/sector-*; do
+    for plugin in plugins/product-group-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         echo "Testing $plugin..."
         (cd "$plugin" && cargo test --quiet)
@@ -191,28 +191,28 @@ test-count:
 build:
     cargo build --workspace --release
 
-# Build all Wasm sector plugins (requires wasm32-wasip1 target)
+# Build all Wasm product-group plugins (requires wasm32-wasip1 target)
 build-plugins:
     #!/usr/bin/env bash
     set -euo pipefail
     for plugin in \
-        plugins/sector-battery \
-        plugins/sector-textile \
-        plugins/sector-steel \
-        plugins/sector-electronics \
-        plugins/sector-construction \
-        plugins/sector-tyre \
-        plugins/sector-toy \
-        plugins/sector-aluminium \
-        plugins/sector-furniture \
-        plugins/sector-detergent; do
+        plugins/product-group-battery \
+        plugins/product-group-textile \
+        plugins/product-group-steel \
+        plugins/product-group-electronics \
+        plugins/product-group-construction \
+        plugins/product-group-tyre \
+        plugins/product-group-toy \
+        plugins/product-group-aluminium \
+        plugins/product-group-furniture \
+        plugins/product-group-detergent; do
         echo "Building $plugin..."
         (cd "$plugin" && cargo build --target wasm32-wasip1 --release)
     done
     echo "All plugins built."
 
-# Build a single sector plugin and print the artifact path.
-# Usage: just build-plugin sector-battery   or just build-plugin battery
+# Build a single product-group plugin and print the artifact path.
+# Usage: just build-plugin product-group-battery   or just build-plugin battery
 #
 # Builds only. Installing the artifact wherever a host loads plugins from is
 # that host's business, not this repo's — a build recipe here that wrote into a
@@ -224,20 +224,20 @@ build-plugin PLUGIN:
     ROOT_DIR="$(pwd)"
     PLUGIN_RAW="{{PLUGIN}}"
     if [ -z "$PLUGIN_RAW" ]; then
-        echo "Usage: just build-plugin sector-battery  (or just build-plugin battery)"
+        echo "Usage: just build-plugin product-group-battery  (or just build-plugin battery)"
         exit 1
     fi
-    # Normalize name: accept "sector-battery" or "battery"
-    PLUGIN_NAME="${PLUGIN_RAW#sector-}"
-    PLUGIN_DIR="${ROOT_DIR}/plugins/sector-${PLUGIN_NAME}"
+    # Normalize name: accept "product-group-battery" or "battery"
+    PLUGIN_NAME="${PLUGIN_RAW#product-group-}"
+    PLUGIN_DIR="${ROOT_DIR}/plugins/product-group-${PLUGIN_NAME}"
     if [ ! -d "$PLUGIN_DIR" ]; then
         echo "Plugin directory not found: $PLUGIN_DIR"
         exit 2
     fi
     echo "Building $PLUGIN_DIR"
     (cd "$PLUGIN_DIR" && cargo build --target wasm32-wasip1 --release)
-    # The sector plugins share one workspace (plugins/Cargo.toml), so cargo
-    # writes here — not to plugins/sector-<name>/target, which older layouts
+    # The product-group plugins share one workspace (plugins/Cargo.toml), so cargo
+    # writes here — not to plugins/product-group-<name>/target, which older layouts
     # left behind and which a consumer globbing for *.wasm will happily find.
     ART="${ROOT_DIR}/plugins/target/wasm32-wasip1/release/sector_${PLUGIN_NAME}.wasm"
     if [ ! -f "$ART" ]; then
@@ -276,7 +276,7 @@ gs1-oracle:
     NODE_PATH=.github/scripts/node_modules \
         node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl
 
-# Freeze a sector-data fixture for any declared schema version that lacks one.
+# Freeze a product-group-data fixture for any declared schema version that lacks one.
 #
 # `tests/schema_compat.rs` asserts that every version the catalog claims to
 # support still reads through `Passport::from_stored`. That only works if each

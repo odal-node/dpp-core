@@ -12,7 +12,7 @@ struct Embedded {
 }
 
 /// One record per authority. Adding a vocabulary is a single entry plus a file
-/// in `vocabularies/`, exactly as adding a sector is in `dpp-domain`.
+/// in `vocabularies/`, exactly as adding a product group is in `dpp-domain`.
 const EMBEDDED: &[Embedded] = &[
     Embedded {
         key: "gs1",
@@ -103,7 +103,7 @@ impl VocabularyRegister {
     /// If an embedded record is not valid JSON for a [`Vocabulary`], or if its
     /// `key` disagrees with its filename. Both are compile-time-authored data,
     /// so a failure here is a build defect rather than a runtime condition —
-    /// the same contract `SectorCatalog` makes about sector manifests.
+    /// the same contract `ProductGroupCatalog` makes about product group manifests.
     #[must_use]
     pub fn new() -> Self {
         let entries = EMBEDDED

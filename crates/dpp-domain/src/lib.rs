@@ -25,8 +25,8 @@ mod test_support;
 
 pub use catalog::{
     CatalogError, DateBasis, Granularity, Instrument, InstrumentBinding, InstrumentCatalog,
-    InstrumentKind, InstrumentStatus, ObligationDate, PassportObligation, RegulatoryStatus,
-    RetentionBasis, SectorCatalog, SectorDescriptor,
+    InstrumentKind, InstrumentRef, InstrumentStatus, ObligationDate, PassportObligation,
+    ProductGroupCatalog, ProductGroupDescriptor, RecordedBasis, RegulatoryStatus, RetentionBasis,
 };
 
 pub use domain::{
@@ -37,24 +37,24 @@ pub use domain::{
         Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
         PassportCredentialSubject, SignedCredential,
     },
-    lint::{LintFinding, LintResult, LintSeverity, lint_sector_data},
+    lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     passport::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_WIRE_KEYS, Passport,
         PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
-    product_identity::ProductIdentity,
-    sector::{
+    product_group::{
         AluminiumData, BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprint,
         CarbonFootprintClass, CarbonFootprintClassError, ConstructionData, DetergentData,
         DeviceType, DynamicPerformance, ElectronicsData, EnergyEfficiencyClass,
         EnvironmentalReading, ExpectedLifetime, FibreEntry, FurnitureData, HarmfulEvents,
         HazardSymbol, HazardousSubstance, LifecycleStage, MaterialComposition, MattressData,
-        ProductionRoute, RepairCriterion, RepairabilityScore, Sector, SectorData,
+        ProductGroup, ProductGroupData, ProductionRoute, RepairCriterion, RepairabilityScore,
         StateOfChargeReading, StateOfHealth, SteelData, SurfactantEntry, SvhcSubstance,
         SystemBoundary, TemperatureRange, TextileData, ToyData, TyreData, UnsoldGoodsDestination,
-        UnsoldGoodsReason, UnsoldGoodsReport, UsageHistory, redact_sector_data,
+        UnsoldGoodsReason, UnsoldGoodsReport, UsageHistory, redact_product_group_data,
         validate_fibre_composition, validate_surfactants, validate_svhc_substances,
     },
+    product_identity::ProductIdentity,
     status::PassportStatus,
     transfer::{
         OperatorRole, ResponsibleOperator, TransferChain, TransferError, TransferReason,
@@ -66,9 +66,9 @@ pub use domain::field_error::{FieldError, ValidationErrors};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use domain::validation::{
-    BatchValidationItem, SectorValidator, SectorValidatorRegistry, batch_errors,
-    validate_raw_sector_data, validate_sector_data, validate_sector_data_batch,
-    validate_sector_data_with_registry,
+    BatchValidationItem, ProductGroupValidator, ProductGroupValidatorRegistry, batch_errors,
+    validate_product_group_data, validate_product_group_data_batch,
+    validate_product_group_data_with_registry, validate_raw_product_group_data,
 };
 
 pub use ports::archive::{

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/tyre-v1.0.0.json",
   "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
-  "title": "Odal Node — Tyre Sector Data (v1.0.0)",
+  "title": "Odal Node — Tyre Product Group Data (v1.0.0)",
   "description": "Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. DPP mandate expected ~2029. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
   "type": "object",
   "required": [

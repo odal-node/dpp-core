@@ -130,9 +130,9 @@ If a published version has a critical defect:
 Yanking is a last resort. Prefer publishing a patch release whenever possible,
 since yanking breaks downstream `Cargo.lock` files.
 
-## Sector Plugins
+## Product group Plugins
 
-Wasm sector plugins (`plugins/sector-*`) are not part of the workspace and are
+Wasm product group plugins (`plugins/product-group-*`) are not part of the workspace and are
 not published to crates.io. They are released as `.wasm` artefacts attached to
 GitHub Releases. Their versions track independently from the workspace version.
 

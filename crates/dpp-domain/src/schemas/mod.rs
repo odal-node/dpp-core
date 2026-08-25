@@ -1,10 +1,10 @@
-//! Versioned schema registry for EU ESPR sector schemas.
+//! Versioned schema registry for EU ESPR product group schemas.
 //!
 //! The registry ships with compile-time embedded schemas and supports runtime
 //! registration of new versions ("hot-reload"). This lets a running platform
 //! absorb delegated-act schema changes without recompilation.
 //!
-//! Embedded schemas come from `dpp-core/schemas/{sector}/v{version}.json`.
+//! Embedded schemas come from `dpp-core/schemas/{product group}/v{version}.json`.
 //! Runtime schemas are registered via [`VersionedSchemaRegistry::register`].
 
 mod embedded;

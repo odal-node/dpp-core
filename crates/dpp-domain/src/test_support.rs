@@ -10,17 +10,21 @@ use chrono::Utc;
 
 use crate::domain::gtin::Gtin;
 use crate::domain::passport::{ManufacturerInfo, Passport, PassportId};
-use crate::domain::sector::{BatteryChemistry, BatteryData, BatteryType, Sector, TextileData};
+use crate::domain::product_group::{
+    BatteryChemistry, BatteryData, BatteryType, ProductGroup, TextileData,
+};
 use crate::domain::status::PassportStatus;
 
-/// A minimal, valid `Passport` with no sector data.
+/// A minimal, valid `Passport` with no product group data.
 pub(crate) fn sample_passport() -> Passport {
     let now = Utc::now();
     Passport {
         id: PassportId::new(),
         batch_id: None,
         product_name: "Test Product".into(),
-        sector: Sector::Textile,
+        product_group: ProductGroup::Textile,
+        applicable_instruments: vec![crate::catalog::InstrumentRef::from_catalog("espr")],
+        granularity: Some(crate::catalog::Granularity::Item),
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),
             address: "Berlin, DE".into(),
@@ -31,7 +35,7 @@ pub(crate) fn sample_passport() -> Passport {
         repairability_score: None,
         compliance_result: None,
         lint_result: None,
-        sector_data: None,
+        product_group_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
         jws_signature: None,
@@ -176,8 +180,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
     use crate::domain::commodity_code::CommodityCode;
     use crate::domain::lint::LintResult;
     use crate::domain::passport::{FacilitySnapshot, PassportRef};
+    use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::domain::seal::{SealFormat, SealedEnvelope};
-    use crate::domain::sector::{CarbonFootprint, RepairabilityScore};
     use crate::ports::compliance::ComplianceResult;
 
     let now = Utc::now();

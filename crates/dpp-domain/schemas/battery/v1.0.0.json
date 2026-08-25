@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/battery-v1.0.0.json",
-  "title": "Odal Node — Battery Sector Data (v1.0.0)",
+  "title": "Odal Node — Battery Product Group Data (v1.0.0)",
   "description": "Battery-specific fields required by EU Battery Regulation 2023/1542.",
   "type": "object",
   "required": [

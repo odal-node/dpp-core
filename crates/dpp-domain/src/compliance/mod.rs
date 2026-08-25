@@ -7,8 +7,8 @@
 //!
 //! [`PassthroughRegistry`] dispatches **through** the strategy trait rather than
 //! around it: [`passthrough_strategies`] holds the two Apache-2.0 strategies it
-//! registers, and any sector without one takes a bare-passthrough fallback. That
-//! keeps the per-sector seam exercised by the default build instead of being a
+//! registers, and any product group without one takes a bare-passthrough fallback. That
+//! keeps the per-product group seam exercised by the default build instead of being a
 //! trait nothing implements.
 //!
 //! [`ComplianceRegistry`]: crate::ports::compliance::ComplianceRegistry

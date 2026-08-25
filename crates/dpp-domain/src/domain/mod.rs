@@ -1,4 +1,4 @@
-//! Core DPP domain types: passport, GTIN, identity, status, sector, validation,
+//! Core DPP domain types: passport, GTIN, identity, status, product group, validation,
 //! and transfer of responsibility.
 
 pub mod commodity_code;
@@ -11,9 +11,9 @@ pub mod gtin;
 pub mod identity;
 pub mod lint;
 pub mod passport;
+pub mod product_group;
 pub mod product_identity;
 pub mod seal;
-pub mod sector;
 pub mod status;
 pub mod transfer;
 #[cfg(not(target_arch = "wasm32"))]

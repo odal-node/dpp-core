@@ -1,4 +1,4 @@
-//! [`SectorDescriptor`] — a single product group's catalog entry.
+//! [`ProductGroupDescriptor`] — a single product group's catalog entry.
 
 use serde::{Deserialize, Serialize};
 
@@ -24,9 +24,9 @@ use serde::{Deserialize, Serialize};
 /// changes when a new act arrives; all of the law does.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SectorDescriptor {
+pub struct ProductGroupDescriptor {
     /// Canonical product-group key, e.g. `"battery"`, `"unsold-goods"`. Matches
-    /// the schema-registry key and the plugin's `meta().sector`.
+    /// the schema-registry key and the plugin's `meta().product_group`.
     pub key: String,
     /// Human-readable title.
     pub title: String,
@@ -50,7 +50,7 @@ pub struct SectorDescriptor {
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub disclosure: std::collections::HashMap<String, crate::domain::identity::Disclosure>,
     /// Plugin that handles this product group (crate / filename stem, e.g.
-    /// `"sector-battery"`). `None` if no plugin is bound yet.
+    /// `"product-group-battery"`). `None` if no plugin is bound yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plugin: Option<String>,
     /// Free-text note about scope or implementation. Regulatory notes belong on

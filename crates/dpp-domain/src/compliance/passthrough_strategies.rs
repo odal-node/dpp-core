@@ -2,20 +2,20 @@
 //!
 //! Each one lifts the metrics a manufacturer supplied into a
 //! [`ComplianceResult`] **verbatim**. None of them calculates, scores, or
-//! decides anything: computing a determination is the job of the Wasm sector
+//! decides anything: computing a determination is the job of the Wasm product group
 //! plugins on the open-source path, or of a proprietary tier's own strategies.
 //! Every result here therefore carries
 //! [`ComplianceStatus::PassthroughNoValidation`](crate::ports::compliance::ComplianceStatus::PassthroughNoValidation)
 //! and no findings.
 //!
-//! # Why these exist rather than a single sector-agnostic passthrough
+//! # Why these exist rather than a single product group-agnostic passthrough
 //!
 //! [`ComplianceRegistry`](crate::ports::compliance::ComplianceRegistry) is the
 //! seam a proprietary binary swaps out wholesale;
 //! [`ComplianceStrategy`] is the
-//! seam it swaps out **one sector at a time**, which is the useful granularity:
+//! seam it swaps out **one product group at a time**, which is the useful granularity:
 //! a tier that computes a real battery determination still wants the passthrough
-//! behaviour for the eleven sectors it does not model.
+//! behaviour for the eleven product groups it does not model.
 //!
 //! That seam previously had no implementation anywhere — the trait was
 //! published, documented as having two, and dispatched to by nothing. These are
@@ -25,8 +25,8 @@
 //!
 //! # Which metric goes where
 //!
-//! [`ComplianceResult`]'s three metric fields are sector-agnostic, and the
-//! sector data types are not, so each strategy states its own mapping rather
+//! [`ComplianceResult`]'s three metric fields are product group-agnostic, and the
+//! product group data types are not, so each strategy states its own mapping rather
 //! than leaving it to be inferred:
 //!
 //! | Result field | Battery | Textile |
@@ -37,7 +37,7 @@
 
 use chrono::NaiveDate;
 
-use crate::domain::sector::SectorData;
+use crate::domain::product_group::ProductGroupData;
 use crate::ports::compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceResult, ComplianceStrategy,
 };
@@ -66,7 +66,7 @@ use crate::ports::compliance::{
 pub struct PassthroughBatteryStrategy;
 
 impl ComplianceStrategy for PassthroughBatteryStrategy {
-    fn sector_key(&self) -> &str {
+    fn product_group_key(&self) -> &str {
         "battery"
     }
 
@@ -75,11 +75,11 @@ impl ComplianceStrategy for PassthroughBatteryStrategy {
     /// selects none.
     fn compute(
         &self,
-        data: &SectorData,
+        data: &ProductGroupData,
         _law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError> {
-        let SectorData::Battery(battery) = data else {
-            return Err(wrong_sector("battery", data));
+        let ProductGroupData::Battery(battery) = data else {
+            return Err(wrong_product_group("battery", data));
         };
         Ok(ComplianceResult {
             // Manufacturer-declared, not computed. `co2e_per_unit_kg` is
@@ -100,7 +100,7 @@ impl ComplianceStrategy for PassthroughBatteryStrategy {
 
 /// Textile passthrough.
 ///
-/// The sector is `provisional` in the catalog — no delegated act is in force —
+/// The product group is `provisional` in the catalog — no delegated act is in force —
 /// so every field here is a manufacturer declaration against a data model that
 /// is not yet ratified. `PassthroughNoValidation` is the only honest status, and
 /// `gate_determination` would downgrade a binding one anyway.
@@ -108,7 +108,7 @@ impl ComplianceStrategy for PassthroughBatteryStrategy {
 pub struct PassthroughTextileStrategy;
 
 impl ComplianceStrategy for PassthroughTextileStrategy {
-    fn sector_key(&self) -> &str {
+    fn product_group_key(&self) -> &str {
         "textile"
     }
 
@@ -116,11 +116,11 @@ impl ComplianceStrategy for PassthroughTextileStrategy {
     /// [`PassthroughBatteryStrategy::compute`].
     fn compute(
         &self,
-        data: &SectorData,
+        data: &ProductGroupData,
         _law_in_force_on: Option<NaiveDate>,
     ) -> Result<ComplianceResult, ComplianceError> {
-        let SectorData::Textile(textile) = data else {
-            return Err(wrong_sector("textile", data));
+        let ProductGroupData::Textile(textile) = data else {
+            return Err(wrong_product_group("textile", data));
         };
         Ok(ComplianceResult {
             co2e_score: textile.carbon_footprint_kg_co2e,
@@ -134,18 +134,18 @@ impl ComplianceStrategy for PassthroughTextileStrategy {
     }
 }
 
-/// The error for a strategy handed data for a different sector.
+/// The error for a strategy handed data for a different product group.
 ///
 /// A dispatch bug rather than bad user input, but it is reported as
 /// [`ComplianceErrorKind::InvalidInput`] because from the strategy's position
 /// that is exactly what it received, and because the alternative — panicking on
 /// a mismatch — would make a routing mistake in a host take the process down.
-fn wrong_sector(expected: &str, got: &SectorData) -> ComplianceError {
+fn wrong_product_group(expected: &str, got: &ProductGroupData) -> ComplianceError {
     ComplianceError {
         kind: ComplianceErrorKind::InvalidInput,
         message: format!(
             "{expected} strategy received {} data",
-            got.sector().catalog_key()
+            got.product_group().catalog_key()
         ),
     }
 }
@@ -153,15 +153,15 @@ fn wrong_sector(expected: &str, got: &SectorData) -> ComplianceError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sector::SectorData;
+    use crate::domain::product_group::ProductGroupData;
     use crate::ports::compliance::ComplianceStatus;
 
-    fn battery() -> SectorData {
-        SectorData::Battery(Box::new(crate::test_support::sample_battery_data()))
+    fn battery() -> ProductGroupData {
+        ProductGroupData::Battery(Box::new(crate::test_support::sample_battery_data()))
     }
 
-    fn textile() -> SectorData {
-        SectorData::Textile(Box::new(crate::domain::sector::TextileData {
+    fn textile() -> ProductGroupData {
+        ProductGroupData::Textile(Box::new(crate::domain::product_group::TextileData {
             carbon_footprint_kg_co2e: Some(8.5),
             recycled_content_pct: Some(42.0),
             repair_score: Some(7.5),
@@ -213,12 +213,12 @@ mod tests {
         );
     }
 
-    /// A strategy handed another sector's data errors rather than panicking.
+    /// A strategy handed another product group's data errors rather than panicking.
     ///
     /// This is a host routing bug, and a library that aborts the process on one
     /// gives the host no way to report it.
     #[test]
-    fn a_strategy_refuses_another_sectors_data() {
+    fn a_strategy_refuses_another_product_groups_data() {
         let err = PassthroughBatteryStrategy
             .compute(&textile(), None)
             .expect_err("battery strategy must refuse textile data");
@@ -229,17 +229,17 @@ mod tests {
     /// Each strategy answers with the catalog key it is registered under.
     ///
     /// The registry keys its map on this, so a wrong answer here silently routes
-    /// every passport of that sector to the fallback.
+    /// every passport of that product group to the fallback.
     #[test]
-    fn sector_keys_match_the_catalog() {
-        let catalog = crate::SectorCatalog::new();
+    fn product_group_keys_match_the_catalog() {
+        let catalog = crate::ProductGroupCatalog::new();
         for key in [
-            PassthroughBatteryStrategy.sector_key(),
-            PassthroughTextileStrategy.sector_key(),
+            PassthroughBatteryStrategy.product_group_key(),
+            PassthroughTextileStrategy.product_group_key(),
         ] {
             assert!(
                 catalog.get(key).is_some(),
-                "'{key}' is not a catalog sector key"
+                "'{key}' is not a catalog product_group key"
             );
         }
     }

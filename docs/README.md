@@ -14,7 +14,7 @@ This folder documents **the standard, not the product**: what a Digital Product 
 |---|---|
 | "How is the library structured, and why hexagonal?" | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) · [architecture/DESIGN-PATTERNS.md](architecture/DESIGN-PATTERNS.md) |
 | "How do identity, signing, and verifiable credentials work?" | [architecture/IDENTITY.md](architecture/IDENTITY.md) |
-| "How do sector plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
+| "How do product group plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
 | "How do passports link to their components and predecessors?" | [architecture/PRODUCT-LINEAGE.md](architecture/PRODUCT-LINEAGE.md) — design proposal, not yet implemented |
 | "Where does code meet regulation, formally?" | [regulatory/CONFORMITY.md](regulatory/CONFORMITY.md) — written for assessment bodies |
 | "How are releases, versions, and contributions governed?" | [governance/](governance/) — VERSIONING, RELEASE, CONTRIBUTING, CHANGELOG |
@@ -25,4 +25,4 @@ This folder documents **the standard, not the product**: what a Digital Product 
 
 **The compiler enforces the boundary.** Core builds with zero infrastructure (`cargo build --workspace`, no DB, no env). Anything that needs a database or an HTTP client lives across the seam in the engine. The port traits in `dpp-domain/src/ports/` *are* the boundary — the module is authoritative, prose never quotes a hardcoded count.
 
-**Honesty is a feature.** Placeholder implementations (the Ghost family) are clearly marked, regulatory citations that can't be pinned to the Official Journal are flagged rather than asserted, and provisional sectors can never emit a binding compliance verdict.
+**Honesty is a feature.** Placeholder implementations (the Ghost family) are clearly marked, regulatory citations that can't be pinned to the Official Journal are flagged rather than asserted, and provisional product groups can never emit a binding compliance verdict.

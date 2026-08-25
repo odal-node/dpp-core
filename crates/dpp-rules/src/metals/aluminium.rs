@@ -5,7 +5,7 @@
 //! embedded-carbon reporting for aluminium imports but does **not** set
 //! production-level CO₂e thresholds that would make a product non-compliant for
 //! DPP purposes. The thresholds below are **industry/CBAM benchmark values**
-//! used by the `sector-aluminium` plugin; they are not finalized EU DPP mandates.
+//! used by the `product_group-aluminium` plugin; they are not finalized EU DPP mandates.
 //!
 //! ## Production routes and CO₂e reference thresholds (kg CO₂e / tonne Al)
 //! | Route                | Threshold used by plugin |
@@ -14,7 +14,7 @@
 //! | `secondary-recycled` | ≤ 1 000                  |
 //! | `mixed`              | ≤ 5 000                  |
 //!
-//! Source: CBAM benchmark values / `sector-aluminium` plugin. These are
+//! Source: CBAM benchmark values / `product_group-aluminium` plugin. These are
 //! informational reference points until a finalized EU DPP threshold is adopted.
 //!
 //! ## Schema fields (aluminium v1.1.0)
@@ -25,7 +25,7 @@
 //! - `countryOfOrigin`    — ISO 3166-1 alpha-2
 
 // ── Production route CO₂e reference thresholds ───────────────────────────────
-// These values are CBAM benchmarks used by the sector-aluminium plugin.
+// These values are CBAM benchmarks used by the product group-aluminium plugin.
 // They are NOT finalized EU DPP compliance thresholds.
 
 /// Reference CO₂e threshold for primary (Hall-Héroult) aluminium (kg CO₂e / tonne).
@@ -44,7 +44,7 @@ pub const CO2E_REF_MIXED_KG_PER_T: f64 = 5_000.0;
 /// the route enum separately via JSON Schema).
 ///
 /// **Note:** this is a benchmark check, not an EU DPP compliance determination.
-/// The aluminium sector plugin calls this function; it returns `NOT_ASSESSED`
+/// The aluminium product group plugin calls this function; it returns `NOT_ASSESSED`
 /// until a finalized regulatory threshold is published.
 #[must_use]
 pub fn co2e_within_route_threshold(route: &str, co2e_kg_per_tonne: f64) -> bool {

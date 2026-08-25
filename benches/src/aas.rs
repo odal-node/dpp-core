@@ -7,8 +7,10 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_aas::build_aas_from_passport;
 use dpp_domain::Audience;
 use dpp_domain::domain::gtin::Gtin;
-use dpp_domain::domain::sector::{BatteryChemistry, BatteryData, BatteryType, SectorData};
-use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, Sector};
+use dpp_domain::domain::product_group::{
+    BatteryChemistry, BatteryData, BatteryType, ProductGroupData,
+};
+use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, ProductGroup};
 use dpp_tests::fixtures::base_passport;
 
 const GTIN: &str = "09506000134352";
@@ -34,8 +36,8 @@ fn battery_passport() -> Passport {
         created_at: now,
         updated_at: now,
         ..base_passport(
-            Sector::Battery,
-            SectorData::Battery(Box::new(BatteryData {
+            ProductGroup::Battery,
+            ProductGroupData::Battery(Box::new(BatteryData {
                 gtin: Gtin::parse(GTIN).unwrap(),
                 battery_chemistry: BatteryChemistry::Lfp,
                 nominal_voltage_v: 3.2,

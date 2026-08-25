@@ -24,7 +24,7 @@
 //!
 //! It is **not** a row-for-row copy of the guidance's 71 data points, and the
 //! two cannot be diffed on length. This table keys on the wire names of
-//! *sector-data* fields, so a guidance row whose content lives on the passport
+//! *product group-data* fields, so a guidance row whose content lives on the passport
 //! envelope has no row here and is enforced elsewhere:
 //!
 //! - Data points 3 and 4 (manufacturer name; postal address) are
@@ -35,7 +35,7 @@
 //!   envelope fields.
 //!
 //! An omission here is therefore only meaningful for a data point that *does*
-//! map to a sector-data field.
+//! map to a product group-data field.
 //!
 //! # Where all 71 rows went
 //!
@@ -43,7 +43,7 @@
 //! 71 and this table's length is accounted for as follows, so a future reader
 //! can check the claim rather than take it:
 //!
-//! - **Envelope, not sector data** — rows 2, 3, 4 (registrant identity;
+//! - **Envelope, not product group data** — rows 2, 3, 4 (registrant identity;
 //!   manufacturer name; postal address), enforced as above. Row 5
 //!   (manufacturer web and email) is *"optional, to be filled if such data is
 //!   available"*, so it carries no obligation to enforce.
@@ -239,7 +239,7 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
 ///
 /// `field` is the **wire** name — `expectedLifetimeCycles`, not
 /// `expected_lifetime_cycles` — because this crate is `no_std` and zero-dep and
-/// is consumed both by the domain types and by the Wasm sector plugins, which
+/// is consumed both by the domain types and by the Wasm product group plugins, which
 /// see JSON and never the Rust struct.
 ///
 /// Returns [`Requirement::Unknown`] for a category the guidance does not cover

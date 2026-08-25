@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/battery-v2.1.0.json",
-  "title": "Odal Node — Battery Sector Data (v2.1.0)",
+  "title": "Odal Node — Battery Product Group Data (v2.1.0)",
   "description": "Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.1.0 removes the invented A-E enumeration on carbonFootprintClass — Art. 7(2) defines no class labels and requires the Commission to review the number of classes every three years — and adds the ruleset id and version that produced the label, since a class is meaningless without the scale it came from. It also adds placedOnMarketDate, which is what determines whether a staged obligation attaches to a given battery.",
   "type": "object",
   "required": [

@@ -47,7 +47,7 @@
 //! input hash, ruleset id + version, factor dataset version and table hash —
 //! ready to be stored in the proof-bound store for notified-body audit.
 //!
-//! # Adding a new sector calculator
+//! # Adding a new product group calculator
 //!
 //! ## New methodology (algorithm not yet in dpp-calc)
 //!

@@ -11,14 +11,15 @@
 //! - **Fail-closed redaction**: `default_disclosure = Confidential` gates unlisted fields.
 //! - **Transfer deadlock resolved**: `reject()` / `cancel()` make terminal states
 //!   reachable, unblocking the chain for a new transfer.
-//! - **Passport sector-data validation**: `Passport::validate()` now wires into
-//!   `validate_sector_data()`, catching cross-field errors (e.g. fibre sum ≠ 100).
+//! - **Passport product group-data validation**: `Passport::validate()` now wires into
+//!   `validate_product_group_data()`, catching cross-field errors (e.g. fibre sum ≠ 100).
 
 use chrono::Utc;
-use dpp_domain::access::{SectorAccessPolicy, filter_by_audience};
+use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
 use dpp_domain::{
-    Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, Sector, SectorData,
-    TextileData, TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus,
+    Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, ProductGroup,
+    ProductGroupData, TextileData, TransferChain, TransferError, TransferReason, TransferRecord,
+    TransferStatus,
 };
 use dpp_tests::fixtures::{base_passport, make_operator, make_subject};
 use dpp_vc::{
@@ -285,9 +286,9 @@ fn signature_tamper_rejected() {
 fn fail_closed_default_disclosure_blocks_unlisted_fields() {
     use std::collections::HashMap;
 
-    let policy = SectorAccessPolicy {
+    let policy = ProductGroupAccessPolicy {
         name: "strict-policy".into(),
-        sector: "test".into(),
+        product_group: "test".into(),
         field_disclosure: {
             let mut m = HashMap::new();
             m.insert("productName".into(), Disclosure::Public);
@@ -325,13 +326,13 @@ fn fail_closed_default_disclosure_blocks_unlisted_fields() {
 /// Nested confidential fields cannot bypass redaction via nesting.
 #[test]
 fn nested_confidential_field_cannot_bypass_via_nesting() {
-    let policy =
-        SectorAccessPolicy::for_schema_version("textile", "1.2.0").expect("textile in catalog");
+    let policy = ProductGroupAccessPolicy::for_schema_version("textile", "1.2.0")
+        .expect("textile in catalog");
 
     let data = json!({
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
         "countryOfOrigin": "DE",
-        "sectorData": {
+        "productGroupData": {
             "careInstructions": "cold wash",
             "jwsSignature": "eyJhbGciOiJFZERTQSJ9.nested-leak-attempt",
         }
@@ -340,13 +341,13 @@ fn nested_confidential_field_cannot_bypass_via_nesting() {
     let decision = filter_by_audience(&data, &policy, Audience::Public);
 
     assert!(
-        decision.filtered_data["sectorData"]
+        decision.filtered_data["productGroupData"]
             .get("jwsSignature")
             .is_none(),
         "nested jwsSignature must be redacted from the public audience"
     );
     // The surrounding object is still present (the redaction is field-level, not subtree-level)
-    assert!(decision.filtered_data.get("sectorData").is_some());
+    assert!(decision.filtered_data.get("productGroupData").is_some());
 }
 
 // ─── Transfer state machine tests ─────────────────────────────────────────────
@@ -488,9 +489,9 @@ fn reject_completed_transfer_returns_invalid_state() {
     );
 }
 
-// ─── Passport sector-data validation tests ────────────────────────────────────
+// ─── Passport product group-data validation tests ────────────────────────────────────
 
-/// `Passport::validate()` must surface cross-field errors from `validate_sector_data`:
+/// `Passport::validate()` must surface cross-field errors from `validate_product_group_data`:
 /// a Textile passport where fibre percentages do not sum to ~100% is invalid.
 #[test]
 fn passport_validate_catches_bad_fibre_sum() {
@@ -509,8 +510,8 @@ fn passport_validate_catches_bad_fibre_sum() {
         created_at: now,
         updated_at: now,
         ..base_passport(
-            Sector::Textile,
-            SectorData::Textile(Box::new(TextileData {
+            ProductGroup::Textile,
+            ProductGroupData::Textile(Box::new(TextileData {
                 gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
                 // sum = 50%, should be ~100%
                 fibre_composition: vec![FibreEntry {
@@ -550,11 +551,11 @@ fn passport_validate_catches_bad_fibre_sum() {
     let err = passport.validate().unwrap_err().to_string();
     assert!(
         err.contains("fibre") || err.contains("Fibre") || err.contains("50"),
-        "validate() must surface fibre-sum error from sector_data validation, got: {err}"
+        "validate() must surface fibre-sum error from product_group_data validation, got: {err}"
     );
 
     // Fix the fibre sum and confirm validate() now passes.
-    if let Some(SectorData::Textile(ref mut td)) = passport.sector_data {
+    if let Some(ProductGroupData::Textile(ref mut td)) = passport.product_group_data {
         td.fibre_composition.push(FibreEntry {
             fibre: "polyester".into(),
             pct: 50.0,

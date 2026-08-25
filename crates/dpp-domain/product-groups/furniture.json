@@ -1,0 +1,22 @@
+{
+  "key": "furniture",
+  "title": "Furniture",
+  "schemaVersions": [
+    "1.0.0",
+    "1.1.0",
+    "1.2.0"
+  ],
+  "currentSchemaVersion": "1.2.0",
+  "productCategories": [
+    "chair",
+    "table",
+    "sofa",
+    "shelf"
+  ],
+  "disclosure": {
+    "svhcSubstances": "restricted",
+    "disassemblyInstructionsUrl": "restricted"
+  },
+  "plugin": "product-group-furniture",
+  "notes": "Mattresses are a separate product group and not a category here — the working plan selects them separately from furniture. v1.2.0 (current) removes `mattress` from productType; v1.1.0 is kept for historical immutability and still accepts it."
+}

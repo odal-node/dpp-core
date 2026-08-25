@@ -12,8 +12,8 @@ Passports mandated by:
 | Regulation | Reference | Status | dpp-core Coverage |
 |---|---|---|---|
 | ESPR | Regulation (EU) 2024/1781 | In force | Core passport model, per-audience field disclosure, schema validation |
-| Battery Regulation | Regulation (EU) 2023/1542 | In force, DPP deadline Feb 2027 | Battery schemas (v1.0.0, v2.0.0 … v2.6.0), sector plugin, per-category content rules |
-| Textile (anticipated) | ESPR delegated act (draft) | See timeline note below | Textile schemas (v1.0.0, v1.1.0), sector plugin |
+| Battery Regulation | Regulation (EU) 2023/1542 | In force, DPP deadline Feb 2027 | Battery schemas (v1.0.0, v2.0.0 … v2.6.0), product group plugin, per-category content rules |
+| Textile (anticipated) | ESPR delegated act (draft) | See timeline note below | Textile schemas (v1.0.0, v1.1.0), product group plugin |
 | CBAM | Regulation (EU) 2023/956 | In force | Steel schema (v1.0.0), embedded emissions fields |
 
 > **Timeline note:** the textile DPP delegated act has no adopted date yet; published estimates range from ~2026 to 2028. Treat any specific year here as provisional and verify against EUR-Lex before relying on it.
@@ -56,11 +56,11 @@ Each JSON schema under `schemas/` is traceable to its regulatory basis:
 | `aluminium/v1.0.0.json` | ESPR 2024/1781 / CBAM | (delegated act anticipated) | Production route, CO₂e/tonne, recycled content |
 | `construction/v1.0.0.json` | CPR 2024/3110 | (delegated acts anticipated) | Construction product fields |
 | `detergent/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Surfactant / ingredient fields |
-| `furniture/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Furniture sector fields |
-| `toy/v1.0.0.json` | EU 2025/2509 (Toy Safety) | (delegated act anticipated) | Toy sector fields |
-| `tyre/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Tyre sector fields |
+| `furniture/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Furniture product group fields |
+| `toy/v1.0.0.json` | EU 2025/2509 (Toy Safety) | (delegated act anticipated) | Toy product group fields |
+| `tyre/v1.0.0.json` | ESPR 2024/1781 | (delegated act anticipated) | Tyre product group fields |
 
-The current schema version per sector is resolved by `SectorCatalog`, not hardcoded at call sites. See `docs/regulatory/REGULATORY.md` for which sectors carry implemented compliance rules vs. placeholders.
+The current schema version per product group is resolved by `ProductGroupCatalog`, not hardcoded at call sites. See `docs/regulatory/REGULATORY.md` for which product groups carry implemented compliance rules vs. placeholders.
 
 ## Regulatory Change Process
 
@@ -85,29 +85,29 @@ against v1 remain valid against v1 indefinitely, even after v2 is published.
 
 ## Compliance Architecture
 
-dpp-core exposes a pluggable determination seam for sector-specific compliance:
+dpp-core exposes a pluggable determination seam for product-group-specific compliance:
 
 ```
 ComplianceRegistry (port trait)
   ├── PassthroughRegistry (dpp-core, Apache) → PassthroughNoValidation, computes nothing
-  └── plugin-backed registry (platform)      → Wasm sector plugins (sector-battery, etc.)
+  └── plugin-backed registry (platform)      → Wasm product group plugins (product-group-battery, etc.)
 ```
 
-The `ComplianceRegistry` trait defines `compute(&self, sector: Sector, data:
-&SectorData) -> Result<ComplianceResult, ComplianceError>`; the per-sector
-`ComplianceStrategy` trait defines `compute(&self, data: &SectorData) ->
+The `ComplianceRegistry` trait defines `compute(&self, product_group: Product group, data:
+&ProductGroupData) -> Result<ComplianceResult, ComplianceError>`; the per-product group
+`ComplianceStrategy` trait defines `compute(&self, data: &ProductGroupData) ->
 Result<ComplianceResult, ComplianceError>`. The Apache default
 (`PassthroughRegistry`) computes nothing and returns
-`PassthroughNoValidation` for every sector; real determinations come from the
-Wasm sector plugins (or a proprietary `PremiumComplianceRegistry`). A computed
-determination is passed through `gate_determination(catalog.is_in_force(sector),
-…)` so a provisional sector can never surface a binding result. This separation
+`PassthroughNoValidation` for every product group; real determinations come from the
+Wasm product group plugins (or a proprietary `PremiumComplianceRegistry`). A computed
+determination is passed through `gate_determination(catalog.is_in_force(product group),
+…)` so a provisional product group can never surface a binding result. This separation
 means:
 
-- **Core stays generic** — no sector-specific determination logic in the workspace crates.
+- **Core stays generic** — no product-group-specific determination logic in the workspace crates.
 - **Regulations are isolated** — a Battery Regulation change only touches
-  `sector-battery` (and the shared rules in `dpp-rules`).
-- **New sectors are additive** — adding a new delegated act means adding a
+  `product-group-battery` (and the shared rules in `dpp-rules`).
+- **New product groups are additive** — adding a new delegated act means adding a
   schema file, a catalog manifest, and a plugin.
 
 ## Cryptographic Compliance

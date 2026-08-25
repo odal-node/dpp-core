@@ -128,7 +128,7 @@ dpp-crypto        — Ed25519 key management, AES-GCM, JWS sign/verify, encrypte
 dpp-vc            — W3C Verifiable Credentials, did:web documents, status lists, JSON-LD context
 dpp-digital-link  — GS1 Digital Link parser and link-type negotiation (pure, no I/O)
 dpp-aas           — Asset Administration Shell projection: shells + per-product-group submodels
-dpp-plugin-traits — Wasm plugin host/guest contract: DppSectorPlugin trait, capabilities, AbiResult
+dpp-plugin-traits — Wasm plugin host/guest contract: DppProductGroupPlugin trait, capabilities, AbiResult
 dpp-plugin-sdk    — guest-side SDK: export_plugin! macro (generates the ABI incl. describe()) + Validator
 dpp-registry      — EU Central Registry interface types (wasm32-safe)
 dpp-rules         — pure no_std, zero-dep cross-field regulatory rules; shared by dpp-domain and the Wasm plugins (kept separate by design, so neither depends on the other)
@@ -136,14 +136,14 @@ dpp-calc          — EU-methodology calculators (CO2e cradle-to-gate, EN 45554 
 dpp-tests         — cross-crate integration tests (textile E2E, transfer of responsibility, audience gatekeeping, schema conformity)
 ```
 
-Sector plugins (`plugins/sector-*`) are standalone Rust crates compiled to `wasm32-wasip1`, excluded from the workspace. Each implements `DppSectorPlugin` and calls `export_plugin!` once; **`sector-battery` is the reference implementation**. The host calls a plugin's `describe()` export and runs `check_compatibility` before dispatch. See `docs/architecture/PLUGIN-HOST.md`.
+Product group plugins (`plugins/product-group-*`) are standalone Rust crates compiled to `wasm32-wasip1`, excluded from the workspace. Each implements `DppProductGroupPlugin` and calls `export_plugin!` once; **`product-group-battery` is the reference implementation**. The host calls a plugin's `describe()` export and runs `check_compatibility` before dispatch. See `docs/architecture/PLUGIN-HOST.md`.
 
 ## Build and Development Commands
 
 ```sh
 just check          # Full gate: fmt-check → lint → test → test-doc → test-plugins → doc → audit
 just build          # Release build for all workspace crates
-just build-plugins  # Compile Wasm sector plugins (wasm32-wasip1)
+just build-plugins  # Compile Wasm product group plugins (wasm32-wasip1)
 just test           # cargo nextest run --workspace (does NOT run doctests)
 just test-doc       # cargo test --doc --workspace — compiles each crate's README
 just lint           # cargo clippy --workspace --all-targets -- -D warnings
@@ -157,7 +157,7 @@ just clean          # cargo clean
 
 Port traits define the core/platform boundary:
 - `PassportRepository` (async, persistence)
-- `ComplianceRegistry` + `ComplianceStrategy` (non-async, sector dispatch)
+- `ComplianceRegistry` + `ComplianceStrategy` (non-async, product group dispatch)
 - `IdentityPort` (async, sign/verify)
 - `PluginHost` (non-async, Wasm dispatch)
 - `ArchivePort` (async, immutable archival with retention guarantees)
@@ -168,12 +168,12 @@ All implementations live in the platform repo.
 
 ### Schemas
 
-Versioned JSON schemas at `crates/dpp-domain/schemas/{sector}/v{version}.json` (inside the crate so they ship on publish). The `VersionedSchemaRegistry` in dpp-domain embeds them via `include_str!()` and validates passport data at runtime. Adding a new schema version is a single file addition. **Never** `include_str!` a path outside the crate dir — `cargo publish` excludes it and the crate fails to build for downstream consumers.
+Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.json` (inside the crate so they ship on publish). The `VersionedSchemaRegistry` in dpp-domain embeds them via `include_str!()` and validates passport data at runtime. Adding a new schema version is a single file addition. **Never** `include_str!` a path outside the crate dir — `cargo publish` excludes it and the crate fails to build for downstream consumers.
 
 ### Wasm Targets
 
 - `wasm32-unknown-unknown` — `dpp-registry`, `dpp-digital-link`, `dpp-aas` (not `dpp-crypto`/`dpp-vc`: the RNG needs a platform entropy source)
-- `wasm32-wasip1` — sector plugins (wasmtime host in platform)
+- `wasm32-wasip1` — product group plugins (wasmtime host in platform)
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.

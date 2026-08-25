@@ -16,7 +16,7 @@ pub struct RulesetManifest {
     /// EU-act citations this bundle encodes (audit trail for the change).
     #[serde(default)]
     pub act_citations: Vec<String>,
-    /// Sector → schema version this bundle references (never forks schemas).
+    /// ProductGroup → schema version this bundle references (never forks schemas).
     #[serde(default)]
     pub schema_versions: BTreeMap<String, String>,
     /// Hex SHA-256 over the JCS-canonicalised `content`.
