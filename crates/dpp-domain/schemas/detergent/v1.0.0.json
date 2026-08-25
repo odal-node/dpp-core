@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://schema.odal-node.io/dpp/detergent-v1.0.0.json",
-  "$comment": "DRAFT — NOT IN FORCE. This sector's status is `provisional` in the sector catalog: no delegated act binds it yet, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set \"status\": \"in_force\" in crates/dpp-domain/sectors/<key>.json. CI then requires this marker to be removed.",
+  "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Detergent Sector Data (v1.0.0)",
   "description": "Detergent and surfactant fields per EU Regulation 2026/405. DPP mandate 2029. Surfactant concentrations use the EU-standard disclosure bands from Annex VII (same bands as Regulation 648/2004 labelling tradition).",
   "type": "object",

@@ -1,10 +1,12 @@
-//! [`RetentionBasis`] — whether a sector's `retentionYears` traces to an
-//! adopted legal text, or is carried as an assumption pending one.
+//! [`RetentionBasis`] — whether a `retentionYears` figure traces to an adopted
+//! legal text, or is carried as an assumption pending one.
 
 use serde::{Deserialize, Serialize};
 
-/// Whether [`crate::catalog::SectorDescriptor::retention_years`] is sourced
-/// from an adopted legal text, or an assumption carried until one exists.
+/// Whether a `retentionYears` figure — on an
+/// [`Instrument`](crate::catalog::Instrument) or on one of its
+/// [`InstrumentBinding`](crate::catalog::InstrumentBinding)s — is sourced from
+/// an adopted legal text, or an assumption carried until one exists.
 ///
 /// `retentionYears` is shipped data describing an operator's legal
 /// obligation. A plausible number with no traceable basis is the same defect

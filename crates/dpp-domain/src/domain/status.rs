@@ -39,6 +39,27 @@ pub enum PassportStatus {
 }
 
 impl PassportStatus {
+    /// Every status this build models, for exhaustive iteration.
+    ///
+    /// `PassportStatus` is `#[non_exhaustive]`, so a consumer outside this crate
+    /// cannot enumerate it — and a consumer that publishes an API description
+    /// must, in order to list the values its endpoints can return. Without this
+    /// the list is hand-written downstream, keeps compiling when a variant is
+    /// added here, and the new status ships undocumented: exactly how
+    /// `superseded` and `deactivated` came to be missing from the engine's
+    /// OpenAPI description while both were reachable.
+    ///
+    /// A status added later is deliberately not covered until it is added here
+    /// on purpose. Same contract as [`crate::domain::seal::SealFormat::ALL`].
+    pub const ALL: &'static [Self] = &[
+        Self::Draft,
+        Self::Published,
+        Self::Suspended,
+        Self::Archived,
+        Self::Superseded,
+        Self::Deactivated,
+    ];
+
     /// The API wire string for this status — shared by [`Serialize`] and
     /// [`std::fmt::Display`] so the two can never drift on the mapping.
     const fn wire_str(&self) -> &'static str {
@@ -216,6 +237,51 @@ mod tests {
             let json = serde_json::to_string(&s).unwrap();
             let back: PassportStatus = serde_json::from_str(&json).unwrap();
             prop_assert_eq!(s, back);
+        }
+    }
+}
+
+#[cfg(test)]
+mod passport_status_all_tests {
+    use super::PassportStatus;
+
+    /// `ALL` must list every variant.
+    ///
+    /// The match is exhaustive with no catch-all, so a new variant stops this
+    /// compiling; the length assertion then fails until `ALL` is updated. Both
+    /// stages matter — downstream consumers cannot enumerate this enum at all
+    /// (it is `#[non_exhaustive]`) and inherit any gap in `ALL` silently. The
+    /// engine's API description omitted `superseded` and `deactivated` for
+    /// exactly that reason.
+    #[test]
+    fn all_lists_every_variant() {
+        for status in PassportStatus::ALL {
+            match status {
+                PassportStatus::Draft
+                | PassportStatus::Published
+                | PassportStatus::Suspended
+                | PassportStatus::Archived
+                | PassportStatus::Superseded
+                | PassportStatus::Deactivated => {}
+            }
+        }
+        assert_eq!(
+            PassportStatus::ALL.len(),
+            6,
+            "a variant was added to the match above but not to ALL"
+        );
+    }
+
+    /// Every listed status must have a distinct wire string, since `ALL` is what
+    /// a consumer builds its documented value set from.
+    #[test]
+    fn all_wire_strings_are_distinct() {
+        let mut seen = std::collections::BTreeSet::new();
+        for status in PassportStatus::ALL {
+            assert!(
+                seen.insert(status.to_string()),
+                "two statuses serialise to the same wire string: {status}"
+            );
         }
     }
 }

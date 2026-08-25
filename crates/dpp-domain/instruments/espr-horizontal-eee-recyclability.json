@@ -1,0 +1,17 @@
+{
+  "id": "espr-horizontal-eee-recyclability",
+  "title": "ESPR horizontal requirements on recycled content and recyclability of electrical and electronic equipment",
+  "kind": "delegated",
+  "status": "anticipated",
+  "parent": "espr",
+  "passport": { "obligation": "required" },
+  "productGroups": [
+    {
+      "productGroup": "lmt",
+      "status": "provisional",
+      "legalBasis": [],
+      "notes": "Light means of transport — monowheels, e-scooters, e-bikes and e-mopeds up to L2e under Regulation (EU) 168/2013. Source is the JRC priorities study's recyclability coverage table, which is a preparatory technical study, NOT law and not a Commission position by its own disclaimer. Recorded because it is the case this catalog exists to represent, not because it binds anything: the study states that the horizontal requirements' product sets include product groups that were never shortlisted as candidates for priority action, naming LMT. There is no product-group manifest for this key and there may never be one."
+    }
+  ],
+  "notes": "The second horizontal act from the 2025-2030 working plan, anticipated with no adoption year stated. It carries the binding that proves the model: a product group reached by an act while having no manifest, no schema and no place on any priority list. Nothing derives from a product group here — the reach is recorded on the act, which is the only place it can be written down. Every value is provisional or anticipated and none of it may be presented as sourced."
+}

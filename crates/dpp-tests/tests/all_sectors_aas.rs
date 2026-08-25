@@ -19,9 +19,9 @@ use dpp_domain::Audience;
 use dpp_domain::domain::sector::CriticalRawMaterial;
 use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
-    EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, ProductionRoute, RepairabilityScore,
-    Sector, SectorData, SteelData, SurfactantEntry, SvhcSubstance, TextileData, ToyData, TyreData,
-    UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
+    EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, MattressData, ProductionRoute,
+    RepairabilityScore, Sector, SectorData, SteelData, SurfactantEntry, SvhcSubstance, TextileData,
+    ToyData, TyreData, UnsoldGoodsDestination, UnsoldGoodsReason, UnsoldGoodsReport,
 };
 use dpp_tests::fixtures::base_passport as base;
 
@@ -187,6 +187,20 @@ fn furniture_data() -> FurnitureData {
     }
 }
 
+fn mattress_data() -> MattressData {
+    MattressData {
+        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        primary_material: "upholstered".into(),
+        country_of_origin: "SE".into(),
+        co2e_per_unit_kg: Some(48.0),
+        recycled_content_pct: Some(12.0),
+        repairability_score: Some(3.0),
+        svhc_substances: Some(vec![svhc()]),
+        disassembly_instructions_url: Some("https://acme.example.com/mattress".into()),
+        end_of_life_instructions: Some("Separate foam from steel coils and recycle".into()),
+    }
+}
+
 fn detergent_data() -> DetergentData {
     DetergentData {
         gtin: Gtin::parse(VALID_GTIN).unwrap(),
@@ -270,6 +284,15 @@ fn all_sector_cases() -> Vec<(Sector, SectorData, &'static str, &'static str)> {
             SectorData::Furniture(furniture_data()),
             "1.0.0",
             "FurnitureProductData",
+        ),
+        (
+            // No AAS template of its own: mattresses are provisional, so the
+            // generic projection is the correct output and a typed mapper would
+            // fail `only_in_force_sectors_carry_a_typed_mapper`.
+            Sector::Mattress,
+            SectorData::Mattress(mattress_data()),
+            "1.0.0",
+            "SectorData",
         ),
         (
             Sector::Detergent,
@@ -728,12 +751,13 @@ const PILOT_CARVE_OUT: &str = "textile";
 /// submodel template that does not exist. A generic projection is the honest
 /// rendering of a sector whose ratified template has not been published.
 ///
-/// Driven by the catalog rather than a hardcoded list, so a sector coming into
-/// force flips this expectation by changing its manifest — and this test then
-/// demands the typed mapper that its new status has earned.
+/// Driven by the catalogs rather than a hardcoded list, so a product group
+/// coming into force flips this expectation by changing the binding in its
+/// instrument manifest — and this test then demands the typed mapper that its
+/// new status has earned.
 #[test]
 fn only_in_force_sectors_carry_a_typed_mapper() {
-    let catalog = dpp_domain::SectorCatalog::new();
+    let instruments = dpp_domain::InstrumentCatalog::new();
 
     for (sector, data, version, _id_short) in all_sector_cases() {
         let key = sector.catalog_key().to_owned();
@@ -758,7 +782,7 @@ fn only_in_force_sectors_carry_a_typed_mapper() {
         // The generic projection is the one named for the field it renders;
         // a typed mapper names its own submodel template.
         let is_typed = sector_submodel.id_short != "SectorData";
-        let may_be_typed = catalog.is_in_force(&key) || key == PILOT_CARVE_OUT;
+        let may_be_typed = !instruments.determinable_for(&key).is_empty() || key == PILOT_CARVE_OUT;
 
         assert_eq!(
             is_typed, may_be_typed,

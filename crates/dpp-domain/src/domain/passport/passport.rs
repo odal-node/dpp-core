@@ -221,6 +221,101 @@ fn default_version() -> u32 {
     1
 }
 
+/// Every key [`Passport`] serialises to, in declaration order.
+///
+/// # Why this exists
+///
+/// A consumer that addresses passport JSON *by key* — a JSONB query, an index
+/// expression, a database trigger — cannot use the Rust field name and cannot
+/// read a Rust constant into SQL. It types the camelCase string literally, and
+/// a literal has no relationship to the field it names: rename the field here
+/// and the query keeps parsing, keeps running, and silently returns NULL for
+/// every row. Nothing fails.
+///
+/// This is the vocabulary those consumers must check themselves against.
+/// `passport_wire_keys_tests` proves it is complete against a fully-populated
+/// instance, so a field added or renamed here changes this list, and a consumer
+/// gate that compares against it then names the file to fix.
+///
+/// Serialized (camelCase) names, matching the `Passport` JSON representation.
+pub const PASSPORT_WIRE_KEYS: &[&str] = &[
+    "id",
+    "batchId",
+    "productName",
+    "sector",
+    "manufacturer",
+    "materials",
+    "co2ePerUnit",
+    "repairabilityScore",
+    "complianceResult",
+    "lintResult",
+    "sectorData",
+    "status",
+    "qrCodeUrl",
+    "jwsSignature",
+    "publicJwsSignature",
+    "disclosureSignatures",
+    "createdAt",
+    "updatedAt",
+    "publishedAt",
+    "placedOnMarketDate",
+    "schemaVersion",
+    "retentionLocked",
+    "version",
+    "supersedesId",
+    "parentPassportRef",
+    "componentRefs",
+    "retentionUntil",
+    "productId",
+    "commodityCode",
+    "operatorIdentifier",
+    "facility",
+    "seal",
+];
+
+/// The only [`Passport`] keys that may change once `retention_locked` is set.
+///
+/// Retention-locking a passport freezes its *content* (ESPR: the record must
+/// remain available and unaltered for the retention period). It does not freeze
+/// the record entirely — a passport is still suspended, sealed, re-linted and
+/// re-signed after publication, and each of those writes a key here.
+///
+/// # Why this belongs in core
+///
+/// Which fields survive the freeze is a statement about what a retained passport
+/// guarantees, so it changes when the domain changes — the Golden Rule's test
+/// for core ownership. It was previously stated only inside a PostgreSQL trigger
+/// and had to be re-typed **in full, five times** as fields were added
+/// (`publicJwsSignature`, `lintResult`, `disclosureSignatures`, `seal`), each
+/// time as a fresh migration transcribing all ten strings. Nothing said when a
+/// sixth was due: a new post-publish-mutable field simply failed at runtime with
+/// `ODAL_RETENTION` the first time something tried to write it on a published
+/// record.
+///
+/// A backend enforcing the freeze must derive its list from this value. SQL
+/// cannot read a Rust constant, so a trigger necessarily restates it — but a
+/// restatement that is *checked against this* is a copy with a guard, not a
+/// second source of truth.
+///
+/// Serialized (camelCase) names, matching the `Passport` JSON representation.
+pub const RETENTION_MUTABLE_FIELDS: &[&str] = &[
+    // Lifecycle: suspension and archival are lawful after publication.
+    "status",
+    "publishedAt",
+    "retentionLocked",
+    "updatedAt",
+    // Proofs: re-signing and sealing land after the content is frozen, and each
+    // covers the frozen content rather than altering it.
+    "jwsSignature",
+    "publicJwsSignature",
+    "disclosureSignatures",
+    "seal",
+    // Serving metadata, not passport content.
+    "qrCodeUrl",
+    // Advisory plausibility output, explicitly re-computable after publish.
+    "lintResult",
+];
+
 /// The catalog sector key and recorded schema version a stored document's
 /// `sectorData` was written under, read without assuming the document
 /// deserializes into the current shape. `None` if either is absent or
@@ -664,5 +759,150 @@ impl Passport {
         }
 
         PassportView(value)
+    }
+}
+
+#[cfg(test)]
+mod retention_mutable_fields_tests {
+    use super::RETENTION_MUTABLE_FIELDS;
+    use crate::test_support::sample_passport;
+
+    /// Every entry must be a key `Passport` actually serialises to.
+    ///
+    /// The list is strings and nothing else ties it to the struct. A stale entry
+    /// names a key that no longer exists, so the field it was meant to keep
+    /// writable becomes frozen — and that failure only appears at runtime, on a
+    /// published record, when something tries to write it.
+    ///
+    /// Only fields that always serialise are asserted here: the four proof
+    /// fields and `seal` are `skip_serializing_if`, so they are checked against
+    /// the populated instance below.
+    #[test]
+    fn every_mutable_key_is_a_real_passport_field() {
+        let mut passport = sample_passport();
+        passport.public_jws_signature = Some("eyJ..a".to_owned());
+        passport.jws_signature = Some("eyJ..b".to_owned());
+        passport
+            .disclosure_signatures
+            .insert("public+restricted".to_owned(), "eyJ..c".to_owned());
+        passport.qr_code_url = Some("https://id.example/dpp/1".to_owned());
+        passport.seal = Some(crate::domain::seal::SealedEnvelope {
+            format: crate::domain::seal::SealFormat::Cades,
+            seal_value: "MIIB".to_owned(),
+            signing_cert_ref: None,
+            sealed_at: chrono::Utc::now(),
+            placeholder: true,
+        });
+        passport.lint_result = Some(crate::domain::lint::LintResult {
+            pack_version: "1.0.0".to_owned(),
+            findings: Vec::new(),
+            assessed_at: chrono::Utc::now(),
+        });
+        passport.published_at = Some(chrono::Utc::now());
+
+        let json = serde_json::to_value(&passport).expect("passport serialises");
+        let obj = json.as_object().expect("passport is a JSON object");
+
+        let stale: Vec<&str> = RETENTION_MUTABLE_FIELDS
+            .iter()
+            .copied()
+            .filter(|k| !obj.contains_key(*k))
+            .collect();
+
+        assert!(
+            stale.is_empty(),
+            "RETENTION_MUTABLE_FIELDS names keys `Passport` does not serialise to: {stale:?}"
+        );
+    }
+
+    /// A field cannot be both frozen-by-retention-mutable and user-patchable in
+    /// the sense the repository guard means: these are different axes, but an
+    /// entry appearing in neither list and changing after publish is the case
+    /// that fails at runtime. This pins the overlap that does exist so a future
+    /// edit to either list has to think about the other.
+    #[test]
+    fn mutable_and_protected_overlap_is_deliberate() {
+        use crate::ports::passport_repo::PROTECTED_PATCH_FIELDS;
+        let both: Vec<&str> = RETENTION_MUTABLE_FIELDS
+            .iter()
+            .copied()
+            .filter(|k| PROTECTED_PATCH_FIELDS.contains(k))
+            .collect();
+        // Every one of these is written by the system after publish and must
+        // never be written by a user patch — that is why it is in both.
+        assert_eq!(
+            both,
+            vec![
+                "status",
+                "publishedAt",
+                "retentionLocked",
+                "jwsSignature",
+                "publicJwsSignature",
+                "disclosureSignatures",
+                "seal",
+            ],
+            "the overlap between system-writable-after-publish and \
+             not-user-patchable changed; confirm the new shape is intended"
+        );
+    }
+}
+
+#[cfg(test)]
+mod passport_wire_keys_tests {
+    use super::PASSPORT_WIRE_KEYS;
+    use crate::test_support::fully_populated_passport;
+
+    /// `PASSPORT_WIRE_KEYS` must be exactly the key set a `Passport` emits.
+    ///
+    /// Both directions matter. A missing key means a consumer checking itself
+    /// against this list would reject a query that is actually correct; an extra
+    /// key means the list blesses a string that addresses nothing, which is the
+    /// silent-NULL failure it exists to prevent.
+    #[test]
+    fn wire_keys_are_exactly_what_passport_emits() {
+        let json = serde_json::to_value(fully_populated_passport()).expect("serialises");
+        let emitted: std::collections::BTreeSet<String> = json
+            .as_object()
+            .expect("passport is a JSON object")
+            .keys()
+            .cloned()
+            .collect();
+        let declared: std::collections::BTreeSet<String> =
+            PASSPORT_WIRE_KEYS.iter().map(|k| (*k).to_owned()).collect();
+
+        let missing: Vec<&String> = emitted.difference(&declared).collect();
+        let extra: Vec<&String> = declared.difference(&emitted).collect();
+
+        assert!(
+            missing.is_empty(),
+            "Passport emits keys PASSPORT_WIRE_KEYS does not list: {missing:?}"
+        );
+        assert!(
+            extra.is_empty(),
+            "PASSPORT_WIRE_KEYS lists keys Passport does not emit: {extra:?} — either the field \
+             was renamed, or `fully_populated_passport` does not populate it"
+        );
+    }
+
+    /// The two derived lists must be subsets of the vocabulary, or they name
+    /// keys that address nothing.
+    #[test]
+    fn derived_lists_use_only_real_wire_keys() {
+        use super::RETENTION_MUTABLE_FIELDS;
+        use crate::ports::passport_repo::PROTECTED_PATCH_FIELDS;
+
+        for (name, list) in [
+            ("RETENTION_MUTABLE_FIELDS", RETENTION_MUTABLE_FIELDS),
+            ("PROTECTED_PATCH_FIELDS", PROTECTED_PATCH_FIELDS),
+        ] {
+            let stale: Vec<&&str> = list
+                .iter()
+                .filter(|k| !PASSPORT_WIRE_KEYS.contains(k))
+                .collect();
+            assert!(
+                stale.is_empty(),
+                "{name} names keys that are not Passport wire keys: {stale:?}"
+            );
+        }
     }
 }

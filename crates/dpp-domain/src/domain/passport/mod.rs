@@ -16,6 +16,6 @@ pub use facility::FacilitySnapshot;
 pub use id::PassportId;
 pub use manufacturer::ManufacturerInfo;
 pub use material::MaterialEntry;
-pub use passport::Passport;
+pub use passport::{PASSPORT_WIRE_KEYS, Passport, RETENTION_MUTABLE_FIELDS};
 pub use reference::PassportRef;
 pub use view::PassportView;

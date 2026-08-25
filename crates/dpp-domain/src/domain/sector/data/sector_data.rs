@@ -8,6 +8,7 @@ use super::construction::ConstructionData;
 use super::detergent::DetergentData;
 use super::electronics::ElectronicsData;
 use super::furniture::FurnitureData;
+use super::mattress::MattressData;
 use super::steel::SteelData;
 use super::textile::TextileData;
 use super::toy::ToyData;
@@ -53,6 +54,7 @@ pub enum SectorData {
     Toy(ToyData),
     Aluminium(AluminiumData),
     Furniture(FurnitureData),
+    Mattress(MattressData),
     Detergent(DetergentData),
     /// A product group this build has no typed variant for.
     ///
@@ -97,6 +99,7 @@ impl Serialize for SectorData {
             Self::Toy(d) => serde_json::to_value(d),
             Self::Aluminium(d) => serde_json::to_value(d),
             Self::Furniture(d) => serde_json::to_value(d),
+            Self::Mattress(d) => serde_json::to_value(d),
             Self::Detergent(d) => serde_json::to_value(d),
             Self::Other { data, .. } => Ok(data.clone()),
         }
@@ -145,6 +148,7 @@ impl<'de> Deserialize<'de> for SectorData {
             Sector::Toy => typed!(Toy),
             Sector::Aluminium => typed!(Aluminium),
             Sector::Furniture => typed!(Furniture),
+            Sector::Mattress => typed!(Mattress),
             Sector::Detergent => typed!(Detergent),
             Sector::Other(sector) => Ok(Self::Other {
                 sector,
@@ -220,6 +224,7 @@ impl SectorData {
             SectorData::Toy(_) => Sector::Toy,
             SectorData::Aluminium(_) => Sector::Aluminium,
             SectorData::Furniture(_) => Sector::Furniture,
+            SectorData::Mattress(_) => Sector::Mattress,
             SectorData::Detergent(_) => Sector::Detergent,
             SectorData::Other { sector, .. } => Sector::Other(sector.clone()),
         }
@@ -261,6 +266,7 @@ impl SectorData {
             | SectorData::Toy(_)
             | SectorData::Aluminium(_)
             | SectorData::Furniture(_)
+            | SectorData::Mattress(_)
             | SectorData::Detergent(_)
             | SectorData::Other { .. } => None,
         }
@@ -282,6 +288,7 @@ impl SectorData {
             SectorData::Toy(d) => Some(d.gtin.as_str()),
             SectorData::Aluminium(d) => Some(d.gtin.as_str()),
             SectorData::Furniture(d) => Some(d.gtin.as_str()),
+            SectorData::Mattress(d) => Some(d.gtin.as_str()),
             SectorData::Detergent(d) => Some(d.gtin.as_str()),
             SectorData::UnsoldGoods(_) | SectorData::Other { .. } => None,
         }

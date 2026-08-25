@@ -31,6 +31,22 @@ pub enum TransferReason {
 }
 
 impl TransferReason {
+    /// Every reason this build models, for exhaustive iteration.
+    ///
+    /// `TransferReason` is `#[non_exhaustive]`, so a consumer outside this crate
+    /// cannot enumerate it, and one publishing an API description has to. See
+    /// [`crate::domain::seal::SealFormat::ALL`] for the same contract: a reason
+    /// added later is deliberately not covered until it is added here.
+    pub const ALL: &'static [Self] = &[
+        Self::Sale,
+        Self::Return,
+        Self::Remanufacturing,
+        Self::Repurposing,
+        Self::PreparationForReuse,
+        Self::Import,
+        Self::InsolvencySuccession,
+    ];
+
     /// The stable wire form, for payloads that carry the reason as a string.
     ///
     /// Spelled out rather than derived from `Serialize` so that renaming a
@@ -180,5 +196,32 @@ impl TransferRecord {
         }
         self.completed_at = Some(Utc::now());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod transfer_reason_all_tests {
+    use super::TransferReason;
+
+    /// `ALL` must list every variant — see `OperatorRole`'s equivalent test for
+    /// why this is two stages rather than one.
+    #[test]
+    fn all_lists_every_variant() {
+        for reason in TransferReason::ALL {
+            match reason {
+                TransferReason::Sale
+                | TransferReason::Return
+                | TransferReason::Remanufacturing
+                | TransferReason::Repurposing
+                | TransferReason::PreparationForReuse
+                | TransferReason::Import
+                | TransferReason::InsolvencySuccession => {}
+            }
+        }
+        assert_eq!(
+            TransferReason::ALL.len(),
+            7,
+            "a variant was added to the match above but not to ALL"
+        );
     }
 }

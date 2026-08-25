@@ -29,6 +29,7 @@ pub enum Sector {
     Toy,
     Aluminium,
     Furniture,
+    Mattress,
     Detergent,
     /// A product group this build has no typed variant for, holding its wire
     /// tag verbatim. Never a placeholder: the key is preserved, so the
@@ -54,6 +55,7 @@ impl Sector {
             Self::Toy => "toy",
             Self::Aluminium => "aluminium",
             Self::Furniture => "furniture",
+            Self::Mattress => "mattress",
             Self::Detergent => "detergent",
             Self::Other(key) => key,
         }
@@ -77,6 +79,7 @@ impl Sector {
             "toy" => Self::Toy,
             "aluminium" => Self::Aluminium,
             "furniture" => Self::Furniture,
+            "mattress" => Self::Mattress,
             "detergent" => Self::Detergent,
             other => Self::Other(other.to_owned()),
         }
@@ -100,6 +103,7 @@ impl Sector {
             Self::Toy => "toy",
             Self::Aluminium => "aluminium",
             Self::Furniture => "furniture",
+            Self::Mattress => "mattress",
             Self::Detergent => "detergent",
             Self::Other(tag) => tag,
         }
@@ -145,6 +149,7 @@ mod tests {
             Sector::Toy,
             Sector::Aluminium,
             Sector::Furniture,
+            Sector::Mattress,
             Sector::Detergent,
             Sector::Other("packaging".into()),
         ] {

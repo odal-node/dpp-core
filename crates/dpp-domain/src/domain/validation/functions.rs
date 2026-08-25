@@ -257,6 +257,7 @@ fn cross_field_errors(sector_data: &SectorData, errors: &mut Vec<FieldError>) {
         SectorData::Electronics(d) => push_svhc(d.svhc_substances.as_deref(), errors),
         SectorData::Toy(d) => push_svhc(d.svhc_substances.as_deref(), errors),
         SectorData::Furniture(d) => push_svhc(d.svhc_substances.as_deref(), errors),
+        SectorData::Mattress(d) => push_svhc(d.svhc_substances.as_deref(), errors),
         SectorData::Detergent(d) => {
             if let Err(msg) = validate_surfactants(&d.surfactants) {
                 errors.push(FieldError {

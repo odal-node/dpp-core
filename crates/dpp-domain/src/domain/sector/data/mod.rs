@@ -9,6 +9,7 @@ pub mod construction;
 pub mod detergent;
 pub mod electronics;
 pub mod furniture;
+pub mod mattress;
 #[allow(clippy::module_inception)]
 pub mod sector_data;
 pub mod shared;
@@ -28,6 +29,7 @@ pub use construction::ConstructionData;
 pub use detergent::{DetergentData, SurfactantEntry};
 pub use electronics::ElectronicsData;
 pub use furniture::FurnitureData;
+pub use mattress::MattressData;
 pub use sector_data::{SectorData, redact_sector_data};
 pub use shared::{CriticalRawMaterial, SvhcSubstance};
 pub use steel::SteelData;

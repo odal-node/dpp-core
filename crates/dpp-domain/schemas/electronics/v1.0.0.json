@@ -236,5 +236,6 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "NO PASSPORT OBLIGATION. An act binds this product group today, but no act requires a digital product passport for it — the duty is either absent from the instrument entirely or discharged through another system under ESPR Art. 9(4)(b). This schema therefore describes data we model, not a passport the law asks for. Structural validation against it is not evidence of compliance with any passport obligation, and no binding passport determination may be emitted here. Removing this marker takes an act that actually imposes a passport; no status change can do it."
 }

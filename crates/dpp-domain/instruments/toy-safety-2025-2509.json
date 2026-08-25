@@ -1,0 +1,22 @@
+{
+  "id": "toy-safety-2025-2509",
+  "title": "Toy Safety Regulation (EU) 2025/2509",
+  "celex": "32025R2509",
+  "kind": "direct",
+  "status": "adopted",
+  "passport": {
+    "obligation": "required",
+    "from": { "date": "2030-08-01", "basis": "sourced" }
+  },
+  "retentionYears": 10,
+  "retentionYearsBasis": "sourced",
+  "productGroups": [
+    {
+      "productGroup": "toy",
+      "status": "provisional",
+      "legalBasis": ["Regulation (EU) 2025/2509"],
+      "notes": "retentionYears is sourced: the Regulation requires 10 years after placing on the market, including in cases of insolvency. Adopted 2025-12-12 and in force since 2026-01-01, but fully applicable only from 2030-08-01 after a 54-month transition, so nothing is bindingly determinable yet. The implementing acts defining the technical and procedural passport requirements are not published, so a conformant toy data carrier cannot be generated today."
+    }
+  ],
+  "notes": "A direct instrument with a firm passport date, which is rarer than it looks — most of the catalog is undated. Its identifier-sharing provision is one of the two proofs that a product bears one passport however many instruments apply: the unique product identifier, operator identifier and registration identifier 'shall be the same' as those used under other Union law."
+}

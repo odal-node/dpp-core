@@ -1,0 +1,26 @@
+{
+  "id": "ecodesign-energy-labelling-mobile",
+  "title": "Ecodesign and energy labelling for smartphones, mobile phones and tablets — Regulations (EU) 2023/1670 and 2023/1669",
+  "celex": "32023R1670",
+  "kind": "adjacent",
+  "status": "adopted",
+  "passport": {
+    "obligation": "displacedBy",
+    "system": "EPREL",
+    "basis": "ESPR Art. 9(4)(b)"
+  },
+  "productGroups": [
+    {
+      "productGroup": "electronics",
+      "status": "in_force",
+      "legalBasis": [
+        "Regulation (EU) 2023/1670 Art. 1(1)",
+        "Regulation (EU) 2023/1669"
+      ],
+      "retentionYears": 10,
+      "retentionYearsBasis": "assumed",
+      "notes": "retentionYears is assumed: neither Regulation has been checked for a retention figure, and since neither imposes a passport there may be no such figure to find. Binding since 2025-06-20 for smartphones, other mobile phones, cordless phones and slate tablets — repairability class A-E, durability, seven-year spare parts, OS updates. Those obligations are real and determinable. What does not exist is a passport obligation: neither Regulation contains the phrase 'digital product passport', and their information mechanism is EPREL."
+    }
+  ],
+  "notes": "The record that the previous model could not hold. Its predecessor entry carried status in_force together with dppAppliesFrom 2025-06-20 — but 2025-06-20 is Reg. 2023/1670's *ecodesign* application date under Directive 2009/125/EC, relabelled as a passport date, and no passport obligation exists to date. Because in_force was the gate for binding determinations, a node could assert compliance against an obligation that is not there. Here the two facts are recorded separately and both stay true: the binding is in_force, and the passport is displaced. ESPR Art. 9(4)(b) lets the Commission exempt a product group where other Union law provides an equivalent digital system, and the 2025-2030 working plan states the position in terms: every product covered by ecodesign measures will have a passport 'except if there is an alternative digital system providing equivalent information, for example the EPREL database'. EPREL is the alternative to a passport, not a form of one, and we do not model it."
+}

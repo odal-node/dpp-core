@@ -1,14 +1,16 @@
 {
   "key": "detergent",
   "title": "Detergents & Surfactants",
-  "status": "provisional",
-  "regime": "detergents",
-  "legalBasis": ["Regulation (EU) 2026/405 (Detergents)"],
-  "retentionYears": 10,
-  "retentionYearsBasis": "sourced",
-  "schemaVersions": ["1.0.0", "1.1.0"],
+  "schemaVersions": [
+    "1.0.0",
+    "1.1.0"
+  ],
   "currentSchemaVersion": "1.1.0",
-  "productCategories": ["laundry", "dishwashing", "surface-cleaner", "personal-care"],
-  "plugin": "sector-detergent",
-  "notes": "Detergents Regulation adopted; surfactant biodegradability already required, but the DPP obligation is anticipated ~2029. Provisional until then. retentionYears sourced: Reg. (EU) 2026/405 requires 10 years after placing on the market, including in cases of insolvency, liquidation or cessation of activity."
+  "productCategories": [
+    "laundry",
+    "dishwashing",
+    "surface-cleaner",
+    "personal-care"
+  ],
+  "plugin": "sector-detergent"
 }

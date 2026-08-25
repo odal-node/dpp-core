@@ -1,70 +1,60 @@
-//! [`SectorDescriptor`] — a single sector's catalog entry.
+//! [`SectorDescriptor`] — a single product group's catalog entry.
 
 use serde::{Deserialize, Serialize};
 
-use super::regime::Regime;
-use super::retention::RetentionBasis;
-use super::status::RegulatoryStatus;
-
-/// A single sector's catalog entry — the canonical record every component
-/// (schema registry, plugin host, passport model) resolves against.
+/// A single product group's catalog entry — the canonical record every
+/// component (schema registry, plugin host, passport model) resolves against.
+///
+/// # What this record is not
+///
+/// It carries **no law**. `status`, `regime`, `legalBasis`, `dppAppliesFrom`,
+/// `retentionYears` and `retentionYearsBasis` were fields here, and every one of
+/// them was singular — which asserts that exactly one act governs a product
+/// group. ESPR Art. 5(7) says otherwise: one delegated act may cover many
+/// product groups, a group-specific act may supplement a horizontal one, and the
+/// Regulation contains no precedence rule anywhere, so overlapping acts
+/// accumulate. Each of those fields is a property of an *(act, product group)*
+/// pair and now lives on
+/// [`InstrumentBinding`](crate::catalog::InstrumentBinding), reached through
+/// [`InstrumentCatalog`](crate::catalog::InstrumentCatalog).
+///
+/// What is left is identity, scope, and our own implementation of it: what the
+/// group is called, what sub-types it has, which schema versions we serve for
+/// it, how its fields are disclosed, and which plugin handles it. None of that
+/// changes when a new act arrives; all of the law does.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SectorDescriptor {
-    /// Canonical sector key, e.g. `"battery"`, `"unsold-goods"`. Matches the
-    /// schema-registry sector key and the plugin's `meta().sector`.
+    /// Canonical product-group key, e.g. `"battery"`, `"unsold-goods"`. Matches
+    /// the schema-registry key and the plugin's `meta().sector`.
     pub key: String,
     /// Human-readable title.
     pub title: String,
-    /// Regulatory status — gates whether determinations are binding.
-    pub status: RegulatoryStatus,
-    /// Which EU legal instrument family this sector derives from.
-    ///
-    /// Orthogonal to [`Self::status`]: the regime says *which law*, the status
-    /// says *whether it binds yet*. Determination gating must never branch on
-    /// this field.
-    pub regime: Regime,
-    /// EU legal instrument(s) this sector derives from.
-    pub legal_basis: Vec<String>,
-    /// ISO-8601 date the **passport obligation** applies from, when known.
-    ///
-    /// Scope note: this is when the DPP itself becomes mandatory. It is **not**
-    /// the determination gate and must not be used as one — a regulation may
-    /// bind long before its passport is required (see [`RegulatoryStatus`]).
-    /// Where a sector carries several obligations with different dates, this
-    /// records the earliest that binds an in-scope operator; the manifest
-    /// `notes` carry the rest.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dpp_applies_from: Option<String>,
-    /// Minimum data retention in years required by the applicable act.
-    pub retention_years: u32,
-    /// Whether [`Self::retention_years`] is sourced from an adopted legal
-    /// text or carried as an assumption — see [`RetentionBasis`].
-    pub retention_years_basis: RetentionBasis,
-    /// Schema versions available for this sector (semver strings).
+    /// Schema versions available for this product group (semver strings).
     pub schema_versions: Vec<String>,
-    /// The schema version applicable to *new* passports in this sector right
-    /// now. Decouples "current" from "latest embedded" so a future schema can
-    /// ship embedded without becoming current until its act is in force. Must
-    /// be one of `schema_versions`.
+    /// The schema version applicable to *new* passports in this product group
+    /// right now. Decouples "current" from "latest embedded" so a future schema
+    /// can ship embedded without becoming current until its act is in force.
+    /// Must be one of `schema_versions`.
     pub current_schema_version: String,
-    /// Product categories *within* this sector — sub-types a plugin may branch
-    /// on, never dispatch keys. See `DATA-MODEL.md` §3.4.
+    /// Product categories *within* this product group — sub-types a plugin may
+    /// branch on, never dispatch keys. See `DATA-MODEL.md` §3.4.
     #[serde(default)]
     pub product_categories: Vec<String>,
     /// Per-field [`Disclosure`](crate::domain::identity::Disclosure) class for
-    /// this sector's data: field name → class; unlisted fields default to
+    /// this product group's data: field name → class; unlisted fields default to
     /// public. Not an ordering — a class names which audiences may see the
     /// field, and the audiences do not nest. Universal conformity fields
     /// (signatures, audit trails) are folded in by the access-policy engine, so
-    /// they are not repeated per sector here.
+    /// they are not repeated per product group here.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub disclosure: std::collections::HashMap<String, crate::domain::identity::Disclosure>,
-    /// Plugin that handles this sector (crate / filename stem, e.g.
+    /// Plugin that handles this product group (crate / filename stem, e.g.
     /// `"sector-battery"`). `None` if no plugin is bound yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plugin: Option<String>,
-    /// Free-text regulatory note (effective dates, scope, caveats).
+    /// Free-text note about scope or implementation. Regulatory notes belong on
+    /// the instrument or its binding, with the act they describe.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 }

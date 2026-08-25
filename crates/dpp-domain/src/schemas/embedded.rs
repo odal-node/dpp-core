@@ -140,6 +140,16 @@ const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/furniture/v1.1.0.json"),
     },
     EmbeddedSchema {
+        sector: "furniture",
+        version: "1.2.0",
+        json: include_str!("../../schemas/furniture/v1.2.0.json"),
+    },
+    EmbeddedSchema {
+        sector: "mattress",
+        version: "1.0.0",
+        json: include_str!("../../schemas/mattress/v1.0.0.json"),
+    },
+    EmbeddedSchema {
         sector: "detergent",
         version: "1.0.0",
         json: include_str!("../../schemas/detergent/v1.0.0.json"),
