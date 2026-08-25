@@ -1,7 +1,10 @@
 //! `dpp-domain` — EU Digital Product Passport domain types and port traits.
 //!
-//! This crate is the dependency root of the DPP workspace. Every other crate
-//! depends on this one. It depends only on `dpp-rules` (pure regulatory rules).
+//! The dependency root of the DPP workspace: any crate here may depend on it,
+//! and it depends only on `dpp-rules` (pure regulatory rules). Not every crate
+//! does — `dpp-rules`, `dpp-crypto`, `dpp-calc`, `dpp-vocab`, `dpp-plugin-traits`
+//! and `dpp-plugin-sdk` stand on their own, which is why a Wasm product-group
+//! plugin never links this crate.
 //!
 //! No I/O, no async, no HTTP, no database drivers — pure domain logic only.
 

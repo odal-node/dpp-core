@@ -33,9 +33,18 @@ Draft  -->  Active (Published)  -->  Suspended  -->  Archived
 |---|---|---|
 | Draft -> Active | All mandatory fields present and valid | Signed with issuer's Ed25519 key; JWS produced |
 | Active -> Suspended | Reason required (recall, investigation, etc.) | Signature retained; resolver returns 410 |
-| Any -> Archived | Irreversible | Retained for regulatory lifecycle (10-20 years) |
+| Any -> Archived | Irreversible | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
 
 Every transition is recorded by the platform layer (audit logging is a platform concern, not a domain concern).
+
+**On retention.** The period is not a constant in this document or anywhere else
+in prose. It is the **maximum** across every recorded `InstrumentBinding` that
+reaches the product group — periods are floors, so a record kept long enough for
+the longest satisfies them all — and it carries the provenance of the figure that
+produced it: the fold is `Sourced` only when *every* contributing figure is.
+Every figure recorded today happens to be 10 years, several of them `Assumed`
+rather than read from an adopted text, which is exactly why the number is not
+written down here as though it were settled.
 
 ---
 

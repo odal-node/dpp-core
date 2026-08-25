@@ -1,4 +1,4 @@
-﻿use chrono::{Duration, Utc};
+use chrono::{Duration, Utc};
 
 use crate::status_list::StatusList;
 

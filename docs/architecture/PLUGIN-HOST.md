@@ -105,8 +105,18 @@ All ten plugins run on the SDK (`dpp-plugin-sdk` + `export_plugin!`):
 |---|---|---|---|
 | `product-group-battery` | battery | `schemas/battery/v{1.0.0, 2.0.0 … 2.6.0}.json` | SDK (`DppProductGroupPlugin`) |
 | `product-group-textile` | textile, unsold-goods | `schemas/textile/*`, `unsold-goods/*` | SDK (`DppProductGroupPlugin`) |
-| `product-group-steel` | steel | `schemas/steel/v1.0.0.json` | SDK (`DppProductGroupPlugin`) |
-| `product-group-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-detergent` | resp. | `schemas/{product-group}/v1.0.0.json` | SDK (`DppProductGroupPlugin`) |
+| `product-group-steel` | steel | `schemas/steel/*` | SDK (`DppProductGroupPlugin`) |
+| `product-group-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-detergent` | resp. | `schemas/{product-group}/*` | SDK (`DppProductGroupPlugin`) |
+
+Schema versions are deliberately not enumerated here — several of these groups
+are past v1.0.0 and the list went stale the first time one moved. A plugin
+validates against whatever versions its product group has registered in
+`dpp-domain::schemas::embedded`; that file is the authority.
+
+**`mattress` has no plugin** — twelve product groups, ten plugins. It was split
+out of `furniture` because the ESPR working plan makes Mattresses a separate
+product group, and no delegated act exists for it, so there is nothing for a
+plugin to check that furniture's does not already cover.
 
 Plugins are standalone Rust crates excluded from the workspace. Each depends on `dpp-plugin-sdk` (which re-exports `dpp-plugin-traits`), implements `DppProductGroupPlugin`, and calls `export_plugin!` once — none hand-roll the ABI. **`product-group-battery` is the reference implementation.**
 

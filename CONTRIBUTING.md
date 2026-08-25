@@ -56,14 +56,14 @@ That's it. Everything compiles and tests with nothing else running.
 
 ```
 dpp-core/
-  Cargo.toml              # Workspace root — 9 member crates + benches
+  Cargo.toml              # Workspace root — 12 member crates + benches
   LICENSE                  # Apache-2.0
   crates/
     dpp-domain/           # Domain types, port traits, ProductGroupCatalog, VersionedSchemaRegistry
       schemas/            # Versioned JSON schemas, embedded via include_str! (the product):
-                          #   aluminium, battery (v1+v2), construction, detergent,
-                          #   electronics, furniture, steel, textile (v1+v2),
-                          #   unsold-goods, toy, tyre  — 11 product groups
+                          #   aluminium, battery, construction, detergent, electronics,
+                          #   furniture, mattress, steel, textile, toy, tyre,
+                          #   unsold-goods  — 12 product groups, 30 versions
     dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
     dpp-crypto/           # Ed25519, AES-GCM, JWS, encrypted keystore
     dpp-vc/               # W3C VCs, did:web, status lists, LocalIdentityService, JSON-LD
@@ -73,7 +73,8 @@ dpp-core/
     dpp-plugin-traits/    # Wasm plugin ABI (no_std)
     dpp-plugin-sdk/       # Guest-side SDK: export_plugin! macro + Validator
     dpp-registry/         # EU registry interface types (wasm32-safe)
-    dpp-tests/            # Cross-crate integration tests (publish = false)
+    dpp-vocab/            # External vocabulary authorities, one file per authority
+    dpp-tests/            # Cross-crate integration tests and structural tripwires (publish = false)
   benches/                 # Criterion benchmarks (workspace member)
   plugins/                 # 10 product group Wasm plugins (excluded from workspace)
     product-group-battery/  product-group-textile/  product-group-steel/  product-group-electronics/
@@ -105,6 +106,19 @@ dpp-tests         -> dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas (dev only
 ---
 
 ## 4. Coding Conventions
+
+### Where a file goes
+
+[`docs/architecture/CODE-LAYOUT.md`](docs/architecture/CODE-LAYOUT.md) is the
+standard: one public type per file, `mod.rs` is a pure index, tests are siblings
+rather than inline, every file opens with a `//!` doc, only `lib.rs` sits at a
+crate's `src/` root.
+
+Most of those rules are enforced by tripwires in `crates/dpp-tests/tests/`, so
+`just check` will tell you before a reviewer does. Each carries a baseline of
+files that already violate it; those are being worked through. **Do not add to a
+baseline to go green** — fix the file, or mark it with a
+`// LAYOUT-DEVIATION: <reason>` comment, which is greppable and has to state why.
 
 ### Pure Domain Code
 

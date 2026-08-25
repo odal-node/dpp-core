@@ -1,29 +1,51 @@
-//! Drift tripwire: no `mod.rs` in a published crate may declare a public item.
+//! Drift tripwire: no `mod.rs` in the workspace may declare a public item.
 //!
-//! Mechanical enforcement of the re-layout's rule 2 (`docs/refactor-2026-07/core/00-INDEX.md`):
-//! a `mod.rs` is a pure index — module docs, `pub use` re-exports, and
+//! A `mod.rs` is a pure index — module docs, `pub use` re-exports, and
 //! submodule declarations only. Zero `pub struct` / `pub enum` / `pub trait` /
 //! `pub fn` definitions. This keeps every `mod.rs` skimmable and forces new
 //! types into their own named file as the crate grows.
+//!
+//! Rule 2 of `docs/architecture/CODE-LAYOUT.md`, and for a long time the only
+//! rule there with a test behind it — which is why it is also the only one that
+//! never drifted.
 
 use std::fs;
 use std::path::{Path, PathBuf};
-
-const PUBLISHED_CRATES: &[&str] = &[
-    "dpp-domain",
-    "dpp-crypto",
-    "dpp-digital-link",
-    "dpp-plugin-traits",
-    "dpp-plugin-sdk",
-    "dpp-registry",
-    "dpp-rules",
-    "dpp-calc",
-];
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
+}
+
+/// Every `src` directory this rule governs, per `CODE-LAYOUT.md` §5: all
+/// workspace crates and all Wasm plugins.
+///
+/// Discovered rather than listed, matching `layout.rs`. This test previously
+/// carried a hand-written roster of eight crates, and `dpp-aas`, `dpp-vc` and
+/// `dpp-vocab` — all three published — were never on it, so rule 2 had simply
+/// never run against them. That is the exact failure the standard names: a
+/// hardcoded roster is how a new crate ends up silently unchecked.
+fn governed_src_dirs() -> Vec<PathBuf> {
+    let root = workspace_root();
+    let mut dirs = Vec::new();
+    for group in ["crates", "plugins"] {
+        let Ok(entries) = fs::read_dir(root.join(group)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let src = entry.path().join("src");
+            if src.is_dir() {
+                dirs.push(src);
+            }
+        }
+    }
+    assert!(
+        dirs.len() > 10,
+        "expected to discover the crates and plugins, found {} — has the repo layout moved?",
+        dirs.len()
+    );
+    dirs
 }
 
 /// Recursively collect every `mod.rs` under `dir`.
@@ -62,31 +84,23 @@ fn declares_public_item(line: &str) -> bool {
 
 #[test]
 fn mod_rs_files_are_pure_indexes() {
-    let root = workspace_root();
     let mut violations = Vec::new();
 
-    for krate in PUBLISHED_CRATES {
-        let src_dir = root.join("crates").join(krate).join("src");
+    for src_dir in governed_src_dirs() {
         let mut mod_files = Vec::new();
         find_mod_rs_files(&src_dir, &mut mod_files);
 
         for path in mod_files {
             let src = fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-            let mut in_doctest = false;
             for (i, line) in src.lines().enumerate() {
                 let trimmed = line.trim();
-                // Skip fenced code blocks inside `///`/`//!` doc comments —
-                // illustrative snippets (e.g. "pub trait Foo" in an example)
-                // aren't real items in this file.
-                if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-                    let doc_text = trimmed.trim_start_matches("///").trim_start_matches("//!");
-                    if doc_text.trim_start().starts_with("```") {
-                        in_doctest = !in_doctest;
-                    }
-                    continue;
-                }
-                if in_doctest || trimmed.starts_with("//") {
+                // Every comment line goes, which drops the illustrative snippets
+                // inside fenced doc examples with it — a `pub trait Foo` in an
+                // example is not an item in this file. No fence tracking: see
+                // `code_lines` in `layout.rs` for why a latching flag is worse
+                // than none.
+                if trimmed.starts_with("//") {
                     continue;
                 }
                 if declares_public_item(trimmed) {

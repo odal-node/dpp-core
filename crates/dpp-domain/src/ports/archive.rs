@@ -5,6 +5,19 @@
 //! withdrawal by the economic operator. A copy of the DPP must be hosted by
 //! an independent third-party digital service provider.
 //!
+//! The obligation is **Art. 10(4)**: the economic operator "shall make available
+//! a back-up copy of the digital product passport through a digital product
+//! passport service provider", which **Art. 2(32)** defines as "an independent
+//! third-party authorised by the economic operator". The period is **Annex
+//! III(i)** — "at least the expected lifetime of a specific product" — delegated
+//! per product group. **Annex III(l)** makes the provider's reference a passport
+//! data element.
+//!
+//! Two consequences worth stating, because both have been got wrong before.
+//! *Independent third party* means an operator's own storage does not discharge
+//! this, however durable. And the article is **not Art. 13**, which establishes
+//! the registry and is a different duty entirely.
+//!
 //! This port defines the contract that platform adapters implement to
 //! replicate published passport data to an independent archive.
 

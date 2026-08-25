@@ -146,12 +146,26 @@ Conditional {
 
 struct Trigger {
     empowerment: &'static str,
-    kind: InstrumentKind,              // Delegated | Implementing
+    kind: TriggerKind,                 // Delegated | Implementing
     adoption_deadline: Option<NaiveDate>,
     /// `None` until the act is adopted and its OJ entry-into-force date is read.
     entered_into_force: Option<NaiveDate>,
 }
 ```
+
+⚠️ **`TriggerKind` above is a sketch and is deliberately *not* named
+`InstrumentKind`.** A real `InstrumentKind` now exists in
+`dpp-domain::catalog` with the variants **Framework · Delegated · Direct ·
+Adjacent** — it classifies what kind of act an instrument is, not what starts a
+date offset. The two answer different questions and must not be conflated when
+this gets built; reuse the real one only if its variants genuinely fit.
+
+**Also reconsider the premise when this is picked up.** "No relevant instrument
+has entered into force" was true when written and is no longer true in general:
+Impl. Reg. (EU) 2026/2 and Del. Reg. (EU) 2026/296 were adopted 9 February 2026
+under ESPR Arts. 24(3) and 25(5). Neither is a *battery* trigger, so the
+deferral stands on its own terms — but the sentence should be read as scoped to
+Reg. (EU) 2023/1542, which is what it meant.
 
 `Conditional` resolves to `InForce` once every trigger has an
 `entered_into_force`, and behaves like `Pending` until then — so

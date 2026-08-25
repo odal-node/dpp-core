@@ -35,8 +35,11 @@ All workspace crates share a single version number defined in the root
 `Cargo.toml` via `workspace.package.version`. This means every release bumps
 all crates together. The rationale:
 
-1. The crates are tightly coupled — `dpp-domain` is a dependency of every
-   other crate.
+1. The crates that depend on each other are tightly coupled, and `dpp-domain`
+   is the hub of that set — `dpp-aas`, `dpp-digital-link`, `dpp-registry`,
+   `dpp-vc` and `dpp-tests` all build on it. (`dpp-rules`, `dpp-crypto`,
+   `dpp-calc`, `dpp-vocab`, `dpp-plugin-traits` and `dpp-plugin-sdk` do not, so
+   lockstep bumps them for consistency rather than necessity.)
 2. A single version makes it trivial for downstream consumers to ensure
    compatible combinations.
 3. Once individual crates stabilise at different rates (post-1.0), lockstep
