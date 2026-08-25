@@ -3,8 +3,21 @@ use std::collections::HashMap;
 use crate::{Audience, Disclosure, ProductGroupCatalog};
 use serde_json::json;
 
-use super::filter::filter_by_audience;
-use super::policy::ProductGroupAccessPolicy;
+use super::filter::{filter_by_audience, filter_by_audience_in_scope};
+use super::policy::{DocumentScope, ProductGroupAccessPolicy};
+
+/// Filter a **bare product-group payload** — a document whose root is already
+/// inside `productGroupData`, which is how the resolver filters it on its second
+/// pass. Says so explicitly, because a payload filtered as an envelope would have
+/// none of its product group's classes applied and would serve every restricted
+/// field in it.
+fn filter_payload(
+    data: &serde_json::Value,
+    policy: &ProductGroupAccessPolicy,
+    audience: Audience,
+) -> super::filter::PolicyDecision {
+    filter_by_audience_in_scope(data, policy, audience, DocumentScope::ProductGroupData)
+}
 
 /// The policy for a product group's current schema version — the path a served
 /// passport actually takes.
@@ -49,7 +62,7 @@ fn sample_textile_data() -> serde_json::Value {
 fn public_tier_redacts_professional_and_confidential() {
     let policy = textile_policy();
     let data = sample_textile_data();
-    let decision = filter_by_audience(&data, &policy, Audience::Public);
+    let decision = filter_payload(&data, &policy, Audience::Public);
 
     assert!(decision.filtered_data["fibreComposition"].is_array());
     assert!(decision.filtered_data["countryOfManufacturing"].is_string());
@@ -84,7 +97,7 @@ fn public_tier_redacts_professional_and_confidential() {
 fn professional_tier_sees_professional_fields() {
     let policy = textile_policy();
     let data = sample_textile_data();
-    let decision = filter_by_audience(&data, &policy, Audience::LegitimateInterest);
+    let decision = filter_payload(&data, &policy, Audience::LegitimateInterest);
 
     assert!(decision.filtered_data["svhcSubstances"].is_array());
     assert!(decision.filtered_data["disassemblyInstructions"].is_string());
@@ -109,7 +122,7 @@ fn professional_tier_sees_professional_fields() {
 fn confidential_tier_sees_everything() {
     let policy = textile_policy();
     let data = sample_textile_data();
-    let decision = filter_by_audience(&data, &policy, Audience::Authority);
+    let decision = filter_payload(&data, &policy, Audience::Authority);
 
     assert!(decision.redacted_fields.is_empty());
     assert!(decision.filtered_data["svhcSubstances"].is_array());
@@ -158,7 +171,7 @@ fn battery_policy_public_keeps_point_1_and_drops_point_2() {
         "criticalRawMaterials": [{"casNumber": "7440-48-4", "name": "Cobalt"}],
         "disassemblyInstructionsUrl": "https://example.com/disassembly"
     });
-    let decision = filter_by_audience(&data, &policy, Audience::Public);
+    let decision = filter_payload(&data, &policy, Audience::Public);
     assert!(decision.filtered_data.get("gtin").is_some());
     // Point 1 — must survive.
     assert!(
@@ -264,7 +277,7 @@ fn custom_policy_overrides_defaults() {
         .insert("durabilityScore".into(), Disclosure::Restricted);
 
     let data = sample_textile_data();
-    let decision = filter_by_audience(&data, &policy, Audience::Public);
+    let decision = filter_payload(&data, &policy, Audience::Public);
     assert!(decision.filtered_data.get("durabilityScore").is_none());
     assert!(
         decision
@@ -275,6 +288,9 @@ fn custom_policy_overrides_defaults() {
 
 // ── crypto Gap 6: path-aware, fail-closed redaction ──────────────────────────
 
+/// A policy classifying one **product-group** field — the scope a schema's
+/// `x-disclosure` annotations live in. Tests using it put their data under
+/// `productGroupData`, where such a class applies.
 fn policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPolicy {
     let mut field_disclosure = HashMap::new();
     field_disclosure.insert(name.to_owned(), class);
@@ -282,6 +298,21 @@ fn policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPolicy {
         name: "test".into(),
         product_group: "test".into(),
         field_disclosure,
+        envelope_disclosure: HashMap::new(),
+        default_disclosure: Disclosure::Public,
+    }
+}
+
+/// A policy classifying one **envelope** field — the scope conformity evidence
+/// and passport-level classes live in, which applies at any depth.
+fn envelope_policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPolicy {
+    let mut envelope_disclosure = HashMap::new();
+    envelope_disclosure.insert(name.to_owned(), class);
+    ProductGroupAccessPolicy {
+        name: "test".into(),
+        product_group: "test".into(),
+        field_disclosure: HashMap::new(),
+        envelope_disclosure,
         default_disclosure: Disclosure::Public,
     }
 }
@@ -313,9 +344,14 @@ fn nested_confidential_field_is_redacted() {
 #[test]
 fn confidential_field_in_array_is_redacted() {
     let policy = policy_with("secret", Disclosure::Conformity);
-    let data = json!({ "items": [ {"id": 1, "secret": "x"}, {"id": 2, "secret": "y"} ] });
+    let data = json!({
+        "productGroupData": { "items": [ {"id": 1, "secret": "x"}, {"id": 2, "secret": "y"} ] }
+    });
     let decision = filter_by_audience(&data, &policy, Audience::Public);
-    for el in decision.filtered_data["items"].as_array().unwrap() {
+    for el in decision.filtered_data["productGroupData"]["items"]
+        .as_array()
+        .unwrap()
+    {
         assert!(
             el.get("secret").is_none(),
             "array-nested secret must be redacted"
@@ -325,7 +361,7 @@ fn confidential_field_in_array_is_redacted() {
     assert!(
         decision
             .redacted_fields
-            .contains(&"items[0].secret".to_owned())
+            .contains(&"productGroupData.items[0].secret".to_owned())
     );
 }
 
@@ -334,7 +370,7 @@ fn confidential_field_in_array_is_redacted() {
 fn casing_and_separator_drift_does_not_bypass() {
     let policy = policy_with("disassemblyInstructions", Disclosure::Restricted);
     let data = json!({ "disassembly_instructions": "secret", "public": 1 });
-    let decision = filter_by_audience(&data, &policy, Audience::Public);
+    let decision = filter_payload(&data, &policy, Audience::Public);
     assert!(
         decision
             .filtered_data
@@ -348,7 +384,7 @@ fn casing_and_separator_drift_does_not_bypass() {
 /// Fail-closed mode: with `default_disclosure = Confidential`, an unlisted field is redacted.
 #[test]
 fn fail_closed_default_disclosure_redacts_unlisted() {
-    let mut policy = policy_with("publicField", Disclosure::Public);
+    let mut policy = envelope_policy_with("publicField", Disclosure::Public);
     policy.default_disclosure = Disclosure::Conformity;
     let data = json!({ "publicField": "ok", "unclassified": "should-not-leak" });
     let decision = filter_by_audience(&data, &policy, Audience::Public);
@@ -379,22 +415,35 @@ fn passport_default_keeps_facility_and_manufacturer_public() {
     assert_eq!(out["operatorIdentifier"], json!("DE123456789"));
 }
 
-/// Documents the leaf-key collision (crypto): elevating a *generic* leaf name
-/// redacts it in **every** object it appears in — here, gating `address` drops
-/// both `facility.address` and `manufacturer.address`. This is why policies must
-/// use specific field names, and why `facility.address` cannot be gated in
-/// isolation without a path-aware matcher. Guards against a naive future edit.
+/// Documents what remains of the leaf-key collision, and where it now stops.
+///
+/// **Still true, within one scope:** elevating a *generic* leaf name redacts it
+/// in every object it appears in at that scope. Gating `address` drops both
+/// `facility.address` and `manufacturer.address`, because matching is by leaf
+/// name and neither is more specific than the other. Policies must therefore
+/// still use specific field names.
+///
+/// **No longer true across scopes:** a class drawn from a *product group's*
+/// schema no longer reaches the envelope. It used to, and that was the defect —
+/// a schema describes the contents of `productGroupData` and has no authority
+/// over the passport around it, so a product group declaring `address`,
+/// `recordedAt` or `name` could silently reclassify an envelope field of the
+/// same name. Both halves are asserted below; dropping either loses a real
+/// property.
 #[test]
-fn generic_leaf_key_collides_across_objects() {
-    let mut policy = ProductGroupAccessPolicy::passport_default();
-    policy
-        .field_disclosure
-        .insert("address".into(), Disclosure::Restricted);
+fn generic_leaf_key_collides_within_a_scope_but_not_across_them() {
     let data = json!({
         "manufacturer": { "name": "ACME", "address": "Berlin, DE" },
-        "facility": { "value": "4012345000009", "address": "1 Allee, Berlin" }
+        "facility": { "value": "4012345000009", "address": "1 Allee, Berlin" },
+        "productGroupData": { "supplier": { "address": "Rue X, Paris" } }
     });
-    let out = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+
+    // Envelope-scoped class: collides across envelope objects, as before.
+    let mut envelope = ProductGroupAccessPolicy::passport_default();
+    envelope
+        .envelope_disclosure
+        .insert("address".into(), Disclosure::Restricted);
+    let out = filter_by_audience(&data, &envelope, Audience::Public).filtered_data;
     assert!(
         out["manufacturer"].get("address").is_none(),
         "collision: gating `address` also drops manufacturer.address"
@@ -405,6 +454,20 @@ fn generic_leaf_key_collides_across_objects() {
     );
     // Non-colliding leaves are untouched.
     assert_eq!(out["facility"]["value"], json!("4012345000009"));
+
+    // Product-group-scoped class: reaches its own payload and nothing else.
+    let product_group = policy_with("address", Disclosure::Restricted);
+    let out = filter_by_audience(&data, &product_group, Audience::Public).filtered_data;
+    assert!(
+        out["productGroupData"]["supplier"].get("address").is_none(),
+        "a product group's class must apply inside its own payload"
+    );
+    assert_eq!(
+        out["manufacturer"]["address"],
+        json!("Berlin, DE"),
+        "a product group's schema has no authority over the envelope"
+    );
+    assert_eq!(out["facility"]["address"], json!("1 Allee, Berlin"));
 }
 
 // ── Art. 77(2) lattice ───────────────────────────────────────────────────────
@@ -740,7 +803,7 @@ fn an_unrecognised_disclosure_token_falls_through_to_public() {
 
     // And the leak is real through the filter, not just the map.
     let data = json!({ "safetyMeasures": "Isolate at the service disconnect" });
-    let served = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+    let served = filter_payload(&data, &policy, Audience::Public).filtered_data;
     assert!(
         served.get("safetyMeasures").is_some(),
         "the public view carries a field the typo declassified"
@@ -802,7 +865,7 @@ fn a_nested_property_is_classified_by_its_own_annotation() {
         "supplier":  { "tradingName": "ACME", "internalContact": "ops@example.invalid" },
         "shipments": [ { "reference": "S-1", "unitCostEur": 12.5 } ]
     });
-    let public = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+    let public = filter_payload(&data, &policy, Audience::Public).filtered_data;
 
     assert!(
         public["supplier"].get("internalContact").is_none(),
@@ -820,7 +883,7 @@ fn a_nested_property_is_classified_by_its_own_annotation() {
     assert_eq!(public["shipments"][0]["reference"], json!("S-1"));
 
     // The audience that may see it, does.
-    let authority = filter_by_audience(&data, &policy, Audience::Authority).filtered_data;
+    let authority = filter_payload(&data, &policy, Audience::Authority).filtered_data;
     assert_eq!(authority["shipments"][0]["unitCostEur"], json!(12.5));
     assert_eq!(
         authority["supplier"]["internalContact"],
@@ -942,7 +1005,7 @@ fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
         "sohMethodology": "IEC 62660-1:2018",
     });
 
-    let served_before = filter_by_audience(&data, &before, Audience::Public).filtered_data;
+    let served_before = filter_payload(&data, &before, Audience::Public).filtered_data;
     assert!(
         served_before.get("sohMethodology").is_none(),
         "restricted today, so the public view must not carry it"
@@ -953,7 +1016,7 @@ fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
     after
         .field_disclosure
         .insert("sohMethodology".into(), Disclosure::Public);
-    let served_after = filter_by_audience(&data, &after, Audience::Public).filtered_data;
+    let served_after = filter_payload(&data, &after, Audience::Public).filtered_data;
 
     assert_eq!(
         served_after.get("sohMethodology"),
@@ -989,7 +1052,7 @@ fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {
     let point_4 = ["dynamicPerformance", "batteryStatus", "usageHistory"];
 
     for audience in [Audience::Public, Audience::Authority] {
-        let view = filter_by_audience(&data, &policy, audience);
+        let view = filter_payload(&data, &policy, audience);
         for key in point_4 {
             assert!(
                 view.filtered_data.get(key).is_none(),
@@ -1003,7 +1066,7 @@ fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {
         );
     }
 
-    let holder = filter_by_audience(&data, &policy, Audience::LegitimateInterest);
+    let holder = filter_payload(&data, &policy, Audience::LegitimateInterest);
     for key in point_4 {
         assert!(
             holder.filtered_data.get(key).is_some(),
@@ -1025,6 +1088,7 @@ fn individual_item_data_is_withheld_from_authorities() {
         name: "lattice-test".into(),
         product_group: "battery".into(),
         field_disclosure,
+        envelope_disclosure: HashMap::new(),
         default_disclosure: Disclosure::Public,
     };
     let data = json!({
@@ -1034,14 +1098,14 @@ fn individual_item_data_is_withheld_from_authorities() {
         "cycleHistory": [1, 2, 3],
     });
 
-    let authority = filter_by_audience(&data, &policy, Audience::Authority);
+    let authority = filter_payload(&data, &policy, Audience::Authority);
     assert!(authority.filtered_data.get("testReport").is_some());
     assert!(
         authority.filtered_data.get("cycleHistory").is_none(),
         "Art. 77(2)(b) does not grant authorities Annex XIII point 4"
     );
 
-    let interest = filter_by_audience(&data, &policy, Audience::LegitimateInterest);
+    let interest = filter_payload(&data, &policy, Audience::LegitimateInterest);
     assert!(interest.filtered_data.get("cycleHistory").is_some());
     assert!(
         interest.filtered_data.get("testReport").is_none(),
@@ -1052,7 +1116,7 @@ fn individual_item_data_is_withheld_from_authorities() {
     assert!(authority.filtered_data.get("dismantlingInfo").is_some());
     assert!(interest.filtered_data.get("dismantlingInfo").is_some());
 
-    let public = filter_by_audience(&data, &policy, Audience::Public);
+    let public = filter_payload(&data, &policy, Audience::Public);
     assert_eq!(public.filtered_data.as_object().unwrap().len(), 1);
     assert!(public.filtered_data.get("productName").is_some());
 }
@@ -1075,7 +1139,7 @@ fn points_two_three_and_four_each_reach_a_different_audience() {
         "batteryStatus": "original",
     });
 
-    let public = filter_by_audience(&data, &policy, Audience::Public).filtered_data;
+    let public = filter_payload(&data, &policy, Audience::Public).filtered_data;
     for key in ["safetyMeasures", "testReportResults", "batteryStatus"] {
         assert!(
             public.get(key).is_none(),
@@ -1083,7 +1147,7 @@ fn points_two_three_and_four_each_reach_a_different_audience() {
         );
     }
 
-    let authority = filter_by_audience(&data, &policy, Audience::Authority).filtered_data;
+    let authority = filter_payload(&data, &policy, Audience::Authority).filtered_data;
     assert!(authority.get("safetyMeasures").is_some(), "point 2");
     assert!(authority.get("testReportResults").is_some(), "point 3");
     assert!(
@@ -1091,11 +1155,78 @@ fn points_two_three_and_four_each_reach_a_different_audience() {
         "point 4 is withheld from authorities — Art. 77(2)(b) does not reach it"
     );
 
-    let holder = filter_by_audience(&data, &policy, Audience::LegitimateInterest).filtered_data;
+    let holder = filter_payload(&data, &policy, Audience::LegitimateInterest).filtered_data;
     assert!(holder.get("safetyMeasures").is_some(), "point 2");
     assert!(holder.get("batteryStatus").is_some(), "point 4");
     assert!(
         holder.get("testReportResults").is_none(),
         "point 3 is authorities only — a legitimate interest does not reach test reports"
+    );
+}
+
+/// The reproduction that started this: a battery passport's **envelope** must
+/// not inherit a class from the battery *schema* because of a shared key name.
+///
+/// `Passport::applicable_instruments` once carried a `recordedAt`. The battery
+/// schema declares its own `recordedAt` as individual-tier data (Annex XIII
+/// point 4), and the filter classified by bare key name at every depth — so the
+/// envelope field was stripped from every public battery projection, and the
+/// document that came out no longer deserialised. That failure was loud only by
+/// luck: the same collision on an optional field would have gone missing in
+/// silence.
+///
+/// Asserted against the **real** battery policy, not a synthetic one, so it
+/// holds against whatever the shipped schema actually declares.
+#[test]
+fn an_envelope_field_does_not_inherit_a_product_group_class_by_name() {
+    let policy = battery_policy();
+    assert_eq!(
+        policy.disclosure_for_key("recordedAt", DocumentScope::ProductGroupData),
+        Disclosure::Individual,
+        "fixture assumption: the battery schema classifies recordedAt as individual"
+    );
+
+    let data = json!({
+        "productGroup": "battery",
+        "applicableInstruments": [
+            { "instrument": "battery-reg-2023-1542", "recorded": "catalog",
+              "recordedAt": "2026-01-01T00:00:00Z" }
+        ],
+        "productGroupData": {
+            "productGroup": "battery",
+            "recordedAt": "2026-01-01T00:00:00Z"
+        }
+    });
+
+    for audience in [
+        Audience::Public,
+        Audience::LegitimateInterest,
+        Audience::Authority,
+    ] {
+        let out = filter_by_audience(&data, &policy, audience);
+        assert!(
+            out.filtered_data["applicableInstruments"][0]
+                .get("recordedAt")
+                .is_some(),
+            "{audience:?}: an envelope key must not be classified by the product \
+             group's schema, got {}",
+            out.filtered_data
+        );
+    }
+
+    // The same name *inside* the payload is still the product group's to
+    // classify, and still withheld from everyone but a legitimate-interest
+    // holder. Both halves are the point: scoping the class must not disarm it.
+    let public = filter_by_audience(&data, &policy, Audience::Public);
+    assert!(
+        public.filtered_data["productGroupData"]
+            .get("recordedAt")
+            .is_none(),
+        "individual-tier payload data must stay withheld from the public"
+    );
+    assert!(
+        public
+            .redacted_fields
+            .contains(&"productGroupData.recordedAt".to_owned())
     );
 }
