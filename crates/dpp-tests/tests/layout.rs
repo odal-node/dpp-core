@@ -384,6 +384,10 @@ const INLINE_TESTS_BASELINE: &[&str] = &[
     "crates/dpp-digital-link/src/digital_link/syntax_dictionary.rs",
     "crates/dpp-digital-link/src/linktype/media_type.rs",
     "crates/dpp-digital-link/src/linktype/vocabulary.rs",
+    "crates/dpp-domain/src/domain/passport/passport.rs",
+    "crates/dpp-domain/src/domain/product_group/data/product_group_data.rs",
+    "crates/dpp-domain/src/domain/transfer/operator.rs",
+    "crates/dpp-domain/src/domain/transfer/record.rs",
     "crates/dpp-plugin-sdk/src/validate.rs",
     "crates/dpp-registry/src/granularity.rs",
     "crates/dpp-rules/src/batteries/chemistry.rs",
@@ -430,10 +434,26 @@ fn rule_7_tests_are_siblings_not_inline() {
             if has_deviation_marker(&src) {
                 continue;
             }
-            // An inline test module is `mod tests {`; the sibling-file form is
-            // `mod tests;`, which is what the rule asks for.
+            // An inline test module is `mod <name> {`; the sibling-file form is
+            // `mod <name>;`, which is what the rule asks for.
+            //
+            // Any test-ish name counts, not just `tests`. An earlier version
+            // matched `mod tests {` alone and so missed five modules named for
+            // their subject — `mod passport_wire_keys_tests {` and friends — one
+            // of which then fooled a measurement into reporting a violation that
+            // was only ever a fixture.
             let inline = code_lines(&src).iter().any(|l| {
-                (l.starts_with("mod tests") || l.starts_with("pub mod tests")) && l.ends_with('{')
+                let Some(rest) = l
+                    .strip_prefix("mod ")
+                    .or_else(|| l.strip_prefix("pub mod "))
+                else {
+                    return false;
+                };
+                if !rest.ends_with('{') {
+                    return false;
+                }
+                let name = rest.trim_end_matches('{').trim();
+                name == "tests" || name.ends_with("_tests")
             });
             if inline {
                 found.insert(rel(&path), String::new());
@@ -505,3 +525,468 @@ fn rule_8_every_file_has_module_docs() {
         MODULE_DOCS_BASELINE,
     );
 }
+
+// ---------------------------------------------------------------------------
+// Rule 0 — imports point up the tier ladder
+// ---------------------------------------------------------------------------
+
+/// The tier of each top-level module in `dpp-domain`, per `CODE-LAYOUT.md` §1.
+///
+/// Only `dpp-domain` carries tiers today. The law is stated for this crate
+/// because it is the one that grew a cycle, and adding a module to this table is
+/// a deliberate act — an unlisted module is not silently exempt, it fails.
+const TIERS: &[(&str, u8)] = &[
+    ("access", 3),
+    ("catalog", 2),
+    ("compliance", 4),
+    ("domain", 2),
+    ("ports", 4),
+    ("schemas", 3),
+];
+
+fn tier_of(module: &str) -> Option<u8> {
+    TIERS.iter().find(|(m, _)| *m == module).map(|(_, t)| *t)
+}
+
+/// Test files may reach anywhere: a test exercises the thing it covers from
+/// outside, and the ladder is a statement about production dependencies.
+fn is_test_file(path: &Path) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    name == "tests.rs"
+        || name == "golden_vectors.rs"
+        || name.ends_with("_tests.rs")
+        || path.components().any(|c| c.as_os_str() == "tests")
+}
+
+#[test]
+fn rule_0_tier_imports_point_up() {
+    let root = workspace_root().join("crates/dpp-domain/src");
+    let mut files = Vec::new();
+    find_rs_files(&root, &mut files);
+
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for path in files {
+        if is_test_file(&path) {
+            continue;
+        }
+        let Some(src) = read_source(&path) else {
+            continue;
+        };
+        if has_deviation_marker(&src) {
+            continue;
+        }
+        // The file's own module is the first path component under `src/`.
+        let relative = rel(&path);
+        let Some(rest) = relative.strip_prefix("crates/dpp-domain/src/") else {
+            continue;
+        };
+        let Some((own, _)) = rest.split_once('/') else {
+            continue; // lib.rs and friends sit above the ladder
+        };
+        let Some(own_tier) = tier_of(own) else {
+            continue;
+        };
+
+        let mut breaches: BTreeSet<String> = BTreeSet::new();
+        for line in code_lines(&src) {
+            let mut rest = line;
+            while let Some(at) = rest.find("crate::") {
+                rest = &rest[at + "crate::".len()..];
+                let target: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if target == own {
+                    continue;
+                }
+                if let Some(t) = tier_of(&target)
+                    && t > own_tier
+                {
+                    breaches.insert(format!("{target}(t{t})"));
+                }
+            }
+        }
+        if !breaches.is_empty() {
+            found.insert(
+                relative,
+                format!(
+                    "t{own_tier} imports {}",
+                    breaches.into_iter().collect::<Vec<_>>().join(", ")
+                ),
+            );
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 0 — imports may only point up the tier ladder",
+        &found,
+        TIER_BASELINE,
+    );
+}
+
+const TIER_BASELINE: &[&str] = &[
+    "crates/dpp-domain/src/domain/error.rs",
+    "crates/dpp-domain/src/domain/passport/passport.rs",
+    "crates/dpp-domain/src/domain/validation/functions.rs",
+];
+
+// ---------------------------------------------------------------------------
+// Rule 11 — a concept that outgrew its file becomes a directory
+// ---------------------------------------------------------------------------
+
+/// Proxy, in the same sense rule 1's is. A test cannot tell whether two files
+/// are one concept; it can tell that `gtin.rs` sits beside `gtin_check_digit.rs`,
+/// which is what an outgrown concept looks like from outside.
+#[test]
+fn rule_11_an_outgrown_concept_is_a_directory() {
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in governed_src_dirs() {
+        let mut dirs = vec![dir];
+        while let Some(d) = dirs.pop() {
+            let Ok(entries) = fs::read_dir(&d) else {
+                continue;
+            };
+            let mut stems: Vec<(String, PathBuf)> = Vec::new();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                } else if path.extension().and_then(|e| e.to_str()) == Some("rs")
+                    && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                {
+                    stems.push((stem.to_owned(), path.clone()));
+                }
+            }
+            for (stem, path) in &stems {
+                for (other, _) in &stems {
+                    if other == stem || !other.starts_with(&format!("{stem}_")) {
+                        continue;
+                    }
+                    // Any `*_tests.rs` beside it is the sibling-test file
+                    // rules 4 and 7 require. Flagging it would make two rules
+                    // contradict each other, and the one that fires first wins.
+                    if other.ends_with("_tests") {
+                        continue;
+                    }
+                    let Some(src) = read_source(path) else {
+                        continue;
+                    };
+                    if has_deviation_marker(&src) {
+                        continue;
+                    }
+                    found.insert(rel(path), format!("{other}.rs is part of it"));
+                }
+            }
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 11 — a concept spanning two files becomes a directory",
+        &found,
+        OUTGROWN_CONCEPT_BASELINE,
+    );
+}
+
+const OUTGROWN_CONCEPT_BASELINE: &[&str] = &["crates/dpp-domain/src/catalog/instrument.rs"];
+
+// ---------------------------------------------------------------------------
+// Rule 12 — a file never repeats the name of its directory
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rule_12_no_name_repeats_its_directory() {
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in governed_src_dirs() {
+        let mut files = Vec::new();
+        find_rs_files(&dir, &mut files);
+        for path in files {
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let Some(parent) = path
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+            else {
+                continue;
+            };
+            // `ghosts/ghost_archive.rs` repeats just as surely as
+            // `battery/battery_data.rs`, so a plural directory is compared in
+            // its singular form too.
+            let singular = parent.strip_suffix('s').unwrap_or(parent);
+            if !(stem.starts_with(&format!("{parent}_"))
+                || stem.starts_with(&format!("{singular}_")))
+            {
+                continue;
+            }
+            let Some(src) = read_source(&path) else {
+                continue;
+            };
+            if has_deviation_marker(&src) {
+                continue;
+            }
+            found.insert(rel(&path), format!("inside {parent}/"));
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 12 — a file never repeats the name of its directory",
+        &found,
+        NAME_REPEATS_BASELINE,
+    );
+}
+
+const NAME_REPEATS_BASELINE: &[&str] = &[
+    "crates/dpp-domain/src/domain/compliance/compliance_status_all_tests.rs",
+    "crates/dpp-domain/src/domain/eol/eol_event.rs",
+    "crates/dpp-domain/src/domain/product_group/data/battery/battery_data.rs",
+    "crates/dpp-domain/src/domain/product_group/product_group_tests.rs",
+    "crates/dpp-domain/src/ports/ghosts/ghost_archive.rs",
+    "crates/dpp-domain/src/ports/ghosts/ghost_registry_sync.rs",
+    "crates/dpp-domain/src/ports/ghosts/ghost_seal.rs",
+    "crates/dpp-domain/src/schemas/schema_entry.rs",
+];
+
+// ---------------------------------------------------------------------------
+// Rule 13 — hyphens outside module paths, underscores inside
+// ---------------------------------------------------------------------------
+
+/// A directory under `src/` is a Rust identifier, and identifiers cannot contain
+/// a hyphen — so the split is a language constraint rather than a preference.
+/// Everything that is *not* a module path takes the hyphen: crate directories,
+/// plugin directories, and the data directories beside them.
+#[test]
+fn rule_13_hyphens_outside_module_paths() {
+    let root = workspace_root();
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+
+    for dir in governed_src_dirs() {
+        let mut files = Vec::new();
+        find_rs_files(&dir, &mut files);
+        for path in files {
+            let relative = rel(&path);
+            let Some((_, after_src)) = relative.split_once("/src/") else {
+                continue;
+            };
+            if after_src.contains('-') {
+                found.insert(relative, "hyphen in a module path".to_owned());
+            }
+        }
+    }
+
+    for group in ["crates", "plugins"] {
+        let Ok(entries) = fs::read_dir(root.join(group)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let krate = entry.path();
+            if !krate.is_dir() {
+                continue;
+            }
+            let name = krate.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if name.contains('_') {
+                found.insert(rel(&krate), "underscore in a crate directory".to_owned());
+            }
+            let Ok(inner) = fs::read_dir(&krate) else {
+                continue;
+            };
+            for sub in inner.flatten() {
+                let path = sub.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let sub_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if matches!(
+                    sub_name,
+                    "src" | "tests" | "benches" | "examples" | "target"
+                ) {
+                    continue;
+                }
+                if sub_name.contains('_') {
+                    found.insert(rel(&path), "underscore in a data directory".to_owned());
+                }
+            }
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 13 — hyphens outside module paths, underscores inside",
+        &found,
+        HYPHEN_BASELINE,
+    );
+}
+
+const HYPHEN_BASELINE: &[&str] = &[];
+
+// ---------------------------------------------------------------------------
+// Rule 14 — an error lives in an error.rs
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rule_14_errors_live_in_error_rs() {
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in governed_src_dirs() {
+        let mut files = Vec::new();
+        find_rs_files(&dir, &mut files);
+        for path in files {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if name == "error.rs" || is_test_file(&path) {
+                continue;
+            }
+            let Some(src) = read_source(&path) else {
+                continue;
+            };
+            if has_deviation_marker(&src) {
+                continue;
+            }
+            let errors: Vec<String> = code_lines(&src)
+                .iter()
+                .filter_map(|l| {
+                    let rest = l
+                        .strip_prefix("pub enum ")
+                        .or_else(|| l.strip_prefix("pub struct "))?;
+                    let ident = rest.split(|c: char| !c.is_alphanumeric()).next()?;
+                    ident.ends_with("Error").then(|| ident.to_owned())
+                })
+                .collect();
+            if !errors.is_empty() {
+                found.insert(rel(&path), errors.join(", "));
+            }
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 14 — an error type lives in an error.rs",
+        &found,
+        ERROR_PLACEMENT_BASELINE,
+    );
+}
+
+const ERROR_PLACEMENT_BASELINE: &[&str] = &[
+    "crates/dpp-aas/src/builder.rs",
+    "crates/dpp-crypto/src/jades/header.rs",
+    "crates/dpp-domain/src/domain/commodity_code.rs",
+    "crates/dpp-domain/src/domain/field_error.rs",
+    "crates/dpp-domain/src/domain/gtin/gln.rs",
+    "crates/dpp-domain/src/domain/gtin/gtin.rs",
+    "crates/dpp-domain/src/domain/product_group/data/unsold_goods/cn_category.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/carbon_footprint_class.rs",
+    "crates/dpp-domain/src/schemas/lens/lens.rs",
+    "crates/dpp-domain/src/schemas/lens/upcast_error.rs",
+    "crates/dpp-domain/src/schemas/registration_error.rs",
+    "crates/dpp-rules/src/bundle/types.rs",
+];
+
+// ---------------------------------------------------------------------------
+// Rule 15 — a shared thing lives at the nearest common parent of its users
+// ---------------------------------------------------------------------------
+
+/// Directory names that assert "several of my siblings use these".
+///
+/// A roster, unlike the crate discovery elsewhere in this file, because the claim
+/// is *semantic*: no directory listing reveals that a module is meant to be
+/// shared. `enums` is on it because it is the legacy bucket this rule was drawn
+/// from, and it comes off the day that bucket is dissolved.
+const SHARED_BUCKETS: &[&str] = &["common", "shared", "enums"];
+
+#[test]
+fn rule_15_shared_means_shared() {
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in governed_src_dirs() {
+        let mut dirs = vec![dir];
+        while let Some(d) = dirs.pop() {
+            let Ok(entries) = fs::read_dir(&d) else {
+                continue;
+            };
+            let children: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+            for path in &children {
+                if path.is_dir() {
+                    dirs.push(path.clone());
+                }
+            }
+            for bucket in &children {
+                let name = bucket.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if !bucket.is_dir() || !SHARED_BUCKETS.contains(&name) {
+                    continue;
+                }
+                let mut bucket_files = Vec::new();
+                find_rs_files(bucket, &mut bucket_files);
+
+                // Each sibling of the bucket is one candidate user, and it counts
+                // once however many times it mentions the type. Counting textual
+                // occurrences instead would let a single sibling that imports a
+                // type and then names it in one field look like two users, which
+                // is exactly the false "shared" this rule exists to catch.
+                //
+                // Tests do not count: a fixture reaching for a type is not a
+                // sibling depending on it. Neither does a `mod.rs` — re-exporting
+                // a type is indexing it, not using it, and counting the index
+                // would let every bucket in the tree look shared by one hop.
+                let mut sibling_srcs: Vec<String> = Vec::new();
+                for sibling in &children {
+                    if sibling == bucket {
+                        continue;
+                    }
+                    let mut sfiles = Vec::new();
+                    if sibling.is_dir() {
+                        find_rs_files(sibling, &mut sfiles);
+                    } else {
+                        sfiles.push(sibling.clone());
+                    }
+                    let mut joined = String::new();
+                    for f in sfiles {
+                        if is_test_file(&f)
+                            || f.file_name().and_then(|n| n.to_str()) == Some("mod.rs")
+                        {
+                            continue;
+                        }
+                        if let Some(s) = read_source(&f) {
+                            joined.push_str(&s);
+                        }
+                    }
+                    sibling_srcs.push(joined);
+                }
+
+                for file in bucket_files {
+                    if is_test_file(&file) {
+                        continue;
+                    }
+                    let Some(src) = read_source(&file) else {
+                        continue;
+                    };
+                    if has_deviation_marker(&src) {
+                        continue;
+                    }
+                    let lonely: Vec<String> = code_lines(&src)
+                        .iter()
+                        .filter_map(|l| {
+                            let rest = l
+                                .strip_prefix("pub enum ")
+                                .or_else(|| l.strip_prefix("pub struct "))
+                                .or_else(|| l.strip_prefix("pub trait "))?;
+                            let ident = rest.split(|c: char| !c.is_alphanumeric()).next()?;
+                            let uses = sibling_srcs.iter().filter(|s| s.contains(ident)).count();
+                            (uses < 2).then(|| format!("{ident} used by {uses}"))
+                        })
+                        .collect();
+                    if !lonely.is_empty() {
+                        found.insert(rel(&file), lonely.join(", "));
+                    }
+                }
+            }
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 15 — a type in a shared bucket needs at least two users",
+        &found,
+        SHARED_BUCKET_BASELINE,
+    );
+}
+
+const SHARED_BUCKET_BASELINE: &[&str] = &[
+    "crates/dpp-domain/src/domain/product_group/enums/battery_chemistry.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/battery_status.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/battery_type.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/carbon_footprint_class.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/device_type.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/energy_efficiency_class.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/lifecycle_stage.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/production_route.rs",
+    "crates/dpp-domain/src/domain/product_group/enums/system_boundary.rs",
+    "crates/dpp-rules/src/common/date.rs",
+];

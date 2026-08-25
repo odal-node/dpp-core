@@ -115,6 +115,13 @@ blocks inside a source file.
 The reason is rule 4: tests inline in a source file have no size of their own, so
 nothing can tell you when they have outgrown it.
 
+**Any test-named module counts, not just `tests`.** The gate matched `mod tests {`
+alone until 2026-08-25 and so missed five modules named for their subject —
+`mod passport_wire_keys_tests {` and four like it. One of those then fooled a
+measurement taken *for this document* into reporting a violation that was only
+ever a fixture, which is a fair summary of why the narrow version was worth
+widening.
+
 ### Rule 8 — every file opens with a `//!` module doc
 
 Within the first three lines. A file that cannot say what it is for in one line
@@ -283,17 +290,24 @@ The set of crates and plugins each one scans is **discovered from the directory
 tree**, not listed. A hardcoded roster is how a new crate ends up silently
 unchecked, which is the failure these tests exist to prevent.
 
-> **Rules 0 and 11–15 are new in this pull request and their tests land in the
-> next commit on the same branch.** Until they do, this document names six gates
-> that do not exist, which is exactly the third category §5 says must not exist.
-> **This branch does not merge in that state** — the rules and their tripwires
-> arrive together or the rules come back out.
->
-> Rule 11's gate is a proxy, in the same sense rule 1's is. A test cannot tell
-> whether two files are one concept; it can tell that `gtin.rs` sits beside
-> `gtin_check_digit.rs`, which is what an outgrown concept looks like from the
-> outside. The rule is larger than the gate and the document says so rather than
-> pretending otherwise.
+Two of these gates are **proxies**, in the same sense rule 1's is, and the
+document says so rather than implying the test is the rule:
+
+- **Rule 11.** A test cannot tell whether two files are one concept. It can tell
+  that `gtin.rs` sits beside `gtin_check_digit.rs`, which is what an outgrown
+  concept looks like from outside. A `*_tests.rs` companion is excluded — it is
+  the sibling-test file rules 4 and 7 *require*, and flagging it would put two
+  rules in contradiction.
+- **Rule 15.** "Shared" is a claim about intent, so the gate reads a roster of
+  bucket names rather than discovering them. It counts *distinct siblings*, not
+  mentions, and it does not count a `mod.rs` — re-exporting a type is indexing
+  it, not using it, and counting the index would let every bucket in the tree
+  look shared by one hop.
+
+Rule 15 also measures at the level it is given. `ProductionRoute` really is used
+by two product groups, but both sit under `data/`, so from `enums/` they are one
+sibling and it reports one user. That resolves itself when the groups become
+siblings of `common/`; until then it is baselined and the reason is here.
 
 **Rule 1's tripwire is a proxy, not the rule.** It fires at three public types
 because a type plus its error is idiomatic and should not need a marker. Two
