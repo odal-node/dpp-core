@@ -29,11 +29,11 @@
 use async_trait::async_trait;
 
 use crate::domain::{
-    error::DppError,
     passport::{Passport, PassportId},
     product_identity::ProductIdentity,
     status::PassportStatus,
 };
+use crate::error::DppError;
 
 /// Fields governed by the state machine, the retention lock, the publish/seal
 /// pipeline, record identity, or a dedicated transition method — none of

@@ -1,10 +1,8 @@
 //! [`InMemoryArchive`] — a `HashMap`-backed archive for tests and local runs.
 
 use super::*;
-use crate::domain::{
-    error::DppError,
-    passport::{Passport, PassportId},
-};
+use crate::domain::passport::{Passport, PassportId};
+use crate::error::DppError;
 use async_trait::async_trait;
 use chrono::Utc;
 use sha2::{Digest, Sha256};

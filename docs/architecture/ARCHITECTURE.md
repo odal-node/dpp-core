@@ -77,9 +77,11 @@ compares this list against `lib.rs` and fails the build in either direction.
 | `access` | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
 | `catalog` | Two catalogs. `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding; it carries **no law**. `InstrumentCatalog` — the acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair, which is where status, legal basis, dates, retention and granularity live |
 | `compliance` | The Apache-2.0 passthrough registry and its per-product group strategies |
-| `domain` | The passport aggregate, product group data, lifecycle, transfer, validation |
+| `domain` | The passport aggregate, product group data, lifecycle, transfer |
+| `error` | `DppError` and the per-field validation detail. Sits **above** the tier ladder in [CODE-LAYOUT.md](CODE-LAYOUT.md) §1, because a crate-wide error has to be able to name a type from any tier |
 | `ports` | The core↔platform trait boundary (see [PORTS.md](PORTS.md)) |
 | `schemas` | `VersionedSchemaRegistry`, the embedded JSON Schemas, and version lenses |
+| `validation` | Schema conformance and cross-field regulatory rules — the policy pass `Passport::validate` deliberately does not run, so the aggregate keeps its invariants without the registry in its dependency tree |
 
 Prefer naming the concerns over asserting a count — a count is the part that
 goes stale while every claim around it stays checkable.
@@ -90,8 +92,10 @@ access
 catalog
 compliance
 domain
+error
 ports
 schemas
+validation
 ```
 <!-- DOMAIN-CONCERNS:END -->
 

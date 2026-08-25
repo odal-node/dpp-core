@@ -178,11 +178,11 @@ pub(crate) fn sample_textile_data() -> TextileData {
 /// from this.
 pub(crate) fn fully_populated_passport() -> Passport {
     use crate::domain::commodity_code::CommodityCode;
+    use crate::domain::compliance::ComplianceResult;
     use crate::domain::lint::LintResult;
     use crate::domain::passport::{FacilitySnapshot, PassportRef};
     use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::domain::seal::{SealFormat, SealedEnvelope};
-    use crate::ports::compliance::ComplianceResult;
 
     let now = Utc::now();
     let reference = PassportRef {

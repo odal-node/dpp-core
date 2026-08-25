@@ -10,14 +10,14 @@ use super::{
     FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
 };
 use crate::catalog::{Granularity, InstrumentRef};
+use crate::domain::compliance::ComplianceResult;
+use crate::domain::seal::SealedEnvelope;
 use crate::domain::{
     identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     lint::LintResult,
     product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore},
     status::PassportStatus,
 };
-use crate::ports::compliance::ComplianceResult;
-use crate::ports::seal::SealedEnvelope;
 
 /// The canonical Digital Product Passport record as defined by EU ESPR.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -388,13 +388,13 @@ impl Passport {
     /// method does not try to guess which.
     ///
     /// Two distinct failure shapes, both typed rather than a generic error:
-    /// - [`crate::domain::error::DppError::SchemaIncompatible`] — the recorded `schemaVersion` is
+    /// - [`crate::error::dpp::DppError::SchemaIncompatible`] — the recorded `schemaVersion` is
     ///   older than current and no registered lens bridges any of the gap.
     ///   This is not always fixable by writing one: a required field the
     ///   document predates (no source data anywhere in the document to derive
     ///   it from) has no honest transform, and this crate will not synthesize
     ///   one.
-    /// - [`crate::domain::error::DppError::Serialisation`] — the direct attempt failed for a reason
+    /// - [`crate::error::dpp::DppError::Serialisation`] — the direct attempt failed for a reason
     ///   unrelated to a bridgeable version gap (no product group data, product group
     ///   unknown to the catalog, already at the current version, or the
     ///   upcast document still does not match the current shape).
@@ -402,8 +402,8 @@ impl Passport {
         doc: serde_json::Value,
         lenses: &crate::schemas::lens::LensRegistry,
         catalog: &crate::catalog::ProductGroupCatalog,
-    ) -> Result<Self, crate::domain::error::DppError> {
-        use crate::domain::error::DppError;
+    ) -> Result<Self, crate::error::dpp::DppError> {
+        use crate::error::dpp::DppError;
         use serde::Deserialize as _;
 
         let direct_err = match Self::deserialize(&doc) {
@@ -448,9 +448,9 @@ impl Passport {
     ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
     ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     /// - `product_group_data` passes JSON Schema + cross-field rules via
-    ///   [`crate::domain::validation::validate_product_group_data`] (non-wasm32 only)
-    pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
-        use crate::domain::field_error::{FieldError, ValidationErrors};
+    ///   [`crate::validation::validate_product_group_data`] (non-wasm32 only)
+    pub fn validate(&self) -> Result<(), crate::error::dpp::DppError> {
+        use crate::error::field::{FieldError, ValidationErrors};
 
         let mut errors: Vec<FieldError> = Vec::new();
 
@@ -563,21 +563,18 @@ impl Passport {
             });
         }
 
-        // ProductGroup-data validation: JSON Schema + cross-field rules (fibre sum, SVHC, etc.).
-        // Excluded from wasm32 builds because jsonschema depends on reqwest's blocking API.
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Some(ref data) = self.product_group_data
-            && let Err(ve) = crate::domain::validation::validate_product_group_data(data)
-        {
-            errors.extend(ve.errors);
-        }
-
+        // Schema conformance is deliberately NOT checked here. It needs the
+        // versioned schema registry, which drags `jsonschema` and through it a
+        // blocking HTTP client, and an aggregate that cannot state its own
+        // invariants without a network stack in the tree is the wrong shape.
+        // `validation::validate_passport` runs both halves; this method is the
+        // invariants alone, and is the same on every target.
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(crate::domain::error::DppError::Validation(
-                ValidationErrors { errors },
-            ))
+            Err(crate::error::dpp::DppError::Validation(ValidationErrors {
+                errors,
+            }))
         }
     }
 
@@ -597,9 +594,9 @@ impl Passport {
     pub fn transition_to(
         &mut self,
         next: PassportStatus,
-    ) -> Result<(), crate::domain::error::DppError> {
+    ) -> Result<(), crate::error::dpp::DppError> {
         if !self.status.can_transition_to(&next) {
-            return Err(crate::domain::error::DppError::InvalidTransition {
+            return Err(crate::error::dpp::DppError::InvalidTransition {
                 current: self.status.to_string(),
                 required: next.to_string(),
             });
@@ -639,7 +636,7 @@ impl Passport {
     /// so one call is a complete answer.
     ///
     /// [`transition_to`]: Passport::transition_to
-    /// [`DppError`]: crate::domain::error::DppError
+    /// [`DppError`]: crate::error::dpp::DppError
     ///
     /// # Why this is a hard gate and not a lint
     ///
@@ -665,23 +662,20 @@ impl Passport {
     /// would be the defect this crate exists to avoid. That is a real hole and
     /// it is deliberate; it closes when a source covering those categories
     /// exists.
-    pub fn check_mandatory_content(&self) -> Result<(), crate::domain::error::DppError> {
-        use crate::domain::field_error::{FieldError, ValidationErrors};
+    pub fn check_mandatory_content(&self) -> Result<(), crate::error::dpp::DppError> {
+        use crate::error::field::{FieldError, ValidationErrors};
 
         if self.product_group != crate::domain::product_group::ProductGroup::Battery {
             return Ok(());
         }
         let Some(data) = self.product_group_data.as_ref() else {
-            return Err(crate::domain::error::DppError::Validation(
-                ValidationErrors {
-                    errors: vec![FieldError {
-                        field: "/productGroupData".to_owned(),
-                        message:
-                            "a battery passport cannot be published without product_group data"
-                                .to_owned(),
-                    }],
-                },
-            ));
+            return Err(crate::error::dpp::DppError::Validation(ValidationErrors {
+                errors: vec![FieldError {
+                    field: "/productGroupData".to_owned(),
+                    message: "a battery passport cannot be published without product_group data"
+                        .to_owned(),
+                }],
+            }));
         };
         let Ok(value) = serde_json::to_value(data) else {
             return Ok(());
@@ -712,9 +706,9 @@ impl Passport {
         if missing.is_empty() {
             Ok(())
         } else {
-            Err(crate::domain::error::DppError::Validation(
-                ValidationErrors { errors: missing },
-            ))
+            Err(crate::error::dpp::DppError::Validation(ValidationErrors {
+                errors: missing,
+            }))
         }
     }
 

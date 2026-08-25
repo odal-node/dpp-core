@@ -6,11 +6,11 @@ use async_trait::async_trait;
 use crate::domain::passport::ManufacturerInfo;
 use crate::domain::product_group::ProductGroup;
 use crate::domain::{
-    error::DppError,
     passport::{Passport, PassportId},
     product_identity::ProductIdentity,
     status::PassportStatus,
 };
+use crate::error::DppError;
 use std::collections::HashMap;
 use std::sync::Mutex;
 

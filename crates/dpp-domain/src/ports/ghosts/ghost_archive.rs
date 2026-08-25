@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::error::DppError;
 use crate::domain::passport::{Passport, PassportId};
+use crate::error::dpp::DppError;
 use crate::ports::archive::{
     ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, retention_deadline,
 };

@@ -4,10 +4,8 @@ use async_trait::async_trait;
 
 use super::receipt::ArchiveReceipt;
 use super::verification::ArchiveVerification;
-use crate::domain::{
-    error::DppError,
-    passport::{Passport, PassportId},
-};
+use crate::domain::passport::{Passport, PassportId};
+use crate::error::DppError;
 
 /// Port trait for replicating DPP records to an independent third-party archive.
 ///

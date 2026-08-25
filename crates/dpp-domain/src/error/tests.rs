@@ -1,6 +1,6 @@
 //! How each domain error renders.
 
-use super::error::*;
+use super::dpp::*;
 
 #[test]
 fn not_found_display() {

@@ -1,7 +1,7 @@
 //! Runtime-registered product group validator trait and registry — the extensibility
 //! seam for product groups not known to this crate at compile time.
 
-use crate::domain::field_error::FieldError;
+use crate::error::field::FieldError;
 
 /// Trait for runtime-registered product group validators.
 ///

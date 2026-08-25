@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
 
-use crate::domain::error::DppError;
+use crate::error::dpp::DppError;
 
 use crate::ports::seal::{
     SealCapabilities, SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication,
@@ -27,7 +27,7 @@ impl SealPort for GhostSeal {
         // consumer, which is most of what a ghost is for.
         if !self.capabilities().can_produce(&req) {
             return Err(DppError::Validation(
-                crate::domain::field_error::ValidationErrors::message(format!(
+                crate::error::field::ValidationErrors::message(format!(
                     "GhostSeal does not produce {:?}/{:?}",
                     req.sig_format, req.mode
                 )),

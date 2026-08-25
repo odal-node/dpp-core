@@ -46,7 +46,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::error::DppError;
+use crate::error::dpp::DppError;
 
 pub use crate::domain::seal::{
     SealCapabilities, SealChecks, SealConformanceLevel, SealCredentialRef, SealEnvelope,

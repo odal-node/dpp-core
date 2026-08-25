@@ -7,12 +7,14 @@ use semver::Version;
 
 use super::validator::ProductGroupValidatorRegistry;
 use crate::catalog::ProductGroupCatalog;
-use crate::domain::field_error::{FieldError, ValidationErrors};
+use crate::domain::passport::Passport;
 use crate::domain::product_group::{
     ProductGroupData, SvhcSubstance, battery_recycled_chemistry_conflicts,
     validate_battery_operating_temp, validate_fibre_composition, validate_surfactants,
     validate_svhc_substances,
 };
+use crate::error::DppError;
+use crate::error::field::{FieldError, ValidationErrors};
 use crate::schemas::VersionedSchemaRegistry;
 
 /// The embedded schema registry, built once.
@@ -286,5 +288,46 @@ fn push_svhc(substances: Option<&[SvhcSubstance]>, errors: &mut Vec<FieldError>)
             field: "/svhcSubstances".to_owned(),
             message: msg,
         });
+    }
+}
+
+/// Validate a passport completely: its own invariants, then schema conformance
+/// of its product-group data.
+///
+/// This is the pairing [`Passport::validate`] used to do alone, split because
+/// the two halves are not the same kind of check.
+///
+/// [`Passport::validate`] is the aggregate stating what must be true of itself —
+/// a non-empty product name, a well-formed schema version, a repairability score
+/// inside its range. It needs nothing but the record, so it runs on every target
+/// and never fails for a reason outside the passport.
+///
+/// Schema conformance needs the versioned registry, which reaches `jsonschema`
+/// and through it a blocking HTTP client. An aggregate that cannot state its own
+/// invariants without a network stack in its dependency tree is the wrong shape,
+/// and the `#[cfg(not(target_arch = "wasm32"))]` that used to sit inside
+/// `validate` was that fact showing through as a conditional rather than as a
+/// boundary.
+///
+/// Callers wanting both — the publish path — want this. Callers wanting only the
+/// record's own consistency want [`Passport::validate`].
+#[must_use = "a validation result that is discarded has validated nothing"]
+pub fn validate_passport(passport: &Passport) -> Result<(), DppError> {
+    let mut errors = match passport.validate() {
+        Ok(()) => Vec::new(),
+        Err(DppError::Validation(ve)) => ve.errors,
+        Err(other) => return Err(other),
+    };
+
+    if let Some(ref data) = passport.product_group_data
+        && let Err(ve) = validate_product_group_data(data)
+    {
+        errors.extend(ve.errors);
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(DppError::Validation(ValidationErrors { errors }))
     }
 }

@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::error::DppError;
 use crate::domain::passport::PassportId;
+use crate::error::dpp::DppError;
 use crate::ports::registry_sync::{
     RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
 };

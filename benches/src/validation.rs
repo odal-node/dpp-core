@@ -3,9 +3,7 @@ use dpp_domain::domain::gtin::Gtin;
 use dpp_domain::domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };
-use dpp_domain::domain::validation::{
-    validate_product_group_data, validate_product_group_data_batch,
-};
+use dpp_domain::validation::{validate_product_group_data, validate_product_group_data_batch};
 
 fn valid_battery() -> ProductGroupData {
     ProductGroupData::Battery(Box::new(BatteryData {

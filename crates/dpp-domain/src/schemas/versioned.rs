@@ -261,8 +261,8 @@ impl VersionedSchemaRegistry {
         product_group: &str,
         version: &str,
         data: &serde_json::Value,
-    ) -> Result<(), crate::domain::field_error::ValidationErrors> {
-        use crate::domain::field_error::{FieldError, ValidationErrors};
+    ) -> Result<(), crate::error::field::ValidationErrors> {
+        use crate::error::field::{FieldError, ValidationErrors};
 
         let version = version.parse::<Version>().map_err(|_| ValidationErrors {
             errors: vec![FieldError {
@@ -287,7 +287,7 @@ impl VersionedSchemaRegistry {
         product_group: &str,
         version: &str,
         data: &serde_json::Value,
-    ) -> Result<(), crate::domain::field_error::ValidationErrors> {
+    ) -> Result<(), crate::error::field::ValidationErrors> {
         let Ok(version) = version.parse::<Version>() else {
             return Ok(());
         };
@@ -307,8 +307,8 @@ impl VersionedSchemaRegistry {
         product_group: &str,
         version: &Version,
         data: &serde_json::Value,
-    ) -> Result<(), crate::domain::field_error::ValidationErrors> {
-        use crate::domain::field_error::{FieldError, ValidationErrors};
+    ) -> Result<(), crate::error::field::ValidationErrors> {
+        use crate::error::field::{FieldError, ValidationErrors};
 
         let compiled = self
             .compiled_schema(product_group, version)

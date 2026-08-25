@@ -21,10 +21,13 @@ pub mod access;
 pub mod catalog;
 pub mod compliance;
 pub mod domain;
+pub mod error;
 pub mod ports;
 pub mod schemas;
 #[cfg(test)]
 mod test_support;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod validation;
 
 pub use catalog::{
     CatalogError, DateBasis, Granularity, Instrument, InstrumentBinding, InstrumentCatalog,
@@ -34,7 +37,6 @@ pub use catalog::{
 
 pub use domain::{
     commodity_code::{CommodityCode, CommodityCodeError},
-    error::DppError,
     gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
     identity::{
         Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
@@ -112,12 +114,12 @@ pub use domain::{
     },
 };
 
-pub use domain::field_error::{FieldError, ValidationErrors};
+pub use error::{DppError, FieldError, ValidationErrors};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use domain::validation::{
+pub use validation::{
     BatchValidationItem, ProductGroupValidator, ProductGroupValidatorRegistry, batch_errors,
-    validate_product_group_data, validate_product_group_data_batch,
+    validate_passport, validate_product_group_data, validate_product_group_data_batch,
     validate_product_group_data_with_registry, validate_raw_product_group_data,
 };
 

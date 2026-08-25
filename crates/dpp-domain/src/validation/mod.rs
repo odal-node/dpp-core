@@ -32,10 +32,10 @@ mod tests;
 
 pub use batch::{BatchValidationItem, batch_errors, validate_product_group_data_batch};
 pub use functions::{
-    validate_product_group_data, validate_product_group_data_with_registry,
+    validate_passport, validate_product_group_data, validate_product_group_data_with_registry,
     validate_raw_product_group_data,
 };
 pub use validator::{ProductGroupValidator, ProductGroupValidatorRegistry};
 
-// `FieldError` and `ValidationErrors` live in `crate::domain::field_error`
+// `FieldError` and `ValidationErrors` live in `crate::error::field`
 // (wasm-safe) so `DppError` can carry structured validation detail.

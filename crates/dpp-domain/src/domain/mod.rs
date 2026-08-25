@@ -6,10 +6,7 @@ pub mod commodity_code;
 mod commodity_code_tests;
 pub mod compliance;
 pub mod eol;
-pub mod error;
-#[cfg(test)]
-mod error_tests;
-pub mod field_error;
+
 pub mod graph;
 #[cfg(test)]
 mod graph_tests;
@@ -28,5 +25,3 @@ pub mod status;
 #[cfg(test)]
 mod status_tests;
 pub mod transfer;
-#[cfg(not(target_arch = "wasm32"))]
-pub mod validation;

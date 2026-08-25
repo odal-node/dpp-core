@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::catalog::ProductGroupCatalog;
-use crate::domain::error::DppError;
 use crate::domain::product_group::{ProductGroup, ProductGroupData};
+use crate::error::dpp::DppError;
 use crate::schemas::lens::LensRegistry;
 
 use super::tests::make_passport;

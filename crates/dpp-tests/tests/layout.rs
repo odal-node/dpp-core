@@ -542,6 +542,7 @@ const TIERS: &[(&str, u8)] = &[
     ("domain", 2),
     ("ports", 4),
     ("schemas", 3),
+    ("validation", 3),
 ];
 
 fn tier_of(module: &str) -> Option<u8> {
@@ -623,11 +624,10 @@ fn rule_0_tier_imports_point_up() {
     );
 }
 
-const TIER_BASELINE: &[&str] = &[
-    "crates/dpp-domain/src/domain/error.rs",
-    "crates/dpp-domain/src/domain/passport/passport.rs",
-    "crates/dpp-domain/src/domain/validation/functions.rs",
-];
+// `passport.rs` remains: `from_stored` takes a `&LensRegistry`, which is the
+// factory carve-out that CODE-LAYOUT.md section 1 states. The other two entries
+// are gone: `error/` moved above the ladder and `validation/` moved to tier 3.
+const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/domain/passport/passport.rs"];
 
 // ---------------------------------------------------------------------------
 // Rule 11 — a concept that outgrew its file becomes a directory
@@ -826,7 +826,17 @@ fn rule_14_errors_live_in_error_rs() {
         find_rs_files(&dir, &mut files);
         for path in files {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name == "error.rs" || is_test_file(&path) {
+            // An `error/` directory satisfies the rule exactly as an `error.rs`
+            // does — the point is that a module's failure modes sit in one known
+            // place, not that the place is a single file. A crate-wide error
+            // surface outgrows one file and rule 11 then requires the directory,
+            // so demanding the file here would put two rules in contradiction.
+            let in_error_dir = path
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                == Some("error");
+            if name == "error.rs" || in_error_dir || is_test_file(&path) {
                 continue;
             }
             let Some(src) = read_source(&path) else {
@@ -861,7 +871,6 @@ const ERROR_PLACEMENT_BASELINE: &[&str] = &[
     "crates/dpp-aas/src/builder.rs",
     "crates/dpp-crypto/src/jades/header.rs",
     "crates/dpp-domain/src/domain/commodity_code.rs",
-    "crates/dpp-domain/src/domain/field_error.rs",
     "crates/dpp-domain/src/domain/gtin/gln.rs",
     "crates/dpp-domain/src/domain/gtin/gtin.rs",
     "crates/dpp-domain/src/domain/product_group/data/unsold_goods/cn_category.rs",

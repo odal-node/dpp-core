@@ -4,7 +4,8 @@ use async_trait::async_trait;
 
 use super::record::RegistryRecord;
 use super::request::RegistrationRequest;
-use crate::domain::{error::DppError, passport::PassportId};
+use crate::domain::passport::PassportId;
+use crate::error::DppError;
 
 /// Port trait for synchronising DPP records with the EU Central Registry.
 ///

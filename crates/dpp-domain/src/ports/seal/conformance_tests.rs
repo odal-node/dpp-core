@@ -28,10 +28,7 @@ struct SubstitutesFormat;
 
 #[async_trait]
 impl SealPort for SubstitutesFormat {
-    async fn seal(
-        &self,
-        _req: SealRequest,
-    ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+    async fn seal(&self, _req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         Ok(SealedEnvelope {
             // Whatever was asked for, this is what you get.
             format: SealFormat::Cades,
@@ -44,7 +41,7 @@ impl SealPort for SubstitutesFormat {
     async fn verify(
         &self,
         _env: &SealedEnvelope,
-    ) -> Result<SealVerification, crate::domain::error::DppError> {
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
         Ok(SealVerification::passed(SealChecks::FullValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
@@ -83,10 +80,7 @@ struct PassesOverNothing;
 
 #[async_trait]
 impl SealPort for PassesOverNothing {
-    async fn seal(
-        &self,
-        req: SealRequest,
-    ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         Ok(SealedEnvelope {
             format: req.sig_format,
             seal_value: "synthetic".into(),
@@ -98,7 +92,7 @@ impl SealPort for PassesOverNothing {
     async fn verify(
         &self,
         _env: &SealedEnvelope,
-    ) -> Result<SealVerification, crate::domain::error::DppError> {
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
         Ok(SealVerification {
             indication: SealIndication::TotalPassed,
             checks: SealChecks::None,
@@ -139,13 +133,10 @@ struct ShortLivedOnly;
 
 #[async_trait]
 impl SealPort for ShortLivedOnly {
-    async fn seal(
-        &self,
-        req: SealRequest,
-    ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         if !self.capabilities().can_produce(&req) {
-            return Err(crate::domain::error::DppError::Validation(
-                crate::domain::field_error::ValidationErrors::message("profile not advertised"),
+            return Err(crate::error::dpp::DppError::Validation(
+                crate::error::field::ValidationErrors::message("profile not advertised"),
             ));
         }
         Ok(SealedEnvelope {
@@ -159,7 +150,7 @@ impl SealPort for ShortLivedOnly {
     async fn verify(
         &self,
         _env: &SealedEnvelope,
-    ) -> Result<SealVerification, crate::domain::error::DppError> {
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
         Ok(SealVerification::passed(SealChecks::FullValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
@@ -221,13 +212,10 @@ struct SealsButCannotVerify;
 
 #[async_trait]
 impl SealPort for SealsButCannotVerify {
-    async fn seal(
-        &self,
-        req: SealRequest,
-    ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         if !self.capabilities().can_produce(&req) {
-            return Err(crate::domain::error::DppError::Validation(
-                crate::domain::field_error::ValidationErrors::message("profile not advertised"),
+            return Err(crate::error::dpp::DppError::Validation(
+                crate::error::field::ValidationErrors::message("profile not advertised"),
             ));
         }
         Ok(SealedEnvelope {
@@ -241,9 +229,9 @@ impl SealPort for SealsButCannotVerify {
     async fn verify(
         &self,
         _env: &SealedEnvelope,
-    ) -> Result<SealVerification, crate::domain::error::DppError> {
-        Err(crate::domain::error::DppError::Validation(
-            crate::domain::field_error::ValidationErrors::message("verification unsupported"),
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
+        Err(crate::error::dpp::DppError::Validation(
+            crate::error::field::ValidationErrors::message("verification unsupported"),
         ))
     }
     fn capabilities(&self) -> SealCapabilities {
@@ -278,10 +266,7 @@ struct FormatWithNoPackaging;
 
 #[async_trait]
 impl SealPort for FormatWithNoPackaging {
-    async fn seal(
-        &self,
-        _req: SealRequest,
-    ) -> Result<SealedEnvelope, crate::domain::error::DppError> {
+    async fn seal(&self, _req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         Ok(SealedEnvelope {
             format: SealFormat::Pades,
             seal_value: "synthetic".into(),
@@ -293,7 +278,7 @@ impl SealPort for FormatWithNoPackaging {
     async fn verify(
         &self,
         _env: &SealedEnvelope,
-    ) -> Result<SealVerification, crate::domain::error::DppError> {
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
         Ok(SealVerification::passed(SealChecks::FullValidation))
     }
     fn capabilities(&self) -> SealCapabilities {

@@ -201,14 +201,14 @@ fn default_version_is_one_and_skipped_when_none_optional_fields_absent() {
     assert!(json.get("retentionUntil").is_none() || json["retentionUntil"].is_null());
 }
 
+/// A passport whose fibre percentages sum to 50% — a cross-field rule violation
+/// that only the schema/rules pass can see.
 #[cfg(not(target_arch = "wasm32"))]
-#[test]
-fn validate_wires_product_group_data_validation() {
+fn passport_with_bad_fibre_sum() -> Passport {
     use crate::domain::product_group::{FibreEntry, TextileData};
     let mut p = make_passport();
     p.product_group = ProductGroup::Textile;
     p.product_group_data = Some(ProductGroupData::Textile(Box::new(TextileData {
-        // fibre sum = 50% — cross-field rule must catch this
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),
             pct: 50.0,
@@ -218,10 +218,34 @@ fn validate_wires_product_group_data_validation() {
         chemical_compliance_standard: "REACH".into(),
         ..crate::test_support::sample_textile_data()
     })));
-    let err = p.validate().unwrap_err().to_string();
+    p
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn validate_passport_wires_product_group_data_validation() {
+    let err = crate::validation::validate_passport(&passport_with_bad_fibre_sum())
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("fibreComposition") || err.contains("fibre"),
         "expected fibre error from product_group_data validation, got: {err}"
+    );
+}
+
+/// The other half of the same decision, and the reason the split exists.
+///
+/// `Passport::validate` is the aggregate's own invariants. Schema conformance
+/// needs the versioned registry — `jsonschema`, and through it a blocking HTTP
+/// client — so it lives in the policy tier and the aggregate stays buildable on
+/// every target. If this test ever fails, the dependency has crept back in.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn validate_alone_does_not_reach_the_schema_registry() {
+    assert!(
+        passport_with_bad_fibre_sum().validate().is_ok(),
+        "Passport::validate must check invariants only — the fibre sum is a \
+         schema/rules concern and belongs to validation::validate_passport"
     );
 }
 

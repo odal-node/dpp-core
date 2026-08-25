@@ -1,8 +1,8 @@
 //! Field-level validation error types.
 //!
 //! Kept free of any schema/`jsonschema` dependency (unlike the rest of
-//! [`crate::domain::validation`], which is wasm-gated) so that
-//! [`crate::domain::error::DppError`] can carry structured validation detail on
+//! [`crate::validation`], which is wasm-gated) so that
+//! [`crate::error::dpp::DppError`] can carry structured validation detail on
 //! every target, including `wasm32`.
 
 /// A single field-level validation failure.
