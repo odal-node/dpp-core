@@ -384,10 +384,6 @@ const INLINE_TESTS_BASELINE: &[&str] = &[
     "crates/dpp-digital-link/src/digital_link/syntax_dictionary.rs",
     "crates/dpp-digital-link/src/linktype/media_type.rs",
     "crates/dpp-digital-link/src/linktype/vocabulary.rs",
-    "crates/dpp-domain/src/domain/passport/record.rs",
-    "crates/dpp-domain/src/domain/product_group/data/product_group_data.rs",
-    "crates/dpp-domain/src/domain/transfer/operator.rs",
-    "crates/dpp-domain/src/domain/transfer/record.rs",
     "crates/dpp-plugin-sdk/src/validate.rs",
     "crates/dpp-registry/src/granularity.rs",
     "crates/dpp-rules/src/batteries/chemistry.rs",
@@ -536,13 +532,28 @@ fn rule_8_every_file_has_module_docs() {
 /// because it is the one that grew a cycle, and adding a module to this table is
 /// a deliberate act — an unlisted module is not silently exempt, it fails.
 const TIERS: &[(&str, u8)] = &[
-    ("access", 3),
+    ("identifier", 1),
     ("catalog", 2),
-    ("compliance", 4),
-    ("domain", 2),
-    ("ports", 4),
+    ("compliance", 2),
+    ("eol", 2),
+    ("facility", 2),
+    ("graph", 2),
+    ("identity", 2),
+    ("instrument", 2),
+    ("manufacturer", 2),
+    ("material", 2),
+    ("passport", 2),
+    ("product", 2),
+    ("product_group", 2),
+    ("seal", 2),
+    ("status", 2),
+    ("transfer", 2),
+    ("access", 3),
+    ("lint", 3),
     ("schemas", 3),
     ("validation", 3),
+    ("passthrough", 4),
+    ("ports", 4),
 ];
 
 fn tier_of(module: &str) -> Option<u8> {
@@ -627,7 +638,7 @@ fn rule_0_tier_imports_point_up() {
 // `passport.rs` remains: `from_stored` takes a `&LensRegistry`, which is the
 // factory carve-out that CODE-LAYOUT.md section 1 states. The other two entries
 // are gone: `error/` moved above the ladder and `validation/` moved to tier 3.
-const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/domain/passport/record.rs"];
+const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/passport/record.rs"];
 
 // ---------------------------------------------------------------------------
 // Rule 11 — a concept that outgrew its file becomes a directory

@@ -184,7 +184,7 @@ fn carbon_footprint_class_bound_matches_the_schema() {
     // two statements of one fact. If they disagree, a value can pass schema
     // validation and fail typed deserialization (or the reverse), and the
     // failure surfaces far from either declaration.
-    use crate::domain::product_group::CarbonFootprintClass;
+    use crate::product_group::CarbonFootprintClass;
 
     let reg = VersionedSchemaRegistry::new();
     let json = reg

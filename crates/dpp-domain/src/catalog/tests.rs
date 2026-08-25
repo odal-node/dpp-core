@@ -1,7 +1,7 @@
 //! `ProductGroupCatalog` load, gating, and runtime registration.
 
 use super::*;
-use crate::domain::instrument::InstrumentCatalog;
+use crate::instrument::InstrumentCatalog;
 
 #[test]
 fn loads_all_embedded_manifests() {

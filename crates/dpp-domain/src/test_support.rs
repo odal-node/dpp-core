@@ -8,12 +8,10 @@
 
 use chrono::Utc;
 
-use crate::domain::identifier::Gtin;
-use crate::domain::passport::{ManufacturerInfo, Passport, PassportId};
-use crate::domain::product_group::{
-    BatteryChemistry, BatteryData, BatteryType, ProductGroup, TextileData,
-};
-use crate::domain::status::PassportStatus;
+use crate::identifier::Gtin;
+use crate::passport::{ManufacturerInfo, Passport, PassportId};
+use crate::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroup, TextileData};
+use crate::status::PassportStatus;
 
 /// A minimal, valid `Passport` with no product group data.
 pub(crate) fn sample_passport() -> Passport {
@@ -23,9 +21,7 @@ pub(crate) fn sample_passport() -> Passport {
         batch_id: None,
         product_name: "Test Product".into(),
         product_group: ProductGroup::Textile,
-        applicable_instruments: vec![crate::domain::instrument::InstrumentRef::from_catalog(
-            "espr",
-        )],
+        applicable_instruments: vec![crate::instrument::InstrumentRef::from_catalog("espr")],
         granularity: Some(crate::catalog::Granularity::Item),
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),
@@ -179,12 +175,12 @@ pub(crate) fn sample_textile_data() -> TextileData {
 /// about a subset. Anything reasoning over `Passport`'s JSON keys must build
 /// from this.
 pub(crate) fn fully_populated_passport() -> Passport {
-    use crate::domain::compliance::ComplianceResult;
-    use crate::domain::identifier::CommodityCode;
-    use crate::domain::lint::LintResult;
-    use crate::domain::passport::{FacilitySnapshot, PassportRef};
-    use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};
-    use crate::domain::seal::{SealFormat, SealedEnvelope};
+    use crate::compliance::ComplianceResult;
+    use crate::identifier::CommodityCode;
+    use crate::lint::LintResult;
+    use crate::passport::{FacilitySnapshot, PassportRef};
+    use crate::product_group::{CarbonFootprint, RepairabilityScore};
+    use crate::seal::{SealFormat, SealedEnvelope};
 
     let now = Utc::now();
     let reference = PassportRef {
@@ -240,8 +236,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
 /// so the depth lint stays quiet — tests that want a finding should reach in and
 /// break one thing rather than build a whole second fixture.
 pub(crate) fn sample_unsold_goods_report()
--> crate::domain::product_group::data::unsold_goods::UnsoldGoodsReport {
-    use crate::domain::product_group::data::unsold_goods::*;
+-> crate::product_group::data::unsold_goods::UnsoldGoodsReport {
+    use crate::product_group::data::unsold_goods::*;
     use chrono::NaiveDate;
 
     UnsoldGoodsReport {

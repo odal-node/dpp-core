@@ -40,11 +40,11 @@
 //! `GhostSeal` returns clearly-synthetic envelopes so registration code can be
 //! written and tested against this contract today.
 //!
-//! The value objects this trait produces — [`SealedEnvelope`](crate::domain::seal::SealedEnvelope) and friends — are
-//! domain values, not ports, and live in [`crate::domain::seal`]. They are
+//! The value objects this trait produces — [`SealedEnvelope`](crate::seal::SealedEnvelope) and friends — are
+//! domain values, not ports, and live in [`crate::seal`]. They are
 //!
 //! The value objects this trait carries — `SealedEnvelope` and friends — are
-//! domain values, not ports, and live in [`crate::domain::seal`]. They are
+//! domain values, not ports, and live in [`crate::seal`]. They are
 //! **not** re-exported here: a second path to the same type is what let a
 //! tier-2 aggregate import tier 4 in the first place (CODE-LAYOUT.md §1).
 

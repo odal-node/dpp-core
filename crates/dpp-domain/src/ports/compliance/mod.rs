@@ -10,7 +10,7 @@
 //!
 //!
 //! The value objects these traits produce — `ComplianceResult` and friends —
-//! are domain values, not ports, and live in [`crate::domain::compliance`].
+//! are domain values, not ports, and live in [`crate::compliance`].
 //! They are **not** re-exported here: a second path to the same type is what
 //! let a tier-2 aggregate import tier 4 in the first place (CODE-LAYOUT.md §1).
 

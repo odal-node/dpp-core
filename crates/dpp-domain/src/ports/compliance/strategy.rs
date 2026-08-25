@@ -2,17 +2,17 @@
 
 use chrono::NaiveDate;
 
-use crate::domain::compliance::{ComplianceError, ComplianceResult};
-use crate::domain::product_group::ProductGroupData;
+use crate::compliance::{ComplianceError, ComplianceResult};
+use crate::product_group::ProductGroupData;
 
 /// Per-product group compliance calculation strategy.
 ///
 /// The Apache-2.0 build ships
-/// [`PassthroughBatteryStrategy`](crate::compliance::PassthroughBatteryStrategy)
+/// [`PassthroughBatteryStrategy`](crate::passthrough::PassthroughBatteryStrategy)
 /// and
-/// [`PassthroughTextileStrategy`](crate::compliance::PassthroughTextileStrategy),
+/// [`PassthroughTextileStrategy`](crate::passthrough::PassthroughTextileStrategy),
 /// both registered in
-/// [`PassthroughRegistry::new`](crate::compliance::PassthroughRegistry::new). A
+/// [`PassthroughRegistry::new`](crate::passthrough::PassthroughRegistry::new). A
 /// proprietary tier registers its own for the product groups it models and leaves the
 /// rest on passthrough.
 ///
@@ -25,7 +25,7 @@ use crate::domain::product_group::ProductGroupData;
 /// # Contract
 ///
 /// An implementation receives the [`ProductGroupData`] for **its own** product group and
-/// must return [`ComplianceErrorKind::InvalidInput`](crate::domain::compliance::ComplianceErrorKind::InvalidInput) rather than panicking if
+/// must return [`ComplianceErrorKind::InvalidInput`](crate::compliance::ComplianceErrorKind::InvalidInput) rather than panicking if
 /// handed another's — a routing mistake in a host should be reportable, not
 /// fatal.
 ///

@@ -22,7 +22,7 @@
 //! `globalAssetId` to make the door respond would put a fabricated trade-item
 //! identifier into a document an integrator's toolchain treats as authoritative.
 
-use dpp_domain::domain::product_group::{DisclosureScope, UnsoldGoodsReport};
+use dpp_domain::product_group::{DisclosureScope, UnsoldGoodsReport};
 
 use crate::model::{AasSemId, AasSubmodel};
 use crate::property::{double_property, enum_wire_str, string_property};

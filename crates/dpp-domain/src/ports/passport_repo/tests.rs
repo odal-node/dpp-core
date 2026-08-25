@@ -3,14 +3,14 @@
 use super::port::*;
 use async_trait::async_trait;
 
-use crate::domain::passport::ManufacturerInfo;
-use crate::domain::product_group::ProductGroup;
-use crate::domain::{
+use crate::error::DppError;
+use crate::passport::ManufacturerInfo;
+use crate::product_group::ProductGroup;
+use crate::{
     passport::{Passport, PassportId},
-    product_identity::ProductIdentity,
+    product::ProductIdentity,
     status::PassportStatus,
 };
-use crate::error::DppError;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -228,7 +228,7 @@ async fn default_patch_fields_unknown_id_is_not_found() {
 
 #[tokio::test]
 async fn default_find_by_identity_matches_across_draft_and_published() {
-    use crate::domain::product_group::ProductGroupData;
+    use crate::product_group::ProductGroupData;
 
     let repo = InMemoryRepo::default();
     let mut p = draft_passport("Battery A");

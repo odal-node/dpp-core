@@ -20,12 +20,27 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod access;
 pub mod catalog;
 pub mod compliance;
-pub mod domain;
+pub mod eol;
 pub mod error;
+pub mod facility;
+pub mod graph;
+pub mod identifier;
+pub mod identity;
+pub mod instrument;
+pub mod lint;
+pub mod manufacturer;
+pub mod material;
+pub mod passport;
+pub mod passthrough;
 pub mod ports;
+pub mod product;
+pub mod product_group;
 pub mod schemas;
+pub mod seal;
+pub mod status;
 #[cfg(test)]
 mod test_support;
+pub mod transfer;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validation;
 
@@ -33,12 +48,12 @@ pub use catalog::{
     CatalogError, Granularity, ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus,
     RetentionBasis,
 };
-pub use domain::instrument::{
+pub use instrument::{
     DateBasis, Instrument, InstrumentBinding, InstrumentCatalog, InstrumentKind, InstrumentRef,
     InstrumentStatus, ObligationDate, PassportObligation, RecordedBasis,
 };
 
-pub use domain::{
+pub use crate::{
     identifier::{
         CnCategory, CnCategoryError, CommodityCode, CommodityCodeError, Gln, GlnError, Gtin,
         GtinError, gs1_check_digit,
@@ -52,6 +67,7 @@ pub use domain::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_WIRE_KEYS, Passport,
         PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
+    product::ProductIdentity,
     product_group::{
         AluminiumData,
         BatteryChemistry,
@@ -109,7 +125,6 @@ pub use domain::{
         validate_surfactants,
         validate_svhc_substances,
     },
-    product_identity::ProductIdentity,
     status::PassportStatus,
     transfer::{
         OperatorRole, ResponsibleOperator, TransferChain, TransferError, TransferReason,
@@ -126,7 +141,7 @@ pub use validation::{
     validate_product_group_data_with_registry, validate_raw_product_group_data,
 };
 
-pub use domain::compliance::{
+pub use compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
     gate_determination,
 };
@@ -140,7 +155,9 @@ pub use ports::registry_sync::{
     RegistrySyncPort,
 };
 
-pub use compliance::{PassthroughBatteryStrategy, PassthroughRegistry, PassthroughTextileStrategy};
+pub use passthrough::{
+    PassthroughBatteryStrategy, PassthroughRegistry, PassthroughTextileStrategy,
+};
 
 /// Compile-checks this crate's README examples.
 ///

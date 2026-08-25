@@ -1,7 +1,7 @@
 //! Behaviour of the registration request builder and the granularity mapping.
 
 use super::*;
-use crate::domain::{
+use crate::{
     passport::{ManufacturerInfo, Passport},
     status::PassportStatus,
 };
@@ -23,7 +23,7 @@ fn make_published_passport() -> Passport {
         schema_version: "1.1.0".into(),
         retention_locked: true,
         operator_identifier: Some("did:web:acme.example.com".into()),
-        facility: Some(crate::domain::passport::FacilitySnapshot {
+        facility: Some(crate::passport::FacilitySnapshot {
             scheme: "national".into(),
             value: "FAC-DE-001".into(),
             name: "Acme Plant".into(),
@@ -127,11 +127,11 @@ fn registry_status_serde_round_trip() {
 /// carry it rather than claiming the product has none.
 #[test]
 fn the_model_identifier_reaches_the_registration() {
-    use crate::domain::product_group::ProductGroupData;
+    use crate::product_group::ProductGroupData;
 
     let mut passport = make_published_passport();
     passport.product_group_data = Some(ProductGroupData::Battery(Box::new(
-        crate::domain::product_group::BatteryData {
+        crate::product_group::BatteryData {
             battery_model_id: Some("BM-4815".into()),
             ..crate::test_support::sample_battery_data()
         },

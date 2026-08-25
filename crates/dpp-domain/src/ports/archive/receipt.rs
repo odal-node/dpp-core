@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::passport::PassportId;
+use crate::passport::PassportId;
 
 /// The archive deadline for a passport retained `years` from `now` — the
 /// shared 365-day-per-year approximation used by every archive adapter.

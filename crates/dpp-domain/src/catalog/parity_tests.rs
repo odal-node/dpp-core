@@ -2,9 +2,9 @@
 //! registry and the access policy must all describe the same product groups.
 
 use super::*;
-use crate::domain::instrument::InstrumentCatalog;
+use crate::instrument::InstrumentCatalog;
 
-/// Parity guard: the closed [`ProductGroup`](crate::domain::product_group::ProductGroup) enum
+/// Parity guard: the closed [`ProductGroup`](crate::product_group::ProductGroup) enum
 /// and the open [`ProductGroupCatalog`] must describe the same set of
 /// *compile-time* product groups. Runtime-registered product groups degrade to
 /// `ProductGroupData::Other`, but every typed `ProductGroup` variant (except `Other`)
@@ -13,7 +13,7 @@ use crate::domain::instrument::InstrumentCatalog;
 /// of a product group" drift from reappearing across the enum ↔ catalog boundary.
 #[test]
 fn product_group_enum_and_catalog_agree() {
-    use crate::domain::product_group::ProductGroup;
+    use crate::product_group::ProductGroup;
 
     let catalog = ProductGroupCatalog::new();
 

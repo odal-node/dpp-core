@@ -1,4 +1,4 @@
-use dpp_domain::domain::product_group::ElectronicsData;
+use dpp_domain::product_group::ElectronicsData;
 
 use crate::model::{AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
 use crate::property::{

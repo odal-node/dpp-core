@@ -1,8 +1,8 @@
 //! Batch validation of multiple product group-data items in one pass.
 
 use super::functions::validate_product_group_data;
-use crate::domain::product_group::ProductGroupData;
 use crate::error::field::ValidationErrors;
+use crate::product_group::ProductGroupData;
 
 /// Result of validating a single item in a batch.
 #[derive(Debug, Clone)]

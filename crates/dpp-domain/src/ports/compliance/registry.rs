@@ -2,8 +2,8 @@
 
 use chrono::NaiveDate;
 
-use crate::domain::compliance::{ComplianceError, ComplianceResult};
-use crate::domain::product_group::ProductGroupData;
+use crate::compliance::{ComplianceError, ComplianceResult};
+use crate::product_group::ProductGroupData;
 
 /// Registry that dispatches to the correct `ComplianceStrategy` by product group.
 ///

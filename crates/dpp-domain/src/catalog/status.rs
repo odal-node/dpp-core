@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Where one act's obligations stand for one product group.
 ///
-/// Held on [`InstrumentBinding`](crate::domain::instrument::InstrumentBinding), not on the
+/// Held on [`InstrumentBinding`](crate::instrument::InstrumentBinding), not on the
 /// product group: a group is routinely in force under one act and provisional
 /// under another, so a single per-group value must either assert against an
 /// unadopted act or stay silent about an adopted one.
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// This answers one question only: **does this act create binding, determinable
 /// obligations for this product group right now?** It is deliberately not the
 /// same question as "is a passport owed" — that is
-/// [`PassportObligation`](crate::domain::instrument::PassportObligation), which is
+/// [`PassportObligation`](crate::instrument::PassportObligation), which is
 /// independent and does not gate determinations.
 ///
 /// An act can bind years before its passport obligation begins. The Batteries

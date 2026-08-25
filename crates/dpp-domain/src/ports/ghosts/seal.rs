@@ -5,11 +5,11 @@ use chrono::Utc;
 
 use crate::error::dpp::DppError;
 
-use crate::domain::seal::{
+use crate::ports::seal::SealPort;
+use crate::seal::{
     SealCapabilities, SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication,
     SealMode, SealRequest, SealVerification, SealedEnvelope,
 };
-use crate::ports::seal::SealPort;
 
 /// No-op implementation for use before a QTSP integration is configured.
 ///

@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 
-use crate::domain::seal::{SealCapabilities, SealRequest, SealVerification, SealedEnvelope};
 use crate::error::DppError;
+use crate::seal::{SealCapabilities, SealRequest, SealVerification, SealedEnvelope};
 
 /// Port trait for applying and verifying eIDAS qualified electronic seals.
 ///

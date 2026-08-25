@@ -4,15 +4,15 @@ use super::*;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::passport::PassportId;
-use crate::domain::seal::{
-    SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication, SealMode,
-    SealRequest,
-};
-use crate::domain::seal::{SealCredentialRef, SealedEnvelope};
+use crate::passport::PassportId;
 use crate::ports::registry_sync::RegistrationGranularity;
 use crate::ports::registry_sync::{RegistrationRequest, RegistryStatus, RegistrySyncPort};
 use crate::ports::seal::SealPort;
+use crate::seal::{
+    SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication, SealMode,
+    SealRequest,
+};
+use crate::seal::{SealCredentialRef, SealedEnvelope};
 
 /// A request whose packaging is one the format actually defines.
 ///
@@ -130,9 +130,7 @@ async fn ghost_check_status_returns_not_found() {
 
 #[tokio::test]
 async fn ghost_notify_transfer_returns_not_found() {
-    use crate::domain::transfer::{
-        OperatorRole, ResponsibleOperator, TransferReason, TransferRecord,
-    };
+    use crate::transfer::{OperatorRole, ResponsibleOperator, TransferReason, TransferRecord};
 
     let operator = |did: &str, name: &str| ResponsibleOperator {
         did: did.to_owned(),
@@ -168,7 +166,7 @@ async fn ghost_seal_returns_placeholder() {
     let req = SealRequest {
         payload_hash: "abc123def456".into(),
         mode: SealMode::ProviderSeal,
-        key_ref: crate::domain::seal::SealCredentialRef {
+        key_ref: crate::seal::SealCredentialRef {
             qtsp_id: "test-qtsp".into(),
             credential_id: "cred-001".into(),
         },

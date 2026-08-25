@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use dpp_domain::domain::identifier::Gtin;
-use dpp_domain::domain::product_group::{
+use dpp_domain::identifier::Gtin;
+use dpp_domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };
 use dpp_domain::validation::{validate_product_group_data, validate_product_group_data_batch};

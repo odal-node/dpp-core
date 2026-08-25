@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::passport::PassportId;
 use crate::error::dpp::DppError;
+use crate::passport::PassportId;
 use crate::ports::registry_sync::{
     RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
 };
@@ -41,7 +41,7 @@ impl RegistrySyncPort for GhostRegistrySync {
 
     async fn notify_transfer(
         &self,
-        record: &crate::domain::transfer::TransferRecord,
+        record: &crate::transfer::TransferRecord,
         _registry_id: &str,
     ) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(

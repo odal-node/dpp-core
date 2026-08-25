@@ -3,12 +3,12 @@
 use async_trait::async_trait;
 
 use super::protected_fields::PROTECTED_PATCH_FIELDS;
-use crate::domain::{
+use crate::error::DppError;
+use crate::{
     passport::{Passport, PassportId},
-    product_identity::ProductIdentity,
+    product::ProductIdentity,
     status::PassportStatus,
 };
-use crate::error::DppError;
 
 /// Port trait for all DPP persistence operations.
 ///

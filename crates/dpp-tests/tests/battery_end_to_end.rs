@@ -17,7 +17,7 @@ use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
 use dpp_digital_link::DigitalLink;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
-use dpp_domain::domain::product_group::CriticalRawMaterial;
+use dpp_domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
     ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, ProductGroup,

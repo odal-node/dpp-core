@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::record::RegistryRecord;
 use super::request::RegistrationRequest;
-use crate::domain::passport::PassportId;
 use crate::error::DppError;
+use crate::passport::PassportId;
 
 /// Port trait for synchronising DPP records with the EU Central Registry.
 ///
@@ -38,7 +38,7 @@ pub trait RegistrySyncPort: Send + Sync {
     /// know which record the handover refers to, so a caller that does not yet
     /// have one must wait rather than send an unattached notification.
     ///
-    /// Takes the whole [`TransferRecord`](crate::domain::transfer::TransferRecord)
+    /// Takes the whole [`TransferRecord`](crate::transfer::TransferRecord)
     /// rather than just the incoming
     /// operator's identifier. A registry notification names **both** legal
     /// persons and carries the dual signatures that authorise the handover;
@@ -47,7 +47,7 @@ pub trait RegistrySyncPort: Send + Sync {
     /// strings for data the system had already collected.
     async fn notify_transfer(
         &self,
-        record: &crate::domain::transfer::TransferRecord,
+        record: &crate::transfer::TransferRecord,
         registry_id: &str,
     ) -> Result<RegistryRecord, DppError>;
 }

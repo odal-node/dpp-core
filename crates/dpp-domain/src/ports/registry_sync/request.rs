@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::granularity::RegistrationGranularity;
 use super::registering_operator::RegisteringOperator;
-use crate::domain::passport::PassportId;
+use crate::passport::PassportId;
 
 /// Registration request sent to the EU Central Registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +52,7 @@ pub struct RegistrationRequest {
     /// facility's name/country/scheme rather than a bare identifier. `None` when
     /// the passport was published without a facility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub facility: Option<crate::domain::passport::FacilitySnapshot>,
+    pub facility: Option<crate::passport::FacilitySnapshot>,
     /// Product category for product group routing within the registry.
     pub product_category: String,
     /// GS1 Digital Link URI or DID URI resolving to the DPP data.
@@ -108,7 +108,7 @@ impl RegistrationRequest {
     /// group; `model_id` is left unset here and linked by the caller where a
     /// model design exists for the product.
     pub fn from_published_passport(
-        passport: &crate::domain::passport::Passport,
+        passport: &crate::passport::Passport,
         operator: RegisteringOperator<'_>,
         granularity: RegistrationGranularity,
     ) -> Self {

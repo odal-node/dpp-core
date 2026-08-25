@@ -68,7 +68,7 @@ const EMBEDDED: &[EmbeddedManifest] = &[
 /// Identity and scope only. Anything a caller wants to know about the **law** —
 /// whether obligations bind, whether a passport is owed and from when, how long
 /// a record must be kept, at what level — comes from
-/// [`InstrumentCatalog`](crate::domain::instrument::InstrumentCatalog), because each of those is a
+/// [`InstrumentCatalog`](crate::instrument::InstrumentCatalog), because each of those is a
 /// property of an act reaching this group and a group may be reached by several.
 pub struct ProductGroupCatalog {
     entries: Vec<ProductGroupDescriptor>,

@@ -2,9 +2,9 @@
 
 use super::stub::InMemoryArchive;
 use super::*;
-use crate::domain::passport::*;
-use crate::domain::product_group::{CarbonFootprint, RepairabilityScore};
-use crate::domain::status::PassportStatus;
+use crate::passport::*;
+use crate::product_group::{CarbonFootprint, RepairabilityScore};
+use crate::status::PassportStatus;
 use chrono::Utc;
 
 fn make_test_passport() -> Passport {

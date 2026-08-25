@@ -2,7 +2,7 @@
 //!
 //! This is one of two catalogs and it carries **no law**. The acts, their
 //! bindings and the obligations they create live in
-//! [`crate::domain::instrument`], which was lifted out of here because it is a
+//! [`crate::instrument`], which was lifted out of here because it is a
 //! different axis that changes for different reasons.
 //!
 //! [`ProductGroupCatalog`] is the single source of truth for *what product groups
@@ -34,7 +34,7 @@
 //! [`ProductGroupDescriptor`] used to carry a singular `regime`, `status`,
 //! `dppAppliesFrom` and `retentionYears`, each assuming one act governs one
 //! group. Those fields are gone. The acts, their bindings and the obligations
-//! they create live in [`crate::domain::instrument`], and the two catalogs no
+//! they create live in [`crate::instrument`], and the two catalogs no
 //! longer overlap and so cannot disagree: this one answers *what groups exist
 //! and how we serve them*, that one answers *what binds them*. Anything asking
 //! whether an obligation applies goes there.
