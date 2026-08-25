@@ -147,8 +147,9 @@ fn assert_against_baseline(rule: &str, found: &BTreeMap<String, String>, baselin
 /// Strip `///` and `//!` doc comments, and the fenced code blocks inside them,
 /// so an illustrative `pub struct Foo` in an example is not counted as an item.
 ///
-/// Shared by the rule 1 and rule 7 scanners; both were fooled by doctests in an
-/// earlier draft.
+/// Shared by the rule 1 and rule 7 scanners. Mirrors the same handling in
+/// `mod_rs_is_pure_index.rs`, which needs it for the same reason: this crate's
+/// doc comments contain a lot of illustrative Rust.
 fn code_lines(src: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut in_doctest = false;
