@@ -108,15 +108,23 @@ with a *counted* escape hatch survives.
 
 ## 3. What enforces what
 
-| Rule | Tripwire | Fails when |
+All but rule 2 live in `crates/dpp-tests/tests/layout.rs`, one `#[test]` each,
+sharing one directory walk. Rule 2 keeps its own file because it predates the
+rest and works.
+
+| Rule | Test | Fails when |
 |---|---|---|
-| 1, 5 | `layout_one_type_per_file` | a source file declares ≥3 public types |
+| 1, 5 | `layout::rule_1_one_public_type_per_file` | a source file declares ≥3 public types |
 | 2 | `mod_rs_is_pure_index` | a `mod.rs` declares a public item |
 | 3 | — | *guidance only* |
-| 4 | `layout_tests_files_are_navigable` | a `tests.rs` exceeds 400 lines |
-| 6, 9 | `layout_only_lib_rs_at_root` | a crate has a root `.rs` other than `lib.rs` or `test_support.rs` |
-| 7 | `layout_tests_are_siblings` | a source file contains an inline `#[cfg(test)] mod tests` |
-| 8 | `layout_module_docs` | a `.rs` file has no `//!` in its first three lines |
+| 4 | `layout::rule_4_tests_files_are_navigable` | a `tests.rs` exceeds 400 lines |
+| 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
+| 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
+| 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
+
+The set of crates and plugins each one scans is **discovered from the directory
+tree**, not listed. A hardcoded roster is how a new crate ends up silently
+unchecked, which is the failure these tests exist to prevent.
 
 **Rule 1's tripwire is a proxy, not the rule.** It fires at three public types
 because a type plus its error is idiomatic and should not need a marker. Two
