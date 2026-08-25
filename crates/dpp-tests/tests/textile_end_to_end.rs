@@ -14,7 +14,7 @@
 use chrono::Utc;
 use dpp_aas::map_dpp_to_aas_submodel;
 use dpp_digital_link::DigitalLink;
-use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, ProductGroup,
     ProductGroupData, RepairabilityScore, SvhcSubstance, TextileData,
@@ -179,7 +179,12 @@ fn credential_issuance_and_audience_filtering() {
         .expect("textile in catalog");
 
     // ── Public audience ────────────────────────────────────────────────────
-    let public_decision = filter_by_audience(&textile_fields, &policy, Audience::Public);
+    let public_decision = filter_by_audience_in_scope(
+        &textile_fields,
+        &policy,
+        Audience::Public,
+        DocumentScope::ProductGroupData,
+    );
     // The public audience must NOT see restricted fields
     assert!(
         public_decision
@@ -225,7 +230,12 @@ fn credential_issuance_and_audience_filtering() {
     if let dpp_vc::credential::VerificationResult::Valid { audience, .. } = &result {
         assert_eq!(*audience, Audience::LegitimateInterest);
 
-        let pro_decision = filter_by_audience(&textile_fields, &policy, *audience);
+        let pro_decision = filter_by_audience_in_scope(
+            &textile_fields,
+            &policy,
+            *audience,
+            DocumentScope::ProductGroupData,
+        );
         // Professional MUST see SVHC and disassembly data
         assert!(
             pro_decision.filtered_data.get("svhcSubstances").is_some(),
