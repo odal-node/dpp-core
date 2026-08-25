@@ -13,6 +13,7 @@ This folder documents **the standard, not the product**: what a Digital Product 
 | You're asking… | Read |
 |---|---|
 | "How is the library structured, and why hexagonal?" | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) · [architecture/DESIGN-PATTERNS.md](architecture/DESIGN-PATTERNS.md) |
+| "Where does this file go, and what enforces that?" | [architecture/CODE-LAYOUT.md](architecture/CODE-LAYOUT.md) |
 | "How do identity, signing, and verifiable credentials work?" | [architecture/IDENTITY.md](architecture/IDENTITY.md) |
 | "How do product group plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
 | "How do passports link to their components and predecessors?" | [architecture/PRODUCT-LINEAGE.md](architecture/PRODUCT-LINEAGE.md) — design proposal, not yet implemented |

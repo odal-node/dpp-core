@@ -107,6 +107,19 @@ dpp-tests         -> dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas (dev only
 
 ## 4. Coding Conventions
 
+### Where a file goes
+
+[`docs/architecture/CODE-LAYOUT.md`](docs/architecture/CODE-LAYOUT.md) is the
+standard: one public type per file, `mod.rs` is a pure index, tests are siblings
+rather than inline, every file opens with a `//!` doc, only `lib.rs` sits at a
+crate's `src/` root.
+
+Most of those rules are enforced by tripwires in `crates/dpp-tests/tests/`, so
+`just check` will tell you before a reviewer does. Each carries a baseline of
+files that already violate it; those are being worked through. **Do not add to a
+baseline to go green** — fix the file, or mark it with a
+`// LAYOUT-DEVIATION: <reason>` comment, which is greppable and has to state why.
+
 ### Pure Domain Code
 
 Every module in this workspace must compile without I/O crates. If you are importing `axum`, `sqlx`, or `async-nats`, that code belongs downstream, not here.
