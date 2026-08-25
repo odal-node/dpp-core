@@ -1,10 +1,15 @@
 //! Drift tripwire: the concern inventory in `docs/architecture/ARCHITECTURE.md`
 //! must exactly match the public modules declared in `dpp-domain`'s `lib.rs`.
 //!
-//! `dpp-domain` is the largest crate in the workspace — roughly three and a half
-//! times the next one — and is the hub every other crate depends on. That makes
-//! it the crate most able to absorb a new capability without anyone noticing,
-//! and "it has room" is exactly how a hub becomes a bag.
+//! `dpp-domain` is by a wide margin the largest crate in the workspace, and the
+//! hub of the crates that depend on anything at all. That makes it the crate
+//! most able to absorb a new capability without anyone noticing, and "it has
+//! room" is exactly how a hub becomes a bag.
+//!
+//! Deliberately no ratio here. An earlier version of this comment said "roughly
+//! three and a half times the next one", which had drifted by the time anyone
+//! checked — in a file whose whole subject is that prose counts go stale with
+//! nothing watching them.
 //!
 //! The rule this enforces is that **growing a top-level concern is a deliberate
 //! act**: adding one means editing `lib.rs` *and* the inventory, which is the

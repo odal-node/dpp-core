@@ -62,7 +62,8 @@ dpp-tests — cross-crate integration tests (not published)
 
 ## dpp-domain — The Domain
 
-The dependency root. Every other crate may depend on it; it depends on nothing internal.
+The dependency root. Every other crate may depend on it; it depends on nothing
+internal but `dpp-rules`. Six of them do not — see [VERSIONING.md](../governance/VERSIONING.md).
 
 ### Top-level concerns
 
@@ -74,7 +75,7 @@ compares this list against `lib.rs` and fails the build in either direction.
 | Concern | What it holds |
 |---|---|
 | `access` | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
-| `catalog` | Product group manifests: regulatory status, regime, retention, schema versions |
+| `catalog` | Two catalogs. `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding; it carries **no law**. `InstrumentCatalog` — the acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair, which is where status, legal basis, dates, retention and granularity live |
 | `compliance` | The Apache-2.0 passthrough registry and its per-product group strategies |
 | `domain` | The passport aggregate, product group data, lifecycle, transfer, validation |
 | `ports` | The core↔platform trait boundary (see [PORTS.md](PORTS.md)) |

@@ -7,12 +7,18 @@
 Core domain types, port traits, and schema validation for the
 [Odal Node](https://odal-node.io) Digital Product Passport system.
 
-This is the foundational crate. All other `dpp-*` crates depend on it.
-It contains everything that changes when EU regulations change — and nothing else.
+This is the foundational crate: any other `dpp-*` crate may depend on it, and
+several do. It contains everything that changes when EU regulations change — and
+nothing else.
 
 ## When to use this crate
 
 - You need the DPP data model: `Passport`, `ProductGroupData`, `TransferChain`.
+- You need to know **what law reaches a product group**: `InstrumentCatalog`
+  holds one manifest per act, with a `PassportObligation` and one
+  `InstrumentBinding` per (act, product group) pair. Obligations accumulate —
+  ESPR Art. 5(7) lets acts overlap and sets no precedence rule between them — so
+  this answers with a *set*, and a determination is always made under a named act.
 - You are implementing a platform adapter (database, HTTP layer) and need the
   port trait interfaces: `PassportRepository`, `IdentityPort`, `PluginHost`, etc.
 - You want to validate passport data against embedded JSON schemas.
@@ -25,8 +31,11 @@ use dpp_domain::catalog::ProductGroupCatalog;
 use dpp_domain::Audience;
 use serde_json::json;
 
-// Product group metadata is data, not code: regime, status and retention all come
-// from the catalog manifests.
+// Product groups are data, not code — one embedded manifest each. The descriptor
+// carries identity, scope, schema versions, disclosure and plugin binding, and no
+// law at all: status, legal basis, passport obligation, dates, retention and
+// granularity are properties of an (act, product group) pair and live on
+// `InstrumentBinding` in `catalog::InstrumentCatalog`.
 let catalog = ProductGroupCatalog::new();
 let battery = catalog.get("battery").expect("battery is in the catalog");
 assert_eq!(battery.key, "battery");

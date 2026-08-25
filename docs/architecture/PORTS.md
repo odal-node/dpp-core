@@ -10,7 +10,7 @@ drifts the moment another port lands). CI enforces agreement: the test
 
 | Module | Trait(s) | Concern |
 |---|---|---|
-| `archive` | `ArchivePort` | Immutable third-party archival with retention guarantees (ESPR Art. 13). |
+| `archive` | `ArchivePort` | Immutable third-party archival with retention guarantees (ESPR **Art. 10(4)** back-up copy, **Art. 2(32)** independent third party, **Annex III(i)** availability period — *not* Art. 13, which is the registry). |
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity_port` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |

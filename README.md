@@ -41,7 +41,7 @@ Succeeds with zero infrastructure running. No DB, no Redis, no env vars. If it n
 dpp-core/
   crates/
     dpp-domain .......... Domain types, port traits, VersionedSchemaRegistry, JSON Schema validation
-      schemas/ .......... Versioned JSON Schemas for 11 product groups (battery, textile, electronics, …), embedded via include_str!
+      schemas/ .......... Versioned JSON Schemas for 12 product groups (battery, textile, electronics, …), embedded via include_str!
     dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify, JAdES
     dpp-digital-link .... GS1 Digital Link parser and link-type negotiation
     dpp-aas ............. Asset Administration Shell (AAS) shells and submodels
@@ -51,7 +51,8 @@ dpp-core/
     dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
     dpp-registry ........ EU Central Registry interface types (wasm32-safe)
     dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
-    dpp-tests ........... Cross-crate integration tests (domain, crypto, digital-link, aas, vc)
+    dpp-vocab ........... External vocabulary authorities, one file per authority, with what we verified
+    dpp-tests ........... Cross-crate integration tests and the structural tripwires
   plugins/ .............. 10 Wasm product group plugins (wasm32-wasip1, excluded from workspace)
 ```
 

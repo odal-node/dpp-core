@@ -48,29 +48,50 @@ Custom serde: domain `Published` serialises to wire `"active"` (and back). This 
 
 ### 3.1 Base Passport (`Passport` struct)
 
-All DPPs — regardless of product group — carry these fields. Source: `dpp-domain/src/domain/passport.rs`.
+All DPPs — regardless of product group — carry these fields. Source:
+`dpp-domain/src/domain/passport/passport.rs`.
+
+**`PASSPORT_WIRE_KEYS` in that file is the authority**, not this table. It is a
+`const` the tests assert against, so it cannot drift; the table below is a
+reading aid and is only as fresh as its last edit. If the two disagree, the
+constant is right.
 
 | Field | Rust Type | JSON name | Description |
 |---|---|---|---|
-| `id` | `PassportId` (UUID v4) | `"id"` | Unique passport identifier |
+| `id` | `PassportId` | `"id"` | Unique passport identifier |
 | `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9) |
 | `product_name` | `String` | `"productName"` | Human-readable product name (ESPR Art. 9) |
-| `product group` | `ProductGroup` enum | `"product group"` | EU ESPR product group — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
+| `product_group` | `ProductGroup` | `"productGroup"` | EU ESPR product group — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
+| `applicable_instruments` | `Vec<InstrumentRef>` | `"applicableInstruments"` | The acts that applied at issuance, **recorded not computed**, and immutable thereafter (see §3.5) |
+| `granularity` | `Option<Granularity>` | `"granularity"` | Model / batch / item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one — the position of every ESPR product group today |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill of materials entries |
-| `co2e_per_unit` | `Option<f64>` | `"co2ePerUnit"` | CO₂e per unit in kg — may be set by compliance engine |
-| `repairability_score` | `Option<f64>` | `"repairabilityScore"` | Repairability score (0.0–10.0) |
+| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit — may be set by the compliance engine |
+| `repairability_score` | `Option<RepairabilityScore>` | `"repairabilityScore"` | Structured `{overall, criteria}`, not a bare number |
+| `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
+| `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
 | `product_group_data` | `Option<ProductGroupData>` | `"productGroupData"` | Typed product-group-specific data (tagged enum) |
 | `status` | `PassportStatus` | `"status"` | Lifecycle state (see §2) |
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
-| `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over canonical payload (Ed25519) |
+| `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |
+| `public_jws_signature` | `Option<String>` | `"publicJwsSignature"` | JWS over the **public projection** — a different redaction, so never interchangeable with the above |
+| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Per-audience signatures, keyed by audience |
 | `created_at` | `DateTime<Utc>` | `"createdAt"` | Record creation timestamp |
 | `updated_at` | `DateTime<Utc>` | `"updatedAt"` | Last modification timestamp |
-| `published_at` | `Option<DateTime>` | `"publishedAt"` | First publish timestamp |
+| `published_at` | `Option<DateTime<Utc>>` | `"publishedAt"` | First publish timestamp |
+| `placed_on_market_date` | `Option<NaiveDate>` | `"placedOnMarketDate"` | Fixes which law governs. Never defaulted to today — a determination depending on an absent value has no answer, and saying so is the answer |
 | `schema_version` | `String` | `"schemaVersion"` | Semver of the product group schema used for validation |
 | `retention_locked` | `bool` | `"retentionLocked"` | Set permanently on first publish; prevents deletion |
-| `parent_passport_ref` | `Option<PassportRef>` | `"parentPassportRef"` | Cross-operator predecessor this record derives from (second-life lineage). Omitted when absent. |
-| `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports — the bill of materials. Omitted when empty. |
+| `version` | `u32` | `"version"` | Monotonic counter; `1` on first publish |
+| `supersedes_id` | `Option<PassportId>` | `"supersedesId"` | The passport this record supersedes. `None` for first versions |
+| `parent_passport_ref` | `Option<PassportRef>` | `"parentPassportRef"` | Cross-operator predecessor (second-life lineage). Omitted when absent |
+| `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports. Omitted when empty |
+| `retention_until` | `Option<DateTime<Utc>>` | `"retentionUntil"` | Computed at publish from the instrument bindings' retention fold |
+| `product_id` | `Option<Uuid>` | `"productId"` | Opaque link to an internal product-template record. **Not a legal identifier** |
+| `commodity_code` | `Option<CommodityCode>` | `"commodityCode"` | CN code. Absent rather than guessed — a registry requiring it refuses the registration instead of this node inventing a classification |
+| `operator_identifier` | `Option<String>` | `"operatorIdentifier"` | The operator **at signing time**, covered by the signature. Reading it as "who is responsible today" is wrong for any passport that has changed hands |
+| `facility` | `Option<FacilitySnapshot>` | `"facility"` | A snapshot, so a retired facility never orphans a published passport |
+| `seal` | `Option<SealedEnvelope>` | `"seal"` | eIDAS qualified electronic seal over `jws_signature` |
 
 ### 3.2 ManufacturerInfo
 
@@ -102,7 +123,7 @@ Elements of `Passport.materials` — bill of materials entries.
 | `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
 | `steel` | `product_category` | `"flat"` / `"long"` / … |
 | `electronics` | `product_category` | `"smartphone"` / `"other-mobile-phone"` / `"cordless-phone"` / `"tablet"` — closed, Reg. (EU) 2023/1670 Art. 1(1) |
-| `unsold-goods` | `product_category` | `"apparel"` / `"footwear"` / … |
+| `unsold-goods` | `product_category` | `"apparel"` / `"footwear"` / … — **ours, and superseded.** Impl. Reg. (EU) 2026/2 Art. 3 delimits by CN code. See §4.4 |
 | `furniture` | `product_type` | — |
 | `tyre` | `tyre_class` | `"C1"` / … |
 
@@ -111,7 +132,57 @@ Elements of `Passport.materials` — bill of materials entries.
 2. These fields are plain product group data. A plugin *may* read one to choose an internal rule path, but it does not change which plugin runs.
 3. The names and shapes are deliberately uneven — they track what each product group's own act defines, not a normalised cross-product group vocabulary. Only `battery_type` is a closed, required, typed enum; that follows from Art. 1(3) being a named enumeration in law, which is not true of the others.
 
-`Passport::validate()` enforces that `product group` matches `product_group_data`'s product group when the latter is present.
+`Passport::validate()` enforces that `productGroup` matches `productGroupData`'s product group when the latter is present.
+
+### 3.5 Applicable instruments — the law is not on the product group
+
+A product group does **not** determine the law that governs it, and the model no
+longer pretends otherwise. `ProductGroupDescriptor` carries identity, scope,
+schema versions, disclosure classes and a plugin binding — and no legal fields at
+all. Status, legal basis, passport obligation, dates, retention and granularity
+are properties of an **(act, product group) pair** and live on `InstrumentBinding`
+in the second catalog. See [ARCHITECTURE.md](ARCHITECTURE.md) §`dpp-domain`.
+
+Three records replace what used to be one:
+
+| Record | Answers |
+|---|---|
+| `Instrument` | *What is this act?* — id, CELEX, `InstrumentKind` (Framework · Delegated · Direct · Adjacent), `InstrumentStatus`, and its `PassportObligation` |
+| `ProductGroup­Descriptor` | *What is this group and how do we serve it?* — key, title, schema versions, product categories, disclosure, plugin |
+| `InstrumentBinding` | *What does this act do to this group?* — one per pair: status, legal basis, dates, retention, granularity |
+
+**Why a set and not a field.** ESPR **Art. 5(7)** lets one delegated act cover
+many product groups and lets a group-specific act supplement a horizontal one,
+and the Regulation contains **no precedence rule anywhere** — so overlapping acts
+*accumulate*. Applicable instruments are therefore a set, and the governing
+requirement is the union.
+
+**Folds are unions, never precedence.** Retention is the **maximum** (periods are
+floors). The passport due date is the **earliest** (once the first act's date
+arrives, a passport is owed). Granularity is the **most granular** (an item-level
+record satisfies a model-level requirement). Provenance folds too: a compound
+retention figure is `Sourced` only if *every* contributing figure is.
+
+**"May this bind?" is never folded to a boolean.** `InstrumentCatalog::determinable_for`
+returns the (instrument, binding) pairs, not a yes/no, because a determination is
+always made *under a named act* — a caller that only learns "yes" cannot say what
+it is asserting against. That is exactly how a determination once came to be
+emitted against an obligation that did not exist.
+
+**`PassportObligation` is a three-way answer**, not an optional date:
+`Required { from }` · `NotRequired` · `DisplacedBy { system, basis }`. The third
+is ESPR **Art. 9(4)(b)** — an act whose information duty is discharged through
+another system, e.g. EPREL. Without it, an act that creates real, live obligations
+but *no passport* could only be recorded as "no date yet", which reads as "a
+passport is coming". Determinability and passport duty are **independent
+predicates**: ESPR Arts. 24–25 bind today and impose no passport at all.
+
+**Recorded, not computed.** `applicable_instruments` is written at issuance and is
+immutable in both senses — it is in `PROTECTED_PATCH_FIELDS` and absent from
+`RETENTION_MUTABLE_FIELDS`. Corrections go by supersession. `InstrumentRef` also
+carries a `RecordedBasis` of `Catalog` or `Operator`; `Operator` is not a
+fallback, it is the case where an act reaches a product whose group no catalog
+models and the operator must assert it.
 
 ---
 
@@ -197,17 +268,59 @@ Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2
 
 Schemas: `schemas/textile/v1.0.0.json`, `schemas/textile/v1.1.0.json`
 
-### 4.3 Steel Product group — PROVISIONAL
+### 4.3 The rest of the catalog
 
-CBAM-aligned. Schema at `schemas/steel/v1.0.0.json`.
+Every product group has a typed variant and at least one schema. Only `battery`
+and `textile` have models deep enough to warrant their own section above; the
+others are listed here rather than each getting a stub.
 
-### 4.4 Unsold Goods (`UnsoldGoodsReport`)
+| Product group | Type | Current schema | Note |
+|---|---|---|---|
+| `aluminium` | `AluminiumData` | v1.1.0 | Carbon intensity, CBAM-aligned. Intermediate product |
+| `construction` | `ConstructionData` | v1.1.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
+| `detergent` | `DetergentData` | v1.1.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
+| `electronics` | `ElectronicsData` | v1.2.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
+| `furniture` | `FurnitureData` | v1.2.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
+| `mattress` | `MattressData` | v1.0.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
+| `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
+| `toy` | `ToyData` | v1.1.0 | Reg. (EU) 2025/2509 |
+| `tyre` | `TyreData` | v1.0.0 | |
+| `unsold-goods` | `UnsoldGoodsReport` | v1.0.0 | See §4.4 — **not a product group** and its model is out of date |
 
-ESPR Art. 25 / Annex VII destruction-ban reporting for unsold consumer products. Schema at `schemas/unsold-goods/v1.0.0.json`.
+`ProductGroupData::Other` keeps the tag and payload of a product group this build
+has no typed variant for, verbatim, so an unknown group round-trips rather than
+being dropped.
 
-### 4.5 Electronics, Other
+### 4.4 Unsold goods is not a product group, and its model predates its law
 
-`ProductGroupData::Electronics` and `ProductGroupData::Other` variants exist but have no product-group-specific struct yet.
+ESPR Arts. 24–25 / Annex VII. It occupies a catalog slot for implementation
+convenience and borrows textile's plugin, but it is a **horizontal obligation on
+an operator over a financial year**, not a product placed on the market. It
+carries `PassportObligation::NotRequired`: the duty is real and binding today,
+and there is no passport anywhere in Arts. 24–25.
+
+⚠️ **`UnsoldGoodsReport` does not match the adopted format.** Two acts now govern
+this, both adopted 9 February 2026 and neither reflected in the type:
+
+- **Commission Implementing Regulation (EU) 2026/2** (CELEX `32026R0002`), under
+  Art. 24(3) — Art. 2(1) requires the disclosure to comply with the format in its
+  **Annex I**, and Art. 3 delimits categories by **CN code**, first two digits
+  (four for its Annex II list).
+- **Commission Delegated Regulation (EU) 2026/296** (CELEX `32026R0296`), under
+  Art. 25(5) — the **closed list of derogations** from the destruction ban.
+  Annex I note (h) of 2026/2 points its reason vocabulary at that list.
+
+Known divergences: the period is a **financial year** with start and end dates,
+not a free-text quarter; categories are **CN codes**, not names like `"apparel"`;
+the disclosure needs a legal-entity header and a standalone-vs-consolidated flag;
+unit counts and a packaging-included flag are absent; waste treatment is a
+**percentage split** across preparing-for-reuse, recycling, other recovery,
+disposal, total destruction and unknown — where *destruction is the sum of
+recycling, other recovery and disposal* — not a single destination; and the two
+"measures taken / planned to prevent destruction" fields have no representation.
+`UnsoldGoodsReason`'s variants are ours, not the Regulation's.
+
+Reuse `CommodityCode` for the CN axis when this is rebuilt.
 
 ---
 
@@ -258,7 +371,13 @@ Schemas follow semver. The `VersionedSchemaRegistry` in `dpp-domain` discovers a
 | Minor (`1.x.0`) | New optional fields; provisional -> strict | Yes |
 | Major (`x.0.0`) | Field renamed, type changed, or removed | No |
 
-Current schemas: 28 embedded versions across 11 product groups — see
-`crates/dpp-domain/src/schemas/embedded.rs` for the registered list. Every one
-is reachable at runtime; a passport is validated against the version it
-declares, not against the newest.
+The registered list is `crates/dpp-domain/src/schemas/embedded.rs`, and it is the
+only place worth reading for what exists — every product group carries at least
+one version and several carry three. Every registered version is reachable at
+runtime; a passport is validated against the version it declares, not against
+the newest.
+
+No count is written here on purpose. This paragraph used to open "28 embedded
+versions across 11 product groups", which was wrong within a day of `mattress`
+landing — nine lines below the advice in §"Version bump" that a count is the part
+that goes stale while every claim around it stays checkable.

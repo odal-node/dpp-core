@@ -1,10 +1,13 @@
 //! Drift tripwire: no `mod.rs` in a published crate may declare a public item.
 //!
-//! Mechanical enforcement of the re-layout's rule 2 (`docs/refactor-2026-07/core/00-INDEX.md`):
-//! a `mod.rs` is a pure index — module docs, `pub use` re-exports, and
+//! A `mod.rs` is a pure index — module docs, `pub use` re-exports, and
 //! submodule declarations only. Zero `pub struct` / `pub enum` / `pub trait` /
 //! `pub fn` definitions. This keeps every `mod.rs` skimmable and forces new
 //! types into their own named file as the crate grows.
+//!
+//! One of several code-layout rules this repository holds itself to, and for a
+//! long time the only one with a test behind it — which is why it is also the
+//! only one that never drifted.
 
 use std::fs;
 use std::path::{Path, PathBuf};
