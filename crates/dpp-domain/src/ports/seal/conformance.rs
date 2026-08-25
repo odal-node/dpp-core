@@ -40,10 +40,11 @@
 
 use std::fmt;
 
-use super::{
+use crate::domain::seal::{
     SealCapabilities, SealConformanceLevel, SealCredentialRef, SealEnvelope, SealFormat,
-    SealIndication, SealMode, SealPort, SealRequest, SealVerification,
+    SealIndication, SealMode, SealRequest, SealVerification,
 };
+use crate::ports::seal::SealPort;
 
 /// A conformance finding: something an adapter got wrong.
 #[derive(Debug, Clone, PartialEq, Eq)]

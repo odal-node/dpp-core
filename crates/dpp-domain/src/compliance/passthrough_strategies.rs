@@ -5,7 +5,7 @@
 //! decides anything: computing a determination is the job of the Wasm product group
 //! plugins on the open-source path, or of a proprietary tier's own strategies.
 //! Every result here therefore carries
-//! [`ComplianceStatus::PassthroughNoValidation`](crate::ports::compliance::ComplianceStatus::PassthroughNoValidation)
+//! [`ComplianceStatus::PassthroughNoValidation`](crate::domain::compliance::ComplianceStatus::PassthroughNoValidation)
 //! and no findings.
 //!
 //! # Why these exist rather than a single product group-agnostic passthrough
@@ -37,10 +37,9 @@
 
 use chrono::NaiveDate;
 
+use crate::domain::compliance::{ComplianceError, ComplianceErrorKind, ComplianceResult};
 use crate::domain::product_group::ProductGroupData;
-use crate::ports::compliance::{
-    ComplianceError, ComplianceErrorKind, ComplianceResult, ComplianceStrategy,
-};
+use crate::ports::compliance::ComplianceStrategy;
 
 /// Battery passthrough — Regulation (EU) 2023/1542.
 ///
@@ -137,7 +136,7 @@ impl ComplianceStrategy for PassthroughTextileStrategy {
 /// The error for a strategy handed data for a different product group.
 ///
 /// A dispatch bug rather than bad user input, but it is reported as
-/// [`ComplianceErrorKind::InvalidInput`] because from the strategy's position
+/// [`ComplianceErrorKind::InvalidInput`](crate::domain::compliance::ComplianceErrorKind::InvalidInput) because from the strategy's position
 /// that is exactly what it received, and because the alternative — panicking on
 /// a mismatch — would make a routing mistake in a host take the process down.
 fn wrong_product_group(expected: &str, got: &ProductGroupData) -> ComplianceError {

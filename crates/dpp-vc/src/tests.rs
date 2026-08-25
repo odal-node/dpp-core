@@ -10,7 +10,7 @@ use crate::local_service::LocalIdentityService;
 use crate::test_support::temp_store;
 use dpp_crypto::keystore::KeyStore;
 
-use dpp_domain::{PassportId, ports::identity_port::IdentityPort};
+use dpp_domain::{PassportId, ports::identity::IdentityPort};
 
 fn test_service() -> LocalIdentityService {
     let path = std::env::temp_dir().join(format!("test-identity-{}.json", uuid::Uuid::now_v7()));

@@ -1,6 +1,6 @@
 //! Which passport fields a patch may never reach.
 
-use super::passport_repo::PROTECTED_PATCH_FIELDS;
+use super::protected_fields::PROTECTED_PATCH_FIELDS;
 use crate::domain::passport::{FacilitySnapshot, PassportId, PassportRef};
 use crate::domain::seal::{SealFormat, SealedEnvelope};
 use crate::test_support::sample_passport;

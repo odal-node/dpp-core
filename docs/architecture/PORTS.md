@@ -12,9 +12,9 @@ drifts the moment another port lands). CI enforces agreement: the test
 |---|---|---|
 | `archive` | `ArchivePort` | Immutable third-party archival with retention guarantees (ESPR **Art. 10(4)** back-up copy, **Art. 2(32)** independent third party, **Annex III(i)** availability period — *not* Art. 13, which is the registry). |
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
-| `identity_port` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
+| `identity` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
-| `plugin_host_port` | `PluginHost` | Wasm product group-plugin dispatch. |
+| `plugin_host` | `PluginHost` | Wasm product group-plugin dispatch. |
 | `registry_sync` | `RegistrySyncPort` | EU Central Registry registration/status sync (ESPR Art. 13). |
 | `seal` | `SealPort` | eIDAS qualified electronic seal (eIDAS 910/2014). |
 
@@ -33,9 +33,9 @@ so the inventory is complete, and are excluded from the machine block below.
 ```
 archive
 compliance
-identity_port
+identity
 passport_repo
-plugin_host_port
+plugin_host
 registry_sync
 seal
 ```

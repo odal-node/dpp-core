@@ -17,17 +17,16 @@ use chrono::NaiveDate;
 
 use super::passthrough_strategies::{PassthroughBatteryStrategy, PassthroughTextileStrategy};
 use crate::{
+    domain::compliance::{ComplianceError, ComplianceResult},
     domain::product_group::ProductGroupData,
-    ports::compliance::{
-        ComplianceError, ComplianceRegistry, ComplianceResult, ComplianceStrategy,
-    },
+    ports::compliance::{ComplianceRegistry, ComplianceStrategy},
 };
 
 /// Open-source passthrough compliance registry.
 ///
 /// Makes no determination for any product group and computes no metrics: every product group
 /// yields
-/// [`ComplianceStatus::PassthroughNoValidation`](crate::ports::compliance::ComplianceStatus::PassthroughNoValidation).
+/// [`ComplianceStatus::PassthroughNoValidation`](crate::domain::compliance::ComplianceStatus::PassthroughNoValidation).
 ///
 /// # Dispatch
 ///

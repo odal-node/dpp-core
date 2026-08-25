@@ -2,8 +2,8 @@
 
 use super::passthrough_strategies::*;
 use crate::domain::compliance::ComplianceErrorKind;
+use crate::domain::compliance::ComplianceStatus;
 use crate::domain::product_group::ProductGroupData;
-use crate::ports::compliance::ComplianceStatus;
 use crate::ports::compliance::ComplianceStrategy;
 
 fn battery() -> ProductGroupData {

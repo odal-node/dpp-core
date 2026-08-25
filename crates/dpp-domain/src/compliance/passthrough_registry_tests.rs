@@ -1,11 +1,11 @@
 //! Dispatch through the strategy trait, and the bare-passthrough fallback.
 
 use super::passthrough_registry::*;
+use crate::domain::compliance::ComplianceStatus;
 use crate::domain::compliance::{ComplianceError, ComplianceResult};
 use crate::domain::product_group::{
     BatteryData, FibreEntry, ProductGroup, ProductGroupData, TextileData,
 };
-use crate::ports::compliance::ComplianceStatus;
 use crate::ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 use chrono::NaiveDate;
 

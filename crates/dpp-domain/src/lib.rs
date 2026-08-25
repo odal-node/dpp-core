@@ -123,13 +123,14 @@ pub use validation::{
     validate_product_group_data_with_registry, validate_raw_product_group_data,
 };
 
+pub use domain::compliance::{
+    ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
+    gate_determination,
+};
 pub use ports::archive::{
     ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, GhostArchive,
 };
-pub use ports::compliance::{
-    ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceRegistry, ComplianceResult,
-    ComplianceStatus, ComplianceStrategy, gate_determination,
-};
+pub use ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus,

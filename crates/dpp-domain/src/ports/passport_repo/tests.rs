@@ -1,6 +1,6 @@
 //! The passport repository contract, exercised against an in-memory double.
 
-use super::passport_repo::*;
+use super::port::*;
 use async_trait::async_trait;
 
 use crate::domain::passport::ManufacturerInfo;

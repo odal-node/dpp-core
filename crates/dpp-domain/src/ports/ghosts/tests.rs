@@ -5,13 +5,14 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::passport::PassportId;
+use crate::domain::seal::{
+    SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication, SealMode,
+    SealRequest,
+};
 use crate::domain::seal::{SealCredentialRef, SealedEnvelope};
 use crate::ports::registry_sync::RegistrationGranularity;
 use crate::ports::registry_sync::{RegistrationRequest, RegistryStatus, RegistrySyncPort};
-use crate::ports::seal::{
-    SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication, SealMode, SealPort,
-    SealRequest,
-};
+use crate::ports::seal::SealPort;
 
 /// A request whose packaging is one the format actually defines.
 ///
@@ -167,7 +168,7 @@ async fn ghost_seal_returns_placeholder() {
     let req = SealRequest {
         payload_hash: "abc123def456".into(),
         mode: SealMode::ProviderSeal,
-        key_ref: super::super::seal::SealCredentialRef {
+        key_ref: crate::domain::seal::SealCredentialRef {
             qtsp_id: "test-qtsp".into(),
             credential_id: "cred-001".into(),
         },

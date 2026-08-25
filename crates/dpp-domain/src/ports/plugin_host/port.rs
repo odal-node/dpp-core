@@ -1,7 +1,7 @@
 //! `PluginHost` port — delegates compliance computation to loaded Wasm product group plugins.
 
+use crate::domain::compliance::{ComplianceError, ComplianceResult};
 use crate::domain::product_group::ProductGroupData;
-use crate::ports::compliance::{ComplianceError, ComplianceResult};
 
 /// Port trait for the Wasm plugin host.
 ///
