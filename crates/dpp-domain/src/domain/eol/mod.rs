@@ -11,10 +11,10 @@ mod deactivation_reason;
 #[cfg(test)]
 mod deactivation_reason_kinds_tests;
 mod derogation_ref;
-mod eol_event;
+mod event;
 #[cfg(test)]
 mod tests;
 
 pub use deactivation_reason::DeactivationReason;
 pub use derogation_ref::DerogationRef;
-pub use eol_event::EolEvent;
+pub use event::EolEvent;

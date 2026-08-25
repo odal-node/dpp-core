@@ -3,7 +3,7 @@
 use semver::Version;
 use serde_json::Value;
 
-use super::lens::{Lens, LensError};
+use super::transform::{Lens, LensError};
 
 /// The compiled-in lenses shipped with core, versioned alongside the schemas
 /// they bridge.

@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use super::builtin::builtin_lenses;
 use super::derived_view::DerivedView;
-use super::lens::Lens;
+use super::transform::Lens;
 use super::upcast_error::UpcastError;
 
 /// A registry of upcast lenses, composing single-hop transforms into multi-hop

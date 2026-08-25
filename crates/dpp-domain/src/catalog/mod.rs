@@ -19,7 +19,7 @@
 //!
 //! - [`descriptor`] — the [`ProductGroupDescriptor`] record shape.
 //! - [`error`] — [`CatalogError`].
-//! - [`catalog`] — [`ProductGroupCatalog`] itself, plus the embedded manifests.
+//! - [`product_group`] — [`ProductGroupCatalog`] itself, plus the embedded manifests.
 //! - [`status`] — the [`RegulatoryStatus`] determination gate, now per binding.
 //! - [`retention`] — the [`RetentionBasis`] provenance marker.
 //!
@@ -54,8 +54,7 @@
 //! - [`instrument_catalog`] — [`InstrumentCatalog`] and its embedded manifests.
 
 pub mod binding;
-#[allow(clippy::module_inception)]
-pub mod catalog;
+
 pub mod descriptor;
 pub mod error;
 pub mod granularity;
@@ -66,6 +65,7 @@ pub mod instrument_ref;
 pub mod instrument_status;
 pub mod obligation_date;
 pub mod passport_obligation;
+pub mod product_group;
 
 pub mod retention;
 pub mod status;
@@ -86,7 +86,6 @@ mod passport_obligation_tests;
 mod tests;
 
 pub use binding::InstrumentBinding;
-pub use catalog::ProductGroupCatalog;
 pub use descriptor::ProductGroupDescriptor;
 pub use error::CatalogError;
 pub use granularity::Granularity;
@@ -97,6 +96,7 @@ pub use instrument_ref::{InstrumentRef, RecordedBasis};
 pub use instrument_status::InstrumentStatus;
 pub use obligation_date::{DateBasis, ObligationDate};
 pub use passport_obligation::PassportObligation;
+pub use product_group::ProductGroupCatalog;
 
 pub use retention::RetentionBasis;
 pub use status::RegulatoryStatus;

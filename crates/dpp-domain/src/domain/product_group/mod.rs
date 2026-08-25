@@ -7,7 +7,7 @@
 //!
 //! ## Module layout
 //!
-//! - [`product_group`] — the [`ProductGroup`] discriminant.
+//! - [`group`] — the [`ProductGroup`] discriminant.
 //! - [`enums`]   — cross-product group typed enumerations (chemistry, classes, routes).
 //! - [`carbon_footprint`] and [`repairability_score`] — structured environmental metrics.
 //! - [`data`]    — one file per product group + the [`ProductGroupData`] union and `redact_product_group_data`.
@@ -19,10 +19,10 @@
 pub mod carbon_footprint;
 pub mod data;
 pub mod enums;
-#[allow(clippy::module_inception)]
-pub mod product_group;
+
+pub mod group;
 #[cfg(test)]
-mod product_group_tests;
+mod group_tests;
 pub mod repairability_score;
 pub mod validation;
 
@@ -52,7 +52,7 @@ pub use enums::{
     BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass, CarbonFootprintClassError,
     DeviceType, EnergyEfficiencyClass, LifecycleStage, ProductionRoute, SystemBoundary,
 };
-pub use product_group::ProductGroup;
+pub use group::ProductGroup;
 pub use repairability_score::{RepairCriterion, RepairabilityScore};
 pub use validation::{
     battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,

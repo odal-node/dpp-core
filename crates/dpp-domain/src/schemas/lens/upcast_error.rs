@@ -2,7 +2,7 @@
 
 use semver::Version;
 
-use super::lens::LensError;
+use super::transform::LensError;
 
 /// Why an upcast could not be produced. Never a silent identity.
 #[derive(Debug, Clone, PartialEq, Eq)]

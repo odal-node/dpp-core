@@ -18,14 +18,14 @@ mod builtin;
 #[cfg(test)]
 mod builtin_tests;
 mod derived_view;
-#[allow(clippy::module_inception)]
-mod lens;
+
 mod registry;
 #[cfg(test)]
 mod tests;
+mod transform;
 mod upcast_error;
 
 pub use derived_view::DerivedView;
-pub use lens::{Lens, LensError};
 pub use registry::LensRegistry;
+pub use transform::{Lens, LensError};
 pub use upcast_error::UpcastError;

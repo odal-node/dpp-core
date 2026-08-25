@@ -1,6 +1,6 @@
 //! The `ProductGroup` discriminant: wire keys and round-trips.
 
-use super::product_group::*;
+use super::group::*;
 
 #[test]
 fn wire_str_matches_serde_serialization() {

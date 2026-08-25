@@ -384,7 +384,7 @@ const INLINE_TESTS_BASELINE: &[&str] = &[
     "crates/dpp-digital-link/src/digital_link/syntax_dictionary.rs",
     "crates/dpp-digital-link/src/linktype/media_type.rs",
     "crates/dpp-digital-link/src/linktype/vocabulary.rs",
-    "crates/dpp-domain/src/domain/passport/passport.rs",
+    "crates/dpp-domain/src/domain/passport/record.rs",
     "crates/dpp-domain/src/domain/product_group/data/product_group_data.rs",
     "crates/dpp-domain/src/domain/transfer/operator.rs",
     "crates/dpp-domain/src/domain/transfer/record.rs",
@@ -627,7 +627,7 @@ fn rule_0_tier_imports_point_up() {
 // `passport.rs` remains: `from_stored` takes a `&LensRegistry`, which is the
 // factory carve-out that CODE-LAYOUT.md section 1 states. The other two entries
 // are gone: `error/` moved above the ladder and `validation/` moved to tier 3.
-const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/domain/passport/passport.rs"];
+const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/domain/passport/record.rs"];
 
 // ---------------------------------------------------------------------------
 // Rule 11 — a concept that outgrew its file becomes a directory
@@ -711,10 +711,18 @@ fn rule_12_no_name_repeats_its_directory() {
             // `ghosts/ghost_archive.rs` repeats just as surely as
             // `battery/battery_data.rs`, so a plural directory is compared in
             // its singular form too.
+            //
+            // An exact match — `passport/passport.rs` — is the purest form of the
+            // same fault, and the one clippy already reports as
+            // `module_inception`. Six files here carried an `#[allow]` for it,
+            // which is what a rule looks like when it is silenced rather than
+            // kept.
             let singular = parent.strip_suffix('s').unwrap_or(parent);
-            if !(stem.starts_with(&format!("{parent}_"))
-                || stem.starts_with(&format!("{singular}_")))
-            {
+            let repeats = stem == parent
+                || stem == singular
+                || stem.starts_with(&format!("{parent}_"))
+                || stem.starts_with(&format!("{singular}_"));
+            if !repeats {
                 continue;
             }
             let Some(src) = read_source(&path) else {
@@ -733,15 +741,12 @@ fn rule_12_no_name_repeats_its_directory() {
     );
 }
 
+// Both are the exact-match form the widened rule now sees. `gtin/gtin.rs` goes
+// when that directory becomes `identifier/` and the file becomes `gtin.rs`
+// beside `gln.rs`; `dpp-vocab` is another crate and its own pass.
 const NAME_REPEATS_BASELINE: &[&str] = &[
-    "crates/dpp-domain/src/domain/compliance/compliance_status_all_tests.rs",
-    "crates/dpp-domain/src/domain/eol/eol_event.rs",
-    "crates/dpp-domain/src/domain/product_group/data/battery/battery_data.rs",
-    "crates/dpp-domain/src/domain/product_group/product_group_tests.rs",
-    "crates/dpp-domain/src/ports/ghosts/ghost_archive.rs",
-    "crates/dpp-domain/src/ports/ghosts/ghost_registry_sync.rs",
-    "crates/dpp-domain/src/ports/ghosts/ghost_seal.rs",
-    "crates/dpp-domain/src/schemas/schema_entry.rs",
+    "crates/dpp-domain/src/domain/gtin/gtin.rs",
+    "crates/dpp-vocab/src/register/register.rs",
 ];
 
 // ---------------------------------------------------------------------------
@@ -875,7 +880,7 @@ const ERROR_PLACEMENT_BASELINE: &[&str] = &[
     "crates/dpp-domain/src/domain/gtin/gtin.rs",
     "crates/dpp-domain/src/domain/product_group/data/unsold_goods/cn_category.rs",
     "crates/dpp-domain/src/domain/product_group/enums/carbon_footprint_class.rs",
-    "crates/dpp-domain/src/schemas/lens/lens.rs",
+    "crates/dpp-domain/src/schemas/lens/transform.rs",
     "crates/dpp-domain/src/schemas/lens/upcast_error.rs",
     "crates/dpp-domain/src/schemas/registration_error.rs",
     "crates/dpp-rules/src/bundle/types.rs",

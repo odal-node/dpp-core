@@ -12,9 +12,9 @@ mod conformance_shape_tests;
 #[cfg(test)]
 mod conformance_tests;
 mod embedded;
+mod entry;
 pub mod lens;
 mod registration_error;
-mod schema_entry;
 #[cfg(test)]
 mod serialisation_tests;
 #[cfg(test)]
@@ -23,7 +23,7 @@ mod tests;
 mod validation_tests;
 mod versioned;
 
+pub use entry::{SchemaEntry, SchemaOrigin};
 pub use lens::{DerivedView, Lens, LensError, LensRegistry, UpcastError};
 pub use registration_error::SchemaRegistrationError;
-pub use schema_entry::{SchemaEntry, SchemaOrigin};
 pub use versioned::VersionedSchemaRegistry;

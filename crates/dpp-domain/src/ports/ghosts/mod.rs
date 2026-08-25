@@ -24,12 +24,12 @@
 //! either way; revisit only if a ghost is ever caught reaching production
 //! silently.
 
-mod ghost_archive;
-mod ghost_registry_sync;
-mod ghost_seal;
+mod archive;
+mod registry_sync;
+mod seal;
 #[cfg(test)]
 mod tests;
 
-pub use ghost_archive::GhostArchive;
-pub use ghost_registry_sync::GhostRegistrySync;
-pub use ghost_seal::GhostSeal;
+pub use archive::GhostArchive;
+pub use registry_sync::GhostRegistrySync;
+pub use seal::GhostSeal;

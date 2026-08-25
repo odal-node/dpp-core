@@ -6,12 +6,12 @@
 //! produce them are the extension seam and live in
 //! [`crate::ports::compliance`].
 
-#[cfg(test)]
-mod compliance_status_all_tests;
 mod error;
 mod finding;
 mod result;
 mod status;
+#[cfg(test)]
+mod status_all_tests;
 #[cfg(test)]
 mod tests;
 

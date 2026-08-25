@@ -1,6 +1,6 @@
 //! Battery (EU Battery Regulation 2023/1542).
 
-mod battery_data;
+mod data;
 mod dynamic_performance;
 mod environmental_reading;
 mod expected_lifetime;
@@ -12,7 +12,7 @@ mod state_of_health;
 mod temperature_range;
 mod usage_history;
 
-pub use battery_data::BatteryData;
+pub use data::BatteryData;
 pub use dynamic_performance::DynamicPerformance;
 pub use environmental_reading::EnvironmentalReading;
 pub use expected_lifetime::ExpectedLifetime;
