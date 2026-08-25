@@ -444,10 +444,9 @@ impl Passport {
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `product_group_data.product group()` matches `self.product_group` if present
-    /// - for `ProductGroup::UnsoldGoods`, `commodity_code` is present and within
-    ///   ESPR Annex VII scope (apparel & clothing accessories, or footwear),
-    ///   and `product_group_data.product_category` (when present) agrees with the
-    ///   Annex VII heading the commodity code falls under
+    /// - for `ProductGroup::UnsoldGoods`, the disclosure carries at least one
+    ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
+    ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     /// - `product_group_data` passes JSON Schema + cross-field rules via
     ///   [`crate::domain::validation::validate_product_group_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::domain::error::DppError> {
@@ -540,13 +539,6 @@ impl Passport {
             });
         }
 
-        // ESPR Annex VII eligibility: an unsold-goods passport must declare a
-        // commodity code within Annex VII's two headings (apparel & clothing
-        // accessories, or footwear) — a passport cannot claim this product group for
-        // a product the destruction ban does not cover. When product_group_data is
-        // also present, its own product_category word must agree with the
-        // heading the commodity code actually falls under — two fields
-        // describing the same product must not contradict each other.
         // An unsold-goods record is a disclosure by an undertaking over a
         // financial year, not a product placed on the market, so the envelope's
         // `commodity_code` has nothing to describe: the categories are on the
