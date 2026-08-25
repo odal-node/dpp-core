@@ -21,6 +21,8 @@ pub mod enums;
 pub mod metrics;
 #[allow(clippy::module_inception)]
 pub mod product_group;
+#[cfg(test)]
+mod product_group_tests;
 pub mod validation;
 
 #[cfg(test)]

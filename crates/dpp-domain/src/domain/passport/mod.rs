@@ -7,6 +7,8 @@ pub mod material;
 #[allow(clippy::module_inception)]
 pub mod passport;
 pub mod reference;
+#[cfg(test)]
+mod reference_tests;
 pub mod view;
 
 #[cfg(test)]
