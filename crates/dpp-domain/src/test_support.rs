@@ -23,7 +23,9 @@ pub(crate) fn sample_passport() -> Passport {
         batch_id: None,
         product_name: "Test Product".into(),
         product_group: ProductGroup::Textile,
-        applicable_instruments: vec![crate::catalog::InstrumentRef::from_catalog("espr")],
+        applicable_instruments: vec![crate::domain::instrument::InstrumentRef::from_catalog(
+            "espr",
+        )],
         granularity: Some(crate::catalog::Granularity::Item),
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),

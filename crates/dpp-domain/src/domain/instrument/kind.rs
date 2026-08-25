@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// What kind of legal act an instrument is — not *which* act, which is
-/// [`Instrument::id`](crate::catalog::Instrument::id).
+/// [`Instrument::id`](crate::domain::instrument::Instrument::id).
 ///
 /// # Why the two were separated
 ///
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Splitting the axis gives each of the three shapes a home, and lets an
 /// instrument name its framework through
-/// [`Instrument::parent`](crate::catalog::Instrument::parent) rather than by
+/// [`Instrument::parent`](crate::domain::instrument::Instrument::parent) rather than by
 /// being collapsed into it.
 ///
 /// Serialised as a bare string with [`InstrumentKind::Other`] absorbing any
@@ -35,7 +35,7 @@ pub enum InstrumentKind {
     /// An act adopted **under** a framework that carries the product-level
     /// requirements — an ESPR delegated act, whether it covers one product group
     /// or many horizontally. Names its framework in
-    /// [`Instrument::parent`](crate::catalog::Instrument::parent).
+    /// [`Instrument::parent`](crate::domain::instrument::Instrument::parent).
     ///
     /// This variant was missing from the first sketch of this axis, which had
     /// only framework / direct / adjacent. That omission would have forced every
@@ -60,7 +60,7 @@ pub enum InstrumentKind {
     /// An act adopted **under** a framework that fixes the *procedure or format*
     /// by which an obligation is met, rather than the obligation itself — an EU
     /// implementing act. Names its framework in
-    /// [`Instrument::parent`](crate::catalog::Instrument::parent).
+    /// [`Instrument::parent`](crate::domain::instrument::Instrument::parent).
     ///
     /// Distinct from [`Self::Delegated`] because the Treaty distinction is real
     /// and the two do different work: a delegated act may supplement or amend

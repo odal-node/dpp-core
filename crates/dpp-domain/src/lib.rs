@@ -30,9 +30,12 @@ mod test_support;
 pub mod validation;
 
 pub use catalog::{
-    CatalogError, DateBasis, Granularity, Instrument, InstrumentBinding, InstrumentCatalog,
-    InstrumentKind, InstrumentRef, InstrumentStatus, ObligationDate, PassportObligation,
-    ProductGroupCatalog, ProductGroupDescriptor, RecordedBasis, RegulatoryStatus, RetentionBasis,
+    CatalogError, Granularity, ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus,
+    RetentionBasis,
+};
+pub use domain::instrument::{
+    DateBasis, Instrument, InstrumentBinding, InstrumentCatalog, InstrumentKind, InstrumentRef,
+    InstrumentStatus, ObligationDate, PassportObligation, RecordedBasis,
 };
 
 pub use domain::{

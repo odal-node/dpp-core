@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::obligation_date::ObligationDate;
+use super::date::ObligationDate;
 
 /// Whether an instrument requires a digital product passport.
 ///

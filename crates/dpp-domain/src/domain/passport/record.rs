@@ -9,8 +9,9 @@ use uuid::Uuid;
 use super::{
     FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
 };
-use crate::catalog::{Granularity, InstrumentRef};
+use crate::catalog::Granularity;
 use crate::domain::compliance::ComplianceResult;
+use crate::domain::instrument::InstrumentRef;
 use crate::domain::seal::SealedEnvelope;
 use crate::domain::{
     identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},

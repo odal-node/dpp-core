@@ -1,12 +1,12 @@
 //! [`InstrumentCatalog`] — the open, data-driven catalog of legal instruments.
 
+use super::act::Instrument;
 use super::binding::InstrumentBinding;
-use super::error::CatalogError;
-use super::granularity::Granularity;
-use super::instrument::Instrument;
-use super::instrument_ref::InstrumentRef;
-use super::obligation_date::ObligationDate;
-use super::retention::RetentionBasis;
+use super::obligation::ObligationDate;
+use super::reference::InstrumentRef;
+use crate::catalog::error::CatalogError;
+use crate::catalog::granularity::Granularity;
+use crate::catalog::retention::RetentionBasis;
 
 struct EmbeddedInstrument {
     id: &'static str,
@@ -18,51 +18,51 @@ struct EmbeddedInstrument {
 const EMBEDDED: &[EmbeddedInstrument] = &[
     EmbeddedInstrument {
         id: "espr",
-        json: include_str!("../../instruments/espr.json"),
+        json: include_str!("../../../instruments/espr.json"),
     },
     EmbeddedInstrument {
         id: "espr-horizontal-repairability",
-        json: include_str!("../../instruments/espr-horizontal-repairability.json"),
+        json: include_str!("../../../instruments/espr-horizontal-repairability.json"),
     },
     EmbeddedInstrument {
         id: "espr-horizontal-eee-recyclability",
-        json: include_str!("../../instruments/espr-horizontal-eee-recyclability.json"),
+        json: include_str!("../../../instruments/espr-horizontal-eee-recyclability.json"),
     },
     EmbeddedInstrument {
         id: "battery-reg-2023-1542",
-        json: include_str!("../../instruments/battery-reg-2023-1542.json"),
+        json: include_str!("../../../instruments/battery-reg-2023-1542.json"),
     },
     EmbeddedInstrument {
         id: "toy-safety-2025-2509",
-        json: include_str!("../../instruments/toy-safety-2025-2509.json"),
+        json: include_str!("../../../instruments/toy-safety-2025-2509.json"),
     },
     EmbeddedInstrument {
         id: "detergents-2026-405",
-        json: include_str!("../../instruments/detergents-2026-405.json"),
+        json: include_str!("../../../instruments/detergents-2026-405.json"),
     },
     EmbeddedInstrument {
         id: "cpr-2024-3110",
-        json: include_str!("../../instruments/cpr-2024-3110.json"),
+        json: include_str!("../../../instruments/cpr-2024-3110.json"),
     },
     EmbeddedInstrument {
         id: "elv-2026-1738",
-        json: include_str!("../../instruments/elv-2026-1738.json"),
+        json: include_str!("../../../instruments/elv-2026-1738.json"),
     },
     EmbeddedInstrument {
         id: "ecodesign-energy-labelling-mobile",
-        json: include_str!("../../instruments/ecodesign-energy-labelling-mobile.json"),
+        json: include_str!("../../../instruments/ecodesign-energy-labelling-mobile.json"),
     },
     EmbeddedInstrument {
         id: "ppwr-2025-40",
-        json: include_str!("../../instruments/ppwr-2025-40.json"),
+        json: include_str!("../../../instruments/ppwr-2025-40.json"),
     },
     EmbeddedInstrument {
         id: "unsold-goods-format-2026-2",
-        json: include_str!("../../instruments/unsold-goods-format-2026-2.json"),
+        json: include_str!("../../../instruments/unsold-goods-format-2026-2.json"),
     },
     EmbeddedInstrument {
         id: "unsold-goods-derogations-2026-296",
-        json: include_str!("../../instruments/unsold-goods-derogations-2026-296.json"),
+        json: include_str!("../../../instruments/unsold-goods-derogations-2026-296.json"),
     },
 ];
 
@@ -89,7 +89,7 @@ pub const EMBEDDED_COUNT: usize = EMBEDDED.len();
 ///
 /// Wired and authoritative for law. Status, legal basis, passport obligation,
 /// dates, retention and granularity left
-/// [`ProductGroupDescriptor`](super::ProductGroupDescriptor) entirely, so there
+/// [`ProductGroupDescriptor`](crate::catalog::ProductGroupDescriptor) entirely, so there
 /// is no second copy to drift from — a question about what binds a product group
 /// has exactly one place to be asked.
 pub struct InstrumentCatalog {

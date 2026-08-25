@@ -3,11 +3,11 @@
 use serde::{Deserialize, Serialize};
 
 use super::binding::InstrumentBinding;
-use super::granularity::Granularity;
-use super::instrument_kind::InstrumentKind;
-use super::instrument_status::InstrumentStatus;
-use super::passport_obligation::PassportObligation;
-use super::retention::RetentionBasis;
+use super::kind::InstrumentKind;
+use super::obligation::PassportObligation;
+use super::status::InstrumentStatus;
+use crate::catalog::granularity::Granularity;
+use crate::catalog::retention::RetentionBasis;
 
 /// One EU legal act, with the product groups it reaches.
 ///

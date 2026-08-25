@@ -4,6 +4,7 @@
 pub mod compliance;
 pub mod eol;
 pub mod identifier;
+pub mod instrument;
 
 pub mod graph;
 #[cfg(test)]

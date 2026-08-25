@@ -2,6 +2,7 @@
 //! registry and the access policy must all describe the same product groups.
 
 use super::*;
+use crate::domain::instrument::InstrumentCatalog;
 
 /// Parity guard: the closed [`ProductGroup`](crate::domain::product_group::ProductGroup) enum
 /// and the open [`ProductGroupCatalog`] must describe the same set of

@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 /// Regulation contains no precedence rule anywhere, so overlapping acts
 /// accumulate. Each of those fields is a property of an *(act, product group)*
 /// pair and now lives on
-/// [`InstrumentBinding`](crate::catalog::InstrumentBinding), reached through
-/// [`InstrumentCatalog`](crate::catalog::InstrumentCatalog).
+/// [`InstrumentBinding`](crate::domain::instrument::InstrumentBinding), reached through
+/// [`InstrumentCatalog`](crate::domain::instrument::InstrumentCatalog).
 ///
 /// What is left is identity, scope, and our own implementation of it: what the
 /// group is called, what sub-types it has, which schema versions we serve for

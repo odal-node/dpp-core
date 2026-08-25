@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::granularity::Granularity;
-use super::passport_obligation::PassportObligation;
-use super::retention::RetentionBasis;
-use super::status::RegulatoryStatus;
+use super::obligation::PassportObligation;
+use crate::catalog::granularity::Granularity;
+use crate::catalog::retention::RetentionBasis;
+use crate::catalog::status::RegulatoryStatus;
 
 /// One instrument's reach into one product group, and the terms on which it
 /// reaches it.
@@ -54,7 +54,7 @@ pub struct InstrumentBinding {
     /// The specific provisions this binding rests on, e.g.
     /// `["Regulation (EU) 2023/1542 Art. 77(1)"]`. Article-level, because the
     /// binding is article-level: the act as a whole is
-    /// [`Instrument::celex`](super::instrument::Instrument::celex).
+    /// [`Instrument::celex`](super::Instrument::celex).
     #[serde(default)]
     pub legal_basis: Vec<String>,
     /// Passport obligation scoped to this group, overriding the instrument's

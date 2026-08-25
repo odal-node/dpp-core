@@ -1,6 +1,7 @@
 //! `InstrumentCatalog` load, provenance, fold and divergence tests.
 
 use super::*;
+use crate::catalog::{CatalogError, Granularity, ProductGroupCatalog, RetentionBasis};
 
 /// Every embedded manifest parses and lands in the catalog.
 ///
@@ -10,7 +11,7 @@ use super::*;
 #[test]
 fn loads_all_embedded_manifests() {
     let catalog = InstrumentCatalog::new();
-    assert_eq!(catalog.len(), instrument_catalog::EMBEDDED_COUNT);
+    assert_eq!(catalog.len(), catalog::EMBEDDED_COUNT);
 }
 
 /// Every instrument claiming a text must name it. An `Adopted` record with no

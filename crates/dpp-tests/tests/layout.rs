@@ -685,7 +685,9 @@ fn rule_11_an_outgrown_concept_is_a_directory() {
     );
 }
 
-const OUTGROWN_CONCEPT_BASELINE: &[&str] = &["crates/dpp-domain/src/catalog/instrument.rs"];
+// Empty since 2026-08-26: `catalog/instrument*.rs` became the `instrument/`
+// module, which is exactly what this rule was asking for.
+const OUTGROWN_CONCEPT_BASELINE: &[&str] = &[];
 
 // ---------------------------------------------------------------------------
 // Rule 12 — a file never repeats the name of its directory

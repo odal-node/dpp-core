@@ -46,7 +46,7 @@ impl ComplianceStatus {
 /// act does reach pass through unchanged, as do non-binding statuses.
 ///
 /// Callers obtain `in_force` from
-/// [`InstrumentCatalog::determinable_for`](crate::catalog::InstrumentCatalog::determinable_for),
+/// [`InstrumentCatalog::determinable_for`](crate::domain::instrument::InstrumentCatalog::determinable_for),
 /// which returns the (act, binding) pairs rather than a boolean. Pass the act
 /// through to whatever records the result: a determination is always made under
 /// a named instrument, and a caller that only learns "yes" cannot say which act
