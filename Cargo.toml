@@ -83,7 +83,7 @@ aes-gcm      = "0.11"
 rand         = "0.10"
 
 # Schema validation
-jsonschema   = "0.49"
+jsonschema   = "0.50"
 semver       = "1"
 
 # Property-based testing (dev-only)
