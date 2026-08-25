@@ -66,15 +66,15 @@ One name, one place: the crate root, feature-gated. Not `fixtures.rs`, not
 `helpers.rs`. This is the one file rule 6 allows beside `lib.rs`, because
 scaffolding that is hard to find gets rewritten instead of reused.
 
-### Rule 10 — integration tests are named for their kind
+### Rule 10 — integration tests are named for their kind *(guidance)*
 
 In `crates/dpp-tests/tests/`, a **tripwire** — a test that asserts a structural
-or documentary invariant rather than behaviour — is prefixed `layout_` when it
-guards this document, and otherwise named for the invariant it guards
-(`domain_concerns`, `ports_inventory`, `mod_rs_is_pure_index`,
-`open_product_group_lane`, `provisional_schema_marker`, `schema_conformity`).
-Behavioural tests are named for the behaviour (`battery_end_to_end`,
-`access_gatekeeping`, `transfer_of_responsibility`).
+or documentary invariant rather than behaviour — is named for the invariant it
+guards: `layout` for this document, and otherwise `domain_concerns`,
+`ports_inventory`, `mod_rs_is_pure_index`, `open_product_group_lane`,
+`provisional_schema_marker`, `schema_conformity`. Behavioural tests are named
+for the behaviour (`battery_end_to_end`, `access_gatekeeping`,
+`transfer_of_responsibility`).
 
 They fail for different reasons and are read by different people: a red tripwire
 means the repo drifted from its own rules, a red behavioural test means the code
@@ -85,7 +85,7 @@ is wrong.
 > `tests/`. Moving these into `tests/tripwires/` would require an explicit
 > `[[test]]` entry per file in `Cargo.toml` — and a tripwire that silently does
 > not run because someone forgot an entry is a worse failure than a flat
-> directory. Auto-discovery is the safer property; the prefix does the grouping.
+> directory. Auto-discovery is the safer property; the name does the grouping.
 
 ---
 
@@ -108,9 +108,9 @@ with a *counted* escape hatch survives.
 
 ## 3. What enforces what
 
-All but rule 2 live in `crates/dpp-tests/tests/layout.rs`, one `#[test]` each,
-sharing one directory walk. Rule 2 keeps its own file because it predates the
-rest and works.
+Every enforced rule but rule 2 lives in `crates/dpp-tests/tests/layout.rs`, one
+`#[test]` each, sharing one directory walk. Rule 2 keeps its own file because it
+predates the rest and works.
 
 | Rule | Test | Fails when |
 |---|---|---|
@@ -121,6 +121,7 @@ rest and works.
 | 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
 | 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
+| 10 | — | *guidance only* |
 
 The set of crates and plugins each one scans is **discovered from the directory
 tree**, not listed. A hardcoded roster is how a new crate ends up silently
@@ -149,17 +150,21 @@ entry a marker has to state a reason.
 
 This standard existed before this document, in five numbered rules. Exactly one
 of them had a test. That rule had **zero** violations. Every other rule had
-many — twelve oversized test files, one file with twelve public types, twenty
-eight files with no module doc, sixty one inline test modules.
+many — twelve oversized test files, two files with twelve public types, twenty
+six files with no module doc, seventy one inline test modules.
 
 The rules were not wrong and nobody ignored them on purpose. They simply had
 nothing watching them, and a rule with nothing watching it is a preference.
 Preferences lose to deadlines.
 
 Rule 3 stays guidance because it cannot be tested without a definition of
-"verb-domain" that nobody would agree on. That is a reason to label it honestly,
-not a reason to promote it — an unenforceable rule sitting in a list of enforced
-ones is what teaches a reader that the list is decorative.
+"verb-domain" that nobody would agree on. Rule 10 stays guidance for the same
+kind of reason: a test could assert that every file in `tests/` is on a known
+list, but the list would have to be hand-maintained, so it would catch a
+*rename* and miss the thing that actually matters — a tripwire named as though
+it were behavioural. That is a reason to label both honestly, not a reason to
+promote them — an unenforceable rule sitting in a list of enforced ones is what
+teaches a reader that the list is decorative.
 
 **A tripwire is not trusted until it has been seen to fail.** Introduce a
 violation, watch it go red, revert. A gate nobody has watched fail is a gate
