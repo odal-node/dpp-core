@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 
 use crate::error::DppError;
-use crate::{identity::SignedCredential, passport::PassportId};
+use crate::{credential::SignedCredential, passport::PassportId};
 
 /// Port trait for identity operations — signing and DID management.
 #[async_trait]

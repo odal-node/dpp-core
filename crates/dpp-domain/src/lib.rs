@@ -20,12 +20,13 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod access;
 pub mod catalog;
 pub mod compliance;
+pub mod credential;
+pub mod disclosure;
 pub mod eol;
 pub mod error;
 pub mod facility;
 pub mod graph;
 pub mod identifier;
-pub mod identity;
 pub mod instrument;
 pub mod lint;
 pub mod manufacturer;
@@ -41,7 +42,6 @@ pub mod status;
 #[cfg(test)]
 mod test_support;
 pub mod transfer;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod validation;
 
 pub use catalog::{
@@ -54,13 +54,11 @@ pub use instrument::{
 };
 
 pub use crate::{
+    credential::{PassportCredential, PassportCredentialSubject, SignedCredential},
+    disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     identifier::{
         CnCategory, CnCategoryError, CommodityCode, CommodityCodeError, Gln, GlnError, Gtin,
         GtinError, gs1_check_digit,
-    },
-    identity::{
-        Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
-        PassportCredentialSubject, SignedCredential,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     passport::{
@@ -121,9 +119,6 @@ pub use crate::{
         UsageHistory,
         WasteTreatmentSplit,
         redact_product_group_data,
-        validate_fibre_composition,
-        validate_surfactants,
-        validate_svhc_substances,
     },
     status::PassportStatus,
     transfer::{
@@ -137,8 +132,11 @@ pub use error::{DppError, FieldError, ValidationErrors};
 #[cfg(not(target_arch = "wasm32"))]
 pub use validation::{
     BatchValidationItem, ProductGroupValidator, ProductGroupValidatorRegistry, batch_errors,
+    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
+    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
     validate_passport, validate_product_group_data, validate_product_group_data_batch,
     validate_product_group_data_with_registry, validate_raw_product_group_data,
+    validate_surfactants, validate_svhc_substances,
 };
 
 pub use compliance::{

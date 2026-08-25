@@ -1,6 +1,7 @@
 //! The disclosure lattice: which audience reaches which Annex XIII points.
 
 use super::*;
+use crate::credential::{PassportCredential, PassportCredentialSubject};
 use serde_json::Value;
 
 #[test]

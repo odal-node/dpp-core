@@ -1,7 +1,7 @@
 //! Redaction by audience: which fields each tier of viewer is served.
 
 use super::*;
-use crate::identity::Audience;
+use crate::disclosure::Audience;
 use crate::product_group::{BatteryData, ProductGroup, ProductGroupData};
 
 use super::tests::make_passport;
@@ -142,7 +142,7 @@ fn public_view_omits_every_non_public_passport_field() {
     // which the crypto layer's policy classified as Restricted. A public view
     // built through the domain path disclosed it. Both now read one table, and
     // this asserts the property rather than the three fields that were listed.
-    use crate::identity::PASSPORT_FIELD_DISCLOSURE;
+    use crate::disclosure::PASSPORT_FIELD_DISCLOSURE;
 
     let mut passport = make_passport();
     // Populate every non-public field so absence in the view proves redaction,

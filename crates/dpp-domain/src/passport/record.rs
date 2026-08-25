@@ -14,7 +14,7 @@ use crate::compliance::ComplianceResult;
 use crate::instrument::InstrumentRef;
 use crate::seal::SealedEnvelope;
 use crate::{
-    identity::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
+    disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     lint::LintResult,
     product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore},
     status::PassportStatus,
@@ -97,7 +97,7 @@ pub struct Passport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub public_jws_signature: Option<String>,
     /// Compact JWS signatures over the **non-public** redacted views, keyed by
-    /// [`disclosure_key`](crate::identity::disclosure_key) — e.g.
+    /// [`disclosure_key`](crate::disclosure::disclosure_key) — e.g.
     /// `public+restricted+individual`.
     ///
     /// Every audience that receives more than the public view needs a proof over

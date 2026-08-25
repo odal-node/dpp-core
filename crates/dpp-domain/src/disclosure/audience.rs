@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::disclosure::{DISCLOSURE_ORDER, Disclosure, disclosure_key};
+use super::class::{DISCLOSURE_ORDER, Disclosure, disclosure_key};
 
 /// Who is asking for passport data.
 ///

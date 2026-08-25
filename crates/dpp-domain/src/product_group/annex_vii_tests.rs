@@ -68,7 +68,7 @@ fn state_of_health_is_withheld_from_authorities() {
     // surveillance. Before this change the field was unclassified and therefore
     // public — this asserts the classification, through the catalog.
     use crate::catalog::ProductGroupCatalog;
-    use crate::identity::{Audience, Disclosure};
+    use crate::disclosure::{Audience, Disclosure};
 
     let catalog = ProductGroupCatalog::new();
     let battery = catalog.get("battery").expect("battery in catalog");
@@ -151,7 +151,7 @@ fn measured_lifetime_is_individual_but_the_design_figure_stays_public() {
     // two different classes — collapsing them would either hide a public figure
     // or publish an individual battery's usage history.
     use crate::catalog::ProductGroupCatalog;
-    use crate::identity::{Audience, Disclosure};
+    use crate::disclosure::{Audience, Disclosure};
 
     let catalog = ProductGroupCatalog::new();
     let battery = catalog.get("battery").expect("battery in catalog");

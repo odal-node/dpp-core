@@ -79,11 +79,12 @@ imports may only point up the ladder, and a tripwire holds them to it.
 |---|---|---|
 | `identifier` | 1 | GS1 and customs-classification vocabulary — `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
 | `catalog` | 2 | `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
+| `credential` | 2 | The W3C Verifiable Credential 2.0 envelope binding a passport to its signed payload |
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
+| `disclosure` | 2 | The Art. 77(2) lattice — `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3: `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
 | `eol` | 2 | End-of-life declarations, and the derogation a destruction claim must cite |
 | `facility` | 2 | `FacilitySnapshot` — where a product was made, as recorded at issuance |
 | `graph` | 2 | The bill-of-materials graph a passport sits in |
-| `identity` | 2 | The W3C VC envelope, and the `Audience`/`Disclosure` lattice |
 | `instrument` | 2 | The legal acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair. **This is where the law lives** |
 | `manufacturer` | 2 | `ManufacturerInfo` — the economic operator that placed the product on the market |
 | `material` | 2 | `MaterialEntry` — one declared constituent material |
@@ -119,7 +120,8 @@ error
 facility
 graph
 identifier
-identity
+credential
+disclosure
 instrument
 lint
 manufacturer

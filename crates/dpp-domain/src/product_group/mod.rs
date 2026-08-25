@@ -11,7 +11,9 @@
 //! - [`carbon_footprint`] — the CO₂e declaration and the vocabulary it is stated in.
 //! - [`repairability_score`] — the non-regulatory repairability heuristic.
 //! - [`data`]    — one file per product group + the [`ProductGroupData`] union and `redact_product_group_data`.
-//! - [`validation`] — thin adapters onto `dpp-rules` cross-field validators.
+//!
+//! The thin adapters onto `dpp-rules` cross-field validators moved to
+//! [`crate::validation::rules`] — there is one validation module now, not two.
 //!
 //! Adding a product group: add `data/{product group}.rs`, a variant to [`ProductGroupData`], an arm
 //! to [`ProductGroup`], and (for shared payloads) an entry in `data/shared.rs`.
@@ -23,7 +25,6 @@ pub mod group;
 #[cfg(test)]
 mod group_tests;
 pub mod repairability_score;
-pub mod validation;
 
 #[cfg(test)]
 mod annex_vii_tests;
@@ -53,8 +54,3 @@ pub use data::{
 };
 pub use group::ProductGroup;
 pub use repairability_score::{RepairCriterion, RepairabilityScore};
-pub use validation::{
-    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
-    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
-    validate_surfactants, validate_svhc_substances,
-};

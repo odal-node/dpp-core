@@ -5,16 +5,16 @@ use std::sync::OnceLock;
 
 use semver::Version;
 
+use super::rules::{
+    battery_recycled_chemistry_conflicts, validate_battery_operating_temp,
+    validate_fibre_composition, validate_surfactants, validate_svhc_substances,
+};
 use super::validator::ProductGroupValidatorRegistry;
 use crate::catalog::ProductGroupCatalog;
 use crate::error::DppError;
 use crate::error::field::{FieldError, ValidationErrors};
 use crate::passport::Passport;
-use crate::product_group::{
-    ProductGroupData, SvhcSubstance, battery_recycled_chemistry_conflicts,
-    validate_battery_operating_temp, validate_fibre_composition, validate_surfactants,
-    validate_svhc_substances,
-};
+use crate::product_group::{ProductGroupData, SvhcSubstance};
 use crate::schemas::VersionedSchemaRegistry;
 
 /// The embedded schema registry, built once.

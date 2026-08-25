@@ -3,8 +3,11 @@
 
 use super::*;
 use crate::catalog::ProductGroupDescriptor;
-use crate::identity::Audience;
-use crate::identity::Disclosure;
+use crate::disclosure::Audience;
+use crate::disclosure::Disclosure;
+use crate::validation::rules::{
+    validate_fibre_composition, validate_surfactants, validate_svhc_substances,
+};
 
 // ── redact_product_group_data ────────────────────────────────────────────────
 

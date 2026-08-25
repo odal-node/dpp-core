@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::passport_credential::PassportCredential;
+use super::passport::PassportCredential;
 
 /// A DPP Verifiable Credential with its JWS proof signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]

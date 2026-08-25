@@ -21,20 +21,33 @@
 //! - [`functions`] — the `validate_*` free functions (schema + cross-field).
 //! - [`batch`] — batch validation over multiple product group-data items.
 
-#![cfg(not(target_arch = "wasm32"))]
-
+// Only the schema pass needs gating. `rules` is a thin adapter onto `dpp-rules`
+// and is pure, so it stays available on every target — the module-level gate
+// that used to sit here withheld it from wasm32 for no reason of its own.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod batch;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod functions;
+pub mod rules;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod validator;
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use batch::{BatchValidationItem, batch_errors, validate_product_group_data_batch};
+#[cfg(not(target_arch = "wasm32"))]
 pub use functions::{
     validate_passport, validate_product_group_data, validate_product_group_data_with_registry,
     validate_raw_product_group_data,
 };
+pub use rules::{
+    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
+    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
+    validate_surfactants, validate_svhc_substances,
+};
+#[cfg(not(target_arch = "wasm32"))]
 pub use validator::{ProductGroupValidator, ProductGroupValidatorRegistry};
 
 // `FieldError` and `ValidationErrors` live in `crate::error::field`

@@ -41,14 +41,14 @@ pub struct ProductGroupDescriptor {
     /// branch on, never dispatch keys. See `DATA-MODEL.md` §3.4.
     #[serde(default)]
     pub product_categories: Vec<String>,
-    /// Per-field [`Disclosure`](crate::identity::Disclosure) class for
+    /// Per-field [`Disclosure`](crate::disclosure::Disclosure) class for
     /// this product group's data: field name → class; unlisted fields default to
     /// public. Not an ordering — a class names which audiences may see the
     /// field, and the audiences do not nest. Universal conformity fields
     /// (signatures, audit trails) are folded in by the access-policy engine, so
     /// they are not repeated per product group here.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub disclosure: std::collections::HashMap<String, crate::identity::Disclosure>,
+    pub disclosure: std::collections::HashMap<String, crate::disclosure::Disclosure>,
     /// Plugin that handles this product group (crate / filename stem, e.g.
     /// `"product-group-battery"`). `None` if no plugin is bound yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
