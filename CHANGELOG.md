@@ -668,6 +668,71 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   second one also needed an absolute path: after the module layout changed,
   `super` from `crate::product::identity` no longer reaches `product_group`.
 
+### Breaking
+
+- **Passport redaction moves to the access layer, never serves a proof, and
+  follows the passport's own schema version.** *(Breaking: the inherent
+  `Passport::redact` is gone; call `dpp_domain::access::redact_passport(&passport,
+  audience)`. The `catalog` argument is gone with it. It no longer returns
+  `jwsSignature` to an authority, nor `seal`, `publicJwsSignature` or
+  `disclosureSignatures` to anyone.)*
+
+  **Why it moved, which is why the bug existed.** `Passport` sits below the
+  access layer on the tier ladder, so an inherent `redact` could not reach
+  `filter_by_audience` without pointing an import down the ladder. It therefore
+  grew its own redaction — a second implementation of a compliance-critical rule
+  with nothing proving the two agreed, and they did not. Rule 0 now enforces
+  what it previously only implied: the layout tripwire rejected the shortcut when
+  this fix first tried to take it.
+
+  **The leak.** `PASSPORT_FIELD_DISCLOSURE` listed four fields, and everything
+  absent from it defaulted to `Public`. `seal`, `publicJwsSignature` and
+  `disclosureSignatures` were all absent, so a public view carried all three.
+  The last is the damaging one: those are *attached* compact JWS, so each embeds
+  the full redacted body for its own audience — handing an anonymous reader the
+  `public+restricted+individual` entry hands over the restricted payload itself,
+  base64url-encoded, not a signature over it.
+
+  **Why a disclosure class could not fix it.** `jwsSignature` *was* classified,
+  as `Conformity`, and that was also wrong: an authority received it attached to
+  a body with individual-item data already removed, so it covered bytes that
+  reader was never given. A class chooses *which* audiences see a field, and the
+  correct answer for a proof is none of them. New `PASSPORT_PROOF_FIELDS` records
+  the four, and redaction removes them unconditionally, last, so nothing can
+  reintroduce one by classing it public. They are *also* classed `Conformity` as
+  defence in depth, so a consumer driving `filter_by_audience` directly with
+  `passport_default()` fails safe rather than open.
+
+  **Version pinning.** `redact` resolved its policy through the catalog's single
+  unversioned disclosure map, which `access::policy` already documents as
+  deprecated: a passport's signatures are frozen over the redaction that produced
+  them, so filtering by whatever that map says *today* applies rules that may
+  postdate the signature, and one reclassification breaks verification for every
+  published passport at once. It now resolves
+  `ProductGroupAccessPolicy::for_schema_version` against the passport's own
+  `schemaVersion`. The correct version was never the caller's to supply, so the
+  parameter is gone rather than corrected — with no parameter there is no way to
+  pass the wrong one.
+
+  **Fail-closed has no audience-shaped hole.** An unknown product group, or a
+  known one at a schema version this build does not carry, reduces
+  `productGroupData` to its `productGroup` tag for *every* audience, including an
+  authority. Previously an authority received the full payload on the reasoning
+  that it may see every class anyway; that confuses "entitled to every class"
+  with "entitled to fields whose class is unknown". Envelope classes still apply,
+  because they are version-independent.
+
+  **The tripwire.** A name list is how `seal` came to be missed, so a longer name
+  list would have the same failure mode one iteration later.
+  `passport_every_wire_key_is_classified` fails the build unless every key in
+  `PASSPORT_WIRE_KEYS` appears in the disclosure table, the proof list, or an
+  explicit allowlist carrying the reason it is safe for everyone — and it fails
+  in reverse too, so a stale entry for a removed field cannot mask a re-added
+  one. Alongside it, `no_audience_receives_any_proof_field` and
+  `no_proof_payload_survives_anywhere_in_a_served_view` assert the property
+  across all three audiences, the second by searching the serialised document so
+  a proof reintroduced under any name or nesting still fails.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
