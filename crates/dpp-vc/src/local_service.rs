@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use sha2::{Digest, Sha256};
 
-use dpp_domain::ports::identity_port::IdentityPort;
+use dpp_domain::ports::identity::IdentityPort;
 use dpp_domain::{DppError, PassportId, SignedCredential};
 
 use dpp_crypto::jws::signer;

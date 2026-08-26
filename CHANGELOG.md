@@ -15,6 +15,71 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The `domain` module is dissolved and every module in `dpp-domain` moves.**
+  *(Breaking: every `dpp_domain::domain::…` path is gone, and `ports::` no longer
+  re-exports model types. Migration below. No compatibility re-exports were
+  added.)*
+
+  `domain/` held 65 of this crate's 106 source files behind a name that says
+  nothing, so nothing in it had been *chosen* to be there. Its children are now top-level
+  modules and `docs/architecture/CODE-LAYOUT.md` §1 gives each one a tier in an
+  eight-tier ladder that imports may only point up, with two tripwires holding
+  the code to it.
+
+  **The general case is that a module kept its name and rose one level**:
+  `dpp_domain::domain::error` is `dpp_domain::error`, and the same for
+  `passport`, `status`, `product_group`, `transfer`, `seal`, `compliance`,
+  `eol`, `graph`, `lint`, `field_error` and `validation`. Five paths changed by
+  more than that:
+
+  - `domain::gtin` and `domain::commodity_code` are `identifier::gtin` and
+    `identifier::commodity_code` — the GS1 and CN vocabulary is gathered into
+    one leaf whose only dependencies are `serde` and `thiserror`.
+  - `domain::gtin::gs1_check_digit` is **not** at `identifier::gtin`. Both
+    `Gtin` and `Gln` use it, so it sits at their nearest common parent in a
+    private module; reach it at the crate root as `dpp_domain::gs1_check_digit`.
+  - `domain::product_identity` is `product`.
+  - `domain::identity` is split: `Audience` and `Disclosure` are in
+    `disclosure`, `PassportCredential` in `credential`.
+  - `ports::compliance::passthrough_registry` is the top-level `passthrough`.
+
+  **`ports/` no longer re-exports model types.** `SealedEnvelope` and the rest of
+  the seal value types are at `seal::`, and `ComplianceResult`,
+  `ComplianceStatus`, `ComplianceFinding`, `ComplianceError` and
+  `ComplianceErrorKind` are at `compliance::`. The traits, the registries and the
+  ghosts stay under `ports::` — as do `SealPort`, `GhostSeal`,
+  `ComplianceRegistry` and `ComplianceStrategy`. Both shims carried a doc comment
+  saying they existed "so existing paths keep resolving", which is a second path
+  to the same type, and a second path is what let a composition-tier module
+  import the boundary tier in the first place. `ports::identity_port` and
+  `ports::plugin_host_port` also lose the stutter: they are `ports::identity` and
+  `ports::plugin_host`.
+
+  **Nothing was removed** — no public item present before this change is absent
+  after it. The only additions are `validation::validate_passport` and the
+  `ProductGroupPayload` trait with its twelve implementations. Every schema,
+  instrument manifest and product-group manifest is byte-identical.
+
+  **The one behavioural change: `Passport::validate` no longer runs the schema
+  pass.** That pass needed the versioned registry, and through it `jsonschema`
+  and a blocking HTTP client, so an aggregate could not state its own invariants
+  without a network stack in its dependency tree. `validate` still checks every
+  field invariant it always did and is now wasm-clean — the
+  `#[cfg(not(target_arch = "wasm32"))]` inside it is gone and the method means
+  one thing on every target. **A caller that wants both halves must move to
+  `validation::validate_passport`**, which runs the field invariants and then
+  the JSON Schema and cross-field rules. A companion test fails if the
+  dependency creeps back. Relatedly, `validation::rules` is available on
+  `wasm32` for the first time: the module carried a blanket gate because *one*
+  submodule needs `jsonschema`, and the pure rule adapters were being withheld
+  for no reason of their own.
+
+  **The break is deliberate rather than hidden.** Compatibility re-exports would
+  leave two ways to reach every type, which is the condition this change exists
+  to end — and the two paths above that a mechanical rewrite gets wrong
+  (`gs1_check_digit` and `passthrough_registry`) fail loudly at compile time
+  precisely because no shim absorbs them.
+
 - **`UnsoldGoodsReport` is rebuilt to the format its implementing act
   prescribes, and unsold-goods schema `v1.0.0` is removed.**
 

@@ -1,3 +1,6 @@
+//! The compile-time schema table: every product-group schema `include_str!`d into
+//! the binary, so a published crate carries its own schemas.
+
 use semver::Version;
 
 use super::{SchemaEntry, SchemaOrigin};

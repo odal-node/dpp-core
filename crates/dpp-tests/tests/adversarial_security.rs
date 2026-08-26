@@ -495,8 +495,14 @@ fn reject_completed_transfer_returns_invalid_state() {
 
 // ─── Passport product group-data validation tests ────────────────────────────────────
 
-/// `Passport::validate()` must surface cross-field errors from `validate_product_group_data`:
-/// a Textile passport where fibre percentages do not sum to ~100% is invalid.
+/// `validation::validate_passport` must surface cross-field errors from
+/// `validate_product_group_data`: a Textile passport where fibre percentages do
+/// not sum to ~100% is invalid.
+///
+/// This asserted against `Passport::validate` until the schema pass moved to the
+/// policy tier. The security property is unchanged — a bad fibre sum is still
+/// refused — but the entry point that owes the refusal is now the one that
+/// actually reaches the schema registry.
 #[test]
 fn passport_validate_catches_bad_fibre_sum() {
     let now = Utc::now();
@@ -552,10 +558,12 @@ fn passport_validate_catches_bad_fibre_sum() {
         )
     };
 
-    let err = passport.validate().unwrap_err().to_string();
+    let err = dpp_domain::validate_passport(&passport)
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("fibre") || err.contains("Fibre") || err.contains("50"),
-        "validate() must surface fibre-sum error from product_group_data validation, got: {err}"
+        "validate_passport must surface fibre-sum error from product_group_data          validation, got: {err}"
     );
 
     // Fix the fibre sum and confirm validate() now passes.
@@ -567,7 +575,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         });
     }
     assert!(
-        passport.validate().is_ok(),
-        "passport with valid fibre sum must pass validate()"
+        dpp_domain::validate_passport(&passport).is_ok(),
+        "passport with valid fibre sum must pass validate_passport"
     );
 }

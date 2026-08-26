@@ -7,7 +7,7 @@
 //! formatting lives on the crypto side, next to the credential it's stamped into.
 
 use dpp_domain::PassportId;
-pub use dpp_domain::domain::identity::{PassportCredential, PassportCredentialSubject};
+pub use dpp_domain::credential::{PassportCredential, PassportCredentialSubject};
 
 /// Build the passport verifiable credential signed by `LocalIdentityService::sign_passport`.
 pub(crate) fn build_passport_credential(

@@ -16,7 +16,7 @@ use dpp_aas::{
     product_group_submodel_template,
 };
 use dpp_domain::Audience;
-use dpp_domain::domain::product_group::CriticalRawMaterial;
+use dpp_domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
     EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, MattressData, ProductGroup,

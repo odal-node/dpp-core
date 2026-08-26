@@ -3,8 +3,8 @@
 pub mod archive;
 pub mod compliance;
 mod ghosts;
-pub mod identity_port;
+pub mod identity;
 pub mod passport_repo;
-pub mod plugin_host_port;
+pub mod plugin_host;
 pub mod registry_sync;
 pub mod seal;

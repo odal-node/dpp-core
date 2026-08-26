@@ -7,13 +7,23 @@
 //! Embedded schemas come from `dpp-core/schemas/{product group}/v{version}.json`.
 //! Runtime schemas are registered via [`VersionedSchemaRegistry::register`].
 
+#[cfg(test)]
+mod conformance_shape_tests;
+#[cfg(test)]
+mod conformance_tests;
 mod embedded;
+mod entry;
 pub mod lens;
+mod registration_error;
+#[cfg(test)]
+mod serialisation_tests;
 #[cfg(test)]
 mod tests;
-mod types;
+#[cfg(test)]
+mod validation_tests;
 mod versioned;
 
+pub use entry::{SchemaEntry, SchemaOrigin};
 pub use lens::{DerivedView, Lens, LensError, LensRegistry, UpcastError};
-pub use types::{SchemaEntry, SchemaOrigin, SchemaRegistrationError};
+pub use registration_error::SchemaRegistrationError;
 pub use versioned::VersionedSchemaRegistry;

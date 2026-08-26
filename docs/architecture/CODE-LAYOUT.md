@@ -4,11 +4,111 @@ Where code goes in this repository, and what enforces it.
 
 This is a standard, not a plan. Every rule below is either **enforced** by a
 tripwire in `crates/dpp-tests/tests/` or explicitly marked **guidance**. There is
-no third category, on purpose — see §4.
+no third category, on purpose — see §5.
+
+§1 says which module a thing belongs in. §2 says how that module is arranged
+internally. They answer different questions and a file has to satisfy both.
 
 ---
 
-## 1. The rules
+## 1. The scope law
+
+Every module sits in exactly one of eight tiers, and **imports may only point up
+the ladder**. A module's tier is a fact about what it imports — see below for
+why that is not the same as what it does.
+
+| Tier | Name | Holds | May import |
+|---|---|---|---|
+| 1 | vocabulary | Names things, decides nothing. `identifier` | nothing in this crate |
+| 2 | value | Value objects with no aggregate of their own. `compliance` `credential` `disclosure` `facility` `field_error` `manufacturer` `material` `seal` `status` | tier 1 |
+| 3 | reference | The embedded, data-driven registries. `catalog` `instrument` `schemas` | tiers 1–2 |
+| 4 | composition | The shapes that bring the tiers below into one — the passport aggregate, the product-group union, and the crate-wide error that wraps any of them. `error` `passport` `product_group` | tiers 1–3 |
+| 5 | satellite | Records that hang off an aggregate. `eol` `graph` `product` `transfer` | tiers 1–4 |
+| 6 | policy | Decides something. `access` `lint` `validation` | tiers 1–5 |
+| 7 | boundary | States what the outside must provide. `ports` | tiers 1–6 |
+| 8 | adapter | An implementation of a port, shipped so the open-source binary has a default. `passthrough` | tiers 1–7 |
+
+Within a tier, imports are allowed but must stay acyclic — three exist today
+(`instrument → catalog`, `passport → error`, `passport → product_group`) and a
+second tripwire holds the whole graph to it.
+
+### Eight tiers, because eight is what the graph has
+
+This was four until 2026-08-26, and four was wrong in a way worth recording: it
+put **sixteen of twenty-three modules in one tier**, which is a tier doing no
+work at all.
+
+The number is not a matter of taste. Levelling the import graph by longest path
+produces seven strata, and the eight above verify against every one of the forty
+production edges with **zero** upward imports. A tier boundary that no edge
+crosses is a boundary the code does not have; a tier holding most of the crate is
+a boundary that explains nothing.
+
+**The ladder is a dependency ordering, not a taxonomy of behaviour.** Where a
+module sits is a fact about its imports, and the tier name labels the stratum
+rather than judging it independently. Assigning by feel produced a table the code
+could not satisfy: `schemas` was filed under *policy* because it decides whether
+data conforms, when it imports exactly one module and sits second from the bottom
+of the graph. The measurement is the authority; the name follows it.
+
+**Nothing may import tier 7.** The one tier-8 module is the open-source default
+adapter; every other `impl …Port for` in the workspace lives in the platform
+repository, already outside this crate.
+
+### Direction is not enough — the graph must also be acyclic
+
+Two modules in the *same* tier can import each other and satisfy every direction
+check, so a second test walks the module graph and fails on any cycle.
+
+It was written because there was one. `error` held both `DppError` — which wraps
+a lens error from `schemas` — and `FieldError`, which `schemas` itself returns.
+That made `error` simultaneously above and below `schemas`, and the direction
+check could not see it: the earlier fix declared `error` "above the ladder",
+which *exempted* the cycle rather than removing it.
+
+**A cycle usually means one module is two things at different levels.** It was
+here: the fix was to split `field_error` out as its own tier-2 module, leaving
+`error` free to sit above the deepest thing it wraps.
+
+### Why a ladder and not a diagram
+
+The tiers exist to make one question answerable without argument: *when two
+modules refer to each other, which direction is the mistake?* Undirected cycles
+cannot answer it — every cycle has a wrong edge and a right one, and with no law
+you can only report that a cycle exists. That is why an earlier review of this
+crate concluded a module split was unavailable: it measured cycles without a rule
+for which way they should have run.
+
+With the ladder, the wrong direction is named and the count is small. When it was
+first applied on 2026-08-25 it found 129 production edges with **five illegal**,
+four of them on one type. After those were fixed and the modules rehoused: **40
+edges, zero illegal, and an empty baseline**.
+
+### Rule 0 — a type lives under `ports/<x>/` only if that port is its sole consumer
+
+This is the test for whether something is really tier 7.
+
+`ArchiveReceipt` passes: nothing but `ArchivePort` touches it, so it belongs
+beside the trait. `SealedEnvelope` and `ComplianceResult` fail — both are fields
+on `Passport`, so filing them under `ports/` puts a tier-4 composition in the
+position of importing tier 7. They are model values that were misfiled, and
+moving the *types* fixes it without touching the aggregate.
+
+**An aggregate keeps its own invariants.** Enforcing them is what an aggregate is
+for, and moving that logic out to satisfy a layer diagram produces an anaemic
+model — a worse fault than the one being fixed, and an invisible one, because
+everything still compiles. What an aggregate may not do is depend on a *service*:
+a registry, a repository, a client. So the cut is at the dependency, never at the
+method.
+
+**Factories are exempt.** An associated function that constructs the type may
+consult a higher-tier service — `Passport::from_stored(doc, &LensRegistry, &Catalog)`
+applies schema lenses to rehydrate a stored record, and that is construction, not
+behaviour. The exemption is written down because a naive tripwire would flag it.
+
+---
+
+## 2. The rules
 
 ### Rule 1 — one public type per file, when the type has gravity
 
@@ -16,9 +116,15 @@ A type has gravity when it has its own `impl` blocks, serde derives beyond a
 plain derive line, or runs to roughly 40 lines including docs. Such a type gets
 its own file, named for it in snake_case: `FacilitySnapshot` → `facility_snapshot.rs`.
 
-A type and its own error enum are *one* concept and belong together. Three or
-more public types in a file is the point at which the file has stopped being
-about one thing.
+A type and its own error enum are *one concept*, so the tripwire does not fire at
+two. Three or more public types in a file is the point at which the file has
+stopped being about one thing.
+
+**That is a statement about counting, not about placement.** Where the error
+actually lives is rule 14's question, and rule 14 wins: once the module has an
+`error.rs`, the error goes there and the two are no longer in one file at all.
+The clause survives for the case where the module has no `error.rs` — a single
+type whose error rides along with it, which is common and fine.
 
 ### Rule 2 — `mod.rs` is a pure index
 
@@ -29,7 +135,7 @@ a new type into its own named file as a module grows.
 ### Rule 3 — free functions group by verb-domain *(guidance)*
 
 `validation/batch.rs`, not one file per three-line helper. **Not enforced**, and
-deliberately so — see §4.
+deliberately so — see §5.
 
 ### Rule 4 — a `tests.rs` splits when it passes 400 lines
 
@@ -54,6 +160,13 @@ blocks inside a source file.
 
 The reason is rule 4: tests inline in a source file have no size of their own, so
 nothing can tell you when they have outgrown it.
+
+**Any test-named module counts, not just `tests`.** The gate matched `mod tests {`
+alone until 2026-08-25 and so missed five modules named for their subject —
+`mod passport_wire_keys_tests {` and four like it. One of those then fooled a
+measurement taken *for this document* into reporting a violation that was only
+ever a fixture, which is a fair summary of why the narrow version was worth
+widening.
 
 ### Rule 8 — every file opens with a `//!` module doc
 
@@ -87,9 +200,101 @@ is wrong.
 > not run because someone forgot an entry is a worse failure than a flat
 > directory. Auto-discovery is the safer property; the name does the grouping.
 
+### Rule 11 — one file for a concept; two files means a directory
+
+A concept that fits in one file is a file. The moment it needs a second — an
+error type, a test file, a helper — it becomes a directory:
+
+```
+<concept>/
+├── mod.rs        always — a pure index (rule 2)
+├── error.rs      optional — only if this module owns an error nothing else shares
+├── tests.rs      when it has tests; tests/ once past 400 lines (rule 4)
+└── <part>.rs     one file per public type with gravity (rule 1)
+```
+
+**Only `mod.rs` is constant.** `error.rs` and `tests.rs` appear when the module
+earns them, and a module whose errors are shared with its siblings does not
+declare its own — it uses the one at the level where the sharing happens
+(rule 15). Beyond those names each directory carries whatever files its own
+subject needs; the constants exist so the *rest* of the listing is the subject.
+
+**The rule then applies to that directory too, at every depth.** `identifier/` is
+not a folder of loose files: `gtin/`, `gln/` and `commodity_code/` are each their
+own module in this shape. What sits *beside* them rather than inside one is
+`check_digit.rs` — `Gtin` and `Gln` both use it, so rule 15 puts it at their
+nearest common parent, not in either.
+
+This is the shape `regex-automata/src/meta/` and `tokio/src/sync/` both use, and
+it is what makes a module skimmable without opening it: the same four names
+appear in every directory, so anything else in the listing is the actual subject.
+
+### Rule 12 — a file never repeats the name of its directory
+
+The path is already the namespace. `battery/data.rs` reads `battery::data` at
+every call site; `battery/battery_data.rs` reads `battery::battery_data` and says
+the word twice forever.
+
+Applies to directories too: `ghosts/archive.rs`, not `ghosts/ghost_archive.rs`.
+
+### Rule 13 — hyphens outside module paths, underscores inside
+
+Crate directories, plugin directories and data directories take `-`
+(`crates/dpp-domain/`, `product-groups/`, `schemas/unsold-goods/`), as do data
+files (`unsold-goods.json`). Module directories and every `.rs` file take `_`.
+
+The split is not taste. A directory under `src/` **is** a Rust identifier, and
+identifiers cannot contain a hyphen — `mod product-group;` does not parse.
+Reaching a hyphenated directory needs `#[path = "…"]` on every module, which
+breaks editor navigation for no gain.
+
+So the same concept is correctly spelled two ways, and both are already in the
+tree: `dpp-domain/product-groups/` is data on disk, `dpp-aas/src/product_groups/`
+is a module path.
+
+### Rule 14 — an error lives in an `error.rs`, never in the type's own file
+
+A module's failure modes are part of its contract and should be readable in one
+file without reading the module. *Which* `error.rs` is rule 15's question — the
+module's own if it owns the error, its nearest shared parent's if it does not.
+
+`error.rs` is therefore **optional per module**. A module with no errors of its
+own does not get an empty one, and a module whose error is shared does not get a
+duplicate.
+
+The crate-wide `error/` sits above the tiers (§1) and carries `DppError` and the
+field-error types.
+
+### Rule 15 — a shared thing lives at the nearest common parent of its users
+
+This is the placement rule, and rules 14 and 3 are special cases of it.
+
+A type used by **one** module belongs *in* that module. A type used by **several
+siblings** belongs in their nearest common parent — as `common/` where the parent
+already holds subjects of its own. A type is never duplicated across siblings,
+and never hoisted higher than the level where the sharing actually happens.
+
+Both halves matter, and the second is the one that rots quietly:
+
+- **Too low** is duplication. Two siblings declaring the same error, or the same
+  enum, is one concept with two homes and eventually two behaviours.
+- **Too high** is a false claim of generality. A shared bucket says *these are
+  the things many of us use*; putting a single sibling's type in it makes that
+  sentence untrue for everything else in the bucket, and the next person adds to
+  the bucket because that is what it appears to be for.
+
+The second failure is already in this crate, which is what the rule is drawn
+from. `product_group/enums/` documents itself as holding enums shared across more
+than one product group. Measured on 2026-08-25: **nine enums, of which one is**.
+Four are battery-only, two electronics-only, and two are used by no product group
+at all. Under this rule the four go to `battery/`, the two to `electronics/`, the
+genuinely shared one stays, and the bucket's sentence becomes true again.
+
+**A "reusable" that only one caller reuses is not shared. It is misfiled.**
+
 ---
 
-## 2. Deviations are legal, and counted
+## 3. Deviations are legal, and counted
 
 Any file that knowingly breaks an enforced rule carries a marker on its own line:
 
@@ -106,7 +311,7 @@ with a *counted* escape hatch survives.
 
 ---
 
-## 3. What enforces what
+## 4. What enforces what
 
 Every enforced rule but rule 2 lives in `crates/dpp-tests/tests/layout.rs`, one
 `#[test]` each, sharing one directory walk. Rule 2 keeps its own file because it
@@ -122,10 +327,36 @@ predates the rest and works.
 | 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
 | 10 | — | *guidance only* |
+| 0 | `layout::rule_0_tier_imports_point_up` | a module imports a higher tier, or is missing from the tier table |
+| 0 | `layout::rule_0_module_graph_is_acyclic` | two modules import each other, directly or through a chain |
+| 11 | `layout::rule_11_an_outgrown_concept_is_a_directory` | two files in one directory share a stem prefix (`gtin.rs` beside `gtin_check_digit.rs`) |
+| 12 | `layout::rule_12_no_name_repeats_its_directory` | a filename begins with its parent directory's name |
+| 13 | `layout::rule_13_hyphens_outside_module_paths` | a `-` appears under `src/`, or a `_` in a crate or data directory |
+| 14 | `layout::rule_14_errors_live_in_error_rs` | a `pub enum …Error` is declared outside an `error.rs` |
+| 15 | `layout::rule_15_shared_means_shared` | a type in a shared parent has fewer than two consumers among its siblings, or two siblings declare the same public type name |
 
 The set of crates and plugins each one scans is **discovered from the directory
 tree**, not listed. A hardcoded roster is how a new crate ends up silently
 unchecked, which is the failure these tests exist to prevent.
+
+Two of these gates are **proxies**, in the same sense rule 1's is, and the
+document says so rather than implying the test is the rule:
+
+- **Rule 11.** A test cannot tell whether two files are one concept. It can tell
+  that `gtin.rs` sits beside `gtin_check_digit.rs`, which is what an outgrown
+  concept looks like from outside. A `*_tests.rs` companion is excluded — it is
+  the sibling-test file rules 4 and 7 *require*, and flagging it would put two
+  rules in contradiction.
+- **Rule 15.** "Shared" is a claim about intent, so the gate reads a roster of
+  bucket names rather than discovering them. It counts *distinct siblings*, not
+  mentions, and it does not count a `mod.rs` — re-exporting a type is indexing
+  it, not using it, and counting the index would let every bucket in the tree
+  look shared by one hop.
+
+Rule 15 also measures at the level it is given. `ProductionRoute` really is used
+by two product groups, but both sit under `data/`, so from `enums/` they are one
+sibling and it reports one user. That resolves itself when the groups become
+siblings of `common/`; until then it is baselined and the reason is here.
 
 **Rule 1's tripwire is a proxy, not the rule.** It fires at three public types
 because a type plus its error is idiomatic and should not need a marker. Two
@@ -146,7 +377,7 @@ entry a marker has to state a reason.
 
 ---
 
-## 4. Why every rule is either enforced or labelled guidance
+## 5. Why every rule is either enforced or labelled guidance
 
 This standard existed before this document, in five numbered rules. Exactly one
 of them had a test. That rule had **zero** violations. Every other rule had
@@ -172,9 +403,29 @@ nobody knows is wired up.
 
 ---
 
-## 5. Scope
+## 6. Scope
 
-These rules govern `crates/*/src/`, `plugins/*/src/`, and
-`crates/dpp-tests/tests/`. They are invisible to consumers: every move is
-internal, with `pub use` in `lib.rs` preserving public paths. A layout change
-that alters the public API is not a layout change.
+§2's rules govern `crates/*/src/`, `plugins/*/src/`, and
+`crates/dpp-tests/tests/`. §1's scope law governs the same trees. Rule 13 reaches
+wider than either, because it is about directory names rather than code: it also
+governs `crates/`, `plugins/`, and the data directories beside them.
+
+### Most layout changes are invisible. The scope law is not.
+
+A move within a module is internal, and `pub use` in `lib.rs` keeps the public
+path steady. That holds for rules 1–14 and it is the normal case.
+
+**§1 is the exception, and deliberately so.** Placing a module in its tier can
+mean it stops being where it was — dissolving a wrapper module renames every path
+beneath it, and `dpp-engine` reaches 98 distinct paths into this crate, most of
+them deep. Those break.
+
+That is a real cost and it is accepted rather than hidden. Compatibility
+re-exports would keep it quiet, and they are refused on purpose: two ways to
+reach the same type is the condition this standard exists to end, and a shim
+outlives its migration by years. The crate has no external users, so the break is
+paid once, mechanically, with the consumer updated in the same change.
+
+**A tier move is therefore a breaking change and is versioned as one.** A layout
+change that alters the public API for any *other* reason is still not a layout
+change.

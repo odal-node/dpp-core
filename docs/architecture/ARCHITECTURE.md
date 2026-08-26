@@ -72,26 +72,75 @@ capability without anyone noticing, so what it contains is inventoried rather
 than described. A module added here is a deliberate act: `domain_concerns.rs`
 compares this list against `lib.rs` and fails the build in either direction.
 
-| Concern | What it holds |
-|---|---|
-| `access` | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
-| `catalog` | Two catalogs. `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding; it carries **no law**. `InstrumentCatalog` — the acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair, which is where status, legal basis, dates, retention and granularity live |
-| `compliance` | The Apache-2.0 passthrough registry and its per-product group strategies |
-| `domain` | The passport aggregate, product group data, lifecycle, transfer, validation |
-| `ports` | The core↔platform trait boundary (see [PORTS.md](PORTS.md)) |
-| `schemas` | `VersionedSchemaRegistry`, the embedded JSON Schemas, and version lenses |
+The **tier** column is the scope law in [CODE-LAYOUT.md](CODE-LAYOUT.md) §1:
+imports may only point up the eight-tier ladder, and two tripwires hold them to
+it — one for direction, one for cycles. The table below is ordered by tier, and
+that order is a measurement of the import graph rather than a judgement about
+what each module does.
+
+| Concern | Tier | What it holds |
+|---|---|---|
+| `identifier` | 1 | GS1 and customs-classification vocabulary — `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
+| `catalog` | 3 | `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
+| `credential` | 2 | The W3C Verifiable Credential 2.0 envelope binding a passport to its signed payload |
+| `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
+| `disclosure` | 2 | The Art. 77(2) lattice — `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3: `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
+| `eol` | 5 | End-of-life declarations, and the derogation a destruction claim must cite |
+| `field_error` | 2 | `FieldError` and `ValidationErrors` — the per-field detail a validation failure carries. Split from `error` because the two sit at different levels, and holding them together was a cycle |
+| `facility` | 2 | `FacilitySnapshot` — where a product was made, as recorded at issuance |
+| `graph` | 5 | The bill-of-materials graph a passport sits in |
+| `instrument` | 3 | The legal acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair. **This is where the law lives** |
+| `manufacturer` | 2 | `ManufacturerInfo` — the economic operator that placed the product on the market |
+| `material` | 2 | `MaterialEntry` — one declared constituent material |
+| `passport` | 4 | The aggregate root, its id, reference and audience-filtered view |
+| `product` | 5 | `ProductIdentity` — what identifies a product, independent of its passport |
+| `product_group` | 4 | The typed per-group payloads and the `ProductGroupData` union |
+| `seal` | 2 | eIDAS seal value objects — format, mode, envelope, verification |
+| `status` | 2 | `PassportStatus`, the lifecycle state machine |
+| `transfer` | 5 | Transfer of responsibility between operators |
+| `access` | 6 | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
+| `lint` | 6 | Non-binding plausibility findings. Never gates publish |
+| `schemas` | 3 | `VersionedSchemaRegistry`, the embedded JSON Schemas, and the version lenses |
+| `validation` | 6 | Schema conformance and cross-field rules — the pass `Passport::validate` deliberately does not run |
+| `ports` | 7 | The core↔platform trait boundary (see [PORTS.md](PORTS.md)). **Nothing may import it** |
+| `passthrough` | 8 | The Apache-2.0 default `ComplianceRegistry` and its per-group strategies — an adapter, wired by the open-source binary |
+| `error` | 4 | `DppError`, the one error every fallible entry point returns. Sits at the level of the deepest thing it wraps — a lens error from `schemas` |
 
 Prefer naming the concerns over asserting a count — a count is the part that
 goes stale while every claim around it stays checkable.
+
+> **There was a `domain` module here until 2026-08-26.** It held 52% of the crate
+> and its name said nothing, so nothing in it had been *chosen* to be there. It
+> was dissolved and its children given real homes, which is most of why this
+> table is long: the concerns were always this many, they were just not visible.
 
 <!-- DOMAIN-CONCERNS:BEGIN (one module name per line; parsed by domain_concerns.rs) -->
 ```
 access
 catalog
 compliance
-domain
+eol
+error
+field_error
+facility
+graph
+identifier
+credential
+disclosure
+instrument
+lint
+manufacturer
+material
+passport
+passthrough
 ports
+product
+product_group
 schemas
+seal
+status
+transfer
+validation
 ```
 <!-- DOMAIN-CONCERNS:END -->
 

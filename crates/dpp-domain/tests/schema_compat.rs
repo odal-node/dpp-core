@@ -39,8 +39,8 @@
 //! says so and writes nothing, and the fixture is authored by hand.
 
 use dpp_domain::catalog::ProductGroupCatalog;
-use dpp_domain::domain::passport::Passport;
-use dpp_domain::domain::product_group::ProductGroup;
+use dpp_domain::passport::Passport;
+use dpp_domain::product_group::ProductGroup;
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_domain::schemas::lens::LensRegistry;
 use serde_json::{Map, Value};

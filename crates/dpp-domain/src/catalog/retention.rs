@@ -4,8 +4,8 @@
 use serde::{Deserialize, Serialize};
 
 /// Whether a `retentionYears` figure — on an
-/// [`Instrument`](crate::catalog::Instrument) or on one of its
-/// [`InstrumentBinding`](crate::catalog::InstrumentBinding)s — is sourced from
+/// [`Instrument`](crate::instrument::Instrument) or on one of its
+/// [`InstrumentBinding`](crate::instrument::InstrumentBinding)s — is sourced from
 /// an adopted legal text, or an assumption carried until one exists.
 ///
 /// `retentionYears` is shipped data describing an operator's legal

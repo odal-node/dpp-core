@@ -1,9 +1,9 @@
-//! Open, data-driven catalogs of EU product groups and the acts that reach them.
+//! The open, data-driven catalog of EU product groups.
 //!
-//! Two catalogs, deliberately separate, because they answer different questions
-//! and change for different reasons.
-//!
-//! ## The product-group catalog
+//! This is one of two catalogs and it carries **no law**. The acts, their
+//! bindings and the obligations they create live in
+//! [`crate::instrument`], which was lifted out of here because it is a
+//! different axis that changes for different reasons.
 //!
 //! [`ProductGroupCatalog`] is the single source of truth for *what product groups
 //! exist*. Unlike a closed `enum` they are described by **data** — one embedded
@@ -19,72 +19,40 @@
 //!
 //! - [`descriptor`] — the [`ProductGroupDescriptor`] record shape.
 //! - [`error`] — [`CatalogError`].
-//! - [`catalog`] — [`ProductGroupCatalog`] itself, plus the embedded manifests.
-//! - [`status`] — the [`RegulatoryStatus`] determination gate, now per binding.
+//! - [`granularity`] — the [`Granularity`] level a passport describes.
+//! - [`product_group`] — [`ProductGroupCatalog`] itself, plus the embedded manifests.
 //! - [`retention`] — the [`RetentionBasis`] provenance marker.
+//! - [`status`] — the [`RegulatoryStatus`] determination gate, per binding.
 //!
-//! ## The instrument catalog
+//! ## Where the law is, and is not
 //!
-//! A second catalog describes the **legal acts** that reach product groups:
-//! [`Instrument`], its [`InstrumentKind`] and [`InstrumentStatus`], the
-//! [`PassportObligation`] it imposes or does not, the [`Granularity`] it fixes,
-//! and one [`InstrumentBinding`] per product group it reaches.
+//! Not here. A product group's law does not fit on the product group: ESPR Art.
+//! 5(7) lets acts overlap with no precedence rule between them, so the
+//! applicable set is a *set*; and an act may reach a group no manifest models,
+//! so the reach has to be recorded on the act rather than the group.
 //!
-//! It exists because a product group's law does not fit on the product group. ESPR Art. 5(7)
-//! lets acts overlap with no precedence rule between them, so the applicable set
-//! is a set; and an act may reach a product group we hold no manifest for, so
-//! the reach has to be recorded on the act. `ProductGroupDescriptor` used to
-//! carry a singular `regime`, `status`, `dppAppliesFrom` and `retentionYears`,
-//! each of which assumes one act governs one product group — which is what this
-//! catalog stops assuming.
-//!
-//! **This is where the law lives.** Those fields are gone from
-//! [`ProductGroupDescriptor`], so the two catalogs no longer overlap and cannot
-//! disagree: the product-group catalog answers *what groups exist and how we
-//! serve them*, this one answers *what binds them*. Anything asking whether an
-//! obligation applies must come here.
-//!
-//! - [`granularity`] — [`Granularity`], the model/batch/item level an act fixes.
-//! - [`instrument_kind`] — [`InstrumentKind`], *what kind* of act.
-//! - [`instrument_status`] — [`InstrumentStatus`], how far through the process.
-//! - [`passport_obligation`] — [`PassportObligation`], [`ObligationDate`],
-//!   [`DateBasis`].
-//! - [`binding`] — [`InstrumentBinding`], one act's reach into one group.
-//! - [`instrument`] — [`Instrument`], the act itself.
-//! - [`instrument_catalog`] — [`InstrumentCatalog`] and its embedded manifests.
-
-pub mod binding;
-#[allow(clippy::module_inception)]
-pub mod catalog;
+//! [`ProductGroupDescriptor`] used to carry a singular `regime`, `status`,
+//! `dppAppliesFrom` and `retentionYears`, each assuming one act governs one
+//! group. Those fields are gone. The acts, their bindings and the obligations
+//! they create live in [`crate::instrument`], and the two catalogs no
+//! longer overlap and so cannot disagree: this one answers *what groups exist
+//! and how we serve them*, that one answers *what binds them*. Anything asking
+//! whether an obligation applies goes there.
 pub mod descriptor;
 pub mod error;
 pub mod granularity;
-pub mod instrument;
-pub mod instrument_catalog;
-pub mod instrument_kind;
-pub mod instrument_ref;
-pub mod instrument_status;
-pub mod passport_obligation;
-
+pub mod product_group;
 pub mod retention;
 pub mod status;
 
 #[cfg(test)]
-mod instrument_tests;
+mod parity_tests;
 #[cfg(test)]
 mod tests;
 
-pub use binding::InstrumentBinding;
-pub use catalog::ProductGroupCatalog;
 pub use descriptor::ProductGroupDescriptor;
 pub use error::CatalogError;
 pub use granularity::Granularity;
-pub use instrument::Instrument;
-pub use instrument_catalog::InstrumentCatalog;
-pub use instrument_kind::InstrumentKind;
-pub use instrument_ref::{InstrumentRef, RecordedBasis};
-pub use instrument_status::InstrumentStatus;
-pub use passport_obligation::{DateBasis, ObligationDate, PassportObligation};
-
+pub use product_group::ProductGroupCatalog;
 pub use retention::RetentionBasis;
 pub use status::RegulatoryStatus;

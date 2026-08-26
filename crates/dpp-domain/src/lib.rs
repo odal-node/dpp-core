@@ -20,31 +20,53 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod access;
 pub mod catalog;
 pub mod compliance;
-pub mod domain;
+pub mod credential;
+pub mod disclosure;
+pub mod eol;
+pub mod error;
+pub mod facility;
+pub mod field_error;
+pub mod graph;
+pub mod identifier;
+pub mod instrument;
+pub mod lint;
+pub mod manufacturer;
+pub mod material;
+pub mod passport;
+pub mod passthrough;
 pub mod ports;
+pub mod product;
+pub mod product_group;
 pub mod schemas;
+pub mod seal;
+pub mod status;
 #[cfg(test)]
 mod test_support;
+pub mod transfer;
+pub mod validation;
 
 pub use catalog::{
-    CatalogError, DateBasis, Granularity, Instrument, InstrumentBinding, InstrumentCatalog,
-    InstrumentKind, InstrumentRef, InstrumentStatus, ObligationDate, PassportObligation,
-    ProductGroupCatalog, ProductGroupDescriptor, RecordedBasis, RegulatoryStatus, RetentionBasis,
+    CatalogError, Granularity, ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus,
+    RetentionBasis,
+};
+pub use instrument::{
+    DateBasis, Instrument, InstrumentBinding, InstrumentCatalog, InstrumentKind, InstrumentRef,
+    InstrumentStatus, ObligationDate, PassportObligation, RecordedBasis,
 };
 
-pub use domain::{
-    commodity_code::{CommodityCode, CommodityCodeError},
-    error::DppError,
-    gtin::{Gln, GlnError, Gtin, GtinError, gs1_check_digit},
-    identity::{
-        Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE, PassportCredential,
-        PassportCredentialSubject, SignedCredential,
+pub use crate::{
+    credential::{PassportCredential, PassportCredentialSubject, SignedCredential},
+    disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
+    identifier::{
+        CnCategory, CnCategoryError, CommodityCode, CommodityCodeError, Gln, GlnError, Gtin,
+        GtinError, gs1_check_digit,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     passport::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_WIRE_KEYS, Passport,
         PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
+    product::ProductIdentity,
     product_group::{
         AluminiumData,
         BatteryChemistry,
@@ -56,8 +78,6 @@ pub use domain::{
         CarbonFootprintClassError,
         // The unsold-goods disclosure, whose shape is fixed by Impl. Reg. (EU)
         // 2026/2 Annex I — see `domain::product_group::data::unsold_goods`.
-        CnCategory,
-        CnCategoryError,
         ConstructionData,
         DetergentData,
         DeviceType,
@@ -100,11 +120,7 @@ pub use domain::{
         UsageHistory,
         WasteTreatmentSplit,
         redact_product_group_data,
-        validate_fibre_composition,
-        validate_surfactants,
-        validate_svhc_substances,
     },
-    product_identity::ProductIdentity,
     status::PassportStatus,
     transfer::{
         OperatorRole, ResponsibleOperator, TransferChain, TransferError, TransferReason,
@@ -112,29 +128,36 @@ pub use domain::{
     },
 };
 
-pub use domain::field_error::{FieldError, ValidationErrors};
+pub use error::DppError;
+pub use field_error::{FieldError, ValidationErrors};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use domain::validation::{
+pub use validation::{
     BatchValidationItem, ProductGroupValidator, ProductGroupValidatorRegistry, batch_errors,
-    validate_product_group_data, validate_product_group_data_batch,
+    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
+    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
+    validate_passport, validate_product_group_data, validate_product_group_data_batch,
     validate_product_group_data_with_registry, validate_raw_product_group_data,
+    validate_surfactants, validate_svhc_substances,
 };
 
+pub use compliance::{
+    ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
+    gate_determination,
+};
 pub use ports::archive::{
     ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, GhostArchive,
 };
-pub use ports::compliance::{
-    ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceRegistry, ComplianceResult,
-    ComplianceStatus, ComplianceStrategy, gate_determination,
-};
+pub use ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus,
     RegistrySyncPort,
 };
 
-pub use compliance::{PassthroughBatteryStrategy, PassthroughRegistry, PassthroughTextileStrategy};
+pub use passthrough::{
+    PassthroughBatteryStrategy, PassthroughRegistry, PassthroughTextileStrategy,
+};
 
 /// Compile-checks this crate's README examples.
 ///

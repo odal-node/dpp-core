@@ -8,8 +8,16 @@
 //! Distinct from `dpp-vc`, which establishes *which* audience a caller holds. A
 //! credential proves the role; this maps the role to fields.
 
+#[cfg(test)]
+mod classification_tests;
 pub mod filter;
+#[cfg(test)]
+mod lattice_tests;
 pub mod policy;
+#[cfg(test)]
+mod policy_tests;
+#[cfg(test)]
+mod redaction_tests;
 #[cfg(test)]
 mod tests;
 
