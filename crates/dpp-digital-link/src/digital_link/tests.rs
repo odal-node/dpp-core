@@ -94,12 +94,12 @@ fn missing_gtin_rejected() {
 fn every_gs1_primary_key_parses_and_round_trips() {
     // SSCC, GDTI, GRAI, GIAI, the party GLN, GINC, GMN.
     for (ai, value) in [
-        ("00", "106141411234567890"),
+        ("00", "106141411234567897"),
         ("253", "4012345678901"),
         ("8003", "04012345678901ABC"),
         ("8004", "4012345ABC123"),
         ("414", "4226350800008"),
-        ("401", "ORDER-99"),
+        ("401", "4012345ORDER99"),
         ("8013", "1987654Ad4X4bL5ttr2310c2K"),
     ] {
         let uri = format!("https://id.odal-node.io/{ai}/{value}");
@@ -128,14 +128,14 @@ fn only_the_gtin_comes_back_validated() {
         "a validated key must not be reachable through the unvalidated accessor"
     );
 
-    let sscc_link = DigitalLink::parse("https://id.odal-node.io/00/106141411234567890").unwrap();
+    let sscc_link = DigitalLink::parse("https://id.odal-node.io/00/106141411234567897").unwrap();
     assert!(
         sscc_link.gtin().is_none(),
         "an SSCC is not a GTIN and must not masquerade as one"
     );
     assert_eq!(
         sscc_link.primary_key.unvalidated_value(),
-        Some("106141411234567890"),
+        Some("106141411234567897"),
         "the only way to its value names what it is"
     );
 }
@@ -148,7 +148,7 @@ fn only_the_gtin_comes_back_validated() {
 /// path opened on, which would have accepted this.
 #[test]
 fn a_qualifier_from_another_primary_key_is_refused() {
-    let uri = "https://id.odal-node.io/00/106141411234567890/22/VAR-1";
+    let uri = "https://id.odal-node.io/00/106141411234567897/22/VAR-1";
     assert!(
         DigitalLink::parse(uri).is_err(),
         "AI 22 does not qualify an SSCC"

@@ -40,7 +40,7 @@ impl DigitalLink {
     /// - `https://id.odal-node.io/01/09506000134352/21/ABC123`
     /// - `https://id.odal-node.io/01/09506000134352/10/BATCH01/21/SN001`
     /// - `https://example.com/resolve/01/09506000134352/21/SN001` (path prefix)
-    /// - `https://id.odal-node.io/00/106141411234567890` (any GS1 primary key)
+    /// - `https://id.odal-node.io/00/106141411234567897` (any GS1 primary key)
     ///
     /// GTIN-8 / GTIN-12 / GTIN-13 are normalised to 14 digits by left-padding.
     /// Unknown AI codes produce `UnknownApplicationIdentifier`; qualifiers out

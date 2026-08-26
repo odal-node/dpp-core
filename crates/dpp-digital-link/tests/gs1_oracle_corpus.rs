@@ -208,10 +208,14 @@ fn corpus() -> Vec<Entry> {
         // `build()` only ever emits what we already construct. The oracle, not
         // us, decides whether each is well-formed.
         for (ai, value, note) in [
-            ("00", "106141411234567890", "SSCC"),
+            ("00", "106141411234567897", "SSCC"),
             ("253", "4012345678901", "GDTI without its optional serial"),
-            ("401", "ORDER-99", "GINC, variable-length alphanumeric"),
-            ("402", "40123456789012340", "GSIN"),
+            (
+                "401",
+                "4012345ORDER99",
+                "GINC, variable-length alphanumeric",
+            ),
+            ("402", "40123456789012349", "GSIN"),
             ("414", "4226350800008", "party GLN"),
             ("8003", "04012345678901ABC", "GRAI"),
             ("8004", "4012345ABC123", "GIAI"),
@@ -225,7 +229,7 @@ fn corpus() -> Vec<Entry> {
         // and it is only refusable now that the qualifier rules are evaluated
         // against the key the path actually opened on.
         out.push(entry(
-            format!("{base}/00/106141411234567890/22/VAR-1"),
+            format!("{base}/00/106141411234567897/22/VAR-1"),
             "qualifier from another primary key's sequence",
         ));
     }
