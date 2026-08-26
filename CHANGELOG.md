@@ -515,6 +515,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   path to publishing skips it. That property was the reason it was private, and
   it is unchanged.
 
+### Fixed
+
+- **The transfer-of-responsibility article pin was stale, and it ships to
+  crates.io.** `docs/regulatory/COMPLIANCE.md` concluded, on 2026-07-04, that no
+  numbered transfer obligation exists. Implementing Regulation (EU) 2026/1778
+  was published on 17 July 2026 — thirteen days later — and **Art. 6a** supplies
+  one: a registered digital product passport "may be transferred to another
+  verified economic operator or, where applicable, to a verified value chain
+  actor that takes over the obligations from the previous actor ... from the
+  date indicated for the transfer."
+
+  The original finding was not wrong and is kept verbatim: it is still the
+  answer for Regulation (EU) 2024/1781 itself, which establishes no transfer
+  mechanism. What changed is that the registry implementing act does, at a
+  different level — what moves is the *registration*, between **eIDAS-verified**
+  actors whose status expires after at most three years (Art. 5(4)).
+
+  Three bounds on what `domain::transfer` may claim follow, and the entry now
+  states them: the registry is the authoritative record of who holds the
+  obligations; Art. 5(3) closes that registry to everyone but verified actors,
+  so it can never be a public reader's proof; and a `did:web` identifier is not
+  evidence of verified-actor standing, so the transfer chain is a local record
+  of what this node was told, not proof of who is responsible.
+
+  Recorded alongside it: Art. 6a does not cover the product-lifecycle cases.
+  **ESPR Art. 11(d)** requires a *new* passport created for a product that
+  already has one to be **linked** to the original, and **Art. 2(16)** defines
+  remanufacturing as producing "a new product" — so a remanufactured product
+  gets a new linked passport (`Passport::parent_passport_ref`) rather than a
+  transfer of the old one. Whether `TransferReason::Remanufacturing`,
+  `::Repurposing` and `::PreparationForReuse` should exist at all is noted as an
+  open domain question and deliberately left open here.
+
+  Documentation only — no type or behaviour changes in this entry.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
