@@ -1,6 +1,7 @@
 //! Error type for all calculator operations in `dpp-calc`.
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum CalcError {
     #[error("invalid input: {0}")]
     InvalidInput(String),

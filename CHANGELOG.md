@@ -633,6 +633,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   migration is required; a document written under the old key still reads, and
   serialisation now emits only the new one.
 
+### Breaking
+
+- **Every public error enum is `#[non_exhaustive]`.** *(Breaking: a downstream
+  `match` on one of these without a wildcard arm no longer compiles. Add `_ =>`.
+  Affects `AasError`, `CalcError`, `DigitalLinkError`, `EuRegistryErrorKind`,
+  `JadesError`, `PluginError`, `RegistryValidationError`, `RulesetError` and
+  `UpcastError`.)*
+
+  Ten of this workspace's public error enums already carried the attribute and
+  nine did not, so this is the convention being applied consistently rather than
+  a new position.
+
+  The cost of the gap is measurable in this very release: `DigitalLinkError`
+  gained `DataAttributeInPath` and `MixedQualifierSequences`, and because the
+  enum was exhaustive those two additions are themselves breaking changes —
+  2 of the 36 findings `cargo semver-checks` reports against 0.18.0. An error
+  type grows every time a new failure becomes describable, so without this every
+  future error case forces a breaking release and the pressure is to smuggle new
+  conditions into existing variants instead.
+
+  Applied to error enums only. `PrimaryKey`, `DocumentScope`, `Granularity` and
+  `Assessability` stay exhaustive on purpose — those are closed choices where
+  making a caller handle every case is the point, not an accident.
+
+### Fixed
+
+- **Two intra-doc links rendered as literal text on docs.rs.** The
+  sector-to-product-group rename left `crate::product group::` and
+  `super::product group::` — a space where the underscore belongs — in
+  `Passport::redact`'s and `ProductIdentity`'s doc comments. A path containing a
+  space is not parsed as an intra-doc link at all, so `cargo doc -D warnings`
+  saw nothing to warn about and the text shipped as prose pointing nowhere. The
+  second one also needed an absolute path: after the module layout changed,
+  `super` from `crate::product::identity` no longer reaches `product_group`.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added

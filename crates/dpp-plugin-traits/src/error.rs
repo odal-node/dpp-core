@@ -16,6 +16,7 @@ pub struct PluginFieldError {
 }
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum PluginError {
     #[error("invalid input: {0}")]
     InvalidInput(String),

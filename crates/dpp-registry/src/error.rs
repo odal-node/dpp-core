@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Error returned when a bridge identifier fails structural validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RegistryValidationError {
     /// A GTIN value is structurally invalid (wrong length or failed mod-10).
     InvalidGtin { value: String, reason: String },
@@ -76,6 +77,7 @@ impl std::error::Error for RegistryValidationError {}
 /// Error categories for EU registry operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum EuRegistryErrorKind {
     /// Network or transport failure.
     ConnectionFailed,

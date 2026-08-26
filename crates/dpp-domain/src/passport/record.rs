@@ -739,7 +739,7 @@ impl Passport {
     /// Anything absent from that table is `Public`.
     ///
     /// `productGroupData`, when present, is independently redacted via
-    /// [`crate::product group::redact_product_group_data`] against the product group descriptor
+    /// [`crate::product_group::redact_product_group_data`] against the product group descriptor
     /// from `catalog`. If the product group is not in the catalog, product group data is
     /// **withheld** from every audience except `Authority` (fail-closed): without
     /// the descriptor's per-field disclosure classes the domain layer cannot tell

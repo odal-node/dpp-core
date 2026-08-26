@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 /// could be forgotten. An error variant for it would be an error nobody can
 /// produce.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum JadesError {
     /// `x5c` was supplied with no certificates in it.
     ///
