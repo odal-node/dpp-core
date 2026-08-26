@@ -66,8 +66,16 @@ impl TransferReason {
 
 /// A single transfer-of-responsibility event in the DPP lifecycle.
 ///
-/// Each transfer is cryptographically signed by both the outgoing and
-/// incoming operators to create an auditable provenance chain.
+/// Recorded in two steps — the outgoing operator authorises the handover, and
+/// the hosting node then attests that the incoming operator accepted it. The
+/// two are **not** symmetric: see [`TransferRecord::from_signature`] and
+/// [`TransferRecord::node_acceptance_attestation`], only the first of which is
+/// a party's own signature.
+///
+/// The chain this builds is an auditable local record of what the node was
+/// told. It is not proof of who holds the obligations: under Implementing
+/// Regulation (EU) 2026/1778 Art. 6a that is the EU registry's record, between
+/// actors whose identity is verified by eIDAS means under its Arts. 4-5.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferRecord {
@@ -83,13 +91,46 @@ pub struct TransferRecord {
     pub reason: TransferReason,
     /// Compact JWS signature from the outgoing operator, signing over the
     /// transfer payload to authorise the handover.
+    ///
+    /// Produced by the node that hosts the outgoing operator, using that
+    /// operator's key — so in the managed single-node model this genuinely is
+    /// the outgoing party's signature. Its counterpart below is not.
     pub from_signature: Option<String>,
-    /// Compact JWS signature from the incoming operator, accepting
-    /// responsibility for the DPP.
-    pub to_signature: Option<String>,
+    /// This **node's** attestation that the incoming operator accepted the
+    /// handover. **Not a signature by the incoming operator.**
+    ///
+    /// The incoming operator is a party with no key on this node, so nothing
+    /// here can be signed by them. What is recorded is a JWS over the same
+    /// [`Self::signing_payload`], produced by the same key that produced
+    /// [`Self::from_signature`], at the moment the acceptance step ran. Because
+    /// the payload is RFC 8785 canonical, the JWS header carries no nonce or
+    /// timestamp, and Ed25519 is deterministic, the two values are **byte-
+    /// identical** in the managed model. The second one therefore carries
+    /// exactly one bit — that the acceptance step ran — and `completed_at`
+    /// carries the same bit with a timestamp attached.
+    ///
+    /// It is named for what it is because the previous name, `to_signature`,
+    /// was not. That name invited every consumer — including the registry
+    /// notification built from this record — to read the value as the incoming
+    /// operator's own authorisation, which is a claim no node can make about a
+    /// counterparty whose key it does not hold.
+    ///
+    /// **The authoritative record of who holds the obligations is the EU
+    /// registry**, under Implementing Regulation (EU) 2026/1778 Art. 6a, between
+    /// actors whose identity is verified by eIDAS means under its Arts. 4–5.
+    /// A chain of `did:web` identifiers is not evidence of that standing. See
+    /// `docs/regulatory/COMPLIANCE.md` § Transfer-of-Responsibility Article Pin.
+    ///
+    /// `alias` keeps chains stored under the old key readable: without it every
+    /// already-completed transfer would deserialize with this field `None` and
+    /// [`Self::is_complete`] would start answering `false` for handovers that
+    /// did complete.
+    #[serde(alias = "toSignature")]
+    pub node_acceptance_attestation: Option<String>,
     /// Timestamp when the transfer was initiated.
     pub initiated_at: DateTime<Utc>,
-    /// Timestamp when the transfer was completed (both parties signed).
+    /// Timestamp when the transfer was completed — the outgoing operator had
+    /// authorised it and the acceptance step had run.
     /// `None` if the transfer is still pending acceptance.
     pub completed_at: Option<DateTime<Utc>>,
     /// Timestamp when the incoming operator explicitly rejected the transfer.
@@ -105,13 +146,19 @@ pub struct TransferRecord {
 }
 
 impl TransferRecord {
-    /// The canonical content both operators sign over: the immutable core
+    /// The canonical content signed over at both steps: the immutable core
     /// of the transfer, excluding the signatures themselves and the lifecycle
     /// timestamps set *after* signing (`completed_at`/`rejected_at`/`cancelled_at`).
     ///
-    /// Both `from_operator` and `to_operator` sign a JWS over the JCS
-    /// canonicalisation of this value, so the two signatures bind the same
-    /// immutable handover terms. Tampering any bound field invalidates both.
+    /// [`Self::from_signature`] and [`Self::node_acceptance_attestation`] are
+    /// both JWS over the JCS canonicalisation of this value, so both bind the
+    /// same immutable handover terms and tampering any bound field invalidates
+    /// both.
+    ///
+    /// Note what that implies: the same payload signed by the same key yields
+    /// the same JWS, so in the managed single-node model the two values are
+    /// byte-identical. That is a property of this design rather than a defect —
+    /// the second records that the acceptance step ran, and nothing more.
     #[must_use]
     pub fn signing_payload(&self) -> serde_json::Value {
         serde_json::json!({
@@ -136,16 +183,22 @@ impl TransferRecord {
         if self.cancelled_at.is_some() {
             return TransferStatus::Cancelled;
         }
-        match (&self.from_signature, &self.to_signature, &self.completed_at) {
+        match (
+            &self.from_signature,
+            &self.node_acceptance_attestation,
+            &self.completed_at,
+        ) {
             (Some(_), Some(_), Some(_)) => TransferStatus::Completed,
             (Some(_), Some(_), None) => TransferStatus::Accepted,
             _ => TransferStatus::Initiated,
         }
     }
 
-    /// Returns `true` if both parties have signed and the transfer is finalised.
+    /// Returns `true` if the handover was authorised, accepted and finalised.
     pub fn is_complete(&self) -> bool {
-        self.from_signature.is_some() && self.to_signature.is_some() && self.completed_at.is_some()
+        self.from_signature.is_some()
+            && self.node_acceptance_attestation.is_some()
+            && self.completed_at.is_some()
     }
 
     /// The incoming operator explicitly rejects the transfer.
@@ -181,11 +234,13 @@ impl TransferRecord {
         }
     }
 
-    /// Mark the transfer as completed once both parties have signed.
+    /// Mark the transfer as completed once it is authorised and accepted.
     ///
-    /// Only valid from `Accepted` state (both signatures present, no
-    /// `completed_at` yet). This is the final step before the incoming
-    /// operator becomes the current responsible operator in the chain.
+    /// Only valid from `Accepted` state ([`Self::from_signature`] and
+    /// [`Self::node_acceptance_attestation`] both present, no `completed_at`
+    /// yet). This is the final step before the incoming operator becomes the
+    /// current responsible operator **in this node's chain** — which is a local
+    /// record, not the registry's determination of who holds the obligations.
     pub fn complete(&mut self) -> Result<(), TransferError> {
         let s = self.status();
         if s != TransferStatus::Accepted {

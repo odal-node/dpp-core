@@ -368,7 +368,7 @@ fn make_initiated_transfer(
         to_operator: to.clone(),
         reason: TransferReason::Sale,
         from_signature: Some("sig-from".into()),
-        to_signature: None,
+        node_acceptance_attestation: None,
         initiated_at: Utc::now(),
         completed_at: None,
         rejected_at: None,
@@ -483,7 +483,7 @@ fn reject_completed_transfer_returns_invalid_state() {
     let to = make_operator("did:web:b.com", "Test", OperatorRole::Distributor, "DE");
 
     let mut t = make_initiated_transfer(pid, &from, &to);
-    t.to_signature = Some("sig-to".into());
+    t.node_acceptance_attestation = Some("sig-to".into());
     t.completed_at = Some(Utc::now());
     assert_eq!(t.status(), TransferStatus::Completed);
 

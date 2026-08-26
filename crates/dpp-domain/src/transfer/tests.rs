@@ -29,7 +29,7 @@ fn make_transfer(
         to_operator: to.clone(),
         reason,
         from_signature: Some("sig-from".into()),
-        to_signature: None,
+        node_acceptance_attestation: None,
         initiated_at: Utc::now(),
         completed_at: None,
         rejected_at: None,
@@ -59,7 +59,7 @@ fn completed_transfer_changes_current_operator() {
     let mut chain = TransferChain::new(pid, original.clone());
 
     let mut transfer = make_transfer(pid, &original, &new_op, TransferReason::Remanufacturing);
-    transfer.to_signature = Some("sig-to".into());
+    transfer.node_acceptance_attestation = Some("sig-to".into());
     transfer.completed_at = Some(Utc::now());
 
     chain.initiate_transfer(transfer).unwrap();
@@ -112,7 +112,7 @@ fn transfer_status_derives_correctly() {
     assert_eq!(t.status(), TransferStatus::Initiated);
 
     // Accepted (both signed, not completed)
-    t.to_signature = Some("sig".into());
+    t.node_acceptance_attestation = Some("sig".into());
     assert_eq!(t.status(), TransferStatus::Accepted);
 
     // Completed
@@ -131,14 +131,14 @@ fn multiple_completed_transfers_track_chain() {
 
     // A → B
     let mut t1 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
-    t1.to_signature = Some("sig".into());
+    t1.node_acceptance_attestation = Some("sig".into());
     t1.completed_at = Some(Utc::now());
     chain.initiate_transfer(t1).unwrap();
     assert_eq!(chain.current_operator().did, "did:web:b.com");
 
     // B → C
     let mut t2 = make_transfer(pid, &op_b, &op_c, TransferReason::Remanufacturing);
-    t2.to_signature = Some("sig".into());
+    t2.node_acceptance_attestation = Some("sig".into());
     t2.completed_at = Some(Utc::now());
     chain.initiate_transfer(t2).unwrap();
     assert_eq!(chain.current_operator().did, "did:web:c.com");
@@ -174,7 +174,7 @@ fn reject_from_accepted_fails() {
     let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
     let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
-    t.to_signature = Some("sig-to".into()); // now Accepted
+    t.node_acceptance_attestation = Some("sig-to".into()); // now Accepted
     assert_eq!(t.status(), TransferStatus::Accepted);
     assert!(matches!(
         t.reject(),
@@ -198,7 +198,7 @@ fn cancel_from_accepted_succeeds() {
     let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
     let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
-    t.to_signature = Some("sig-to".into());
+    t.node_acceptance_attestation = Some("sig-to".into());
     assert_eq!(t.status(), TransferStatus::Accepted);
     t.cancel().unwrap();
     assert_eq!(t.status(), TransferStatus::Cancelled);
@@ -210,7 +210,7 @@ fn cancel_from_completed_fails() {
     let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
     let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
-    t.to_signature = Some("sig-to".into());
+    t.node_acceptance_attestation = Some("sig-to".into());
     t.completed_at = Some(Utc::now());
     assert_eq!(t.status(), TransferStatus::Completed);
     assert!(matches!(
@@ -225,7 +225,7 @@ fn complete_from_accepted_succeeds() {
     let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
     let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
-    t.to_signature = Some("sig-to".into());
+    t.node_acceptance_attestation = Some("sig-to".into());
     t.complete().unwrap();
     assert_eq!(t.status(), TransferStatus::Completed);
     assert!(t.is_complete());
@@ -301,4 +301,67 @@ fn cancelled_transfer_unblocks_new_initiation() {
 
     let t2 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
     assert!(chain.initiate_transfer(t2).is_ok());
+}
+
+/// A chain stored before the rename must keep reading, with the acceptance
+/// marker intact.
+///
+/// `TransferChain` is persisted as a JSON document, so renaming the field
+/// renamed the wire key. Without the `toSignature` alias every already-completed
+/// transfer would deserialize with `node_acceptance_attestation: None`, and
+/// [`TransferRecord::is_complete`] would begin answering `false` for handovers
+/// that did complete — a silent rewrite of history rather than a load error.
+#[test]
+fn a_record_stored_under_the_old_key_still_reads_as_complete() {
+    let stored = serde_json::json!({
+        "transferId": Uuid::now_v7(),
+        "passportId": PassportId::new(),
+        "fromOperator": make_operator("did:web:a.example", "A", OperatorRole::Manufacturer),
+        "toOperator": make_operator("did:web:b.example", "B", OperatorRole::Remanufacturer),
+        "reason": "sale",
+        "fromSignature": "eyJhbGciOiJFZERTQSJ9.from",
+        "toSignature": "eyJhbGciOiJFZERTQSJ9.from",
+        "initiatedAt": "2026-07-01T00:00:00Z",
+        "completedAt": "2026-07-02T00:00:00Z",
+        "notes": null,
+    });
+
+    let record: TransferRecord = serde_json::from_value(stored).expect("old shape must read");
+
+    assert_eq!(
+        record.node_acceptance_attestation.as_deref(),
+        Some("eyJhbGciOiJFZERTQSJ9.from"),
+        "the alias did not carry the stored acceptance marker across the rename"
+    );
+    assert!(
+        record.is_complete(),
+        "a completed handover must not become incomplete by being re-read"
+    );
+    assert_eq!(record.status(), TransferStatus::Completed);
+}
+
+/// The new name is what we write, even though the old one is still read.
+///
+/// An alias is a one-way concession to stored data. If serialisation kept
+/// emitting `toSignature` the rename would be cosmetic — every consumer
+/// downstream, including the registry notification, would still be told that
+/// the incoming operator signed.
+#[test]
+fn serialisation_emits_the_new_key_only() {
+    let pid = PassportId::new();
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Recycler);
+    let mut record = make_transfer(pid, &from, &to, TransferReason::InsolvencySuccession);
+    record.node_acceptance_attestation = Some("attestation".into());
+
+    let wire = serde_json::to_value(&record).expect("serialise");
+
+    assert!(
+        wire.get("nodeAcceptanceAttestation").is_some(),
+        "the honest key must be on the wire"
+    );
+    assert!(
+        wire.get("toSignature").is_none(),
+        "the old key must not be emitted — it states a claim the node cannot make"
+    );
 }

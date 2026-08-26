@@ -550,6 +550,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   Documentation only — no type or behaviour changes in this entry.
 
+### Breaking
+
+- **A transfer's second proof is named for what it is: the node's attestation,
+  not the incoming operator's signature.** *(Breaking:
+  `TransferRecord::to_signature` and `TransferNotification::to_signature` are
+  renamed to `node_acceptance_attestation`; the wire key changes from
+  `toSignature` to `nodeAcceptanceAttestation`. Stored documents are unaffected —
+  `#[serde(alias = "toSignature")]` keeps the old key readable, and a test pins
+  that a chain written before the rename still reports `is_complete()`.)*
+
+  The incoming operator holds no key on the node recording the handover, so
+  nothing in that record can be signed by them. What was stored under
+  `to_signature` is a JWS over the same `signing_payload()`, produced by the same
+  key that produced `from_signature`, at the moment the acceptance step ran.
+  The payload is RFC 8785 canonical, the JWS header carries no nonce or
+  timestamp, and Ed25519 is deterministic — so the two values are byte-identical
+  in the managed single-node model. The second carries one bit, that the
+  acceptance step ran, which `completed_at` already carries with a timestamp.
+
+  That was a deliberate design decision and is unchanged. What was wrong was the
+  name, because the name is what travelled: a `to_signature` field reaching a
+  registry notification reads as evidence that both parties authorised the
+  handover, and no node can state that about a counterparty whose key it does
+  not hold.
+
+  The doc comments now also say where the authority actually sits. Implementing
+  Regulation (EU) 2026/1778 **Art. 6a** transfers a registered passport between
+  actors whose identity is verified by eIDAS means under its **Arts. 4-5**, and
+  **Art. 5(3)** closes that registry to everyone else. A chain of `did:web`
+  identifiers is not evidence of that standing, so `TransferChain` is documented
+  as an auditable local record of what the node was told — not proof of who
+  holds the obligations.
+
+  **Migration:** rename the field at each construction and read site. No data
+  migration is required; a document written under the old key still reads, and
+  serialisation now emits only the new one.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added

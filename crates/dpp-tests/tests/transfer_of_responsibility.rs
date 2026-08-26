@@ -31,7 +31,7 @@ fn make_transfer(
         to_operator: to.clone(),
         reason,
         from_signature: Some("eyJhbGciOiJFZERTQSJ9.from-sig".into()),
-        to_signature: None,
+        node_acceptance_attestation: None,
         initiated_at: Utc::now(),
         completed_at: None,
         rejected_at: None,
@@ -41,7 +41,7 @@ fn make_transfer(
 }
 
 fn complete_transfer(record: &mut TransferRecord) {
-    record.to_signature = Some("eyJhbGciOiJFZERTQSJ9.to-sig".into());
+    record.node_acceptance_attestation = Some("eyJhbGciOiJFZERTQSJ9.to-sig".into());
     record.completed_at = Some(Utc::now());
 }
 
@@ -179,7 +179,7 @@ fn pending_transfer_blocks_new_initiation() {
         "PT",
     );
 
-    // First transfer — pending (no to_signature)
+    // First transfer — pending (no node_acceptance_attestation)
     let transfer_a = make_transfer(pid, &manufacturer, &target_a, TransferReason::Sale);
     chain.initiate_transfer(transfer_a).unwrap();
 
@@ -252,7 +252,7 @@ fn transfer_provenance_audit_trail() {
     for t in &chain.transfers {
         assert!(t.is_complete());
         assert!(t.from_signature.is_some());
-        assert!(t.to_signature.is_some());
+        assert!(t.node_acceptance_attestation.is_some());
         assert!(t.completed_at.is_some());
     }
 }
