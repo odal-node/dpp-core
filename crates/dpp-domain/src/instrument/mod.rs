@@ -8,6 +8,8 @@
 //! nine files share a directory and a reader share two subjects.
 
 pub mod act;
+#[cfg(test)]
+mod axis_tests;
 pub mod binding;
 pub mod catalog;
 pub mod kind;

@@ -2,7 +2,7 @@
 //! and instrument kind bear on determination.
 
 use super::*;
-use crate::catalog::{Granularity, ProductGroupCatalog, RegulatoryStatus, RetentionBasis};
+use crate::catalog::{ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus};
 
 /// Guards the assumption that ESPR is the only source of a DPP obligation.
 /// Battery, toy, detergent, construction and electronics each derive from their

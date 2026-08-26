@@ -11,6 +11,8 @@ pub mod detergent;
 pub mod electronics;
 pub mod furniture;
 pub mod mattress;
+#[cfg(test)]
+mod other_constructor_tests;
 pub mod product_group_data;
 pub mod steel;
 pub mod textile;

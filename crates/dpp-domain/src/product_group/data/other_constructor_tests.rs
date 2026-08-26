@@ -3,6 +3,8 @@
 use super::*;
 use serde_json::json;
 
+use crate::product_group::ProductGroup;
+
 /// A non-object payload is refused rather than accepted untagged.
 ///
 /// The hazard is not the round-trip failure, which is merely wrong. It is
@@ -29,9 +31,8 @@ fn a_non_object_payload_is_refused() {
 /// An object for an untyped product group is still accepted, tag or not.
 #[test]
 fn an_object_for_an_unknown_product_group_is_still_accepted() {
-    let tagged =
-        ProductGroupData::other(json!({ "productGroup": "quantum-widget", "spinPct": 3 }))
-            .expect("an unknown tagged product_group is representable");
+    let tagged = ProductGroupData::other(json!({ "productGroup": "quantum-widget", "spinPct": 3 }))
+        .expect("an unknown tagged product_group is representable");
     assert_eq!(
         tagged.product_group(),
         ProductGroup::Other("quantum-widget".into())
