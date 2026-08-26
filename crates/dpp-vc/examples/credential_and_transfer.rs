@@ -85,7 +85,7 @@ fn main() {
         to_operator: remanufacturer.clone(),
         reason: TransferReason::Remanufacturing,
         from_signature: Some("eyJhbGciOiJFZERTQSJ9.from-sig-placeholder".into()),
-        to_signature: Some("eyJhbGciOiJFZERTQSJ9.to-sig-placeholder".into()),
+        node_acceptance_attestation: Some("eyJhbGciOiJFZERTQSJ9.to-sig-placeholder".into()),
         initiated_at: Utc::now(),
         completed_at: Some(Utc::now()),
         rejected_at: None,

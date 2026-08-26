@@ -33,12 +33,21 @@ pub struct TransferNotification {
     pub reason: String,
     /// ISO 8601 timestamp of the transfer.
     pub transferred_at: DateTime<Utc>,
-    /// JWS signature from the outgoing operator.
+    /// JWS signature from the outgoing operator, authorising the handover.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from_signature: Option<String>,
-    /// JWS signature from the incoming operator.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to_signature: Option<String>,
+    /// The notifying node's attestation that the incoming operator accepted —
+    /// **not** a signature by the incoming operator, who holds no key on that
+    /// node. Sending it under its former name, `toSignature`, told the registry
+    /// that both parties had authorised the handover, which the notifier is in
+    /// no position to state.
+    ///
+    /// The registry's own record is the authority here: Implementing Regulation
+    /// (EU) 2026/1778 Art. 6a transfers a registration between actors whose
+    /// identity is verified under its Arts. 4-5, and this notification is a
+    /// report to that record rather than evidence for it.
+    #[serde(alias = "toSignature", skip_serializing_if = "Option::is_none")]
+    pub node_acceptance_attestation: Option<String>,
 }
 
 impl TransferNotification {
@@ -49,11 +58,11 @@ impl TransferNotification {
     /// registration's operator does — a legal name, a valid country, and a
     /// structurally sound identifier for the scheme.
     ///
-    /// The two signatures are deliberately **not** required here: a transfer is
-    /// initiated by the outgoing operator and only countersigned when the
-    /// incoming one accepts, so a notification can legitimately be built before
-    /// `to_signature` exists. Whether an unaccepted transfer should be notified
-    /// at all is a caller's decision, not a structural one.
+    /// Neither proof field is required here: a transfer is initiated by the
+    /// outgoing operator and the acceptance step only runs when the incoming
+    /// one accepts, so a notification can legitimately be built before
+    /// `node_acceptance_attestation` exists. Whether an unaccepted transfer
+    /// should be notified at all is a caller's decision, not a structural one.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
         self.from_operator.validate()?;
         self.to_operator.validate()?;

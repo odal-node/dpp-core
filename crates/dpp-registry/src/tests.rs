@@ -121,7 +121,7 @@ fn transfer_notification_round_trip() {
         reason: "sale".into(),
         transferred_at: Utc::now(),
         from_signature: Some("sig_from...".into()),
-        to_signature: Some("sig_to...".into()),
+        node_acceptance_attestation: Some("sig_to...".into()),
     };
     let json = serde_json::to_value(&notif).unwrap();
     assert_eq!(json["reason"], "sale");
@@ -551,7 +551,7 @@ fn sample_transfer() -> TransferNotification {
         reason: "sale".into(),
         transferred_at: Utc::now(),
         from_signature: Some("sig_from...".into()),
-        to_signature: Some("sig_to...".into()),
+        node_acceptance_attestation: Some("sig_to...".into()),
     }
 }
 
@@ -608,12 +608,12 @@ fn transfer_without_a_reason_is_refused() {
 
 /// A transfer is initiated by the outgoing operator and countersigned only when
 /// the incoming one accepts, so a pending transfer legitimately has no
-/// `to_signature`. Requiring it here would make the notification unbuildable
+/// `node_acceptance_attestation`. Requiring it here would make the notification unbuildable
 /// for exactly the case a registry most wants to hear about.
 #[test]
 fn a_pending_transfer_still_validates() {
     let mut notif = sample_transfer();
-    notif.to_signature = None;
+    notif.node_acceptance_attestation = None;
     assert!(notif.validate().is_ok());
 }
 

@@ -147,7 +147,7 @@ async fn ghost_notify_transfer_returns_not_found() {
         to_operator: operator("did:web:new.example.com", "New Operator GmbH"),
         reason: TransferReason::Sale,
         from_signature: None,
-        to_signature: None,
+        node_acceptance_attestation: None,
         initiated_at: Utc::now(),
         completed_at: None,
         rejected_at: None,
