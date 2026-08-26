@@ -733,6 +733,53 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   across all three audiences, the second by searching the serialised document so
   a proof reintroduced under any name or nesting still fails.
 
+### Added
+
+- **The access-credential wire format is published, with the code to use it.**
+  New `dpp_vc::credential::jwt` records the VC-JWT envelope contract and adds
+  `sign_access_credential` and `authenticate_access_credential`.
+
+  `DppAccessCredential` has no `proof` member, and that is correct under this
+  envelope — the credential JSON is the payload of a compact JWS and the wrapper
+  is external. What was missing was that this crate never said so. It published
+  a complete-looking verification stack — the builder, `verify_credential_claims`,
+  `verify_credential_claims_with_trust`, `check_revocation` — with no statement
+  anywhere that the document must arrive signed, and no way to check one.
+
+  That gap has a specific consequence. `verify_credential_claims_with_trust` asks
+  whether a credential's `issuer` is trusted, and `issuer` is a string whoever
+  produced the document chose. **Trust checking without signature verification is
+  decorative**, so a consumer assembling a verifier from these parts got a stack
+  that reads as authoritative and authenticates nothing.
+
+  `authenticate_access_credential` establishes one thing: the document was signed
+  by a key published in the issuer's DID document, and it names that document's
+  subject as its issuer. It deliberately does *not* check the validity window,
+  trust, or revocation — those stay in the composed verifiers, because running
+  them first means acting on attacker-chosen fields, most obviously fetching a
+  status list from a URL inside an unauthenticated document.
+
+  The DID document is a **parameter**, not something the function fetches:
+  resolving a DID is network I/O and this crate performs none. The caller
+  resolves it from the credential's own `issuer`, and the function re-checks that
+  binding against the document it was handed — so a caller that resolves the
+  wrong document is refused rather than silently trusted. That check catches what
+  a signature alone cannot: a credential correctly signed by A, verified against
+  a document that carries A's key but is labelled B.
+
+  `sign_access_credential` is the issuer's side, signing over the JCS canonical
+  form so an issuer and a verifier cannot disagree about a document they both
+  consider correct. Its doc states plainly that issuing is an authority's act,
+  not a node's — a node signing its own access credentials has attested nothing
+  to anyone.
+
+  Ten tests, weighted to the refusals: tampered payload, `alg:none`, a document
+  with no matching key, a document for a different DID carrying the right key, a
+  correctly-signed payload that is not a credential, and structurally broken
+  input. The two binding tests were each confirmed to fail with the check
+  removed, and they fail for different reasons — one is caught by the signature,
+  the other only by the issuer binding.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
