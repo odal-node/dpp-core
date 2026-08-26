@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::error::field::ValidationErrors;
+use crate::field_error::ValidationErrors;
 
 /// Top-level error type for the DPP domain.
 #[derive(Debug, Error)]

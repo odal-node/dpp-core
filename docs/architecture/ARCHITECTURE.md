@@ -83,6 +83,7 @@ imports may only point up the ladder, and a tripwire holds them to it.
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
 | `disclosure` | 2 | The Art. 77(2) lattice — `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3: `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
 | `eol` | 2 | End-of-life declarations, and the derogation a destruction claim must cite |
+| `field_error` | 2 | `FieldError` and `ValidationErrors` — the per-field detail a validation failure carries. Split from `error` because the two sit at different levels, and holding them together was a cycle |
 | `facility` | 2 | `FacilitySnapshot` — where a product was made, as recorded at issuance |
 | `graph` | 2 | The bill-of-materials graph a passport sits in |
 | `instrument` | 2 | The legal acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair. **This is where the law lives** |
@@ -100,7 +101,7 @@ imports may only point up the ladder, and a tripwire holds them to it.
 | `validation` | 3 | Schema conformance and cross-field rules — the pass `Passport::validate` deliberately does not run |
 | `ports` | 4 | The core↔platform trait boundary (see [PORTS.md](PORTS.md)). **Nothing may import it** |
 | `passthrough` | 4 | The Apache-2.0 default `ComplianceRegistry` and its per-group strategies — an adapter, wired by the open-source binary |
-| `error` | — | `DppError` and the per-field detail. Sits **above** the ladder, because a crate-wide error has to be able to name a type from any tier |
+| `error` | 2 | `DppError`, the one error every fallible entry point returns. Sits at the level of the deepest thing it wraps — a lens error from `schemas` |
 
 Prefer naming the concerns over asserting a count — a count is the part that
 goes stale while every claim around it stays checkable.
@@ -117,6 +118,7 @@ catalog
 compliance
 eol
 error
+field_error
 facility
 graph
 identifier

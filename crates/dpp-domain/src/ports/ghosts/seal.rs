@@ -28,7 +28,7 @@ impl SealPort for GhostSeal {
         // consumer, which is most of what a ghost is for.
         if !self.capabilities().can_produce(&req) {
             return Err(DppError::Validation(
-                crate::error::field::ValidationErrors::message(format!(
+                crate::field_error::ValidationErrors::message(format!(
                     "GhostSeal does not produce {:?}/{:?}",
                     req.sig_format, req.mode
                 )),

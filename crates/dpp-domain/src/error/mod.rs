@@ -1,18 +1,14 @@
 //! The crate-wide error surface.
 //!
-//! This module sits **above** the tier ladder in `CODE-LAYOUT.md` §1 rather than
-//! inside it: a crate-wide error has to be able to name a type from any tier, so
-//! constraining which tiers it may reach would only push the coupling somewhere
-//! less visible.
-//!
-//! - [`dpp`] — [`DppError`], the one error every fallible entry point returns.
-//! - [`field`] — [`FieldError`] and [`ValidationErrors`], the per-field detail a
-//!   validation failure carries.
+//! [`DppError`] is the one error every fallible entry point returns. It sits at
+//! the level of the deepest thing it wraps — a lens error from
+//! [`crate::schemas`] — which is why it is *not* the same module as
+//! [`crate::field_error`], the per-field detail it carries. Holding both here
+//! made this module simultaneously above and below `schemas`, and that cycle
+//! was invisible to a check that only looked at direction.
 
 pub mod dpp;
-pub mod field;
 #[cfg(test)]
 mod tests;
 
 pub use dpp::DppError;
-pub use field::{FieldError, ValidationErrors};

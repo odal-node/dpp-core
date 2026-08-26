@@ -535,6 +535,9 @@ const TIERS: &[(&str, u8)] = &[
     ("identifier", 1),
     ("catalog", 2),
     ("compliance", 2),
+    ("schemas", 2),
+    ("error", 2),
+    ("field_error", 2),
     ("eol", 2),
     ("facility", 2),
     ("graph", 2),
@@ -551,7 +554,6 @@ const TIERS: &[(&str, u8)] = &[
     ("transfer", 2),
     ("access", 3),
     ("lint", 3),
-    ("schemas", 3),
     ("validation", 3),
     ("passthrough", 4),
     ("ports", 4),
@@ -574,6 +576,37 @@ fn is_test_file(path: &Path) -> bool {
 #[test]
 fn rule_0_tier_imports_point_up() {
     let root = workspace_root().join("crates/dpp-domain/src");
+
+    // An unlisted module used to be skipped, which made the table's own doc
+    // ("an unlisted module is not silently exempt, it fails") untrue — a new
+    // top-level module would have been exempt from the ladder until somebody
+    // noticed. Placing a module in a tier is the decision this rule exists to
+    // force, so not deciding has to fail.
+    let mut unlisted: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if tier_of(name).is_none() {
+                unlisted.push(name.to_owned());
+            }
+        }
+    }
+    assert!(
+        unlisted.is_empty(),
+        "\nCODE-LAYOUT.md rule 0 — these modules are not in the tier table:\n{}\n\n\
+         Add each to `TIERS` with the tier it belongs in. A module with no tier \
+         is not exempt from the ladder; it is undecided.\n",
+        unlisted
+            .iter()
+            .map(|m| format!("  {m}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
     let mut files = Vec::new();
     find_rs_files(&root, &mut files);
 
@@ -636,10 +669,11 @@ fn rule_0_tier_imports_point_up() {
     );
 }
 
-// `passport.rs` remains: `from_stored` takes a `&LensRegistry`, which is the
-// factory carve-out that CODE-LAYOUT.md section 1 states. The other two entries
-// are gone: `error/` moved above the ladder and `validation/` moved to tier 3.
-const TIER_BASELINE: &[&str] = &["crates/dpp-domain/src/passport/record.rs"];
+// Empty. The ladder holds with no exceptions. Two things got it there: the
+// `error` cycle was broken by splitting `field_error` out, and `schemas` moved
+// to tier 2 — where its imports always put it — rather than tier 3, where a
+// "policy" label had put it by hand.
+const TIER_BASELINE: &[&str] = &[];
 
 // ---------------------------------------------------------------------------
 // Rule 11 — a concept that outgrew its file becomes a directory
@@ -998,3 +1032,98 @@ fn rule_15_shared_means_shared() {
 }
 
 const SHARED_BUCKET_BASELINE: &[&str] = &["crates/dpp-rules/src/common/date.rs"];
+
+/// Every production import edge between two top-level `dpp-domain` modules.
+///
+/// Test files are excluded on purpose: a test reaches for whatever it needs to
+/// exercise the thing it covers, and the ladder is a statement about production
+/// dependencies. Including them would report cycles that do not exist at
+/// runtime — measured on 2026-08-26, two of the three apparent cycles in this
+/// crate were `tests.rs` files.
+fn module_edges() -> BTreeSet<(String, String)> {
+    let root = workspace_root().join("crates/dpp-domain/src");
+    let mut files = Vec::new();
+    find_rs_files(&root, &mut files);
+
+    let mut edges = BTreeSet::new();
+    for path in files {
+        if is_test_file(&path) {
+            continue;
+        }
+        let Some(src) = read_source(&path) else {
+            continue;
+        };
+        let relative = rel(&path);
+        let Some(rest) = relative.strip_prefix("crates/dpp-domain/src/") else {
+            continue;
+        };
+        let Some((own, _)) = rest.split_once('/') else {
+            continue;
+        };
+        if tier_of(own).is_none() {
+            continue;
+        }
+        for line in code_lines(&src) {
+            let mut rest = line;
+            while let Some(at) = rest.find("crate::") {
+                rest = &rest[at + "crate::".len()..];
+                let target: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if target != own && tier_of(&target).is_some() {
+                    edges.insert((own.to_owned(), target));
+                }
+            }
+        }
+    }
+    edges
+}
+
+#[test]
+fn rule_0_module_graph_is_acyclic() {
+    let edges = module_edges();
+    let mut remaining: BTreeSet<String> = TIERS.iter().map(|(m, _)| (*m).to_owned()).collect();
+
+    // Kahn, from the leaves up: drop any module that no longer depends on
+    // anything still in the set, and repeat. Whatever cannot be dropped is in a
+    // cycle, or depends on one.
+    loop {
+        let leaves: Vec<String> = remaining
+            .iter()
+            .filter(|m| {
+                !edges
+                    .iter()
+                    .any(|(src, dst)| src == *m && remaining.contains(dst))
+            })
+            .cloned()
+            .collect();
+        if leaves.is_empty() {
+            break;
+        }
+        for leaf in leaves {
+            remaining.remove(&leaf);
+        }
+    }
+
+    if remaining.is_empty() {
+        return;
+    }
+
+    let mut detail = String::new();
+    for m in &remaining {
+        let deps: Vec<&str> = edges
+            .iter()
+            .filter(|(src, dst)| src == m && remaining.contains(dst))
+            .map(|(_, dst)| dst.as_str())
+            .collect();
+        detail.push_str(&format!("  {m} -> {}\n", deps.join(", ")));
+    }
+    panic!(
+        "\nCODE-LAYOUT.md rule 0 — these modules form an import cycle:\n\n{detail}\n\
+         A cycle passes the tier check whenever both modules sit in the same tier, \
+         so direction alone does not catch it. It usually means one module is two \
+         things at different levels — `error` was, until `field_error` was split \
+         out of it on 2026-08-26.\n"
+    );
+}

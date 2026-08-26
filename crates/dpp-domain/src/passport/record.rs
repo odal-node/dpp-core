@@ -451,7 +451,7 @@ impl Passport {
     /// - `product_group_data` passes JSON Schema + cross-field rules via
     ///   [`crate::validation::validate_product_group_data`] (non-wasm32 only)
     pub fn validate(&self) -> Result<(), crate::error::dpp::DppError> {
-        use crate::error::field::{FieldError, ValidationErrors};
+        use crate::field_error::{FieldError, ValidationErrors};
 
         let mut errors: Vec<FieldError> = Vec::new();
 
@@ -664,7 +664,7 @@ impl Passport {
     /// it is deliberate; it closes when a source covering those categories
     /// exists.
     pub fn check_mandatory_content(&self) -> Result<(), crate::error::dpp::DppError> {
-        use crate::error::field::{FieldError, ValidationErrors};
+        use crate::field_error::{FieldError, ValidationErrors};
 
         if self.product_group != crate::product_group::ProductGroup::Battery {
             return Ok(());

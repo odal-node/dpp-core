@@ -2,7 +2,7 @@
 //! extensibility and batch validation.
 
 use super::*;
-use crate::error::field::FieldError;
+use crate::field_error::FieldError;
 use crate::product_group::{BatteryData, FibreEntry, ProductGroupData, TextileData};
 use crate::schemas::VersionedSchemaRegistry;
 use semver::Version;

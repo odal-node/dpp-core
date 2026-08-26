@@ -12,7 +12,7 @@ use super::rules::{
 use super::validator::ProductGroupValidatorRegistry;
 use crate::catalog::ProductGroupCatalog;
 use crate::error::DppError;
-use crate::error::field::{FieldError, ValidationErrors};
+use crate::field_error::{FieldError, ValidationErrors};
 use crate::passport::Passport;
 use crate::product_group::{ProductGroupData, SvhcSubstance};
 use crate::schemas::VersionedSchemaRegistry;

@@ -27,9 +27,28 @@ ladder**.
 **Nothing may import tier 4.** Adapters live in the platform repository and are
 already outside this crate; every `impl …Port for` in the workspace is there.
 
-`error/` sits **above** the ladder rather than inside it. It is the one module
-that may name a type from any tier, because a crate-wide error has to be able to
-carry any of them.
+### Direction is not enough — the graph must also be acyclic
+
+Two modules in the *same* tier can import each other and satisfy every direction
+check, so a second test walks the module graph and fails on any cycle.
+
+It was written because there was one. `error` held both `DppError` — which wraps
+a lens error from `schemas` — and `FieldError`, which `schemas` itself returns.
+That made `error` simultaneously above and below `schemas`, and the direction
+check could not see it: the earlier fix declared `error` "above the ladder",
+which *exempted* the cycle rather than removing it.
+
+**A cycle usually means one module is two things at different levels.** It was
+here: the fix was to split `field_error` out as its own tier-2 module, leaving
+`error` free to sit above the deepest thing it wraps.
+
+The same exercise corrected a hand-assigned tier. `schemas` had been labelled
+tier 3 because it *decides* whether data conforms — but it imports exactly one
+module, which puts it second from the bottom of the graph. **The ladder is a
+dependency ordering, not a taxonomy of behaviour**; where a module sits is a fact
+about its imports, and the tier name is a label for the stratum rather than an
+independent judgement. Assigning by feel produced a table the code could not
+satisfy.
 
 ### Why a ladder and not a diagram
 
@@ -285,7 +304,8 @@ predates the rest and works.
 | 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
 | 10 | — | *guidance only* |
-| 0 | `layout::tier_imports_point_up` | a module imports a higher tier |
+| 0 | `layout::rule_0_tier_imports_point_up` | a module imports a higher tier, or is missing from the tier table |
+| 0 | `layout::rule_0_module_graph_is_acyclic` | two modules import each other, directly or through a chain |
 | 11 | `layout::rule_11_an_outgrown_concept_is_a_directory` | two files in one directory share a stem prefix (`gtin.rs` beside `gtin_check_digit.rs`) |
 | 12 | `layout::rule_12_no_name_repeats_its_directory` | a filename begins with its parent directory's name |
 | 13 | `layout::rule_13_hyphens_outside_module_paths` | a `-` appears under `src/`, or a `_` in a crate or data directory |

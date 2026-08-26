@@ -137,7 +137,7 @@ impl SealPort for ShortLivedOnly {
     async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         if !self.capabilities().can_produce(&req) {
             return Err(crate::error::dpp::DppError::Validation(
-                crate::error::field::ValidationErrors::message("profile not advertised"),
+                crate::field_error::ValidationErrors::message("profile not advertised"),
             ));
         }
         Ok(SealedEnvelope {
@@ -216,7 +216,7 @@ impl SealPort for SealsButCannotVerify {
     async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
         if !self.capabilities().can_produce(&req) {
             return Err(crate::error::dpp::DppError::Validation(
-                crate::error::field::ValidationErrors::message("profile not advertised"),
+                crate::field_error::ValidationErrors::message("profile not advertised"),
             ));
         }
         Ok(SealedEnvelope {
@@ -232,7 +232,7 @@ impl SealPort for SealsButCannotVerify {
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
         Err(crate::error::dpp::DppError::Validation(
-            crate::error::field::ValidationErrors::message("verification unsupported"),
+            crate::field_error::ValidationErrors::message("verification unsupported"),
         ))
     }
     fn capabilities(&self) -> SealCapabilities {

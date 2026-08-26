@@ -25,6 +25,7 @@ pub mod disclosure;
 pub mod eol;
 pub mod error;
 pub mod facility;
+pub mod field_error;
 pub mod graph;
 pub mod identifier;
 pub mod instrument;
@@ -127,7 +128,8 @@ pub use crate::{
     },
 };
 
-pub use error::{DppError, FieldError, ValidationErrors};
+pub use error::DppError;
+pub use field_error::{FieldError, ValidationErrors};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use validation::{
