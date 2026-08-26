@@ -228,8 +228,8 @@ fn gs1_digital_link_parsing_for_battery() {
     let url = format!("https://id.gs1.org/01/{VALID_GTIN}/21/LOT-2027-B-0917");
     let link = DigitalLink::parse(&url).expect("should parse valid GS1 Digital Link");
 
-    assert_eq!(link.gtin.as_str(), VALID_GTIN);
-    assert_eq!(link.serial.as_deref(), Some("LOT-2027-B-0917"));
+    assert_eq!(link.gtin().expect("a GTIN-keyed link").as_str(), VALID_GTIN);
+    assert_eq!(link.serial(), Some("LOT-2027-B-0917"));
 
     let rebuilt = link.build();
     assert!(rebuilt.contains(VALID_GTIN));

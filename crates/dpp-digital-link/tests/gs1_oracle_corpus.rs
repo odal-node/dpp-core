@@ -42,7 +42,7 @@
 //! runs and still checks our own side, so an ordinary `just check` gets the
 //! coverage without producing files.
 
-use dpp_digital_link::DigitalLink;
+use dpp_digital_link::{DigitalLink, PrimaryKey};
 use dpp_domain::Gtin;
 
 /// GTINs with correct check digits, spanning the lengths we normalise from.
@@ -95,13 +95,20 @@ fn corpus() -> Vec<Entry> {
     for base in RESOLVER_BASES {
         for gtin in VALID_GTINS {
             let parsed = Gtin::parse(gtin).expect("corpus GTIN must be valid");
+            // Qualifiers in GS1's canonical order for AI 01. `None` entries
+            // are dropped, so each call builds exactly the combination named.
             let dl = |variant, batch, serial, tpcsn| DigitalLink {
                 resolver_base: (*base).to_owned(),
-                gtin: parsed.clone(),
-                variant,
-                batch,
-                serial,
-                tpcsn,
+                primary_key: PrimaryKey::Gtin(parsed.clone()),
+                qualifiers: [
+                    ("22", variant),
+                    ("10", batch),
+                    ("21", serial),
+                    ("235", tpcsn),
+                ]
+                .into_iter()
+                .filter_map(|(ai, v): (&str, Option<String>)| v.map(|v| (ai.to_owned(), v)))
+                .collect(),
             };
 
             // Every qualifier combination the builder emits, in canonical order.
@@ -188,6 +195,39 @@ fn corpus() -> Vec<Entry> {
             format!("{base}/01/{gtin}/04/NOSUCHAI"),
             "unassigned application identifier",
         ));
+
+        // ── The other fifteen primary keys ──────────────────────────────
+        //
+        // These could not be in the corpus until the parser read them: the
+        // oracle asserts agreement in both directions with no mechanism for a
+        // known disagreement, so a conformant link we refused would have failed
+        // the job rather than reported a gap. That is the coupling — the cases
+        // and the support have to land together.
+        //
+        // Written by hand from GS1's dictionary rather than built, because
+        // `build()` only ever emits what we already construct. The oracle, not
+        // us, decides whether each is well-formed.
+        for (ai, value, note) in [
+            ("00", "106141411234567890", "SSCC"),
+            ("253", "4012345678901", "GDTI without its optional serial"),
+            ("401", "ORDER-99", "GINC, variable-length alphanumeric"),
+            ("402", "40123456789012340", "GSIN"),
+            ("414", "4226350800008", "party GLN"),
+            ("8003", "04012345678901ABC", "GRAI"),
+            ("8004", "4012345ABC123", "GIAI"),
+            ("8013", "1987654Ad4X4bL5ttr2310c2K", "GMN"),
+        ] {
+            out.push(entry(format!("{base}/{ai}/{value}"), note));
+        }
+
+        // A qualifier that belongs to a *different* primary key. AI 22
+        // qualifies AI 01 and not AI 00, so this is not a link GS1 defines —
+        // and it is only refusable now that the qualifier rules are evaluated
+        // against the key the path actually opened on.
+        out.push(entry(
+            format!("{base}/00/106141411234567890/22/VAR-1"),
+            "qualifier from another primary key's sequence",
+        ));
     }
 
     out
@@ -210,6 +250,7 @@ fn every_built_link_round_trips_through_our_own_parser() {
         "serial and third-party serial from different alternative sequences",
         "unassigned application identifier",
         "data attribute in the path rather than the query string",
+        "qualifier from another primary key's sequence",
     ];
 
     for e in corpus() {

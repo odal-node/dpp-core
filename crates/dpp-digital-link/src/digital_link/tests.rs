@@ -6,8 +6,8 @@ use super::*;
 fn round_trip_gtin_serial() {
     let uri = "https://id.odal-node.io/01/09506000134352/21/ABC123";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.gtin.as_str(), "09506000134352");
-    assert_eq!(dl.serial.as_deref(), Some("ABC123"));
+    assert_eq!(dl.gtin().unwrap().as_str(), "09506000134352");
+    assert_eq!(dl.serial(), Some("ABC123"));
     assert_eq!(dl.build(), uri);
 }
 
@@ -25,10 +25,10 @@ fn round_trips_the_first_qualifier_sequence() {
     // sequences AI 01 declares as `dlpkey=22,10,21|235`.
     let uri = "https://id.odal-node.io/01/09506000134352/22/VAR-1/10/LOT-9/21/SN-7";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.variant.as_deref(), Some("VAR-1"));
-    assert_eq!(dl.batch.as_deref(), Some("LOT-9"));
-    assert_eq!(dl.serial.as_deref(), Some("SN-7"));
-    assert_eq!(dl.tpcsn, None);
+    assert_eq!(dl.variant(), Some("VAR-1"));
+    assert_eq!(dl.batch(), Some("LOT-9"));
+    assert_eq!(dl.serial(), Some("SN-7"));
+    assert_eq!(dl.tpcsn(), None);
     assert_eq!(dl.build(), uri);
 }
 
@@ -37,8 +37,8 @@ fn round_trips_the_alternative_qualifier_sequence() {
     // 235 is the *other* alternative, used on its own.
     let uri = "https://id.odal-node.io/01/09506000134352/235/TPX-3";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.tpcsn.as_deref(), Some("TPX-3"));
-    assert_eq!(dl.serial, None);
+    assert_eq!(dl.tpcsn(), Some("TPX-3"));
+    assert_eq!(dl.serial(), None);
     assert_eq!(dl.build(), uri);
 }
 
@@ -60,8 +60,8 @@ fn qualifiers_from_two_alternative_sequences_are_rejected() {
 fn parse_with_batch() {
     let uri = "https://id.odal-node.io/01/09506000134352/10/BATCH01/21/SN001";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.batch.as_deref(), Some("BATCH01"));
-    assert_eq!(dl.serial.as_deref(), Some("SN001"));
+    assert_eq!(dl.batch(), Some("BATCH01"));
+    assert_eq!(dl.serial(), Some("SN001"));
 }
 
 #[test]
@@ -75,11 +75,107 @@ fn invalid_gtin_rejected() {
 
 #[test]
 fn missing_gtin_rejected() {
+    // AI 21 is a qualifier, not a primary key, so there is genuinely no primary
+    // key here and `MissingGtin` is the accurate verdict.
     let uri = "https://id.odal-node.io/21/SN1";
     assert!(matches!(
         DigitalLink::parse(uri),
         Err(DigitalLinkError::MissingGtin)
     ));
+}
+
+/// A link keyed on any of GS1's sixteen primary keys parses and round-trips.
+///
+/// These are conformant Digital Links a partner may legitimately send. Refusing
+/// them as `MissingGtin` claimed the sender's link was malformed, which sends
+/// the investigation to the wrong side of the integration — the "we reject, GS1
+/// accepts" direction the oracle's own header calls the quiet one.
+#[test]
+fn every_gs1_primary_key_parses_and_round_trips() {
+    // SSCC, GDTI, GRAI, GIAI, the party GLN, GINC, GMN.
+    for (ai, value) in [
+        ("00", "106141411234567890"),
+        ("253", "4012345678901"),
+        ("8003", "04012345678901ABC"),
+        ("8004", "4012345ABC123"),
+        ("414", "4226350800008"),
+        ("401", "ORDER-99"),
+        ("8013", "1987654Ad4X4bL5ttr2310c2K"),
+    ] {
+        let uri = format!("https://id.odal-node.io/{ai}/{value}");
+        let dl = DigitalLink::parse(&uri).unwrap_or_else(|e| panic!("{uri} must parse: {e}"));
+        assert_eq!(dl.primary_key.ai(), ai);
+        assert_eq!(dl.build(), uri, "{ai} must round-trip");
+    }
+}
+
+/// The one validated key is reachable as a `Gtin`; the other fifteen are not,
+/// and can only be read through a method that says so.
+///
+/// This is the API carrying the asymmetry rather than a doc paragraph carrying
+/// it. `Gtin::parse` verifies a mod-10 check digit; nothing here verifies the
+/// SSCC's, because what a `csum` covers differs per key — AI 8003's covers a
+/// middle component, AI 8013 uses a different algorithm entirely — and a check
+/// that is wrong in the permissive direction is worse than no check, since it
+/// reports a validation that did not happen.
+#[test]
+fn only_the_gtin_comes_back_validated() {
+    let gtin_link = DigitalLink::parse("https://id.odal-node.io/01/09506000134352").unwrap();
+    assert!(gtin_link.gtin().is_some(), "a GTIN is validated");
+    assert_eq!(
+        gtin_link.primary_key.unvalidated_value(),
+        None,
+        "a validated key must not be reachable through the unvalidated accessor"
+    );
+
+    let sscc_link = DigitalLink::parse("https://id.odal-node.io/00/106141411234567890").unwrap();
+    assert!(
+        sscc_link.gtin().is_none(),
+        "an SSCC is not a GTIN and must not masquerade as one"
+    );
+    assert_eq!(
+        sscc_link.primary_key.unvalidated_value(),
+        Some("106141411234567890"),
+        "the only way to its value names what it is"
+    );
+}
+
+/// A qualifier belonging to a *different* primary key is refused.
+///
+/// AI 22 is one of AI 01's qualifiers and not one of AI 00's, so an SSCC path
+/// carrying it is not a link GS1 defines. Before the primary key was read from
+/// the dictionary the qualifier rules were evaluated against AI 01 whatever the
+/// path opened on, which would have accepted this.
+#[test]
+fn a_qualifier_from_another_primary_key_is_refused() {
+    let uri = "https://id.odal-node.io/00/106141411234567890/22/VAR-1";
+    assert!(
+        DigitalLink::parse(uri).is_err(),
+        "AI 22 does not qualify an SSCC"
+    );
+}
+
+/// The set is read from the vendored dictionary, not from a list in the code,
+/// so it tracks GS1's designations rather than a snapshot of them.
+///
+/// Guards the vacuous case too: if the dictionary ever failed to load, every
+/// lookup would return `None`, the loop above would panic, and this would
+/// report zero — but a future refactor could make the first silent.
+#[test]
+fn the_primary_key_set_comes_from_the_dictionary() {
+    let keys: Vec<&str> = super::syntax_dictionary::dictionary()
+        .values()
+        .filter(|s| s.dl_primary_key)
+        .map(|s| s.ai.as_str())
+        .collect();
+
+    assert!(
+        keys.len() > 1,
+        "the dictionary should mark several primary keys, found {}",
+        keys.len()
+    );
+    assert!(keys.contains(&"01"), "GTIN must be among them");
+    assert!(keys.contains(&"00"), "SSCC must be among them");
 }
 
 // ── G-5: official GS1 Digital Link worked examples ──────────────────────
@@ -102,7 +198,7 @@ mod gs1_official_worked_examples {
     fn section_5_1_gtin_canonical() {
         let uri = "https://id.gs1.org/01/09520123456788";
         let dl = DigitalLink::parse(uri).expect("GS1's own canonical example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
         assert_eq!(dl.resolver_base, "https://id.gs1.org");
         assert_eq!(dl.build(), uri, "must round-trip to the canonical form");
     }
@@ -112,7 +208,7 @@ mod gs1_official_worked_examples {
     fn section_5_1_gtin_custom_domain() {
         let uri = "https://brand.example.com/01/09520123456788";
         let dl = DigitalLink::parse(uri).expect("GS1's own custom-domain example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
         assert_eq!(dl.build(), uri);
     }
 
@@ -123,7 +219,7 @@ mod gs1_official_worked_examples {
     fn section_5_1_gtin_with_path_prefix() {
         let uri = "https://brand.example.com/some-extra/pathinfo/01/09520123456788";
         let dl = DigitalLink::parse(uri).expect("GS1's own path-prefix example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
         assert_eq!(
             dl.resolver_base,
             "https://brand.example.com/some-extra/pathinfo"
@@ -136,8 +232,8 @@ mod gs1_official_worked_examples {
     fn section_5_2_gtin_plus_cpv() {
         let uri = "https://id.gs1.org/01/09520123456788/22/2A";
         let dl = DigitalLink::parse(uri).expect("GS1's own CPV example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
-        assert_eq!(dl.variant.as_deref(), Some("2A"));
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
+        assert_eq!(dl.variant(), Some("2A"));
         assert_eq!(dl.build(), uri);
     }
 
@@ -146,8 +242,8 @@ mod gs1_official_worked_examples {
     fn section_5_3_gtin_plus_batch_lot() {
         let uri = "https://id.gs1.org/01/09520123456788/10/ABC123";
         let dl = DigitalLink::parse(uri).expect("GS1's own batch/lot example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
-        assert_eq!(dl.batch.as_deref(), Some("ABC123"));
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
+        assert_eq!(dl.batch(), Some("ABC123"));
         assert_eq!(dl.build(), uri);
     }
 
@@ -156,8 +252,8 @@ mod gs1_official_worked_examples {
     fn section_5_4_gtin_plus_serial() {
         let uri = "https://id.gs1.org/01/09520123456788/21/12345";
         let dl = DigitalLink::parse(uri).expect("GS1's own serial-number example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
-        assert_eq!(dl.serial.as_deref(), Some("12345"));
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
+        assert_eq!(dl.serial(), Some("12345"));
         assert_eq!(dl.build(), uri);
     }
 
@@ -171,9 +267,9 @@ mod gs1_official_worked_examples {
     fn section_5_5_gtin_plus_batch_plus_serial_query_string_ignored() {
         let uri = "https://id.gs1.org/01/09520123456788/10/ABC1/21/12345?17=180426";
         let dl = DigitalLink::parse(uri).expect("GS1's own batch+serial+expiry example must parse");
-        assert_eq!(dl.gtin.as_str(), "09520123456788");
-        assert_eq!(dl.batch.as_deref(), Some("ABC1"));
-        assert_eq!(dl.serial.as_deref(), Some("12345"));
+        assert_eq!(dl.gtin().unwrap().as_str(), "09520123456788");
+        assert_eq!(dl.batch(), Some("ABC1"));
+        assert_eq!(dl.serial(), Some("12345"));
         // build() has no AI 17 support, so it reproduces the path without
         // the query string — still a valid, equivalent GS1 Digital Link URI.
         assert_eq!(
@@ -257,15 +353,15 @@ fn bad_check_digit_rejected_via_parse() {
 fn query_string_does_not_corrupt_serial() {
     let uri = "https://id.odal-node.io/01/09506000134352/21/SN001?linkType=gs1:pip";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.serial.as_deref(), Some("SN001"));
+    assert_eq!(dl.serial(), Some("SN001"));
 }
 
 #[test]
 fn query_only_uri_returns_gtin_cleanly() {
     let uri = "https://id.odal-node.io/01/09506000134352?linkType=gs1:pip";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.gtin.as_str(), "09506000134352");
-    assert_eq!(dl.serial, None);
+    assert_eq!(dl.gtin().unwrap().as_str(), "09506000134352");
+    assert_eq!(dl.serial(), None);
 }
 
 // ── 3.4a: GTIN normalisation ──────────────────────────────────
@@ -275,7 +371,7 @@ fn gtin_13_normalised_to_14() {
     // EAN-13 5901234123457 → GTIN-14 05901234123457 (check digit preserved)
     let uri = "https://id.odal-node.io/01/5901234123457/21/SN1";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.gtin.as_str(), "05901234123457");
+    assert_eq!(dl.gtin().unwrap().as_str(), "05901234123457");
 }
 
 #[test]
@@ -283,7 +379,7 @@ fn gtin_12_normalised_to_14() {
     // UPC-A 012345678905 → GTIN-14 00012345678905
     let uri = "https://id.odal-node.io/01/012345678905/21/SN1";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.gtin.as_str(), "00012345678905");
+    assert_eq!(dl.gtin().unwrap().as_str(), "00012345678905");
 }
 
 #[test]
@@ -372,14 +468,14 @@ fn percent_encoded_serial_decoded_on_parse() {
     // %2F is '/'
     let uri = "https://id.odal-node.io/01/09506000134352/21/SN%2F001";
     let dl = DigitalLink::parse(uri).unwrap();
-    assert_eq!(dl.serial.as_deref(), Some("SN/001"));
+    assert_eq!(dl.serial(), Some("SN/001"));
 }
 
 #[test]
 fn slash_in_serial_encoded_on_build() {
     let uri = "https://id.odal-node.io/01/09506000134352/21/SN1";
     let mut dl = DigitalLink::parse(uri).unwrap();
-    dl.serial = Some("SN/001".to_owned());
+    dl.qualifiers = vec![("21".to_owned(), "SN/001".to_owned())];
     assert!(dl.build().contains("/21/SN%2F001"));
 }
 
@@ -387,7 +483,7 @@ fn slash_in_serial_encoded_on_build() {
 fn question_mark_in_serial_encoded_on_build() {
     let uri = "https://id.odal-node.io/01/09506000134352/21/SN1";
     let mut dl = DigitalLink::parse(uri).unwrap();
-    dl.serial = Some("SN?001".to_owned());
+    dl.qualifiers = vec![("21".to_owned(), "SN?001".to_owned())];
     assert!(dl.build().contains("/21/SN%3F001"));
 }
 

@@ -130,19 +130,34 @@ impl ElementString {
     ///
     /// # Errors
     ///
-    /// [`DigitalLinkError::MissingGtin`] when no AI 01 was present. GS1 defines
-    /// sixteen Digital Link primary keys; this crate builds links only on GTIN,
-    /// so an element string keyed on any other is decoded correctly here but
-    /// cannot be turned into a link yet.
+    /// [`DigitalLinkError::MissingGtin`] when no AI 01 was present.
+    ///
+    /// GS1 defines sixteen Digital Link primary keys and [`DigitalLink`] now
+    /// reads all of them, but this type models the GTIN family of AIs as typed
+    /// fields, so an element string keyed on another primary key keeps that key
+    /// in [`ElementString::other`] and cannot be lifted to a link from here.
+    /// Parsing a *URI* on any primary key is unaffected.
     pub fn to_digital_link(&self, resolver_base: &str) -> Result<DigitalLink, DigitalLinkError> {
         let gtin = self.gtin.clone().ok_or(DigitalLinkError::MissingGtin)?;
+
+        // Emitted in GS1's canonical qualifier order for AI 01, which is the
+        // order `dlpkey=22,10,21|235` declares.
+        let mut qualifiers = Vec::new();
+        for (ai, value) in [
+            ("22", &self.variant),
+            ("10", &self.batch),
+            ("21", &self.serial),
+            ("235", &self.tpcsn),
+        ] {
+            if let Some(v) = value {
+                qualifiers.push((ai.to_owned(), v.clone()));
+            }
+        }
+
         Ok(DigitalLink {
             resolver_base: resolver_base.trim_end_matches('/').to_owned(),
-            gtin,
-            variant: self.variant.clone(),
-            batch: self.batch.clone(),
-            serial: self.serial.clone(),
-            tpcsn: self.tpcsn.clone(),
+            primary_key: super::primary_key::PrimaryKey::Gtin(gtin),
+            qualifiers,
         })
     }
 }
@@ -284,9 +299,9 @@ mod tests {
 
         let uri = link.build();
         let reparsed = DigitalLink::parse(&uri).expect("round-trips");
-        assert_eq!(reparsed.gtin.to_string(), GTIN);
-        assert_eq!(reparsed.serial.as_deref(), Some("12345"));
-        assert_eq!(reparsed.batch.as_deref(), Some("BATCH01"));
+        assert_eq!(reparsed.gtin().unwrap().to_string(), GTIN);
+        assert_eq!(reparsed.serial(), Some("12345"));
+        assert_eq!(reparsed.batch(), Some("BATCH01"));
     }
 
     /// GS1 defines sixteen Digital Link primary keys and this crate builds
