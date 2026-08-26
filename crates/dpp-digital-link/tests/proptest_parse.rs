@@ -29,7 +29,7 @@ proptest! {
     fn serial_round_trips(serial in "[A-Za-z0-9]{1,20}") {
         let uri = format!("https://id.odal-node.io/01/09506000134352/21/{serial}");
         let dl = DigitalLink::parse(&uri).expect("canonical DL must parse");
-        prop_assert_eq!(dl.gtin.as_str(), "09506000134352");
-        prop_assert_eq!(dl.serial.as_deref(), Some(serial.as_str()));
+        prop_assert_eq!(dl.gtin().unwrap().as_str(), "09506000134352");
+        prop_assert_eq!(dl.serial(), Some(serial.as_str()));
     }
 }

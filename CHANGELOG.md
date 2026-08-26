@@ -15,6 +15,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`DigitalLink` reads all sixteen GS1 Digital Link primary keys, not only the
+  GTIN.** *(Breaking: `DigitalLink.gtin`, `.variant`, `.batch`, `.serial` and
+  `.tpcsn` are no longer fields. `primary_key: PrimaryKey` and
+  `qualifiers: Vec<(String, String)>` replace them; the old names are methods
+  returning `Option`.)*
+
+  GS1 marks sixteen AIs as Digital Link primary keys — `00` (SSCC), `253`
+  (GDTI), `401` (GINC), `414` (party GLN), `8003` (GRAI), `8004` (GIAI), `8013`
+  (GMN) and the rest. `DigitalLink::parse` looked for `01` and reported every
+  other one as `MissingGtin`: *"URI is missing the '/01/' GTIN segment"*.
+
+  That was a statement about the sender's link, and it was false. A partner
+  sending an SSCC-keyed link is conformant; we were the side that could not read
+  it. Reporting it as a malformed link sends the investigation to the wrong side
+  of the integration, and it is the *"we reject, GS1 accepts"* direction the GS1
+  oracle's own header calls the quiet one — interoperability lost with no error
+  ever logged.
+
+  Which AIs may open a path, and which qualifiers each accepts, is now read from
+  the vendored GS1 Barcode Syntax Dictionary rather than encoded in the parser.
+  A qualifier is validated against the key the path actually opened on, so AI
+  `22` — which qualifies a GTIN and not an SSCC — is refused on an SSCC path.
+
+  **Only the GTIN comes back validated, and the API says so.** `PrimaryKey::Gtin`
+  holds a check-digit-verified [`Gtin`]; the other fifteen are length-checked
+  and nothing more, reachable only through `PrimaryKey::unvalidated_value`. That
+  asymmetry is deliberate: most of these declare a `csum`, but what the check
+  digit covers differs per key — AI `8003` is `N1,zero N13,csum [X..16]`, so it
+  covers a middle component rather than the value, and AI `8013` uses
+  `csumalpha`, a different algorithm. Implementing those from the shape of a
+  dictionary line, without the specification defining each, is the invented
+  detail this crate refuses elsewhere, and a check wrong in the permissive
+  direction is worse than none because it reports a validation that never
+  happened. A caller cannot reach one of those values without writing the word
+  `unvalidated`.
+
+  *Migration:* `dl.gtin` becomes `dl.gtin()`, returning `Option<&Gtin>` since the
+  key may not be a GTIN. `dl.serial`, `.batch`, `.variant` and `.tpcsn` become
+  methods returning `Option<&str>`. Constructing a link literally now sets
+  `primary_key: PrimaryKey::Gtin(g)` and a `qualifiers` list in path order.
+
+  The GS1 oracle corpus gains the other primary keys. It could not carry them
+  before: it asserts agreement with GS1 in both directions with no mechanism for
+  a known disagreement, so a conformant link we refused would have failed the
+  job rather than recorded a gap. The cases and the support had to land together.
+
 - **The `domain` module is dissolved and every module in `dpp-domain` moves.**
   *(Breaking: every `dpp_domain::domain::…` path is gone, and `ports::` no longer
   re-exports model types. Migration below. No compatibility re-exports were

@@ -15,19 +15,16 @@ fn main() {
 
     println!("Parsed: {uri}");
     println!("  Resolver: {}", link.resolver_base);
-    println!("  GTIN (AI 01): {}", link.gtin);
-    println!(
-        "  Serial (AI 21): {}",
-        link.serial.as_deref().unwrap_or("—")
-    );
-    println!("  Batch (AI 10): {}", link.batch.as_deref().unwrap_or("—"));
+    println!("  GTIN (AI 01): {}", link.gtin().unwrap());
+    println!("  Serial (AI 21): {}", link.serial().unwrap_or("—"));
+    println!("  Batch (AI 10): {}", link.batch().unwrap_or("—"));
 
     let uri_batch = "https://id.odal-node.io/01/09506000134352/10/LOT-Q2-2026/21/UNIT-042";
     let link_batch = DigitalLink::parse(uri_batch).unwrap();
     println!("\nParsed: {uri_batch}");
-    println!("  GTIN: {}", link_batch.gtin);
-    println!("  Batch: {}", link_batch.batch.as_deref().unwrap_or("—"));
-    println!("  Serial: {}", link_batch.serial.as_deref().unwrap_or("—"));
+    println!("  GTIN: {}", link_batch.gtin().unwrap());
+    println!("  Batch: {}", link_batch.batch().unwrap_or("—"));
+    println!("  Serial: {}", link_batch.serial().unwrap_or("—"));
 
     let built = link.build();
     println!("\nRebuilt URI: {built}");

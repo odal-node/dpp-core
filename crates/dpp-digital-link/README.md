@@ -32,8 +32,20 @@ use dpp_domain::Disclosure;
 
 // Parse a GS1 Digital Link URL
 let link = DigitalLink::parse("https://id.gs1.org/01/09521234543213/21/ABC123").unwrap();
-assert_eq!(link.gtin.as_str(), "09521234543213");
-assert_eq!(link.serial.as_deref(), Some("ABC123"));
+// `gtin()` is an Option: GS1 defines sixteen primary keys and a conformant
+// link may open on any of them. Only the GTIN comes back validated.
+assert_eq!(link.gtin().unwrap().as_str(), "09521234543213");
+assert_eq!(link.serial(), Some("ABC123"));
+
+// A link keyed on an SSCC parses too. Its value is length-checked and not
+// check-digit verified, and the only accessor for it says so.
+let sscc = DigitalLink::parse("https://id.gs1.org/00/106141411234567890").unwrap();
+assert_eq!(sscc.primary_key.ai(), "00");
+assert!(sscc.gtin().is_none());
+assert_eq!(
+    sscc.primary_key.unvalidated_value(),
+    Some("106141411234567890"),
+);
 
 // Negotiate the best link for a JSON consumer
 let descriptors = vec![LinkDescriptor {

@@ -78,7 +78,7 @@ mod tests {
         let serial = short_serial(&uuid);
         let url = build_qr_url("https://id.odal-node.io", "09506000134352", &serial, None);
         let parsed = DigitalLink::parse(&url).expect("a derived serial must parse");
-        assert_eq!(parsed.serial.as_deref(), Some(serial.as_str()));
+        assert_eq!(parsed.serial(), Some(serial.as_str()));
         assert!(serial.chars().count() <= 20);
     }
 
