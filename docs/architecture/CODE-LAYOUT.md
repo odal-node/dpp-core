@@ -221,7 +221,9 @@ subject needs; the constants exist so the *rest* of the listing is the subject.
 
 **The rule then applies to that directory too, at every depth.** `identifier/` is
 not a folder of loose files: `gtin/`, `gln/` and `commodity_code/` are each their
-own module in this shape, and `gtin/` holds `check_digit.rs` inside it.
+own module in this shape. What sits *beside* them rather than inside one is
+`check_digit.rs` — `Gtin` and `Gln` both use it, so rule 15 puts it at their
+nearest common parent, not in either.
 
 This is the shape `regex-automata/src/meta/` and `tokio/src/sync/` both use, and
 it is what makes a module skimmable without opening it: the same four names

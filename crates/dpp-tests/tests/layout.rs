@@ -678,9 +678,10 @@ fn rule_0_tier_imports_point_up() {
 }
 
 // Empty. The ladder holds with no exceptions. Two things got it there: the
-// `error` cycle was broken by splitting `field_error` out, and `schemas` moved
-// to tier 2 — where its imports always put it — rather than tier 3, where a
-// "policy" label had put it by hand.
+// `error` cycle was broken by splitting `field_error` out, and `schemas` was
+// moved down to where its imports put it — it imports one module and sits second
+// from the bottom of the graph — rather than left near the top, where a "policy"
+// label had put it by hand.
 const TIER_BASELINE: &[&str] = &[];
 
 // ---------------------------------------------------------------------------

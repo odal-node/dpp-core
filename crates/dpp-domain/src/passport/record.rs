@@ -435,7 +435,7 @@ impl Passport {
         serde_json::from_value(doc).map_err(|e| DppError::Serialisation(e.to_string()))
     }
 
-    /// Validate passport fields for structural correctness and product group-data integrity.
+    /// Validate the passport's own field invariants.
     ///
     /// Checks:
     /// - `product_name` is non-empty
@@ -448,8 +448,16 @@ impl Passport {
     /// - for `ProductGroup::UnsoldGoods`, the disclosure carries at least one
     ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
     ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
-    /// - `product_group_data` passes JSON Schema + cross-field rules via
-    ///   [`crate::validation::validate_product_group_data`] (non-wasm32 only)
+    ///
+    /// **This does not validate `product_group_data` against its JSON Schema**,
+    /// and does not run the cross-field regulatory rules. That pass needs the
+    /// versioned schema registry — and through it `jsonschema` and a blocking
+    /// HTTP client — which an aggregate stating its own invariants must not
+    /// depend on. It is why this method is the same on every target, `wasm32`
+    /// included.
+    ///
+    /// **For both halves, call [`crate::validation::validate_passport`]**, which
+    /// runs this and then [`crate::validation::validate_product_group_data`].
     pub fn validate(&self) -> Result<(), crate::error::dpp::DppError> {
         use crate::field_error::{FieldError, ValidationErrors};
 
