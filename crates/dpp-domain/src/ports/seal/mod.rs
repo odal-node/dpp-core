@@ -48,6 +48,16 @@
 //! **not** re-exported here: a second path to the same type is what let a
 //! tier-2 aggregate import tier 4 in the first place (CODE-LAYOUT.md §1).
 
+/// A kit that holds any [`SealPort`] implementation to the contract above.
+///
+/// The refusal rule on [`SealPort::seal`] was a doc comment and nothing else,
+/// and a contract with one implementor that does not honour it is weaker than
+/// no contract, because it reads as a guarantee. Run
+/// [`conformance::check_seal_port`] against an adapter to find out.
+///
+/// A submodule of the port rather than a sibling of it: the contract belongs to
+/// `SealPort`, so the checks do too, and `ports/mod.rs` stays an inventory of
+/// ports — which the `ports_inventory` tripwire holds it to.
 pub mod conformance;
 #[cfg(test)]
 mod conformance_tests;

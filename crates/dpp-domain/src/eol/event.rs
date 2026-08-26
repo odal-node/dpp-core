@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::deactivation_reason::DeactivationReason;
 use crate::passport::PassportId;
 
+/// The end-of-life event attached to a passport when it is deactivated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EolEvent {

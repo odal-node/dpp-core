@@ -7,6 +7,11 @@ use serde::{Deserialize, Serialize};
 
 use super::error::CarbonFootprintClassError;
 
+/// A carbon footprint performance class label, preserved verbatim as declared.
+///
+/// **Deliberately not an enumeration.** Art. 7(2) of Regulation (EU) 2023/1542
+/// defines no class labels — it defers them to a delegated act that has not been
+/// adopted, and in the same paragraph requires the Commission to "review the
 /// number of performance classes and the thresholds between them, every three
 /// years". A fixed variant set is therefore wrong on a three-year cycle.
 ///

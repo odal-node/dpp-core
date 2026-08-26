@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::error::CnCategoryError;
 
+/// A combined-nomenclature **chapter** (2 digits) or **heading** (4 digits).
+///
+/// # Not [`CommodityCode`](crate::identifier::CommodityCode)
 ///
 /// The two are different levels of the same nomenclature and must not be
 /// substituted for one another. `CommodityCode` is a *product's own*

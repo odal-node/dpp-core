@@ -16,7 +16,7 @@ pub trait SealPort: Send + Sync {
     ///
     /// # An implementation must refuse what it cannot produce
     ///
-    /// If [`SealCapabilities::can_produce`] is false for `req`, this must return
+    /// If [`SealCapabilities::can_produce`](crate::seal::SealCapabilities::can_produce) is false for `req`, this must return
     /// an error rather than a seal. Advertising one thing and delivering another
     /// is not a convenience — it silently substitutes a different attestation
     /// than the caller asked for, and both axes carry meaning that cannot be

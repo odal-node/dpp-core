@@ -7,7 +7,7 @@
 //! Doc comments are not enforcement, and the gap showed: the only real adapter
 //! in the project builds its envelope with a hardcoded format regardless of what
 //! the caller asked for, and never consults
-//! [`SealCapabilities::can_produce`]. A contract with one implementor that does
+//! [`SealCapabilities::can_produce`](crate::seal::SealCapabilities::can_produce). A contract with one implementor that does
 //! not honour it is weaker than no contract, because it reads as a guarantee.
 //!
 //! The kit lives in `dpp-core` rather than beside any adapter deliberately. The
