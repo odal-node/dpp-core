@@ -532,31 +532,39 @@ fn rule_8_every_file_has_module_docs() {
 /// because it is the one that grew a cycle, and adding a module to this table is
 /// a deliberate act — an unlisted module is not silently exempt, it fails.
 const TIERS: &[(&str, u8)] = &[
+    // 1 vocabulary — names things, decides nothing.
     ("identifier", 1),
-    ("catalog", 2),
+    // 2 value — value objects with no aggregate of their own.
     ("compliance", 2),
-    ("schemas", 2),
-    ("error", 2),
-    ("field_error", 2),
-    ("eol", 2),
-    ("facility", 2),
-    ("graph", 2),
     ("credential", 2),
     ("disclosure", 2),
-    ("instrument", 2),
+    ("facility", 2),
+    ("field_error", 2),
     ("manufacturer", 2),
     ("material", 2),
-    ("passport", 2),
-    ("product", 2),
-    ("product_group", 2),
     ("seal", 2),
     ("status", 2),
-    ("transfer", 2),
-    ("access", 3),
-    ("lint", 3),
-    ("validation", 3),
-    ("passthrough", 4),
-    ("ports", 4),
+    // 3 reference — the embedded, data-driven registries.
+    ("catalog", 3),
+    ("instrument", 3),
+    ("schemas", 3),
+    // 4 composition — the shapes that bring the tiers below into one.
+    ("error", 4),
+    ("passport", 4),
+    ("product_group", 4),
+    // 5 satellite — records that hang off an aggregate.
+    ("eol", 5),
+    ("graph", 5),
+    ("product", 5),
+    ("transfer", 5),
+    // 6 policy — decides something.
+    ("access", 6),
+    ("lint", 6),
+    ("validation", 6),
+    // 7 boundary — traits the outside implements. Nothing may import it.
+    ("ports", 7),
+    // 8 adapter — an implementation of a port, shipped for the OSS binary.
+    ("passthrough", 8),
 ];
 
 fn tier_of(module: &str) -> Option<u8> {

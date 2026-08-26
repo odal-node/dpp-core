@@ -13,19 +13,47 @@ internally. They answer different questions and a file has to satisfy both.
 
 ## 1. The scope law
 
-Every module sits in exactly one of four tiers. A module's tier is a property of
-**what it does**, not of what it contains, and **imports may only point up the
-ladder**.
+Every module sits in exactly one of eight tiers, and **imports may only point up
+the ladder**. A module's tier is a fact about what it imports — see below for
+why that is not the same as what it does.
 
-| Tier | Name | Does | May import |
+| Tier | Name | Holds | May import |
 |---|---|---|---|
-| 1 | vocabulary | Names things. Decides nothing. | nothing in this crate |
-| 2 | model | Records what is true. | tier 1, and tier 2 acyclically |
-| 3 | policy | Decides something. | tiers 1–2 |
-| 4 | ports | States what the outside must provide. | tiers 1–3 |
+| 1 | vocabulary | Names things, decides nothing. `identifier` | nothing in this crate |
+| 2 | value | Value objects with no aggregate of their own. `compliance` `credential` `disclosure` `facility` `field_error` `manufacturer` `material` `seal` `status` | tier 1 |
+| 3 | reference | The embedded, data-driven registries. `catalog` `instrument` `schemas` | tiers 1–2 |
+| 4 | composition | The shapes that bring the tiers below into one — the passport aggregate, the product-group union, and the crate-wide error that wraps any of them. `error` `passport` `product_group` | tiers 1–3 |
+| 5 | satellite | Records that hang off an aggregate. `eol` `graph` `product` `transfer` | tiers 1–4 |
+| 6 | policy | Decides something. `access` `lint` `validation` | tiers 1–5 |
+| 7 | boundary | States what the outside must provide. `ports` | tiers 1–6 |
+| 8 | adapter | An implementation of a port, shipped so the open-source binary has a default. `passthrough` | tiers 1–7 |
 
-**Nothing may import tier 4.** Adapters live in the platform repository and are
-already outside this crate; every `impl …Port for` in the workspace is there.
+Within a tier, imports are allowed but must stay acyclic — three exist today
+(`instrument → catalog`, `passport → error`, `passport → product_group`) and a
+second tripwire holds the whole graph to it.
+
+### Eight tiers, because eight is what the graph has
+
+This was four until 2026-08-26, and four was wrong in a way worth recording: it
+put **sixteen of twenty-three modules in one tier**, which is a tier doing no
+work at all.
+
+The number is not a matter of taste. Levelling the import graph by longest path
+produces seven strata, and the eight above verify against every one of the forty
+production edges with **zero** upward imports. A tier boundary that no edge
+crosses is a boundary the code does not have; a tier holding most of the crate is
+a boundary that explains nothing.
+
+**The ladder is a dependency ordering, not a taxonomy of behaviour.** Where a
+module sits is a fact about its imports, and the tier name labels the stratum
+rather than judging it independently. Assigning by feel produced a table the code
+could not satisfy: `schemas` was filed under *policy* because it decides whether
+data conforms, when it imports exactly one module and sits second from the bottom
+of the graph. The measurement is the authority; the name follows it.
+
+**Nothing may import tier 7.** The one tier-8 module is the open-source default
+adapter; every other `impl …Port for` in the workspace lives in the platform
+repository, already outside this crate.
 
 ### Direction is not enough — the graph must also be acyclic
 
@@ -42,14 +70,6 @@ which *exempted* the cycle rather than removing it.
 here: the fix was to split `field_error` out as its own tier-2 module, leaving
 `error` free to sit above the deepest thing it wraps.
 
-The same exercise corrected a hand-assigned tier. `schemas` had been labelled
-tier 3 because it *decides* whether data conforms — but it imports exactly one
-module, which puts it second from the bottom of the graph. **The ladder is a
-dependency ordering, not a taxonomy of behaviour**; where a module sits is a fact
-about its imports, and the tier name is a label for the stratum rather than an
-independent judgement. Assigning by feel produced a table the code could not
-satisfy.
-
 ### Why a ladder and not a diagram
 
 The tiers exist to make one question answerable without argument: *when two
@@ -59,18 +79,19 @@ you can only report that a cycle exists. That is why an earlier review of this
 crate concluded a module split was unavailable: it measured cycles without a rule
 for which way they should have run.
 
-With the ladder, the wrong direction is named and the count is small. Measured
-against `main` on 2026-08-25: 129 production import edges between top-level
-modules, **five illegal**, four of them on one type.
+With the ladder, the wrong direction is named and the count is small. When it was
+first applied on 2026-08-25 it found 129 production edges with **five illegal**,
+four of them on one type. After those were fixed and the modules rehoused: **40
+edges, zero illegal, and an empty baseline**.
 
 ### Rule 0 — a type lives under `ports/<x>/` only if that port is its sole consumer
 
-This is the test for whether something is really tier 4.
+This is the test for whether something is really tier 7.
 
 `ArchiveReceipt` passes: nothing but `ArchivePort` touches it, so it belongs
 beside the trait. `SealedEnvelope` and `ComplianceResult` fail — both are fields
-on `Passport`, so filing them under `ports/` puts a tier-2 aggregate in the
-position of importing tier 4. They are model values that were misfiled, and
+on `Passport`, so filing them under `ports/` puts a tier-4 composition in the
+position of importing tier 7. They are model values that were misfiled, and
 moving the *types* fixes it without touching the aggregate.
 
 **An aggregate keeps its own invariants.** Enforcing them is what an aggregate is
@@ -81,7 +102,7 @@ a registry, a repository, a client. So the cut is at the dependency, never at th
 method.
 
 **Factories are exempt.** An associated function that constructs the type may
-consult a tier-3 service — `Passport::from_stored(doc, &LensRegistry, &Catalog)`
+consult a higher-tier service — `Passport::from_stored(doc, &LensRegistry, &Catalog)`
 applies schema lenses to rehydrate a stored record, and that is construction, not
 behaviour. The exemption is written down because a naive tripwire would flag it.
 
