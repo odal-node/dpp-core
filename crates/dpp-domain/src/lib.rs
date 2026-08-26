@@ -63,8 +63,8 @@ pub use crate::{
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     passport::{
-        FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_WIRE_KEYS, Passport,
-        PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
+        FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_PROOF_FIELDS,
+        PASSPORT_WIRE_KEYS, Passport, PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
     product::ProductIdentity,
     product_group::{

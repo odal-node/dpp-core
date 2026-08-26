@@ -6,7 +6,7 @@ use crate::product_group::{
 };
 use crate::status::PassportStatus;
 
-pub(super) fn make_passport() -> Passport {
+pub(crate) fn make_passport() -> Passport {
     Passport {
         id: PassportId(uuid::Uuid::nil()),
         batch_id: Some("BATCH-001".to_owned()),

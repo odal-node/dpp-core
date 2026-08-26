@@ -1,183 +1,181 @@
-//! Redaction by audience: which fields each tier of viewer is served.
+//! The classification tripwires for [`Passport`]'s field lists.
+//!
+//! These police the *lists* — every wire key is deliberately classified, and the
+//! lists do not contradict each other. What those classifications then do to a
+//! served view is exercised in `access::passport_view_tests`.
 
-use super::*;
-use crate::disclosure::Audience;
-use crate::product_group::{BatteryData, ProductGroup, ProductGroupData};
+use crate::disclosure::{Disclosure, PASSPORT_FIELD_DISCLOSURE};
+use crate::passport::PASSPORT_PROOF_FIELDS;
 
-use super::tests::make_passport;
+// ── The tripwire ─────────────────────────────────────────────────────────────
 
-fn battery_passport_with_due_diligence() -> Passport {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::Battery;
-    p.batch_id = Some("BATCH-42".into());
-    p.jws_signature = Some("eyJhbGci.test.signature".into());
-    p.product_group_data = Some(ProductGroupData::Battery(Box::new(BatteryData {
-        due_diligence_url: Some("https://acme.example.com/due-diligence".into()),
-        disassembly_instructions_url: Some("https://acme.example.com/disassembly".into()),
-        ..crate::test_support::sample_battery_data()
-    })));
-    p
-}
-
+/// **Every wire key of [`Passport`] must be deliberately classified.**
+///
+/// This is the test that exists because a name list is how the leak happened.
+/// `seal`, `publicJwsSignature` and `disclosureSignatures` were absent from
+/// [`PASSPORT_FIELD_DISCLOSURE`], so they defaulted to `Public` and a public view
+/// carried all three — and nothing anywhere failed, because "absent from the
+/// table" and "deliberately public" were indistinguishable.
+///
+/// They are distinguishable here. A new field on `Passport` lands in
+/// [`PASSPORT_WIRE_KEYS`] (its own completeness test enforces that), and this
+/// fails the build until someone puts it in exactly one of three places:
+/// the disclosure table, the proof list, or the allowlist below with a reason.
+///
+/// The allowlist is the point. It is not a way to skip the decision — it is
+/// where the decision is recorded, in a diff a reviewer reads.
 #[test]
-fn redact_public_strips_batch_id_jws_and_retention() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let p = battery_passport_with_due_diligence();
-    let view = p.redact(Audience::Public, &catalog).into_value();
-    assert!(
-        view.get("batchId").is_none(),
-        "batchId must be stripped at Public"
-    );
-    assert!(
-        view.get("jwsSignature").is_none(),
-        "jwsSignature must be stripped at Public"
-    );
-    assert!(
-        view.get("retentionLocked").is_none(),
-        "retentionLocked must be stripped at Public"
-    );
-    assert!(
-        view.get("productName").is_some(),
-        "productName must survive"
-    );
-}
+fn passport_every_wire_key_is_classified() {
+    /// Keys deliberately served to everyone, each with the reason it is safe.
+    const PUBLICLY_SERVED: &[(&str, &str)] = &[
+        (
+            "id",
+            "the passport identifier is what a QR code resolves to",
+        ),
+        ("productName", "Annex III basic product information"),
+        (
+            "productGroup",
+            "the dispatch key; a reader needs it to interpret the rest",
+        ),
+        (
+            "applicableInstruments",
+            "which law governs this product is not a secret",
+        ),
+        (
+            "granularity",
+            "model/batch/item — states what the record describes",
+        ),
+        (
+            "manufacturer",
+            "Annex III(k): name and contact details of the operator",
+        ),
+        ("materials", "Annex III material content is consumer-facing"),
+        ("co2ePerUnit", "a declared environmental figure"),
+        ("repairabilityScore", "a declared repairability figure"),
+        (
+            "complianceResult",
+            "the determination itself; withholding it defeats the passport",
+        ),
+        (
+            "productGroupData",
+            "filtered field-by-field by the product group's own policy",
+        ),
+        (
+            "status",
+            "whether the passport is live, suspended or archived",
+        ),
+        ("qrCodeUrl", "the public address of this passport"),
+        ("createdAt", "record lifecycle timestamp"),
+        ("updatedAt", "record lifecycle timestamp"),
+        ("publishedAt", "record lifecycle timestamp"),
+        (
+            "placedOnMarketDate",
+            "the regulated triggering event that fixes governing law",
+        ),
+        (
+            "schemaVersion",
+            "a reader needs it to interpret productGroupData",
+        ),
+        ("version", "monotonic version counter"),
+        ("supersedesId", "lineage: which passport this replaces"),
+        (
+            "parentPassportRef",
+            "ESPR Art. 11(d) linkage to the original passport",
+        ),
+        ("componentRefs", "bill-of-materials linkage"),
+        (
+            "retentionUntil",
+            "how long this record must remain reachable",
+        ),
+        (
+            "productId",
+            "opaque internal template link, not a legal identifier",
+        ),
+        (
+            "commodityCode",
+            "customs classification, registered publicly anyway",
+        ),
+        (
+            "operatorIdentifier",
+            "Annex III(k) unique operator identifier",
+        ),
+        ("facility", "Annex III facility snapshot"),
+    ];
 
-#[test]
-fn redact_public_strips_gated_product_group_fields() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let p = battery_passport_with_due_diligence();
-    let view = p.redact(Audience::Public, &catalog).into_value();
-    let sd = &view["productGroupData"];
-    assert!(
-        sd.get("dueDiligenceUrl").is_some(),
-        "dueDiligenceUrl is Annex XIII point 1(d) — publicly accessible"
-    );
-    assert!(
-        sd.get("disassemblyInstructionsUrl").is_none(),
-        "disassemblyInstructionsUrl is Annex XIII point 2(c) — withheld from the public"
-    );
-    assert!(
-        sd.get("batteryChemistry").is_some(),
-        "batteryChemistry is Public — must survive"
-    );
-    assert!(
-        sd.get("co2ePerUnitKg").is_some(),
-        "co2ePerUnitKg is Public — must survive"
-    );
-}
+    let classified: std::collections::BTreeSet<&str> = PASSPORT_FIELD_DISCLOSURE
+        .iter()
+        .map(|(f, _)| *f)
+        .chain(PASSPORT_PROOF_FIELDS.iter().copied())
+        .chain(PUBLICLY_SERVED.iter().map(|(f, _)| *f))
+        .collect();
 
-#[test]
-fn redact_professional_exposes_gated_product_group_fields() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let p = battery_passport_with_due_diligence();
-    let view = p
-        .redact(Audience::LegitimateInterest, &catalog)
-        .into_value();
-    let sd = &view["productGroupData"];
+    let unclassified: Vec<&str> = crate::passport::PASSPORT_WIRE_KEYS
+        .iter()
+        .copied()
+        .filter(|k| !classified.contains(k))
+        .collect();
+
     assert!(
-        sd.get("dueDiligenceUrl").is_some(),
-        "Professional must see dueDiligenceUrl"
-    );
-    assert!(sd.get("disassemblyInstructionsUrl").is_some());
-    // Still no JWS / retentionLocked at Professional
-    assert!(view.get("jwsSignature").is_none());
-    assert!(view.get("retentionLocked").is_none());
-    // But batchId is visible
-    assert!(view.get("batchId").is_some());
-}
-
-#[test]
-fn redact_confidential_exposes_everything() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let p = battery_passport_with_due_diligence();
-    let view = p.redact(Audience::Authority, &catalog).into_value();
-    assert!(view.get("batchId").is_some());
-    assert!(view.get("jwsSignature").is_some());
-    assert!(view.get("retentionLocked").is_some());
-    let sd = &view["productGroupData"];
-    assert!(sd.get("dueDiligenceUrl").is_some());
-}
-
-#[test]
-fn redact_no_product_group_data_leaves_passport_fields() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let p = make_passport(); // no product_group_data, no batchId
-    let view = p.redact(Audience::Public, &catalog).into_value();
-    assert!(view.get("productName").is_some());
-    assert!(view.get("productGroupData").is_none());
-}
-
-#[test]
-fn redact_unknown_product_group_withholds_product_group_data_below_confidential() {
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let mut p = make_passport();
-    // `Other` maps to catalog key "other", which is absent from the embedded
-    // catalog — so there are no per-field disclosure classes to redact against.
-    p.product_group = ProductGroup::Other("other".into());
-    p.product_group_data = Some(
-        ProductGroupData::other(serde_json::json!({ "secretField": "leak-me" }))
-            .expect("an untagged payload has no typed variant"),
-    );
-
-    // Public: no descriptor → withhold product group data entirely (fail closed).
-    let public = p.redact(Audience::Public, &catalog).into_value();
-    assert!(
-        public["productGroupData"].is_null(),
-        "unknown-product_group data must be withheld below Confidential, got: {}",
-        public["productGroupData"]
-    );
-    assert!(
-        !public.to_string().contains("leak-me"),
-        "confidential product_group field leaked to a Public viewer"
+        unclassified.is_empty(),
+        "these Passport fields are classified nowhere, so redaction defaults them \
+         to Public and no test would notice: {unclassified:?}\n\n\
+         Put each one in exactly one of:\n  \
+         - PASSPORT_FIELD_DISCLOSURE, if some audiences may not see it\n  \
+         - PASSPORT_PROOF_FIELDS, if it is a signature, seal or other proof\n  \
+         - PUBLICLY_SERVED in this test, with the reason it is safe for everyone"
     );
 
-    // Confidential: sees every field anyway → full data.
-    let conf = p.redact(Audience::Authority, &catalog).into_value();
-    assert_eq!(conf["productGroupData"]["secretField"], "leak-me");
-}
-
-#[test]
-fn public_view_omits_every_non_public_passport_field() {
-    // Regression: `redact` carried its own field list and omitted `lintResult`,
-    // which the crypto layer's policy classified as Restricted. A public view
-    // built through the domain path disclosed it. Both now read one table, and
-    // this asserts the property rather than the three fields that were listed.
-    use crate::disclosure::PASSPORT_FIELD_DISCLOSURE;
-
-    let mut passport = make_passport();
-    // Populate every non-public field so absence in the view proves redaction,
-    // not that the field was simply unset.
-    passport.batch_id = Some("BATCH-42".into());
-    passport.jws_signature = Some("eyJhbGci.test.signature".into());
-    passport.retention_locked = true;
-    passport.lint_result = Some(crate::lint::LintResult {
-        pack_version: "test".into(),
-        findings: Vec::new(),
-        assessed_at: chrono::Utc::now(),
-    });
-
-    let catalog = crate::catalog::ProductGroupCatalog::new();
-    let value = passport.redact(Audience::Public, &catalog).into_value();
-    let obj = value.as_object().expect("view is an object");
-
-    for (field, class) in PASSPORT_FIELD_DISCLOSURE {
-        if !Audience::Public.may_see(*class) {
-            assert!(
-                !obj.contains_key(*field),
-                "public view must not contain '{field}'"
-            );
-        }
+    // The reverse direction: a key listed here that no longer exists is a stale
+    // entry, and a stale allowlist is how a removed-then-re-added field slips
+    // back in unclassified.
+    let wire: std::collections::BTreeSet<&str> = crate::passport::PASSPORT_WIRE_KEYS
+        .iter()
+        .copied()
+        .collect();
+    for (field, _) in PUBLICLY_SERVED {
+        assert!(
+            wire.contains(field),
+            "'{field}' is allowlisted as publicly served but is not a Passport wire key"
+        );
     }
+    for field in PASSPORT_PROOF_FIELDS {
+        assert!(
+            wire.contains(field),
+            "'{field}' is listed as a proof field but is not a Passport wire key"
+        );
+    }
+}
 
-    // Guard against a vacuous pass: each field must actually be present for an
-    // audience entitled to it, otherwise absence above proves nothing.
-    let authority = passport.redact(Audience::Authority, &catalog).into_value();
-    let authority = authority.as_object().expect("view is an object");
-    for (field, class) in PASSPORT_FIELD_DISCLOSURE {
-        if Audience::Authority.may_see(*class) {
-            assert!(
-                authority.contains_key(*field),
-                "'{field}' should be visible to an authority; absence above would be vacuous"
+/// No field may be classified twice — the three lists must partition, not overlap.
+///
+/// An overlap is not harmless: a proof field that is *also* in the disclosure
+/// table reads as though its class decides who sees it, which is the exact
+/// misreading that let `jwsSignature` reach an authority attached to a body it
+/// could not verify. The proof list wins at runtime; this keeps the lists honest
+/// about which one is load-bearing.
+#[test]
+fn a_passport_field_is_never_classified_as_both_proof_and_public() {
+    let public_ok: std::collections::BTreeSet<&str> = PASSPORT_PROOF_FIELDS
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for (field, _) in PASSPORT_FIELD_DISCLOSURE {
+        if public_ok.contains(field) {
+            // Deliberate overlap, documented as defence in depth: the class makes
+            // the raw filter fail safe, the proof list makes redaction correct.
+            // Assert the class is the most restrictive one, so the backstop is
+            // actually a backstop.
+            let class = PASSPORT_FIELD_DISCLOSURE
+                .iter()
+                .find(|(f, _)| f == field)
+                .map(|(_, c)| *c)
+                .expect("just found it");
+            assert_eq!(
+                class,
+                Disclosure::Conformity,
+                "'{field}' is a proof field, so its defence-in-depth class must be \
+                 the most restrictive available, not {class:?}"
             );
         }
     }

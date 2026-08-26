@@ -17,7 +17,7 @@ mod redaction_tests;
 #[cfg(test)]
 mod retention_mutable_fields_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 mod validation_tests;
 #[cfg(test)]
@@ -27,6 +27,6 @@ pub use crate::facility::FacilitySnapshot;
 pub use crate::manufacturer::ManufacturerInfo;
 pub use crate::material::MaterialEntry;
 pub use id::PassportId;
-pub use record::{PASSPORT_WIRE_KEYS, Passport, RETENTION_MUTABLE_FIELDS};
+pub use record::{PASSPORT_PROOF_FIELDS, PASSPORT_WIRE_KEYS, Passport, RETENTION_MUTABLE_FIELDS};
 pub use reference::PassportRef;
 pub use view::PassportView;

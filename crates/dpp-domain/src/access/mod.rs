@@ -13,6 +13,9 @@ mod classification_tests;
 pub mod filter;
 #[cfg(test)]
 mod lattice_tests;
+pub mod passport_view;
+#[cfg(test)]
+mod passport_view_tests;
 pub mod policy;
 #[cfg(test)]
 mod policy_tests;
@@ -22,4 +25,5 @@ mod redaction_tests;
 mod tests;
 
 pub use filter::{PolicyDecision, filter_by_audience, filter_by_audience_in_scope};
+pub use passport_view::redact_passport;
 pub use policy::{DocumentScope, ProductGroupAccessPolicy};

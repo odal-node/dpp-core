@@ -39,7 +39,16 @@ pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     // free-text findings about our own data quality — operator- and
     // auditor-facing, not consumer-facing.
     ("lintResult", Disclosure::Restricted),
+    // The four proof fields. `Passport::redact` strips these unconditionally —
+    // see `PASSPORT_PROOF_FIELDS` for why no class can be the whole answer. They
+    // are classed here as well, as defence in depth, so a consumer driving
+    // `filter_by_audience` directly with `passport_default()` fails safe instead
+    // of serving a proof to the public. `Conformity` is the most restrictive
+    // class a single entry can carry.
     ("jwsSignature", Disclosure::Conformity),
+    ("publicJwsSignature", Disclosure::Conformity),
+    ("disclosureSignatures", Disclosure::Conformity),
+    ("seal", Disclosure::Conformity),
     ("retentionLocked", Disclosure::Conformity),
 ];
 

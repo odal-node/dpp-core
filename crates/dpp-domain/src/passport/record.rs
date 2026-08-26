@@ -6,15 +6,12 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{
-    FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef, PassportView,
-};
+use super::{FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef};
 use crate::catalog::Granularity;
 use crate::compliance::ComplianceResult;
 use crate::instrument::InstrumentRef;
 use crate::seal::SealedEnvelope;
 use crate::{
-    disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     lint::LintResult,
     product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore},
     status::PassportStatus,
@@ -300,6 +297,51 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "commodityCode",
     "operatorIdentifier",
     "facility",
+    "seal",
+];
+
+/// The [`Passport`] keys that carry a **proof**, never product content.
+///
+/// # Why these are not a disclosure class
+///
+/// The obvious modelling is to give each of these an [`crate::disclosure::Audience`] in
+/// [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`] and let redaction handle them like any other
+/// field. That was tried and it is a category error, which produced two
+/// different bugs at once:
+///
+/// - `seal`, `publicJwsSignature` and `disclosureSignatures` had **no** entry,
+///   so they defaulted to `Public` and a public view carried all three. The last
+///   is the damaging one: those are *attached* compact JWS, so each embeds the
+///   full redacted body for its own audience — handing an anonymous reader the
+///   `public+restricted+individual` entry hands over the restricted payload
+///   itself, not a signature over it.
+/// - `jwsSignature` **had** an entry, `Conformity`, so an authority received it
+///   attached to a body with individual-item data already removed. It covers the
+///   *full* payload, so it verifies against nothing that reader was given. The
+///   class did not make the answer safer; it made it wrong.
+///
+/// These are also classed `Conformity` in [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`] as
+/// defence in depth, so a consumer driving the raw filter fails safe. That is a
+/// backstop, not the answer: a class can only choose *which* audiences see a
+/// field, and the correct answer here is none of them.
+///
+/// A proof is not data about the product that some audiences may see. It is a
+/// statement about a specific sequence of bytes. The rule that actually holds is:
+/// **a view is a payload, and whoever serves it attaches the one proof that
+/// covers exactly the bytes being sent.** No audience arithmetic can express
+/// that, so redaction removes every one of these unconditionally and leaves
+/// attaching the right one to the serving layer.
+///
+/// `passport_every_wire_key_is_classified` fails the build if a new key is added
+/// to [`Passport`] without being placed here, in [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`],
+/// or on that test's explicit public allowlist — because a name list is exactly
+/// how `seal` came to be missed in the first place.
+///
+/// Serialized (camelCase) names, matching the `Passport` JSON representation.
+pub const PASSPORT_PROOF_FIELDS: &[&str] = &[
+    "jwsSignature",
+    "publicJwsSignature",
+    "disclosureSignatures",
     "seal",
 ];
 
@@ -719,71 +761,5 @@ impl Passport {
                 errors: missing,
             }))
         }
-    }
-
-    /// Return an audience-filtered JSON view of this passport.
-    ///
-    /// NOTE: this is a self-contained domain convenience, **not** the authoritative
-    /// public view. The payload that is signed (`publicJwsSignature`) and served on
-    /// the public route is produced by the `dpp-crypto` policy engine (vault
-    /// `public_view`), which fails closed on unknown product groups. Do not wire this into
-    /// the public-serving path expecting byte-parity with the signed view.
-    ///
-    /// Top-level fields are removed according to
-    /// [`PASSPORT_FIELD_DISCLOSURE`]
-    /// — the single source for this fact, shared with the crypto layer's
-    /// `ProductGroupAccessPolicy::passport_default()`. At present:
-    /// - `Restricted`: `batchId`, `lintResult`
-    /// - `Conformity`: `jwsSignature`, `retentionLocked`
-    ///
-    /// Anything absent from that table is `Public`.
-    ///
-    /// `productGroupData`, when present, is independently redacted via
-    /// [`crate::product_group::redact_product_group_data`] against the product group descriptor
-    /// from `catalog`. If the product group is not in the catalog, product group data is
-    /// **withheld** from every audience except `Authority` (fail-closed): without
-    /// the descriptor's per-field disclosure classes the domain layer cannot tell
-    /// which fields are safe to expose, so it exposes none.
-    pub fn redact(
-        &self,
-        audience: Audience,
-        catalog: &crate::catalog::ProductGroupCatalog,
-    ) -> PassportView {
-        let mut value = match serde_json::to_value(self) {
-            Ok(v) => v,
-            Err(_) => return PassportView(serde_json::Value::Null),
-        };
-
-        if let Some(obj) = value.as_object_mut() {
-            // Driven by the shared table, not a second hand-written list —
-            // the two used to disagree about `lintResult`.
-            for (field, class) in PASSPORT_FIELD_DISCLOSURE {
-                if !audience.may_see(*class) {
-                    obj.remove(*field);
-                }
-            }
-            // Re-redact productGroupData using the catalog's per-field disclosure map.
-            if let Some(ref sd) = self.product_group_data {
-                let product_group = sd.product_group();
-                let key = product_group.catalog_key();
-                let redacted = if let Some(descriptor) = catalog.get(key) {
-                    crate::product_group::redact_product_group_data(sd, audience, descriptor)
-                } else if audience.may_see(Disclosure::Conformity) {
-                    // Unknown product group: the full payload is only safe for the
-                    // audience that already sees conformity evidence.
-                    serde_json::to_value(sd).unwrap_or(serde_json::Value::Null)
-                } else {
-                    // Fail closed: without per-field classes we cannot tell
-                    // which fields are restricted, so withhold product group data
-                    // entirely rather than leak it.
-                    serde_json::Value::Null
-                };
-                obj.insert("productGroupData".into(), redacted);
-            } else {
-                obj.remove("productGroupData");
-            }
-        }
-
-        PassportView(value)
     }
 }

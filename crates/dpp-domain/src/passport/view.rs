@@ -3,7 +3,7 @@
 /// An audience-filtered, serialisable view of a
 /// [`Passport`](crate::passport::Passport).
 ///
-/// Produced by [`Passport::redact`](crate::passport::Passport::redact).
+/// Produced by [`redact_passport`](crate::access::redact_passport).
 /// Serialises transparently to JSON — use this type wherever a consumer
 /// should only see the fields allowed by their
 /// [`Audience`](crate::disclosure::Audience).
