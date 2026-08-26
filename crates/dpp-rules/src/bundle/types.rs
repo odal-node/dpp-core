@@ -54,6 +54,7 @@ impl VerifiedRuleset {
 /// Why a bundle was refused. Verification is fail-closed — any of these keeps
 /// the caller on its current ruleset.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum RulesetError {
     /// The manifest JWS did not verify under the pinned publisher key.
     #[error("bundle signature invalid or not signed by the pinned publisher key")]

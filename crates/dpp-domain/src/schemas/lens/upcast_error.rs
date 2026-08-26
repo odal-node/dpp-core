@@ -6,6 +6,7 @@ use super::transform::LensError;
 
 /// Why an upcast could not be produced. Never a silent identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UpcastError {
     /// No chain of registered lenses bridges `from` → `to` for this product group.
     NoPath {

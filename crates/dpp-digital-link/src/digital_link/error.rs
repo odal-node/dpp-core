@@ -4,6 +4,7 @@ use dpp_domain::GtinError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum DigitalLinkError {
     #[error("URI is missing the '/01/' GTIN segment")]
     MissingGtin,

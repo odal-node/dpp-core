@@ -11,7 +11,7 @@ use crate::product_group::ProductGroup;
 /// Not a validated GS1 type — `gtin` is whatever string the product group's typed
 /// data carries (only `Battery` validates it as a [`crate::identifier::Gtin`]; the
 /// rest store it unchecked, and `UnsoldGoods`/`Other` carry none at all —
-/// see [`super::product group::ProductGroupData::gtin`]).
+/// see [`crate::product_group::ProductGroupData::gtin`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductIdentity {
     pub product_group: ProductGroup,

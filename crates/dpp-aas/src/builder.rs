@@ -11,6 +11,7 @@ use super::product_groups;
 
 /// Why an AAS projection could not be built.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum AasError {
     /// The passport did not survive a masking round-trip. Structural, not a
     /// permissions failure: the disclosure policy removed a field the passport
