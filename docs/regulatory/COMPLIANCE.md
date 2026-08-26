@@ -159,6 +159,16 @@ Verified against the OJ text of IR 2026/1778 (adopted 16 July 2026, published
 - **Automated checks on submission** (**Art. 8(7)**): semantic conformity,
   coherence of mandatory data, conformity with the required granularity level,
   and — *where relevant* — validity of the commodity code.
+- **Transfer of registered passports** (**Art. 6a**): a registered DPP "may be
+  transferred to another verified economic operator or, where applicable, to a
+  verified value chain actor that takes over the obligations from the previous
+  actor ... from the date indicated for the transfer." Recital (10) gives the
+  triggers as failed identity verification and organisational change (merger,
+  split, sale of the actor, cessation). **The registry is therefore the
+  authoritative record of who holds the obligations, and Art. 5(3) closes it to
+  everyone but verified actors.** Full treatment, including how this bounds what
+  `domain::transfer` may claim, is under *Transfer-of-Responsibility Article
+  Pin* below.
 
 dpp-core's `dpp-registry` crate is a **ghost connector** carrying preparatory
 interface types that **predate the published specification**:
@@ -215,13 +225,89 @@ Do not treat the shapes in the second list as an implementation target.
 
 ## Transfer-of-Responsibility Article Pin
 
-Verified against the OJ text of Regulation (EU) 2024/1781, 2026-07-04, to
-resolve an internal citation ambiguity (the transfer-of-responsibility
-obligation had been cited inconsistently as either Art. 9 or Art. 12):
+**Superseded in part on 2026-08-26 by Implementing Regulation (EU) 2026/1778.**
+The 2026-07-04 entry below concluded that no numbered transfer obligation
+exists. That was correct as to Regulation (EU) 2024/1781 and remains so, but the
+registry implementing act published **13 days later** supplies one at a
+different level. Both halves are kept here: the correction first, the original
+finding after it, because the original is still the answer for ESPR itself.
 
-- **No single article establishes a transfer-of-responsibility mechanism**
-  for a DPP moving between economic operators (resale, recycler take-over,
-  insolvency succession, etc.).
+### The correction — IR 2026/1778 Art. 6a (verified 2026-08-26)
+
+Verified against the OJ text (OJ L, 17.7.2026; in force on the twentieth day
+following publication, i.e. 6 August 2026):
+
+> **Article 6a — Transfer of registered digital product passports**
+>
+> "Registered digital product passports may be transferred to another verified
+> economic operator or, where applicable, to a verified value chain actor that
+> takes over the obligations from the previous actor in relation to those
+> digital product passports from the date indicated for the transfer."
+
+**Recital (10)** gives the triggers: an actor that "did not pass the identity
+verification before the deadline", and "organisational changes such as merging,
+splitting or sale of all or parts of the actor, cessation of activities or other
+circumstances."
+
+Three things follow, and each narrows what our `transfer` module may claim:
+
+1. **What moves is the *registration*, not the passport document.** Art. 6a is
+   about registered DPPs changing hands in the registry. It does not describe a
+   mechanism for the passport artefact itself.
+2. **The parties are eIDAS-*verified* actors**, under Arts. 4 and 5, and that
+   status expires — Art. 5(4) caps it at "no longer than three years from the
+   date of verification". A `did:web` identifier is not that, and a chain built
+   on DIDs is not evidence of Art. 6a standing.
+3. **The registry is the authority, and it is closed.** Art. 5(3): "Only
+   verified value chain actors shall have access to the registry." So the
+   registry can confirm who holds the obligations, but only to a reader who is
+   themselves verified — never to the general public.
+
+**Consequently the authoritative record of a transfer is the registry, and
+`domain::transfer`'s chain is a local record of what this node was told and what
+it notified upstream.** It is not, and must not be presented as, proof of who
+holds the obligations. The node reports each completed handover upward to the
+registry; that report is a projection of the local record, not a substitute for
+the registry's own determination.
+
+### The two mechanisms are distinct, and `TransferReason` spans both
+
+Art. 6a is not the only way responsibility moves, and it does not cover the
+product-lifecycle cases:
+
+- **ESPR Art. 11(d)**: "where a **new** digital product passport is created for
+  a product that already has a digital product passport, the new digital product
+  passport shall be **linked** to the original digital product passport or
+  passports."
+- **ESPR Art. 2(16)** defines remanufacturing as "actions through which a **new
+  product** is produced from objects that are waste, products or components and
+  through which at least one change is made that substantially affects the
+  safety, performance, purpose or type of the product."
+
+Read together: a remanufactured product is a new product, it gets a **new,
+linked** passport, and no transfer of the original occurs. That mechanism is
+`Passport::parent_passport_ref`, not `TransferChain`.
+
+So `TransferReason::Remanufacturing`, `::Repurposing` and `::PreparationForReuse`
+sit closer to Art. 11(d) lineage than to Art. 6a, while `::InsolvencySuccession`
+— and a *corporate* reading of `::Sale`, meaning sale of the actor rather than
+of the product — sit under Art. 6a. **Whether those three variants should exist
+at all is an open domain question, deliberately not resolved by this entry.**
+
+Note also that **Art. 11(c)** and **Art. 11(e)** both anchor the obligation to
+"the economic operator responsible for the **creation** of the digital product
+passport", not to a moving current holder — which is why `operator_identifier`
+is frozen at publish and is not rewritten by a transfer.
+
+### The original finding — Regulation (EU) 2024/1781 (verified 2026-07-04)
+
+Verified against the OJ text on 2026-07-04, to resolve an internal citation
+ambiguity (the transfer-of-responsibility obligation had been cited
+inconsistently as either Art. 9 or Art. 12). **This still stands as to ESPR.**
+
+- **No single article of Regulation (EU) 2024/1781 establishes a
+  transfer-of-responsibility mechanism** for a DPP moving between economic
+  operators (resale, recycler take-over, insolvency succession, etc.).
 - **Art. 11(e)** is the closest fit: it requires the passport to "remain
   available ... including after an insolvency, a liquidation or a cessation
   of activity ... of the economic operator responsible for the creation of
@@ -241,10 +327,15 @@ obligation had been cited inconsistently as either Art. 9 or Art. 12):
   "Art. 9/12" citation was not traceable to operative text and is superseded
   by this entry.
 
-Given no article mandates transfer mechanics, `domain::transfer`'s
-dual-signed transfer handshake is a design choice that satisfies — and
-exceeds — Art. 11(e)'s continuity requirement; it is not a literal
-implementation of a numbered transfer obligation, because none exists.
+### What `domain::transfer` may be described as
+
+The dual-signed handshake is **an engineering design choice** that satisfies —
+and exceeds — Art. 11(e)'s continuity requirement, and that produces the record
+this node notifies to the registry under Art. 6a. It is **not** a literal
+implementation of a numbered transfer obligation in ESPR, because none exists
+there; and it is **not** evidence of an Art. 6a transfer, because that rests on
+verified-actor status this node cannot attest to.
+
 Treat this as engineering due diligence, not legal advice — verify
 independently before relying on it in a filing or contract.
 
@@ -262,6 +353,7 @@ independently before relying on it in a filing or contract.
 
 - [ESPR Regulation (EU) 2024/1781](https://eur-lex.europa.eu/eli/reg/2024/1781)
 - [Battery Regulation (EU) 2023/1542](https://eur-lex.europa.eu/eli/reg/2023/1542)
+- [DPP Registry Implementing Regulation (EU) 2026/1778](https://eur-lex.europa.eu/eli/reg_impl/2026/1778/oj)
 - [CBAM Regulation (EU) 2023/956](https://eur-lex.europa.eu/eli/reg/2023/956)
 - [GS1 Digital Link Standard](https://www.gs1.org/standards/gs1-digital-link)
 - [W3C Verifiable Credentials Data Model v2.0](https://www.w3.org/TR/vc-data-model-2.0/)
