@@ -28,8 +28,9 @@ pub struct PolicyDecision {
 /// Which classes apply depends on **where** a key sits: a product group's schema
 /// governs its own payload and stops there, while envelope classes apply
 /// everywhere. See [`DocumentScope`] for why that boundary exists and what went
-/// wrong without it. Matching *within* a scope is still by leaf name, so a
-/// generic name is still a poor thing to restrict — that limit is unchanged.
+/// wrong without it. Within a scope, a key is classified by its **path** — the
+/// chain of object keys leading to it — so a leaf name shared by a restricted
+/// and a public object is no longer forced to mean one thing in both.
 ///
 /// Visibility is a lattice, not a threshold: an `Authority` is not a superset of
 /// a `LegitimateInterest` holder. Individual-item data (Annex XIII point 4) is
@@ -67,7 +68,16 @@ pub fn filter_by_audience_in_scope(
     root_scope: DocumentScope,
 ) -> PolicyDecision {
     let mut redacted_fields = Vec::new();
-    let filtered_data = filter_value(data, policy, audience, "", root_scope, &mut redacted_fields);
+    let mut segments: Vec<String> = Vec::new();
+    let filtered_data = filter_value(
+        data,
+        policy,
+        audience,
+        "",
+        root_scope,
+        &mut segments,
+        &mut redacted_fields,
+    );
     PolicyDecision {
         audience,
         redacted_fields,
@@ -84,6 +94,7 @@ fn filter_value(
     audience: Audience,
     prefix: &str,
     scope: DocumentScope,
+    segments: &mut Vec<String>,
     redacted: &mut Vec<String>,
 ) -> serde_json::Value {
     match data {
@@ -95,6 +106,13 @@ fn filter_value(
                 } else {
                     format!("{prefix}.{key}")
                 };
+                // The classification path is object keys only. `prefix` carries
+                // array indices too, because it is what a redaction is *reported*
+                // as, and a reader needs the index to find the element.
+                segments.push(key.clone());
+                let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
+                let class = policy.disclosure_for_path(&borrowed, scope);
+                drop(borrowed);
                 // The key itself is classified in the scope it *sits* in; its
                 // children are classified in the scope it *opens*. Crossing at
                 // the child rather than the key is what keeps `productGroupData`
@@ -108,35 +126,45 @@ fn filter_value(
                 } else {
                     DocumentScope::Envelope
                 };
-                if audience.may_see(policy.disclosure_for_key(key, scope)) {
+                if audience.may_see(class) {
                     filtered.insert(
                         key.clone(),
-                        filter_value(value, policy, audience, &path, child_scope, redacted),
+                        filter_value(
+                            value,
+                            policy,
+                            audience,
+                            &path,
+                            child_scope,
+                            segments,
+                            redacted,
+                        ),
                     );
                 } else {
                     redacted.push(path);
                 }
+                segments.pop();
             }
             serde_json::Value::Object(filtered)
         }
         // An array does not change scope: its items are the same thing its key
-        // was, indexed.
-        serde_json::Value::Array(items) => serde_json::Value::Array(
-            items
-                .iter()
-                .enumerate()
-                .map(|(i, v)| {
-                    filter_value(
-                        v,
-                        policy,
-                        audience,
-                        &format!("{prefix}[{i}]"),
-                        scope,
-                        redacted,
-                    )
-                })
-                .collect(),
-        ),
+        // was, indexed. It adds no classification segment either — an element
+        // sits exactly where its key sits — so `segments` is passed through
+        // untouched while `prefix` gains the index for reporting.
+        serde_json::Value::Array(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for (i, item) in items.iter().enumerate() {
+                out.push(filter_value(
+                    item,
+                    policy,
+                    audience,
+                    &format!("{prefix}[{i}]"),
+                    scope,
+                    segments,
+                    redacted,
+                ));
+            }
+            serde_json::Value::Array(out)
+        }
         other => other.clone(),
     }
 }

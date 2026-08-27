@@ -830,6 +830,65 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the filtering will not match the rules the passport's signatures were frozen
   over.
 
+- **Disclosure classes are recorded and matched by path, so one leaf name can
+  mean different things in different places.** *(Breaking in effect rather than
+  in signature: `ProductGroupAccessPolicy::field_disclosure` keys change from
+  bare leaf names to dotted paths for every nested property. A hand-built policy
+  keyed by leaf still works — a bare leaf is a one-segment suffix — but code
+  that *inspects* the map by leaf name will no longer find nested entries. New
+  `disclosure_for_path`; `disclosure_for_key` and `disclosure_for_field` are
+  unchanged and delegate to it.)*
+
+  Matching was by normalized leaf name at any depth, which meant a leaf carried
+  **one** class for the whole document. Battery declares `name` and `casNumber`
+  under both a restricted `materialComposition` and a public
+  `criticalRawMaterials`; the collector merged the collision with
+  `most_restrictive`, so restricting one restricted its twin. That redacts
+  Annex III content the public passport is legally required to carry, and
+  **over-redaction is not the safe direction when the public view is an
+  obligation**.
+
+  The workaround was to put the restriction on the enclosing object and let the
+  filter drop the whole subtree. Enforcement was never wrong; what was missing
+  was the ability to classify a nested field on its own terms.
+
+  Now a policy key is a **path suffix** and the most specific match wins.
+  `materialComposition.name` governs only that position; a bare `name` still
+  matches at any depth as the weakest match, so every policy written before this
+  behaves exactly as it did. Ties at equal specificity still resolve to the most
+  restrictive class, keeping the verdict deterministic across `HashMap`
+  iteration order.
+
+  Only `properties` adds a path segment. Array `items` and the
+  `allOf`/`anyOf`/`oneOf` combinators describe the same position their parent
+  does, and an array index is not a segment either — which matches the filter,
+  where `criticalRawMaterials[0].casNumber` classifies as
+  `["criticalRawMaterials", "casNumber"]`. `definitions`/`$defs` are reached by
+  `$ref` from somewhere the walk cannot see, so they restart at the root and keep
+  bare-leaf keys.
+
+  **The fail-closed fallback.** A caller that knows only a leaf name cannot
+  supply a path, and a lookup that simply missed would return the default —
+  `Public` — for restricted data. So a longer policy key still matches on its
+  final segment at the weakest specificity, and ties there take the most
+  restrictive class. An under-specified question gets the conservative answer;
+  the filter, which always has the real path, gets the precise one.
+
+  Scope is unchanged and still enforced: a product group's classes do not reach
+  the passport envelope however precisely they are written.
+
+  **No shipped schema changes class.**
+  `every_declared_property_resolves_to_its_own_class` walks every version of
+  every product group and asserts each declared `x-disclosure` resolves to
+  exactly itself — a direct check on real data, since a class that moved would be
+  a leak or an over-redaction invisible in a diff of the matcher.
+
+  It replaces `no_schema_declares_one_field_name_in_two_classes`, which is
+  removed. That gate rejected a schema declaring one leaf in two classes — a
+  proxy for the limit this change removes, and now an obstacle to using the
+  expressiveness it unlocks. The replacement is strictly stronger: it catches a
+  wrong class rather than the shape that used to cause one.
+
 ### Fixed
 
 - **Schema descriptions asserted DPP mandate dates that no adopted act
@@ -936,6 +995,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Toy Safety Directive and does require CE marking; and Directive (EU) 2017/1132
   Art. 16 does establish the unique company identifier the unsold-goods schema
   cites for the EUID.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
