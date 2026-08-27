@@ -225,7 +225,7 @@
         "array",
         "null"
       ],
-      "description": "Contact allergens regulated under REACH Annex XVII entry 72 (e.g. certain disperse dyes, chromium VI, nickel in accessories).",
+      "description": "Contact allergens regulated under Regulation (EC) No 1907/2006 (REACH) Annex XVII entry 72 (e.g. certain disperse dyes, chromium VI, nickel in accessories).",
       "items": {
         "type": "string",
         "minLength": 1

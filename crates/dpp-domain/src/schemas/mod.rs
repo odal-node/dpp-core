@@ -14,6 +14,10 @@ mod conformance_tests;
 mod embedded;
 mod entry;
 pub mod lens;
+#[cfg(test)]
+mod prose_act_reference_tests;
+#[cfg(test)]
+mod prose_citation_tests;
 mod registration_error;
 #[cfg(test)]
 mod serialisation_tests;

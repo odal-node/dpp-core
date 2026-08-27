@@ -13,6 +13,62 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **A gate over schema prose: a regulatory claim must name what it rests on.**
+  Every other gate step in this repo reads Rust. Nothing read a `description`
+  string, and every recorded instance of a fabricated regulatory claim in this
+  project has been in prose or data — including two electronics descriptions
+  that asserted an adoption date, an effective date and a phase-two date **for
+  an act that does not exist**, and shipped to crates.io.
+
+  The full prose audit is what made the rules non-arbitrary. Every defect it
+  found was one of two shapes: a bare assertion with no citation, or a citation
+  that did not hold. Every description carrying a checkable citation checked out,
+  without exception. Four rules encode that:
+
+  - an `Annex`/`Art.` citation must name its act by number, in the schema's
+    **root** description or in the citing description itself;
+  - every act number cited must resolve to the instrument catalog or to an
+    explicit inventory of acts cited but not modelled, each with a reason;
+  - schema prose must not state a passport applicability date at all — that
+    belongs in `crates/dpp-domain/instruments/`, where it carries a `basis`;
+  - any other date claim must name its act in the same description.
+
+  It cannot check that a citation is *true* — that needs the OJ text and a
+  reader. It checks that one is present, well-formed, and points at an act this
+  crate knows, which turns the next audit from research into a lookup.
+
+### Fixed
+
+- **Twelve regulatory-prose defects, found by the gate above in descriptions
+  that had already passed a full manual audit.**
+
+  Six asserted a passport applicability date: `detergent` v1.0.0/v1.1.0 ("DPP
+  mandate 2029"), `toy` v1.0.0/v1.1.0 ("DPP mandate 2030"), `furniture` v1.2.0
+  and `mattress` v1.0.0 ("indicative delegated-act adoption 2028 / 2029"). These
+  are the same shape removed elsewhere in the previous pass and were missed
+  because that pass worked from the versions it had already opened. All six
+  dates were already in the instrument catalog — `toy-safety-2025-2509` carries
+  `2030-08-01` sourced, `detergents-2026-405` carries `2029-09-23`, and the ESPR
+  binding notes record furniture 2028 and mattress 2029 as indicative — so
+  nothing is lost by removing them from prose, which has nowhere to put a basis.
+
+  Six cited REACH with no act number: `Art. 33` in `furniture` v1.0.0–v1.2.0 and
+  `mattress` v1.0.0, `Annex XVII entry 72` in `textile` v1.1.0/v1.2.0. Now
+  anchored to Regulation (EC) No 1907/2006. Both citations verified against the
+  consolidated text: Art. 33 is the duty to communicate information on
+  substances in articles "in a concentration above 0,1 % weight by weight (w/w)",
+  and Appendix 12 to entry 72 does list disperse dyes, chromium VI compounds and
+  nickel — so the substances named in the textile description are correct.
+
+  **`toy` called Regulation (EU) 2025/2509 a *Delegated* Regulation.** The OJ
+  header reads "REGULATION (EU) 2025/2509 OF THE EUROPEAN PARLIAMENT AND OF THE
+  COUNCIL" — an ordinary legislative act adopted 26 November 2025, repealing
+  Directive 2009/48/EC. A delegated act is made by the Commission under a
+  delegation of power, which is a different instrument with a different amendment
+  path, so this was not a naming quibble.
+
 ### Breaking
 
 - **A `$ref`'d definition now carries its disclosure classes to every path that

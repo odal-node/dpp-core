@@ -142,6 +142,13 @@ deliberately so — see §5.
 Along the same seams its source split. A test file nobody can navigate is a test
 file nobody reads before changing the thing it covers.
 
+**400 is the target; the tripwire fires at 500.** The figure is a judgement about
+navigability rather than a measurement, and enforcing a judgement to the line
+produces churn instead of better files — a 407-line file gets split at whichever
+seam is nearest the limit, which is rarely the seam a reader wanted. Write to
+400. A file inside the ±100 tolerance is conforming, not deviating, and needs no
+`LAYOUT-DEVIATION` marker.
+
 ### Rule 5 — an enum with `impl` gravity is a type under rule 1
 
 State machines like `PassportStatus` count. A small closed enum that exists only
@@ -209,7 +216,7 @@ error type, a test file, a helper — it becomes a directory:
 <concept>/
 ├── mod.rs        always — a pure index (rule 2)
 ├── error.rs      optional — only if this module owns an error nothing else shares
-├── tests.rs      when it has tests; tests/ once past 400 lines (rule 4)
+├── tests.rs      when it has tests; tests/ once past 400 lines (rule 4, tripwire 500)
 └── <part>.rs     one file per public type with gravity (rule 1)
 ```
 
@@ -322,7 +329,7 @@ predates the rest and works.
 | 1, 5 | `layout::rule_1_one_public_type_per_file` | a source file declares ≥3 public types |
 | 2 | `mod_rs_is_pure_index` | a `mod.rs` declares a public item |
 | 3 | — | *guidance only* |
-| 4 | `layout::rule_4_tests_files_are_navigable` | a `tests.rs` exceeds 400 lines |
+| 4 | `layout::rule_4_tests_files_are_navigable` | a `tests.rs` exceeds 500 lines (400 target + 100 tolerance) |
 | 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
 | 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
