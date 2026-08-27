@@ -1,7 +1,17 @@
-//! Every schema property declares a disclosure class, and no field name is
-//! declared in two classes across the schemas that share a scope.
-
-use crate::Disclosure;
+//! Every schema property declares a disclosure class.
+//!
+//! This file also used to hold `no_schema_declares_one_field_name_in_two_classes`,
+//! which rejected a schema declaring one leaf name in two classes. That was a
+//! proxy for a limit that no longer exists: the matcher keyed on bare leaf names,
+//! so two positions sharing a name could not carry different classes, and the
+//! constructor would have silently picked the more restrictive.
+//!
+//! Classes are now recorded and matched by path, so declaring a name differently
+//! in two places is a thing a schema may legitimately do. The proxy is replaced
+//! by a stronger, direct check in `super::path_matching_tests`:
+//! `every_declared_property_resolves_to_its_own_class` asserts that every
+//! declared class in every shipped schema resolves to exactly itself — which
+//! catches a wrong class rather than merely the shape that used to cause one.
 
 use super::policy::ProductGroupAccessPolicy;
 
@@ -95,117 +105,6 @@ fn undeclared_properties(schema: &serde_json::Value) -> Vec<(String, String)> {
     let mut out = Vec::new();
     walk(schema, "", &mut out);
     out
-}
-
-/// No schema declares one field name in two different classes.
-///
-/// Matching is by normalized **leaf name** at any depth, so `materialComposition.name`
-/// and `criticalRawMaterial.name` are one key. A schema declaring them
-/// differently is asking for something the matcher cannot express, and the
-/// constructor would have to pick — silently, and for every field of that name
-/// in the document.
-///
-/// It picks the more restrictive one, which is the safe direction but is still
-/// a guess at what the author meant. This test means no shipped schema ever
-/// makes it guess. It is also what keeps `disclosure_for_field` honest: the
-/// tie-break exists for hand-built policies, not for these.
-///
-/// **This is the constraint that decides how a nested field may be classified.**
-/// A nested property whose leaf name is shared with a more permissive field
-/// elsewhere in the same schema cannot be restricted by annotation alone —
-/// restricting it would restrict the twin. Where that arises today the parent
-/// object carries the restriction instead, and the filter removes the whole
-/// subtree before ever reaching the leaf. Expressing it on the leaf itself
-/// needs a path-aware matcher, which this crate does not have.
-#[test]
-fn no_schema_declares_one_field_name_in_two_classes() {
-    use std::collections::HashMap;
-
-    let reg = crate::schemas::VersionedSchemaRegistry::new();
-    for product_group in reg.product_groups() {
-        for version in reg.versions_for(product_group) {
-            let json = reg.get(product_group, version).expect("registry listed it");
-            let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
-
-            let mut seen: HashMap<String, (String, Disclosure)> = HashMap::new();
-            let mut clashes: Vec<String> = Vec::new();
-            collect_declared(&schema, "", &mut |path: &str, name: &str, class| {
-                let key: String = name
-                    .chars()
-                    .filter(char::is_ascii_alphanumeric)
-                    .map(|c| c.to_ascii_lowercase())
-                    .collect();
-                if let Some((first_path, first)) = seen.get(&key) {
-                    if *first != class {
-                        clashes.push(format!(
-                            "'{name}' is {first:?} at {first_path} and {class:?} at {path}"
-                        ));
-                    }
-                } else {
-                    seen.insert(key, (path.to_owned(), class));
-                }
-            });
-
-            assert!(
-                clashes.is_empty(),
-                "{product_group} v{version}: one field name declared in two classes, so the policy \
-                 cannot express both: {clashes:?}"
-            );
-        }
-    }
-}
-
-/// Visit every declared `(path, name, class)` triple in a schema.
-fn collect_declared(
-    node: &serde_json::Value,
-    path: &str,
-    visit: &mut impl FnMut(&str, &str, Disclosure),
-) {
-    let Some(object) = node.as_object() else {
-        return;
-    };
-    if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
-        for (name, prop) in properties {
-            let child = if path.is_empty() {
-                name.clone()
-            } else {
-                format!("{path}.{name}")
-            };
-            if let Some(class) = prop
-                .get("x-disclosure")
-                .and_then(serde_json::Value::as_str)
-                .and_then(|t| match t {
-                    "public" => Some(Disclosure::Public),
-                    "restricted" => Some(Disclosure::Restricted),
-                    "conformity" => Some(Disclosure::Conformity),
-                    "individual" => Some(Disclosure::Individual),
-                    _ => None,
-                })
-            {
-                visit(&child, name, class);
-            }
-            collect_declared(prop, &child, visit);
-        }
-    }
-    for key in ["items", "additionalProperties"] {
-        if let Some(child) = object.get(key) {
-            collect_declared(child, &format!("{path}[]"), visit);
-        }
-    }
-    for key in ["definitions", "$defs"] {
-        if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
-            for (name, definition) in block {
-                collect_declared(definition, &format!("{key}.{name}"), visit);
-            }
-        }
-    }
-    for key in ["allOf", "anyOf", "oneOf"] {
-        if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
-            for branch in branches {
-                collect_declared(branch, path, visit);
-            }
-        }
-    }
 }
 
 /// Every schema version of every product group yields a policy, and every property in

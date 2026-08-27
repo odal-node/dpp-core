@@ -13,30 +13,27 @@ use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, ProductGroupCatalog};
 /// `disassembly_instructions` — closing the casing/nesting drift that let
 /// restricted fields leak to the public audience.
 ///
-/// **Caution — leaf matching is path-insensitive *within a scope*.** A policy
-/// key matches that leaf wherever it appears at any depth of the scope it
-/// governs. Do **not** restrict a generic leaf name shared across objects (e.g.
-/// `name`, `value`, `country`, `address`): such a key would redact
-/// `facility.address` *and* `manufacturer.address` alike, over-redacting Annex
-/// III public fields. Use only specific, unambiguous field names (e.g.
-/// `dueDiligenceUrl`, `svhcSubstances`).
+/// **Keys are path suffixes, and the most specific match wins.** A key may name
+/// a bare leaf (`svhcSubstances`) or a path (`materialComposition.name`). A path
+/// key applies only where those segments end the field's own path, so one leaf
+/// name can carry different classes in different places.
 ///
-/// What *is* bounded is the scope: a class drawn from a product group's schema
-/// no longer reaches the passport envelope, so a product group cannot reclassify
-/// an envelope field by declaring a property of the same name. See
-/// [`DocumentScope`]. Gating a shared leaf on a single **path** would still
-/// require a path matcher, which this is not.
+/// That used to be impossible. Keyed by leaf alone, `name` had to mean one thing
+/// everywhere: battery declares it under both a restricted `materialComposition`
+/// and a public `criticalRawMaterials`, and the fail-closed tie-break took the
+/// restrictive class for both — redacting Annex III content the public passport
+/// is legally required to carry. **Over-redaction is not the safe direction when
+/// the public view is an obligation.** The workaround was to restrict the
+/// enclosing object instead and let the filter remove the whole subtree, which
+/// worked but meant a nested field could not be classified on its own terms.
 ///
-/// A schema cannot get this wrong quietly: `access::tests`'
-/// `no_schema_declares_one_field_name_in_two_classes` fails the build if one
-/// name is declared in two classes. It is a real limit rather than an
-/// oversight, and it decides how a nested field may be classified — a nested
-/// property sharing a leaf name with a more permissive field elsewhere in the
-/// same schema cannot be restricted on the leaf, because that would restrict
-/// the twin as well. Where that arises the **enclosing object** carries the
-/// restriction and [`super::filter::filter_by_audience`] removes the whole
-/// subtree before reaching the leaf, which is why it is a constraint on
-/// expression rather than a hole in enforcement.
+/// A one-segment key still matches at any depth, because a bare leaf is simply
+/// the weakest suffix rather than a special case — so every policy written
+/// before paths existed behaves exactly as it did.
+///
+/// Scope is a separate and still-enforced boundary: a class drawn from a product
+/// group's schema does not reach the passport envelope however precisely it is
+/// written. See [`DocumentScope`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductGroupAccessPolicy {
@@ -110,13 +107,63 @@ pub enum DocumentScope {
     ProductGroupData,
 }
 
+/// How many segments of `policy_key` match the tail of `path`, or `None` if it
+/// is not a suffix of it at all.
+///
+/// A policy key is a dotted path (`materialComposition.name`) or a bare leaf
+/// (`name`, which is the one-segment case). It matches when its segments align
+/// with the last segments of `path`, each compared by [`keys_match_normalized`].
+/// The returned count is the specificity — a longer match is a more precise
+/// statement about where the field sits, and wins.
+///
+/// Suffix rather than full path so a class stays attached to the shape it
+/// describes rather than to one position in one schema. A definition reused
+/// under two parents keeps its meaning, and a policy written before nesting
+/// existed keeps working.
+///
+/// # The leaf fallback, and why it is specificity zero
+///
+/// A caller that knows only a leaf name — [`ProductGroupAccessPolicy::disclosure_for_field`]
+/// is the public one — cannot supply the path a nested key was recorded under.
+/// Without a fallback, asking about `recordedAt` when the policy holds
+/// `usageHistory.recordedAt` would find no match and return the default, and the
+/// default is `Public`. **That is fail-open for restricted data**, reached by
+/// asking an under-specified question rather than by any schema being wrong.
+///
+/// So a policy key longer than the query still matches on its final segment,
+/// scoring `0`. Being the weakest score, it loses to every genuine suffix match,
+/// and ties among leaf matches resolve to the most restrictive class. A question
+/// that cannot distinguish two positions gets the conservative answer for both,
+/// while the filter — which always has the real path — gets the precise one.
+fn path_suffix_depth(policy_key: &str, path: &[&str]) -> Option<usize> {
+    let key_segments = policy_key.split('.').count();
+
+    if key_segments > path.len() {
+        // Fall back to the leaf. `path` is never empty in practice — the filter
+        // always pushes a key before classifying — but an empty one has no leaf
+        // to compare and must not match anything.
+        let (Some(key_leaf), Some(query_leaf)) = (policy_key.split('.').next_back(), path.last())
+        else {
+            return None;
+        };
+        return keys_match_normalized(key_leaf, query_leaf).then_some(0);
+    }
+
+    let tail = &path[path.len() - key_segments..];
+    policy_key
+        .split('.')
+        .zip(tail.iter())
+        .all(|(k, p)| keys_match_normalized(k, p))
+        .then_some(key_segments)
+}
+
 /// Whether `a` and `b` are equal for field-matching purposes once both are
 /// normalized — non-alphanumerics (`_`, `-`) dropped, case-folded, so
 /// `disassemblyInstructions` == `disassembly_instructions` — without
-/// allocating a `String` for either side. [`ProductGroupAccessPolicy::disclosure_for_field`]
-/// runs this once per classified field, per document key, at every
-/// recursion depth of [`super::filter::filter_by_audience`], so avoiding an
-/// allocation per comparison matters there.
+/// allocating a `String` for either side. [`ProductGroupAccessPolicy::disclosure_for_path`]
+/// runs this once per policy key, per document key, at every recursion depth of
+/// [`super::filter::filter_by_audience`], so avoiding an allocation per
+/// comparison matters there.
 fn keys_match_normalized(a: &str, b: &str) -> bool {
     let mut a_chars = a.chars().filter(char::is_ascii_alphanumeric);
     let mut b_chars = b.chars().filter(char::is_ascii_alphanumeric);
@@ -169,48 +216,84 @@ fn parse_disclosure(token: &str) -> Option<Disclosure> {
 /// directly; following the pointer as well would visit them twice and buy
 /// nothing. It also means a cyclic `$ref` cannot loop this function.
 ///
-/// A leaf name declared twice with **different** classes keeps the more
-/// restrictive one. That is a fail-closed tie-break for a schema that should
-/// not exist — `access::tests` rejects the ambiguity at build time — and it is
-/// never reached by a schema that passes that gate.
-fn collect_disclosures(node: &serde_json::Value, out: &mut HashMap<String, Disclosure>) {
+/// # Keys are paths, not bare leaf names
+///
+/// A property nested at `materialComposition.name` is recorded under that
+/// dotted path rather than under `name`. Recording the leaf alone meant one name
+/// carried one class for the whole document: battery declares `name` and
+/// `casNumber` under both a `Restricted` `materialComposition` and a `Public`
+/// `criticalRawMaterials`, and collapsing them took the more restrictive class
+/// for both — over-redacting Annex III content the public view is required to
+/// carry. Over-redaction is not the safe direction here.
+///
+/// Only `properties` adds a segment. Array `items` and the `allOf` / `anyOf` /
+/// `oneOf` combinators describe the *same* position as their parent, so they add
+/// none — which matches the filter, where an array index is not a path segment
+/// either.
+///
+/// `definitions` / `$defs` are the exception: their contents are reached by
+/// `$ref` from somewhere this walk cannot see, so there is no path to record and
+/// their properties keep bare-leaf keys. Those still match at any depth, which
+/// is what makes them useful and also why a definition is a poor place to put a
+/// class that only holds somewhere specific.
+///
+/// A path declared twice with **different** classes keeps the more restrictive
+/// one. With paths this is now genuinely unreachable for two distinct positions;
+/// it remains as the fail-closed tie-break for the one case that survives — two
+/// definition blocks declaring the same leaf differently.
+fn collect_disclosures(
+    node: &serde_json::Value,
+    path: &str,
+    out: &mut HashMap<String, Disclosure>,
+) {
     let Some(object) = node.as_object() else {
         return;
     };
 
     if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
         for (name, prop) in properties {
+            let child_path = if path.is_empty() {
+                name.clone()
+            } else {
+                format!("{path}.{name}")
+            };
             if let Some(class) = prop
                 .get("x-disclosure")
                 .and_then(serde_json::Value::as_str)
                 .and_then(parse_disclosure)
             {
-                out.entry(name.clone())
+                out.entry(child_path.clone())
                     .and_modify(|existing| *existing = existing.most_restrictive(class))
                     .or_insert(class);
             }
-            collect_disclosures(prop, out);
+            collect_disclosures(prop, &child_path, out);
         }
     }
 
+    // An array element sits at the same path its key does — the filter does not
+    // treat an index as a segment either — so these carry `path` unchanged.
     for key in ["items", "additionalProperties"] {
         if let Some(child) = object.get(key) {
-            collect_disclosures(child, out);
+            collect_disclosures(child, path, out);
         }
     }
 
+    // Reached by `$ref` from somewhere this walk cannot see, so there is no path
+    // to root them at. They restart at the empty path and keep bare-leaf keys.
     for key in ["definitions", "$defs"] {
         if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
             for definition in block.values() {
-                collect_disclosures(definition, out);
+                collect_disclosures(definition, "", out);
             }
         }
     }
 
+    // Combinators describe the same object their parent does, so they add no
+    // segment.
     for key in ["allOf", "anyOf", "oneOf"] {
         if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
             for branch in branches {
-                collect_disclosures(branch, out);
+                collect_disclosures(branch, path, out);
             }
         }
     }
@@ -326,7 +409,7 @@ impl ProductGroupAccessPolicy {
         schema.get("properties")?.as_object()?;
 
         let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
-        collect_disclosures(&schema, &mut field_disclosure);
+        collect_disclosures(&schema, "", &mut field_disclosure);
 
         Some(Self {
             name: format!("{product_group_key}-{version}"),
@@ -383,18 +466,72 @@ impl ProductGroupAccessPolicy {
     /// one by declaring a property with the same name.
     #[must_use]
     pub fn disclosure_for_key(&self, key: &str, scope: DocumentScope) -> Disclosure {
+        self.disclosure_for_path(&[key], scope)
+    }
+
+    /// Get the disclosure class for a key, given the full path of object keys
+    /// that leads to it.
+    ///
+    /// `path` is the chain of **object keys** from the document root to the key
+    /// being classified, innermost last. Array indices are not segments — an
+    /// element sits where its key sits — so
+    /// `criticalRawMaterials[0].casNumber` is
+    /// `["criticalRawMaterials", "casNumber"]`.
+    ///
+    /// # Most specific wins
+    ///
+    /// A policy key matches when its own segments are a **suffix** of `path`,
+    /// compared with the same case- and separator-insensitive normalization used
+    /// for bare names. The match with the most segments wins.
+    ///
+    /// That is what lets one leaf name carry different classes in different
+    /// places. Battery declares `name` and `casNumber` under both a `Restricted`
+    /// `materialComposition` and a `Public` `criticalRawMaterials`; keyed by leaf
+    /// alone, one class had to cover both, and the fail-closed tie-break took the
+    /// restrictive one — redacting Annex III content from the public view, which
+    /// the regulation requires it to carry. Over-redaction is not the safe
+    /// direction when the public passport is a legal obligation.
+    ///
+    /// A single-segment policy key still matches at any depth, because a
+    /// one-segment suffix is the weakest match rather than a special case. Every
+    /// policy written before paths existed therefore behaves exactly as it did.
+    ///
+    /// # Ties
+    ///
+    /// Two policy keys of equal specificity that both match resolve to the
+    /// **most restrictive** class. `field_disclosure` is keyed by literal name
+    /// but matched after normalization, so `jwsSignature` and `jws_signature` can
+    /// both answer one lookup; taking whichever `HashMap` iteration reached first
+    /// made a disclosure verdict vary between calls in one process, which is
+    /// fatal for content-binding. Ambiguity resolves the safe way, and the same
+    /// way every time.
+    #[must_use]
+    pub fn disclosure_for_path(&self, path: &[&str], scope: DocumentScope) -> Disclosure {
         let scoped = match scope {
             DocumentScope::ProductGroupData => Some(&self.field_disclosure),
             DocumentScope::Envelope => None,
         };
-        scoped
+
+        let mut best: Option<(usize, Disclosure)> = None;
+        for (policy_key, class) in scoped
             .into_iter()
             .chain(std::iter::once(&self.envelope_disclosure))
             .flat_map(|map| map.iter())
-            .filter(|(k, _)| keys_match_normalized(k, key))
-            .map(|(_, d)| *d)
-            .reduce(Disclosure::most_restrictive)
-            .unwrap_or(self.default_disclosure)
+        {
+            let Some(depth) = path_suffix_depth(policy_key, path) else {
+                continue;
+            };
+            best = Some(match best {
+                None => (depth, *class),
+                Some((best_depth, _)) if depth > best_depth => (depth, *class),
+                Some((best_depth, best_class)) if depth == best_depth => {
+                    (best_depth, best_class.most_restrictive(*class))
+                }
+                Some(kept) => kept,
+            });
+        }
+
+        best.map_or(self.default_disclosure, |(_, class)| class)
     }
 
     /// Get the disclosure class for a field, matched by normalized key name

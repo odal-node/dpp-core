@@ -16,11 +16,15 @@ mod lattice_tests;
 pub mod passport_view;
 #[cfg(test)]
 mod passport_view_tests;
+#[cfg(test)]
+mod path_matching_tests;
 pub mod policy;
 #[cfg(test)]
 mod policy_tests;
 #[cfg(test)]
 mod redaction_tests;
+#[cfg(test)]
+mod schema_class_resolution_tests;
 #[cfg(test)]
 mod tests;
 
