@@ -248,9 +248,41 @@ fn shell_has_correct_asset_information() {
         .collect();
     assert!(names.contains(&"gtin"));
     assert!(names.contains(&"serialId"));
+
+    // `batchId` is `Restricted` in `PASSPORT_FIELD_DISCLOSURE`, so an anonymous
+    // reader does not get one — and until the projection was wired through the
+    // shared redaction, it did.
+    //
+    // The masking policy was resolved with `for_schema_version` alone, whose
+    // `envelope_disclosure` carries only the universal conformity names. The
+    // passport-level classes were never folded in, so every envelope field they
+    // govern fell to the `Public` default here while the JSON view stripped it.
+    // The same passport disclosed different things depending on which
+    // representation you asked for.
+    assert!(
+        !names.contains(&"batchId"),
+        "an anonymous reader must not receive the batch identifier: {names:?}"
+    );
+}
+
+/// The credentialed audience does get it, so the assertion above is a redaction
+/// rather than the projection simply never emitting a batch id.
+#[test]
+fn batch_id_reaches_an_audience_entitled_to_it() {
+    let passport = minimal_passport(ProductGroup::Textile);
+    let (shell, _) =
+        build_aas_from_passport(&passport, "09506000134352", Audience::LegitimateInterest)
+            .expect("masking");
+
+    let names: Vec<&str> = shell
+        .asset_information
+        .specific_asset_ids
+        .iter()
+        .map(|id| id.name.as_str())
+        .collect();
     assert!(
         names.contains(&"batchId"),
-        "batch_id should appear when set"
+        "a legitimate-interest reader may see the batch identifier: {names:?}"
     );
 }
 

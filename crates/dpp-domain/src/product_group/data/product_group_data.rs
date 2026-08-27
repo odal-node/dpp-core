@@ -295,32 +295,3 @@ impl ProductGroupData {
         self.payload()?.gtin()
     }
 }
-
-/// Serialize `data` to a JSON object and strip any top-level field the
-/// `audience` may not see.
-///
-/// `descriptor.disclosure` maps camelCase JSON field names to their
-/// [`Disclosure`](crate::disclosure::Disclosure) class; visibility is
-/// decided by [`Audience::may_see`](crate::disclosure::Audience::may_see),
-/// which is a lattice and not a threshold. Fields not listed in the map are
-/// always retained (default: Public).
-///
-/// Returns a `serde_json::Value::Object` with redacted fields removed.
-/// Returns `serde_json::Value::Null` if serialization fails.
-pub fn redact_product_group_data(
-    data: &ProductGroupData,
-    audience: crate::disclosure::Audience,
-    descriptor: &crate::catalog::ProductGroupDescriptor,
-) -> serde_json::Value {
-    let mut value = match serde_json::to_value(data) {
-        Ok(v) => v,
-        Err(_) => return serde_json::Value::Null,
-    };
-    if let Some(obj) = value.as_object_mut() {
-        obj.retain(|key, _| match descriptor.disclosure.get(key) {
-            Some(&class) => audience.may_see(class),
-            None => true,
-        });
-    }
-    value
-}

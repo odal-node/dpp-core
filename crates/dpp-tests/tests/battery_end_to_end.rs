@@ -11,7 +11,7 @@
 //! 4. Parse a GS1 Digital Link for the battery (dpp-digital-link)
 //! 5. Issue a Verifiable Credential for a recycler (dpp-crypto)
 //! 6. Verify the credential and apply audience filtering (dpp-crypto)
-//! 7. Redact product group data through the catalog descriptor (dpp-domain)
+//! 7. Filter product group data by audience through the one access filter (dpp-domain)
 
 use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
@@ -20,8 +20,8 @@ use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audi
 use dpp_domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
-    ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, ProductGroup,
-    ProductGroupCatalog, ProductGroupData, RepairabilityScore, redact_product_group_data,
+    ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, ProductGroup, ProductGroupData,
+    RepairabilityScore,
 };
 use dpp_tests::fixtures::base_passport;
 use dpp_vc::credential::{
@@ -189,15 +189,21 @@ fn battery_passport_maps_to_aas_shell() {
     let (shell, submodels) =
         build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
 
-    // Shell wiring: GTIN becomes the global asset id; passport + batch are
-    // specific asset ids.
+    // Shell wiring: GTIN becomes the global asset id, and the passport id is a
+    // specific asset id.
+    //
+    // The batch is **not**, at this audience. `batchId` is `Restricted`, and the
+    // projection now applies the same passport-level classes the JSON view does
+    // — it previously resolved a policy that carried only the universal
+    // conformity names, so every envelope field fell to the public default here
+    // while being stripped elsewhere.
     assert!(shell.asset_information.global_asset_id.contains(VALID_GTIN));
     assert!(
-        shell
+        !shell
             .asset_information
             .specific_asset_ids
             .iter()
-            .any(|a| a.name == "batchId" && a.value == "LOT-2027-B-0917")
+            .any(|a| a.name == "batchId")
     );
 
     // Five core submodels + one battery product group submodel.
@@ -308,19 +314,31 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     }
 }
 
+/// The Annex XIII tiers a battery payload is served at, through the one filter.
+///
+/// This used to exercise `redact_product_group_data`, a second redaction path
+/// that matched keys exactly, never recursed, and retained anything unlisted.
+/// It is gone; the assertions are not, because what they pin is the regulation
+/// rather than the function — and one of them is a recorded correction.
 #[test]
-fn redact_product_group_data_strips_professional_fields_at_public_tier() {
+fn battery_annex_xiii_tiers_hold_through_the_audience_filter() {
     let passport = make_battery_passport();
-    let catalog = ProductGroupCatalog::new();
-    let descriptor = catalog.get("battery").expect("battery in catalog");
-    let data = passport.product_group_data.as_ref().unwrap();
+    let policy = ProductGroupAccessPolicy::for_schema_version("battery", &passport.schema_version)
+        .expect("the battery schema version this fixture declares is registered");
+    let data = serde_json::to_value(passport.product_group_data.as_ref().unwrap())
+        .expect("product group data serialises");
+
+    let at = |audience| {
+        filter_by_audience_in_scope(&data, &policy, audience, DocumentScope::ProductGroupData)
+            .filtered_data
+    };
 
     // Public viewer: point 2 stripped, point 1 retained. `dueDiligenceUrl`
     // (point 1(d)) and `criticalRawMaterials` (point 1(b), and Annex VI Part A
     // point 10 via point 1(a)) are on the public tier — this test asserted the
     // opposite until the annex was read against it.
-    let public = redact_product_group_data(data, Audience::Public, descriptor);
-    let public_obj = public.as_object().expect("redacted data is an object");
+    let public = at(Audience::Public);
+    let public_obj = public.as_object().expect("filtered data is an object");
     assert!(public_obj.contains_key("gtin"));
     assert!(public_obj.contains_key("dueDiligenceUrl"));
     assert!(public_obj.contains_key("criticalRawMaterials"));
@@ -329,7 +347,7 @@ fn redact_product_group_data_strips_professional_fields_at_public_tier() {
     // Authority sees Restricted and Conformity fields. It does *not* see
     // `Individual` ones — Annex XIII point 4 is legitimate-interest-only, which
     // is why this is a lattice and not a ranking.
-    let authority = redact_product_group_data(data, Audience::Authority, descriptor);
+    let authority = at(Audience::Authority);
     let conf_obj = authority.as_object().unwrap();
     assert!(conf_obj.contains_key("disassemblyInstructionsUrl"));
     assert!(conf_obj.contains_key("dueDiligenceUrl"));

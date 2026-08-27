@@ -780,6 +780,56 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   removed, and they fail for different reasons — one is caught by the signature,
   the other only by the issuer binding.
 
+### Breaking
+
+- **One audience redaction, and the AAS projection stops disclosing `batchId` to
+  the public.** *(Breaking: `redact_product_group_data` is removed. Its callers
+  should use `access::filter_by_audience_in_scope` with a version-pinned policy,
+  or `access::redact_passport` for a whole passport. The public AAS Environment
+  no longer carries `batchId` as a `specificAssetId` or as a submodel
+  `Property`.)*
+
+  **The removal.** `redact_product_group_data` matched keys with an exact
+  `HashMap` lookup, never recursed past the top level, and retained anything
+  unlisted. So a restricted field that was nested, differently-cased, or simply
+  absent from the descriptor map was served — three of the defects the access
+  filter exists to prevent, in a function whose name invited use. Nothing but its
+  own tests still called it.
+
+  **The leak it was hiding was somewhere else.** Auditing every audience path
+  turned up three implementations of "resolve a policy, filter, apply the
+  backstops", and they had drifted:
+
+  - `dpp-aas::mask` carried a guard the others lacked — dropping any
+    `productGroupData` key the declared schema version does not declare. A key
+    nobody classified falls to the policy default, `Public`; the version-pinned
+    policy is safer than the catalog map in every respect but that one, where it
+    under-applies. Under-applying disclosure is a leak.
+  - `dpp-aas::mask` also resolved its policy with `for_schema_version` alone,
+    whose `envelope_disclosure` carries only the universal conformity names. The
+    passport-level classes were never folded in, so **every envelope field they
+    govern fell to the public default in the AAS projection while being stripped
+    from the JSON view.** `batchId` is `Restricted`; the same passport disclosed
+    it as AAS and withheld it as JSON.
+
+  `redact_passport` now owns policy resolution, the filter, both backstops and
+  the proof strip, and `dpp-aas::mask` calls it. The unclassified-key guard moves
+  with it, so it applies everywhere rather than on whichever surface someone last
+  thought about.
+
+  **What the committed AAS fixtures show.** Regenerating them removes `batchId`
+  from every product group's public Environment — as a `specificAssetId` and as a
+  submodel `Property` — and changes nothing else. Zero additions across eleven
+  fixtures. That diff is the whole behavioural effect.
+
+  **Migration.** A consumer relying on `batchId` in a public AAS Environment was
+  relying on a disclosure defect and must present a credential for it. A caller
+  of `redact_product_group_data` moves to `filter_by_audience_in_scope`, which
+  needs a `ProductGroupAccessPolicy` — build it with `for_schema_version` against
+  the passport's own `schemaVersion` rather than the catalog's current map, or
+  the filtering will not match the rules the passport's signatures were frozen
+  over.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added

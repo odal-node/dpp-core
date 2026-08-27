@@ -100,16 +100,73 @@ pub fn redact_passport(passport: &Passport, audience: Audience) -> PassportView 
         // the catalog knows the product group: a known group at an unknown
         // schema version resolves to no policy, and a group-only check would
         // wave it through with every field public.
-        if resolved.is_none()
-            && let Some(product_group_data) = obj.get("productGroupData")
-            && let Some(tag) = product_group_data.get("productGroup").cloned()
-        {
-            obj.insert(
-                "productGroupData".to_owned(),
-                serde_json::json!({ "productGroup": tag }),
-            );
+        match resolved {
+            None => {
+                if let Some(product_group_data) = obj.get("productGroupData")
+                    && let Some(tag) = product_group_data.get("productGroup").cloned()
+                {
+                    obj.insert(
+                        "productGroupData".to_owned(),
+                        serde_json::json!({ "productGroup": tag }),
+                    );
+                }
+            }
+            Some(ref product_group_policy) => {
+                drop_unclassified_product_group_keys(obj, product_group_policy);
+            }
         }
     }
 
     PassportView(view)
+}
+
+/// Drop any `productGroupData` key the passport's **declared schema version**
+/// does not declare.
+///
+/// # The hazard this closes
+///
+/// Sourcing classes from the version a passport was validated against is what
+/// keeps a published passport filtered by the rules that produced its
+/// signatures. The corollary is the danger: a key that version does not declare
+/// is classified by nobody, and an unclassified key falls to the policy default
+/// — `Public`. The version-pinned policy is safer than the catalog's single map
+/// in every other respect and *less* safe in exactly this one, because it
+/// under-applies where the map over-applied. **Under-applying disclosure is a
+/// leak.**
+///
+/// Raising `default_disclosure` does not work: this policy covers the whole
+/// document, and the envelope's public fields — `productName`, `status` — are
+/// declared in no product group schema, so they would all vanish. The guard has
+/// to be structural and scoped to `productGroupData`: where nobody has
+/// classified the content, keep only what is accounted for.
+///
+/// Reaching it needs an **invalid** passport, since every product group schema
+/// sets `additionalProperties: false` and validation rejects undeclared keys.
+/// This is defence in depth. It runs for **every** audience, because an
+/// unclassified field is not more disclosable to a credentialed reader than to
+/// an anonymous one.
+fn drop_unclassified_product_group_keys(
+    view: &mut serde_json::Map<String, serde_json::Value>,
+    product_group_policy: &ProductGroupAccessPolicy,
+) {
+    let Some(product_group_data) = view
+        .get_mut("productGroupData")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+
+    // `productGroup` is the variant tag rather than a schema property, and the
+    // document has to keep round-tripping through `ProductGroupData`.
+    //
+    // Matching is by path suffix for the same reason the filter matches that
+    // way: `field_disclosure` keys nested properties under their parent, so a
+    // top-level key is accounted for when any policy key ends with it.
+    product_group_data.retain(|key, _| {
+        key == "productGroup"
+            || product_group_policy
+                .field_disclosure
+                .keys()
+                .any(|declared| declared == key || declared.ends_with(&format!(".{key}")))
+    });
 }
