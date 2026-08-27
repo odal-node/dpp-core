@@ -4,7 +4,10 @@
   "celex": "32024R3110",
   "kind": "direct",
   "status": "adopted",
-  "passport": { "obligation": "required" },
+  "passport": {
+    "obligation": "required",
+    "from": { "date": "2026-01-08", "basis": "sourced" }
+  },
   "productGroups": [
     {
       "productGroup": "construction",
@@ -15,5 +18,5 @@
       "notes": "retentionYears is sourced: the Regulation imposes 10 years on the economic operator. In force since 2025-01-07 and applicable in stages from 2026-01-08, but the per-product duty depends on harmonised technical specifications plus delegated and implementing acts, so nothing is determinable. The DPP system is expected to be implemented in principle by end 2027 with the obligation applying some 18 months later — both figures secondary-sourced, which is why the instrument carries no passport date at all rather than an invented one. WRONG AXIS, to be re-homed: the CPR uses 'product group' zero times and defines product family, then product category, then product type, with its own Annex VII family list. This binding keeps the existing catalog key so nothing breaks; re-homing it is a later step and needs CPR Annex VII read first."
     }
   ],
-  "notes": "A real passport instrument, unlike the electronics pair — Art. 75 creates a construction DPP outright. Its first expected product families are rebar, cement, doors and windows with their hardware, and thermal insulation, of which our existing product-category list carries only cement."
+  "notes": "A real passport instrument, unlike the electronics pair — Art. 75 creates a construction DPP outright. Its first expected product families are rebar, cement, doors and windows with their hardware, and thermal insulation, of which our existing product-category list carries only cement. The 2026-01-08 date is Art. 96: the Regulation applies from that day, and Arts. 75 and 76 — the construction DPP system and the passport itself — are not among the articles Art. 96 excepts. Two cautions. It is not 8 January 2027: that is Art. 96's date for Art. 92, which is Penalties. And the obligation is not yet operable, because Art. 75(1) requires the Commission to establish the DPP system by delegated act and none has been adopted, so the article applies while the system it depends on does not exist."
 }

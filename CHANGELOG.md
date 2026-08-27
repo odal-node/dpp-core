@@ -886,6 +886,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   2017/1132. Those primary texts are not held locally, and a summary site is not
   a source.
 
+- **Two instrument dates corrected against the primary texts.**
+
+  `detergents-2026-405`'s passport date carried `basis: assumed`. It is sourced:
+  Regulation (EU) 2026/405's final article says *"This Regulation, with the
+  exception of Article 4(3) and (4), shall apply from 23 September 2029"*, and
+  Article 4 is *Biodegradability* — so the passport obligation is not among the
+  exceptions and takes the general date. Flipped to `sourced`.
+
+  `cpr-2024-3110` carried a passport obligation with **no** date. Regulation (EU)
+  2024/3110 Art. 96 applies the Regulation from **8 January 2026**, and Arts. 75
+  and 76 — the construction DPP system and the passport itself — are not among
+  the articles Art. 96 excepts. Added as `sourced`, with two cautions recorded in
+  `notes`:
+
+  - It is **not** 8 January 2027. That is Art. 96's date for **Art. 92**, which
+    is *Penalties*.
+  - The obligation is not yet operable: Art. 75(1) requires the Commission to
+    establish the DPP system by delegated act, and none has been adopted, so the
+    article applies while the system it depends on does not exist.
+
+  **`ecodesign-energy-labelling-mobile` was deliberately left without a date.**
+  Regulations (EU) 2023/1670 and 2023/1669 both apply from 20 June 2025, but that
+  instrument's obligation is `displacedBy: EPREL` — it mandates no passport, so
+  it has no passport application date. Recording the ecodesign date there is
+  precisely the error [`DateBasis`](crate::instrument::DateBasis)'s own
+  documentation records: *"A date inferred from an ecodesign application date was
+  shipped as a passport application date."*
+
+  No type changed. The catalog already models a passport date with its
+  provenance, and the ESPR bindings already carried each product group's
+  indicative adoption year — textile 2027, furniture 2028, mattresses 2029,
+  tyre 2027, aluminium 2027, steel 2026 — every one of which matches COM(2025)
+  187 final. The schema prose was contradicting data the catalog already held
+  correctly.
+
 ## [0.18.0] - 2026-08-19
 
 ### Added
