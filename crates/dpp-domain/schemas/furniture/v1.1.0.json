@@ -88,7 +88,7 @@
       "items": {
         "$ref": "#/definitions/svhcSubstance"
       },
-      "description": "SVHC substances present above 0.1% w/w per REACH Article 33.",
+      "description": "SVHC substances present above 0.1% w/w per Regulation (EC) No 1907/2006 (REACH) Art. 33.",
       "x-disclosure": "restricted"
     },
     "disassemblyInstructionsUrl": {
