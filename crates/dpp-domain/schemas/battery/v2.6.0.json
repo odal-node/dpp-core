@@ -429,7 +429,7 @@
         "lead",
         null
       ],
-      "description": "Article 13(5) chemical symbol where one applies (Annex XIII point 1(q)). Closed: the article names exactly two.",
+      "description": "Article 13(5) chemical symbol where one applies: Cd above 0,002 % cadmium, Pb above 0,004 % lead. Closed: the article names exactly two. Not itself an Annex XIII point 1(q) item — that point covers the marking requirements of Art. 13(3) and (4) — but it travels with them, since 13(5) requires the symbol to be printed beneath the separate collection symbol.",
       "x-disclosure": "public"
     },
     "hazardousSubstances": {

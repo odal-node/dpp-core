@@ -6,7 +6,7 @@
   "status": "adopted",
   "passport": {
     "obligation": "required",
-    "from": { "date": "2029-09-23", "basis": "assumed" }
+    "from": { "date": "2029-09-23", "basis": "sourced" }
   },
   "productGroups": [
     {

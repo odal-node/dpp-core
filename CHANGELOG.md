@@ -819,8 +819,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   **What the committed AAS fixtures show.** Regenerating them removes `batchId`
   from every product group's public Environment — as a `specificAssetId` and as a
-  submodel `Property` — and changes nothing else. Zero additions across eleven
-  fixtures. That diff is the whole behavioural effect.
+  submodel `Property` — and changes nothing else. Zero additions across twelve
+  fixtures, 120 deletions. That diff is the whole behavioural effect.
 
   **Migration.** A consumer relying on `batchId` in a public AAS Environment was
   relying on a disclosure defect and must present a credential for it. A caller
@@ -830,6 +830,112 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the filtering will not match the rules the passport's signatures were frozen
   over.
 
+### Fixed
+
+- **Schema descriptions asserted DPP mandate dates that no adopted act
+  establishes, and four of them were checkably wrong.** Five product groups
+  carried a forward-looking date in prose that ships to crates.io:
+
+  | Product group | Asserted | ESPR Working Plan, indicative adoption |
+  |---|---|---|
+  | aluminium | `~2030` | **2027** |
+  | furniture | `~2028-2031` | **2028** |
+  | tyre | `~2029` | **2027** |
+  | textile | `2025-2026` | **2027** |
+  | construction | `~2028-2032` | not in that plan — unsourced |
+
+  Verified against COM(2025) 187 final, the Ecodesign and Energy Labelling
+  Working Plan 2025-2030, whose table column is headed *"Indicative timeline for
+  adoption"*. Four of the five are wrong in both directions — aluminium three
+  years late, textile two years early.
+
+  Even the correct figures would not license the claim. "Indicative timeline for
+  adoption" is when a delegated act is *adopted*, not when an obligation applies;
+  a transition follows. So these are removed rather than corrected, and each
+  description now points at the product group manifest, which is where an
+  applicability date belongs and where it can carry a source. That is the pattern
+  the electronics schema already used.
+
+- **The electronics description conflated entry into force with application.**
+  It said Regulations (EU) 2023/1670 and 2023/1669 were "in force since
+  2025-06-20". Both say *"It shall apply from 20 June 2025"*, and both entered
+  into force on the twentieth day after publication on 31 August 2023. Right
+  date, wrong verb, and the two are legally distinct — the same conflation that
+  makes a staged obligation look like it binds earlier or later than it does.
+
+- **A battery field cited an Annex XIII point that does not cover it.** The
+  chemical-symbol field cited *Annex XIII point 1(q)*, which is "the marking
+  requirements laid down in Article 13(3) and (4)". The field's content comes
+  from **Art. 13(5)** — the Cd/Pb symbol for batteries above 0,002 % cadmium or
+  0,004 % lead — which point 1(q) does not enumerate.
+
+  The description now cites Art. 13(5) for the content and states the
+  relationship rather than implying membership: the symbol is not itself a point
+  1(q) item, but travels with those markings, because 13(5) requires it to be
+  printed beneath the separate collection symbol. The sibling field citing
+  Art. 13(4) under point 1(q) was already correct and is unchanged.
+
+  **Confirmed correct and left alone** in the same pass: Annex XIII points 1(a),
+  1(h), 1(i), 1(j), 1(l), 1(n) and 1(o) against the OJ text of Regulation (EU)
+  2023/1542, and Regulation (EU) 2023/1670 Art. 1(1)'s scope — which does
+  enumerate exactly smartphones, other mobile phones, cordless phones and slate
+  tablets, as the electronics schema claims.
+
+  **Not verified, and deliberately not touched:** claims resting on Regulation
+  (EU) 2020/740, Directive 2011/65/EU, Directive 2009/48/EC and Regulation (EU)
+  2017/1132. Those primary texts are not held locally, and a summary site is not
+  a source.
+
+- **Two instrument dates corrected against the primary texts.**
+
+  `detergents-2026-405`'s passport date carried `basis: assumed`. It is sourced:
+  Regulation (EU) 2026/405's final article says *"This Regulation, with the
+  exception of Article 4(3) and (4), shall apply from 23 September 2029"*, and
+  Article 4 is *Biodegradability* — so the passport obligation is not among the
+  exceptions and takes the general date. Flipped to `sourced`.
+
+  `cpr-2024-3110` carried a passport obligation with **no** date. Regulation (EU)
+  2024/3110 Art. 96 applies the Regulation from **8 January 2026**, and Arts. 75
+  and 76 — the construction DPP system and the passport itself — are not among
+  the articles Art. 96 excepts. Added as `sourced`, with two cautions recorded in
+  `notes`:
+
+  - It is **not** 8 January 2027. That is Art. 96's date for **Art. 92**, which
+    is *Penalties*.
+  - The obligation is not yet operable: Art. 75(1) requires the Commission to
+    establish the DPP system by delegated act, and none has been adopted, so the
+    article applies while the system it depends on does not exist.
+
+  **`ecodesign-energy-labelling-mobile` was deliberately left without a date.**
+  Regulations (EU) 2023/1670 and 2023/1669 both apply from 20 June 2025, but that
+  instrument's obligation is `displacedBy: EPREL` — it mandates no passport, so
+  it has no passport application date. Recording the ecodesign date there is
+  precisely the error [`DateBasis`](crate::instrument::DateBasis)'s own
+  documentation records: *"A date inferred from an ecodesign application date was
+  shipped as a passport application date."*
+
+  No type changed. The catalog already models a passport date with its
+  provenance, and the ESPR bindings already carried each product group's
+  indicative adoption year — textile 2027, furniture 2028, mattresses 2029,
+  tyre 2027, aluminium 2027, steel 2026 — every one of which matches COM(2025)
+  187 final. The schema prose was contradicting data the catalog already held
+  correctly.
+
+
+- **A tyre noise class was stated one boundary out.** The description said class
+  `C` is "at or above limit". Regulation (EU) 2020/740 Annex I Part C bands it as
+  A ≤ LV−3, LV−3 < B ≤ LV, C > LV — so a tyre measuring **exactly** the limit
+  value is class B, not C. The description now carries the three bands and names
+  the boundary explicitly.
+
+  Verified in the same pass and left unchanged: 2020/740 applies from 1 May 2021
+  and repeals Regulation (EC) No 1222/2009 with effect from the same day; fuel
+  efficiency and wet grip are both graded on an "A to E" scale, so the schema's
+  emphatic "NOT the old A-G scale" is right; C1/C2/C3 are cars, vans and
+  heavy-duty vehicles; Directive 2011/65/EU is RoHS; Directive 2009/48/EC is the
+  Toy Safety Directive and does require CE marking; and Directive (EU) 2017/1132
+  Art. 16 does establish the unique company identifier the unsold-goods schema
+  cites for the EUID.
 ## [0.18.0] - 2026-08-19
 
 ### Added

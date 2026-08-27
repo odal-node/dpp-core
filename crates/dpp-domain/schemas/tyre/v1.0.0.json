@@ -3,7 +3,7 @@
   "$id": "https://schema.odal-node.io/dpp/tyre-v1.0.0.json",
   "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
   "title": "Odal Node — Tyre Product Group Data (v1.0.0)",
-  "description": "Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. DPP mandate expected ~2029. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
+  "description": "Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. Applicability dates and regulatory status are held in the product group manifest, not here. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
   "type": "object",
   "required": [
     "gtin",
@@ -70,7 +70,7 @@
         "C",
         null
       ],
-      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Class A = significantly below limit; B = below limit; C = at or above limit. Thresholds differ per tyre class (C1/C2/C3).",
+      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Bands from Annex I Part C against the limit value (LV) in Reg. (EC) 661/2009 Annex II Part C: A is N <= LV-3, B is LV-3 < N <= LV, C is N > LV. Note the boundary — a tyre measuring exactly LV is class B, not C.",
       "x-disclosure": "public"
     },
     "rollingResistanceNPerKn": {
