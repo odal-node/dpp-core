@@ -307,16 +307,6 @@ impl DppProductGroupPlugin for BatteryPlugin {
     }
 }
 
-/// Annex XIII content the battery's category owes, and content it must not
-/// carry — the Commission's per-category data-point table, read at create time.
-///
-/// The binding check is the host's, at first publish. Repeating it here is not
-/// duplication of the *rule* — the table has one home in `dpp-rules` and both
-/// callers read it — but of the *moment*: a passport that will be refused at
-/// publish should not have to reach publish to discover why, and a field the
-/// guidance says must not be filled is never mentioned there at all.
-///
-/// Missing content is reported as **one** finding rather than one per field.
 /// Read Art. 8(4)'s second-life test off the payload's `batteryStatus`.
 ///
 /// `batteryStatus` is Annex XIII point 4(c), whose closed set is
@@ -342,6 +332,16 @@ fn art8_second_life(input: &PluginInput) -> Art8SecondLife {
     }
 }
 
+/// Annex XIII content the battery's category owes, and content it must not
+/// carry — the Commission's per-category data-point table, read at create time.
+///
+/// The binding check is the host's, at first publish. Repeating it here is not
+/// duplication of the *rule* — the table has one home in `dpp-rules` and both
+/// callers read it — but of the *moment*: a passport that will be refused at
+/// publish should not have to reach publish to discover why, and a field the
+/// guidance says must not be filled is never mentioned there at all.
+///
+/// Missing content is reported as **one** finding rather than one per field.
 /// An EV battery owes 38 mandatory fields and a fresh draft carries almost
 /// none, so per-field advisories would put dozens of findings into a document
 /// that is stored, signed and served. The publish refusal names them
