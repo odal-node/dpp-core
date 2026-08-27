@@ -24,6 +24,10 @@ mod policy_tests;
 #[cfg(test)]
 mod redaction_tests;
 #[cfg(test)]
+mod ref_path_tests;
+#[cfg(test)]
+mod ref_walk_tests;
+#[cfg(test)]
 mod schema_class_resolution_tests;
 #[cfg(test)]
 mod tests;
