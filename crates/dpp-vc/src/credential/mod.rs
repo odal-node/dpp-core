@@ -22,11 +22,15 @@
 //! ## Credential lifecycle
 //!
 //! 1. An authority issues a `DppAccessCredential` to an operator.
-//! 2. The credential is signed as a JWS using the issuer's Ed25519 key.
+//! 2. The credential is signed into its VC-JWT wire form — see [`jwt`] for the
+//!    envelope contract, which binds every issuer that produces one.
 //! 3. When requesting professional/confidential data, the holder presents the VC.
 //! 4. The verifier checks the JWS, expiration, revocation status, and scope.
 
 mod builder;
+pub mod jwt;
+#[cfg(test)]
+mod jwt_tests;
 mod revocation;
 #[cfg(test)]
 mod tests;
@@ -35,6 +39,7 @@ mod types;
 mod verify;
 
 pub use builder::CredentialBuilder;
+pub use jwt::{authenticate_access_credential, sign_access_credential};
 pub use revocation::{RevocationOutcome, check_revocation};
 pub use trust::{AllowAllIssuers, StaticTrustedIssuers, TrustedIssuerRegistry};
 pub use types::{
