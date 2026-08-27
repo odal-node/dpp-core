@@ -39,18 +39,25 @@ fn every_declared_property_resolves_to_its_own_class() {
             )
             .expect("policy builds from a listed schema");
 
-            declared_paths(&schema, &[], &mut |path: &[String], class| {
-                let borrowed: Vec<&str> = path.iter().map(String::as_str).collect();
-                let answered =
-                    policy.disclosure_for_path(&borrowed, DocumentScope::ProductGroupData);
-                checked += 1;
-                if answered != class {
-                    wrong.push(format!(
+            let mut active_refs: Vec<String> = Vec::new();
+            declared_paths(
+                &schema,
+                &[],
+                &schema,
+                &mut active_refs,
+                &mut |path: &[String], class| {
+                    let borrowed: Vec<&str> = path.iter().map(String::as_str).collect();
+                    let answered =
+                        policy.disclosure_for_path(&borrowed, DocumentScope::ProductGroupData);
+                    checked += 1;
+                    if answered != class {
+                        wrong.push(format!(
                         "{product_group} v{version}: {} declares {class:?} but resolves to {answered:?}",
                         borrowed.join(".")
                     ));
-                }
-            });
+                    }
+                },
+            );
         }
     }
 
@@ -63,17 +70,38 @@ fn every_declared_property_resolves_to_its_own_class() {
 }
 
 /// Visit every declared `(path, class)` pair in a schema, mirroring how
-/// `collect_disclosures` walks it: only `properties` adds a segment, and
-/// `definitions` / `$defs` restart at the root because `$ref` reaches them from
-/// somewhere this walk cannot see.
+/// `collect_disclosures` walks it: only `properties` adds a segment,
+/// `definitions` / `$defs` are walked at the root for the bare-leaf floor, and
+/// local `$ref` pointers are followed so a definition is also visited under the
+/// path of whatever referred to it.
+///
+/// **This is a mirror, and its limits follow from that.** It reproduces the
+/// collector's rules rather than deriving them independently, so a rule that is
+/// wrong in both places satisfies it. What it does catch is the collector and
+/// the matcher disagreeing — including a definition declared in two blocks with
+/// different classes, which resolves to the merged value and fails the
+/// assertion. For a check that does not share the collector's assumptions, see
+/// `ref_path_tests::the_filter_redacts_by_path_through_a_ref`, which redacts a
+/// document and inspects what survives.
 fn declared_paths(
     node: &serde_json::Value,
     path: &[String],
+    root: &serde_json::Value,
+    active_refs: &mut Vec<String>,
     visit: &mut impl FnMut(&[String], Disclosure),
 ) {
     let Some(object) = node.as_object() else {
         return;
     };
+
+    if let Some(pointer) = object.get("$ref").and_then(serde_json::Value::as_str)
+        && let Some(target) = pointer.strip_prefix('#').and_then(|p| root.pointer(p))
+        && !active_refs.iter().any(|seen| seen == pointer)
+    {
+        active_refs.push(pointer.to_owned());
+        declared_paths(target, path, root, active_refs, visit);
+        active_refs.pop();
+    }
 
     if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
         for (name, prop) in properties {
@@ -86,26 +114,27 @@ fn declared_paths(
             {
                 visit(&child, class);
             }
-            declared_paths(prop, &child, visit);
+            declared_paths(prop, &child, root, active_refs, visit);
         }
     }
 
-    for key in ["items", "additionalProperties"] {
-        if let Some(node) = object.get(key) {
-            declared_paths(node, path, visit);
-        }
+    if let Some(node) = object.get("items") {
+        declared_paths(node, path, root, active_refs, visit);
+    }
+    if let Some(node) = object.get("additionalProperties") {
+        declared_paths(node, &[], root, active_refs, visit);
     }
     for key in ["definitions", "$defs"] {
         if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
             for definition in block.values() {
-                declared_paths(definition, &[], visit);
+                declared_paths(definition, &[], root, active_refs, visit);
             }
         }
     }
     for key in ["allOf", "anyOf", "oneOf"] {
         if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
             for branch in branches {
-                declared_paths(branch, path, visit);
+                declared_paths(branch, path, root, active_refs, visit);
             }
         }
     }

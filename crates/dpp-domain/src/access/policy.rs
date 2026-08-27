@@ -14,18 +14,26 @@ use crate::{Disclosure, PASSPORT_FIELD_DISCLOSURE, ProductGroupCatalog};
 /// restricted fields leak to the public audience.
 ///
 /// **Keys are path suffixes, and the most specific match wins.** A key may name
-/// a bare leaf (`svhcSubstances`) or a path (`materialComposition.name`). A path
+/// a bare leaf (`svhcSubstances`) or a path (`anodeMaterial.weightPct`). A path
 /// key applies only where those segments end the field's own path, so one leaf
 /// name can carry different classes in different places.
 ///
-/// That used to be impossible. Keyed by leaf alone, `name` had to mean one thing
-/// everywhere: battery declares it under both a restricted `materialComposition`
-/// and a public `criticalRawMaterials`, and the fail-closed tie-break took the
-/// restrictive class for both — redacting Annex III content the public passport
-/// is legally required to carry. **Over-redaction is not the safe direction when
+/// That used to be impossible. Keyed by leaf alone, a name had to mean one thing
+/// everywhere: battery's `materialComposition` and `criticalRawMaterial` both
+/// declare `name` and `casNumber`, so classifying one of those positions
+/// classified its twin, and the fail-closed tie-break resolved any disagreement
+/// to the restrictive class — redacting Annex III content the public passport is
+/// legally required to carry. **Over-redaction is not the safe direction when
 /// the public view is an obligation.** The workaround was to restrict the
 /// enclosing object instead and let the filter remove the whole subtree, which
-/// worked but meant a nested field could not be classified on its own terms.
+/// worked — battery still does it, which is why nothing was ever mis-served —
+/// but meant a nested field could not be classified on its own terms.
+///
+/// Both of those are `definitions` blocks reached by `$ref`, as is every shared
+/// leaf in this crate's schemas. Path keys alone did not reach them: a
+/// definition was walked at the root and kept bare-leaf keys, so the collision
+/// survived. Following the pointer is what made the distinction expressible —
+/// see `collect_disclosures`.
 ///
 /// A one-segment key still matches at any depth, because a bare leaf is simply
 /// the weakest suffix rather than a special case — so every policy written
@@ -205,50 +213,104 @@ fn parse_disclosure(token: &str) -> Option<Disclosure> {
     }
 }
 
+/// Record `class` for `key`, keeping the more restrictive of two declarations.
+fn record_disclosure(out: &mut HashMap<String, Disclosure>, key: String, class: Disclosure) {
+    out.entry(key)
+        .and_modify(|existing| *existing = existing.most_restrictive(class))
+        .or_insert(class);
+}
+
+/// Resolve a local `$ref` — `#/definitions/x`, `#/$defs/x` — against the schema
+/// root. Non-local and unresolvable pointers yield `None`.
+///
+/// Only same-document pointers are followed. A `$ref` to another file names a
+/// document this crate does not have, and inventing a class for a shape it
+/// cannot read is worse than leaving the definition's bare-leaf key to cover it.
+fn resolve_local_ref<'a>(
+    node: &serde_json::Map<String, serde_json::Value>,
+    root: &'a serde_json::Value,
+) -> Option<(&'a serde_json::Value, String)> {
+    let pointer = node.get("$ref").and_then(serde_json::Value::as_str)?;
+    let path = pointer.strip_prefix('#')?;
+    let target = root.pointer(path)?;
+    Some((target, pointer.to_owned()))
+}
+
 /// Walk every `properties` map in a schema and record each declared class.
 ///
 /// Descends through nested `properties`, array `items`, `additionalProperties`,
-/// the `definitions` / `$defs` blocks that `$ref` resolves into, and the
-/// `allOf` / `anyOf` / `oneOf` combinators.
-///
-/// `$ref` itself is deliberately **not** followed. Matching is by leaf name, so
-/// a definition's properties are reached by walking the definitions block
-/// directly; following the pointer as well would visit them twice and buy
-/// nothing. It also means a cyclic `$ref` cannot loop this function.
+/// the `definitions` / `$defs` blocks, the `allOf` / `anyOf` / `oneOf`
+/// combinators, and local `$ref` pointers.
 ///
 /// # Keys are paths, not bare leaf names
 ///
 /// A property nested at `materialComposition.name` is recorded under that
 /// dotted path rather than under `name`. Recording the leaf alone meant one name
-/// carried one class for the whole document: battery declares `name` and
-/// `casNumber` under both a `Restricted` `materialComposition` and a `Public`
-/// `criticalRawMaterials`, and collapsing them took the more restrictive class
-/// for both — over-redacting Annex III content the public view is required to
-/// carry. Over-redaction is not the safe direction here.
+/// carried one class for the whole document, and collapsing a collision took the
+/// more restrictive class for both — over-redacting Annex III content the public
+/// view is required to carry. Over-redaction is not the safe direction here.
 ///
 /// Only `properties` adds a segment. Array `items` and the `allOf` / `anyOf` /
 /// `oneOf` combinators describe the *same* position as their parent, so they add
 /// none — which matches the filter, where an array index is not a path segment
 /// either.
 ///
-/// `definitions` / `$defs` are the exception: their contents are reached by
-/// `$ref` from somewhere this walk cannot see, so there is no path to record and
-/// their properties keep bare-leaf keys. Those still match at any depth, which
-/// is what makes them useful and also why a definition is a poor place to put a
-/// class that only holds somewhere specific.
+/// # A definition is recorded twice, deliberately
+///
+/// `definitions` / `$defs` blocks are walked at the **empty path**, giving their
+/// properties bare-leaf keys, *and* every local `$ref` is followed so the same
+/// properties are recorded again under the path of whatever referred to them.
+/// Battery's `materialComposition` is `$ref`'d from `anodeMaterial`,
+/// `cathodeMaterial` and `electrolyteMaterial`, so its `name` lands as
+/// `anodeMaterial.name`, `cathodeMaterial.name`, `electrolyteMaterial.name` —
+/// and as bare `name`.
+///
+/// The two serve different purposes and neither replaces the other.
+///
+/// The **referring paths** are what make a definition's class positional. Two
+/// definitions declaring the same leaf now yield distinct keys, so
+/// `criticalRawMaterials.name` can be `Public` while `anodeMaterial.name` is
+/// `Restricted`, which by-leaf keying could not express: the collision merged to
+/// the restrictive class and redacted both.
+///
+/// The **bare-leaf key is the floor**, and dropping it would be a leak. This walk
+/// descends `properties`, `items`, `additionalProperties`, the three combinators
+/// and `$ref`, and nothing else — not `patternProperties`, `if` / `then` /
+/// `else`, `not`, or `dependentSchemas`. A definition reached only from one of
+/// those would have no referring path recorded at all, and with no bare-leaf key
+/// its class would vanish and the field would fall to `default_disclosure`,
+/// which is `Public`. Keeping the leaf means an unreachable reference
+/// over-applies rather than under-applies. Since a referring path always scores
+/// higher than the one-segment leaf, the floor never overrides a position that
+/// was named explicitly.
+///
+/// A cyclic `$ref` cannot loop this function: `active_refs` holds the pointers
+/// on the current descent and a pointer already there is not re-entered.
 ///
 /// A path declared twice with **different** classes keeps the more restrictive
-/// one. With paths this is now genuinely unreachable for two distinct positions;
-/// it remains as the fail-closed tie-break for the one case that survives — two
-/// definition blocks declaring the same leaf differently.
+/// one — the fail-closed tie-break, now reachable mainly where one definition is
+/// referred to from two places whose own classes differ.
 fn collect_disclosures(
     node: &serde_json::Value,
     path: &str,
+    root: &serde_json::Value,
+    active_refs: &mut Vec<String>,
     out: &mut HashMap<String, Disclosure>,
 ) {
     let Some(object) = node.as_object() else {
         return;
     };
+
+    // A `$ref` describes the position its holder occupies, so the target is
+    // walked at `path` unchanged — the same rule `items` follows, and why
+    // `items: { $ref: ... }` lands a definition on the array's own path.
+    if let Some((target, pointer)) = resolve_local_ref(object, root)
+        && !active_refs.iter().any(|seen| seen == &pointer)
+    {
+        active_refs.push(pointer);
+        collect_disclosures(target, path, root, active_refs, out);
+        active_refs.pop();
+    }
 
     if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
         for (name, prop) in properties {
@@ -262,28 +324,33 @@ fn collect_disclosures(
                 .and_then(serde_json::Value::as_str)
                 .and_then(parse_disclosure)
             {
-                out.entry(child_path.clone())
-                    .and_modify(|existing| *existing = existing.most_restrictive(class))
-                    .or_insert(class);
+                record_disclosure(out, child_path.clone(), class);
             }
-            collect_disclosures(prop, &child_path, out);
+            collect_disclosures(prop, &child_path, root, active_refs, out);
         }
     }
 
     // An array element sits at the same path its key does — the filter does not
-    // treat an index as a segment either — so these carry `path` unchanged.
-    for key in ["items", "additionalProperties"] {
-        if let Some(child) = object.get(key) {
-            collect_disclosures(child, path, out);
-        }
+    // treat an index as a segment either — so `items` carries `path` unchanged.
+    if let Some(child) = object.get("items") {
+        collect_disclosures(child, path, root, active_refs, out);
     }
 
-    // Reached by `$ref` from somewhere this walk cannot see, so there is no path
-    // to root them at. They restart at the empty path and keep bare-leaf keys.
+    // A map's values sit one segment deeper than the map, under a key chosen by
+    // the document rather than the schema. No static path can name that segment,
+    // so carrying `path` here would record a key no document can match and the
+    // field would fall to the `Public` default. These restart at the empty path
+    // instead and keep bare-leaf keys, which match at any depth.
+    if let Some(child) = object.get("additionalProperties") {
+        collect_disclosures(child, "", root, active_refs, out);
+    }
+
+    // Walked at the root as the floor described above, independently of whether
+    // any `$ref` above reached them.
     for key in ["definitions", "$defs"] {
         if let Some(block) = object.get(key).and_then(|b| b.as_object()) {
             for definition in block.values() {
-                collect_disclosures(definition, "", out);
+                collect_disclosures(definition, "", root, active_refs, out);
             }
         }
     }
@@ -293,7 +360,7 @@ fn collect_disclosures(
     for key in ["allOf", "anyOf", "oneOf"] {
         if let Some(branches) = object.get(key).and_then(|b| b.as_array()) {
             for branch in branches {
-                collect_disclosures(branch, path, out);
+                collect_disclosures(branch, path, root, active_refs, out);
             }
         }
     }
@@ -409,7 +476,14 @@ impl ProductGroupAccessPolicy {
         schema.get("properties")?.as_object()?;
 
         let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
-        collect_disclosures(&schema, "", &mut field_disclosure);
+        let mut active_refs: Vec<String> = Vec::new();
+        collect_disclosures(
+            &schema,
+            "",
+            &schema,
+            &mut active_refs,
+            &mut field_disclosure,
+        );
 
         Some(Self {
             name: format!("{product_group_key}-{version}"),
@@ -485,12 +559,18 @@ impl ProductGroupAccessPolicy {
     /// for bare names. The match with the most segments wins.
     ///
     /// That is what lets one leaf name carry different classes in different
-    /// places. Battery declares `name` and `casNumber` under both a `Restricted`
-    /// `materialComposition` and a `Public` `criticalRawMaterials`; keyed by leaf
-    /// alone, one class had to cover both, and the fail-closed tie-break took the
-    /// restrictive one — redacting Annex III content from the public view, which
-    /// the regulation requires it to carry. Over-redaction is not the safe
-    /// direction when the public passport is a legal obligation.
+    /// places. Battery's `materialComposition` and `criticalRawMaterial` both
+    /// declare `name` and `casNumber`; keyed by leaf alone, one class had to
+    /// cover both positions, and any disagreement resolved to the restrictive
+    /// one — redacting Annex III content from the public view, which the
+    /// regulation requires it to carry. Over-redaction is not the safe direction
+    /// when the public passport is a legal obligation.
+    ///
+    /// Both are `definitions` blocks, so the paths that separate them
+    /// (`anodeMaterial.name` against `criticalRawMaterials.name`) exist only
+    /// because `collect_disclosures` follows `$ref`. A path matcher over a
+    /// walk that stopped at the definitions block would have left this exact
+    /// case where it was.
     ///
     /// A single-segment policy key still matches at any depth, because a
     /// one-segment suffix is the weakest match rather than a special case. Every

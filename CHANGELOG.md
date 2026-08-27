@@ -15,6 +15,56 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A `$ref`'d definition now carries its disclosure classes to every path that
+  refers to it, which is what finally makes a shared leaf name classifiable per
+  position.** *(Breaking in effect rather than in signature:
+  `ProductGroupAccessPolicy::field_disclosure` gains a key per referring path for
+  every property declared inside a `definitions` / `$defs` block. Existing keys
+  are unchanged and no shipped class moves. Code that *inspects* the map will see
+  more entries than before.)*
+
+  Path keys shipped without reaching the case they were built for. Every shared
+  leaf in this crate's schemas lives in a definition: battery's
+  `materialComposition` is `$ref`'d from `anodeMaterial`, `cathodeMaterial` and
+  `electrolyteMaterial`, and `criticalRawMaterial` from `criticalRawMaterials`.
+  Definitions were walked at the root and kept bare-leaf keys, so `name` and
+  `casNumber` still collapsed to one key each and still merged to the most
+  restrictive class — the collision path matching was meant to remove. Writing
+  `anodeMaterial.name` produced bare `name` and changed nothing.
+
+  Local `$ref` pointers are now followed, and the target is recorded at the
+  referring path. `anodeMaterial.name` and `criticalRawMaterials.name` are
+  distinct keys, so one may be `Restricted` while the other stays `Public`.
+
+  **The bare-leaf key is kept as well, deliberately.** The walk descends
+  `properties`, `items`, `additionalProperties`, the three combinators and
+  `$ref` — not `patternProperties`, `if` / `then` / `else`, `not` or
+  `dependentSchemas`. A definition referred to from one of those gets no
+  referring path, and dropping its leaf would send the field to
+  `default_disclosure`, which is `Public`. Keeping it means an unreachable
+  reference over-applies rather than under-applies, and since a referring path
+  always outscores the one-segment leaf, the floor never overrides a position
+  that was named.
+
+  A cyclic `$ref` cannot loop the collector: the pointers on the current descent
+  are held and one already there is not re-entered. Self-reference and mutual
+  reference are both covered by tests, which fail by hanging rather than by
+  asserting if the guard is removed.
+
+  **No shipped class moves.** Only `materialComposition.weightPct` (battery) and
+  the `svhcSubstance` / `criticalRawMaterial` fields (electronics, furniture,
+  mattress, toy) are non-public inside a definition, and no product group
+  declares one leaf in two definitions with different classes — so there was no
+  live collision to resolve, and every declared class still resolves to itself
+  across every version of every product group.
+
+  Also fixed alongside it: `additionalProperties` subschemas were walked carrying
+  the map's own path. A map's values sit one segment deeper under a key the
+  document chooses, so that recorded a key no document could match and the field
+  would have fallen to the `Public` default. They restart at the empty path and
+  keep bare-leaf keys. Latent — every `additionalProperties` in the shipped
+  schemas is `false`.
+
 - **`DigitalLink` reads all sixteen GS1 Digital Link primary keys, not only the
   GTIN.** *(Breaking: `DigitalLink.gtin`, `.variant`, `.batch`, `.serial` and
   `.tpcsn` are no longer fields. `primary_key: PrimaryKey` and
