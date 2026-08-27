@@ -33,5 +33,8 @@ mod tests;
 mod types;
 mod verify;
 
-pub use types::{RulesetError, RulesetManifest, SignedBundle, VerifiedRuleset};
+pub use types::{
+    AcceptancePolicy, RulesetAcceptance, RulesetError, RulesetManifest, RulesetProvenance,
+    SignedBundle,
+};
 pub use verify::{JwsVerify, content_hash, verify_bundle};

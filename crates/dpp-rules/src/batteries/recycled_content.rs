@@ -138,10 +138,54 @@ pub enum Art8Phase {
     NotCovered,
     /// In scope, but placed on the market before the phase began.
     NotYetBinding,
+    /// Art. 8(4) disapplies Art. 8(1)–(3) to this battery: it went through a
+    /// second-life operation having already been on the market.
+    ///
+    /// Distinct from [`Art8Phase::NotCovered`], which says the category is
+    /// outside Art. 8 altogether. Here the category *is* covered and the battery
+    /// is individually excused, which is a different sentence to put in front of
+    /// an operator.
+    ExemptSecondLife,
     /// Art. 8(2) minimums apply — the `*_2031` constants.
     Phase1,
     /// Art. 8(3) minimums apply — the `*_2036` constants.
     Phase2,
+}
+
+/// Whether Art. 8(4)'s second-life carve-out reaches a battery.
+///
+/// # Art. 8(4) is not Art. 10(4), and the difference is the condition
+///
+/// Both articles excuse second-life batteries, and it is tempting to model them
+/// together. They test different things:
+///
+/// - **Art. 8(4)** — the operations, *"if the batteries had already been placed
+///   on the market or put into service **before undergoing such operations**"*.
+///   Prior placement relative to the *operation*.
+/// - **Art. 10(4)** — the operations, where the operator demonstrates placement
+///   *"before the dates on which those obligations become applicable"*. Prior
+///   placement relative to the *obligation dates*.
+///
+/// So Art. 8(4) is the broader of the two: a battery placed on the market in
+/// 2033 and remanufactured in 2035 is exempt from Art. 8, while the equivalent
+/// battery is *not* exempt from Art. 10 because it was placed after those duties
+/// applied. Collapsing them would have made one of the two wrong.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Art8SecondLife {
+    /// An original battery, or one whose history is not established.
+    ///
+    /// The default for an unknown history, deliberately. Art. 8(4) is an
+    /// exemption the operator must be able to demonstrate, and wrongly telling
+    /// an operator they are excused is the worse error — a missed duty is
+    /// discovered by an authority rather than by us.
+    None,
+    /// Prepared for re-use, prepared for repurposing, repurposed or
+    /// remanufactured, **and** already placed on the market or put into service
+    /// before undergoing that operation.
+    ///
+    /// Both halves are required by the article and the caller asserts both by
+    /// choosing this variant.
+    PlacedBeforeOperations,
 }
 
 /// Select the governing Art. 8 phase from the date the battery was **placed on
@@ -152,8 +196,21 @@ pub enum Art8Phase {
 /// does not acquire the 2031 minimums by being assessed in 2033. Passing
 /// "today" here instead of the placing-on-market date produces retroactive
 /// non-compliance findings from 18 Aug 2031 onwards.
+///
+/// `second_life` carries Art. 8(4), which disapplies Art. 8(1)–(3) entirely and
+/// is therefore checked before category or date. See [`Art8SecondLife`] for why
+/// it is not the same test as Art. 10(4)'s.
 #[must_use]
-pub fn art8_phase_for(category: Art8Category, placed_on_market: CalendarDate) -> Art8Phase {
+pub fn art8_phase_for(
+    category: Art8Category,
+    placed_on_market: CalendarDate,
+    second_life: Art8SecondLife,
+) -> Art8Phase {
+    // Art. 8(4) is unconditional on date and category — "paragraphs 1, 2 and 3
+    // shall not apply" — so it answers first.
+    if second_life == Art8SecondLife::PlacedBeforeOperations {
+        return Art8Phase::ExemptSecondLife;
+    }
     match category {
         Art8Category::NotCovered => Art8Phase::NotCovered,
         // Art. 8(2) does not name LMT; only Art. 8(3) does.
@@ -442,7 +499,7 @@ mod tests {
         // would report this battery as non-compliant from 18 Aug 2031 onwards.
         let placed = CalendarDate::new(2030, 6, 1);
         assert_eq!(
-            art8_phase_for(Art8Category::IndustrialEvSli, placed),
+            art8_phase_for(Art8Category::IndustrialEvSli, placed, Art8SecondLife::None),
             Art8Phase::NotYetBinding
         );
     }
@@ -452,14 +509,16 @@ mod tests {
         assert_eq!(
             art8_phase_for(
                 Art8Category::IndustrialEvSli,
-                CalendarDate::new(2031, 8, 17)
+                CalendarDate::new(2031, 8, 17),
+                Art8SecondLife::None
             ),
             Art8Phase::NotYetBinding
         );
         assert_eq!(
             art8_phase_for(
                 Art8Category::IndustrialEvSli,
-                CalendarDate::new(2031, 8, 18)
+                CalendarDate::new(2031, 8, 18),
+                Art8SecondLife::None
             ),
             Art8Phase::Phase1
         );
@@ -470,14 +529,16 @@ mod tests {
         assert_eq!(
             art8_phase_for(
                 Art8Category::IndustrialEvSli,
-                CalendarDate::new(2036, 8, 17)
+                CalendarDate::new(2036, 8, 17),
+                Art8SecondLife::None
             ),
             Art8Phase::Phase1
         );
         assert_eq!(
             art8_phase_for(
                 Art8Category::IndustrialEvSli,
-                CalendarDate::new(2036, 8, 18)
+                CalendarDate::new(2036, 8, 18),
+                Art8SecondLife::None
             ),
             Art8Phase::Phase2
         );
@@ -488,11 +549,19 @@ mod tests {
         // Art. 8(2) does not name LMT batteries; Art. 8(3) does. An LMT battery
         // placed on the market the very day Phase 1 begins is still unbound.
         assert_eq!(
-            art8_phase_for(Art8Category::Lmt, CalendarDate::new(2031, 8, 18)),
+            art8_phase_for(
+                Art8Category::Lmt,
+                CalendarDate::new(2031, 8, 18),
+                Art8SecondLife::None
+            ),
             Art8Phase::NotYetBinding
         );
         assert_eq!(
-            art8_phase_for(Art8Category::Lmt, CalendarDate::new(2036, 8, 18)),
+            art8_phase_for(
+                Art8Category::Lmt,
+                CalendarDate::new(2036, 8, 18),
+                Art8SecondLife::None
+            ),
             Art8Phase::Phase2
         );
     }
@@ -501,7 +570,11 @@ mod tests {
     fn out_of_scope_categories_are_never_bound() {
         // Portable batteries, at any date, including well past Phase 2.
         assert_eq!(
-            art8_phase_for(Art8Category::NotCovered, CalendarDate::new(2040, 1, 1)),
+            art8_phase_for(
+                Art8Category::NotCovered,
+                CalendarDate::new(2040, 1, 1),
+                Art8SecondLife::None
+            ),
             Art8Phase::NotCovered
         );
     }
@@ -511,8 +584,16 @@ mod tests {
         // The whole point of a four-outcome enum: an operator told "not covered"
         // and one told "not yet" have different obligations, and neither has a
         // shortfall.
-        let portable = art8_phase_for(Art8Category::NotCovered, CalendarDate::new(2033, 1, 1));
-        let early_ev = art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2030, 1, 1));
+        let portable = art8_phase_for(
+            Art8Category::NotCovered,
+            CalendarDate::new(2033, 1, 1),
+            Art8SecondLife::None,
+        );
+        let early_ev = art8_phase_for(
+            Art8Category::IndustrialEvSli,
+            CalendarDate::new(2030, 1, 1),
+            Art8SecondLife::None,
+        );
         assert_ne!(portable, early_ev);
     }
 
@@ -524,13 +605,21 @@ mod tests {
         let input = all_metals(16.0, 85.0, 6.0, 6.0);
 
         assert_eq!(
-            art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2032, 1, 1)),
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2032, 1, 1),
+                Art8SecondLife::None
+            ),
             Art8Phase::Phase1
         );
         assert!(art8_shortfalls_2031(&input).is_empty());
 
         assert_eq!(
-            art8_phase_for(Art8Category::IndustrialEvSli, CalendarDate::new(2037, 1, 1)),
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2037, 1, 1),
+                Art8SecondLife::None
+            ),
             Art8Phase::Phase2
         );
         assert!(
@@ -660,7 +749,7 @@ mod tests {
             Art8DeclarationDuty::Undetermined { .. }
         ));
         assert_eq!(
-            art8_phase_for(Art8Category::IndustrialEvSli, placed),
+            art8_phase_for(Art8Category::IndustrialEvSli, placed, Art8SecondLife::None),
             Art8Phase::NotYetBinding
         );
     }
@@ -808,6 +897,68 @@ mod tests {
             Some(5.0),
         );
         assert!(c.is_empty());
+    }
+
+    // ── Art. 8(4) — the second-life carve-out ────────────────────────────────
+    //
+    // Added 2026-08-27. Before it, a remanufactured battery was reported as
+    // bound by the minimum shares that Art. 8(4) removes.
+
+    /// Art. 8(4) disapplies paragraphs 1-3 outright, so it answers before
+    /// category or date. A battery deep inside Phase 2 is still exempt.
+    #[test]
+    fn a_second_life_battery_is_exempt_even_inside_phase_2() {
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                CalendarDate::new(2040, 1, 1),
+                Art8SecondLife::PlacedBeforeOperations,
+            ),
+            Art8Phase::ExemptSecondLife
+        );
+    }
+
+    /// **Art. 8(4) is broader than Art. 10(4).** Its condition is prior
+    /// placement relative to the *operation*, not to the obligation dates, so a
+    /// battery placed in 2033 and remanufactured later is exempt from Art. 8 —
+    /// where the same battery is not exempt from Art. 10. Collapsing the two
+    /// carve-outs into one test would hide exactly this.
+    #[test]
+    fn art8_exemption_does_not_require_placement_before_the_phase_dates() {
+        let placed_after_phase1_began = CalendarDate::new(2033, 5, 1);
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                placed_after_phase1_began,
+                Art8SecondLife::None,
+            ),
+            Art8Phase::Phase1,
+            "an original battery placed in 2033 is bound by Art. 8(2)"
+        );
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::IndustrialEvSli,
+                placed_after_phase1_began,
+                Art8SecondLife::PlacedBeforeOperations,
+            ),
+            Art8Phase::ExemptSecondLife,
+            "the same battery, remanufactured, is exempt under Art. 8(4)"
+        );
+    }
+
+    /// Exempt and NotCovered are different sentences and must stay distinct.
+    #[test]
+    fn exempt_is_not_the_same_answer_as_not_covered() {
+        assert_ne!(Art8Phase::ExemptSecondLife, Art8Phase::NotCovered);
+        assert_eq!(
+            art8_phase_for(
+                Art8Category::NotCovered,
+                CalendarDate::new(2040, 1, 1),
+                Art8SecondLife::PlacedBeforeOperations,
+            ),
+            Art8Phase::ExemptSecondLife,
+            "Art. 8(4) is checked first, so it answers even for an out-of-scope category"
+        );
     }
 }
 

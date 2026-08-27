@@ -93,7 +93,7 @@
         "null"
       ],
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18, Art. 8(3) from 2036-08-18, and Art. 10(4) disapplies the performance duties to batteries placed on the market before they applied. Without it no phase determination is possible.",
+      "description": "Date the battery was placed on the EU market or put into service (ISO 8601, YYYY-MM-DD). Staged obligations attach by this date, not by the date of assessment: Art. 8(2) recycled-content minimums bind batteries placed on the market from 2031-08-18 and Art. 8(3) from 2036-08-18. Without it no phase determination is possible. The Art. 8(4) and Art. 10(4) carve-outs are not a grandfather clause: they reach only batteries prepared for re-use, prepared for repurposing, repurposed or remanufactured, which batteryStatus records. A battery merely placed early is not exempted by them, only not yet caught by a paragraph binding from a later date.",
       "x-disclosure": "public"
     },
     "ratedCapacityKwh": {

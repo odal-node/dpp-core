@@ -13,7 +13,76 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **A signed ruleset bundle must now also be *applicable* and *current*, not
+  merely authentic.** *(Breaking: `verify_bundle` takes a fourth argument, an
+  `AcceptancePolicy` carrying the caller's clock and the manifest in force.
+  `VerifiedRuleset` is renamed `RulesetAcceptance`, its fields are private
+  behind `manifest()`, `content()` and `provenance()`, and it is built either by
+  `verify_bundle` or by the explicitly-named `RulesetAcceptance::unverified_baseline`.
+  Two new `RulesetError` variants, `NotYetEffective` and `Superseded`.)*
+
+  A signature is a statement about **origin**, and it is permanent by
+  construction — it stays valid as long as the key does. Verification checked
+  only authenticity and content integrity, so two things a signature cannot say
+  went unsaid:
+
+  - `effective_date` was in the signed manifest and **never read**. A bundle
+    whose rules take effect next year was adopted the moment it arrived.
+  - **There was no rollback protection.** No monotonicity check, no expiry. An
+    older, perfectly-signed bundle displaced a newer one, so anyone able to serve
+    bytes could pin a node to superseded rules without forging anything. This
+    module's own premise is that currency is verifiable; nothing verified it.
+
+  Currency is measured on `effective_date` rather than `bundle_version`, because
+  versions are publisher-chosen strings and ordering `"2026-Q3.1"` against
+  `"2026-Q3.10"` lexicographically puts the tenth release before the second. The
+  effective date is already signed, already a point in time, and already the
+  thing the ordering means. Equal dates are accepted — a republish at the same
+  effective date is a correction, and refusing it would leave no way to ship one.
+
+  Applicability is reported before currency, so a future-dated bundle is refused
+  as `NotYetEffective` rather than `Superseded`: one tells the caller to hold the
+  bytes and re-offer them, the other to discard them.
+
+- **`RulesetAcceptance` no longer claims an invariant it did not hold.** As
+  `VerifiedRuleset` its doc read *"Only constructible via `verify_bundle`, so
+  holding one is proof it verified"*, while every field was public and the type
+  was not `#[non_exhaustive]`. The one production consumer built one directly —
+  a node with no configured channel seeds itself from compiled-in defaults that
+  have no signature to check. That is the honest default, not a misuse; the
+  fault was a type asserting something a reader downstream could not rely on.
+  `provenance()` now answers it, and `unverified_baseline` is named so the
+  decision reads as a decision at the call site.
+
+- **`art8_phase_for` takes the Art. 8(4) second-life carve-out.** *(Breaking: a
+  third argument, `Art8SecondLife`, and a new `Art8Phase::ExemptSecondLife`.)*
+
+  Art. 8(4) disapplies Art. 8(1)–(3) to batteries prepared for re-use, prepared
+  for repurposing, repurposed or remanufactured that were already on the market.
+  It was not modelled, so a remanufactured battery was reported as bound by
+  minimum shares the Regulation removes. The battery plugin reads the carve-out
+  off `batteryStatus` — Annex XIII point 4(c), whose closed set already names the
+  three qualifying operations — and treats an absent status as *not* exempt,
+  because wrongly excusing a duty is the error an authority finds later.
+
+  **Art. 8(4) is not Art. 10(4).** Art. 8(4) requires prior placement relative to
+  the *operation*; Art. 10(4) relative to the *obligation dates*. So a battery
+  placed in 2033 and remanufactured in 2035 is exempt from Art. 8 and not from
+  Art. 10. Modelling them as one test would have made one of the two wrong.
+
 ### Added
+
+- **The third Annex I substance restriction — lead in portable batteries.**
+  Regulation (EU) 2023/1542 Annex I entry 3: no more than **0,01 % lead** by
+  weight in portable batteries **from 18 August 2024**, with portable zinc-air
+  button cells exempt **until 18 August 2028**. `dpp-rules` implemented the
+  mercury and cadmium entries from the same annex and omitted this one, which is
+  also the only one of the three carrying a date gate and a carve-out — so it is
+  where an omission is least visible and most consequential.
+  `lead_content_prohibited_for_portable` therefore takes the placing-on-market
+  date and a zinc-air flag rather than a bare percentage.
 
 - **A gate over schema prose: a regulatory claim must name what it rests on.**
   Every other gate step in this repo reads Rust. Nothing read a `description`
@@ -40,6 +109,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   crate knows, which turns the next audit from research into a lookup.
 
 ### Fixed
+
+- **The second-life carve-outs were documented as a grandfather clause, and
+  shipped that way.** The `placedOnMarketDate` doc and six battery schema
+  descriptions said *"Art. 10(4) disapplies the performance duties to batteries
+  placed on the market before they applied"*, dropping the article's first
+  condition entirely.
+
+  Art. 10(4) reaches only batteries **prepared for re-use, prepared for
+  repurposing, repurposed or remanufactured**. A battery merely placed on the
+  market early is not exempted by it — it is simply not yet caught by a paragraph
+  that binds from a later date. Those are different mechanisms with different
+  consequences, and the prose stated the exemption far wider than the act does.
+
+  Found by reading Art. 8(4) and Art. 10(4) side by side while modelling the
+  first. Worth recording that the schema-prose gate added in this same release
+  **cannot** catch this: it is a well-formed citation to a real, catalogued act
+  that says something other than the prose claims, which is exactly the limit
+  that gate documents about itself.
+
+- **The mercury and cadmium thresholds cited Art. 9.** Art. 9 is *Performance
+  and durability requirements for portable batteries of general use* and says
+  nothing about substances; the restrictions are **Art. 6** with the thresholds
+  in **Annex I**. The values and their scopes were correct — mercury 0,0005 % for
+  batteries generally, cadmium 0,002 % for portable batteries only — so only the
+  citation moved. The same lines also cited Directive 2006/66/EC, which this
+  Regulation repealed, as a co-source.
 
 - **Twelve regulatory-prose defects, found by the gate above in descriptions
   that had already passed a full manual audit.**
