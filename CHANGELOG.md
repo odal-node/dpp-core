@@ -13,6 +13,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Fixed
+
+- **An Art. 8(4) exemption was indistinguishable from silence.** The battery
+  plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
+  same branch as `NotCovered`, emitting nothing at all.
+
+  Absence of a recycled-content finding is not a statement. It is what a battery
+  outside Art. 8, a battery meeting every minimum share, and a battery nobody
+  assessed all look like, and an exemption an operator has to infer from silence
+  is one they cannot show an authority. An exempt battery now carries
+  `battery.recycled_content.exempt_second_life`, pointed at `/batteryStatus`,
+  naming the article that excuses it and the status the carve-out was read from.
+  `NotCovered` keeps its silence: a category that was never in scope has no duty
+  whose absence needs explaining.
+
+  The wiring had no test at the plugin boundary either. `art8_phase_for` was
+  covered in `dpp-rules`, but nothing checked that the plugin reads
+  `batteryStatus` at all, that `waste` and `original` are not Art. 8(4)
+  operations, or that an unreadable status does not excuse the duty. Four tests
+  added, one of them a control proving the fixture reports a shortfall without
+  the status — without it the other three would pass against a plugin that
+  assessed nothing.
+
+  Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
+  five, in the one paragraph whose job is explaining why they are not collapsed.
+
 ## [0.19.0] - 2026-08-27
 
 ### Breaking

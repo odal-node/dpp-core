@@ -128,10 +128,11 @@ pub enum Art8Category {
 
 /// Which Art. 8 minimum-share phase binds a battery.
 ///
-/// Four outcomes, deliberately not collapsed into `Option`: "Art. 8 does not
-/// reach this battery" and "Art. 8 does not reach this battery *yet*" are
-/// different answers, and reporting either as a shortfall misstates an
-/// operator's legal position.
+/// Five outcomes, deliberately not collapsed into `Option`: "Art. 8 does not
+/// reach this battery", "Art. 8 does not reach this battery *yet*" and "Art. 8
+/// reaches this battery and Art. 8(4) excuses it" are three different answers,
+/// and reporting any of them as a shortfall misstates an operator's legal
+/// position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Art8Phase {
     /// The minimum shares never bind this category.
