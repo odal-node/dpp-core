@@ -248,10 +248,20 @@ pub struct BatteryData {
     ///
     /// Staged obligations attach by this date, never by the date of
     /// assessment: Art. 8(2) recycled-content minimums bind batteries placed
-    /// on the market from 18 Aug 2031, Art. 8(3) from 18 Aug 2036, and
-    /// Art. 10(4) disapplies the performance duties to batteries placed on the
-    /// market before those duties applied. Without it, no phase determination
-    /// is possible and none should be assumed.
+    /// on the market from 18 Aug 2031, and Art. 8(3) from 18 Aug 2036. Without
+    /// it, no phase determination is possible and none should be assumed.
+    ///
+    /// **The second-life carve-outs are not a grandfather clause**, and this
+    /// doc said they were until 2026-08-27. Art. 8(4) and Art. 10(4) reach only
+    /// batteries prepared for re-use, prepared for repurposing, repurposed or
+    /// remanufactured. A battery merely placed on the market early is not
+    /// *exempted* by either — it is simply not yet caught by the paragraph that
+    /// binds from a later date, which is a different mechanism and a different
+    /// answer to give an operator. `batteryStatus` is what distinguishes them.
+    ///
+    /// The two carve-outs also differ from each other: Art. 8(4) asks for prior
+    /// placement relative to the *operation*, Art. 10(4) relative to the
+    /// *obligation dates*.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub placed_on_market_date: Option<NaiveDate>,
 

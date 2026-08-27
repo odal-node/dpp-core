@@ -12,7 +12,9 @@
 
 use base64::Engine;
 
-use super::types::{RulesetError, RulesetManifest, SignedBundle, VerifiedRuleset};
+use super::types::{
+    AcceptancePolicy, RulesetAcceptance, RulesetError, RulesetManifest, SignedBundle,
+};
 
 /// Verifies a compact EdDSA JWS against a base64url-encoded Ed25519 public
 /// key. Implemented by the caller (e.g. a thin adapter over `dpp-crypto`'s
@@ -42,17 +44,42 @@ pub fn content_hash(content: &serde_json::Value) -> Result<String, RulesetError>
         .map_err(|e| RulesetError::Malformed(format!("JCS canonicalisation failed: {e}")))
 }
 
-/// Verify a bundle against the pinned publisher public key (base64url). Both
-/// the signature (authenticity) and the content hash (integrity) must pass.
+/// Verify a bundle against the pinned publisher public key (base64url) and the
+/// caller's [`AcceptancePolicy`].
+///
+/// Four checks, in this order, each fail-closed:
+///
+/// 1. **Authenticity** — the manifest JWS verifies under the pinned key.
+/// 2. **Integrity** — `content` hashes to what the signed manifest commits to.
+/// 3. **Applicability** — the manifest's `effective_date` has arrived.
+/// 4. **Currency** — the bundle is not older than the ruleset in force.
+///
+/// # Why 3 and 4 exist
+///
+/// They did not until 2026-08-27, and their absence was the gap a signature
+/// cannot close. A signature is a statement about *origin*, permanent by
+/// construction: it stays valid for as long as the key does. So an authentic
+/// bundle whose rules start next year was adopted immediately, and — the one
+/// with an adversary — an authentic bundle from two years ago replaced a newer
+/// one, letting anyone able to serve bytes pin a node to superseded rules
+/// without forging anything. This module's own premise is that a customer can
+/// verify currency; nothing verified currency.
+///
+/// **Currency is measured on `effective_date`, not on `bundle_version`.**
+/// Versions here are publisher-chosen strings like `"2026-Q3.1"`, and ordering
+/// them lexicographically puts `2026-Q3.10` before `2026-Q3.2`. The effective
+/// date is already in the signed manifest, already a point in time, and already
+/// the thing the ordering is meant to express.
 ///
 /// # Errors
-/// [`RulesetError`] — fail-closed on a bad signature, hash mismatch, or
-/// malformed input.
+/// [`RulesetError`] — fail-closed on a bad signature, hash mismatch, a bundle
+/// that is not yet effective, one that has been superseded, or malformed input.
 pub fn verify_bundle(
     bundle: &SignedBundle,
     publisher_pubkey_b64: &str,
     verifier: &dyn JwsVerify,
-) -> Result<VerifiedRuleset, RulesetError> {
+    policy: &AcceptancePolicy<'_>,
+) -> Result<RulesetAcceptance, RulesetError> {
     // (1) Authenticity: the manifest JWS verifies under the pinned key.
     if !verifier.verify_eddsa(&bundle.manifest_jws, publisher_pubkey_b64)? {
         return Err(RulesetError::BadSignature);
@@ -63,10 +90,33 @@ pub fn verify_bundle(
     if content_hash(&bundle.content)? != manifest.content_sha256 {
         return Err(RulesetError::ContentHashMismatch);
     }
-    Ok(VerifiedRuleset {
+    // (4) Applicability. Checked before currency so a future-dated bundle is
+    // reported as future-dated rather than as superseded, which is the answer
+    // that tells a caller to hold it and re-offer it later.
+    if manifest.effective_date > policy.now {
+        return Err(RulesetError::NotYetEffective {
+            bundle_version: manifest.bundle_version,
+            effective_date: manifest.effective_date,
+            now: policy.now,
+        });
+    }
+    // (5) Currency. Equal dates are accepted: a republish at the same effective
+    // date is a correction, not a rollback, and refusing it would leave no way
+    // to ship one.
+    if let Some(in_force) = policy.in_force
+        && manifest.effective_date < in_force.effective_date
+    {
+        return Err(RulesetError::Superseded {
+            offered_version: manifest.bundle_version,
+            offered: manifest.effective_date,
+            in_force_version: in_force.bundle_version.clone(),
+            in_force: in_force.effective_date,
+        });
+    }
+    Ok(RulesetAcceptance::verified(
         manifest,
-        content: bundle.content.clone(),
-    })
+        bundle.content.clone(),
+    ))
 }
 
 /// Decode the payload segment of a compact JWS into `T` (used only after the

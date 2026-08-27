@@ -20,8 +20,8 @@ use dpp_plugin_sdk::rules::batteries::degradation::{
 };
 use dpp_plugin_sdk::rules::batteries::passport_content::{fields_not_applicable, mandatory_fields};
 use dpp_plugin_sdk::rules::batteries::recycled_content::{
-    Art8Category, Art8Phase, RecycledContentInput, art8_category_for, art8_phase_for,
-    art8_shortfalls_2031, art8_shortfalls_2036, chemistry_regulated_metals,
+    Art8Category, Art8Phase, Art8SecondLife, RecycledContentInput, art8_category_for,
+    art8_phase_for, art8_shortfalls_2031, art8_shortfalls_2036, chemistry_regulated_metals,
     recycled_content_chemistry_conflicts,
 };
 use dpp_plugin_sdk::rules::common::date::CalendarDate;
@@ -193,7 +193,8 @@ impl DppProductGroupPlugin for BatteryPlugin {
                      shares attach by the date the battery was placed on the EU market.",
                 )),
                 Some(date) => {
-                    let (shortfalls, year, standing) = match art8_phase_for(art8_category, date) {
+                    let (shortfalls, year, standing) =
+                        match art8_phase_for(art8_category, date, art8_second_life(input)) {
                         Art8Phase::Phase1 => (
                             art8_shortfalls_2031(&scoped),
                             "2031",
@@ -222,7 +223,12 @@ impl DppProductGroupPlugin for BatteryPlugin {
                                  batteries placed on the market from 18 Aug 2031",
                             ),
                         },
-                        Art8Phase::NotCovered => (Vec::new(), "", ""),
+                        // Art. 8(4): the paragraphs do not apply at all. No
+                        // shortfall is reportable, and reporting one would
+                        // assert a duty the Regulation removed.
+                        Art8Phase::ExemptSecondLife | Art8Phase::NotCovered => {
+                            (Vec::new(), "", "")
+                        }
                     };
                     for sf in shortfalls {
                         let field = match sf.material {
@@ -311,6 +317,31 @@ impl DppProductGroupPlugin for BatteryPlugin {
 /// guidance says must not be filled is never mentioned there at all.
 ///
 /// Missing content is reported as **one** finding rather than one per field.
+/// Read Art. 8(4)'s second-life test off the payload's `batteryStatus`.
+///
+/// `batteryStatus` is Annex XIII point 4(c), whose closed set is
+/// `original | repurposed | re-used | remanufactured | waste`. Three of those
+/// name an Art. 8(4) operation. `waste` does not: end-of-life is not preparation
+/// for re-use, and a waste battery is not being placed on the market.
+///
+/// A battery reaching one of those three states was necessarily on the market
+/// before it — you cannot repurpose what was never placed — so the article's
+/// second condition is satisfied by the status itself. That inference is the
+/// operator's to stand behind; the field is theirs to declare.
+///
+/// **Absent or unrecognised reads as `None`.** Art. 8(4) is an exemption, and an
+/// undeclared status is not evidence of one. Excusing a duty on a missing field
+/// is the error an authority finds later; asserting one we should not is the
+/// error the operator can see and correct now.
+fn art8_second_life(input: &PluginInput) -> Art8SecondLife {
+    match input.get("batteryStatus").and_then(Value::as_str) {
+        Some("repurposed" | "re-used" | "remanufactured") => {
+            Art8SecondLife::PlacedBeforeOperations
+        }
+        _ => Art8SecondLife::None,
+    }
+}
+
 /// An EV battery owes 38 mandatory fields and a fresh draft carries almost
 /// none, so per-field advisories would put dozens of findings into a document
 /// that is stored, signed and served. The publish refusal names them
