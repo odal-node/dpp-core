@@ -70,7 +70,7 @@
         "C",
         null
       ],
-      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Class A = significantly below limit; B = below limit; C = at or above limit. Thresholds differ per tyre class (C1/C2/C3).",
+      "description": "Noise performance class A/B/C per EU 2020/740 Annex I. Bands from Annex I Part C against the limit value (LV) in Reg. (EC) 661/2009 Annex II Part C: A is N <= LV-3, B is LV-3 < N <= LV, C is N > LV. Note the boundary — a tyre measuring exactly LV is class B, not C.",
       "x-disclosure": "public"
     },
     "rollingResistanceNPerKn": {

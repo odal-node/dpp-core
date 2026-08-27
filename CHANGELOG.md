@@ -921,6 +921,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   187 final. The schema prose was contradicting data the catalog already held
   correctly.
 
+
+- **A tyre noise class was stated one boundary out.** The description said class
+  `C` is "at or above limit". Regulation (EU) 2020/740 Annex I Part C bands it as
+  A ≤ LV−3, LV−3 < B ≤ LV, C > LV — so a tyre measuring **exactly** the limit
+  value is class B, not C. The description now carries the three bands and names
+  the boundary explicitly.
+
+  Verified in the same pass and left unchanged: 2020/740 applies from 1 May 2021
+  and repeals Regulation (EC) No 1222/2009 with effect from the same day; fuel
+  efficiency and wet grip are both graded on an "A to E" scale, so the schema's
+  emphatic "NOT the old A-G scale" is right; C1/C2/C3 are cars, vans and
+  heavy-duty vehicles; Directive 2011/65/EU is RoHS; Directive 2009/48/EC is the
+  Toy Safety Directive and does require CE marking; and Directive (EU) 2017/1132
+  Art. 16 does establish the unique company identifier the unsold-goods schema
+  cites for the EUID.
 ## [0.18.0] - 2026-08-19
 
 ### Added
