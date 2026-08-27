@@ -32,7 +32,7 @@ pub use detergent::{DetergentData, SurfactantEntry};
 pub use electronics::{DeviceType, ElectronicsData, EnergyEfficiencyClass};
 pub use furniture::FurnitureData;
 pub use mattress::MattressData;
-pub use product_group_data::{ProductGroupData, redact_product_group_data};
+pub use product_group_data::ProductGroupData;
 pub use steel::SteelData;
 pub use textile::{FibreEntry, TextileData};
 pub use toy::ToyData;

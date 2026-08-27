@@ -10,7 +10,7 @@
 //! - [`group`] — the [`ProductGroup`] discriminant.
 //! - [`carbon_footprint`] — the CO₂e declaration and the vocabulary it is stated in.
 //! - [`repairability_score`] — the non-regulatory repairability heuristic.
-//! - [`data`]    — one file per product group + the [`ProductGroupData`] union and `redact_product_group_data`.
+//! - [`data`]    — one file per product group + the [`ProductGroupData`] union.
 //!
 //! The thin adapters onto `dpp-rules` cross-field validators moved to
 //! [`crate::validation::rules`] — there is one validation module now, not two.
@@ -51,7 +51,7 @@ pub use data::{
     HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, MattressData,
     ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth, SteelData,
     SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
-    UnsoldGoodsReport, UsageHistory, redact_product_group_data,
+    UnsoldGoodsReport, UsageHistory,
 };
 pub use group::ProductGroup;
 pub use payload::ProductGroupPayload;

@@ -2,32 +2,9 @@
 //! runs through.
 
 use super::*;
-use crate::catalog::ProductGroupDescriptor;
-use crate::disclosure::Audience;
-use crate::disclosure::Disclosure;
 use crate::validation::rules::{
     validate_fibre_composition, validate_surfactants, validate_svhc_substances,
 };
-
-// ── redact_product_group_data ────────────────────────────────────────────────
-
-fn battery_descriptor_with_tiers() -> ProductGroupDescriptor {
-    use std::collections::HashMap;
-    let mut disclosure = HashMap::new();
-    disclosure.insert("dueDiligenceUrl".into(), Disclosure::Restricted);
-    disclosure.insert("criticalRawMaterials".into(), Disclosure::Restricted);
-    disclosure.insert("disassemblyInstructionsUrl".into(), Disclosure::Restricted);
-    ProductGroupDescriptor {
-        key: "battery".into(),
-        title: "Battery".into(),
-        schema_versions: vec!["2.0.0".into()],
-        current_schema_version: "2.0.0".into(),
-        product_categories: vec![],
-        disclosure,
-        plugin: None,
-        notes: None,
-    }
-}
 
 pub(super) fn minimal_battery_data() -> ProductGroupData {
     ProductGroupData::Battery(Box::new(BatteryData {
@@ -36,60 +13,6 @@ pub(super) fn minimal_battery_data() -> ProductGroupData {
         ..crate::test_support::sample_battery_data()
     }))
 }
-
-#[test]
-fn public_viewer_sees_public_fields_only() {
-    let data = minimal_battery_data();
-    let descriptor = battery_descriptor_with_tiers();
-    let json = redact_product_group_data(&data, Audience::Public, &descriptor);
-    // Public fields must be present
-    assert!(json.get("batteryChemistry").is_some());
-    assert!(json.get("co2ePerUnitKg").is_some());
-    assert!(json.get("nominalVoltageV").is_some());
-    // Professional-gated fields must be stripped
-    assert!(
-        json.get("dueDiligenceUrl").is_none(),
-        "due_diligence_url must be hidden from Public"
-    );
-    assert!(
-        json.get("disassemblyInstructionsUrl").is_none(),
-        "disassembly_url must be hidden from Public"
-    );
-}
-
-#[test]
-fn professional_viewer_sees_gated_fields() {
-    let data = minimal_battery_data();
-    let descriptor = battery_descriptor_with_tiers();
-    let json = redact_product_group_data(&data, Audience::LegitimateInterest, &descriptor);
-    assert!(
-        json.get("dueDiligenceUrl").is_some(),
-        "Professional must see due_diligence_url"
-    );
-    assert!(json.get("disassemblyInstructionsUrl").is_some());
-    assert!(json.get("batteryChemistry").is_some());
-}
-
-#[test]
-fn empty_disclosure_retains_all_fields() {
-    let data = minimal_battery_data();
-    let descriptor = ProductGroupDescriptor {
-        key: "battery".into(),
-        title: "Battery".into(),
-        schema_versions: vec!["2.0.0".into()],
-        current_schema_version: "2.0.0".into(),
-        product_categories: vec![],
-        disclosure: std::collections::HashMap::new(),
-        plugin: None,
-        notes: None,
-    };
-    let json = redact_product_group_data(&data, Audience::Public, &descriptor);
-    // No disclosure map = nothing gated = all fields visible
-    assert!(json.get("dueDiligenceUrl").is_some());
-    assert!(json.get("disassemblyInstructionsUrl").is_some());
-    assert!(json.get("batteryChemistry").is_some());
-}
-
 // ── Helper constructors ──────────────────────────────────────────────
 
 fn cotton_fibre(pct: f64) -> FibreEntry {

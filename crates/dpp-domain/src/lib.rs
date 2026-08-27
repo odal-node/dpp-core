@@ -119,7 +119,6 @@ pub use crate::{
         UnsoldGoodsReport,
         UsageHistory,
         WasteTreatmentSplit,
-        redact_product_group_data,
     },
     status::PassportStatus,
     transfer::{
