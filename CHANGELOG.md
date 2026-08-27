@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-27
+
 ### Breaking
 
 - **A signed ruleset bundle must now also be *applicable* and *current*, not
@@ -71,100 +73,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the *operation*; Art. 10(4) relative to the *obligation dates*. So a battery
   placed in 2033 and remanufactured in 2035 is exempt from Art. 8 and not from
   Art. 10. Modelling them as one test would have made one of the two wrong.
-
-### Added
-
-- **The third Annex I substance restriction — lead in portable batteries.**
-  Regulation (EU) 2023/1542 Annex I entry 3: no more than **0,01 % lead** by
-  weight in portable batteries **from 18 August 2024**, with portable zinc-air
-  button cells exempt **until 18 August 2028**. `dpp-rules` implemented the
-  mercury and cadmium entries from the same annex and omitted this one, which is
-  also the only one of the three carrying a date gate and a carve-out — so it is
-  where an omission is least visible and most consequential.
-  `lead_content_prohibited_for_portable` therefore takes the placing-on-market
-  date and a zinc-air flag rather than a bare percentage.
-
-- **A gate over schema prose: a regulatory claim must name what it rests on.**
-  Every other gate step in this repo reads Rust. Nothing read a `description`
-  string, and every recorded instance of a fabricated regulatory claim in this
-  project has been in prose or data — including two electronics descriptions
-  that asserted an adoption date, an effective date and a phase-two date **for
-  an act that does not exist**, and shipped to crates.io.
-
-  The full prose audit is what made the rules non-arbitrary. Every defect it
-  found was one of two shapes: a bare assertion with no citation, or a citation
-  that did not hold. Every description carrying a checkable citation checked out,
-  without exception. Four rules encode that:
-
-  - an `Annex`/`Art.` citation must name its act by number, in the schema's
-    **root** description or in the citing description itself;
-  - every act number cited must resolve to the instrument catalog or to an
-    explicit inventory of acts cited but not modelled, each with a reason;
-  - schema prose must not state a passport applicability date at all — that
-    belongs in `crates/dpp-domain/instruments/`, where it carries a `basis`;
-  - any other date claim must name its act in the same description.
-
-  It cannot check that a citation is *true* — that needs the OJ text and a
-  reader. It checks that one is present, well-formed, and points at an act this
-  crate knows, which turns the next audit from research into a lookup.
-
-### Fixed
-
-- **The second-life carve-outs were documented as a grandfather clause, and
-  shipped that way.** The `placedOnMarketDate` doc and six battery schema
-  descriptions said *"Art. 10(4) disapplies the performance duties to batteries
-  placed on the market before they applied"*, dropping the article's first
-  condition entirely.
-
-  Art. 10(4) reaches only batteries **prepared for re-use, prepared for
-  repurposing, repurposed or remanufactured**. A battery merely placed on the
-  market early is not exempted by it — it is simply not yet caught by a paragraph
-  that binds from a later date. Those are different mechanisms with different
-  consequences, and the prose stated the exemption far wider than the act does.
-
-  Found by reading Art. 8(4) and Art. 10(4) side by side while modelling the
-  first. Worth recording that the schema-prose gate added in this same release
-  **cannot** catch this: it is a well-formed citation to a real, catalogued act
-  that says something other than the prose claims, which is exactly the limit
-  that gate documents about itself.
-
-- **The mercury and cadmium thresholds cited Art. 9.** Art. 9 is *Performance
-  and durability requirements for portable batteries of general use* and says
-  nothing about substances; the restrictions are **Art. 6** with the thresholds
-  in **Annex I**. The values and their scopes were correct — mercury 0,0005 % for
-  batteries generally, cadmium 0,002 % for portable batteries only — so only the
-  citation moved. The same lines also cited Directive 2006/66/EC, which this
-  Regulation repealed, as a co-source.
-
-- **Twelve regulatory-prose defects, found by the gate above in descriptions
-  that had already passed a full manual audit.**
-
-  Six asserted a passport applicability date: `detergent` v1.0.0/v1.1.0 ("DPP
-  mandate 2029"), `toy` v1.0.0/v1.1.0 ("DPP mandate 2030"), `furniture` v1.2.0
-  and `mattress` v1.0.0 ("indicative delegated-act adoption 2028 / 2029"). These
-  are the same shape removed elsewhere in the previous pass and were missed
-  because that pass worked from the versions it had already opened. All six
-  dates were already in the instrument catalog — `toy-safety-2025-2509` carries
-  `2030-08-01` sourced, `detergents-2026-405` carries `2029-09-23`, and the ESPR
-  binding notes record furniture 2028 and mattress 2029 as indicative — so
-  nothing is lost by removing them from prose, which has nowhere to put a basis.
-
-  Six cited REACH with no act number: `Art. 33` in `furniture` v1.0.0–v1.2.0 and
-  `mattress` v1.0.0, `Annex XVII entry 72` in `textile` v1.1.0/v1.2.0. Now
-  anchored to Regulation (EC) No 1907/2006. Both citations verified against the
-  consolidated text: Art. 33 is the duty to communicate information on
-  substances in articles "in a concentration above 0,1 % weight by weight (w/w)",
-  and Appendix 12 to entry 72 does list disperse dyes, chromium VI compounds and
-  nickel — so the substances named in the textile description are correct.
-
-  **`toy` called Regulation (EU) 2025/2509 a *Delegated* Regulation.** The OJ
-  header reads "REGULATION (EU) 2025/2509 OF THE EUROPEAN PARLIAMENT AND OF THE
-  COUNCIL" — an ordinary legislative act adopted 26 November 2025, repealing
-  Directive 2009/48/EC. A delegated act is made by the Commission under a
-  delegation of power, which is a different instrument with a different amendment
-  path, so this was not a naming quibble.
-
-### Breaking
 
 - **A `$ref`'d definition now carries its disclosure classes to every path that
   refers to it, which is what finally makes a shared leaf name classifiable per
@@ -374,118 +282,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   unsold consumer products generally, as 2026/2's own Annex II shows across 45 CN
   headings. The old check rejected every lawful disclosure outside those two.
 
-### Added
-
-- **`InstrumentKind::Implementing`.** The catalog could name a delegated act but
-  not an implementing one, and Impl. Reg. (EU) 2026/2 is the second kind. The
-  Treaty distinction is real — a delegated act may supplement or amend
-  non-essential elements of the basic act, an implementing act only lays down
-  uniform conditions for implementing it — so recording one as the other would
-  assert a power it does not have. Both kinds carry a `parent`.
-
-- **`CnCategory`**, the combined-nomenclature chapter (2 digits) or heading (4)
-  a disclosure line is filed under. Deliberately *not* `CommodityCode`, which is
-  a product's own 6/8/10-digit classification: substituting one for the other
-  files a whole chapter's goods under a single article.
-
-- **Impl. Reg. (EU) 2026/2 and Del. Reg. (EU) 2026/296 in the instrument
-  catalog**, both bound to `unsold-goods`, both `notRequired` — neither creates a
-  passport. 2026/296 carries a **five-year** retention figure that is *not* a
-  passport availability period: Art. 3 requires per-derogation documentation to
-  be kept for five years after destruction and produced to a competent authority
-  within 30 days.
-
-- **A catalog of the legal instruments themselves, so a product group can be
-  governed by more than one.** `InstrumentCatalog` holds one manifest per act —
-  ten today, from ESPR and the Batteries Regulation to the two horizontal
-  ecodesign acts that are still only announced — each carrying an
-  `InstrumentKind`, an `InstrumentStatus`, the `PassportObligation` it imposes,
-  and one `InstrumentBinding` per product group it reaches.
-
-  `SectorDescriptor` carries a single `regime`, `status`, `dppAppliesFrom` and
-  `retentionYears`, which asserts that exactly one act governs a sector. ESPR
-  Art. 5(7) says otherwise: one delegated act may cover many product groups, a
-  group-specific act may supplement a horizontal one, and the Regulation
-  contains no precedence rule anywhere — so overlapping acts accumulate and
-  each of those fields is a property of an *(act, product group)* pair.
-
-  Bindings are held on the act rather than on the product group because an act
-  can reach a group for which no manifest exists at all. That is not
-  hypothetical: the Commission's preparatory analysis states that the horizontal
-  requirements cover sets of products never shortlisted as product groups, and
-  names light means of transport. There is therefore no total function from a
-  product group to its applicable acts, and the catalog offers lookup over what
-  has been recorded, never a derivation.
-
-  `PassportObligation` is the state the previous model could not express:
-  `Required` with an optional dated `ObligationDate`, `NotRequired` for an act
-  that binds but has no passport article, and `DisplacedBy` for one whose
-  information duty is discharged through another system under ESPR Art. 9(4)(b).
-  With it, "these obligations bind today" and "no passport is owed" are
-  separately representable, which they were not before. `DateBasis` marks every
-  date `sourced` or `assumed`, generalising the `RetentionBasis` distinction —
-  a date inferred from an ecodesign application date had been shipped as a
-  passport date with nothing in the record saying so.
-
-  Folds across an applicable set are unions, never precedence choices: retention
-  is the maximum with assumption contagious, a passport is due on the earliest
-  date any act fixes, and granularity is the most granular any act sets.
-  `Granularity` is new and lives with the act, per ESPR Art. 9(2)(d), with
-  `RegistrationGranularity` now converting from it rather than standing alone.
-
-  **Additive and not yet wired** — `SectorCatalog` remains the record every
-  component resolves against. Where the two disagree, a test pins the divergence
-  set exactly, so a new one fails the build. It names four today, of which two
-  are sector manifests asserting a passport date for an obligation no act
-  imposes.
-
-- **Every schema version this crate claims to support now has a frozen document
-  proving it is still readable.** `tests/schema_compat.rs` holds one minimal
-  sector-data fixture per `(sector, version)` the registry serves — 28 today —
-  and asserts each still reads through `Passport::from_stored`, the path a node
-  actually reads stored documents by.
-
-  `Passport` and every `SectorData` variant are the literal on-disk shape of
-  every passport a node has ever stored. A non-additive change to one does not
-  break a consumer at compile time; it makes every already-written document of
-  that shape undeserialisable the moment a node upgrades its pin — a runtime
-  failure against data, per request, with no compile-time signal anywhere. That
-  has happened, and downstream it took out reads for 244 of 276 passports.
-
-  Three properties are checked: every declared version has a fixture (so adding
-  a schema version fails until one is frozen), every fixture validates against
-  the schema it was frozen for, and every fixture still reads today. Fixtures are
-  written once by `just freeze-schema-fixtures` and never regenerated — one
-  regenerated from the current schema would agree with it by construction.
-
-  The gate was verified to fail: adding a required field to `TyreData` produced
-  `tyre v1.0.0: missing field ...`.
-
-### Fixed
-
-- **A textile passport stored under schema v1.0.0 could not be read at all.**
-  The lens chain had no `1.0.0 → 1.1.0` step, so `upcast_str_toward` refused with
-  `NoPath` and every such document was unreadable — while the catalog went on
-  declaring v1.0.0 a supported version.
-
-  The step needs no transformation: v1.0.0 and v1.1.0 declare identical
-  `required` lists, v1.1.0 removes no property, and its sixteen additions are all
-  optional. But a chain cannot cross a gap, so a document two versions behind
-  could not reach the current version through a step that required no change.
-  An identity lens closes it, and `1.0.0 → 1.1.0 → 1.2.0` now carries the
-  document through the `countryOfManufacturing` rename that was always waiting
-  for it.
-
-  Found by the compatibility gate above, on its first run. Textile is the sector
-  whose rename caused the original incident.
-
-  `toward_still_refuses_a_gap_no_lens_touches_at_all` now builds its own
-  synthetic gap. It had used textile 1.0.0 as a convenient example of an
-  unbridged one, which coupled a test about the registry's refusal semantics to a
-  gap in production data — so legitimately fixing that gap failed a test that was
-  never about textile.
-
-### Breaking
+  **`dpp-rules`' unsold-goods surface moves with the model**, and a consumer of
+  that crate sees the break there rather than here. `UnsoldGoodsLintInput` loses
+  `as_of_year`, `as_of_month`, `reporting_period`, `destination`,
+  `destruction_justification`, `operator_name` and `volume_kg`, and gains
+  `lines`, `consolidated_undertaking_count`, `measures_taken_len` and
+  `measures_planned_len`. The five lints that read the departed fields —
+  `reporting_period_in_future`, `reporting_period_format_implausible`,
+  `volume_kg_implausibly_large`,
+  `destruction_justification_without_exempt_destination` and
+  `operator_name_missing_for_third_party_destination` — are replaced by the
+  single `lint_unsold_goods` entry point, and
+  `unsold_goods::annex_vii::product_category_matches_heading` is removed with
+  the Annex VII scoping it enforced.
 
 - **A product group's disclosure classes stop at its own payload.** *(Breaking:
   `ProductGroupAccessPolicy` gains `envelope_disclosure` and the schema-derived
@@ -671,20 +480,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   correctly so for all sixteen of GS1's primary keys rather than only a repeated
   `01`.
 
-### Added
-
-- **The GS1 oracle corpus carries cases our own builder cannot produce.** It was
-  generated entirely from `DigitalLink::build()` output, so it could only ever
-  contain links we already emit — proving what we emit is valid GS1 while saying
-  nothing about valid GS1 we refuse. That is the failure direction the corpus's
-  own header names as the quiet one, and it was structurally invisible.
-
-  Three hand-written entries now carry our verdict for GS1's engine to
-  adjudicate: a path mixing two alternative qualifier sequences, a known data
-  attribute following a qualifier, and a genuinely unassigned AI.
-
-### Breaking
-
 - **`PassportRepository` gains `find_by_gtin_any_status`.** *(Breaking: every
   implementor must add the method.)* The by-GTIN counterpart of the existing
   `find_by_id_any_status`, and it closes the same gap on the other public route.
@@ -742,63 +537,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `Gln::parse` is unchanged: a GLN has no shorter forms, so its exact-13 rule is
   already right.
 
-### Added
-
-- **The mandatory-content publish gate can be previewed.**
-  `Passport::check_mandatory_content` is now public, so a caller can ask whether
-  a passport would clear the gate without attempting the transition.
-
-  It was reachable only through `transition_to`, which meant the only way to
-  learn the answer was to try. A dry-run consumer therefore reported on the
-  checks it could reach and stayed silent about the one that most often refuses.
-
-  `transition_to` calls the same function, so the preview and the refusal it
-  predicts cannot drift, and it returns the same `DppError` — a consumer can
-  render the preview byte-identically to the eventual refusal. A failure names
-  every missing field at once, so one call is a complete answer.
-
-  Being able to ask is not being able to decline: the gate still runs inside
-  `transition_to`, and `status`/`published_at` remain unsettable by hand, so no
-  path to publishing skips it. That property was the reason it was private, and
-  it is unchanged.
-
-### Fixed
-
-- **The transfer-of-responsibility article pin was stale, and it ships to
-  crates.io.** `docs/regulatory/COMPLIANCE.md` concluded, on 2026-07-04, that no
-  numbered transfer obligation exists. Implementing Regulation (EU) 2026/1778
-  was published on 17 July 2026 — thirteen days later — and **Art. 6a** supplies
-  one: a registered digital product passport "may be transferred to another
-  verified economic operator or, where applicable, to a verified value chain
-  actor that takes over the obligations from the previous actor ... from the
-  date indicated for the transfer."
-
-  The original finding was not wrong and is kept verbatim: it is still the
-  answer for Regulation (EU) 2024/1781 itself, which establishes no transfer
-  mechanism. What changed is that the registry implementing act does, at a
-  different level — what moves is the *registration*, between **eIDAS-verified**
-  actors whose status expires after at most three years (Art. 5(4)).
-
-  Three bounds on what `domain::transfer` may claim follow, and the entry now
-  states them: the registry is the authoritative record of who holds the
-  obligations; Art. 5(3) closes that registry to everyone but verified actors,
-  so it can never be a public reader's proof; and a `did:web` identifier is not
-  evidence of verified-actor standing, so the transfer chain is a local record
-  of what this node was told, not proof of who is responsible.
-
-  Recorded alongside it: Art. 6a does not cover the product-lifecycle cases.
-  **ESPR Art. 11(d)** requires a *new* passport created for a product that
-  already has one to be **linked** to the original, and **Art. 2(16)** defines
-  remanufacturing as producing "a new product" — so a remanufactured product
-  gets a new linked passport (`Passport::parent_passport_ref`) rather than a
-  transfer of the old one. Whether `TransferReason::Remanufacturing`,
-  `::Repurposing` and `::PreparationForReuse` should exist at all is noted as an
-  open domain question and deliberately left open here.
-
-  Documentation only — no type or behaviour changes in this entry.
-
-### Breaking
-
 - **A transfer's second proof is named for what it is: the node's attestation,
   not the incoming operator's signature.** *(Breaking:
   `TransferRecord::to_signature` and `TransferNotification::to_signature` are
@@ -834,8 +572,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   migration is required; a document written under the old key still reads, and
   serialisation now emits only the new one.
 
-### Breaking
-
 - **Every public error enum is `#[non_exhaustive]`.** *(Breaking: a downstream
   `match` on one of these without a wildcard arm no longer compiles. Add `_ =>`.
   Affects `AasError`, `CalcError`, `DigitalLinkError`, `EuRegistryErrorKind`,
@@ -857,19 +593,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Applied to error enums only. `PrimaryKey`, `DocumentScope`, `Granularity` and
   `Assessability` stay exhaustive on purpose — those are closed choices where
   making a caller handle every case is the point, not an accident.
-
-### Fixed
-
-- **Two intra-doc links rendered as literal text on docs.rs.** The
-  sector-to-product-group rename left `crate::product group::` and
-  `super::product group::` — a space where the underscore belongs — in
-  `Passport::redact`'s and `ProductIdentity`'s doc comments. A path containing a
-  space is not parsed as an intra-doc link at all, so `cargo doc -D warnings`
-  saw nothing to warn about and the text shipped as prose pointing nowhere. The
-  second one also needed an absolute path: after the module layout changed,
-  `super` from `crate::product::identity` no longer reaches `product_group`.
-
-### Breaking
 
 - **Passport redaction moves to the access layer, never serves a proof, and
   follows the passport's own schema version.** *(Breaking: the inherent
@@ -933,55 +656,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `no_proof_payload_survives_anywhere_in_a_served_view` assert the property
   across all three audiences, the second by searching the serialised document so
   a proof reintroduced under any name or nesting still fails.
-
-### Added
-
-- **The access-credential wire format is published, with the code to use it.**
-  New `dpp_vc::credential::jwt` records the VC-JWT envelope contract and adds
-  `sign_access_credential` and `authenticate_access_credential`.
-
-  `DppAccessCredential` has no `proof` member, and that is correct under this
-  envelope — the credential JSON is the payload of a compact JWS and the wrapper
-  is external. What was missing was that this crate never said so. It published
-  a complete-looking verification stack — the builder, `verify_credential_claims`,
-  `verify_credential_claims_with_trust`, `check_revocation` — with no statement
-  anywhere that the document must arrive signed, and no way to check one.
-
-  That gap has a specific consequence. `verify_credential_claims_with_trust` asks
-  whether a credential's `issuer` is trusted, and `issuer` is a string whoever
-  produced the document chose. **Trust checking without signature verification is
-  decorative**, so a consumer assembling a verifier from these parts got a stack
-  that reads as authoritative and authenticates nothing.
-
-  `authenticate_access_credential` establishes one thing: the document was signed
-  by a key published in the issuer's DID document, and it names that document's
-  subject as its issuer. It deliberately does *not* check the validity window,
-  trust, or revocation — those stay in the composed verifiers, because running
-  them first means acting on attacker-chosen fields, most obviously fetching a
-  status list from a URL inside an unauthenticated document.
-
-  The DID document is a **parameter**, not something the function fetches:
-  resolving a DID is network I/O and this crate performs none. The caller
-  resolves it from the credential's own `issuer`, and the function re-checks that
-  binding against the document it was handed — so a caller that resolves the
-  wrong document is refused rather than silently trusted. That check catches what
-  a signature alone cannot: a credential correctly signed by A, verified against
-  a document that carries A's key but is labelled B.
-
-  `sign_access_credential` is the issuer's side, signing over the JCS canonical
-  form so an issuer and a verifier cannot disagree about a document they both
-  consider correct. Its doc states plainly that issuing is an authority's act,
-  not a node's — a node signing its own access credentials has attested nothing
-  to anyone.
-
-  Ten tests, weighted to the refusals: tampered payload, `alg:none`, a document
-  with no matching key, a document for a different DID carrying the right key, a
-  correctly-signed payload that is not a credential, and structurally broken
-  input. The two binding tests were each confirmed to fail with the check
-  removed, and they fail for different reasons — one is caught by the signature,
-  the other only by the issuer binding.
-
-### Breaking
 
 - **One audience redaction, and the AAS projection stops disclosing `batchId` to
   the public.** *(Breaking: `redact_product_group_data` is removed. Its callers
@@ -1090,7 +764,319 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   expressiveness it unlocks. The replacement is strictly stronger: it catches a
   wrong class rather than the shape that used to cause one.
 
+### Added
+
+- **The third Annex I substance restriction — lead in portable batteries.**
+  Regulation (EU) 2023/1542 Annex I entry 3: no more than **0,01 % lead** by
+  weight in portable batteries **from 18 August 2024**, with portable zinc-air
+  button cells exempt **until 18 August 2028**. `dpp-rules` implemented the
+  mercury and cadmium entries from the same annex and omitted this one, which is
+  also the only one of the three carrying a date gate and a carve-out — so it is
+  where an omission is least visible and most consequential.
+  `lead_content_prohibited_for_portable` therefore takes the placing-on-market
+  date and a zinc-air flag rather than a bare percentage.
+
+- **A gate over schema prose: a regulatory claim must name what it rests on.**
+  Every other gate step in this repo reads Rust. Nothing read a `description`
+  string, and every recorded instance of a fabricated regulatory claim in this
+  project has been in prose or data — including two electronics descriptions
+  that asserted an adoption date, an effective date and a phase-two date **for
+  an act that does not exist**, and shipped to crates.io.
+
+  The full prose audit is what made the rules non-arbitrary. Every defect it
+  found was one of two shapes: a bare assertion with no citation, or a citation
+  that did not hold. Every description carrying a checkable citation checked out,
+  without exception. Four rules encode that:
+
+  - an `Annex`/`Art.` citation must name its act by number, in the schema's
+    **root** description or in the citing description itself;
+  - every act number cited must resolve to the instrument catalog or to an
+    explicit inventory of acts cited but not modelled, each with a reason;
+  - schema prose must not state a passport applicability date at all — that
+    belongs in `crates/dpp-domain/instruments/`, where it carries a `basis`;
+  - any other date claim must name its act in the same description.
+
+  It cannot check that a citation is *true* — that needs the OJ text and a
+  reader. It checks that one is present, well-formed, and points at an act this
+  crate knows, which turns the next audit from research into a lookup.
+
+- **`InstrumentKind::Implementing`.** The catalog could name a delegated act but
+  not an implementing one, and Impl. Reg. (EU) 2026/2 is the second kind. The
+  Treaty distinction is real — a delegated act may supplement or amend
+  non-essential elements of the basic act, an implementing act only lays down
+  uniform conditions for implementing it — so recording one as the other would
+  assert a power it does not have. Both kinds carry a `parent`.
+
+- **`CnCategory`**, the combined-nomenclature chapter (2 digits) or heading (4)
+  a disclosure line is filed under. Deliberately *not* `CommodityCode`, which is
+  a product's own 6/8/10-digit classification: substituting one for the other
+  files a whole chapter's goods under a single article.
+
+- **Impl. Reg. (EU) 2026/2 and Del. Reg. (EU) 2026/296 in the instrument
+  catalog**, both bound to `unsold-goods`, both `notRequired` — neither creates a
+  passport. 2026/296 carries a **five-year** retention figure that is *not* a
+  passport availability period: Art. 3 requires per-derogation documentation to
+  be kept for five years after destruction and produced to a competent authority
+  within 30 days.
+
+- **A catalog of the legal instruments themselves, so a product group can be
+  governed by more than one.** `InstrumentCatalog` holds one manifest per act —
+  ten today, from ESPR and the Batteries Regulation to the two horizontal
+  ecodesign acts that are still only announced — each carrying an
+  `InstrumentKind`, an `InstrumentStatus`, the `PassportObligation` it imposes,
+  and one `InstrumentBinding` per product group it reaches.
+
+  `SectorDescriptor` carries a single `regime`, `status`, `dppAppliesFrom` and
+  `retentionYears`, which asserts that exactly one act governs a sector. ESPR
+  Art. 5(7) says otherwise: one delegated act may cover many product groups, a
+  group-specific act may supplement a horizontal one, and the Regulation
+  contains no precedence rule anywhere — so overlapping acts accumulate and
+  each of those fields is a property of an *(act, product group)* pair.
+
+  Bindings are held on the act rather than on the product group because an act
+  can reach a group for which no manifest exists at all. That is not
+  hypothetical: the Commission's preparatory analysis states that the horizontal
+  requirements cover sets of products never shortlisted as product groups, and
+  names light means of transport. There is therefore no total function from a
+  product group to its applicable acts, and the catalog offers lookup over what
+  has been recorded, never a derivation.
+
+  `PassportObligation` is the state the previous model could not express:
+  `Required` with an optional dated `ObligationDate`, `NotRequired` for an act
+  that binds but has no passport article, and `DisplacedBy` for one whose
+  information duty is discharged through another system under ESPR Art. 9(4)(b).
+  With it, "these obligations bind today" and "no passport is owed" are
+  separately representable, which they were not before. `DateBasis` marks every
+  date `sourced` or `assumed`, generalising the `RetentionBasis` distinction —
+  a date inferred from an ecodesign application date had been shipped as a
+  passport date with nothing in the record saying so.
+
+  Folds across an applicable set are unions, never precedence choices: retention
+  is the maximum with assumption contagious, a passport is due on the earliest
+  date any act fixes, and granularity is the most granular any act sets.
+  `Granularity` is new and lives with the act, per ESPR Art. 9(2)(d), with
+  `RegistrationGranularity` now converting from it rather than standing alone.
+
+  **Additive and not yet wired** — `SectorCatalog` remains the record every
+  component resolves against. Where the two disagree, a test pins the divergence
+  set exactly, so a new one fails the build. It names four today, of which two
+  are sector manifests asserting a passport date for an obligation no act
+  imposes.
+
+- **Every schema version this crate claims to support now has a frozen document
+  proving it is still readable.** `tests/schema_compat.rs` holds one minimal
+  sector-data fixture per `(sector, version)` the registry serves — 28 today —
+  and asserts each still reads through `Passport::from_stored`, the path a node
+  actually reads stored documents by.
+
+  `Passport` and every `SectorData` variant are the literal on-disk shape of
+  every passport a node has ever stored. A non-additive change to one does not
+  break a consumer at compile time; it makes every already-written document of
+  that shape undeserialisable the moment a node upgrades its pin — a runtime
+  failure against data, per request, with no compile-time signal anywhere. That
+  has happened, and downstream it took out reads for 244 of 276 passports.
+
+  Three properties are checked: every declared version has a fixture (so adding
+  a schema version fails until one is frozen), every fixture validates against
+  the schema it was frozen for, and every fixture still reads today. Fixtures are
+  written once by `just freeze-schema-fixtures` and never regenerated — one
+  regenerated from the current schema would agree with it by construction.
+
+  The gate was verified to fail: adding a required field to `TyreData` produced
+  `tyre v1.0.0: missing field ...`.
+
+- **The GS1 oracle corpus carries cases our own builder cannot produce.** It was
+  generated entirely from `DigitalLink::build()` output, so it could only ever
+  contain links we already emit — proving what we emit is valid GS1 while saying
+  nothing about valid GS1 we refuse. That is the failure direction the corpus's
+  own header names as the quiet one, and it was structurally invisible.
+
+  Three hand-written entries now carry our verdict for GS1's engine to
+  adjudicate: a path mixing two alternative qualifier sequences, a known data
+  attribute following a qualifier, and a genuinely unassigned AI.
+
+- **The mandatory-content publish gate can be previewed.**
+  `Passport::check_mandatory_content` is now public, so a caller can ask whether
+  a passport would clear the gate without attempting the transition.
+
+  It was reachable only through `transition_to`, which meant the only way to
+  learn the answer was to try. A dry-run consumer therefore reported on the
+  checks it could reach and stayed silent about the one that most often refuses.
+
+  `transition_to` calls the same function, so the preview and the refusal it
+  predicts cannot drift, and it returns the same `DppError` — a consumer can
+  render the preview byte-identically to the eventual refusal. A failure names
+  every missing field at once, so one call is a complete answer.
+
+  Being able to ask is not being able to decline: the gate still runs inside
+  `transition_to`, and `status`/`published_at` remain unsettable by hand, so no
+  path to publishing skips it. That property was the reason it was private, and
+  it is unchanged.
+
+- **The access-credential wire format is published, with the code to use it.**
+  New `dpp_vc::credential::jwt` records the VC-JWT envelope contract and adds
+  `sign_access_credential` and `authenticate_access_credential`.
+
+  `DppAccessCredential` has no `proof` member, and that is correct under this
+  envelope — the credential JSON is the payload of a compact JWS and the wrapper
+  is external. What was missing was that this crate never said so. It published
+  a complete-looking verification stack — the builder, `verify_credential_claims`,
+  `verify_credential_claims_with_trust`, `check_revocation` — with no statement
+  anywhere that the document must arrive signed, and no way to check one.
+
+  That gap has a specific consequence. `verify_credential_claims_with_trust` asks
+  whether a credential's `issuer` is trusted, and `issuer` is a string whoever
+  produced the document chose. **Trust checking without signature verification is
+  decorative**, so a consumer assembling a verifier from these parts got a stack
+  that reads as authoritative and authenticates nothing.
+
+  `authenticate_access_credential` establishes one thing: the document was signed
+  by a key published in the issuer's DID document, and it names that document's
+  subject as its issuer. It deliberately does *not* check the validity window,
+  trust, or revocation — those stay in the composed verifiers, because running
+  them first means acting on attacker-chosen fields, most obviously fetching a
+  status list from a URL inside an unauthenticated document.
+
+  The DID document is a **parameter**, not something the function fetches:
+  resolving a DID is network I/O and this crate performs none. The caller
+  resolves it from the credential's own `issuer`, and the function re-checks that
+  binding against the document it was handed — so a caller that resolves the
+  wrong document is refused rather than silently trusted. That check catches what
+  a signature alone cannot: a credential correctly signed by A, verified against
+  a document that carries A's key but is labelled B.
+
+  `sign_access_credential` is the issuer's side, signing over the JCS canonical
+  form so an issuer and a verifier cannot disagree about a document they both
+  consider correct. Its doc states plainly that issuing is an authority's act,
+  not a node's — a node signing its own access credentials has attested nothing
+  to anyone.
+
+  Ten tests, weighted to the refusals: tampered payload, `alg:none`, a document
+  with no matching key, a document for a different DID carrying the right key, a
+  correctly-signed payload that is not a credential, and structurally broken
+  input. The two binding tests were each confirmed to fail with the check
+  removed, and they fail for different reasons — one is caught by the signature,
+  the other only by the issuer binding.
+
 ### Fixed
+
+- **The second-life carve-outs were documented as a grandfather clause, and
+  shipped that way.** The `placedOnMarketDate` doc and six battery schema
+  descriptions said *"Art. 10(4) disapplies the performance duties to batteries
+  placed on the market before they applied"*, dropping the article's first
+  condition entirely.
+
+  Art. 10(4) reaches only batteries **prepared for re-use, prepared for
+  repurposing, repurposed or remanufactured**. A battery merely placed on the
+  market early is not exempted by it — it is simply not yet caught by a paragraph
+  that binds from a later date. Those are different mechanisms with different
+  consequences, and the prose stated the exemption far wider than the act does.
+
+  Found by reading Art. 8(4) and Art. 10(4) side by side while modelling the
+  first. Worth recording that the schema-prose gate added in this same release
+  **cannot** catch this: it is a well-formed citation to a real, catalogued act
+  that says something other than the prose claims, which is exactly the limit
+  that gate documents about itself.
+
+- **The mercury and cadmium thresholds cited Art. 9.** Art. 9 is *Performance
+  and durability requirements for portable batteries of general use* and says
+  nothing about substances; the restrictions are **Art. 6** with the thresholds
+  in **Annex I**. The values and their scopes were correct — mercury 0,0005 % for
+  batteries generally, cadmium 0,002 % for portable batteries only — so only the
+  citation moved. The same lines also cited Directive 2006/66/EC, which this
+  Regulation repealed, as a co-source.
+
+- **Twelve regulatory-prose defects, found by the gate above in descriptions
+  that had already passed a full manual audit.**
+
+  Six asserted a passport applicability date: `detergent` v1.0.0/v1.1.0 ("DPP
+  mandate 2029"), `toy` v1.0.0/v1.1.0 ("DPP mandate 2030"), `furniture` v1.2.0
+  and `mattress` v1.0.0 ("indicative delegated-act adoption 2028 / 2029"). These
+  are the same shape removed elsewhere in the previous pass and were missed
+  because that pass worked from the versions it had already opened. All six
+  dates were already in the instrument catalog — `toy-safety-2025-2509` carries
+  `2030-08-01` sourced, `detergents-2026-405` carries `2029-09-23`, and the ESPR
+  binding notes record furniture 2028 and mattress 2029 as indicative — so
+  nothing is lost by removing them from prose, which has nowhere to put a basis.
+
+  Six cited REACH with no act number: `Art. 33` in `furniture` v1.0.0–v1.2.0 and
+  `mattress` v1.0.0, `Annex XVII entry 72` in `textile` v1.1.0/v1.2.0. Now
+  anchored to Regulation (EC) No 1907/2006. Both citations verified against the
+  consolidated text: Art. 33 is the duty to communicate information on
+  substances in articles "in a concentration above 0,1 % weight by weight (w/w)",
+  and Appendix 12 to entry 72 does list disperse dyes, chromium VI compounds and
+  nickel — so the substances named in the textile description are correct.
+
+  **`toy` called Regulation (EU) 2025/2509 a *Delegated* Regulation.** The OJ
+  header reads "REGULATION (EU) 2025/2509 OF THE EUROPEAN PARLIAMENT AND OF THE
+  COUNCIL" — an ordinary legislative act adopted 26 November 2025, repealing
+  Directive 2009/48/EC. A delegated act is made by the Commission under a
+  delegation of power, which is a different instrument with a different amendment
+  path, so this was not a naming quibble.
+
+- **A textile passport stored under schema v1.0.0 could not be read at all.**
+  The lens chain had no `1.0.0 → 1.1.0` step, so `upcast_str_toward` refused with
+  `NoPath` and every such document was unreadable — while the catalog went on
+  declaring v1.0.0 a supported version.
+
+  The step needs no transformation: v1.0.0 and v1.1.0 declare identical
+  `required` lists, v1.1.0 removes no property, and its sixteen additions are all
+  optional. But a chain cannot cross a gap, so a document two versions behind
+  could not reach the current version through a step that required no change.
+  An identity lens closes it, and `1.0.0 → 1.1.0 → 1.2.0` now carries the
+  document through the `countryOfManufacturing` rename that was always waiting
+  for it.
+
+  Found by the compatibility gate above, on its first run. Textile is the sector
+  whose rename caused the original incident.
+
+  `toward_still_refuses_a_gap_no_lens_touches_at_all` now builds its own
+  synthetic gap. It had used textile 1.0.0 as a convenient example of an
+  unbridged one, which coupled a test about the registry's refusal semantics to a
+  gap in production data — so legitimately fixing that gap failed a test that was
+  never about textile.
+
+- **The transfer-of-responsibility article pin was stale, and it ships to
+  crates.io.** `docs/regulatory/COMPLIANCE.md` concluded, on 2026-07-04, that no
+  numbered transfer obligation exists. Implementing Regulation (EU) 2026/1778
+  was published on 17 July 2026 — thirteen days later — and **Art. 6a** supplies
+  one: a registered digital product passport "may be transferred to another
+  verified economic operator or, where applicable, to a verified value chain
+  actor that takes over the obligations from the previous actor ... from the
+  date indicated for the transfer."
+
+  The original finding was not wrong and is kept verbatim: it is still the
+  answer for Regulation (EU) 2024/1781 itself, which establishes no transfer
+  mechanism. What changed is that the registry implementing act does, at a
+  different level — what moves is the *registration*, between **eIDAS-verified**
+  actors whose status expires after at most three years (Art. 5(4)).
+
+  Three bounds on what `domain::transfer` may claim follow, and the entry now
+  states them: the registry is the authoritative record of who holds the
+  obligations; Art. 5(3) closes that registry to everyone but verified actors,
+  so it can never be a public reader's proof; and a `did:web` identifier is not
+  evidence of verified-actor standing, so the transfer chain is a local record
+  of what this node was told, not proof of who is responsible.
+
+  Recorded alongside it: Art. 6a does not cover the product-lifecycle cases.
+  **ESPR Art. 11(d)** requires a *new* passport created for a product that
+  already has one to be **linked** to the original, and **Art. 2(16)** defines
+  remanufacturing as producing "a new product" — so a remanufactured product
+  gets a new linked passport (`Passport::parent_passport_ref`) rather than a
+  transfer of the old one. Whether `TransferReason::Remanufacturing`,
+  `::Repurposing` and `::PreparationForReuse` should exist at all is noted as an
+  open domain question and deliberately left open here.
+
+  Documentation only — no type or behaviour changes in this entry.
+
+- **Two intra-doc links rendered as literal text on docs.rs.** The
+  sector-to-product-group rename left `crate::product group::` and
+  `super::product group::` — a space where the underscore belongs — in
+  `Passport::redact`'s and `ProductIdentity`'s doc comments. A path containing a
+  space is not parsed as an intra-doc link at all, so `cargo doc -D warnings`
+  saw nothing to warn about and the text shipped as prose pointing nowhere. The
+  second one also needed an absolute path: after the module layout changed,
+  `super` from `crate::product::identity` no longer reaches `product_group`.
 
 - **Schema descriptions asserted DPP mandate dates that no adopted act
   establishes, and four of them were checkably wrong.** Five product groups
@@ -1180,7 +1166,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   tyre 2027, aluminium 2027, steel 2026 — every one of which matches COM(2025)
   187 final. The schema prose was contradicting data the catalog already held
   correctly.
-
 
 - **A tyre noise class was stated one boundary out.** The description said class
   `C` is "at or above limit". Regulation (EU) 2020/740 Annex I Part C bands it as
