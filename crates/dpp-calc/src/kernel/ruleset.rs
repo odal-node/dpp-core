@@ -3,6 +3,8 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+use super::parameters::{BundleProvenance, RulesetParameters};
+
 /// Opaque machine-readable identifier for a regulatory ruleset.
 ///
 /// Examples: `"repairability-heuristic-v1"`, `"battery-cfb"`. Always a
@@ -171,6 +173,33 @@ pub trait Ruleset {
     /// [`ParameterBasis`] for why the opposite default would be unsafe.
     fn parameter_basis(&self) -> ParameterBasis {
         ParameterBasis::Sourced
+    }
+
+    /// The numbers this ruleset computes with, in canonical form.
+    ///
+    /// Required, not defaulted, and that is the point: every receipt carries
+    /// [`ruleset_content_sha256`](crate::receipt::CalculationReceipt::ruleset_content_sha256)
+    /// over this, so a ruleset that declared nothing would hash to the same
+    /// empty set as every other silent ruleset and the field would attest to
+    /// nothing. `parameter_basis` can default safely because forgetting it
+    /// over-protects; forgetting this one would quietly hollow out the receipt.
+    ///
+    /// Declare the same statics the ruleset actually computes with rather than
+    /// restating their values, or the two drift and the receipt describes
+    /// numbers that were never used.
+    fn parameters(&self) -> RulesetParameters;
+
+    /// The signed bundle that filled this ruleset's parameters, if any.
+    ///
+    /// `None` for every compiled-in ruleset — the baseline case. A wrapper
+    /// produced by [`fill`](crate::parameters::fill) returns the bundle it
+    /// adopted, which is how a receipt comes to carry a bundle version at all:
+    /// [`CalculationReceipt::for_ruleset`](crate::receipt::CalculationReceipt::for_ruleset)
+    /// reads the provenance and the parameter hash from the same object, so a
+    /// receipt cannot name a bundle while its hash still describes the
+    /// baseline.
+    fn bundle_provenance(&self) -> Option<&BundleProvenance> {
+        None
     }
 }
 

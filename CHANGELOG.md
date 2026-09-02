@@ -15,6 +15,86 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **The signed ruleset-bundle channel had nothing on the other end.** It
+  verified payloads that no crate read, so `CalculationReceipt::bundle_version`
+  was structurally always `None` and the fail-closed verification path had never
+  been reached from a caller whose behaviour depended on it. `dpp-calc` now
+  enables `dpp-rules/bundle` and is that caller.
+
+  **Bundles deliver parameters, not rulesets.** `RulesetId` and `RulesetVersion`
+  stay `&'static str` literals, so nothing arriving over the channel can
+  introduce a ruleset that was not compiled in — a new delegated act still needs
+  a release. That is the deliberate limit of this design.
+
+  New `RulesetParameters` — the numbers a ruleset computes with, as named groups
+  of canonical JSON — plus a required `Ruleset::parameters()`. Groups rather than
+  loose scalars because a set like the repairability weights has an invariant
+  across its members (they must sum to 1.0), and replacing one weight without the
+  others would break it silently.
+
+  `parameters::fill` is the single enforcement point: a `Sourced` ruleset is
+  refused outright, an `Assumed` one accepts a group at a time, and a group the
+  ruleset does not declare — or one whose JSON type changed — is **named rather
+  than dropped**. Serde's default would discard an unrecognised key, so a bundle
+  misspelling `weights` would change nothing, report success, and leave every
+  receipt agreeing with the unchanged numbers.
+
+  **Two new receipt fields, and they had to land now.**
+  `canonical_bytes_for_signing` serialises the whole receipt minus `jws`, so a
+  field added after the first receipt is issued changes the signed bytes for
+  every receipt after it.
+
+  - `ruleset_content_sha256` — always present: the JCS hash of the parameters
+    actually used. `ruleset_id` and `ruleset_version` say *which rule*; this says
+    *which numbers*. Two receipts citing the same id and version, computed by
+    builds carrying different thresholds, were previously indistinguishable — and
+    since `bundle_version` was always `None`, that was every receipt.
+  - `bundle_content_sha256` — the manifest's committed hash, beside
+    `bundle_version`. Either alone is weak: a version is a label the publisher
+    chose and may reuse, and a hash with no version does not say which release to
+    fetch.
+
+  **Breaking, and both for the same reason.** `with_bundle_version` is removed:
+  it could stamp a bundle version onto a receipt whose parameters had never been
+  filled, which is the inconsistency these fields exist to rule out. All three
+  are now read off the ruleset inside `for_ruleset`, so a receipt cannot name a
+  bundle while its parameter hash still describes the baseline. And
+  `CalculationReceipt::new` is now crate-private: it takes an id and a version
+  *string*, not the ruleset they came from, so it cannot populate the parameter
+  hash and would leave an empty one that looks present. Every call site already
+  used `for_ruleset`, which the doc already pointed to.
+
+  `Ruleset` gains a required `parameters()`, so any implementor outside this
+  crate must add one. Deliberate: see above for why it cannot default.
+
+  `FilledRepairabilityRuleset` wires it end to end. It implements
+  `RepairabilityRuleset`, so `repairability::calculate` accepts one without
+  knowing a bundle exists. It also enforces what the kernel has no business
+  knowing: weights must sum to 1.0 and bands must be strictly descending. Nothing
+  else checked — the score is `2 × Σweights × 5` at most, so a bundle whose
+  weights summed to 1.6 put a "0–10" score as high as 16 on the scale the A–E
+  bands are written against, with a receipt attesting to all of it. Verified by
+  removing the check and watching the test fail.
+
+  Two refusals worth naming. Parameters may be taken only from a `Verified`
+  acceptance: `unverified_baseline` exists because a node with no configured
+  channel has to start somewhere, and it would otherwise be a way to hand the
+  fill path bytes nothing authenticated. And a fill never raises `Assumed` to
+  `Sourced` — the channel says who sent the numbers, not what they are, and the
+  heuristic's output stays as non-regulatory as its own basis says it is.
+
+  `RepairabilityWeights` and `RepairabilityThresholds` gain
+  `deny_unknown_fields`, since they now deserialise from a bundle. Two shapes,
+  and only one of them was otherwise silent: a *misspelled* member leaves a
+  required field missing so serde refuses it either way (naming what is absent
+  rather than what was typed), while an *extra* member alongside all six real
+  ones is dropped without a word.
+
+  A `rulesets` key that is not an object is refused for the same reason.
+  `serde_json::Value::get` answers `None` to a string, an array and an absent key
+  alike, so a publisher shipping `"rulesets": []` would have the bundle appear to
+  apply cleanly while every slice in it was skipped.
+
 - **Nothing distinguished a threshold taken from the Official Journal from one
   this project invented.** New `ParameterBasis::{Sourced, Assumed}` in
   `dpp-calc`, exposed as a defaulted `Ruleset::parameter_basis()`.

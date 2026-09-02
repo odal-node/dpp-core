@@ -1,13 +1,51 @@
 //! The two Art. 8 rulesets: effective periods, legal citation, phase dispatch.
 
 use chrono::NaiveDate;
+use serde::Serialize;
 use std::sync::OnceLock;
 
 use dpp_rules::batteries::recycled_content as rules;
 
 use super::calculator::MetalShortfall;
 use super::parameters::RecycledContentInputs;
+use crate::parameters::RulesetParameters;
 use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+
+/// Name of the minimum-share group in [`RulesetParameters`].
+const MINIMUM_SHARES_GROUP: &str = "minimumShares";
+
+/// The Art. 8 minimum recycled shares a phase requires, as percentages.
+///
+/// `Serialize` only, deliberately. These are the Official Journal's numbers —
+/// [`ParameterBasis::Sourced`](crate::ruleset::ParameterBasis::Sourced) — so no
+/// bundle can ever fill them, and a `Deserialize` impl would exist only to
+/// suggest otherwise.
+///
+/// Read from the `dpp-rules` constants rather than restated, for the same reason
+/// this crate depends on that one at all: a threshold amended in one place and
+/// not the other is the failure mode worth designing against.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MinimumShares {
+    cobalt_pct: f64,
+    lead_pct: f64,
+    lithium_pct: f64,
+    nickel_pct: f64,
+}
+
+impl MinimumShares {
+    /// Wrap as the single parameter group an Art. 8 phase declares.
+    ///
+    /// # Panics
+    ///
+    /// Never: every share is a finite `f64` literal in `dpp-rules`, and
+    /// `serde_json` rejects only non-finite floats.
+    fn into_parameters(self) -> RulesetParameters {
+        RulesetParameters::new()
+            .with(MINIMUM_SHARES_GROUP, &self)
+            .expect("Art. 8 minimum shares are finite literals")
+    }
+}
 
 /// Ruleset for an Art. 8 minimum-recycled-share phase.
 ///
@@ -89,6 +127,16 @@ impl Ruleset for Art8Phase1Ruleset {
     fn regulatory_basis(&self) -> &RegulatoryBasis {
         &PHASE1_BASIS
     }
+
+    fn parameters(&self) -> RulesetParameters {
+        MinimumShares {
+            cobalt_pct: rules::COBALT_RECYCLED_PCT_2031,
+            lead_pct: rules::LEAD_RECYCLED_PCT_2031,
+            lithium_pct: rules::LITHIUM_RECYCLED_PCT_2031,
+            nickel_pct: rules::NICKEL_RECYCLED_PCT_2031,
+        }
+        .into_parameters()
+    }
 }
 
 impl RecycledContentRuleset for Art8Phase1Ruleset {
@@ -133,6 +181,16 @@ impl Ruleset for Art8Phase2Ruleset {
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {
         &PHASE2_BASIS
+    }
+
+    fn parameters(&self) -> RulesetParameters {
+        MinimumShares {
+            cobalt_pct: rules::COBALT_RECYCLED_PCT_2036,
+            lead_pct: rules::LEAD_RECYCLED_PCT_2036,
+            lithium_pct: rules::LITHIUM_RECYCLED_PCT_2036,
+            nickel_pct: rules::NICKEL_RECYCLED_PCT_2036,
+        }
+        .into_parameters()
     }
 }
 

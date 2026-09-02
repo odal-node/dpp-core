@@ -112,7 +112,7 @@ pub mod repairability_index;
 pub mod ruleset_registry;
 
 // ── Stable public paths for the spine ────────────────────────────────────────
-pub use kernel::{assessability, clock, error, factor, receipt, ruleset};
+pub use kernel::{assessability, clock, error, factor, parameters, receipt, ruleset};
 
 /// Compile-checks this crate's README examples.
 ///

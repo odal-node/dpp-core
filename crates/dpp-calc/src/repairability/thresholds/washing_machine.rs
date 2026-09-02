@@ -6,8 +6,9 @@
 
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
-    RepairabilityWeights,
+    RepairabilityWeights, repairability_parameters,
 };
+use crate::parameters::RulesetParameters;
 use crate::ruleset::{
     Effectivity, ParameterBasis, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion,
 };
@@ -60,6 +61,10 @@ impl Ruleset for WashingMachineRuleset {
     /// what [`Effectivity::Pending`] on this ruleset records.
     fn parameter_basis(&self) -> ParameterBasis {
         ParameterBasis::Assumed
+    }
+
+    fn parameters(&self) -> RulesetParameters {
+        repairability_parameters(&WASHING_WEIGHTS, &DEFAULT_REPAIRABILITY_THRESHOLDS)
     }
 }
 

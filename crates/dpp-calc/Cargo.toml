@@ -30,7 +30,10 @@ real-factors = []
 # The Art. 8 minimum shares and phase dates are legal thresholds, and they
 # already have a home. Depending on that home rather than restating the numbers
 # is what keeps a threshold from being amended in one crate and not the other.
-dpp-rules  = { workspace = true }
+# `bundle` is on because this crate is the format's first real consumer: the
+# signed-ruleset channel verified payloads that nothing read, so its fail-closed
+# path had never been exercised from a caller whose behaviour depended on it.
+dpp-rules  = { workspace = true, features = ["bundle"] }
 
 serde      = { workspace = true }
 serde_json = { workspace = true }
@@ -40,3 +43,9 @@ uuid       = { workspace = true }
 sha2       = { workspace = true }
 hex        = { workspace = true }
 thiserror  = { workspace = true }
+
+[dev-dependencies]
+# Test-only: the bundle-fill tests assemble a JWS-shaped manifest so they can
+# drive the real `verify_bundle` rather than a stand-in for it. Signing stays
+# engine-side, so only the base64 encoding is needed here.
+base64 = { workspace = true }
