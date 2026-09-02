@@ -26,11 +26,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   act as not yet adopted. Both are "a value the crate already has", and until now
   nothing could tell them apart programmatically.
 
-  Classified as shipped: **Sourced** — `Art8Phase1Ruleset`, `Art8Phase2Ruleset`,
-  `Eu2023_1669Ruleset`, `CradleToGateRuleset`. **Assumed** — `DisplaysRuleset`,
-  `LaptopRuleset`, `WashingMachineRuleset`, and `SimplifiedRepairabilityHeuristic`,
-  whose own basis reads "Non-regulatory: simplified repairability heuristic (NOT
-  EU 2023/1669 Annex IV)".
+  Four rulesets carry an explicit `parameter_basis()`, all of them **Assumed**:
+  `DisplaysRuleset`, `LaptopRuleset`, `WashingMachineRuleset`, and
+  `SimplifiedRepairabilityHeuristic`, whose own basis reads "Non-regulatory:
+  simplified repairability heuristic (NOT EU 2023/1669 Annex IV)".
+
+  The other four — `Art8Phase1Ruleset`, `Art8Phase2Ruleset`, `Eu2023_1669Ruleset`
+  and `CradleToGateRuleset` — say nothing and are therefore **Sourced** by the
+  default. That is on purpose, not an omission: writing an explicit `Sourced` on
+  the law-carrying rulesets would make it the thing a new ruleset gets
+  copy-pasted with, so the next placeholder would arrive carrying a
+  deliberate-looking legal claim instead of the silence the tripwire below is
+  built to catch. What holds those four to their claim is the citation
+  requirement, not a line of code at each site.
 
   That last one is why the distinction is not simply "is it a stub". It resolves,
   it governs dates, and its numbers are still ours.
