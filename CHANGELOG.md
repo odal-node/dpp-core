@@ -13,6 +13,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **`InstrumentCatalog` had no fold for the one question a gate actually asks:
+  does this product group carry a live passport obligation right now?**
+  New `passport_obligation_live`, the conjunction of `determinable_for` and
+  `passport_required_for`.
+
+  Every other compound question already folds here — `retention_for` takes the
+  maximum and degrades the basis if any contributing figure is assumed,
+  `passport_due_for` takes the earliest date, `granularity_for` takes the most
+  granular level — so that a consumer never restates a rule about how obligations
+  compound. This one was left to each caller to write out.
+
+  Neither operand answers it, and both ways they come apart are already modelled
+  here. An act can bind today and require **no passport at all** — `RegulatoryStatus`
+  cites ESPR Arts. 24–25 for that case — so `determinable_for` alone says "yes"
+  for a group that owes nothing. An act can require the information while the
+  passport duty is discharged through another system —
+  `PassportObligation::DisplacedBy`, with ESPR Art. 9(4)(b) and EPREL as the
+  worked example — so `passport_required_for` alone says "yes" where nothing is
+  bindingly determinable. A caller reaching for either on its own enforces an
+  obligation that does not exist, or misses one that does.
+
+  **Both operands stay public**, deliberately. "A passport is required" and "a
+  determination can be made" are different questions, and a caller *reporting*
+  the catalog needs them apart — an obligation can exist while the implementing
+  acts that would make it determinable do not, and saying so is more honest than
+  one boolean. Anything that gates wants the fold; anything that renders wants
+  the halves.
+
 ### Fixed
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
