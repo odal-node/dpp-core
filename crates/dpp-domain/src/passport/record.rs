@@ -159,19 +159,24 @@ pub struct Passport {
     /// **That rule has now been broken twice, deliberately both times, and
     /// recording it is more useful than restating the rule as absolute.**
     /// `sector` → `productGroup` and `parentPassportRef` → `derivedFrom` each
-    /// renamed an envelope key without keeping the old one readable. The two
-    /// fail differently, and the second is the quieter of the two: `product_group`
-    /// is required, so a pre-rename document fails to deserialize outright,
+    /// renamed an envelope key without keeping the old one readable. They failed
+    /// differently, and the second was the more dangerous: `product_group` is
+    /// required, so a pre-rename document refuses to deserialize outright,
     /// whereas this struct sets no `deny_unknown_fields` and `derived_from`
-    /// defaults — so a document carrying `parentPassportRef` loads *successfully*
-    /// and silently arrives with no lineage edge at all.
+    /// defaults — so a document carrying `parentPassportRef` loaded
+    /// *successfully*, silently arriving with no lineage edge at all.
+    ///
+    /// That silence is now closed: [`REMOVED_ENVELOPE_KEYS`] records the old key
+    /// and [`Passport::from_stored`] refuses any document carrying one, so both
+    /// renames fail loudly on the supported read path.
     ///
     /// Both were taken while this project has no published passports to strand.
     /// **That licence ends the moment one exists.** After that, an envelope
     /// rename has to carry the old key or a one-time document rewrite in the
-    /// publish pipeline, because neither failure mode is recoverable: the loud
-    /// one leaves a record nobody can read, and the quiet one leaves a signed
-    /// record that reads as complete while missing a field the signature covers.
+    /// publish pipeline. Refusing to read a document is the right failure, but
+    /// it is still a failure: a rewritten document no longer verifies against a
+    /// signature that covers the old key names, so there is no version of this
+    /// that a real passport survives without a migration written for it.
     pub schema_version: String,
     /// Set to `true` permanently on first publish; never unset thereafter.
     ///
@@ -270,6 +275,32 @@ pub struct Passport {
 fn default_version() -> u32 {
     1
 }
+
+/// Envelope keys this build has removed, each paired with what replaced it.
+///
+/// # Why this has to exist
+///
+/// [`Passport`] deliberately does **not** set `deny_unknown_fields`. A document
+/// written by a newer build must stay readable by an older one — that is the
+/// point of the envelope's additive-only rule — so an unrecognised key is
+/// ignored rather than refused. The cost is that a key which was *removed* is
+/// indistinguishable from one this build simply has not learned about yet.
+///
+/// For a renamed field that is the worst available outcome, and it is not
+/// hypothetical: `parentPassportRef` → `derivedFrom` left a stored document
+/// carrying the old key deserializing **successfully**, with the new field at
+/// its default. The record loads, reports no error, and has silently lost a
+/// value its signature still covers — a second-life passport that quietly
+/// forgets the predecessors Art. 77(7) requires it to link to.
+///
+/// [`Passport::from_stored`] checks this list before anything else so that
+/// document is refused out loud. A direct `serde_json::from_value::<Passport>`
+/// that bypasses `from_stored` still drops the key silently; `from_stored` is
+/// the supported way to read a stored document, and this is one of the reasons.
+///
+/// Entries are permanent. A key removed two renames ago is still a key some
+/// stored document may carry.
+pub const REMOVED_ENVELOPE_KEYS: &[(&str, &str)] = &[("parentPassportRef", "derivedFrom")];
 
 /// Every key [`Passport`] serialises to, in declaration order.
 ///
@@ -474,6 +505,20 @@ impl Passport {
     ) -> Result<Self, crate::error::dpp::DppError> {
         use crate::error::dpp::DppError;
         use serde::Deserialize as _;
+
+        // Before the direct attempt, not after: a document carrying a removed
+        // key deserializes *successfully*, so anything downstream of the happy
+        // path would never see it.
+        if let Some(object) = doc.as_object() {
+            for &(removed, replacement) in REMOVED_ENVELOPE_KEYS {
+                if object.contains_key(removed) {
+                    return Err(DppError::RemovedEnvelopeKey {
+                        removed,
+                        replacement,
+                    });
+                }
+            }
+        }
 
         let direct_err = match Self::deserialize(&doc) {
             Ok(passport) => return Ok(passport),

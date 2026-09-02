@@ -514,11 +514,15 @@ the decision was taken knowingly: this project has no published passports to
 strand, so the cost is currently zero. Two things follow, and neither should be
 inherited by Phase 3 without a fresh decision:
 
-- **The failure is silent, not loud.** `Passport` sets no `deny_unknown_fields`
-  and `derived_from` defaults, so a document still carrying `parentPassportRef`
-  deserializes *successfully* and arrives with no lineage edge. That is a
-  different and quieter failure than the `sector` → `productGroup` rename, where
-  the renamed field was required and pre-rename documents refused to load.
+- **The failure was silent, and is now loud.** `Passport` sets no
+  `deny_unknown_fields` and `derived_from` defaults, so a document still carrying
+  `parentPassportRef` deserialized *successfully* and arrived with no lineage
+  edge — quieter, and worse, than the `sector` → `productGroup` rename, where the
+  renamed field was required and pre-rename documents refused to load.
+  `REMOVED_ENVELOPE_KEYS` now names the old key and `Passport::from_stored`
+  refuses any document carrying one. **Phase 3 should add its own entry there if
+  it removes a key**; changing an element *type* fails loudly on its own, because
+  `#[serde(default)]` applies only when the key is absent.
 - **The licence expires when the first real passport is published.** After that,
   an envelope rename must carry the old key or a one-time document rewrite in
   the publish pipeline. A signature covers the old key names, so a rewritten
