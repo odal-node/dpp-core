@@ -86,7 +86,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   parts thereof", Art. 3(31) on "a battery, that is not a waste battery".
   `SecondLifeOperation::wire_str` is byte-identical to `TransferReason`'s for the
   four names they share, with a test pinning that, because the rule binding a
-  derivation to the dual-signed transfer that consents to it matches one against
+  derivation to the transfer of responsibility that consents to it matches one against
   the other and would fail open if they drifted.
 
   **Migration.** There is no read path for the old key, and a document carrying
@@ -110,6 +110,45 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   without a migration written for it. This was taken knowingly while the project
   has no published passports to strand; `Passport::schema_version`'s doc comment
   records why that licence is temporary and what the next envelope rename owes.
+
+### Added
+
+- **A second-life claim could move regulatory responsibility by asserting it.**
+  New `dpp_rules::lineage::consent` binds a derivation edge to the transfer of
+  responsibility that consents to it.
+
+  A hash-pin proves the target has not been *modified*. It says nothing about
+  whether the target's operator agreed to the relationship, and Reg. (EU)
+  2023/1542 Art. 77(7) moves regulatory responsibility to the operator placing
+  the second-life unit on the market. Anyone could publish a passport claiming to
+  derive from anyone else's product, and nothing checked.
+
+  `check_derivation_consent` reports one finding per unsupported edge:
+  `NoTransfer`, `OutgoingAuthorisationMissing`, `NotAccepted`,
+  `IncomingOperatorMismatch`, `OperationMismatch` — ordered so the most
+  fundamental defect is the one reported, rather than burying a missing
+  authorisation under a reason mismatch. Bill-of-materials edges deliberately get
+  no such requirement: demanding a supplier signature for every assembly is not
+  something a real supply chain produces.
+
+  **What the rule rests on, stated precisely because the design note had it
+  wrong.** That note justified this by saying a transfer record is "dual-signed
+  by both operators". It is not — `TransferRecord::node_acceptance_attestation`
+  says so at the field: the acceptance half is the hosting node's attestation
+  that the step ran, not a signature by the incoming operator, who has no key on
+  the node recording it. The conclusion survives for a different reason: the
+  consent this rule needs is the **predecessor's**, and in a second-life transfer
+  the predecessor's operator is the *outgoing* party — so the half that is a
+  genuine party signature is exactly the half that matters. Acceptance is still
+  checked, as a status rather than as a second signature. Doc comments that
+  repeated the wrong claim are corrected.
+
+  The rule cannot tell whether a transfer concerns the predecessor a given edge
+  points at: an edge identifies its target by URI, a transfer by passport id, and
+  resolving one to the other is a network fetch. **The caller correlates and the
+  rule checks** — so an edge whose caller found no transfer is reported as
+  unconsented, which is the correct reading of "no evidence was found". Enforcing
+  it therefore happens platform-side; this crate carries the rule.
 
 ### Fixed
 

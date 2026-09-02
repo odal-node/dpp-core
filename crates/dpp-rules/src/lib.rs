@@ -38,6 +38,12 @@ pub mod electronics;
 pub mod textiles;
 pub mod unsold_goods;
 
+// Lineage rules — how one passport may claim to derive from another. Top-level
+// rather than per product group because the edges are envelope fields every
+// product group carries, and ESPR Art. 11(d) makes the linkage obligation
+// framework-level.
+pub mod lineage;
+
 // Plausibility lints — non-binding findings, never a compliance gate.
 pub mod lint;
 
