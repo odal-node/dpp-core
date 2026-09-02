@@ -286,7 +286,7 @@ product-lifecycle cases:
 
 Read together: a remanufactured product is a new product, it gets a **new,
 linked** passport, and no transfer of the original occurs. That mechanism is
-`Passport::parent_passport_ref`, not `TransferChain`.
+`Passport::derived_from`, not `TransferChain`.
 
 So `TransferReason::Remanufacturing`, `::Repurposing`, `::PreparationForReuse`
 and `::PreparationForRepurposing` sit closer to Art. 11(d) lineage than to

@@ -13,6 +13,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Lineage held one predecessor where Art. 77(7) says several.**
+  *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
+  `Passport::derived_from: Vec<DerivationRef>`, and the wire key
+  `parentPassportRef` by `derivedFrom`. `PROTECTED_PATCH_FIELDS` and
+  `PASSPORT_WIRE_KEYS` carry the new name. A struct literal must replace
+  `parent_passport_ref: None` with `derived_from: Vec::new()`.)*
+
+  Regulation (EU) 2023/1542 Art. 77(7) requires a second-life battery to have "a
+  new battery passport linked to the battery passport **or passports** of the
+  original battery **or batteries**" — plural on both sides. A stationary storage
+  pack assembled from several retired EV packs is the canonical second-life
+  product, and an `Option` could not represent it at all. This was a data-model
+  defect against the plain text, not a missing convenience.
+
+  The edge is also typed now. `DerivationRef` pairs the pinned reference with a
+  required `SecondLifeOperation`, so it records *which* of the four operations
+  Art. 77(7) names produced the unit rather than leaving it to a field name. The
+  four are defined terms, and the boundary between the two repurposing ones is
+  the waste status of the input: Art. 3(30) operates on "a waste battery, or
+  parts thereof", Art. 3(31) on "a battery, that is not a waste battery".
+  `SecondLifeOperation::wire_str` is byte-identical to `TransferReason`'s for the
+  four names they share, with a test pinning that, because the rule binding a
+  derivation to the dual-signed transfer that consents to it matches one against
+  the other and would fail open if they drifted.
+
+  **Migration.** There is no read path for the old key, and the failure is
+  silent rather than loud: `Passport` sets no `deny_unknown_fields` and
+  `derived_from` defaults, so a stored document still carrying
+  `parentPassportRef` deserializes successfully and arrives with **no lineage
+  edge**. Anything holding passports written before this release must rewrite
+  the key before upgrading — and a rewritten document no longer verifies against
+  its own signature, which covers the old name. This was taken knowingly while
+  the project has no published passports to strand; `Passport::schema_version`'s
+  doc comment records why that licence is temporary and what the next envelope
+  rename owes instead.
+
 ### Fixed
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
