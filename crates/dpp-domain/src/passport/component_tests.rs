@@ -76,19 +76,42 @@ fn a_count_is_a_quantity_without_a_unit() {
     );
 }
 
-/// A document carrying the **old** `componentRefs` element shape is refused.
+/// The **old** element shape still parses, and arrives with no qualifiers.
 ///
-/// Unlike the `parentPassportRef` → `derivedFrom` rename, this change needs no
-/// entry in `REMOVED_ENVELOPE_KEYS`, because the key name is unchanged and
-/// `#[serde(default)]` applies only when a key is *absent*. A present key with
-/// wrong-shaped elements therefore fails on its own.
+/// This is not leniency for its own sake. `componentRefs` is part of the signed
+/// public view that other operators' nodes fetch to verify a bill of materials.
+/// Those passports are signed and belong to someone else, so they can never be
+/// rewritten into the new shape — and a reader that refuses them refuses data
+/// that is correct, current and unforgeable.
 ///
-/// That is worth pinning rather than assuming: "it happens to error today" and
-/// "it is guaranteed to error" are different claims, and only the second one
-/// survives someone later adding a `#[serde(default)]` or a lenient
-/// deserializer to `ComponentRef`.
+/// Refusing would also not fail quietly. A verification walk that cannot parse
+/// an entry reports it as a malformed reference, which is graded as an integrity
+/// violation alongside a hash mismatch — so an upgraded node would accuse a
+/// not-yet-upgraded node of tampering purely from a version difference.
 #[test]
-fn the_old_component_ref_element_shape_is_refused() {
+fn the_element_shape_this_replaced_still_parses() {
+    let bare = serde_json::json!({
+        "uri": "https://example.test/dpp/cell",
+        "publicJwsHash": "b".repeat(64),
+    });
+
+    let edge: ComponentRef =
+        serde_json::from_value(bare).expect("the pre-Phase-3 element shape must still parse");
+
+    assert_eq!(edge.reference, reference());
+    assert_eq!(
+        edge.quantity, None,
+        "an edge written before qualifiers existed declares none"
+    );
+    assert_eq!(edge.role, None);
+}
+
+/// The same, reached through a whole passport rather than one element.
+///
+/// The walk that matters reads `componentRefs` off a fetched passport, so the
+/// tolerance has to survive the container, not just the element in isolation.
+#[test]
+fn a_passport_carrying_the_old_element_shape_still_reads() {
     let passport = crate::test_support::sample_passport();
     let mut doc = serde_json::to_value(&passport).expect("serialise");
     doc.as_object_mut().expect("object").insert(
@@ -99,11 +122,47 @@ fn the_old_component_ref_element_shape_is_refused() {
         }]),
     );
 
-    let err = serde_json::from_value::<Passport>(doc)
-        .expect_err("the pre-Phase-3 element shape must not deserialize");
-    let message = err.to_string();
+    let back: Passport =
+        serde_json::from_value(doc).expect("a passport with pre-Phase-3 edges must still read");
+
+    assert_eq!(back.component_refs.len(), 1);
+    assert_eq!(back.component_refs[0].reference, reference());
+    assert_eq!(back.component_refs[0].quantity, None);
+}
+
+/// Tolerance is read-only: the current shape is the only one ever written.
+///
+/// Accepting the old shape must not turn into emitting it — a round-trip has to
+/// normalise, or the old shape would propagate forward indefinitely.
+#[test]
+fn the_old_shape_is_read_but_never_written_back() {
+    let bare = serde_json::json!({
+        "uri": "https://example.test/dpp/cell",
+        "publicJwsHash": "b".repeat(64),
+    });
+
+    let edge: ComponentRef = serde_json::from_value(bare).expect("parses");
+    let out = serde_json::to_value(&edge).expect("serialises");
+
     assert!(
-        message.contains("reference"),
-        "the error should name the field the old shape lacks, got: {message}"
+        out.get("reference").is_some(),
+        "a re-serialised edge must use the current shape"
     );
+    assert!(
+        out.get("uri").is_none(),
+        "the old shape must not survive a round trip"
+    );
+}
+
+/// A genuinely malformed entry is still refused.
+///
+/// The tolerant reader accepts exactly two shapes. Something that is neither —
+/// a reference missing its pin, say — must still fail, or the walk would treat
+/// nonsense as a valid edge.
+#[test]
+fn an_entry_matching_neither_shape_is_still_refused() {
+    let nonsense = serde_json::json!({ "uri": "https://example.test/dpp/cell" });
+
+    serde_json::from_value::<ComponentRef>(nonsense)
+        .expect_err("an entry that is neither shape must not parse");
 }

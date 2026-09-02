@@ -60,7 +60,14 @@ pub struct Quantity {
 /// This is the asymmetry with the upward direction, where
 /// [`DerivationRef`](super::DerivationRef) moves regulatory responsibility under
 /// Reg. (EU) 2023/1542 Art. 77(7) and so does need a consent artefact.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// # Reads the shape this replaced, on purpose
+///
+/// `Deserialize` is hand-written rather than derived so that a bare
+/// [`PassportRef`] — the element shape before this type existed — still parses,
+/// arriving with no qualifiers. See the [`Deserialize`] impl for why that is not
+/// optional.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentRef {
     /// Where to fetch the constituent's passport, and the hash pinning its
@@ -75,4 +82,72 @@ pub struct ComponentRef {
     /// vocabulary is the product group's to define, not core's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for ComponentRef {
+    /// Accepts both this shape and the bare [`PassportRef`] it replaced.
+    ///
+    /// # Why tolerance is required here and not for stored documents
+    ///
+    /// A stored document lives in one node's own database. When its shape moves,
+    /// that node can rewrite it, so failing loudly is the right behaviour — it
+    /// names a problem whose owner can fix it.
+    ///
+    /// `componentRefs` is not only stored. It is part of the **signed public
+    /// view**, which other operators' nodes fetch over the network to verify a
+    /// bill of materials. Those passports belong to someone else and are signed:
+    /// they cannot be rewritten, by anyone, ever. A reader that refuses the older
+    /// element shape is therefore refusing data that is correct, current and
+    /// unforgeable — and it will keep refusing it for as long as that passport
+    /// exists.
+    ///
+    /// The consequence is worse than a failed read. A verification walk that
+    /// cannot parse an entry reports it as a malformed reference, and a malformed
+    /// reference is graded as an integrity violation — the same class as a hash
+    /// mismatch or a cycle. So without this impl, a node that upgraded would
+    /// accuse a node that had not yet upgraded of **tampering**, on evidence that
+    /// is nothing but a version difference. Nodes here are independent per-
+    /// operator deployments, so that skew is the normal steady state rather than
+    /// a migration window.
+    ///
+    /// The two shapes are disjoint — the older one has `uri`/`publicJwsHash` at
+    /// the top level and no `reference` key — so accepting both requires no
+    /// guessing. Writing is unaffected: this type only ever *serialises* the
+    /// current shape.
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            /// The current shape: a wrapped reference plus optional qualifiers.
+            Qualified {
+                reference: PassportRef,
+                #[serde(default)]
+                quantity: Option<Quantity>,
+                #[serde(default)]
+                role: Option<String>,
+            },
+            /// The shape this type replaced: the reference on its own.
+            Bare(PassportRef),
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::Qualified {
+                reference,
+                quantity,
+                role,
+            } => Self {
+                reference,
+                quantity,
+                role,
+            },
+            Repr::Bare(reference) => Self {
+                reference,
+                quantity: None,
+                role: None,
+            },
+        })
+    }
 }

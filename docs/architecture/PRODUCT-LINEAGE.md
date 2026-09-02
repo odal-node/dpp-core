@@ -544,11 +544,42 @@ inherited by Phase 3 without a fresh decision:
   document does not re-verify and a silently-emptied one verifies while being
   wrong.
 
-Phase 3 object-ified `componentRefs` elements, and that turned out **not** to be
-the same failure. The key name did not change, and `#[serde(default)]` applies
-only when a key is *absent* — so a document carrying the old element shape fails
-deserialization on its own, loudly, and needs no `REMOVED_ENVELOPE_KEYS` entry.
-A test pins that rather than leaving it to a serde implementation detail.
+Phase 3 object-ified `componentRefs` elements, and that is a different failure
+again. The key name did not change, and `#[serde(default)]` applies only when a
+key is *absent* — so a document carrying the old element shape would fail
+deserialization on its own, loudly, needing no `REMOVED_ENVELOPE_KEYS` entry.
 
-**The distinction to carry forward: renaming a key fails silently, changing a
-present key's type fails loudly.** Only the first needs a tripwire.
+**Loud is the wrong answer here, and that is the more important lesson.** The
+first analysis of this asked only where a document is *stored*. It is also
+**fetched**: `componentRefs` is in the signed public view, and other operators'
+nodes read it over the network to verify a bill of materials. A fetched passport
+is signed and belongs to someone else — it can never be rewritten into the new
+shape, by anyone. Refusing it refuses data that is correct, current and
+unforgeable, permanently.
+
+And refusal does not degrade gracefully. A verification walk that cannot parse an
+entry reports a malformed reference, which is graded as an **integrity
+violation**, in the same class as a hash mismatch or a cycle. So an upgraded node
+would report a not-yet-upgraded node's bill of materials as *tampered*, on
+evidence that is nothing but a version difference. Nodes are independent
+per-operator deployments, so that skew is the steady state, not a window.
+
+`ComponentRef` therefore hand-writes `Deserialize` and accepts both shapes. This
+is the same *"a rename that keeps accepting the old key"* discipline the envelope
+rule already states, applied to an element type instead of a key name.
+
+**The distinction to carry forward, in full:**
+
+| Change | Stored document | Fetched document |
+|---|---|---|
+| Rename a key | silent — needs a tripwire | silent lineage loss |
+| Change a present key's type | loud — self-reporting | **loud, and reads as tampering** |
+
+A field in the signed public view answers to the second column. Deciding its
+compatibility from the first alone is how this was nearly shipped wrong.
+
+**Phase 2 is not fully covered by this.** `derivedFrom`'s rename degrades
+silently across nodes rather than accusing anyone, which is milder — but the GS1
+resolver reads `parentPassportRef` from fetched JSON to build predecessor link
+relations, so a version-skewed node emits none. That is a deliberate open
+decision, not an oversight.

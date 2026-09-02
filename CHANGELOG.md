@@ -41,14 +41,28 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   supply chain produces, so a `componentRef` remains a pinned *claim by the
   assembler*, and the verification walk reports it as exactly that.
 
-  **Migration.** Unlike the `derivedFrom` rename, this one already fails loudly
-  and needs no tripwire. The key name is unchanged and `#[serde(default)]`
-  applies only when a key is *absent*, so a stored document carrying the old
-  element shape fails deserialization with a missing-field error rather than
-  loading empty. A test pins that rather than trusting it to remain a serde
-  implementation detail. The standing caveat is unchanged: such a document must
-  be rewritten before upgrading, and a rewritten document no longer verifies
-  against a signature covering the old shape.
+  **Migration — the old element shape is still read, deliberately.**
+  `ComponentRef`'s `Deserialize` is hand-written and accepts a bare
+  `PassportRef` as well, mapping it to an edge with no qualifiers. The two shapes
+  are disjoint, so this needs no guessing, and serialisation is unaffected: only
+  the current shape is ever written.
+
+  This is the opposite of the `derivedFrom` rename's answer, and the difference
+  is *where the document lives*. A stored document sits in one node's own
+  database: when its shape moves, that node can rewrite it, so failing loudly
+  names a problem whose owner can fix it. `componentRefs` is also part of the
+  **signed public view**, which other operators' nodes fetch to verify a bill of
+  materials — and those passports are signed and belong to someone else, so they
+  can never be rewritten. Refusing them would refuse data that is correct,
+  current and unforgeable.
+
+  It would also not fail quietly. A verification walk that cannot parse an entry
+  reports it as a malformed reference, and a malformed reference is graded as an
+  integrity violation — the same class as a hash mismatch. Without the tolerant
+  reader, an upgraded node would report a not-yet-upgraded node's bill of
+  materials as **tampered**, on evidence that is nothing but a version
+  difference. Nodes are independent per-operator deployments, so that skew is the
+  steady state, not a migration window.
 
 - **Lineage held one predecessor where Art. 77(7) says several.**
   *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
