@@ -217,7 +217,7 @@ Single source of truth for JWS verification:
 
 Data types for the EU Central DPP Registry (ESPR Article 13). `wasm32`-safe — no I/O, no HTTP, no async runtime. Contains only wire-format types: `RegistrationPayload`, `EuRegistryEnvelope`, `EuRegistryResponse`, `StatusResponse`, `TransferNotification`, identifier structs (`ProductIdentifier`, `OperatorIdentifier`, `FacilityIdentifier`, `ProductItemIdentifier`), error types, and `RegistryEndpoint` with sandbox/production presets.
 
-The port trait (`RegistrySyncPort`) and its ghost implementation (`GhostRegistrySync`) live in `dpp-domain::ports::registry_sync`, not here. The platform adapter (`EuRegistrySync`) in `dpp-engine/dpp-node/src/infra/` implements the port using `reqwest` and these bridge types.
+The port trait (`RegistrySyncPort`) and its ghost implementation (`GhostRegistrySync`) live in `dpp-domain::ports::registry_sync`, not here. The platform adapter (`EuRegistrySync`) implements the port using `reqwest` and these bridge types.
 
 ---
 

@@ -288,11 +288,20 @@ Read together: a remanufactured product is a new product, it gets a **new,
 linked** passport, and no transfer of the original occurs. That mechanism is
 `Passport::parent_passport_ref`, not `TransferChain`.
 
-So `TransferReason::Remanufacturing`, `::Repurposing` and `::PreparationForReuse`
-sit closer to Art. 11(d) lineage than to Art. 6a, while `::InsolvencySuccession`
-— and a *corporate* reading of `::Sale`, meaning sale of the actor rather than
-of the product — sit under Art. 6a. **Whether those three variants should exist
-at all is an open domain question, deliberately not resolved by this entry.**
+So `TransferReason::Remanufacturing`, `::Repurposing`, `::PreparationForReuse`
+and `::PreparationForRepurposing` sit closer to Art. 11(d) lineage than to
+Art. 6a, while `::InsolvencySuccession` — and a *corporate* reading of `::Sale`,
+meaning sale of the actor rather than of the product — sit under Art. 6a.
+**Whether those four variants should exist at all is an open domain question,
+deliberately not resolved by this entry.**
+
+`::PreparationForRepurposing` was added after this entry was written, and does
+not narrow the question. The four are the operations Reg. (EU) 2023/1542
+Art. 77(7) names, and that article — unlike ESPR — says of exactly those four
+that "the responsibility ... shall be transferred", which is the reason the set
+is now complete rather than three-quarters of an article. The variant was added
+so that whichever way the question falls, all four fall together; a set missing
+one member could only ever be wrong.
 
 Note also that **Art. 11(c)** and **Art. 11(e)** both anchor the obligation to
 "the economic operator responsible for the **creation** of the digital product

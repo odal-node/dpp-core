@@ -24,6 +24,15 @@ pub enum TransferReason {
     Repurposing,
     /// Product prepared for resale as second-hand.
     PreparationForReuse,
+    /// Waste product prepared so that it can serve a different purpose.
+    ///
+    /// Distinct from [`Self::Repurposing`], and the difference is the input,
+    /// not the outcome: Reg. (EU) 2023/1542 Art. 3(30) defines this over "a
+    /// waste battery, or parts thereof", while Art. 3(31) defines repurposing
+    /// over "a battery, that is not a waste battery". Art. 77(7) names all
+    /// four second-life operations, and this one was the only one of them
+    /// this enum could not express.
+    PreparationForRepurposing,
     /// Product imported into the EU by a new importer.
     Import,
     /// Original operator became insolvent; responsibilities assumed by successor.
@@ -43,6 +52,7 @@ impl TransferReason {
         Self::Remanufacturing,
         Self::Repurposing,
         Self::PreparationForReuse,
+        Self::PreparationForRepurposing,
         Self::Import,
         Self::InsolvencySuccession,
     ];
@@ -58,6 +68,7 @@ impl TransferReason {
             Self::Remanufacturing => "remanufacturing",
             Self::Repurposing => "repurposing",
             Self::PreparationForReuse => "preparationForReuse",
+            Self::PreparationForRepurposing => "preparationForRepurposing",
             Self::Import => "import",
             Self::InsolvencySuccession => "insolvencySuccession",
         }
