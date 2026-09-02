@@ -99,3 +99,84 @@ fn undetermined_error_names_the_empowerment_being_waited_on() {
         "error must say which ruleset and which instrument: {msg}"
     );
 }
+
+/// A ruleset that cites no source may not claim its numbers are law.
+///
+/// This is what makes the `Sourced` default safe. The default is deliberately
+/// fail-closed — an unclassified ruleset reads as carrying law, so nothing
+/// overwrites it — but that same default would let a *new* placeholder ruleset
+/// silently claim legal provenance simply by not saying anything. Requiring a
+/// citation for the `Sourced` claim closes that: forget to classify a stub, and
+/// this fails.
+///
+/// Only the safety-relevant direction is asserted. A ruleset sourced from a
+/// print-only standard with no URL is imaginable, and would want a deliberate
+/// decision rather than a test that pre-emptively forbids it.
+#[test]
+fn an_unsourced_ruleset_may_not_claim_its_numbers_are_law() {
+    use crate::kernel::ruleset::ParameterBasis;
+
+    let mut assumed = 0_usize;
+    for ruleset in crate::ruleset_registry::all_rulesets() {
+        let basis = ruleset.parameter_basis();
+        if basis == ParameterBasis::Assumed {
+            assumed += 1;
+            continue;
+        }
+        assert!(
+            ruleset.regulatory_basis().source_url.is_some(),
+            "ruleset '{}' claims Sourced parameters while citing no source — \
+             either give its basis a source_url or classify it Assumed",
+            ruleset.id().0
+        );
+    }
+
+    assert!(
+        assumed > 0,
+        "no ruleset is Assumed, so this test proved nothing; the placeholder \
+         rulesets that motivated the distinction have gone missing"
+    );
+}
+
+/// The default is `Sourced`, and that is the fail-closed direction.
+///
+/// A ruleset that says nothing about its provenance must read as carrying law,
+/// so anything gating on this refuses to touch it. The opposite default would
+/// let an unclassified ruleset be overwritten silently, which is the one
+/// outcome the distinction exists to prevent.
+#[test]
+fn an_unclassified_ruleset_defaults_to_carrying_law() {
+    use super::ruleset::{ParameterBasis, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+
+    struct SaysNothing;
+
+    static ID: RulesetId = RulesetId("says-nothing");
+    static VERSION: RulesetVersion = RulesetVersion("1.0.0");
+    static EFFECTIVITY: Effectivity =
+        Effectivity::pending("an instrument that has not been adopted", None);
+    static BASIS: RegulatoryBasis = RegulatoryBasis {
+        regulation: "unspecified",
+        article: "unspecified",
+        standard: None,
+        technical_study: None,
+        source_url: None,
+        superseded_by: None,
+    };
+
+    impl Ruleset for SaysNothing {
+        fn id(&self) -> &RulesetId {
+            &ID
+        }
+        fn version(&self) -> &RulesetVersion {
+            &VERSION
+        }
+        fn effectivity(&self) -> &Effectivity {
+            &EFFECTIVITY
+        }
+        fn regulatory_basis(&self) -> &RegulatoryBasis {
+            &BASIS
+        }
+    }
+
+    assert_eq!(SaysNothing.parameter_basis(), ParameterBasis::Sourced);
+}

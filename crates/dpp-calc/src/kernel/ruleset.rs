@@ -162,4 +162,52 @@ pub trait Ruleset {
     fn effectivity(&self) -> &Effectivity;
     /// Structured citation for the EU regulation that mandates this calculation.
     fn regulatory_basis(&self) -> &RegulatoryBasis;
+
+    /// Where this ruleset's numbers came from — a published instrument, or us.
+    ///
+    /// Defaults to [`ParameterBasis::Sourced`], which is the fail-closed
+    /// direction: a ruleset that says nothing is treated as carrying law, and
+    /// anything that gates on this refuses to touch it. See
+    /// [`ParameterBasis`] for why the opposite default would be unsafe.
+    fn parameter_basis(&self) -> ParameterBasis {
+        ParameterBasis::Sourced
+    }
+}
+
+/// Whether a ruleset's numbers are taken from a published instrument, or are
+/// this project's own.
+///
+/// # Why this is not the same question as "does a value exist"
+///
+/// Every ruleset here has numbers. Only some of them are law.
+/// `Art8Phase1Ruleset` carries the recycled-content shares verified against
+/// Regulation (EU) 2023/1542 Art. 8(2); `LaptopRuleset` carries invented weights
+/// in a stub whose own effectivity is [`Effectivity::Pending`] and whose basis
+/// records the delegated act as *not yet adopted*. Both "already have a value",
+/// and a rule that cannot tell them apart either freezes the placeholders
+/// forever or lets something overwrite the Official Journal.
+///
+/// # Why `Sourced` is the default
+///
+/// The two mistakes are not symmetric. Treating law as ours risks **silently
+/// replacing a legal threshold** — invisible, and discovered by whoever relies on
+/// the wrong number. Treating ours as law only means a placeholder stays
+/// unchanged until someone classifies it, which is visible and harmless. So an
+/// unclassified ruleset reads as `Sourced`, and the default keeps the trait
+/// addition non-breaking for any implementor outside this crate.
+///
+/// This mirrors [`RetentionBasis`](https://docs.rs/dpp-domain) and `DateBasis`
+/// in the domain crate, which record the same distinction for retention periods
+/// and obligation dates. The vocabulary is deliberately the same; the crates do
+/// not depend on each other, so the type is not shared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ParameterBasis {
+    /// Taken from the published instrument or method the ruleset's
+    /// [`RegulatoryBasis`] cites. Not ours to change.
+    Sourced,
+    /// This project's own figures — a placeholder standing in for an unadopted
+    /// act, or an openly non-regulatory heuristic. Replaceable once the real
+    /// values exist.
+    Assumed,
 }

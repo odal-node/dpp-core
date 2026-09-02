@@ -8,7 +8,9 @@ use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
     RepairabilityWeights,
 };
-use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{
+    Effectivity, ParameterBasis, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion,
+};
 
 pub struct DisplaysRuleset;
 
@@ -52,6 +54,12 @@ impl Ruleset for DisplaysRuleset {
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {
         &DISPLAYS_BASIS
+    }
+
+    /// The weights above are placeholders: no adopted act sets them, which is
+    /// what [`Effectivity::Pending`] on this ruleset records.
+    fn parameter_basis(&self) -> ParameterBasis {
+        ParameterBasis::Assumed
     }
 }
 
