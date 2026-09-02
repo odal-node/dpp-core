@@ -1,7 +1,8 @@
 # Product Lineage — Bill of Materials and Second Life
 
-**Status:** Phases 0, 1 and 2 landed; Phases 3–5 remain proposal. Supersedes the
-open questions raised against the initial BOM/second-life cut.
+**Status:** Phases 0–3 landed; Phases 4 and 5 remain proposal, and both are
+non-breaking. Supersedes the open questions raised against the initial
+BOM/second-life cut.
 **Affects:** `dpp-domain` passport model, `dpp-domain::transfer`, platform-layer
 verification (`verify_tree`, evidence `componentGraph`).
 **Version impact:** breaking — Phase 2 renamed a published envelope field, and
@@ -198,7 +199,7 @@ nor a breaking release. It does **not** resolve the separate open question in
 `TransferReason` at all — it makes the set consistent with the article it is drawn
 from, so that if those variants are later withdrawn, all four go together.
 
-### G4 — The edge is untyped (**upward half CLOSED**)
+### G4 — The edge was untyped — **CLOSED**
 
 `PassportRef` records *where* and *which hash* — never *what relation*. Direction
 was encoded in the field name, which was a deliberate simplification and is no
@@ -208,7 +209,9 @@ longer sufficient:
   the edge must say which one occurred. **Closed in Phase 2** — `DerivationRef`
   carries a required `SecondLifeOperation`.
 - Downward, a BOM edge with no quantity or role cannot answer "how much of what,
-  where" — the question a BOM exists to answer. Still open; Phase 3.
+  where" — the question a BOM exists to answer. **Closed in Phase 3** —
+  `ComponentRef` carries an optional `quantity` and `role`, both of which core
+  transports and never interprets (G8).
 
 ### G5 — No product-life status axis
 
@@ -330,9 +333,9 @@ patch field either, since the transition is also a responsibility move under R5.
 
 ## 5. Proposed model
 
-**The upward half of this section shipped in Phase 2** — `DerivationRef`,
-`SecondLifeOperation` and `derived_from` are in `dpp-domain::passport` as written
-below. `ComponentRef` (Phase 3) and `LifeStatus` (Phase 5) are still proposal.
+**Both edge types shipped** — `DerivationRef` and `SecondLifeOperation` in
+Phase 2, `ComponentRef` and `Quantity` in Phase 3, all in `dpp-domain::passport`.
+`LifeStatus` (Phase 5) is still proposal.
 
 Keep `PassportRef` exactly as it is — a pure "where + pin" primitive, correct and
 direction-neutral. Wrap it per direction with the qualifiers each needs.
@@ -374,6 +377,17 @@ pub struct ComponentRef {
     pub quantity: Option<Quantity>,
     /// Product group-defined role of this constituent ("cell", "outer shell").
     pub role: Option<String>,
+}
+
+/// `Quantity` was named here but never defined. As shipped:
+/// `unit: None` means a dimensionless count — two of a thing, not two
+/// kilograms of it. `f64` matches every other physical quantity in the crate
+/// (`MaterialEntry::weight_kg`); core does no arithmetic on it. The unit is an
+/// opaque label, not a vocabulary core validates against — that would be core
+/// deciding a product group's semantics, which G8 forbids.
+pub struct Quantity {
+    pub value: f64,
+    pub unit: Option<String>,
 }
 ```
 
@@ -478,7 +492,7 @@ two were design calls and are recorded as decided, not as recommendations.
 | **0** | Add `parentPassportRef` + `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line, closes the live bypass, forecloses nothing. | no | **landed** |
 | **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
 | **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | **landed** |
-| **3** | `ComponentRef` with quantity/role (G4-down); the verification walk and the evidence component graph follow the new shape. | **yes** | proposal |
+| **3** | `ComponentRef` with quantity/role (G4-down). The verification walk and the evidence component graph follow the new shape platform-side. | **yes** | **landed** |
 | **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). | no | proposal |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
 
@@ -494,10 +508,11 @@ unblocked by Phase 1's pin and independent of 2–4.
 
 ## 8. Compatibility
 
-Phases 2–3 change published field names and types (`parentPassportRef` →
-`derivedFrom`, done; `componentRefs` element type object-ified, pending). Under
-the lockstep versioning policy this is a single coordinated minor version bump
-across all core crates, with the platform layer following.
+Phases 2 and 3 changed published field names and types (`parentPassportRef` →
+`derivedFrom`; `componentRefs` element type object-ified). Both are done, and
+under the lockstep versioning policy they are one coordinated minor version bump
+across all core crates, with the platform layer following — **they must ship in
+the same release**, which is the whole reason they were sequenced together.
 
 🚨 **An earlier version of this section named a mechanism that does not exist.**
 It said the read-time upcast lens (`?schema_view`) "is the existing seam" and
@@ -529,6 +544,11 @@ inherited by Phase 3 without a fresh decision:
   document does not re-verify and a silently-emptied one verifies while being
   wrong.
 
-Phase 3 object-ifies `componentRefs` elements — the same class of change, on a
-field that is already a `Vec` and already defaults. It will fail the same silent
-way unless it is given a migration or the surrounding data is known to be empty.
+Phase 3 object-ified `componentRefs` elements, and that turned out **not** to be
+the same failure. The key name did not change, and `#[serde(default)]` applies
+only when a key is *absent* — so a document carrying the old element shape fails
+deserialization on its own, loudly, and needs no `REMOVED_ENVELOPE_KEYS` entry.
+A test pins that rather than leaving it to a serde implementation detail.
+
+**The distinction to carry forward: renaming a key fails silently, changing a
+present key's type fails loudly.** Only the first needs a tripwire.

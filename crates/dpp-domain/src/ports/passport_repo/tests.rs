@@ -205,8 +205,12 @@ async fn default_patch_fields_rejects_lineage_edges() {
         }),
         serde_json::json!({
             "componentRefs": [{
-                "uri": "https://id.example.com/dpp/cell",
-                "publicJwsHash": "00",
+                "reference": {
+                    "uri": "https://id.example.com/dpp/cell",
+                    "publicJwsHash": "00",
+                },
+                "quantity": { "value": 2.0 },
+                "role": "cell",
             }]
         }),
     ] {

@@ -15,6 +15,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A bill of materials could not say how much of what.**
+  *(Breaking: `Passport::component_refs` changes element type from
+  `Vec<PassportRef>` to `Vec<ComponentRef>`. The wire key `componentRefs` is
+  unchanged; its elements are now objects. New `ComponentRef` and `Quantity` in
+  `dpp-domain::passport`.)*
+
+  A BOM edge recorded where a constituent's passport is and which hash pins it,
+  and nothing else. It could not say how many, how much, or what part the
+  constituent plays — which is the question a bill of materials exists to answer.
+
+  `ComponentRef` wraps the reference with an optional `quantity` and an optional
+  `role`. `Quantity` is a `value` plus an optional `unit`, where no unit means a
+  dimensionless count.
+
+  **Core carries both qualifiers and interprets neither**, deliberately. A
+  battery module, a fibre lot and an electronics sub-assembly are not the same
+  kind of thing, and no delegated act defines "component" or its granularity for
+  any product group in force. `role` and `unit` are free strings for that reason:
+  a controlled vocabulary here would be core deciding a product group's
+  semantics. Product-group plugins interpret; core transports.
+
+  BOM edges still carry **no** consent requirement, unlike the upward direction.
+  Requiring a supplier signature for every assembly is not something a real
+  supply chain produces, so a `componentRef` remains a pinned *claim by the
+  assembler*, and the verification walk reports it as exactly that.
+
+  **Migration.** Unlike the `derivedFrom` rename, this one already fails loudly
+  and needs no tripwire. The key name is unchanged and `#[serde(default)]`
+  applies only when a key is *absent*, so a stored document carrying the old
+  element shape fails deserialization with a missing-field error rather than
+  loading empty. A test pins that rather than trusting it to remain a serde
+  implementation detail. The standing caveat is unchanged: such a document must
+  be rewritten before upgrading, and a rewritten document no longer verifies
+  against a signature covering the old shape.
+
 - **Lineage held one predecessor where Art. 77(7) says several.**
   *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
   `Passport::derived_from: Vec<DerivationRef>`, and the wire key

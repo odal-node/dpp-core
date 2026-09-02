@@ -178,7 +178,9 @@ pub(crate) fn fully_populated_passport() -> Passport {
     use crate::compliance::ComplianceResult;
     use crate::identifier::CommodityCode;
     use crate::lint::LintResult;
-    use crate::passport::{DerivationRef, FacilitySnapshot, PassportRef, SecondLifeOperation};
+    use crate::passport::{
+        ComponentRef, DerivationRef, FacilitySnapshot, PassportRef, Quantity, SecondLifeOperation,
+    };
     use crate::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::seal::{SealFormat, SealedEnvelope};
 
@@ -211,7 +213,14 @@ pub(crate) fn fully_populated_passport() -> Passport {
         reference: reference.clone(),
         operation: SecondLifeOperation::Repurposing,
     }];
-    passport.component_refs = vec![reference];
+    passport.component_refs = vec![ComponentRef {
+        reference,
+        quantity: Some(Quantity {
+            value: 2.0,
+            unit: None,
+        }),
+        role: Some("cell".to_owned()),
+    }];
     passport.retention_until = Some(now);
     passport.product_id = Some(uuid::Uuid::nil());
     passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));
