@@ -33,6 +33,23 @@ pub enum TransferReason {
     /// four second-life operations, and this one was the only one of them
     /// this enum could not express.
     PreparationForRepurposing,
+    /// The battery has become waste, and responsibility moves with it.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 77(7) second subparagraph
+    /// (OJ L 191, 28.7.2023, p. 73) — responsibility passes to the producer, to
+    /// the producer responsibility organisation where one is appointed under
+    /// Art. 57(1), or to the waste management operator selected under
+    /// Art. 57(8). The same subparagraph mandates **no new passport**, which is
+    /// what distinguishes this handover from the four second-life operations.
+    ///
+    /// Deliberately **not** folded into
+    /// [`SecondLifeOperation`](crate::passport::SecondLifeOperation): that is a
+    /// different vocabulary. Those four describe second-life *processing* that
+    /// produces a new unit, whereas this records a waste handover on a record
+    /// that continues. Folding them would let the lineage-consent rule match a
+    /// waste handover against a derivation edge, which is not the consent that
+    /// rule is looking for.
+    WasteHandover,
     /// Product imported into the EU by a new importer.
     Import,
     /// Original operator became insolvent; responsibilities assumed by successor.
@@ -53,6 +70,7 @@ impl TransferReason {
         Self::Repurposing,
         Self::PreparationForReuse,
         Self::PreparationForRepurposing,
+        Self::WasteHandover,
         Self::Import,
         Self::InsolvencySuccession,
     ];
@@ -69,6 +87,7 @@ impl TransferReason {
             Self::Repurposing => "repurposing",
             Self::PreparationForReuse => "preparationForReuse",
             Self::PreparationForRepurposing => "preparationForRepurposing",
+            Self::WasteHandover => "wasteHandover",
             Self::Import => "import",
             Self::InsolvencySuccession => "insolvencySuccession",
         }

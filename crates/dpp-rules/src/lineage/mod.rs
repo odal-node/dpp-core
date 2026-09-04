@@ -13,12 +13,18 @@
 //! lineage — which the envelope contradicts.
 
 pub mod consent;
+pub mod consistency;
 pub mod finding;
 pub mod input;
+pub mod status_defect;
 
 #[cfg(test)]
 mod consent_tests;
+#[cfg(test)]
+mod consistency_tests;
 
 pub use consent::check_derivation_consent;
+pub use consistency::check_life_status_consistency;
 pub use finding::{ConsentDefect, ConsentFinding};
 pub use input::{DerivationEdge, TransferEvidence};
+pub use status_defect::StatusDefect;

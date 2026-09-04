@@ -35,6 +35,12 @@ pub enum Disclosure {
 /// Fields absent from this list are [`Disclosure::Public`].
 pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     ("batchId", Disclosure::Restricted),
+    // Annex XIII point 4(c) of Reg. (EU) 2023/1542, and point 4's heading is
+    // "INFORMATION AND DATA RELATING TO AN INDIVIDUAL BATTERY ACCESSIBLE ONLY TO
+    // PERSONS WITH A LEGITIMATE INTEREST". Classified rather than left to
+    // `default_disclosure`, which is `Public` — an individual unit's life status
+    // is exactly what that tier exists to keep off the anonymous view.
+    ("lifeStatus", Disclosure::Individual),
     // Advisory plausibility output, re-computable after publish and carrying
     // free-text findings about our own data quality — operator- and
     // auditor-facing, not consumer-facing.
