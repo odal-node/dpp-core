@@ -83,7 +83,7 @@ aes-gcm      = "0.11"
 rand         = "0.10"
 
 # Schema validation
-jsonschema   = "0.50"
+jsonschema   = "0.52"
 semver       = "1"
 
 # Property-based testing (dev-only)
@@ -98,7 +98,7 @@ anyhow       = "1"
 thiserror    = "2"
 
 # KDF
-argon2       = "0.5"
+argon2       = "0.6"
 
 # MAC
 hmac         = "0.13"

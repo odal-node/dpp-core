@@ -175,6 +175,41 @@ impl InstrumentCatalog {
             .any(|i| i.requires_passport_for(product_group))
     }
 
+    /// Whether `product_group` carries a **live** passport obligation: a
+    /// passport is owed *and* a binding determination can be made for it today.
+    ///
+    /// The conjunction of [`Self::determinable_for`] and
+    /// [`Self::passport_required_for`], folded here because neither half answers
+    /// the question and the ways they come apart are modelled in this crate:
+    ///
+    /// - An act can bind today and require **no passport at all** — see
+    ///   [`RegulatoryStatus`](crate::catalog::RegulatoryStatus), which cites
+    ///   ESPR Arts. 24–25 for exactly this case. `determinable_for` alone
+    ///   therefore answers "yes" for a group that owes nothing.
+    /// - An act can require the information while the passport duty is
+    ///   discharged through another system — see
+    ///   [`PassportObligation::DisplacedBy`](crate::instrument::PassportObligation::DisplacedBy),
+    ///   with ESPR Art. 9(4)(b) and EPREL as the worked example. So
+    ///   `passport_required_for` alone answers "yes" where nothing is bindingly
+    ///   determinable.
+    ///
+    /// A caller reaching for either operand on its own enforces an obligation
+    /// that does not exist, or fails to enforce one that does.
+    ///
+    /// # Why this is an addition, not a replacement
+    ///
+    /// Both operands stay public. "A passport is required" and "a determination
+    /// can be made" are different questions, and a caller *reporting* the
+    /// catalog needs them apart — an obligation can exist while the implementing
+    /// acts that would make it determinable do not, and saying so is more honest
+    /// than one boolean. Anything that **gates** on the answer wants this fold;
+    /// anything that **renders** it wants the halves.
+    #[must_use]
+    pub fn passport_obligation_live(&self, product_group: &str) -> bool {
+        !self.determinable_for(product_group).is_empty()
+            && self.passport_required_for(product_group)
+    }
+
     /// The **earliest** date at which any recorded act requires a passport for
     /// `product_group`.
     ///

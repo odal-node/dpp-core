@@ -18,7 +18,8 @@
 /// the default implementation still owes callers that contract. Keeping it
 /// private meant an implementor had no way to honour it except by retyping the
 /// list, and a retyped list drifts: the PostgreSQL backend's copy fell three
-/// entries short (`operatorIdentifier`, `facility`, `parentPassportRef`), which
+/// entries short (`operatorIdentifier`, `facility`, and `parentPassportRef` as
+/// the upward lineage edge was then called — now `derivedFrom`), which
 /// on the only backend that ships made those fields writable through a
 /// user-facing field patch and carried them into the signed publish payload.
 ///
@@ -48,7 +49,7 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     "schemaVersion",
     "operatorIdentifier",
     "facility",
-    "parentPassportRef",
+    "derivedFrom",
     "componentRefs",
     // The applicable law at placing on the market does not change. A
     // mis-recorded set is corrected by superseding the passport, never by
