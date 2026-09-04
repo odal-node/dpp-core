@@ -65,7 +65,7 @@ product groups therefore reuse this same vocabulary through each product group m
 
 ### Implementation
 
-- `dpp_domain::domain::identity` — `Audience`, `Disclosure`, and
+- `dpp_domain::disclosure` — `Audience`, `Disclosure`, and
   `PASSPORT_FIELD_DISCLOSURE`, the single source for the disclosure class of
   every non-public top-level passport field.
 - `dpp_vc::credential` — W3C VC issuance and verification, mapping an operator

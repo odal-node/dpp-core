@@ -286,13 +286,22 @@ product-lifecycle cases:
 
 Read together: a remanufactured product is a new product, it gets a **new,
 linked** passport, and no transfer of the original occurs. That mechanism is
-`Passport::parent_passport_ref`, not `TransferChain`.
+`Passport::derived_from`, not `TransferChain`.
 
-So `TransferReason::Remanufacturing`, `::Repurposing` and `::PreparationForReuse`
-sit closer to Art. 11(d) lineage than to Art. 6a, while `::InsolvencySuccession`
-— and a *corporate* reading of `::Sale`, meaning sale of the actor rather than
-of the product — sit under Art. 6a. **Whether those three variants should exist
-at all is an open domain question, deliberately not resolved by this entry.**
+So `TransferReason::Remanufacturing`, `::Repurposing`, `::PreparationForReuse`
+and `::PreparationForRepurposing` sit closer to Art. 11(d) lineage than to
+Art. 6a, while `::InsolvencySuccession` — and a *corporate* reading of `::Sale`,
+meaning sale of the actor rather than of the product — sit under Art. 6a.
+**Whether those four variants should exist at all is an open domain question,
+deliberately not resolved by this entry.**
+
+`::PreparationForRepurposing` was added after this entry was written, and does
+not narrow the question. The four are the operations Reg. (EU) 2023/1542
+Art. 77(7) names, and that article — unlike ESPR — says of exactly those four
+that "the responsibility ... shall be transferred", which is the reason the set
+is now complete rather than three-quarters of an article. The variant was added
+so that whichever way the question falls, all four fall together; a set missing
+one member could only ever be wrong.
 
 Note also that **Art. 11(c)** and **Art. 11(e)** both anchor the obligation to
 "the economic operator responsible for the **creation** of the digital product
@@ -329,9 +338,14 @@ inconsistently as either Art. 9 or Art. 12). **This still stands as to ESPR.**
 
 ### What `domain::transfer` may be described as
 
-The dual-signed handshake is **an engineering design choice** that satisfies —
+The two-step handshake is **an engineering design choice** that satisfies —
 and exceeds — Art. 11(e)'s continuity requirement, and that produces the record
-this node notifies to the registry under Art. 6a. It is **not** a literal
+this node notifies to the registry under Art. 6a. ("Two-step", not "dual-signed":
+two JWS values exist, but only `from_signature` is a counterparty's own. The
+other is this node's attestation that acceptance ran — see
+`TransferRecord::node_acceptance_attestation`, and §5.1 of
+`docs/architecture/PRODUCT-LINEAGE.md` for a design that read the old wording the
+wrong way.) It is **not** a literal
 implementation of a numbered transfer obligation in ESPR, because none exists
 there; and it is **not** evidence of an Art. 6a transfer, because that rests on
 verified-actor status this node cannot attest to.

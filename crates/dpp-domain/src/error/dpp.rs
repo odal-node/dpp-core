@@ -25,6 +25,21 @@ pub enum DppError {
     #[error("serialisation error: {0}")]
     Serialisation(String),
 
+    /// A stored document carries an envelope key this build has removed, so it
+    /// predates a rename. Reading it would succeed while silently dropping the
+    /// field, which is why it is refused instead. See
+    /// [`crate::passport::REMOVED_ENVELOPE_KEYS`].
+    #[error(
+        "stored document carries removed envelope key `{removed}`, which was renamed to \
+         `{replacement}`: reading it would silently drop the field, so it is refused"
+    )]
+    RemovedEnvelopeKey {
+        /// The key as the stored document spells it.
+        removed: &'static str,
+        /// The key that replaced it.
+        replacement: &'static str,
+    },
+
     /// A stored document's product group data predates the current schema by more
     /// than the registered lens chain can bridge — e.g. a required field the
     /// document was written before, with no source data anywhere to derive it

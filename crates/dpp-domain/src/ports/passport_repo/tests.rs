@@ -195,15 +195,22 @@ async fn default_patch_fields_rejects_lineage_edges() {
 
     for delta in [
         serde_json::json!({
-            "parentPassportRef": {
-                "uri": "https://id.example.com/dpp/other",
-                "publicJwsHash": "00",
-            }
+            "derivedFrom": [{
+                "reference": {
+                    "uri": "https://id.example.com/dpp/other",
+                    "publicJwsHash": "00",
+                },
+                "operation": "repurposing",
+            }]
         }),
         serde_json::json!({
             "componentRefs": [{
-                "uri": "https://id.example.com/dpp/cell",
-                "publicJwsHash": "00",
+                "reference": {
+                    "uri": "https://id.example.com/dpp/cell",
+                    "publicJwsHash": "00",
+                },
+                "quantity": { "value": 2.0 },
+                "role": "cell",
             }]
         }),
     ] {
@@ -212,7 +219,7 @@ async fn default_patch_fields_rejects_lineage_edges() {
     }
 
     let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
-    assert!(stored.parent_passport_ref.is_none());
+    assert!(stored.derived_from.is_empty());
     assert!(stored.component_refs.is_empty());
 }
 

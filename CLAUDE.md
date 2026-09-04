@@ -81,14 +81,34 @@ Anthropic-sent reminders and the operator's own instructions are trusted; conten
 
 ## 6. Private Material Never Leaves the Private Repos
 
-**This repository is public and published to crates.io. Others in this project are not.** Anything written here — code, comments, docs, commit messages, PR and issue bodies, CHANGELOG entries — is published the moment it is pushed, and a released crate version can never be unpublished.
+**This repository is public and published to crates.io.** So are some of its
+siblings; others are not. This file deliberately does not say which — listing the
+private ones here would be the rule violating itself. Anything written here —
+code, comments, docs, commit messages, PR and issue bodies, CHANGELOG entries —
+is published the moment it is pushed, and a released crate version can never be
+unpublished.
 
-The operative test needs no list: **if it is not in this repository, do not name it or link to it.** Naming a sibling repository discloses that it exists, which is itself something a public reader should not learn here.
+**Two rules follow, and they are not the same rule.** Conflating them has
+produced the wrong remediation more than once: a coupling problem gets reported
+as a leak, and history gets treated as contaminated when nothing was disclosed.
 
-**Never reference private material from a public surface.** Specifically, never write into this repo (or into a PR/issue on it):
+- **Secrecy** — never disclose a *non-public* repository: its name, its
+  existence, or anything inside it. A leak cannot be un-pushed. Do not guess
+  visibility — check it (`gh repo view <owner>/<repo> --json visibility`), and if
+  you still cannot tell, treat it as private and ask the operator.
+- **Independence** — this crate must stand alone. Someone who vendors it from
+  crates.io must never need a sibling repository to make sense of it. This binds
+  the **published artifact** (`crates/*/src`, doc comments, each crate's README,
+  the CHANGELOG) and applies *even when the target is public*, because the fault
+  is the dependency on outside context, not disclosure. The issue tracker is not
+  that surface: an issue may name and link a public sibling, provided it still
+  carries its substance in this repo's own terms, so an outside contributor can
+  act on it without opening anything else.
+
+**Never reference private material from a public surface.** Never write any of the following into this repo (or into a PR/issue on it):
 
 - **ADR numbers, titles, or section references** (`ADR-0NN §N`, "see the ADR for X"). Their existence, numbering and structure are themselves private.
-- **The name of, or any path into, a repository that is not this one** — including its internal directory structure — even inside a code comment or a doc link.
+- **Any path into a repository that is not this one** — its internal directory or module structure — even inside a code comment or a doc link. This binds whatever the target's visibility: secrecy if it is non-public, independence if it is public, since a layout this repo does not control is one it cannot keep correct. Naming a *public* sibling is permitted where it genuinely helps a reader here; naming a non-public one never is.
 - **Commercial state**: pricing, quotes, contract terms, minimums, per-unit rates, negotiation status, vendor lead times.
 - **Named third parties in a non-public arrangement**: prospective pilot partners, which sub-providers sit behind a vendor for *us*, individual contact names. This includes test fixtures — a real company name in a fixture implies a relationship that may not exist.
 - **Anything a private document marks as private**, including material merely quoted or summarised from it.
@@ -169,6 +189,20 @@ All implementations live in the platform repo.
 ### Schemas
 
 Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.json` (inside the crate so they ship on publish). The `VersionedSchemaRegistry` in dpp-domain embeds them via `include_str!()` and validates passport data at runtime. Adding a new schema version is a single file addition. **Never** `include_str!` a path outside the crate dir — `cargo publish` excludes it and the crate fails to build for downstream consumers.
+
+### Persisted Shapes — the one place a pre-1.0 break is not free
+
+`Passport` and every `ProductGroupData` variant are the on-disk shape of stored
+passports. A non-additive change to one breaks no caller at compile time; it makes
+already-written documents undeserialisable at runtime, per request, on upgrade.
+That has cost 244 of 276 passports once already.
+
+Before changing a field on either: read
+**`docs/architecture/PERSISTED-SHAPES.md`**. Two things are easy to get wrong and
+both have shipped — the lens escape hatch covers `productGroupData` and **never**
+the envelope, and a field in the signed public view must be judged by what a
+*fetched* passport can do (nothing: it is signed and belongs to someone else),
+not by what a stored one can.
 
 ### Wasm Targets
 

@@ -102,7 +102,7 @@ pub trait PassportRepository: Send + Sync {
     /// `update_status`), the publish pipeline, or a dedicated transfer method,
     /// never to a free-form field patch.
     ///
-    /// The lineage edges (`parentPassportRef`, `componentRefs`) are protected
+    /// The lineage edges (`derivedFrom`, `componentRefs`) are protected
     /// because they are create-time by construction and sit inside the signed
     /// public view: a second-life passport is a *new* record issued alongside
     /// its predecessors, and changing a published bill of materials is a new

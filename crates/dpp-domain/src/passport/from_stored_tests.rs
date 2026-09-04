@@ -99,3 +99,71 @@ fn from_stored_surfaces_a_same_version_mismatch_as_serialisation() {
         "expected a typed Serialisation error, got: {err}"
     );
 }
+
+/// A document carrying a removed envelope key is refused, not silently emptied.
+///
+/// This is the case the check exists for, and it is the one a plain deserialize
+/// cannot catch: `Passport` sets no `deny_unknown_fields`, so serde ignores
+/// `parentPassportRef` and hands back a passport whose `derived_from` is empty.
+/// The control assertion below proves that is still what serde does — without
+/// it, this test would keep passing against a build where the guard had been
+/// deleted and something else happened to reject the document.
+#[test]
+fn from_stored_refuses_a_removed_envelope_key() {
+    let passport = textile_passport();
+    let mut doc = serde_json::to_value(&passport).expect("serialise");
+    doc.as_object_mut().expect("object").insert(
+        "parentPassportRef".to_owned(),
+        serde_json::json!({
+            "uri": "https://id.example/dpp/predecessor",
+            "publicJwsHash": "0".repeat(64),
+        }),
+    );
+
+    // Control: serde alone accepts it and drops the edge.
+    let lenient: Passport =
+        serde_json::from_value(doc.clone()).expect("serde ignores unknown keys");
+    assert!(
+        lenient.derived_from.is_empty(),
+        "control: a plain deserialize is expected to silently lose the edge"
+    );
+
+    let err = Passport::from_stored(doc, &LensRegistry::new(), &ProductGroupCatalog::new())
+        .expect_err("a removed envelope key must be refused");
+
+    match err {
+        DppError::RemovedEnvelopeKey {
+            removed,
+            replacement,
+        } => {
+            assert_eq!(removed, "parentPassportRef");
+            assert_eq!(replacement, "derivedFrom");
+        }
+        other => panic!("expected RemovedEnvelopeKey, got: {other:?}"),
+    }
+}
+
+/// Every replacement named in `REMOVED_ENVELOPE_KEYS` must be a key the struct
+/// actually emits, and every removed key must not be.
+///
+/// The list is strings on both sides. A replacement that no longer exists sends
+/// an operator to a field that is not there, and a "removed" key that is in fact
+/// still live would refuse every document that legitimately carries it.
+#[test]
+fn removed_envelope_keys_name_real_replacements() {
+    assert!(
+        !REMOVED_ENVELOPE_KEYS.is_empty(),
+        "the list is permanent; entries are never pruned"
+    );
+
+    for &(removed, replacement) in REMOVED_ENVELOPE_KEYS {
+        assert!(
+            PASSPORT_WIRE_KEYS.contains(&replacement),
+            "`{replacement}` is offered as the replacement for `{removed}` but is not a wire key"
+        );
+        assert!(
+            !PASSPORT_WIRE_KEYS.contains(&removed),
+            "`{removed}` is listed as removed but the struct still emits it"
+        );
+    }
+}

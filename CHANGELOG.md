@@ -13,7 +13,170 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **A bill of materials could not say how much of what.**
+  *(Breaking: `Passport::component_refs` changes element type from
+  `Vec<PassportRef>` to `Vec<ComponentRef>`. The wire key `componentRefs` is
+  unchanged; its elements are now objects. New `ComponentRef` and `Quantity` in
+  `dpp-domain::passport`.)*
+
+  A BOM edge recorded where a constituent's passport is and which hash pins it,
+  and nothing else. It could not say how many, how much, or what part the
+  constituent plays — which is the question a bill of materials exists to answer.
+
+  `ComponentRef` wraps the reference with an optional `quantity` and an optional
+  `role`. `Quantity` is a `value` plus an optional `unit`, where no unit means a
+  dimensionless count.
+
+  **Core carries both qualifiers and interprets neither**, deliberately. A
+  battery module, a fibre lot and an electronics sub-assembly are not the same
+  kind of thing, and no delegated act defines "component" or its granularity for
+  any product group in force. `role` and `unit` are free strings for that reason:
+  a controlled vocabulary here would be core deciding a product group's
+  semantics. Product-group plugins interpret; core transports.
+
+  BOM edges still carry **no** consent requirement, unlike the upward direction.
+  Requiring a supplier signature for every assembly is not something a real
+  supply chain produces, so a `componentRef` remains a pinned *claim by the
+  assembler*, and the verification walk reports it as exactly that.
+
+  **Migration — the old element shape is still read, deliberately.**
+  `ComponentRef`'s `Deserialize` is hand-written and accepts a bare
+  `PassportRef` as well, mapping it to an edge with no qualifiers. The two shapes
+  are disjoint, so this needs no guessing, and serialisation is unaffected: only
+  the current shape is ever written.
+
+  This is the opposite of the `derivedFrom` rename's answer, and the difference
+  is *where the document lives*. A stored document sits in one node's own
+  database: when its shape moves, that node can rewrite it, so failing loudly
+  names a problem whose owner can fix it. `componentRefs` is also part of the
+  **signed public view**, which other operators' nodes fetch to verify a bill of
+  materials — and those passports are signed and belong to someone else, so they
+  can never be rewritten. Refusing them would refuse data that is correct,
+  current and unforgeable.
+
+  It would also not fail quietly. A verification walk that cannot parse an entry
+  reports it as a malformed reference, and a malformed reference is graded as an
+  integrity violation — the same class as a hash mismatch. Without the tolerant
+  reader, an upgraded node would report a not-yet-upgraded node's bill of
+  materials as **tampered**, on evidence that is nothing but a version
+  difference. Nodes are independent per-operator deployments, so that skew is the
+  steady state, not a migration window.
+
+- **Lineage held one predecessor where Art. 77(7) says several.**
+  *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
+  `Passport::derived_from: Vec<DerivationRef>`, and the wire key
+  `parentPassportRef` by `derivedFrom`. `PROTECTED_PATCH_FIELDS` and
+  `PASSPORT_WIRE_KEYS` carry the new name. A struct literal must replace
+  `parent_passport_ref: None` with `derived_from: Vec::new()`.)*
+
+  Regulation (EU) 2023/1542 Art. 77(7) requires a second-life battery to have "a
+  new battery passport linked to the battery passport **or passports** of the
+  original battery **or batteries**" — plural on both sides. A stationary storage
+  pack assembled from several retired EV packs is the canonical second-life
+  product, and an `Option` could not represent it at all. This was a data-model
+  defect against the plain text, not a missing convenience.
+
+  The edge is also typed now. `DerivationRef` pairs the pinned reference with a
+  required `SecondLifeOperation`, so it records *which* of the four operations
+  Art. 77(7) names produced the unit rather than leaving it to a field name. The
+  four are defined terms, and the boundary between the two repurposing ones is
+  the waste status of the input: Art. 3(30) operates on "a waste battery, or
+  parts thereof", Art. 3(31) on "a battery, that is not a waste battery".
+  `SecondLifeOperation::wire_str` is byte-identical to `TransferReason`'s for the
+  four names they share, with a test pinning that, because the rule binding a
+  derivation to the transfer of responsibility that consents to it matches one against
+  the other and would fail open if they drifted.
+
+  **Migration.** There is no read path for the old key, and a document carrying
+  it is now **refused rather than silently emptied**.
+
+  `Passport` sets no `deny_unknown_fields` — deliberately, so a document written
+  by a newer build stays readable by an older one — which meant serde ignored
+  `parentPassportRef` and handed back a passport whose `derived_from` was empty.
+  The record loaded, reported no error, and had quietly lost a value its
+  signature still covers: a second-life passport forgetting the predecessors
+  Art. 77(7) requires it to link to. New `REMOVED_ENVELOPE_KEYS` records the old
+  key and its replacement, and `Passport::from_stored` checks it before anything
+  else, returning the new `DppError::RemovedEnvelopeKey`. A plain
+  `serde_json::from_value::<Passport>` that bypasses `from_stored` still drops
+  the key silently; `from_stored` is the supported way to read a stored document.
+
+  Anything holding passports written before this release must rewrite the key
+  before upgrading — and a rewritten document no longer verifies against its own
+  signature, which covers the old name. Refusing to read is the right failure but
+  is still a failure: there is no version of this that a real passport survives
+  without a migration written for it. This was taken knowingly while the project
+  has no published passports to strand; `Passport::schema_version`'s doc comment
+  records why that licence is temporary and what the next envelope rename owes.
+
 ### Added
+
+- **A second-life claim could move regulatory responsibility by asserting it.**
+  New `dpp_rules::lineage::consent` binds a derivation edge to the transfer of
+  responsibility that consents to it.
+
+  A hash-pin proves the target has not been *modified*. It says nothing about
+  whether the target's operator agreed to the relationship, and Reg. (EU)
+  2023/1542 Art. 77(7) moves regulatory responsibility to the operator placing
+  the second-life unit on the market. Anyone could publish a passport claiming to
+  derive from anyone else's product, and nothing checked.
+
+  `check_derivation_consent` reports one finding per unsupported edge:
+  `NoTransfer`, `OutgoingAuthorisationMissing`, `NotAccepted`,
+  `IncomingOperatorMismatch`, `OperationMismatch` — ordered so the most
+  fundamental defect is the one reported, rather than burying a missing
+  authorisation under a reason mismatch. Bill-of-materials edges deliberately get
+  no such requirement: demanding a supplier signature for every assembly is not
+  something a real supply chain produces.
+
+  **What the rule rests on, stated precisely because the design note had it
+  wrong.** That note justified this by saying a transfer record is "dual-signed
+  by both operators". It is not — `TransferRecord::node_acceptance_attestation`
+  says so at the field: the acceptance half is the hosting node's attestation
+  that the step ran, not a signature by the incoming operator, who has no key on
+  the node recording it. The conclusion survives for a different reason: the
+  consent this rule needs is the **predecessor's**, and in a second-life transfer
+  the predecessor's operator is the *outgoing* party — so the half that is a
+  genuine party signature is exactly the half that matters. Acceptance is still
+  checked, as a status rather than as a second signature. Doc comments that
+  repeated the wrong claim are corrected.
+
+  The rule cannot tell whether a transfer concerns the predecessor a given edge
+  points at: an edge identifies its target by URI, a transfer by passport id, and
+  resolving one to the other is a network fetch. **The caller correlates and the
+  rule checks** — so an edge whose caller found no transfer is reported as
+  unconsented, which is the correct reading of "no evidence was found". Enforcing
+  it therefore happens platform-side; this crate carries the rule.
+
+- **`InstrumentCatalog` had no fold for the one question a gate actually asks:
+  does this product group carry a live passport obligation right now?**
+  New `passport_obligation_live`, the conjunction of `determinable_for` and
+  `passport_required_for`.
+
+  Every other compound question already folds here — `retention_for` takes the
+  maximum and degrades the basis if any contributing figure is assumed,
+  `passport_due_for` takes the earliest date, `granularity_for` takes the most
+  granular level — so that a consumer never restates a rule about how obligations
+  compound. This one was left to each caller to write out.
+
+  Neither operand answers it, and both ways they come apart are already modelled
+  here. An act can bind today and require **no passport at all** — `RegulatoryStatus`
+  cites ESPR Arts. 24–25 for that case — so `determinable_for` alone says "yes"
+  for a group that owes nothing. An act can require the information while the
+  passport duty is discharged through another system —
+  `PassportObligation::DisplacedBy`, with ESPR Art. 9(4)(b) and EPREL as the
+  worked example — so `passport_required_for` alone says "yes" where nothing is
+  bindingly determinable. A caller reaching for either on its own enforces an
+  obligation that does not exist, or misses one that does.
+
+  **Both operands stay public**, deliberately. "A passport is required" and "a
+  determination can be made" are different questions, and a caller *reporting*
+  the catalog needs them apart — an obligation can exist while the implementing
+  acts that would make it determinable do not, and saying so is more honest than
+  one boolean. Anything that gates wants the fold; anything that renders wants
+  the halves.
 
 - **The signed ruleset-bundle channel had nothing on the other end.** It
   verified payloads that no crate read, so `CalculationReceipt::bundle_version`
@@ -147,6 +310,113 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   alone would either freeze every placeholder permanently or let a bundle
   contradict the Official Journal.
 
+### Documentation
+
+- **The additive-only rule for persisted structs was enforced but never written
+  down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
+  offered the sanctioned way around it, but the rule itself appeared in no
+  document — so it was learned by hitting a red test, for a rule whose failure
+  mode is other people's stored data.
+
+  New `docs/architecture/PERSISTED-SHAPES.md`, linked from the docs index and
+  summarised in `CLAUDE.md`. It states which types are covered, what additive
+  means, when a lens and a schema-version bump make a non-additive change legal,
+  and why "pre-1.0 breaking changes are free" does not transfer to a type whose
+  old values are already on disk and cannot be recompiled.
+
+  Two things it records that were not previously written anywhere, both of which
+  have already been got wrong:
+
+  - **The lens escape hatch covers `productGroupData` and never the envelope.**
+    `schema_version` is scoped to the product-group sub-object; envelope fields
+    are deliberately never lensed, because an envelope transform gone wrong
+    corrupts every product group at once instead of one. So for the envelope,
+    additive-only is not a preference — it is the entire protection.
+  - **A field in the signed public view has two compatibility surfaces.** A
+    stored document can be rewritten by the node that owns it, so refusing to
+    read it is a good, visible failure. A *fetched* document belongs to another
+    operator and is signed, so it can never be rewritten — and refusing it is
+    reported by the verification walk as a malformed reference, which the
+    evidence dossier grades as an integrity violation. Judged from the stored
+    surface alone, a change can look safe while making one node accuse another of
+    tampering over a version difference.
+
+  Also records, rather than glosses, that the frozen-fixture tripwire gives the
+  **envelope no coverage at all**: the fixtures are product-group-data-shaped and
+  the surrounding envelope is a literal written in the current shape, which is
+  precisely the "regenerated fixture agrees with the present by construction"
+  failure the same file warns about. That is why both envelope renames to date
+  passed a green test run.
+
+- **Both `COMPLIANCE-PIN PENDING` markers in the product-lineage architecture
+  note are pinned against the Official Journal text**, and one of them was
+  holding back a value list that was wrong.
+
+  Pinned: the second-life sentence is **Art. 77(7)** (OJ L 191, 28.7.2023,
+  p. 73); the status values are **Annex XIII point 4(c)** (p. 109); the four
+  operations are defined at **Art. 3(29)–(32)** (p. 27).
+
+  The unpinned status list read *"original use, re-used, repurposed,
+  remanufactured, approaching end of life"*. The Regulation says `'original'`,
+  and **"approaching end of life" does not occur anywhere in its text** — the
+  fifth value is `'waste'`. Encoding the list before pinning it would have
+  shipped a status value that does not exist in EU law.
+
+  Reading Art. 77(7) in full also settled the four open questions the note
+  carried. Its second subparagraph gives the waste transition its three named
+  recipients (producer, producer responsibility organisation under Art. 57(1),
+  waste management operator under Art. 57(8)) and mandates **no** new passport;
+  Art. 77(8) gives the only termination the article states, after recycling, so a
+  predecessor consumed by a second-life unit stays `Published`.
+
+  Two consequences are recorded for the unbuilt phases: Annex XIII point 4 is the
+  legitimate-interest tier, so a product-life status field is
+  `Disclosure::Individual` and must not default to the public view; and because
+  the waste transition changes status on a record that continues, such a field
+  cannot be create-time-only.
+
+  §4 is reconciled with what the code actually enforces. It claimed the lineage
+  edges are "create-time by construction"; the invariant the argument supports is
+  *immutable once signed*, and the draft window — where a bill of materials is
+  assembled before there is any signature to break — is legitimate and already
+  relied upon. The section now states the exception with its condition attached,
+  and records that the draft-only guard sits in a caller rather than at the trait
+  boundary.
+
+- **Two architecture docs reached into another repository's internal layout.**
+  The product-lineage note carried a full module path for the verification walk,
+  and the architecture overview carried a source directory for the registry
+  adapter. Both now describe the substance and drop the pointer.
+
+  Not a disclosure — the platform repo is public, and naming it is deliberate
+  and stays. The problem is coupling: this crate is meant to stand alone, and a
+  reader of it on crates.io needs none of those paths to understand the port
+  boundary. A pointer into a layout this repo does not control is also one this
+  repo cannot keep correct.
+
+- **The contributor guide's own rule said the thing that caused the confusion.**
+  Its private-material section opened "This repository is public and published
+  to crates.io. Others in this project are not", and concluded that naming any
+  sibling "discloses that it exists". Both are false — several siblings are
+  public, and this repo names one of them in six other places including that
+  same file's commit rules. Read as written, the rule forbade what the rest of
+  the repo does, and it framed every cross-repo reference as a secrecy problem.
+
+  The section now separates the two rules it had merged: **secrecy**, which
+  covers non-public repositories and says to check visibility rather than guess
+  it, and **independence**, which is why this crate avoids outward pointers even
+  to public siblings — a consumer vendoring it from crates.io must not need one
+  to make sense of it. The path prohibition is kept and now states which rule
+  carries it, so a reader knows whether they are looking at a disclosure or a
+  coupling defect.
+
+  Four stale module paths corrected in passing, all left over from the tier
+  ladder that flattened `dpp-domain::domain::*` to `dpp-domain::*`: three in the
+  product-lineage note, and one in the conformity note that was wrong twice over
+  — `dpp_domain::domain::identity` names a tier that no longer exists and a
+  module that never did. `Audience`, `Disclosure` and `PASSPORT_FIELD_DISCLOSURE`
+  are `dpp_domain::disclosure`.
+
 ### Fixed
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
@@ -172,6 +442,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
   five, in the one paragraph whose job is explaining why they are not collapsed.
+
+- **`TransferReason` modelled three of the four second-life operations
+  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
+  variant, so a transfer performed for that reason could only be recorded as one
+  of the other three — mislabelling which operation the OJ text says occurred,
+  in the field a registry receives.
+
+  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
+  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
+  so no consumer breaks.
+
+  The boundary between the two repurposing operations is the **waste status of
+  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
+  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
+  battery, that is not a waste battery". The architecture note had recorded it as
+  a difference of actor, which the text does not say.
+
+  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
+  about whether the second-life operations belong on `TransferReason` at all. It
+  completes the set so that whichever way that falls, all four fall together.
 
 ## [0.19.0] - 2026-08-27
 

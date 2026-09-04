@@ -79,8 +79,8 @@ fn passport_every_wire_key_is_classified() {
         ("version", "monotonic version counter"),
         ("supersedesId", "lineage: which passport this replaces"),
         (
-            "parentPassportRef",
-            "ESPR Art. 11(d) linkage to the original passport",
+            "derivedFrom",
+            "ESPR Art. 11(d) linkage to the original passport or passports",
         ),
         ("componentRefs", "bill-of-materials linkage"),
         (
