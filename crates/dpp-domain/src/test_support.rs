@@ -47,7 +47,7 @@ pub(crate) fn sample_passport() -> Passport {
         retention_locked: false,
         version: 1,
         supersedes_id: None,
-        parent_passport_ref: None,
+        derived_from: Vec::new(),
         component_refs: Vec::new(),
         retention_until: None,
         product_id: None,
@@ -178,7 +178,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
     use crate::compliance::ComplianceResult;
     use crate::identifier::CommodityCode;
     use crate::lint::LintResult;
-    use crate::passport::{FacilitySnapshot, PassportRef};
+    use crate::passport::{DerivationRef, FacilitySnapshot, PassportRef, SecondLifeOperation};
     use crate::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::seal::{SealFormat, SealedEnvelope};
 
@@ -207,7 +207,10 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.published_at = Some(now);
     passport.placed_on_market_date = Some(now.date_naive());
     passport.supersedes_id = Some(PassportId::new());
-    passport.parent_passport_ref = Some(reference.clone());
+    passport.derived_from = vec![DerivationRef {
+        reference: reference.clone(),
+        operation: SecondLifeOperation::Repurposing,
+    }];
     passport.component_refs = vec![reference];
     passport.retention_until = Some(now);
     passport.product_id = Some(uuid::Uuid::nil());

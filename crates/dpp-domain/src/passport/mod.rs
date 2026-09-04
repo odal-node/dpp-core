@@ -2,6 +2,9 @@
 
 pub mod id;
 
+pub mod derivation;
+#[cfg(test)]
+mod derivation_tests;
 pub mod record;
 pub mod reference;
 #[cfg(test)]
@@ -26,7 +29,11 @@ mod wire_keys_tests;
 pub use crate::facility::FacilitySnapshot;
 pub use crate::manufacturer::ManufacturerInfo;
 pub use crate::material::MaterialEntry;
+pub use derivation::{DerivationRef, SecondLifeOperation};
 pub use id::PassportId;
-pub use record::{PASSPORT_PROOF_FIELDS, PASSPORT_WIRE_KEYS, Passport, RETENTION_MUTABLE_FIELDS};
+pub use record::{
+    PASSPORT_PROOF_FIELDS, PASSPORT_WIRE_KEYS, Passport, REMOVED_ENVELOPE_KEYS,
+    RETENTION_MUTABLE_FIELDS,
+};
 pub use reference::PassportRef;
 pub use view::PassportView;

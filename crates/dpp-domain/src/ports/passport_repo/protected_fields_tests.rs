@@ -1,7 +1,9 @@
 //! Which passport fields a patch may never reach.
 
 use super::protected_fields::PROTECTED_PATCH_FIELDS;
-use crate::passport::{FacilitySnapshot, PassportId, PassportRef};
+use crate::passport::{
+    DerivationRef, FacilitySnapshot, PassportId, PassportRef, SecondLifeOperation,
+};
 use crate::seal::{SealFormat, SealedEnvelope};
 use crate::test_support::sample_passport;
 use chrono::Utc;
@@ -31,7 +33,10 @@ fn every_protected_key_is_a_real_passport_field() {
         .insert("public+restricted".to_owned(), "eyJ..b".to_owned());
     passport.retention_until = Some(now);
     passport.supersedes_id = Some(PassportId::new());
-    passport.parent_passport_ref = Some(reference.clone());
+    passport.derived_from = vec![DerivationRef {
+        reference: reference.clone(),
+        operation: SecondLifeOperation::Repurposing,
+    }];
     passport.component_refs = vec![reference];
     passport.operator_identifier = Some("DE123456789".to_owned());
     passport.facility = Some(FacilitySnapshot {

@@ -6,7 +6,9 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef};
+use super::{
+    DerivationRef, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef,
+};
 use crate::catalog::Granularity;
 use crate::compliance::ComplianceResult;
 use crate::instrument::InstrumentRef;
@@ -150,10 +152,31 @@ pub struct Passport {
     /// envelope field is shared by every product group's stored documents, so a
     /// non-additive envelope change would need a transform over the whole
     /// document — one mistake there corrupts every product group at once, not one.
-    /// The envelope's rule is therefore additive-only, permanently, with no
-    /// exception path: `Option<T>` + `#[serde(default)]`, or a rename that
-    /// keeps accepting the old key, never a bare requirement added to an
-    /// existing field.
+    /// The envelope's rule is therefore additive-only: `Option<T>` +
+    /// `#[serde(default)]`, or a rename that keeps accepting the old key, never
+    /// a bare requirement added to an existing field.
+    ///
+    /// **That rule has now been broken twice, deliberately both times, and
+    /// recording it is more useful than restating the rule as absolute.**
+    /// `sector` → `productGroup` and `parentPassportRef` → `derivedFrom` each
+    /// renamed an envelope key without keeping the old one readable. They failed
+    /// differently, and the second was the more dangerous: `product_group` is
+    /// required, so a pre-rename document refuses to deserialize outright,
+    /// whereas this struct sets no `deny_unknown_fields` and `derived_from`
+    /// defaults — so a document carrying `parentPassportRef` loaded
+    /// *successfully*, silently arriving with no lineage edge at all.
+    ///
+    /// That silence is now closed: [`REMOVED_ENVELOPE_KEYS`] records the old key
+    /// and [`Passport::from_stored`] refuses any document carrying one, so both
+    /// renames fail loudly on the supported read path.
+    ///
+    /// Both were taken while this project has no published passports to strand.
+    /// **That licence ends the moment one exists.** After that, an envelope
+    /// rename has to carry the old key or a one-time document rewrite in the
+    /// publish pipeline. Refusing to read a document is the right failure, but
+    /// it is still a failure: a rewritten document no longer verifies against a
+    /// signature that covers the old key names, so there is no version of this
+    /// that a real passport survives without a migration written for it.
     pub schema_version: String,
     /// Set to `true` permanently on first publish; never unset thereafter.
     ///
@@ -171,16 +194,23 @@ pub struct Passport {
     /// The passport ID this record supersedes. `None` for first-version passports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supersedes_id: Option<PassportId>,
-    /// Cross-operator reference to the predecessor this passport derives from
-    /// (second-life successor linkage). `None` unless this record was issued as a
-    /// successor citing a source passport held by another operator.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_passport_ref: Option<PassportRef>,
+    /// Cross-operator references to the predecessors this passport derives from
+    /// (second-life successor linkage), each typed with the operation that
+    /// produced this unit from it. Empty unless this record was issued as a
+    /// successor citing source passports held by other operators.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 77(7) (OJ L 191, 28.7.2023, p. 73)
+    /// — "linked to the battery passport **or passports** of the original
+    /// battery **or batteries**". Plural on both sides: one second-life unit may
+    /// derive from several predecessors, which is why this is a `Vec`. See
+    /// [`DerivationRef`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub derived_from: Vec<DerivationRef>,
     /// Cross-operator references to the constituent passports this product is
     /// assembled from — its bill of materials. Empty for a unit with no modelled
-    /// sub-assemblies. The inverse edge of `parent_passport_ref`: `component_refs`
-    /// point down to many constituents, `parent_passport_ref` points up to one
-    /// predecessor.
+    /// sub-assemblies. The inverse edge of `derived_from`: `component_refs`
+    /// point down to the constituents, `derived_from` points up to the
+    /// predecessors.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub component_refs: Vec<PassportRef>,
     /// Deadline by which this record must remain accessible. Confirmed against the
@@ -246,6 +276,32 @@ fn default_version() -> u32 {
     1
 }
 
+/// Envelope keys this build has removed, each paired with what replaced it.
+///
+/// # Why this has to exist
+///
+/// [`Passport`] deliberately does **not** set `deny_unknown_fields`. A document
+/// written by a newer build must stay readable by an older one — that is the
+/// point of the envelope's additive-only rule — so an unrecognised key is
+/// ignored rather than refused. The cost is that a key which was *removed* is
+/// indistinguishable from one this build simply has not learned about yet.
+///
+/// For a renamed field that is the worst available outcome, and it is not
+/// hypothetical: `parentPassportRef` → `derivedFrom` left a stored document
+/// carrying the old key deserializing **successfully**, with the new field at
+/// its default. The record loads, reports no error, and has silently lost a
+/// value its signature still covers — a second-life passport that quietly
+/// forgets the predecessors Art. 77(7) requires it to link to.
+///
+/// [`Passport::from_stored`] checks this list before anything else so that
+/// document is refused out loud. A direct `serde_json::from_value::<Passport>`
+/// that bypasses `from_stored` still drops the key silently; `from_stored` is
+/// the supported way to read a stored document, and this is one of the reasons.
+///
+/// Entries are permanent. A key removed two renames ago is still a key some
+/// stored document may carry.
+pub const REMOVED_ENVELOPE_KEYS: &[(&str, &str)] = &[("parentPassportRef", "derivedFrom")];
+
 /// Every key [`Passport`] serialises to, in declaration order.
 ///
 /// # Why this exists
@@ -290,7 +346,7 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "retentionLocked",
     "version",
     "supersedesId",
-    "parentPassportRef",
+    "derivedFrom",
     "componentRefs",
     "retentionUntil",
     "productId",
@@ -424,8 +480,9 @@ impl Passport {
     /// a non-additive envelope change would need a transform over the *whole*
     /// document, and getting that wrong silently corrupts every product group at
     /// once rather than one. The envelope's compatibility rule is simpler and
-    /// stricter instead: additive only, permanently, no exceptions — see
-    /// [`Passport::schema_version`]'s doc comment. A stored document that
+    /// stricter instead: additive only — see [`Passport::schema_version`]'s doc
+    /// comment, which also records the two renames that have broken it and why
+    /// that licence is temporary. A stored document that
     /// still fails to deserialize after its `productGroupData` has been upcast is
     /// therefore either genuinely malformed or violates that rule, and this
     /// method does not try to guess which.
@@ -448,6 +505,20 @@ impl Passport {
     ) -> Result<Self, crate::error::dpp::DppError> {
         use crate::error::dpp::DppError;
         use serde::Deserialize as _;
+
+        // Before the direct attempt, not after: a document carrying a removed
+        // key deserializes *successfully*, so anything downstream of the happy
+        // path would never see it.
+        if let Some(object) = doc.as_object() {
+            for &(removed, replacement) in REMOVED_ENVELOPE_KEYS {
+                if object.contains_key(removed) {
+                    return Err(DppError::RemovedEnvelopeKey {
+                        removed,
+                        replacement,
+                    });
+                }
+            }
+        }
 
         let direct_err = match Self::deserialize(&doc) {
             Ok(passport) => return Ok(passport),

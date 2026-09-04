@@ -1,18 +1,21 @@
 # Product Lineage — Bill of Materials and Second Life
 
-**Status:** Phases 0 and 1 landed; Phases 2–5 remain proposal. Supersedes the open
-questions raised against the initial BOM/second-life cut.
+**Status:** Phases 0, 1 and 2 landed; Phases 3–5 remain proposal. Supersedes the
+open questions raised against the initial BOM/second-life cut.
 **Affects:** `dpp-domain` passport model, `dpp-domain::transfer`, platform-layer
 verification (`verify_tree`, evidence `componentGraph`).
-**Version impact:** breaking — targets a future minor once implemented, see §8.
+**Version impact:** breaking — Phase 2 renamed a published envelope field, and
+Phase 3 will change another's element type. Both belong to one coordinated minor
+bump; see §8, which also corrects a migration mechanism this document previously
+named and that does not exist.
 
 Two edges relate one passport to another, and they were shipped as an initial cut
 ahead of a requirements pass:
 
 - **`component_refs`** — points *down* to the constituents a product is assembled
   from (its bill of materials).
-- **`parent_passport_ref`** — points *up* to the predecessor a second-life unit
-  derives from.
+- **`derived_from`** (was `parent_passport_ref`) — points *up* to the
+  predecessors a second-life unit derives from.
 
 This document is that requirements pass. It records what the law actually asks
 for, where the current model falls short of it, and the model proposed instead.
@@ -24,7 +27,7 @@ for, where the current model falls short of it, and the model proposed instead.
 | Piece | Where | What it does |
 |---|---|---|
 | `PassportRef` | `dpp-domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is the platform layer's job. |
-| `parent_passport_ref: Option<PassportRef>` | `dpp-domain::passport::record` | Upward second-life link. **At most one.** |
+| `derived_from: Vec<DerivationRef>` | `dpp-domain::passport::record` | Upward second-life links, each typed with its Art. 77(7) operation. Plural since Phase 2; was `parent_passport_ref: Option<PassportRef>`, at most one. |
 | `component_refs: Vec<PassportRef>` | `dpp-domain::passport::record` | Downward BOM links. |
 | `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Dual-signed (outgoing + incoming operator) responsibility handover on **one** passport, with a typed `TransferReason`. |
 | `verify_tree` | platform layer | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
@@ -152,20 +155,23 @@ granularity will actually be specified; none is in force for our product groups 
 
 ## 3. Gap analysis
 
-### G1 — The model cannot express the plural case (violates R2)
+### G1 — The model could not express the plural case (violated R2) — **CLOSED**
 
-`parent_passport_ref: Option<PassportRef>` holds **one** predecessor. The
+`parent_passport_ref: Option<PassportRef>` held **one** predecessor. The
 regulation says "passport **or passports** of the original battery **or
-batteries**". A storage pack built from four retired EV packs cannot be
-represented. This is a data-model defect against the plain text, not a missing
+batteries**". A storage pack built from four retired EV packs could not be
+represented. This was a data-model defect against the plain text, not a missing
 nicety.
+
+Closed in Phase 2: `derived_from: Vec<DerivationRef>`.
 
 ### G2 — Two mechanisms model one regulatory event (violates R3)
 
-`TransferReason` already carries the Art. 77 vocabulary — `Remanufacturing`,
-`Repurposing`, `PreparationForReuse` — but it lives on `TransferRecord`, which
-hands responsibility over on a *single, continuing* passport. `parent_passport_ref`
-creates a *new* passport but carries no responsibility semantics at all.
+`TransferReason` carries the full Art. 77(7) vocabulary since Phase 1 — all four
+operations — but it lives on `TransferRecord`, which hands responsibility over on
+a *single, continuing* passport. `derived_from` creates a *new* passport and now
+names the operation, but still carries no responsibility semantics at all: the
+two vocabularies agree and nothing yet requires them to.
 
 R1 and R3 are the same event: a new passport **and** a responsibility move. Today
 an operator can perform either half independently, and nothing detects the
@@ -192,16 +198,17 @@ nor a breaking release. It does **not** resolve the separate open question in
 `TransferReason` at all — it makes the set consistent with the article it is drawn
 from, so that if those variants are later withdrawn, all four go together.
 
-### G4 — The edge is untyped
+### G4 — The edge is untyped (**upward half CLOSED**)
 
 `PassportRef` records *where* and *which hash* — never *what relation*. Direction
-is encoded in the field name, which was a deliberate simplification and is no
+was encoded in the field name, which was a deliberate simplification and is no
 longer sufficient:
 
-- Upward, the four Art. 77 operations have different legal consequences, so the
-  edge must say which one occurred.
+- Upward, the four Art. 77(7) operations have different legal consequences, so
+  the edge must say which one occurred. **Closed in Phase 2** — `DerivationRef`
+  carries a required `SecondLifeOperation`.
 - Downward, a BOM edge with no quantity or role cannot answer "how much of what,
-  where" — the question a BOM exists to answer.
+  where" — the question a BOM exists to answer. Still open; Phase 3.
 
 ### G5 — No product-life status axis
 
@@ -322,6 +329,10 @@ patch field either, since the transition is also a responsibility move under R5.
 ---
 
 ## 5. Proposed model
+
+**The upward half of this section shipped in Phase 2** — `DerivationRef`,
+`SecondLifeOperation` and `derived_from` are in `dpp-domain::passport` as written
+below. `ComponentRef` (Phase 3) and `LifeStatus` (Phase 5) are still proposal.
 
 Keep `PassportRef` exactly as it is — a pure "where + pin" primitive, correct and
 direction-neutral. Wrap it per direction with the qualifiers each needs.
@@ -466,7 +477,7 @@ two were design calls and are recorded as decided, not as recommendations.
 |---|---|---|---|
 | **0** | Add `parentPassportRef` + `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line, closes the live bypass, forecloses nothing. | no | **landed** |
 | **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
-| **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | proposal |
+| **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | **landed** |
 | **3** | `ComponentRef` with quantity/role (G4-down); the verification walk and the evidence component graph follow the new shape. | **yes** | proposal |
 | **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). | no | proposal |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
@@ -484,11 +495,40 @@ unblocked by Phase 1's pin and independent of 2–4.
 ## 8. Compatibility
 
 Phases 2–3 change published field names and types (`parentPassportRef` →
-`derivedFrom`; `componentRefs` element type object-ified). Under the lockstep
-versioning policy this is a single coordinated minor version bump across all core crates,
-with the platform layer following.
+`derivedFrom`, done; `componentRefs` element type object-ified, pending). Under
+the lockstep versioning policy this is a single coordinated minor version bump
+across all core crates, with the platform layer following.
 
-Passports already published with the current shape must keep verifying — their
-signatures cover the old field names. The read-time upcast lens mechanism
-(`?schema_view`) is the existing seam for that and should carry the migration
-rather than a one-off compatibility branch.
+🚨 **An earlier version of this section named a mechanism that does not exist.**
+It said the read-time upcast lens (`?schema_view`) "is the existing seam" and
+"should carry the migration". It cannot. `Passport::from_stored` lenses
+`productGroupData` and nothing else, and both it and `Passport::schema_version`
+say so explicitly: **envelope fields are never lensed, deliberately**, because a
+lens transforms one product group's sub-object while an envelope field is shared
+by every product group's documents, so getting an envelope transform wrong
+corrupts all of them at once.
+
+The envelope's actual rule is additive-only — `Option<T>` + `#[serde(default)]`,
+or a rename that keeps accepting the old key. **Phase 2 did not do that**, and
+the decision was taken knowingly: this project has no published passports to
+strand, so the cost is currently zero. Two things follow, and neither should be
+inherited by Phase 3 without a fresh decision:
+
+- **The failure was silent, and is now loud.** `Passport` sets no
+  `deny_unknown_fields` and `derived_from` defaults, so a document still carrying
+  `parentPassportRef` deserialized *successfully* and arrived with no lineage
+  edge — quieter, and worse, than the `sector` → `productGroup` rename, where the
+  renamed field was required and pre-rename documents refused to load.
+  `REMOVED_ENVELOPE_KEYS` now names the old key and `Passport::from_stored`
+  refuses any document carrying one. **Phase 3 should add its own entry there if
+  it removes a key**; changing an element *type* fails loudly on its own, because
+  `#[serde(default)]` applies only when the key is absent.
+- **The licence expires when the first real passport is published.** After that,
+  an envelope rename must carry the old key or a one-time document rewrite in
+  the publish pipeline. A signature covers the old key names, so a rewritten
+  document does not re-verify and a silently-emptied one verifies while being
+  wrong.
+
+Phase 3 object-ifies `componentRefs` elements — the same class of change, on a
+field that is already a `Vec` and already defaults. It will fail the same silent
+way unless it is given a migration or the surrounding data is known to be empty.

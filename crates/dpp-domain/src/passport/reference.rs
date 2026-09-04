@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 /// A cross-operator reference to another passport: where to fetch it, and the
 /// hash that pins the exact signed public view expected there.
 ///
-/// Direction-neutral — the owning field name carries the meaning: a
-/// `parent_passport_ref` points up to the predecessor a second-life passport
-/// derives from, while component references point down to constituents.
+/// Direction-neutral — the wrapper that owns it carries the meaning: a
+/// [`DerivationRef`](super::DerivationRef) points up to a predecessor a
+/// second-life passport derives from, while component references point down to
+/// constituents.
 ///
 /// This is pure data. Computing and verifying `public_jws_hash` (a network
 /// fetch plus a JWS check) is the responsibility of the stateful engine, not of

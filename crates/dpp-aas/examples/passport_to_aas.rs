@@ -94,7 +94,7 @@ fn main() {
         retention_locked: false,
         version: 1,
         supersedes_id: None,
-        parent_passport_ref: None,
+        derived_from: Vec::new(),
         component_refs: Vec::new(),
         retention_until: None,
         product_id: None,

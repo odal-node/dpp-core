@@ -13,6 +13,55 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Lineage held one predecessor where Art. 77(7) says several.**
+  *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
+  `Passport::derived_from: Vec<DerivationRef>`, and the wire key
+  `parentPassportRef` by `derivedFrom`. `PROTECTED_PATCH_FIELDS` and
+  `PASSPORT_WIRE_KEYS` carry the new name. A struct literal must replace
+  `parent_passport_ref: None` with `derived_from: Vec::new()`.)*
+
+  Regulation (EU) 2023/1542 Art. 77(7) requires a second-life battery to have "a
+  new battery passport linked to the battery passport **or passports** of the
+  original battery **or batteries**" — plural on both sides. A stationary storage
+  pack assembled from several retired EV packs is the canonical second-life
+  product, and an `Option` could not represent it at all. This was a data-model
+  defect against the plain text, not a missing convenience.
+
+  The edge is also typed now. `DerivationRef` pairs the pinned reference with a
+  required `SecondLifeOperation`, so it records *which* of the four operations
+  Art. 77(7) names produced the unit rather than leaving it to a field name. The
+  four are defined terms, and the boundary between the two repurposing ones is
+  the waste status of the input: Art. 3(30) operates on "a waste battery, or
+  parts thereof", Art. 3(31) on "a battery, that is not a waste battery".
+  `SecondLifeOperation::wire_str` is byte-identical to `TransferReason`'s for the
+  four names they share, with a test pinning that, because the rule binding a
+  derivation to the dual-signed transfer that consents to it matches one against
+  the other and would fail open if they drifted.
+
+  **Migration.** There is no read path for the old key, and a document carrying
+  it is now **refused rather than silently emptied**.
+
+  `Passport` sets no `deny_unknown_fields` — deliberately, so a document written
+  by a newer build stays readable by an older one — which meant serde ignored
+  `parentPassportRef` and handed back a passport whose `derived_from` was empty.
+  The record loaded, reported no error, and had quietly lost a value its
+  signature still covers: a second-life passport forgetting the predecessors
+  Art. 77(7) requires it to link to. New `REMOVED_ENVELOPE_KEYS` records the old
+  key and its replacement, and `Passport::from_stored` checks it before anything
+  else, returning the new `DppError::RemovedEnvelopeKey`. A plain
+  `serde_json::from_value::<Passport>` that bypasses `from_stored` still drops
+  the key silently; `from_stored` is the supported way to read a stored document.
+
+  Anything holding passports written before this release must rewrite the key
+  before upgrading — and a rewritten document no longer verifies against its own
+  signature, which covers the old name. Refusing to read is the right failure but
+  is still a failure: there is no version of this that a real passport survives
+  without a migration written for it. This was taken knowingly while the project
+  has no published passports to strand; `Passport::schema_version`'s doc comment
+  records why that licence is temporary and what the next envelope rename owes.
+
 ### Added
 
 - **`InstrumentCatalog` had no fold for the one question a gate actually asks:

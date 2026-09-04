@@ -84,7 +84,7 @@ constant is right.
 | `retention_locked` | `bool` | `"retentionLocked"` | Set permanently on first publish; prevents deletion |
 | `version` | `u32` | `"version"` | Monotonic counter; `1` on first publish |
 | `supersedes_id` | `Option<PassportId>` | `"supersedesId"` | The passport this record supersedes. `None` for first versions |
-| `parent_passport_ref` | `Option<PassportRef>` | `"parentPassportRef"` | Cross-operator predecessor (second-life lineage). Omitted when absent |
+| `derived_from` | `Vec<DerivationRef>` | `"derivedFrom"` | Cross-operator predecessors this unit derives from, each typed with its Art. 77(7) operation. Plural because the article is. Omitted when empty |
 | `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports. Omitted when empty |
 | `retention_until` | `Option<DateTime<Utc>>` | `"retentionUntil"` | Computed at publish from the instrument bindings' retention fold |
 | `product_id` | `Option<Uuid>` | `"productId"` | Opaque link to an internal product-template record. **Not a legal identifier** |
