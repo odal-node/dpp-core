@@ -1,6 +1,7 @@
 # Product Lineage — Bill of Materials and Second Life
 
-**Status:** Phases 0–4 landed; only Phase 5 remains, and it is non-breaking.
+**Status:** Phases 0–5 landed. Phase 5 was non-breaking, and §4.2 records where
+it corrected this document.
 Supersedes the open questions raised against the initial BOM/second-life cut.
 **Affects:** `dpp-domain` passport model, `dpp-domain::transfer`,
 `dpp-rules::lineage`, platform-layer verification (`verify_tree`, evidence
@@ -335,9 +336,26 @@ reach `'waste'`, which is one of the five values the law enumerates.
 
 The four Art. 77(7) operations *do* each produce a new passport (R1), so those four
 values are set at create. `'waste'` is the transition that is not, and it is the
-reason `life_status` needs a defined mutation path rather than a place in
-`PROTECTED_PATCH_FIELDS`. Phase 5 must specify that path; it is not a free
-patch field either, since the transition is also a responsibility move under R5.
+reason `life_status` needs a defined mutation path. It is not a free patch field
+either, since the transition is also a responsibility move under R5.
+
+**Phase 5 specified that path: the waste transition is a new passport version.**
+An earlier draft of this section expected the path to be an alternative *to*
+`PROTECTED_PATCH_FIELDS`. It is the opposite — the path is `supersedes_id` +
+`version`, which is §4's existing answer to "a signed field must change", and
+being in `PROTECTED_PATCH_FIELDS` is precisely what forces a caller onto it.
+`life_status` is therefore in that list with the other signed fields.
+
+The alternative was a dedicated port method. It does not survive contact with
+the rest of the design: it would break the served body's signature and have to
+re-sign, which is a version bump wearing a disguise, and it would introduce a
+second mutation mechanism for the one field that least needs one. Versioning
+also leaves the audit trail a responsibility move under R5 ought to leave.
+
+`PassportStatus::Superseded` is the right publication status for the old version
+here — it genuinely is a new version of the same product. That is distinct from
+a predecessor *consumed* by a second-life unit, which stays `Published`, since
+Art. 77(8) makes recycling the only termination.
 
 ---
 
@@ -345,7 +363,8 @@ patch field either, since the transition is also a responsibility move under R5.
 
 **Both edge types shipped** — `DerivationRef` and `SecondLifeOperation` in
 Phase 2, `ComponentRef` and `Quantity` in Phase 3, all in `dpp-domain::passport`.
-`LifeStatus` (Phase 5) is still proposal.
+`LifeStatus` shipped in Phase 5, alongside `TransferReason::WasteHandover` and
+`dpp-rules::lineage::check_life_status_consistency`.
 
 Keep `PassportRef` exactly as it is — a pure "where + pin" primitive, correct and
 direction-neutral. Wrap it per direction with the qualifiers each needs.

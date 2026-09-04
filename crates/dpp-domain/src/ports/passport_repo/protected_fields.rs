@@ -51,6 +51,14 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     "facility",
     "derivedFrom",
     "componentRefs",
+    // Four of its five values are set at create, because each Art. 77(7)
+    // operation produces a new passport. `waste` is the one transition that
+    // happens to a record that continues — and it is also a responsibility move
+    // under Art. 77(7)'s second subparagraph, so it is not a free patch field
+    // either. Protected here so the transition goes through `supersedes_id` +
+    // `version`: an explicit versioning event with an audit trail, rather than a
+    // rewrite of a body that has already been signed.
+    "lifeStatus",
     // The applicable law at placing on the market does not change. A
     // mis-recorded set is corrected by superseding the passport, never by
     // patching a published record's legal basis.
