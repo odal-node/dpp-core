@@ -141,9 +141,12 @@ check: fmt-check lint test test-doc test-plugins doc audit
 # is not hypothetical — a crate published as wasm32-safe can acquire a host-only
 # dependency through an ordinary-looking call, and nothing in `check` notices.
 #
-# Deliberately a superset, not a mirror: `doc` and `test-doc` run here and not in
-# CI, because a broken intra-doc link is cheaper to catch now than after a
-# release. Keep in step with `.github/workflows/` when jobs change.
+# `doc` and `test-doc` used to run only here, which made this command the sole
+# gate on a broken intra-doc link reaching a published crate. Two of them proved
+# the point, so CI now has a `doc` job as well and the two are a mirror in that
+# direction. Keeping them here too is not redundant: catching a bad link before
+# a push is cheaper than after one. Keep in step with `.github/workflows/` when
+# jobs change.
 #
 # `semver` is in neither, deliberately. It is not a gate: pre-1.0 minor releases
 # are *allowed* to break, so its output is red for most of any cycle and a check
