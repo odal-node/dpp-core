@@ -70,11 +70,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `FilledRepairabilityRuleset` wires it end to end. It implements
   `RepairabilityRuleset`, so `repairability::calculate` accepts one without
   knowing a bundle exists. It also enforces what the kernel has no business
-  knowing: weights must sum to 1.0 and bands must be strictly descending. Nothing
-  else checked — the score is `2 × Σweights × 5` at most, so a bundle whose
-  weights summed to 1.6 put a "0–10" score as high as 16 on the scale the A–E
-  bands are written against, with a receipt attesting to all of it. Verified by
-  removing the check and watching the test fail.
+  knowing: weights must be non-negative and sum to 1.0, and bands must be
+  strictly descending. Nothing else checked — the score is `2 × Σweights × 5` at
+  most, so a bundle whose weights summed to 1.6 put a "0–10" score as high as 16
+  on the scale the A–E bands are written against, with a receipt attesting to all
+  of it. Verified by removing the check and watching the test fail.
+
+  Non-negativity is a separate condition, not a restatement of the sum: a weight
+  is a *share* of the scale, so a negative one both inverts its parameter — a
+  better sub-score lowering the total — and defeats the sum check itself.
+  `disassembly: 2.0` with `spareParts: -1.0` and four zeros sums to exactly 1.0,
+  and scored a product **20.0, banded A** on the disassembly parameter alone.
+  Confirmed by running it against the code before the check existed.
 
   Two refusals worth naming. Parameters may be taken only from a `Verified`
   acceptance: `unverified_baseline` exists because a node with no configured

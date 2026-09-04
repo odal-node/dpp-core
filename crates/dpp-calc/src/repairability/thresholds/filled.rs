@@ -59,8 +59,8 @@ impl<'a> FilledRepairabilityRuleset<'a> {
     ///   instrument's and a bundle may not override them.
     /// - The offered slice names a group `base` does not declare, or changes a
     ///   group's JSON type.
-    /// - The filled weights do not sum to 1.0, or the filled band thresholds are
-    ///   not strictly descending.
+    /// - The filled weights are negative or do not sum to 1.0, or the filled
+    ///   band thresholds are not strictly descending.
     ///
     /// # Why the last two are checked here and not in the kernel
     ///
@@ -95,14 +95,43 @@ impl<'a> FilledRepairabilityRuleset<'a> {
     }
 }
 
-/// The six weights must sum to 1.0, or the 0–10 score is not on a 0–10 scale.
+/// The six weights must be non-negative and sum to 1.0, or the 0–10 score is
+/// not on a 0–10 scale.
+///
+/// Both halves are needed, and the sum alone is not enough. A weight is a
+/// *share* of the scale, so a negative one is not a down-weighting — it makes a
+/// better sub-score lower the total — and it defeats the sum check, which is
+/// otherwise the only thing holding the score on scale. `disassembly: 2.0` with
+/// `spareParts: -1.0` and four zeros sums to exactly 1.0 and puts a product
+/// scoring 2 on disassembly alone at **20**, banded A: the very failure the sum
+/// check exists to prevent, arriving through the one gap it leaves. Once every
+/// weight is non-negative and they sum to 1.0, each is at most 1.0 and the score
+/// is bounded by [0, 10] again.
+///
+/// Named in camelCase because that is the key a bundle publisher wrote, not the
+/// Rust field they never see.
 fn validate_weights(id: &RulesetId, w: &RepairabilityWeights) -> Result<(), CalcError> {
-    let sum = w.disassembly
-        + w.spare_parts
-        + w.repair_info
-        + w.diagnostic_tools
-        + w.software_updatability
-        + w.customer_support;
+    let members = [
+        ("disassembly", w.disassembly),
+        ("spareParts", w.spare_parts),
+        ("repairInfo", w.repair_info),
+        ("diagnosticTools", w.diagnostic_tools),
+        ("softwareUpdatability", w.software_updatability),
+        ("customerSupport", w.customer_support),
+    ];
+
+    for (name, value) in members {
+        if !value.is_finite() || value < 0.0 {
+            return Err(CalcError::InvalidInput(format!(
+                "ruleset '{}': bundle weight '{name}' is {value} — every weight is a share of \
+                 the 0–10 scale and must be finite and non-negative; a negative one inverts its \
+                 parameter and lets the weights sum to 1.0 while the score leaves the scale",
+                id.0
+            )));
+        }
+    }
+
+    let sum = members.iter().map(|&(_, value)| value).sum::<f64>();
 
     if !sum.is_finite() || (sum - 1.0).abs() > WEIGHT_SUM_TOLERANCE {
         return Err(CalcError::InvalidInput(format!(

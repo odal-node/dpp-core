@@ -321,6 +321,36 @@ fn weights_that_do_not_sum_to_one_are_refused() {
     assert!(err.to_string().contains("sum to 3"), "{err}");
 }
 
+/// A negative weight is refused, because summing to 1.0 does not by itself keep
+/// the score on the 0–10 scale.
+///
+/// The set below sums to exactly 1.0, so
+/// `weights_that_do_not_sum_to_one_are_refused` passes it. Before the
+/// non-negativity check this set was adopted, and a product scoring 2 on
+/// disassembly and 0 on everything else came out at **20.0, banded A** — the
+/// same off-scale score the sum check exists to prevent, through the one gap it
+/// leaves. Confirmed against the unfixed code rather than reasoned about.
+#[test]
+fn a_negative_weight_is_refused_even_when_the_weights_sum_to_one() {
+    let bundle = bundle_offering(heuristic_slice(serde_json::json!({
+        "disassembly": 2.0,
+        "spareParts": -1.0,
+        "repairInfo": 0.0,
+        "diagnosticTools": 0.0,
+        "softwareUpdatability": 0.0,
+        "customerSupport": 0.0,
+    })));
+    let acceptance = accept(&bundle);
+
+    let err = FilledRepairabilityRuleset::adopt(&SimplifiedRepairabilityHeuristic, &acceptance)
+        .expect_err("a negative weight must be refused");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("spareParts") && msg.contains("non-negative"),
+        "must name the offending weight and why: {msg}"
+    );
+}
+
 /// Bands that are not strictly descending let a score qualify for two of
 /// them, and the first branch taken silently wins.
 #[test]
