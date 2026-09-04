@@ -81,6 +81,75 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   failure the same file warns about. That is why both envelope renames to date
   passed a green test run.
 
+- **Both `COMPLIANCE-PIN PENDING` markers in the product-lineage architecture
+  note are pinned against the Official Journal text**, and one of them was
+  holding back a value list that was wrong.
+
+  Pinned: the second-life sentence is **Art. 77(7)** (OJ L 191, 28.7.2023,
+  p. 73); the status values are **Annex XIII point 4(c)** (p. 109); the four
+  operations are defined at **Art. 3(29)–(32)** (p. 27).
+
+  The unpinned status list read *"original use, re-used, repurposed,
+  remanufactured, approaching end of life"*. The Regulation says `'original'`,
+  and **"approaching end of life" does not occur anywhere in its text** — the
+  fifth value is `'waste'`. Encoding the list before pinning it would have
+  shipped a status value that does not exist in EU law.
+
+  Reading Art. 77(7) in full also settled the four open questions the note
+  carried. Its second subparagraph gives the waste transition its three named
+  recipients (producer, producer responsibility organisation under Art. 57(1),
+  waste management operator under Art. 57(8)) and mandates **no** new passport;
+  Art. 77(8) gives the only termination the article states, after recycling, so a
+  predecessor consumed by a second-life unit stays `Published`.
+
+  Two consequences are recorded for the unbuilt phases: Annex XIII point 4 is the
+  legitimate-interest tier, so a product-life status field is
+  `Disclosure::Individual` and must not default to the public view; and because
+  the waste transition changes status on a record that continues, such a field
+  cannot be create-time-only.
+
+  §4 is reconciled with what the code actually enforces. It claimed the lineage
+  edges are "create-time by construction"; the invariant the argument supports is
+  *immutable once signed*, and the draft window — where a bill of materials is
+  assembled before there is any signature to break — is legitimate and already
+  relied upon. The section now states the exception with its condition attached,
+  and records that the draft-only guard sits in a caller rather than at the trait
+  boundary.
+
+- **Two architecture docs reached into another repository's internal layout.**
+  The product-lineage note carried a full module path for the verification walk,
+  and the architecture overview carried a source directory for the registry
+  adapter. Both now describe the substance and drop the pointer.
+
+  Not a disclosure — the platform repo is public, and naming it is deliberate
+  and stays. The problem is coupling: this crate is meant to stand alone, and a
+  reader of it on crates.io needs none of those paths to understand the port
+  boundary. A pointer into a layout this repo does not control is also one this
+  repo cannot keep correct.
+
+- **The contributor guide's own rule said the thing that caused the confusion.**
+  Its private-material section opened "This repository is public and published
+  to crates.io. Others in this project are not", and concluded that naming any
+  sibling "discloses that it exists". Both are false — several siblings are
+  public, and this repo names one of them in six other places including that
+  same file's commit rules. Read as written, the rule forbade what the rest of
+  the repo does, and it framed every cross-repo reference as a secrecy problem.
+
+  The section now separates the two rules it had merged: **secrecy**, which
+  covers non-public repositories and says to check visibility rather than guess
+  it, and **independence**, which is why this crate avoids outward pointers even
+  to public siblings — a consumer vendoring it from crates.io must not need one
+  to make sense of it. The path prohibition is kept and now states which rule
+  carries it, so a reader knows whether they are looking at a disclosure or a
+  coupling defect.
+
+  Four stale module paths corrected in passing, all left over from the tier
+  ladder that flattened `dpp-domain::domain::*` to `dpp-domain::*`: three in the
+  product-lineage note, and one in the conformity note that was wrong twice over
+  — `dpp_domain::domain::identity` names a tier that no longer exists and a
+  module that never did. `Audience`, `Disclosure` and `PASSPORT_FIELD_DISCLOSURE`
+  are `dpp_domain::disclosure`.
+
 ### Fixed
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
@@ -106,6 +175,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
   five, in the one paragraph whose job is explaining why they are not collapsed.
+
+- **`TransferReason` modelled three of the four second-life operations
+  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
+  variant, so a transfer performed for that reason could only be recorded as one
+  of the other three — mislabelling which operation the OJ text says occurred,
+  in the field a registry receives.
+
+  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
+  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
+  so no consumer breaks.
+
+  The boundary between the two repurposing operations is the **waste status of
+  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
+  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
+  battery, that is not a waste battery". The architecture note had recorded it as
+  a difference of actor, which the text does not say.
+
+  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
+  about whether the second-life operations belong on `TransferReason` at all. It
+  completes the set so that whichever way that falls, all four fall together.
 
 ## [0.19.0] - 2026-08-27
 

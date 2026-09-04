@@ -1,8 +1,8 @@
 # Product Lineage — Bill of Materials and Second Life
 
-**Status:** design proposal, not implemented. Supersedes the open questions raised
-against the initial BOM/second-life cut.
-**Affects:** `dpp-domain` passport model, `dpp-domain::domain::transfer`, engine
+**Status:** Phases 0 and 1 landed; Phases 2–5 remain proposal. Supersedes the open
+questions raised against the initial BOM/second-life cut.
+**Affects:** `dpp-domain` passport model, `dpp-domain::transfer`, platform-layer
 verification (`verify_tree`, evidence `componentGraph`).
 **Version impact:** breaking — targets a future minor once implemented, see §8.
 
@@ -23,11 +23,11 @@ for, where the current model falls short of it, and the model proposed instead.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `PassportRef` | `dpp-domain::domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is the engine's job. |
-| `parent_passport_ref: Option<PassportRef>` | `passport.rs` | Upward second-life link. **At most one.** |
-| `component_refs: Vec<PassportRef>` | `passport.rs` | Downward BOM links. |
-| `TransferRecord` / `TransferChain` | `dpp-domain::domain::transfer` | Dual-signed (outgoing + incoming operator) responsibility handover on **one** passport, with a typed `TransferReason`. |
-| `verify_tree` | engine `dpp-vault::domain::verify::tree` | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
+| `PassportRef` | `dpp-domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is the platform layer's job. |
+| `parent_passport_ref: Option<PassportRef>` | `dpp-domain::passport::record` | Upward second-life link. **At most one.** |
+| `component_refs: Vec<PassportRef>` | `dpp-domain::passport::record` | Downward BOM links. |
+| `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Dual-signed (outgoing + incoming operator) responsibility handover on **one** passport, with a typed `TransferReason`. |
+| `verify_tree` | platform layer | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
 
 The primitives are sound. `PassportRef`'s hash-pin is the right idea, and
 `verify_tree`'s bounding and cycle handling are careful work. The gaps below are
@@ -40,7 +40,7 @@ about *what the edges mean*, not about how they are fetched or checked.
 Conventions of `regulatory/COMPLIANCE.md` apply: a claim that cannot be pinned to
 the Official Journal text is marked, not asserted.
 
-### 2.1 Second life — Battery Regulation (EU) 2023/1542, Art. 77
+### 2.1 Second life — Battery Regulation (EU) 2023/1542, Art. 77(7)
 
 The operative sentence, quoted as published:
 
@@ -64,23 +64,75 @@ Four requirements follow directly from that text:
 - **R4 — Four distinct operations** are named: *preparation for re-use*,
   *preparation for repurposing*, *repurposing*, *remanufacturing*.
 
-🟠 **COMPLIANCE-PIN PENDING** — the sentence above is verbatim and corroborated
-across independent sources, but the paragraph number *within* Art. 77 that carries
-it has not been confirmed against the OJ text. Pin it before citing a paragraph in
-code.
+✅ **COMPLIANCE-PIN: EU 2023/1542, Art. 77(7) (OJ L 191, 28.7.2023, p. 73).**
+Read directly from the Official Journal text. The quoted sentence is the first
+subparagraph of **paragraph 7**, and the "obligations under paragraph 4" it
+transfers are Art. 77(4)'s duty to keep passport information "accurate, complete
+and up to date". The prior 🟠 residual — the paragraph number within Art. 77 — is
+closed.
 
-### 2.2 Change of status — Annex XIII
+The **second subparagraph of the same paragraph** carries the waste transition,
+and it answers §6 question 4 directly:
+
+> Where the status of a battery changes to that of a waste battery, the
+> responsibility for the fulfilment of the obligations under paragraph 4 of this
+> Article shall be transferred either to the producer or, where appointed in
+> accordance with Article 57(1), the producer responsibility organisation, or the
+> waste management operator selected in accordance with Article 57(8).
+
+- **R5 — The waste transition moves responsibility again**, to one of three named
+  recipients, and — unlike the first subparagraph — it mandates **no new
+  passport**. Responsibility moves while the record stays. See §4.
+
+**Art. 77(8)** gives the only termination the article states: "A battery passport
+shall cease to exist after the battery has been recycled." Recycling, not
+consumption by a second-life unit, is what ends a passport. This answers §6
+question 3.
+
+The four operations are defined terms, and the boundary between the two
+repurposing ones is the **waste status of the input**, not the actor:
+
+- **Art. 3(30)** — *preparation for repurposing*: "any operation, by which a
+  **waste battery**, or parts thereof, is prepared so that it can be used for a
+  different purpose or application than that for which it was originally
+  designed".
+- **Art. 3(31)** — *repurposing*: "any operation that results in a battery, **that
+  is not a waste battery**, or parts thereof being used for a purpose or
+  application other than that for which the battery was originally designed".
+
+✅ **COMPLIANCE-PIN: EU 2023/1542, Art. 3(29)–(32) (OJ L 191, 28.7.2023, p. 27).**
+
+### 2.2 Change of status — Annex XIII point 4(c)
 
 A battery that has undergone one of the four operations must carry information on
 its **change of status**, reported per **point 4 of Annex XIII** and reachable via
-the QR code. Reported status values track the product's life (original use,
-re-used, repurposed, remanufactured, approaching end of life), and a battery that
-becomes waste transfers responsibility again — to the producer or waste-management
-operator. A recycled unit's passport is deactivated.
+the QR code. The enumerated values, quoted as published:
 
-🟠 **COMPLIANCE-PIN PENDING** — the Annex XIII point 4 anchor is corroborated; the
-enumerated status values are not yet quoted verbatim from the OJ text. Do not
-encode the value list as law until pinned.
+> (c) information on the status of the battery, defined as 'original',
+> 'repurposed', 're-used', 'remanufactured' or 'waste';
+
+✅ **COMPLIANCE-PIN: EU 2023/1542, Annex XIII point 4(c) (OJ L 191, 28.7.2023,
+p. 109).** Read directly from the Official Journal text.
+
+**The value list this document previously carried was wrong in two of five**, which
+is exactly what the pin existed to catch. It read *"original use, re-used,
+repurposed, remanufactured, approaching end of life"*. The OJ says `'original'`,
+not "original use"; and **"approaching end of life" is not a status value in this
+Regulation at all** — the string does not occur anywhere in its text, and the fifth
+value is `'waste'`. Encoding the unpinned list would have shipped a status value
+that does not exist in EU law.
+
+Two further facts follow from where point 4 sits, and both bind Phase 5:
+
+- **Point 4 is the legitimate-interest tier.** Its heading is "INFORMATION AND DATA
+  RELATING TO AN INDIVIDUAL BATTERY ACCESSIBLE ONLY TO PERSONS WITH A LEGITIMATE
+  INTEREST". `life_status` is therefore **not public**. `Disclosure::Individual`
+  already carries exactly this meaning — its own doc names "status" — so the field
+  must be classified there rather than defaulting to public.
+- **Status is reported on change, over the life of one record.** Point 4(a) requires
+  the performance and durability values "when the battery is placed on the market
+  **and when it is subject to changes in its status**". A status that is reported on
+  change is not a create-time constant. See §4.
 
 ### 2.3 ESPR (EU) 2024/1781
 
@@ -119,12 +171,26 @@ R1 and R3 are the same event: a new passport **and** a responsibility move. Toda
 an operator can perform either half independently, and nothing detects the
 inconsistency. Two mechanisms for one event is how they drift.
 
-### G3 — `TransferReason` is missing one of the four operations (violates R4)
+### G3 — `TransferReason` was missing one of the four operations (violated R4) — **CLOSED**
 
-Art. 77 names four operations. `TransferReason` has three:
+Art. 77(7) names four operations. `TransferReason` had three:
 `PreparationForReuse`, `Repurposing`, `Remanufacturing`. **`preparation for
-repurposing` is absent.** It is a distinct operation with a distinct actor in the
-text.
+repurposing` was absent**, so a transfer performed for that reason could only be
+recorded as one of the other three.
+
+An earlier draft of this section said the distinction was "a distinct actor in
+the text". That is not what the text says, and the correction matters for anyone
+implementing the boundary: **Art. 3(30) and Art. 3(31) separate the two by the
+waste status of the input** — preparation for repurposing operates on a *waste*
+battery, repurposing on one that is *not* a waste battery. Both may be performed
+by the same actor.
+
+Closed ahead of Phase 2: adding a variant to `TransferReason` is additive, and the
+enum is `#[non_exhaustive]`, so it needs neither Phase 2's `SecondLifeOperation`
+nor a breaking release. It does **not** resolve the separate open question in
+`docs/regulatory/COMPLIANCE.md` about whether the second-life operations belong on
+`TransferReason` at all — it makes the set consistent with the article it is drawn
+from, so that if those variants are later withdrawn, all four go together.
 
 ### G4 — The edge is untyped
 
@@ -140,17 +206,20 @@ longer sufficient:
 ### G5 — No product-life status axis
 
 `PassportStatus` (`Draft`/`Published`/`Suspended`/`Archived`/`Superseded`/
-`Deactivated`) is a **publication** lifecycle. Annex XIII point 4 wants a
-**product-life** status (original use / re-used / repurposed / remanufactured /
-waste). These are orthogonal: a repurposed unit's passport is `Published`. Today
-the second axis does not exist, so the change-of-status information has nowhere to
-live. `Deactivated` already matches the recycled-unit case and should stay as-is.
+`Deactivated`) is a **publication** lifecycle. Annex XIII point 4(c) wants a
+**product-life** status — `original` / `repurposed` / `re-used` /
+`remanufactured` / `waste`, now pinned in §2.2. These are orthogonal: a repurposed
+unit's passport is `Published`. Today the second axis does not exist, so the
+change-of-status information has nowhere to live. `Deactivated` matches Art.
+77(8)'s post-recycling end state and should stay as-is.
 
-### G6 — Neither field is protected from `patch_fields`
+### G6 — Neither field was protected from `patch_fields` — **CLOSED**
 
-The original issue. Neither `parentPassportRef` nor `componentRefs` is in
-`PROTECTED_PATCH_FIELDS`, so both are writable through a free-form field patch —
+The original issue. Neither `parentPassportRef` nor `componentRefs` was in
+`PROTECTED_PATCH_FIELDS`, so both were writable through a free-form field patch —
 the same bypass class already closed for `operatorIdentifier` and `facility`.
+Both are in the list now (Phase 0). What that protection may and may not be read
+to mean is §4.
 
 ### G7 — A lineage edge is asserted, never consented to
 
@@ -174,8 +243,8 @@ pinned reference plus product group-neutral qualifiers, and let product group pl
 ## 4. The central question: when may a lineage edge change?
 
 The issue asked whether these fields are create-time-only or attachable
-progressively. The answer differs per direction, and follows from a rule the
-codebase already enforces elsewhere.
+progressively. The answer follows from a rule the codebase already enforces
+elsewhere.
 
 **A field in the signed public view that can change after publish makes the served
 body stop verifying against its own signature.** That is the invariant
@@ -184,19 +253,71 @@ was moved off the Public tier.
 
 Both lineage fields are in the signed public view. So:
 
-- **`derived_from` (upward) is create-time by construction.** Per R1 the
-  second-life passport *is* the new record; there is no window in which it exists
-  without knowing its predecessors.
-- **`component_refs` (downward) is create-time, and a BOM change is a new passport
-  version.** The mechanism already exists: `supersedes_id` + `version`. Mutating a
-  published BOM in place would reintroduce exactly the defect just fixed for
-  `lintResult`.
+- **`derived_from` (upward) is fixed once signed.** Per R1 the second-life passport
+  *is* the new record, and its predecessors are known when it is created.
+- **`component_refs` (downward) is fixed once signed, and a BOM change on a
+  published passport is a new passport version.** The mechanism already exists:
+  `supersedes_id` + `version`. Mutating a published BOM in place would reintroduce
+  exactly the defect just fixed for `lintResult`.
 
-This means **no progressive-attachment port method is needed**, and both fields go
-into `PROTECTED_PATCH_FIELDS`. If a sub-assembly's passport genuinely arrives
-after publication, the correct response is to supersede with a new version that
-includes it — which keeps every signature honest and leaves an auditable trail,
-rather than silently rewriting a signed body.
+**No progressive-attachment port method is needed**, and both fields are in
+`PROTECTED_PATCH_FIELDS`. If a sub-assembly's passport genuinely arrives after
+publication, the correct response is to supersede with a new version that includes
+it — which keeps every signature honest and leaves an auditable trail, rather than
+silently rewriting a signed body.
+
+### 4.1 The invariant is *immutable once signed*, not *create-time*
+
+An earlier draft of this section derived the rule from the signed public view and
+then generalised it to "create-time by construction". Those are not the same
+claim, and the stronger one is wrong.
+
+**The draft window is legitimate.** Between create and first publish there is no
+signature to break, and assembling a bill of materials incrementally before first
+publish is the normal case, not an edge one. The only shipping backend already
+depends on this: it derives its protected list from `PROTECTED_PATCH_FIELDS` with
+`componentRefs` removed, precisely because the update path it serves accepts
+drafts only. This section as previously written forbade what that backend does,
+which is the wrong way round — the backend is right and the rule was overstated.
+
+**So the exception belongs in the rule, with its condition attached.** An
+implementation should be able to say *"editable while `Draft`"* rather than
+*"not protected"*. Stated as an absence from a list, the exception is
+unconditional at the trait boundary; stated as a condition, it survives contact
+with a caller that did not expect it.
+
+**And that distinction is load-bearing, because the guard is not where the
+exception is.** `patch_fields` checks passport status on neither side — the
+draft-only check lives in the *service that calls it*. There is already a second
+caller that reaches `patch_fields` with **published** rows: the lint re-check,
+which persists `lintResult` on every published passport. Nothing is broken today,
+because that caller patches one field and does not touch lineage. But what makes a
+third caller safe is this crate's list, and `componentRefs` is exactly the entry a
+backend removes from it. The invariant then rests on every current and future
+caller re-checking status — the same shape as the drift that put
+`operatorIdentifier`, `facility` and `parentPassportRef` at risk before.
+
+Any second implementation will face the same choice with no guidance and no reason
+to make it the same way. That is what this section has to fix before Phase 2
+rewrites these fields.
+
+### 4.2 `life_status` is not governed by this rule at all
+
+Phase 5's field is a different case, and the rule above must not be extended to it
+by analogy.
+
+Per §2.2 it is `Disclosure::Individual`, so it is not in the signed *public* view;
+and per Art. 77(7) second subparagraph the **waste transition mandates no new
+passport**. A battery whose status changes to waste moves responsibility while
+keeping its record — and Annex XIII point 4(a) expects values reported "when it is
+subject to changes in its status". A create-time-only `life_status` could never
+reach `'waste'`, which is one of the five values the law enumerates.
+
+The four Art. 77(7) operations *do* each produce a new passport (R1), so those four
+values are set at create. `'waste'` is the transition that is not, and it is the
+reason `life_status` needs a defined mutation path rather than a place in
+`PROTECTED_PATCH_FIELDS`. Phase 5 must specify that path; it is not a free
+patch field either, since the transition is also a responsibility move under R5.
 
 ---
 
@@ -206,18 +327,32 @@ Keep `PassportRef` exactly as it is — a pure "where + pin" primitive, correct 
 direction-neutral. Wrap it per direction with the qualifiers each needs.
 
 ```rust
-/// Upward: a predecessor this unit derives from (Art. 77 second life).
+/// Upward: a predecessor this unit derives from (Art. 77(7) second life).
 pub struct DerivationRef {
     pub reference: PassportRef,
     pub operation: SecondLifeOperation,
 }
 
-/// The four operations named by Art. 77.
+/// The four operations named by Art. 77(7). Mirrors the `TransferReason`
+/// variants of the same names, which §5.1 requires it to agree with.
 pub enum SecondLifeOperation {
     PreparationForReuse,
-    PreparationForRepurposing,   // closes G3
+    PreparationForRepurposing,
     Repurposing,
     Remanufacturing,
+}
+
+/// Product-life status, Annex XIII point 4(c). The five values are the
+/// enumerated list, pinned in §2.2 — not a superset, and not renamed.
+///
+/// Classified `Disclosure::Individual`: point 4 is the legitimate-interest
+/// tier, so this must not default to the public view.
+pub enum LifeStatus {
+    Original,
+    Repurposed,
+    Reused,
+    Remanufactured,
+    Waste,
 }
 
 /// Downward: one constituent in the bill of materials.
@@ -238,10 +373,15 @@ On `Passport`:
 pub derived_from: Vec<DerivationRef>,   // closes G1, G4-up
 // was: component_refs: Vec<PassportRef>
 pub component_refs: Vec<ComponentRef>,  // closes G4-down
-pub life_status: Option<LifeStatus>,    // closes G5 — value list pin-pending
+pub life_status: Option<LifeStatus>,    // closes G5 — value list now pinned
 ```
 
-### 5.1 Binding lineage to responsibility (closes G2, G3, G7)
+`life_status` is `Option` because Annex XIII point 4 is battery-regulation
+content and no other in-force product group requires it; `None` means "this
+product group does not report a product-life status", which is distinct from
+`Some(Original)`.
+
+### 5.1 Binding lineage to responsibility (closes G2, G7)
 
 The synthesis worth having: **a `TransferRecord` is already dual-signed by both the
 outgoing and incoming operator.** That is precisely the consent artefact G7 needs,
@@ -253,10 +393,13 @@ So bind them rather than adding a third mechanism:
 > for each predecessor, whose `TransferReason` matches that edge's
 > `SecondLifeOperation`, and whose incoming operator is this passport's operator.
 
-That single rule closes three gaps at once — the two mechanisms become one event
-(G2), the operation vocabulary must agree end-to-end (G3), and a second-life claim
-carries the predecessor operator's signature (G7). It is enforceable as a pure
-cross-field rule in `dpp-rules`, which is where it belongs.
+That single rule closes two gaps at once — the two mechanisms become one event
+(G2), and a second-life claim carries the predecessor operator's signature (G7).
+It is enforceable as a pure cross-field rule in `dpp-rules`, which is where it
+belongs. It also depends on G3 being closed first: the rule matches a
+`SecondLifeOperation` against a `TransferReason`, so a `TransferReason` that
+cannot express `preparation for repurposing` would make the rule unsatisfiable
+for one of the four operations.
 
 BOM edges deliberately get **no** consent requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. The
@@ -266,42 +409,75 @@ it cannot be tampered with, and `verify_tree` already reports exactly that.
 ### 5.2 What stays out of core
 
 - Any product group's definition of "component" or its granularity (G8).
-- Fetching, resolving, and walking edges — engine-side, already correct.
-- The Annex XIII status value list, until pinned to the OJ text.
+- Fetching, resolving, and walking edges — platform-side, already correct.
+- Any status value beyond the five Annex XIII point 4(c) enumerates. The list is
+  now pinned (§2.2) and is closed: a sixth value would be an invention, which is
+  what the unpinned draft of this document produced.
 
 ---
 
-## 6. Open questions
+## 6. Questions resolved
 
-1. **Is `life_status` core or product group data?** It is battery-regulation-derived, but
-   ESPR delegated acts may generalise it. Recommendation: model it in core as an
-   optional, product group-agnostic enum; do not gate compliance on it until pinned.
-2. **Does a second-life passport inherit its predecessors' BOM?** Art. 77 requires
-   linkage, not re-declaration. Recommendation: no inheritance — linkage is
-   sufficient, and copying would duplicate data that can go stale.
-3. **What happens to the predecessor's passport?** `Superseded` is wrong (that
-   means a new *version* of the same product). A retired EV pack that became part
-   of a storage system is not superseded — it is consumed. This may need a status
-   value, or may correctly stay `Published` with the derivation edge as the only
-   record.
-4. **Waste transition.** §2.2 indicates responsibility moves again to the producer
-   or waste-management operator. `TransferReason` has no variant for it and
-   `PassportStatus::Deactivated` covers only the recycled end state.
+All four are settled. Two were answerable from the OJ text and are now pinned;
+two were design calls and are recorded as decided, not as recommendations.
+
+1. **Is `life_status` core or product group data? — Core, optional, not
+   compliance-gating.** It is battery-regulation-derived, but ESPR delegated acts
+   may generalise it, and the shape (a small closed enum on the passport envelope)
+   is product-group-neutral even though the obligation is not. Modelled in core as
+   `Option<LifeStatus>`; no rule gates on it. Its disclosure class is **not** a
+   design call — Annex XIII point 4 fixes it at `Disclosure::Individual` (§2.2).
+
+2. **Does a second-life passport inherit its predecessors' BOM? — No.** Art. 77(7)
+   requires the new passport to be *linked* to the predecessors' passports; it
+   requires no re-declaration of their contents. Copying would duplicate data that
+   can go stale, and the predecessors keep their own passports (question 3), so the
+   data remains reachable through the edge.
+
+3. **What happens to the predecessor's passport? — It stays `Published`.**
+   Answered by the text rather than by taste: **Art. 77(8)** gives the only
+   termination — "A battery passport shall cease to exist after the battery has
+   been recycled." Being consumed by a second-life unit is not recycling, so no
+   termination is triggered. `Superseded` remains wrong for the reason already
+   stated (it means a new *version* of the same product), and no new
+   `PassportStatus` value is needed. The derivation edge is the record of what
+   happened, which is exactly what Art. 77(7) asks for.
+
+4. **Waste transition. — Resolved by Art. 77(7) second subparagraph** (quoted in
+   §2.1), which was not read when this question was written. Responsibility moves
+   to one of three named recipients: the producer, the producer responsibility
+   organisation where appointed under Art. 57(1), or the waste management operator
+   selected under Art. 57(8). Two consequences:
+   - It mandates **no new passport**, so the record continues and its
+     `life_status` becomes `'waste'` in place. That is why §4.2 exempts
+     `life_status` from the immutable-once-signed rule.
+   - `TransferReason` still has no variant for it, and it is a genuine transfer of
+     responsibility under this subparagraph. Adding one is **Phase 5's** work, not
+     Phase 2's, because the recipient set is the waste-operator vocabulary rather
+     than the second-life one. `PassportStatus::Deactivated` continues to cover
+     only the Art. 77(8) post-recycling end state, which is a later and distinct
+     event.
 
 ---
 
 ## 7. Phased plan
 
-| Phase | Scope | Breaking |
-|---|---|---|
-| **0** | Add `parentPassportRef` + `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line, closes the live bypass, forecloses nothing. | no |
-| **1** | Pin Art. 77's paragraph number and the Annex XIII point 4 status list against the OJ text; resolve §6 open questions. | no |
-| **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G3, G4-up). Add the missing `TransferReason` variant. | **yes** |
-| **3** | `ComponentRef` with quantity/role (G4-down); engine `verify_tree` and evidence `componentGraph` follow the new shape. | **yes** |
-| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). | no |
-| **5** | `life_status` (G5), gated on Phase 1's pin. | no |
+| Phase | Scope | Breaking | State |
+|---|---|---|---|
+| **0** | Add `parentPassportRef` + `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line, closes the live bypass, forecloses nothing. | no | **landed** |
+| **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
+| **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | proposal |
+| **3** | `ComponentRef` with quantity/role (G4-down); the verification walk and the evidence component graph follow the new shape. | **yes** | proposal |
+| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). | no | proposal |
+| **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
 
-Phase 0 is independently landable and should not wait for the rest.
+Phase 0 was independently landable and did not wait for the rest. Phase 1 carried
+G3 as well: the variant is additive on a `#[non_exhaustive]` enum, so it needed
+neither Phase 2's breaking release nor `SecondLifeOperation` to exist first, and
+Phase 4's binding rule is unsatisfiable without it.
+
+Phases 2 and 3 are independent of each other; 4 needs 2's vocabulary; 5 is
+unblocked by Phase 1's pin and independent of 2–4.
 
 ---
 
@@ -310,7 +486,7 @@ Phase 0 is independently landable and should not wait for the rest.
 Phases 2–3 change published field names and types (`parentPassportRef` →
 `derivedFrom`; `componentRefs` element type object-ified). Under the lockstep
 versioning policy this is a single coordinated minor version bump across all core crates,
-with the engine following.
+with the platform layer following.
 
 Passports already published with the current shape must keep verifying — their
 signatures cover the old field names. The read-time upcast lens mechanism
