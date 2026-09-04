@@ -111,53 +111,73 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   has no published passports to strand; `Passport::schema_version`'s doc comment
   records why that licence is temporary and what the next envelope rename owes.
 
-### Fixed
+### Added
 
-- **An Art. 8(4) exemption was indistinguishable from silence.** The battery
-  plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
-  same branch as `NotCovered`, emitting nothing at all.
+- **`InstrumentCatalog` had no fold for the one question a gate actually asks:
+  does this product group carry a live passport obligation right now?**
+  New `passport_obligation_live`, the conjunction of `determinable_for` and
+  `passport_required_for`.
 
-  Absence of a recycled-content finding is not a statement. It is what a battery
-  outside Art. 8, a battery meeting every minimum share, and a battery nobody
-  assessed all look like, and an exemption an operator has to infer from silence
-  is one they cannot show an authority. An exempt battery now carries
-  `battery.recycled_content.exempt_second_life`, pointed at `/batteryStatus`,
-  naming the article that excuses it and the status the carve-out was read from.
-  `NotCovered` keeps its silence: a category that was never in scope has no duty
-  whose absence needs explaining.
+  Every other compound question already folds here — `retention_for` takes the
+  maximum and degrades the basis if any contributing figure is assumed,
+  `passport_due_for` takes the earliest date, `granularity_for` takes the most
+  granular level — so that a consumer never restates a rule about how obligations
+  compound. This one was left to each caller to write out.
 
-  The wiring had no test at the plugin boundary either. `art8_phase_for` was
-  covered in `dpp-rules`, but nothing checked that the plugin reads
-  `batteryStatus` at all, that `waste` and `original` are not Art. 8(4)
-  operations, or that an unreadable status does not excuse the duty. Four tests
-  added, one of them a control proving the fixture reports a shortfall without
-  the status — without it the other three would pass against a plugin that
-  assessed nothing.
+  Neither operand answers it, and both ways they come apart are already modelled
+  here. An act can bind today and require **no passport at all** — `RegulatoryStatus`
+  cites ESPR Arts. 24–25 for that case — so `determinable_for` alone says "yes"
+  for a group that owes nothing. An act can require the information while the
+  passport duty is discharged through another system —
+  `PassportObligation::DisplacedBy`, with ESPR Art. 9(4)(b) and EPREL as the
+  worked example — so `passport_required_for` alone says "yes" where nothing is
+  bindingly determinable. A caller reaching for either on its own enforces an
+  obligation that does not exist, or misses one that does.
 
-  Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
-  five, in the one paragraph whose job is explaining why they are not collapsed.
-
-- **`TransferReason` modelled three of the four second-life operations
-  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
-  variant, so a transfer performed for that reason could only be recorded as one
-  of the other three — mislabelling which operation the OJ text says occurred,
-  in the field a registry receives.
-
-  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
-  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
-  so no consumer breaks.
-
-  The boundary between the two repurposing operations is the **waste status of
-  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
-  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
-  battery, that is not a waste battery". The architecture note had recorded it as
-  a difference of actor, which the text does not say.
-
-  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
-  about whether the second-life operations belong on `TransferReason` at all. It
-  completes the set so that whichever way that falls, all four fall together.
+  **Both operands stay public**, deliberately. "A passport is required" and "a
+  determination can be made" are different questions, and a caller *reporting*
+  the catalog needs them apart — an obligation can exist while the implementing
+  acts that would make it determinable do not, and saying so is more honest than
+  one boolean. Anything that gates wants the fold; anything that renders wants
+  the halves.
 
 ### Documentation
+
+- **The additive-only rule for persisted structs was enforced but never written
+  down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
+  offered the sanctioned way around it, but the rule itself appeared in no
+  document — so it was learned by hitting a red test, for a rule whose failure
+  mode is other people's stored data.
+
+  New `docs/architecture/PERSISTED-SHAPES.md`, linked from the docs index and
+  summarised in `CLAUDE.md`. It states which types are covered, what additive
+  means, when a lens and a schema-version bump make a non-additive change legal,
+  and why "pre-1.0 breaking changes are free" does not transfer to a type whose
+  old values are already on disk and cannot be recompiled.
+
+  Two things it records that were not previously written anywhere, both of which
+  have already been got wrong:
+
+  - **The lens escape hatch covers `productGroupData` and never the envelope.**
+    `schema_version` is scoped to the product-group sub-object; envelope fields
+    are deliberately never lensed, because an envelope transform gone wrong
+    corrupts every product group at once instead of one. So for the envelope,
+    additive-only is not a preference — it is the entire protection.
+  - **A field in the signed public view has two compatibility surfaces.** A
+    stored document can be rewritten by the node that owns it, so refusing to
+    read it is a good, visible failure. A *fetched* document belongs to another
+    operator and is signed, so it can never be rewritten — and refusing it is
+    reported by the verification walk as a malformed reference, which the
+    evidence dossier grades as an integrity violation. Judged from the stored
+    surface alone, a change can look safe while making one node accuse another of
+    tampering over a version difference.
+
+  Also records, rather than glosses, that the frozen-fixture tripwire gives the
+  **envelope no coverage at all**: the fixtures are product-group-data-shaped and
+  the surrounding envelope is a literal written in the current shape, which is
+  precisely the "regenerated fixture agrees with the present by construction"
+  failure the same file warns about. That is why both envelope renames to date
+  passed a green test run.
 
 - **Both `COMPLIANCE-PIN PENDING` markers in the product-lineage architecture
   note are pinned against the Official Journal text**, and one of them was
@@ -227,6 +247,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   — `dpp_domain::domain::identity` names a tier that no longer exists and a
   module that never did. `Audience`, `Disclosure` and `PASSPORT_FIELD_DISCLOSURE`
   are `dpp_domain::disclosure`.
+
+### Fixed
+
+- **An Art. 8(4) exemption was indistinguishable from silence.** The battery
+  plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
+  same branch as `NotCovered`, emitting nothing at all.
+
+  Absence of a recycled-content finding is not a statement. It is what a battery
+  outside Art. 8, a battery meeting every minimum share, and a battery nobody
+  assessed all look like, and an exemption an operator has to infer from silence
+  is one they cannot show an authority. An exempt battery now carries
+  `battery.recycled_content.exempt_second_life`, pointed at `/batteryStatus`,
+  naming the article that excuses it and the status the carve-out was read from.
+  `NotCovered` keeps its silence: a category that was never in scope has no duty
+  whose absence needs explaining.
+
+  The wiring had no test at the plugin boundary either. `art8_phase_for` was
+  covered in `dpp-rules`, but nothing checked that the plugin reads
+  `batteryStatus` at all, that `waste` and `original` are not Art. 8(4)
+  operations, or that an unreadable status does not excuse the duty. Four tests
+  added, one of them a control proving the fixture reports a shortfall without
+  the status — without it the other three would pass against a plugin that
+  assessed nothing.
+
+  Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
+  five, in the one paragraph whose job is explaining why they are not collapsed.
+
+- **`TransferReason` modelled three of the four second-life operations
+  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
+  variant, so a transfer performed for that reason could only be recorded as one
+  of the other three — mislabelling which operation the OJ text says occurred,
+  in the field a registry receives.
+
+  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
+  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
+  so no consumer breaks.
+
+  The boundary between the two repurposing operations is the **waste status of
+  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
+  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
+  battery, that is not a waste battery". The architecture note had recorded it as
+  a difference of actor, which the text does not say.
+
+  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
+  about whether the second-life operations belong on `TransferReason` at all. It
+  completes the set so that whichever way that falls, all four fall together.
 
 ## [0.19.0] - 2026-08-27
 
