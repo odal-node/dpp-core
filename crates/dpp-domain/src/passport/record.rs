@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{
-    ComponentRef, DerivationRef, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId,
+    ComponentRef, DerivationRef, FacilitySnapshot, LifeStatus, ManufacturerInfo, MaterialEntry,
+    PassportId,
 };
 use crate::catalog::Granularity;
 use crate::compliance::ComplianceResult;
@@ -216,6 +217,22 @@ pub struct Passport {
     /// These point at other products that have passports of their own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub component_refs: Vec<ComponentRef>,
+    /// Where this unit sits in its product life — original, or the second-life
+    /// operation that produced it, or waste.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1542, Annex XIII point 4(c)
+    /// (OJ L 191, 28.7.2023, p. 109). Orthogonal to [`Passport::status`], which
+    /// is the *publication* lifecycle: a repurposed unit's passport is
+    /// `Published`. See [`LifeStatus`], which also explains why the field is
+    /// classified `Individual` and why `Waste` is the one value that is a
+    /// transition rather than a create-time property.
+    ///
+    /// `None` where the product group does not call for one. Only Reg. (EU)
+    /// 2023/1542 defines this vocabulary, and a textile passport asserting
+    /// `'original'` would be borrowing a battery term for a question its own
+    /// instrument does not ask.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub life_status: Option<LifeStatus>,
     /// Deadline by which this record must remain accessible. Confirmed against the
     /// verbatim OJ text (Regulation (EU) 2024/1781): **Art. 9(2)(i)** requires the
     /// delegated act to specify "the period during which the digital product
@@ -351,6 +368,7 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "supersedesId",
     "derivedFrom",
     "componentRefs",
+    "lifeStatus",
     "retentionUntil",
     "productId",
     "commodityCode",

@@ -49,6 +49,7 @@ pub(crate) fn sample_passport() -> Passport {
         supersedes_id: None,
         derived_from: Vec::new(),
         component_refs: Vec::new(),
+        life_status: None,
         retention_until: None,
         product_id: None,
         commodity_code: None,
@@ -179,7 +180,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
     use crate::identifier::CommodityCode;
     use crate::lint::LintResult;
     use crate::passport::{
-        ComponentRef, DerivationRef, FacilitySnapshot, PassportRef, Quantity, SecondLifeOperation,
+        ComponentRef, DerivationRef, FacilitySnapshot, LifeStatus, PassportRef, Quantity,
+        SecondLifeOperation,
     };
     use crate::product_group::{CarbonFootprint, RepairabilityScore};
     use crate::seal::{SealFormat, SealedEnvelope};
@@ -221,6 +223,10 @@ pub(crate) fn fully_populated_passport() -> Passport {
         }),
         role: Some("cell".to_owned()),
     }];
+    // Agrees with the `Repurposing` edge above on purpose: the consistency rule
+    // in `dpp-rules` reports a status its derivation edges do not support, and a
+    // fixture that tripped its own rule would be a poor example of a passport.
+    passport.life_status = Some(LifeStatus::Repurposed);
     passport.retention_until = Some(now);
     passport.product_id = Some(uuid::Uuid::nil());
     passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));

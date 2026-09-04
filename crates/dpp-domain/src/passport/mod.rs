@@ -8,6 +8,9 @@ mod component_tests;
 pub mod derivation;
 #[cfg(test)]
 mod derivation_tests;
+pub mod life_status;
+#[cfg(test)]
+mod life_status_tests;
 pub mod record;
 pub mod reference;
 #[cfg(test)]
@@ -35,6 +38,7 @@ pub use crate::material::MaterialEntry;
 pub use component::{ComponentRef, Quantity};
 pub use derivation::{DerivationRef, SecondLifeOperation};
 pub use id::PassportId;
+pub use life_status::LifeStatus;
 pub use record::{
     PASSPORT_PROOF_FIELDS, PASSPORT_WIRE_KEYS, Passport, REMOVED_ENVELOPE_KEYS,
     RETENTION_MUTABLE_FIELDS,

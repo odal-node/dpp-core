@@ -113,6 +113,92 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **Product-life status had nowhere to live.** New `LifeStatus` on
+  `dpp-domain::passport`, carried by `Passport::life_status`.
+
+  `PassportStatus` is a **publication** lifecycle — draft, published, suspended,
+  archived, superseded, deactivated. Annex XIII point 4(c) of Reg. (EU) 2023/1542
+  wants a **product-life** status. They are orthogonal, most obviously for a
+  repurposed unit whose passport is perfectly ordinarily `Published`, so the
+  change-of-status information the Regulation requires had no home.
+
+  **Five values, and they are the Official Journal's own strings.** Point 4(c)
+  (OJ L 191, 28.7.2023, p. 109) defines the status as `'original'`,
+  `'repurposed'`, `'re-used'`, `'remanufactured'` or `'waste'`. Every other wire
+  vocabulary in this crate is camelCase and this one is not, deliberately: the
+  annex does not name concepts for us to spell as we like, it enumerates literal
+  values. `re-used` keeps its hyphen for that reason — `reused` would be a value
+  the instrument does not contain. A test pins all five against the quoted text.
+  There is no sixth: "approaching end of life" appears nowhere in the Regulation,
+  and an earlier draft of the design note carried it in place of `'original'`.
+
+  **Not public.** Point 4's heading is "INFORMATION AND DATA RELATING TO AN
+  INDIVIDUAL BATTERY ACCESSIBLE ONLY TO PERSONS WITH A LEGITIMATE INTEREST", so
+  the field is `Disclosure::Individual` in `PASSPORT_FIELD_DISCLOSURE`. That
+  entry is load-bearing rather than decorative, and a test asserts it: the
+  passport policy's `default_disclosure` is `Public`, so an envelope field nobody
+  classifies is served to anonymous readers. Its absence, not its presence, is
+  the silent failure.
+
+  **The waste transition is a new passport version.** Four of the five values are
+  set at create, because each Art. 77(7) operation produces a new passport and a
+  second-life unit is born knowing its status. `'waste'` is the one transition
+  that happens to a record that *continues* — Art. 77(7)'s second subparagraph
+  moves responsibility on a battery becoming waste and mandates no new passport,
+  while point 4(a) expects values reported "when it is subject to changes in its
+  status". A create-time-only field could never reach one of the five values the
+  law enumerates. So `lifeStatus` joins `PROTECTED_PATCH_FIELDS`, which forces
+  the transition through `supersedes_id` + `version`: §4's existing answer to "a
+  signed field must change", with an audit trail. A dedicated port method would
+  have re-signed the served body, which is a version bump wearing a disguise.
+
+  `Option`, and `None` is the ordinary case for most product groups: only
+  Reg. (EU) 2023/1542 defines this vocabulary, and a textile passport asserting
+  `'original'` would be borrowing a battery term for a question its own
+  instrument does not ask.
+
+- **A waste handover could not be recorded as one.** New
+  `TransferReason::WasteHandover`.
+
+  Art. 77(7)'s second subparagraph names three recipients — the producer, the
+  producer responsibility organisation where appointed under Art. 57(1), or the
+  waste management operator selected under Art. 57(8) — and `TransferReason` had
+  no variant for any of them.
+
+  Deliberately **not** folded into the four `SecondLifeOperation` values: that is
+  a different vocabulary. Those describe second-life *processing* that yields a
+  new unit; this records a handover on a record that continues. Folding them
+  would let the lineage-consent rule match a waste handover against a derivation
+  edge, which is not the consent that rule looks for.
+
+- **A passport could claim a life status its own lineage contradicted.** New
+  `dpp_rules::lineage::check_life_status_consistency`, reporting a `StatusDefect`.
+
+  A passport claiming `'remanufactured'` whose only derivation edge says
+  `repurposing` is inconsistent on its face, and nothing checked. Store it, then
+  check it — the same shape as the derivation-consent rule next door.
+
+  **Storing beats deriving, and the plural case is why.** Deriving the status
+  from `derived_from` is tempting and does not survive Art. 77(7) permitting
+  several predecessors with nothing forcing them to share an operation: a unit
+  built from one repurposed and one remanufactured predecessor has no unambiguous
+  derived status. So the rule asks that **at least one** edge support the claim,
+  not that every edge agree — requiring agreement would make that lawful record
+  unrepresentable. `repurposed` is supported by either repurposing operation,
+  since Art. 3(30) and Art. 3(31) differ by the waste status of the *input*
+  rather than the outcome.
+
+  **`'waste'` is exempt, and that is not an oversight.** A waste battery's
+  derivation edges still describe how it was manufactured and say nothing about
+  whether it is now waste. A repurposed unit that later became waste carries a
+  `repurposing` edge and a `waste` status, and both are correct — checking one
+  against the other would report an entirely ordinary record as inconsistent.
+
+  `UnknownStatus` is unreachable from core, whose `LifeStatus` is a closed enum.
+  It exists for the Wasm plugins, which hand this crate JSON string fields, and
+  it is reported rather than ignored because the fail-open reading of an invented
+  value is to treat it as consistent with anything.
+
 - **A second-life claim could move regulatory responsibility by asserting it.**
   New `dpp_rules::lineage::consent` binds a derivation edge to the transfer of
   responsibility that consents to it.
