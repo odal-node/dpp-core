@@ -43,6 +43,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   one boolean. Anything that gates wants the fold; anything that renders wants
   the halves.
 
+### Documentation
+
+- **The additive-only rule for persisted structs was enforced but never written
+  down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
+  offered the sanctioned way around it, but the rule itself appeared in no
+  document — so it was learned by hitting a red test, for a rule whose failure
+  mode is other people's stored data.
+
+  New `docs/architecture/PERSISTED-SHAPES.md`, linked from the docs index and
+  summarised in `CLAUDE.md`. It states which types are covered, what additive
+  means, when a lens and a schema-version bump make a non-additive change legal,
+  and why "pre-1.0 breaking changes are free" does not transfer to a type whose
+  old values are already on disk and cannot be recompiled.
+
+  Two things it records that were not previously written anywhere, both of which
+  have already been got wrong:
+
+  - **The lens escape hatch covers `productGroupData` and never the envelope.**
+    `schema_version` is scoped to the product-group sub-object; envelope fields
+    are deliberately never lensed, because an envelope transform gone wrong
+    corrupts every product group at once instead of one. So for the envelope,
+    additive-only is not a preference — it is the entire protection.
+  - **A field in the signed public view has two compatibility surfaces.** A
+    stored document can be rewritten by the node that owns it, so refusing to
+    read it is a good, visible failure. A *fetched* document belongs to another
+    operator and is signed, so it can never be rewritten — and refusing it is
+    reported by the verification walk as a malformed reference, which the
+    evidence dossier grades as an integrity violation. Judged from the stored
+    surface alone, a change can look safe while making one node accuse another of
+    tampering over a version difference.
+
+  Also records, rather than glosses, that the frozen-fixture tripwire gives the
+  **envelope no coverage at all**: the fixtures are product-group-data-shaped and
+  the surrounding envelope is a literal written in the current shape, which is
+  precisely the "regenerated fixture agrees with the present by construction"
+  failure the same file warns about. That is why both envelope renames to date
+  passed a green test run.
+
 ### Fixed
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery

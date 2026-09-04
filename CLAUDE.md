@@ -170,6 +170,20 @@ All implementations live in the platform repo.
 
 Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.json` (inside the crate so they ship on publish). The `VersionedSchemaRegistry` in dpp-domain embeds them via `include_str!()` and validates passport data at runtime. Adding a new schema version is a single file addition. **Never** `include_str!` a path outside the crate dir — `cargo publish` excludes it and the crate fails to build for downstream consumers.
 
+### Persisted Shapes — the one place a pre-1.0 break is not free
+
+`Passport` and every `ProductGroupData` variant are the on-disk shape of stored
+passports. A non-additive change to one breaks no caller at compile time; it makes
+already-written documents undeserialisable at runtime, per request, on upgrade.
+That has cost 244 of 276 passports once already.
+
+Before changing a field on either: read
+**`docs/architecture/PERSISTED-SHAPES.md`**. Two things are easy to get wrong and
+both have shipped — the lens escape hatch covers `productGroupData` and **never**
+the envelope, and a field in the signed public view must be judged by what a
+*fetched* passport can do (nothing: it is signed and belongs to someone else),
+not by what a stored one can.
+
 ### Wasm Targets
 
 - `wasm32-unknown-unknown` — `dpp-registry`, `dpp-digital-link`, `dpp-aas` (not `dpp-crypto`/`dpp-vc`: the RNG needs a platform entropy source)
