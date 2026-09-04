@@ -1,12 +1,12 @@
 # Product Lineage — Bill of Materials and Second Life
 
-**Status:** Phases 0–3 landed; Phases 4 and 5 remain proposal, and both are
-non-breaking. Supersedes the open questions raised against the initial
-BOM/second-life cut.
-**Affects:** `dpp-domain` passport model, `dpp-domain::transfer`, platform-layer
-verification (`verify_tree`, evidence `componentGraph`).
-**Version impact:** breaking — Phase 2 renamed a published envelope field, and
-Phase 3 will change another's element type. Both belong to one coordinated minor
+**Status:** Phases 0–4 landed; only Phase 5 remains, and it is non-breaking.
+Supersedes the open questions raised against the initial BOM/second-life cut.
+**Affects:** `dpp-domain` passport model, `dpp-domain::transfer`,
+`dpp-rules::lineage`, platform-layer verification (`verify_tree`, evidence
+`componentGraph`).
+**Version impact:** breaking — Phase 2 renamed a published envelope field and
+Phase 3 changed another's element type. Both belong to one coordinated minor
 bump; see §8, which also corrects a migration mechanism this document previously
 named and that does not exist.
 
@@ -29,8 +29,8 @@ for, where the current model falls short of it, and the model proposed instead.
 |---|---|---|
 | `PassportRef` | `dpp-domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is the platform layer's job. |
 | `derived_from: Vec<DerivationRef>` | `dpp-domain::passport::record` | Upward second-life links, each typed with its Art. 77(7) operation. Plural since Phase 2; was `parent_passport_ref: Option<PassportRef>`, at most one. |
-| `component_refs: Vec<PassportRef>` | `dpp-domain::passport::record` | Downward BOM links. |
-| `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Dual-signed (outgoing + incoming operator) responsibility handover on **one** passport, with a typed `TransferReason`. |
+| `component_refs: Vec<ComponentRef>` | `dpp-domain::passport::record` | Downward BOM links, each with an optional quantity and role. Object-ified in Phase 3; was `Vec<PassportRef>`. |
+| `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Responsibility handover on **one** passport, with a typed `TransferReason`. Carries the **outgoing** operator's authorisation plus the hosting node's attestation that acceptance ran — *not* a signature by the incoming operator. See §5.1. |
 | `verify_tree` | platform layer | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
 
 The primitives are sound. `PassportRef`'s hash-pin is the right idea, and
@@ -166,17 +166,20 @@ nicety.
 
 Closed in Phase 2: `derived_from: Vec<DerivationRef>`.
 
-### G2 — Two mechanisms model one regulatory event (violates R3)
+### G2 — Two mechanisms modelled one regulatory event (violated R3) — **CLOSED**
 
 `TransferReason` carries the full Art. 77(7) vocabulary since Phase 1 — all four
 operations — but it lives on `TransferRecord`, which hands responsibility over on
-a *single, continuing* passport. `derived_from` creates a *new* passport and now
-names the operation, but still carries no responsibility semantics at all: the
-two vocabularies agree and nothing yet requires them to.
+a *single, continuing* passport. `derived_from` creates a *new* passport and names
+the operation. The two vocabularies agreed and nothing required them to.
 
-R1 and R3 are the same event: a new passport **and** a responsibility move. Today
-an operator can perform either half independently, and nothing detects the
+R1 and R3 are the same event: a new passport **and** a responsibility move. An
+operator could perform either half independently and nothing detected the
 inconsistency. Two mechanisms for one event is how they drift.
+
+Closed in Phase 4: `dpp_rules::lineage::consent` requires them to agree, so the
+two mechanisms now describe one event or the passport is reported as
+unsupported.
 
 ### G3 — `TransferReason` was missing one of the four operations (violated R4) — **CLOSED**
 
@@ -231,15 +234,22 @@ the same bypass class already closed for `operatorIdentifier` and `facility`.
 Both are in the list now (Phase 0). What that protection may and may not be read
 to mean is §4.
 
-### G7 — A lineage edge is asserted, never consented to
+### G7 — A lineage edge was asserted, never consented to — **CLOSED for second life**
 
 The hash-pin proves the *target* has not been modified. It does not prove the
 target's operator agreed to the relationship. Anyone can publish a passport
 claiming to derive from, or contain, anyone else's product.
 
-For BOM this is mostly benign (over-claiming a supplier is a commercial problem).
-For second life it is not: R3 moves regulatory responsibility, and responsibility
-must not be assignable by unilateral assertion.
+For BOM this is mostly benign (over-claiming a supplier is a commercial problem),
+and it stays that way on purpose — see §5.1. For second life it is not: R3 moves
+regulatory responsibility, and responsibility must not be assignable by
+unilateral assertion.
+
+Closed in Phase 4 for the derivation direction: `dpp_rules::lineage::consent`
+refuses a second-life edge that no transfer of responsibility supports. The
+consent it rests on is the **outgoing** operator's authorisation — the
+predecessor's own — which §5.1 explains, and which is not the reason this
+document originally gave.
 
 ### G8 — "Component" is undefined across product groups
 
@@ -408,9 +418,27 @@ product group does not report a product-life status", which is distinct from
 
 ### 5.1 Binding lineage to responsibility (closes G2, G7)
 
-The synthesis worth having: **a `TransferRecord` is already dual-signed by both the
-outgoing and incoming operator.** That is precisely the consent artefact G7 needs,
-and precisely the responsibility move R3 requires.
+The synthesis worth having: **a second-life operation already *is* a transfer of
+responsibility under Art. 77(7)**, and a transfer record already carries the
+outgoing operator's own authorisation. That is the consent artefact G7 needs, and
+the responsibility move R3 requires, in one artefact that exists.
+
+🚨 **An earlier version of this section justified that differently, and was
+wrong.** It said a `TransferRecord` is "dual-signed by both the outgoing and
+incoming operator". It is not, and `TransferRecord` says so at the field itself:
+the acceptance half is the **hosting node's attestation that the acceptance step
+ran**, not a signature by the incoming operator, who has no key on the node
+recording it. That field was renamed from `to_signature` precisely because the
+old name invited this misreading, and this document then made it anyway.
+
+The conclusion survives, for a reason worth stating because it is easy to get
+backwards. **The consent this rule needs is the predecessor's**, and in a
+second-life transfer the predecessor's operator is the *outgoing* party — so the
+half that is a genuine party signature is exactly the half that matters. The
+incoming half would have been this passport's own operator asserting something
+about itself, which was never evidence of anything. Acceptance is still checked,
+because an abandoned or rejected handover should not support a live claim, but it
+is checked as a *status*, not as a second signature.
 
 So bind them rather than adding a third mechanism:
 
@@ -419,12 +447,21 @@ So bind them rather than adding a third mechanism:
 > `SecondLifeOperation`, and whose incoming operator is this passport's operator.
 
 That single rule closes two gaps at once — the two mechanisms become one event
-(G2), and a second-life claim carries the predecessor operator's signature (G7).
-It is enforceable as a pure cross-field rule in `dpp-rules`, which is where it
-belongs. It also depends on G3 being closed first: the rule matches a
-`SecondLifeOperation` against a `TransferReason`, so a `TransferReason` that
-cannot express `preparation for repurposing` would make the rule unsatisfiable
-for one of the four operations.
+(G2), and a second-life claim carries the predecessor operator's authorisation
+(G7). It shipped in Phase 4 as `dpp_rules::lineage::consent`, a pure cross-field
+rule, which is where it belongs. It also depended on G3 being closed first: the
+rule matches a `SecondLifeOperation` against a `TransferReason`, so a
+`TransferReason` that could not express `preparation for repurposing` would have
+made the rule unsatisfiable for one of the four operations.
+
+**One thing the rule cannot do, and does not pretend to.** It cannot tell whether
+a transfer record actually concerns the predecessor a given edge points at: an
+edge identifies its target by URI, a transfer identifies its subject by passport
+id, and resolving one to the other is a network fetch. So the **caller
+correlates and the rule checks**. An edge whose caller found no corresponding
+transfer is reported as unconsented — the correct reading of "no evidence was
+found", rather than an assumption that none exists. That also means the rule is
+enforced platform-side, because core cannot resolve a URI.
 
 BOM edges deliberately get **no** consent requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. The
@@ -493,7 +530,7 @@ two were design calls and are recorded as decided, not as recommendations.
 | **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
 | **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | **landed** |
 | **3** | `ComponentRef` with quantity/role (G4-down). The verification walk and the evidence component graph follow the new shape platform-side. | **yes** | **landed** |
-| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). | no | proposal |
+| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). Enforced platform-side, since correlating an edge to a transfer needs a URI resolved. | no | **landed** |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
 
 Phase 0 was independently landable and did not wait for the rest. Phase 1 carried

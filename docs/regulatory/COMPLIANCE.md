@@ -338,9 +338,14 @@ inconsistently as either Art. 9 or Art. 12). **This still stands as to ESPR.**
 
 ### What `domain::transfer` may be described as
 
-The dual-signed handshake is **an engineering design choice** that satisfies —
+The two-step handshake is **an engineering design choice** that satisfies —
 and exceeds — Art. 11(e)'s continuity requirement, and that produces the record
-this node notifies to the registry under Art. 6a. It is **not** a literal
+this node notifies to the registry under Art. 6a. ("Two-step", not "dual-signed":
+two JWS values exist, but only `from_signature` is a counterparty's own. The
+other is this node's attestation that acceptance ran — see
+`TransferRecord::node_acceptance_attestation`, and §5.1 of
+`docs/architecture/PRODUCT-LINEAGE.md` for a design that read the old wording the
+wrong way.) It is **not** a literal
 implementation of a numbered transfer obligation in ESPR, because none exists
 there; and it is **not** evidence of an Art. 6a transfer, because that rests on
 verified-actor status this node cannot attest to.
