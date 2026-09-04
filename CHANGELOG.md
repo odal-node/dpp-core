@@ -113,6 +113,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A ruleset that missed `all_rulesets()` escaped both provenance tripwires.**
+  New `every_ruleset_impl_reaches_the_registry` scans `dpp-calc` for
+  `impl Ruleset` and fails on any type absent from the registry.
+
+  `all_rulesets()` is hand-maintained, and two safety properties are asserted by
+  *iterating* it: `an_unsourced_ruleset_may_not_claim_its_numbers_are_law`, which
+  keeps the fail-closed `ParameterBasis::Sourced` default honest, and
+  `every_ruleset_declares_the_numbers_it_computes_with`, which stops a ruleset
+  hashing the empty parameter set into its `ruleset_content_sha256`. Both simply
+  stop applying to a ruleset nobody registers. The one gate that existed ran the
+  other way — `active_map_entries_reference_real_rulesets` checks that a
+  calculator-map entry names a ruleset that exists, never that a ruleset reaches
+  the list. So adding a threshold file and forgetting the row withdrew both
+  guarantees silently, and nothing in review looked wrong, because the diff that
+  should have carried the row is the diff that didn't.
+
+  It is a source-text gate because Rust cannot enumerate a trait's implementors
+  on stable. The alternatives are a registry macro — a new dependency plus
+  link-section tricks that do not suit the `wasm32` targets this workspace builds
+  for — or a proc-macro attribute on every impl, which is the same "remember to
+  add it" problem wearing a different hat.
+
+  **Two exemptions, both structural rather than a name on a list.** A type
+  parameterised *only by lifetimes* cannot be a row at all, since
+  `&'static [&'static dyn Ruleset]` requires a `'static` value; wrappers like
+  `FilledRepairabilityRuleset` also delegate identity, effectivity and basis to a
+  base ruleset that the gate does require to be registered, so both properties
+  are still asserted against the base. Modules a parent declares
+  `#[cfg(test)] mod …;` hold test doubles rather than shipped rulesets. Neither
+  exemption is generous: `Foo<Bar>` is *not* exempt, because it can perfectly
+  well be a `'static` row, and neither is an inline `#[cfg(test)]` block inside a
+  shipping file.
+
+  The gate reports both directions. A registered name with no impl found means
+  the scanner has drifted rather than that the row is wrong — which is the
+  vacuous pass a source-text gate has to defend against, since a parser that
+  quietly stops matching would let this test succeed while checking nothing.
+
 - **A second-life claim could move regulatory responsibility by asserting it.**
   New `dpp_rules::lineage::consent` binds a derivation edge to the transfer of
   responsibility that consents to it.
