@@ -251,3 +251,91 @@ fn every_passport_date_comes_from_an_act_that_requires_a_passport() {
         assert!(instruments.passport_due_for(key).is_none(), "{key}");
     }
 }
+
+/// The live-obligation fold answers correctly in all four quadrants of its two
+/// operands, using the real catalog rather than a fixture.
+///
+/// Both false-positive directions are represented, because they are the reason
+/// the fold exists rather than being left to each caller:
+///
+/// | product group | determinable | passport required | live |
+/// |---|---|---|---|
+/// | `battery`      | yes | yes | **yes** |
+/// | `electronics`  | yes | no — discharged through another system | no |
+/// | `unsold-goods` | yes | no — the act has no passport article | no |
+/// | `toy`          | no — adopted but not yet applying | yes | no |
+///
+/// A caller using `determinable_for` alone would enforce a passport for
+/// `electronics` and `unsold-goods`, which owe none. One using
+/// `passport_required_for` alone would enforce one for `toy`, where nothing is
+/// bindingly determinable yet.
+#[test]
+fn a_live_passport_obligation_needs_both_halves() {
+    let catalog = InstrumentCatalog::new();
+
+    assert!(
+        catalog.passport_obligation_live("battery"),
+        "battery binds today and owes a passport"
+    );
+
+    for group in ["electronics", "unsold-goods"] {
+        assert!(
+            !catalog.determinable_for(group).is_empty(),
+            "{group} is determinable, so only the passport half can exclude it"
+        );
+        assert!(
+            !catalog.passport_obligation_live(group),
+            "{group} owes no passport, so no obligation is live"
+        );
+    }
+
+    assert!(
+        catalog.passport_required_for("toy"),
+        "toy owes a passport, so only the determinability half can exclude it"
+    );
+    assert!(
+        !catalog.passport_obligation_live("toy"),
+        "toy's act does not apply yet, so nothing is determinable and no obligation is live"
+    );
+}
+
+/// A live obligation never claims more than its operands allow, for every
+/// product group the catalog knows.
+///
+/// Stated as two implications rather than by recomputing the conjunction. A test
+/// that restates the implementation cannot catch a defect in it, and would fail
+/// on exactly the change this fold exists to absorb — the issue behind it notes
+/// the conjunction is the piece most likely to grow a third condition. These
+/// invariants hold however it grows: whatever else "live" comes to require, it
+/// can never be true where no passport is owed, or where nothing is bindingly
+/// determinable.
+///
+/// The other direction — both halves true and the fold saying no — is covered by
+/// `battery` above, which is the only combination that produces it.
+#[test]
+fn a_live_obligation_never_outruns_its_operands() {
+    let catalog = InstrumentCatalog::new();
+    let product_groups = ProductGroupCatalog::new();
+
+    let mut live = 0_usize;
+    for key in product_groups.keys() {
+        if !catalog.passport_obligation_live(key) {
+            continue;
+        }
+        live += 1;
+        assert!(
+            catalog.passport_required_for(key),
+            "{key} reports a live obligation while owing no passport"
+        );
+        assert!(
+            !catalog.determinable_for(key).is_empty(),
+            "{key} reports a live obligation while nothing is determinable"
+        );
+    }
+
+    assert!(
+        live > 0,
+        "no product group reports a live obligation, so the implications above \
+         held vacuously and this test proved nothing"
+    );
+}
