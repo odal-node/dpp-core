@@ -81,54 +81,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   failure the same file warns about. That is why both envelope renames to date
   passed a green test run.
 
-### Fixed
-
-- **An Art. 8(4) exemption was indistinguishable from silence.** The battery
-  plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
-  same branch as `NotCovered`, emitting nothing at all.
-
-  Absence of a recycled-content finding is not a statement. It is what a battery
-  outside Art. 8, a battery meeting every minimum share, and a battery nobody
-  assessed all look like, and an exemption an operator has to infer from silence
-  is one they cannot show an authority. An exempt battery now carries
-  `battery.recycled_content.exempt_second_life`, pointed at `/batteryStatus`,
-  naming the article that excuses it and the status the carve-out was read from.
-  `NotCovered` keeps its silence: a category that was never in scope has no duty
-  whose absence needs explaining.
-
-  The wiring had no test at the plugin boundary either. `art8_phase_for` was
-  covered in `dpp-rules`, but nothing checked that the plugin reads
-  `batteryStatus` at all, that `waste` and `original` are not Art. 8(4)
-  operations, or that an unreadable status does not excuse the duty. Four tests
-  added, one of them a control proving the fixture reports a shortfall without
-  the status — without it the other three would pass against a plugin that
-  assessed nothing.
-
-  Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
-  five, in the one paragraph whose job is explaining why they are not collapsed.
-
-- **`TransferReason` modelled three of the four second-life operations
-  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
-  variant, so a transfer performed for that reason could only be recorded as one
-  of the other three — mislabelling which operation the OJ text says occurred,
-  in the field a registry receives.
-
-  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
-  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
-  so no consumer breaks.
-
-  The boundary between the two repurposing operations is the **waste status of
-  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
-  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
-  battery, that is not a waste battery". The architecture note had recorded it as
-  a difference of actor, which the text does not say.
-
-  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
-  about whether the second-life operations belong on `TransferReason` at all. It
-  completes the set so that whichever way that falls, all four fall together.
-
-### Documentation
-
 - **Both `COMPLIANCE-PIN PENDING` markers in the product-lineage architecture
   note are pinned against the Official Journal text**, and one of them was
   holding back a value list that was wrong.
@@ -197,6 +149,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   — `dpp_domain::domain::identity` names a tier that no longer exists and a
   module that never did. `Audience`, `Disclosure` and `PASSPORT_FIELD_DISCLOSURE`
   are `dpp_domain::disclosure`.
+
+### Fixed
+
+- **An Art. 8(4) exemption was indistinguishable from silence.** The battery
+  plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
+  same branch as `NotCovered`, emitting nothing at all.
+
+  Absence of a recycled-content finding is not a statement. It is what a battery
+  outside Art. 8, a battery meeting every minimum share, and a battery nobody
+  assessed all look like, and an exemption an operator has to infer from silence
+  is one they cannot show an authority. An exempt battery now carries
+  `battery.recycled_content.exempt_second_life`, pointed at `/batteryStatus`,
+  naming the article that excuses it and the status the carve-out was read from.
+  `NotCovered` keeps its silence: a category that was never in scope has no duty
+  whose absence needs explaining.
+
+  The wiring had no test at the plugin boundary either. `art8_phase_for` was
+  covered in `dpp-rules`, but nothing checked that the plugin reads
+  `batteryStatus` at all, that `waste` and `original` are not Art. 8(4)
+  operations, or that an unreadable status does not excuse the duty. Four tests
+  added, one of them a control proving the fixture reports a shortfall without
+  the status — without it the other three would pass against a plugin that
+  assessed nothing.
+
+  Also corrected: `Art8Phase`'s doc said *"Four outcomes"* while the enum has
+  five, in the one paragraph whose job is explaining why they are not collapsed.
+
+- **`TransferReason` modelled three of the four second-life operations
+  Reg. (EU) 2023/1542 Art. 77(7) names.** `preparation for repurposing` had no
+  variant, so a transfer performed for that reason could only be recorded as one
+  of the other three — mislabelling which operation the OJ text says occurred,
+  in the field a registry receives.
+
+  `TransferReason::PreparationForRepurposing` added, with its `ALL` entry and the
+  wire form `preparationForRepurposing`. Additive on a `#[non_exhaustive]` enum,
+  so no consumer breaks.
+
+  The boundary between the two repurposing operations is the **waste status of
+  the input**, not the actor: Art. 3(30) defines preparation for repurposing over
+  "a waste battery, or parts thereof", Art. 3(31) defines repurposing over "a
+  battery, that is not a waste battery". The architecture note had recorded it as
+  a difference of actor, which the text does not say.
+
+  This does not resolve the standing question in `docs/regulatory/COMPLIANCE.md`
+  about whether the second-life operations belong on `TransferReason` at all. It
+  completes the set so that whichever way that falls, all four fall together.
 
 ## [0.19.0] - 2026-08-27
 
