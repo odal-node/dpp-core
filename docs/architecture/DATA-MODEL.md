@@ -85,7 +85,7 @@ constant is right.
 | `version` | `u32` | `"version"` | Monotonic counter; `1` on first publish |
 | `supersedes_id` | `Option<PassportId>` | `"supersedesId"` | The passport this record supersedes. `None` for first versions |
 | `derived_from` | `Vec<DerivationRef>` | `"derivedFrom"` | Cross-operator predecessors this unit derives from, each typed with its Art. 77(7) operation. Plural because the article is. Omitted when empty |
-| `component_refs` | `Vec<PassportRef>` | `"componentRefs"` | Cross-operator references to constituent passports. Omitted when empty |
+| `component_refs` | `Vec<ComponentRef>` | `"componentRefs"` | Cross-operator references to constituent passports, each with an optional `quantity` and `role` that core carries and never interprets. Omitted when empty |
 | `retention_until` | `Option<DateTime<Utc>>` | `"retentionUntil"` | Computed at publish from the instrument bindings' retention fold |
 | `product_id` | `Option<Uuid>` | `"productId"` | Opaque link to an internal product-template record. **Not a legal identifier** |
 | `commodity_code` | `Option<CommodityCode>` | `"commodityCode"` | CN code. Absent rather than guessed — a registry requiring it refuses the registration instead of this node inventing a classification |

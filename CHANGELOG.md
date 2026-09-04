@@ -15,6 +15,55 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A bill of materials could not say how much of what.**
+  *(Breaking: `Passport::component_refs` changes element type from
+  `Vec<PassportRef>` to `Vec<ComponentRef>`. The wire key `componentRefs` is
+  unchanged; its elements are now objects. New `ComponentRef` and `Quantity` in
+  `dpp-domain::passport`.)*
+
+  A BOM edge recorded where a constituent's passport is and which hash pins it,
+  and nothing else. It could not say how many, how much, or what part the
+  constituent plays — which is the question a bill of materials exists to answer.
+
+  `ComponentRef` wraps the reference with an optional `quantity` and an optional
+  `role`. `Quantity` is a `value` plus an optional `unit`, where no unit means a
+  dimensionless count.
+
+  **Core carries both qualifiers and interprets neither**, deliberately. A
+  battery module, a fibre lot and an electronics sub-assembly are not the same
+  kind of thing, and no delegated act defines "component" or its granularity for
+  any product group in force. `role` and `unit` are free strings for that reason:
+  a controlled vocabulary here would be core deciding a product group's
+  semantics. Product-group plugins interpret; core transports.
+
+  BOM edges still carry **no** consent requirement, unlike the upward direction.
+  Requiring a supplier signature for every assembly is not something a real
+  supply chain produces, so a `componentRef` remains a pinned *claim by the
+  assembler*, and the verification walk reports it as exactly that.
+
+  **Migration — the old element shape is still read, deliberately.**
+  `ComponentRef`'s `Deserialize` is hand-written and accepts a bare
+  `PassportRef` as well, mapping it to an edge with no qualifiers. The two shapes
+  are disjoint, so this needs no guessing, and serialisation is unaffected: only
+  the current shape is ever written.
+
+  This is the opposite of the `derivedFrom` rename's answer, and the difference
+  is *where the document lives*. A stored document sits in one node's own
+  database: when its shape moves, that node can rewrite it, so failing loudly
+  names a problem whose owner can fix it. `componentRefs` is also part of the
+  **signed public view**, which other operators' nodes fetch to verify a bill of
+  materials — and those passports are signed and belong to someone else, so they
+  can never be rewritten. Refusing them would refuse data that is correct,
+  current and unforgeable.
+
+  It would also not fail quietly. A verification walk that cannot parse an entry
+  reports it as a malformed reference, and a malformed reference is graded as an
+  integrity violation — the same class as a hash mismatch. Without the tolerant
+  reader, an upgraded node would report a not-yet-upgraded node's bill of
+  materials as **tampered**, on evidence that is nothing but a version
+  difference. Nodes are independent per-operator deployments, so that skew is the
+  steady state, not a migration window.
+
 - **Lineage held one predecessor where Art. 77(7) says several.**
   *(Breaking: `Passport::parent_passport_ref: Option<PassportRef>` is replaced by
   `Passport::derived_from: Vec<DerivationRef>`, and the wire key

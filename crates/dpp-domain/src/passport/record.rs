@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{
-    DerivationRef, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId, PassportRef,
+    ComponentRef, DerivationRef, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PassportId,
 };
 use crate::catalog::Granularity;
 use crate::compliance::ComplianceResult;
@@ -207,12 +207,15 @@ pub struct Passport {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub derived_from: Vec<DerivationRef>,
     /// Cross-operator references to the constituent passports this product is
-    /// assembled from — its bill of materials. Empty for a unit with no modelled
-    /// sub-assemblies. The inverse edge of `derived_from`: `component_refs`
-    /// point down to the constituents, `derived_from` points up to the
-    /// predecessors.
+    /// assembled from — its bill of materials, each qualified by how much and in
+    /// what role. Empty for a unit with no modelled sub-assemblies. The inverse
+    /// edge of `derived_from`: `component_refs` point down to the constituents,
+    /// `derived_from` points up to the predecessors.
+    ///
+    /// Distinct from [`Passport::materials`], which lists *substances* by weight.
+    /// These point at other products that have passports of their own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub component_refs: Vec<PassportRef>,
+    pub component_refs: Vec<ComponentRef>,
     /// Deadline by which this record must remain accessible. Confirmed against the
     /// verbatim OJ text (Regulation (EU) 2024/1781): **Art. 9(2)(i)** requires the
     /// delegated act to specify "the period during which the digital product
