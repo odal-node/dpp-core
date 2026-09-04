@@ -44,7 +44,10 @@ src/
 │   ├── error.rs              CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
 │   ├── receipt.rs            CalculationReceipt — proof-of-calculation envelope
 │   ├── ruleset.rs            RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
+│   │                         ParameterBasis — are these numbers law, or ours?
 │   │                         Ruleset trait — every methodology trait extends this
+│   ├── parameters.rs         RulesetParameters + fill(): a signed bundle may fill
+│   │                         an Assumed ruleset's numbers, never a Sourced one's
 │   ├── clock.rs              AssessmentClock — the governing-law date; there is no now()
 │   ├── assessability.rs      Assessability<T>: Assessed | NotYetInForce | Undetermined
 │   │                         | Expired | OutOfScope — none of which is non-compliance
@@ -241,8 +244,15 @@ Shape shown for orientation; the definition is in `kernel::receipt`:
 pub struct CalculationReceipt {
     pub receipt_id:             Uuid,          // UUIDv7 — time-sortable
     pub input_hash:             String,        // SHA-256 of canonical JSON inputs
-    pub ruleset_id:             String,        // e.g. "smartphone-tablet-repairability"
+    pub ruleset_id:             String,        // e.g. "repairability-heuristic-v1"
     pub ruleset_version:        String,        // e.g. "1.0.0"
+    /// SHA-256 of the parameter set actually used — which *numbers*, where
+    /// `ruleset_id` + `ruleset_version` say which *rule*.
+    pub ruleset_content_sha256: String,
+    /// The signed bundle that filled those parameters, if any. Both `None` for
+    /// the compiled-in baseline, and they only ever move together.
+    pub bundle_version:         Option<String>,
+    pub bundle_content_sha256:  Option<String>,
     pub factor_dataset_id:      String,        // empty if no FactorProvider used
     pub factor_dataset_version: String,
     pub factor_set_hash:        Option<String>, // SHA-256 of full factor table
@@ -253,8 +263,13 @@ pub struct CalculationReceipt {
 ```
 
 The platform stores this alongside the passport record. A notified body can re-run
-any calculation from the receipt: same inputs (verify via `input_hash`) + same ruleset
-version + same factor dataset version → must produce the same output.
+any calculation from the receipt: same inputs (verify via `input_hash`) + same
+parameters (verify via `ruleset_content_sha256`) + same factor dataset version →
+must produce the same output.
+
+The parameter hash is what makes that a check rather than a claim. A version
+string is maintained by hand, so two receipts citing the same `ruleset_version`
+from builds carrying different thresholds used to be indistinguishable.
 
 ---
 

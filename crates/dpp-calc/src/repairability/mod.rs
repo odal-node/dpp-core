@@ -51,6 +51,6 @@ mod golden_vectors;
 pub use calculator::{ParameterContributions, RepairabilityClass, RepairabilityResult, calculate};
 pub use parameters::RepairabilityInputs;
 pub use thresholds::{
-    DisplaysRuleset, LaptopRuleset, RepairabilityRuleset, SimplifiedRepairabilityHeuristic,
-    WashingMachineRuleset,
+    DisplaysRuleset, FilledRepairabilityRuleset, LaptopRuleset, RepairabilityRuleset,
+    SimplifiedRepairabilityHeuristic, WashingMachineRuleset,
 };

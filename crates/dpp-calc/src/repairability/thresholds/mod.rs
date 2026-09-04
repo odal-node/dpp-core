@@ -11,10 +11,13 @@
 //!
 //! - `types` — the shared [`RepairabilityWeights`] / [`RepairabilityThresholds`] tables.
 //! - `ruleset` — the [`RepairabilityRuleset`] trait.
+//! - `filled` — [`FilledRepairabilityRuleset`], a ruleset whose parameters a
+//!   verified bundle supplied.
 //! - one file per concrete ruleset version: `smartphone` (in force today),
 //!   `laptop`, `displays`, `washing_machine` (reserved stubs).
 
 mod displays;
+mod filled;
 mod laptop;
 mod ruleset;
 mod smartphone;
@@ -24,8 +27,13 @@ mod types;
 mod washing_machine;
 
 pub use displays::DisplaysRuleset;
+pub use filled::FilledRepairabilityRuleset;
 pub use laptop::LaptopRuleset;
 pub use ruleset::RepairabilityRuleset;
 pub use smartphone::SimplifiedRepairabilityHeuristic;
-pub use types::{DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityThresholds, RepairabilityWeights};
+pub(crate) use types::repairability_parameters;
+pub use types::{
+    DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityThresholds, RepairabilityWeights,
+    THRESHOLDS_GROUP, WEIGHTS_GROUP,
+};
 pub use washing_machine::WashingMachineRuleset;

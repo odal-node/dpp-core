@@ -37,10 +37,31 @@ pub struct CalculationReceipt {
     pub ruleset_id: String,
     /// Version of the ruleset (semver-shaped string).
     pub ruleset_version: String,
-    /// Version of the signed Compliance-Current bundle that delivered this
-    /// ruleset. `None` when the ruleset came from the built-in baseline
-    /// (no signed bundle involved).
+    /// SHA-256 of the JCS (RFC 8785) canonical JSON of the parameter set this
+    /// calculation actually used.
+    ///
+    /// `ruleset_id` and `ruleset_version` say *which rule*; this says *which
+    /// numbers*. Without it two receipts citing the same id and version,
+    /// computed by builds carrying different thresholds, are indistinguishable —
+    /// and since a version is a string a human maintains, that is not a remote
+    /// failure. Always populated, whether or not a bundle was involved: the
+    /// baseline case is the one that had no other evidence.
+    ///
+    /// Empty string until populated via
+    /// [`for_ruleset`](CalculationReceipt::for_ruleset), which is the only
+    /// constructor that has a ruleset to read it from.
+    pub ruleset_content_sha256: String,
+    /// Version of the signed Compliance-Current bundle that filled this
+    /// ruleset's parameters. `None` when the ruleset came from the built-in
+    /// baseline (no signed bundle involved).
     pub bundle_version: Option<String>,
+    /// The signed bundle manifest's `contentSha256` — the bytes the publisher
+    /// committed to. `None` for the built-in baseline.
+    ///
+    /// Travels with `bundle_version` because either alone is weak: a version is
+    /// a label the publisher chose and may reuse, and a hash with no version
+    /// does not say which release to go and fetch.
+    pub bundle_content_sha256: Option<String>,
     /// Identifier of the factor dataset (empty if no factor provider was used).
     pub factor_dataset_id: String,
     /// Version of the factor dataset (empty if no factor provider was used).
@@ -67,7 +88,14 @@ impl CalculationReceipt {
     /// Both timestamps come from `clock` — the receipt never reads the wall
     /// clock itself, so replaying a stored calculation reproduces its dates
     /// exactly rather than stamping today's.
-    pub fn new(
+    ///
+    /// Crate-private, because it cannot populate `ruleset_content_sha256` — it
+    /// takes an id and a version string, not the ruleset those came from. A
+    /// receipt built this way would carry an empty parameter hash that *looks*
+    /// present, which is worse than not having the field. Callers outside this
+    /// crate go through [`for_ruleset`](Self::for_ruleset), which the doc
+    /// already told them to use.
+    pub(crate) fn new(
         input_hash: impl Into<String>,
         ruleset_id: impl Into<String>,
         ruleset_version: impl Into<String>,
@@ -79,7 +107,9 @@ impl CalculationReceipt {
             output_hash: String::new(),
             ruleset_id: ruleset_id.into(),
             ruleset_version: ruleset_version.into(),
+            ruleset_content_sha256: String::new(),
             bundle_version: None,
+            bundle_content_sha256: None,
             factor_dataset_id: String::new(),
             factor_dataset_version: String::new(),
             factor_set_hash: None,
@@ -94,31 +124,41 @@ impl CalculationReceipt {
     /// calculator's `calculate()` should use instead of hand-assembling
     /// `CalculationReceipt::new(...).with_output_hash(...)` — see
     /// `co2e::calculator::calculate` / `repairability::calculator::calculate`.
+    /// # Provenance is read here, and only here
+    ///
+    /// The parameter hash and the bundle fields all come off the same
+    /// `ruleset`, so a receipt cannot name a bundle while its hash still
+    /// describes the baseline. There is deliberately no setter for any of the
+    /// three: `with_bundle_version` used to exist and could be called on a
+    /// receipt whose parameters had never been filled, which is exactly the
+    /// inconsistency these fields are meant to rule out.
     pub fn for_ruleset<T: Serialize>(
         inputs: &T,
         ruleset: &dyn Ruleset,
         clock: AssessmentClock,
         output_hash: impl Into<String>,
     ) -> Result<Self, CalcError> {
-        Ok(Self::new(
+        let mut receipt = Self::new(
             input_hash(inputs)?,
             ruleset.id().0,
             ruleset.version().0,
             clock,
         )
-        .with_output_hash(output_hash))
+        .with_output_hash(output_hash);
+
+        receipt.ruleset_content_sha256 = ruleset.parameters().content_sha256()?;
+
+        if let Some(provenance) = ruleset.bundle_provenance() {
+            receipt.bundle_version = Some(provenance.bundle_version.clone());
+            receipt.bundle_content_sha256 = Some(provenance.content_sha256.clone());
+        }
+
+        Ok(receipt)
     }
 
     /// Bind the numeric output values to this receipt.
     pub fn with_output_hash(mut self, hash: impl Into<String>) -> Self {
         self.output_hash = hash.into();
-        self
-    }
-
-    /// Stamp the signed Compliance-Current bundle version that delivered this
-    /// ruleset. Leave unset (`None`) for the built-in baseline rulesets.
-    pub fn with_bundle_version(mut self, bundle_version: impl Into<String>) -> Self {
-        self.bundle_version = Some(bundle_version.into());
         self
     }
 
@@ -210,16 +250,32 @@ mod tests {
         assert_eq!(receipt.jws.as_deref(), Some("jws-token"));
     }
 
+    /// The bundle fields default to absent and survive a JSON round trip.
+    ///
+    /// This asserted `json["bundle_version"]` before, which is not a key this
+    /// struct ever emits — it is `rename_all = "camelCase"`, so the key is
+    /// `bundleVersion`, and indexing a `serde_json::Value` with a missing key
+    /// yields `Null`. The assertion therefore passed no matter what the field
+    /// serialised as, and the test's name promised a round trip it never
+    /// performed. Both halves are checked here instead.
     #[test]
-    fn bundle_version_defaults_to_none_and_round_trips() {
+    fn bundle_fields_default_to_absent_and_round_trip() {
         let receipt = CalculationReceipt::new("in", "r", "1.0.0", test_clock());
         assert_eq!(receipt.bundle_version, None);
+        assert_eq!(receipt.bundle_content_sha256, None);
 
         let json = serde_json::to_value(&receipt).unwrap();
-        assert_eq!(json["bundle_version"], serde_json::Value::Null);
+        assert!(
+            json.get("bundle_version").is_none(),
+            "snake_case key must not appear — the struct is camelCase"
+        );
+        assert_eq!(json["bundleVersion"], serde_json::Value::Null);
+        assert_eq!(json["bundleContentSha256"], serde_json::Value::Null);
 
-        let stamped = receipt.with_bundle_version("bundle-2026.07");
-        assert_eq!(stamped.bundle_version.as_deref(), Some("bundle-2026.07"));
+        let back: CalculationReceipt = serde_json::from_value(json).unwrap();
+        assert_eq!(back.bundle_version, None);
+        assert_eq!(back.bundle_content_sha256, None);
+        assert_eq!(back.receipt_id, receipt.receipt_id);
     }
 
     #[test]

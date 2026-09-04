@@ -3,7 +3,18 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
+use crate::parameters::RulesetParameters;
 use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+
+/// Names of this ruleset's parameter groups in [`RulesetParameters`].
+///
+/// All four are Annex IV point 5 / Annex II Table 4 figures, so none of them is
+/// fillable — they are declared so that a receipt hashes the numbers a
+/// determination actually used, not so a bundle can offer replacements.
+const WEIGHTS_GROUP: &str = "weights";
+const PART_WEIGHTS_RIGID_GROUP: &str = "partWeightsRigid";
+const PART_WEIGHTS_FOLDABLE_GROUP: &str = "partWeightsFoldable";
+const CLASS_BOUNDARIES_GROUP: &str = "classBoundaries";
 
 /// Parameter weights for the index. Annex IV point 5:
 /// `R = SDD*0,25 + SF*0,15 + ST*0,15 + SSP*0,15 + SSU*0,15 + SRI*0,15`.
@@ -124,6 +135,18 @@ impl Ruleset for Eu2023_1669Ruleset {
         EFFECTIVE.get_or_init(|| {
             Effectivity::open(NaiveDate::from_ymd_opt(2025, 6, 20).expect("valid date"))
         })
+    }
+
+    /// # Panics
+    ///
+    /// Never: every weight and boundary is a finite `f64` literal.
+    fn parameters(&self) -> RulesetParameters {
+        RulesetParameters::new()
+            .with(WEIGHTS_GROUP, &WEIGHTS)
+            .and_then(|p| p.with(PART_WEIGHTS_RIGID_GROUP, &PART_WEIGHTS_RIGID))
+            .and_then(|p| p.with(PART_WEIGHTS_FOLDABLE_GROUP, &PART_WEIGHTS_FOLDABLE))
+            .and_then(|p| p.with(CLASS_BOUNDARIES_GROUP, &CLASS_BOUNDARIES))
+            .expect("EU 2023/1669 weights and boundaries are finite literals")
     }
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {

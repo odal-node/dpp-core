@@ -3,9 +3,17 @@
 use chrono::NaiveDate;
 use std::sync::OnceLock;
 
+use crate::parameters::RulesetParameters;
 use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
 
 use super::LifecycleStage;
+
+/// Name of the system-boundary group in [`RulesetParameters`].
+///
+/// The declared stage list *is* this ruleset's parameter: PEF Method v3.1 §9
+/// sets the boundary, and a result that silently covered a different set of
+/// stages would not be comparable with one that did not.
+const DECLARED_STAGES_GROUP: &str = "declaredStages";
 
 /// Regulatory ruleset for a CO₂e methodology.
 ///
@@ -54,6 +62,15 @@ impl Ruleset for CradleToGateRuleset {
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {
         &CTG_BASIS
+    }
+
+    /// # Panics
+    ///
+    /// Never: `LifecycleStage` serialises to a plain string.
+    fn parameters(&self) -> RulesetParameters {
+        RulesetParameters::new()
+            .with(DECLARED_STAGES_GROUP, &CTG_STAGES)
+            .expect("lifecycle stages serialise as strings")
     }
 }
 

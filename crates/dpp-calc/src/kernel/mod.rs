@@ -10,6 +10,8 @@
 //!   metric has a value, or which of four reasons it does not.
 //! - [`ruleset`] — the [`Ruleset`](ruleset::Ruleset) framework: identity,
 //!   effectivity, and structured legal citation.
+//! - [`parameters`] — the numbers a ruleset carries, and the fill-never-override
+//!   rule a signed bundle is held to when it offers replacements.
 //! - [`receipt`] — the proof-of-calculation envelope plus JCS hashing helpers.
 //! - [`factor`]  — the runtime injection point for licensed LCI factor datasets.
 //!
@@ -23,6 +25,7 @@ pub mod clock;
 pub mod error;
 pub mod factor;
 pub mod hashing;
+pub mod parameters;
 pub mod receipt;
 pub mod ruleset;
 
