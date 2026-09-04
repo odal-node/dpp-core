@@ -178,6 +178,51 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   one boolean. Anything that gates wants the fold; anything that renders wants
   the halves.
 
+- **Nothing distinguished a threshold taken from the Official Journal from one
+  this project invented.** New `ParameterBasis::{Sourced, Assumed}` in
+  `dpp-calc`, exposed as a defaulted `Ruleset::parameter_basis()`.
+
+  Every ruleset in the crate has numbers. Only some of them are law.
+  `Art8Phase1Ruleset` carries the recycled-content shares verified against
+  Regulation (EU) 2023/1542 Art. 8(2). `LaptopRuleset` carries invented weights
+  in a stub whose effectivity is `Pending` and whose basis records the delegated
+  act as not yet adopted. Both are "a value the crate already has", and until now
+  nothing could tell them apart programmatically.
+
+  Four rulesets carry an explicit `parameter_basis()`, all of them **Assumed**:
+  `DisplaysRuleset`, `LaptopRuleset`, `WashingMachineRuleset`, and
+  `SimplifiedRepairabilityHeuristic`, whose own basis reads "Non-regulatory:
+  simplified repairability heuristic (NOT EU 2023/1669 Annex IV)".
+
+  The other four — `Art8Phase1Ruleset`, `Art8Phase2Ruleset`, `Eu2023_1669Ruleset`
+  and `CradleToGateRuleset` — say nothing and are therefore **Sourced** by the
+  default. That is on purpose, not an omission: writing an explicit `Sourced` on
+  the law-carrying rulesets would make it the thing a new ruleset gets
+  copy-pasted with, so the next placeholder would arrive carrying a
+  deliberate-looking legal claim instead of the silence the tripwire below is
+  built to catch. What holds those four to their claim is the citation
+  requirement, not a line of code at each site.
+
+  That last one is why the distinction is not simply "is it a stub". It resolves,
+  it governs dates, and its numbers are still ours.
+
+  **The default is `Sourced`, which is the fail-closed direction.** The two
+  mistakes are not symmetric: treating law as ours risks silently replacing a
+  legal threshold, which is invisible; treating ours as law only leaves a
+  placeholder unchanged until someone classifies it. Defaulting also keeps the
+  trait addition non-breaking for any implementor outside this crate.
+
+  A tripwire keeps that default honest: a ruleset citing no `source_url` may not
+  claim `Sourced`, so a new placeholder cannot acquire legal provenance by
+  staying silent. Verified to fail before shipping — claiming `Sourced` on the
+  smartphone heuristic makes it fail, naming the ruleset and both remedies.
+
+  Groundwork for the signed-ruleset-bundle channel, where the operative rule is
+  that a bundle may **fill** a parameter and may never **override** one that
+  comes from law. That rule needs this distinction to be expressible; presence
+  alone would either freeze every placeholder permanently or let a bundle
+  contradict the Official Journal.
+
 ### Documentation
 
 - **The additive-only rule for persisted structs was enforced but never written

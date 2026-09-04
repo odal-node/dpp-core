@@ -19,7 +19,9 @@ use super::{
 };
 use crate::error::CalcError;
 use crate::repairability::parameters::RepairabilityInputs;
-use crate::ruleset::{Effectivity, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion};
+use crate::ruleset::{
+    Effectivity, ParameterBasis, RegulatoryBasis, Ruleset, RulesetId, RulesetVersion,
+};
 
 static SMARTPHONE_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
     disassembly: 0.25,
@@ -67,6 +69,18 @@ impl Ruleset for SimplifiedRepairabilityHeuristic {
 
     fn regulatory_basis(&self) -> &RegulatoryBasis {
         &SMARTPHONE_BASIS
+    }
+
+    /// **Not a stub, and still ours.** This ruleset resolves and governs dates,
+    /// unlike the three pending ones — but its own basis says *"Non-regulatory:
+    /// simplified repairability heuristic (NOT EU 2023/1669 Annex IV)"*, so the
+    /// numbers are this project's rather than an act's.
+    ///
+    /// The case that shows why presence is the wrong test: a rule keyed on "does
+    /// a value exist" would protect these as if they were law, and a rule keyed
+    /// on "is this a stub" would miss them.
+    fn parameter_basis(&self) -> ParameterBasis {
+        ParameterBasis::Assumed
     }
 }
 
