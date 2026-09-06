@@ -486,4 +486,10 @@ impl crate::product_group::payload::ProductGroupPayload for BatteryData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// Art. 1(3)'s five categories. Always present: the field is required and
+    /// the enum is closed, so a battery always states which one it is.
+    fn product_category(&self) -> Option<&str> {
+        Some(self.battery_type.wire_str())
+    }
 }

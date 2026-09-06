@@ -2,6 +2,8 @@
 
 mod data;
 mod device_type;
+#[cfg(test)]
+mod device_type_tests;
 mod efficiency_class;
 
 pub use data::ElectronicsData;

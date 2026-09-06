@@ -53,4 +53,11 @@ impl crate::product_group::payload::ProductGroupPayload for TyreData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// Reg. (EU) 2020/740's C1/C2/C3 classes. Constrained by the `tyreClass`
+    /// enum in this group's schema. Not the fuel-efficiency or wet-grip class:
+    /// those grade a tyre within its class rather than saying which it is.
+    fn product_category(&self) -> Option<&str> {
+        Some(&self.tyre_class)
+    }
 }

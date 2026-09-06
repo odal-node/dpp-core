@@ -44,4 +44,10 @@ impl crate::product_group::payload::ProductGroupPayload for ConstructionData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// CPR calls this axis the product family; it is this group's category.
+    /// Constrained by the `productFamily` enum in this group's schema.
+    fn product_category(&self) -> Option<&str> {
+        Some(&self.product_family)
+    }
 }

@@ -65,4 +65,11 @@ impl crate::product_group::payload::ProductGroupPayload for DetergentData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// The detergent product type. Constrained by the `productType` enum in
+    /// this group's schema. Not [`Self::format`](DetergentData::format), which
+    /// is the physical presentation of the same product type.
+    fn product_category(&self) -> Option<&str> {
+        Some(&self.product_type)
+    }
 }

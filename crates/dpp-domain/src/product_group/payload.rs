@@ -46,4 +46,37 @@ pub trait ProductGroupPayload {
     /// cares about. The SVHC lints run on the second and stay silent on the
     /// first, so collapsing them would make an unasked group look cleared.
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]>;
+
+    /// The product category this record declares, as the wire string the
+    /// catalog lists in `productCategories`.
+    ///
+    /// # Why the group has to answer this itself
+    ///
+    /// There is no common field to read. Seven groups carry a category and name
+    /// it seven different things — `batteryType`, `productFamily`,
+    /// `productType`, `productCategory`, `tyreClass` — because each act names
+    /// its own axis and none of them agreed to call it the same thing. Which
+    /// field *is* the category is a fact about the act, so it is answered in
+    /// the group's own file, exactly like [`Self::model_identifier`].
+    ///
+    /// # It must be the category axis, not merely a field with few values
+    ///
+    /// The answer is what a caller compares against a credential's declared
+    /// scope, so it has to be the axis that scope is about. A field that
+    /// partitions the group some *other* way — how the metal was made, how old
+    /// the child is — has a small enumerated domain and looks the part, and
+    /// answering with one would let a credential scoped to a category be
+    /// satisfied by something that is not a category. Where the act defines no
+    /// such axis the answer is `None`.
+    ///
+    /// The values themselves are constrained by the group's own schema enum,
+    /// the same gate every other validated field passes. Note that this is
+    /// **wider** than the catalog's `productCategories`, which is a curated
+    /// subset rather than the legal domain — a furniture passport may lawfully
+    /// be a `bed`, which the schema allows and the catalog does not list.
+    ///
+    /// `None` is a real answer, the same way it is for the other two: it says
+    /// this group has no category a passport can state, not that a value is
+    /// missing.
+    fn product_category(&self) -> Option<&str>;
 }

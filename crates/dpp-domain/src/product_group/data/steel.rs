@@ -40,4 +40,11 @@ impl crate::product_group::payload::ProductGroupPayload for SteelData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// The steel grade. Constrained by the `productCategory` enum in this
+    /// group's schema rather than by the Rust type, which is the same guarantee
+    /// every other validated string field has.
+    fn product_category(&self) -> Option<&str> {
+        Some(&self.product_category)
+    }
 }

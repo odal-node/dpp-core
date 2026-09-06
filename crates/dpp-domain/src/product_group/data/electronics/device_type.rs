@@ -24,3 +24,20 @@ pub enum DeviceType {
     #[serde(rename = "tablet")]
     Tablet,
 }
+
+impl DeviceType {
+    /// The serde wire tag for this device type, e.g. `"other-mobile-phone"`.
+    ///
+    /// Equivalent to `serde_json::to_value(self)` but without the allocation
+    /// and `Value` round trip. `device_type_wire_str_matches_serde` pins the
+    /// two together — which matters more here than usual, since `Tablet`'s tag
+    /// is the one value that does not follow the `kebab-case` rule.
+    pub const fn wire_str(&self) -> &'static str {
+        match self {
+            Self::Smartphone => "smartphone",
+            Self::OtherMobilePhone => "other-mobile-phone",
+            Self::CordlessPhone => "cordless-phone",
+            Self::Tablet => "tablet",
+        }
+    }
+}

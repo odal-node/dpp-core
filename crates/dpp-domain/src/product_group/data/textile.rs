@@ -166,4 +166,20 @@ impl crate::product_group::payload::ProductGroupPayload for TextileData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
+
+    /// This group models no product category.
+    ///
+    /// The catalog lists `apparel`, `footwear` and `home_textile`, and no
+    /// field here carries any of them — the textile schema has no
+    /// category-shaped property at all, at any version. Those three values are
+    /// therefore unreachable: nothing can set one and nothing can validate
+    /// against one. (`home_textile` is also the only snake_case value in the
+    /// whole catalog, which is the kind of thing an unread list accumulates.)
+    ///
+    /// The delegated act is unadopted, so what a textile category *is* is not
+    /// yet readable from a text. Inventing the field ahead of it would put a
+    /// guess where the act's own axis has to go.
+    fn product_category(&self) -> Option<&str> {
+        None
+    }
 }

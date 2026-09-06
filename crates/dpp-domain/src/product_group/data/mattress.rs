@@ -73,4 +73,11 @@ impl crate::product_group::payload::ProductGroupPayload for MattressData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
+
+    /// A mattress is the product type — which is why this group's field set is
+    /// furniture's with `product_type` removed. The catalog declares no
+    /// categories here, and the two agree.
+    fn product_category(&self) -> Option<&str> {
+        None
+    }
 }

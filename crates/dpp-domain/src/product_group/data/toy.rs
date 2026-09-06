@@ -46,4 +46,11 @@ impl crate::product_group::payload::ProductGroupPayload for ToyData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
+
+    /// This group models no product category, and the catalog declares none.
+    /// `age_group` and `primary_material` are properties of a toy, not
+    /// partitions of the group — a wooden 3-6 toy is not a category of toy.
+    fn product_category(&self) -> Option<&str> {
+        None
+    }
 }
