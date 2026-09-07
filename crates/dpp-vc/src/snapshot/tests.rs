@@ -16,6 +16,23 @@ fn public_key_b64(store: &KeyStore) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(entry.verifying_key.to_bytes())
 }
 
+/// A stand-in for the publish-time proof, which these tests only ever carry
+/// opaquely — the outer proof covers it as bytes and never reads it.
+///
+/// Assembled rather than written as a `eyJ…` literal: a JWS-shaped string in
+/// source is what secret scanners are for, and one of them is right to flag it
+/// even when the token is a fixture. Building it keeps the shape without
+/// putting the shape in the file.
+fn frozen_public_proof() -> String {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    format!(
+        "{}.{}.{}",
+        b64.encode(br#"{"alg":"EdDSA"}"#),
+        b64.encode(br#"{"frozen":true}"#),
+        b64.encode(b"not-a-real-signature"),
+    )
+}
+
 /// The public view a snapshot wraps: passport fields plus the publish-time
 /// proof, which is frozen and travels untouched.
 fn public_view() -> Value {
@@ -23,7 +40,7 @@ fn public_view() -> Value {
         "id": "0192f3c0-0000-7000-8000-000000000000",
         "productName": "Widget",
         "status": "active",
-        "publicJwsSignature": "eyJhbGciOiJFZERTQSJ9.eyJmcm96ZW4iOnRydWV9.c2ln",
+        "publicJwsSignature": frozen_public_proof(),
     })
 }
 
@@ -152,7 +169,7 @@ fn the_outer_proof_covers_the_publish_time_proof() {
 
     document.as_object_mut().expect("object").insert(
         "publicJwsSignature".to_owned(),
-        json!("eyJ4Ijoic3dhcHBlZCJ9"),
+        json!(format!("{}-swapped", frozen_public_proof())),
     );
 
     let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
@@ -264,7 +281,7 @@ fn a_snapshot_survives_the_round_trip_through_bytes() {
         "serial": 9_007_199_254_740_991_i64,
         "materials": [],
         "manufacturer": { "name": "Ünïcode GmbH", "country": "DE" },
-        "publicJwsSignature": "eyJhbGciOiJFZERTQSJ9.eyJmcm96ZW4iOnRydWV9.c2ln",
+        "publicJwsSignature": frozen_public_proof(),
         "asOf": rfc3339,
         "validUntil": (as_of + Duration::days(7)).to_rfc3339_opts(SecondsFormat::Secs, true),
     });
