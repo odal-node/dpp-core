@@ -20,6 +20,8 @@ depends on `dpp-crypto`, whose RNG requires a platform entropy source.
 - You need to check whether a credential has been revoked against a Bitstring
   Status List.
 - You are building the JSON-LD envelope for a passport or a credential.
+- You are reading a *copy* of a passport's public view and need to know whether
+  its time bound still holds — see `snapshot`.
 
 ## What this crate is *not*
 
