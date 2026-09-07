@@ -380,6 +380,7 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "productId",
     "commodityCode",
     "operatorIdentifier",
+    "responsibleOperator",
     "facility",
     "seal",
 ];

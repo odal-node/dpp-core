@@ -226,6 +226,20 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.product_id = Some(uuid::Uuid::nil());
     passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));
     passport.operator_identifier = Some("DE123456789".to_owned());
+    passport.responsible_operator = Some(crate::operator::ResponsibleOperatorSnapshot {
+        operator: crate::operator::ResponsibleOperator {
+            did: "did:web:acme.example.com".to_owned(),
+            name: "Acme GmbH".to_owned(),
+            role: crate::operator::OperatorRole::AuthorisedRepresentative,
+            eu_operator_id: Some("DE123456789".to_owned()),
+            eu_operator_id_scheme: Some("vat".to_owned()),
+            country: "DE".to_owned(),
+            registered_trade_name: Some("Acme".to_owned()),
+            postal_address: Some("Alexanderplatz 1, 10178 Berlin".to_owned()),
+            electronic_address: Some("compliance@acme.example.com".to_owned()),
+        },
+        basis: crate::operator::ResponsibilityBasis::MarketSurveillanceArt4,
+    });
     passport.facility = Some(FacilitySnapshot {
         scheme: "gln".to_owned(),
         value: "4012345000009".to_owned(),
