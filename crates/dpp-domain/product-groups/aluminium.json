@@ -6,11 +6,7 @@
     "1.1.0"
   ],
   "currentSchemaVersion": "1.1.0",
-  "productCategories": [
-    "primary",
-    "secondary-recycled",
-    "mixed"
-  ],
+  "productCategories": [],
   "plugin": "product-group-aluminium",
-  "notes": "CO2e thresholds in the plugin are indicative pending the delegated act."
+  "notes": "CO2e thresholds in the plugin are indicative pending the delegated act. productCategories is empty on purpose: it previously listed primary/secondary-recycled/mixed, which are productionRoute values — how the metal was made, not what the product is. No act defines an aluminium category axis yet."
 }

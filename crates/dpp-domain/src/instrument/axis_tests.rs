@@ -92,11 +92,31 @@ fn every_manifest_round_trips() {
 ///
 /// The correspondence is **not derivable** from the data — depending on product group
 /// the categories live under `productCategory`, `productType`, `batteryType`,
-/// `productFamily`, `productionRoute` or `tyreClass` — so it is declared here.
-/// A product group absent from this table is simply not cross-checked; `textile`, for
-/// example, declares categories but its schema has no enum for them.
+/// `productFamily` or `tyreClass` — so it is declared here.
+///
+/// # Absence is no longer an exemption
+///
+/// This table used to say that a product group absent from it "is simply not
+/// cross-checked", and named `textile` as the example. That made absence a
+/// silent opt-out from the only guard on this axis, and textile spent that
+/// exemption declaring three categories no schema defines anywhere.
+/// `every_product_group_declaring_categories_is_cross_checked` closes it: a
+/// group that declares categories must appear here, so the only way out is to
+/// declare none.
+///
+/// # `aluminium` is not here, and that is the correction
+///
+/// It used to carry `("aluminium", "productionRoute")`. That row made this guard
+/// certify a **production route** as a product category — the two are different
+/// axes, and pointing a drift guard at the wrong property is worse than having
+/// none, because it reports the axis as verified. The catalog no longer declares
+/// aluminium categories, so there is nothing left for a row to check.
+///
+/// `unsold-goods`, `mattress` and `toy` are absent for the plain reason: they
+/// declare no categories. Impl. Reg. (EU) 2026/2 Art. 3 delimits an unsold-goods
+/// disclosure by CN code rather than a category name, so its lines carry
+/// `cnCategories` and its descriptor list is empty.
 const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
-    ("aluminium", "productionRoute"),
     ("battery", "batteryType"),
     ("construction", "productFamily"),
     ("detergent", "productType"),
@@ -104,10 +124,6 @@ const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
     ("furniture", "productType"),
     ("steel", "productCategory"),
     ("tyre", "tyreClass"),
-    // `unsold-goods` is deliberately absent. Impl. Reg. (EU) 2026/2 Art. 3
-    // delimits a disclosure by CN code, not by a category name, so v2.0.0 has
-    // no category enum for a catalog row to be checked against — and the
-    // descriptor's `productCategories` is empty for the same reason.
 ];
 
 /// Drift guard: a catalog product category that is not a legal value of the
@@ -156,4 +172,40 @@ fn product_categories_are_legal_values_of_their_schema_enum() {
             );
         }
     }
+}
+
+/// Completeness guard: the direction the check above cannot run.
+///
+/// `product_categories_are_legal_values_of_their_schema_enum` iterates
+/// `CATEGORY_ENUM_PROPERTY`, so a product group missing from that table is not
+/// checked — and nothing said the table had to be complete. Absence was a
+/// silent exemption, and it was spent: `textile` declared `apparel`, `footwear`
+/// and `home_textile` while its schema carried no enum-valued property at any
+/// version, so all three were values nothing could set and nothing could
+/// validate.
+///
+/// The two directions catch different things and neither subsumes the other.
+/// The first says a declared category is a legal value of the property it is
+/// checked against. This one says a group that declares categories is checked
+/// **at all** — which is the assertion that would have made textile's three
+/// values visible, and the one whose absence is the same defect as #224.
+#[test]
+fn every_product_group_declaring_categories_is_cross_checked() {
+    let catalog = ProductGroupCatalog::new();
+
+    let unchecked: Vec<&str> = catalog
+        .all()
+        .iter()
+        .filter(|d| !d.product_categories.is_empty())
+        .filter(|d| !CATEGORY_ENUM_PROPERTY.iter().any(|(key, _)| *key == d.key))
+        .map(|d| d.key.as_str())
+        .collect();
+
+    assert!(
+        unchecked.is_empty(),
+        "these product groups declare `productCategories` and have no row in \
+         CATEGORY_ENUM_PROPERTY, so nothing checks their values against a schema: \
+         {unchecked:?} — either add a row naming the schema property that enumerates \
+         them, or, if the group's act defines no category axis, declare none"
+    );
 }

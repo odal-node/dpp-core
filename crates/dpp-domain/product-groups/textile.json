@@ -7,16 +7,12 @@
     "1.2.0"
   ],
   "currentSchemaVersion": "1.2.0",
-  "productCategories": [
-    "apparel",
-    "footwear",
-    "home_textile"
-  ],
+  "productCategories": [],
   "disclosure": {
     "svhcSubstances": "restricted",
     "disassemblyInstructions": "restricted",
     "sparePartsAvailable": "restricted"
   },
   "plugin": "product-group-textile",
-  "notes": "Fields are provisional and may change without a migration path."
+  "notes": "Fields are provisional and may change without a migration path. productCategories is empty on purpose: it previously listed apparel/footwear/home_textile, which no schema version defines — the textile schema has no enum-valued property at all — so nothing could set or validate them. The delegated act that would define a category axis is unadopted."
 }
