@@ -35,4 +35,9 @@ impl crate::product_group::payload::ProductGroupPayload for SteelData {
     fn model_identifier(&self) -> Option<&str> {
         None
     }
+
+    /// This act's schema declares no substances-of-concern field.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+        None
+    }
 }

@@ -12,6 +12,9 @@
 mod types;
 
 pub mod battery;
+pub mod svhc;
+#[cfg(test)]
+mod svhc_tests;
 pub mod textile;
 pub mod unsold_goods;
 
@@ -20,4 +23,9 @@ pub use types::{LintFinding, LintSeverity};
 /// Version of this crate's lint pack. Bump whenever a lint is added, removed,
 /// or its trigger condition changes — callers surface this alongside
 /// findings so a consumer can tell which pack produced them.
-pub const LINT_PACK_VERSION: &str = "1.0.0";
+///
+/// 1.1.0 adds the three [`svhc`] lints. They are the first pack that is not
+/// scoped to one product group: REACH Art. 33 reaches every article, so the
+/// lints run wherever a payload declares substances rather than under a single
+/// product group's arm.
+pub const LINT_PACK_VERSION: &str = "1.1.0";

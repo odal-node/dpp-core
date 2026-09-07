@@ -59,4 +59,10 @@ impl crate::product_group::payload::ProductGroupPayload for DetergentData {
     fn model_identifier(&self) -> Option<&str> {
         None
     }
+
+    /// This act's schema declares no substances-of-concern field. Detergent
+    /// hazards are carried by the surfactant and ingredient fields instead.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+        None
+    }
 }

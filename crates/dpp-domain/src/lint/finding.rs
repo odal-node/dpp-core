@@ -40,11 +40,48 @@ fn convert(f: dpp_rules::lint::LintFinding) -> LintFinding {
     }
 }
 
+/// Every lint that applies to this payload: its product group's own pack, plus
+/// the cross-group checks that apply wherever the relevant field exists.
+#[must_use]
+pub fn lint_product_group_data(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
+    let mut findings = product_group_lints(data, as_of);
+    findings.extend(svhc_lints(data));
+    findings
+}
+
+/// Substance-of-very-high-concern lints, for any product group whose schema
+/// carries a declaration.
+///
+/// Outside the product-group match on purpose: REACH Art. 33 reaches every
+/// article, so this runs on all five groups that declare substances rather than
+/// being repeated in five arms — four of which have no pack of their own and
+/// would otherwise have to grow one to get this check.
+///
+/// The list is the compiled-in baseline. Nothing here yet supplies another one;
+/// [`dpp_rules::check_svhc_declarations`] takes it as a parameter so that a
+/// caller can, and the findings state which list ran so a reader can tell.
+fn svhc_lints(data: &ProductGroupData) -> Vec<LintFinding> {
+    let Some(substances) = data.svhc_substances() else {
+        return Vec::new();
+    };
+    let inputs: Vec<dpp_rules::SvhcInput<'_>> = substances
+        .iter()
+        .map(|s| dpp_rules::SvhcInput {
+            cas_number: &s.cas_number,
+            substance_name: &s.substance_name,
+            concentration_pct: s.concentration_pct,
+        })
+        .collect();
+    dpp_rules::lint::svhc::lint_svhc_declarations(&inputs, &dpp_rules::CandidateList::embedded())
+        .into_iter()
+        .map(convert)
+        .collect()
+}
+
 /// Dispatch to the product group-specific lint pack. ProductGroups with no lint pack yet
 /// (everything but battery/textile/unsold-goods in the first ruleset)
 /// produce no findings.
-#[must_use]
-pub fn lint_product_group_data(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
+fn product_group_lints(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
     match data {
         ProductGroupData::Battery(b) => {
             let cathode: Vec<f64> = b

@@ -479,4 +479,11 @@ impl crate::product_group::payload::ProductGroupPayload for BatteryData {
     fn model_identifier(&self) -> Option<&str> {
         self.battery_model_id.as_deref()
     }
+
+    /// Annex XIII declares hazardous substances through its own point-2 and
+    /// point-3 fields, not through a REACH candidate-list declaration, so this
+    /// schema carries no `svhcSubstances`.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+        None
+    }
 }

@@ -36,4 +36,14 @@ pub trait ProductGroupPayload {
     /// `None` means the act defines no such concept — not that the value is
     /// missing.
     fn model_identifier(&self) -> Option<&str>;
+
+    /// Substances of very high concern declared on this payload, where this
+    /// group's schema carries them.
+    ///
+    /// `None` means the schema has no such field — the group was never asked
+    /// for the declaration. `Some(&[])` means it was asked and answered
+    /// "none present", which is a different claim and the one REACH Art. 33
+    /// cares about. The SVHC lints run on the second and stay silent on the
+    /// first, so collapsing them would make an unasked group look cleared.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]>;
 }
