@@ -85,6 +85,7 @@ pub fn base_passport(
         product_id: None,
         commodity_code: None,
         operator_identifier: None,
+        responsible_operator: None,
         facility: None,
         seal: None,
     }
@@ -104,6 +105,9 @@ pub fn make_operator(
         eu_operator_id: None,
         eu_operator_id_scheme: None,
         country: country.into(),
+        registered_trade_name: None,
+        postal_address: Some("Hauptstraße 1, 10115 Berlin".into()),
+        electronic_address: Some("compliance@acme.example.com".into()),
     }
 }
 

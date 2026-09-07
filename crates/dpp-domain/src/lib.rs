@@ -32,6 +32,7 @@ pub mod instrument;
 pub mod lint;
 pub mod manufacturer;
 pub mod material;
+pub mod operator;
 pub mod passport;
 pub mod passthrough;
 pub mod ports;
@@ -62,6 +63,9 @@ pub use crate::{
         GtinError, gs1_check_digit,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
+    operator::{
+        OperatorRole, ResponsibilityBasis, ResponsibleOperator, ResponsibleOperatorSnapshot,
+    },
     passport::{
         FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_PROOF_FIELDS,
         PASSPORT_WIRE_KEYS, Passport, PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
@@ -121,10 +125,7 @@ pub use crate::{
         WasteTreatmentSplit,
     },
     status::PassportStatus,
-    transfer::{
-        OperatorRole, ResponsibleOperator, TransferChain, TransferError, TransferReason,
-        TransferRecord, TransferStatus,
-    },
+    transfer::{TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus},
 };
 
 pub use error::DppError;

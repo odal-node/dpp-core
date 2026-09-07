@@ -20,7 +20,7 @@ why that is not the same as what it does.
 | Tier | Name | Holds | May import |
 |---|---|---|---|
 | 1 | vocabulary | Names things, decides nothing. `identifier` | nothing in this crate |
-| 2 | value | Value objects with no aggregate of their own. `compliance` `credential` `disclosure` `facility` `field_error` `manufacturer` `material` `seal` `status` | tier 1 |
+| 2 | value | Value objects with no aggregate of their own. `compliance` `credential` `disclosure` `facility` `field_error` `manufacturer` `material` `operator` `seal` `status` | tier 1 |
 | 3 | reference | The embedded, data-driven registries. `catalog` `instrument` `schemas` | tiers 1–2 |
 | 4 | composition | The shapes that bring the tiers below into one — the passport aggregate, the product-group union, and the crate-wide error that wraps any of them. `error` `passport` `product_group` | tiers 1–3 |
 | 5 | satellite | Records that hang off an aggregate. `eol` `graph` `product` `transfer` | tiers 1–4 |

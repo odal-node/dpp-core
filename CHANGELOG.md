@@ -15,6 +15,87 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The passport can now say who is answerable for the product, and under which
+  law.** *(Breaking: `ResponsibleOperator` and `OperatorRole` move from
+  `transfer` to a new top-level `operator` module — the crate-root re-exports
+  `dpp_domain::ResponsibleOperator` and `dpp_domain::OperatorRole` are unchanged,
+  but `dpp_domain::transfer::operator::*` paths are gone. `ResponsibleOperator`
+  gains three `Option` fields; `OperatorRole` gains a variant, and it is
+  `#[non_exhaustive]`, so a downstream `match` already needed a wildcard.
+  `Passport` gains `responsible_operator`, additive on the wire.)*
+
+  **Annex III, point (k)** asks the passport to carry "the name, contact details
+  and unique operator identifier of the economic operator established in the
+  Union responsible for carrying out" the relevant tasks. None of the three was
+  in the passport. `operator_identifier` looks like the third and is not: its own
+  documentation says it is the *publisher*, frozen at publish, explicitly not who
+  is responsible now. The name and role lived on `ResponsibleOperator` inside the
+  transfer chain, which the passport does not carry. Contact details were
+  modelled nowhere.
+
+  `Passport::responsible_operator` carries all three by value, the same choice
+  `facility` makes and for the same reason: a signed passport stays a complete
+  record independent of a registry that can move underneath it. **Art. 9(1)**
+  requires passport data to be "accurate, complete and up to date", and a
+  published passport is immutable, so keeping it current means issuing a
+  corrected successor when responsibility moves — the chain stays the history,
+  this is the statement.
+
+  **The basis is recorded, not inferred.** Point (k) is a disjunction — Article 4
+  of Regulation (EU) 2019/1020, *or* Regulation (EU) 2023/988, *or* "similar
+  tasks pursuant to other Union law applicable to the product" — and
+  **Art. 4(5)** limits the first to a closed list of instruments. Of the product
+  groups this crate models, only construction (305/2011) and toys (2009/48/EC)
+  fall inside it. A model that assumed Art. 4 would be recording a false citation
+  for ten of twelve groups, so `ResponsibilityBasis` states which limb applies
+  and the catch-all carries its own citation.
+
+  A note for anyone checking that citation: Annex III(k) prints "Article 15 of
+  Regulation (EU) 2023/988", and Article 15 of that regulation is *Cooperation of
+  economic operators with market surveillance authorities*. The responsible-person
+  provision is **Article 16**. Verified identical in the original OJ and the
+  consolidation, so it is not a transcription artefact. Nothing turns on it —
+  Art. 16(1) applies Art. 4(2) and (3) of 2019/1020 wholesale, so both limbs land
+  on the same person performing the same tasks — and the variant is named for the
+  regulation rather than an article number so it need not choose between the
+  citation as printed and the provision as intended.
+
+  **`OperatorRole` was missing one of the four roles the law names.** Art. 4(2)
+  admits a manufacturer established in the Union, an importer where the
+  manufacturer is not, an authorised representative, and a **fulfilment service
+  provider** where no other is established in the Union — the fallback that stops
+  a product having no answerable party at all. That last one had no variant, so
+  the case could not be written down. `can_be_art_4_operator` now names the four,
+  and it is advisory: three of them carry establishment conditions a role alone
+  cannot check.
+
+  **Contact details are a struct because the law never treats them as a string.**
+  Four provisions converge on one shape — ESPR Art. 27(6) (manufacturer) and
+  Art. 29(3) (importer), Art. 4(4) of 2019/1020, and Art. 16(3) of 2023/988:
+  name, registered trade name or registered trade mark, postal address,
+  electronic address. `registered_trade_name`, `postal_address` and
+  `electronic_address` are those. `electronic_address` is deliberately distinct
+  from `did`: a DID document resolves keys, and nothing in it need be a mailbox.
+
+  **Why the module moved.** `passport` is tier 4 and `transfer` is tier 5, and
+  imports only point up the ladder, so the aggregate could not reach a type the
+  satellite owned. Under the placement rule a thing used by both belongs at their
+  nearest common parent, and an economic operator is a value object with no
+  aggregate of its own — tier 2, beside `manufacturer` and `facility`. The chain
+  records who has *been* responsible and the passport states who *is*; neither
+  owns the concept.
+
+  Also corrected: `operator_identifier`'s doc comment quoted Annex III(k) with
+  the second and third limbs elided behind a `[...]`, which is how the field came
+  to read as though Art. 4 were the only basis.
+
+  **Migration.** `use dpp_domain::{ResponsibleOperator, OperatorRole}` is
+  unchanged. Replace any `dpp_domain::transfer::operator::X` with
+  `dpp_domain::operator::X`. Add `registered_trade_name: None`,
+  `postal_address: None`, `electronic_address: None` to `ResponsibleOperator`
+  literals and `responsible_operator: None` to `Passport` literals; all four
+  reproduce the previous behaviour, and stored documents are unaffected.
+
 - **A bill of materials could not say how much of what.**
   *(Breaking: `Passport::component_refs` changes element type from
   `Vec<PassportRef>` to `Vec<ComponentRef>`. The wire key `componentRefs` is

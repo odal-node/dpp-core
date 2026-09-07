@@ -246,10 +246,18 @@ pub struct Passport {
     /// **Annex III, point (k)** is the data-content basis — "the name, contact
     /// details and unique operator identifier of the economic operator established
     /// in the Union responsible for carrying out the tasks set out in Article 4 of
-    /// Regulation (EU) 2019/1020 [...]"; the identifier-issuance mechanics are
-    /// **Art. 12**. (**Art. 13** governs uploading identifiers to the EU registry —
-    /// a related but distinct obligation, not the field's basis.) Populated by the
-    /// engine from `operator_config`.
+    /// Regulation (EU) 2019/1020 **or Article 15 of Regulation (EU) 2023/988, or
+    /// similar tasks pursuant to other Union law applicable to the product**";
+    /// the identifier-issuance mechanics are **Art. 12**. (**Art. 13** governs
+    /// uploading identifiers to the EU registry — a related but distinct
+    /// obligation, not the field's basis.) Populated by the engine from
+    /// `operator_config`.
+    ///
+    /// The emphasised limbs were previously elided behind a `[...]`, and they
+    /// are not decorative: **Art. 4(5) of Regulation (EU) 2019/1020** limits
+    /// that article to a closed list of instruments which reaches only two of
+    /// the product groups this crate models. Which basis applies is recorded on
+    /// [`responsible_operator`](Self::responsible_operator), not assumed here.
     ///
     /// **This is the operator that published the passport, frozen at publish —
     /// not necessarily the operator responsible for it now.** A transfer of
@@ -261,6 +269,23 @@ pub struct Passport {
     /// today" is wrong for any passport that has changed hands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub operator_identifier: Option<String>,
+    /// The economic operator answerable for this product, and the law that makes
+    /// it so — Annex III, point (k)'s three elements, carried by value.
+    ///
+    /// Distinct from [`operator_identifier`](Self::operator_identifier) in both
+    /// content and time. That field is an identifier for the *publisher*, frozen
+    /// at publish; this is name, contact details **and** identifier for whoever
+    /// is *responsible*, which point (k) is actually asking for and which
+    /// **Art. 9(1)** requires to be "accurate, complete and up to date".
+    ///
+    /// Copied by value rather than referring to the transfer chain, the same
+    /// choice [`facility`](Self::facility) makes: a signed passport stays a
+    /// complete record independent of a registry that can move underneath it.
+    /// Keeping it up to date across a transfer therefore means issuing a
+    /// corrected successor, not rewriting a published record — the chain remains
+    /// the history, this is the statement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub responsible_operator: Option<crate::operator::ResponsibleOperatorSnapshot>,
     /// Snapshot of the Annex III facility where this product was manufactured or
     /// processed, copied by value at create time. Self-contained so the signed
     /// passport stays a complete record independent of the operator's mutable

@@ -59,6 +59,9 @@ fn main() {
         eu_operator_id: Some("DE811234567".into()),
         eu_operator_id_scheme: Some("vat".into()),
         country: "DE".into(),
+        registered_trade_name: None,
+        postal_address: None,
+        electronic_address: None,
     };
 
     let mut chain = TransferChain::new(passport_id, manufacturer.clone());
@@ -76,6 +79,9 @@ fn main() {
         eu_operator_id: Some("NL123456789B01".into()),
         eu_operator_id_scheme: Some("vat".into()),
         country: "NL".into(),
+        registered_trade_name: None,
+        postal_address: None,
+        electronic_address: None,
     };
 
     let transfer = TransferRecord {

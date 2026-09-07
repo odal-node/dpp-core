@@ -106,6 +106,9 @@ fn main() {
         product_id: None,
         commodity_code: None,
         operator_identifier: None,
+        // Annex III(k). `None` here only because this example does not model a
+        // supply chain; a real passport states who is answerable and why.
+        responsible_operator: None,
         facility: None,
         seal: None,
     };
