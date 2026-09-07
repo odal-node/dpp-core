@@ -300,4 +300,4 @@ freeze-schema-fixtures:
 # only in a CI run does not. `just check` fails if the two have drifted, so the
 # record cannot fall behind the schemas it describes.
 schema-changes:
-    WRITE_SCHEMA_CHANGES=1 cargo test -p dpp-domain --test schema_changes the_committed -- --nocapture
+    WRITE_SCHEMA_CHANGES=1 cargo test -p dpp-tests --test schema_changes the_committed -- --nocapture

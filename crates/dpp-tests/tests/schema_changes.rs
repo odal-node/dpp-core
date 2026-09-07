@@ -15,6 +15,16 @@
 //! restatement of a fact that lives in the JSON — and restatements drift. This
 //! file cannot: it is derived from the schema files on every run, and the test
 //! below is what makes that true rather than aspirational.
+//!
+//! # Why it lives here and not in `dpp-domain`
+//!
+//! It reads a path outside any crate — `docs/architecture/` belongs to the
+//! repository, not to a package. `dpp-domain` is published, and `cargo package`
+//! carries `tests/` along, so the same test vendored from crates.io would find
+//! no report and fail claiming the schemas had drifted: a false accusation, in
+//! a checkout that has nothing wrong with it. `dpp-tests` is `publish = false`
+//! and already the home of the doc gates that read repository paths
+//! (`domain_concerns.rs`, `ports_inventory.rs`).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -26,15 +36,16 @@ use semver::Version;
 /// Environment variable that switches this test from checking to writing.
 const WRITE_VAR: &str = "WRITE_SCHEMA_CHANGES";
 
-fn schemas_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas")
+fn manifest_relative(rel: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
 }
 
-/// Repository root, two levels up from this crate.
+fn schemas_dir() -> PathBuf {
+    manifest_relative("../dpp-domain/schemas")
+}
+
 fn report_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("docs/architecture/SCHEMA-CHANGES.md")
+    manifest_relative("../../docs/architecture/SCHEMA-CHANGES.md")
 }
 
 /// Every product group's schema versions, semver-ordered.
@@ -79,7 +90,7 @@ fn render() -> String {
     md.push_str(
         "# Schema changes\n\n\
          **Generated — do not edit.** Regenerate with `just schema-changes`;\n\
-         `cargo test -p dpp-domain --test schema_changes` fails if this file has\n\
+         `cargo test -p dpp-tests --test schema_changes` fails if this file has\n\
          drifted from the schemas under `crates/dpp-domain/schemas/`.\n\n\
          One section per product group, one table per version bump: what each\n\
          version changed relative to the one before it.\n\n\

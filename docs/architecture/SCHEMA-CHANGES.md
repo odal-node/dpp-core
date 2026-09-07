@@ -1,7 +1,7 @@
 # Schema changes
 
 **Generated — do not edit.** Regenerate with `just schema-changes`;
-`cargo test -p dpp-domain --test schema_changes` fails if this file has
+`cargo test -p dpp-tests --test schema_changes` fails if this file has
 drifted from the schemas under `crates/dpp-domain/schemas/`.
 
 One section per product group, one table per version bump: what each
