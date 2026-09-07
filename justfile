@@ -292,3 +292,12 @@ gs1-oracle:
 # it says so and writes nothing, and that fixture is authored by hand.
 freeze-schema-fixtures:
     FREEZE_SCHEMA_FIXTURES=1 cargo test -p dpp-domain --test schema_compat freeze_missing_fixtures -- --nocapture
+
+# Regenerate docs/architecture/SCHEMA-CHANGES.md from the schema files.
+#
+# The report is a committed build artifact, like the engine's bundled OpenAPI:
+# an artifact reviewable in the diff that causes it gets read, one that lives
+# only in a CI run does not. `just check` fails if the two have drifted, so the
+# record cannot fall behind the schemas it describes.
+schema-changes:
+    WRITE_SCHEMA_CHANGES=1 cargo test -p dpp-domain --test schema_changes the_committed -- --nocapture
