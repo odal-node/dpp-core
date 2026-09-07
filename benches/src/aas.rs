@@ -21,6 +21,7 @@ fn battery_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "Bench Manufacturing".into(),
             address: "1 Bench Way, Berlin, DE".into(),
+            country: None,
             did_web_url: Some("https://bench.example.com/.well-known/did.json".into()),
         },
         materials: vec![MaterialEntry {

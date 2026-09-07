@@ -15,6 +15,45 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The manufacturer's country had no field, so it was written into the address.**
+  *(Breaking: `ManufacturerInfo` gains `country: Option<String>`. The struct is
+  not `#[non_exhaustive]`, so every struct-literal construction must add the
+  field; `country: None` reproduces the previous behaviour exactly. Additive on
+  the wire — `#[serde(default)]`, so a stored document written before the field
+  existed still deserialises, as `None`.)*
+
+  Country was not modelled, so five bulk importers mapped a `manufacturerCountry`
+  column onto `address`, and the battery importer accepts a full
+  `manufacturerAddress` under the same alias — leaving nothing downstream able to
+  tell which of the two a given passport carries. A two-letter code, an English
+  country name, a localised name and an omission were all equally acceptable and
+  equally unusable.
+
+  It is structural rather than descriptive. Whether an economic operator is
+  established in the Union is what separates a manufacturer from an importer or
+  an authorised representative, and that distinction decides who carries the
+  passport obligation. The registry identifies operators by EORI, which is
+  country-prefixed and cannot be cross-checked against a country buried in free
+  text. Every product group's own `countryOfOrigin` is already constrained to
+  `^[A-Z]{2}$` across 30 schema declarations; the manufacturer's country was the
+  one with no field to constrain.
+
+  `ManufacturerInfo::validate_country` is a **membership** check against the
+  assigned ISO 3166-1 alpha-2 set (`dpp_rules::country_code_valid`), not a
+  two-uppercase-letters shape check — `XX` and `QZ` are refused, where a regex
+  would pass them. `Passport::validate` runs it, and the rule also has a home
+  callable before a `Passport` exists, because the importers that populate the
+  field validate a row first.
+
+  A plain `String` and not a newtype, matching the roughly twenty other
+  country-shaped fields across these crates. There is no country newtype today;
+  introducing the first one here would make this field stricter than all of them,
+  and converting them all is a separate change.
+
+  **Migration.** Add `country: None` to every `ManufacturerInfo` literal, or
+  `Some("DE".into())` where the code is known. Nothing else changes, and stored
+  passports are unaffected.
+
 - **The passport can now say who is answerable for the product, and under which
   law.** *(Breaking: `ResponsibleOperator` and `OperatorRole` move from
   `transfer` to a new top-level `operator` module — the crate-root re-exports

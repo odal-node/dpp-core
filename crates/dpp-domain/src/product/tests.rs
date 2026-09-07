@@ -17,6 +17,7 @@ fn base_passport(
         manufacturer: ManufacturerInfo {
             name: "Acme".into(),
             address: "1 Street".into(),
+            country: None,
             did_web_url: None,
         },
         product_group_data,

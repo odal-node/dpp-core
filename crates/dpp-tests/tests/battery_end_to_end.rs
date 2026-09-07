@@ -42,6 +42,7 @@ fn make_battery_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "Volt Dynamics GmbH".into(),
             address: "Industriestraße 7, 80807 München, DE".into(),
+            country: Some("DE".into()),
             did_web_url: Some("https://voltdynamics.example.com/.well-known/did.json".into()),
         },
         materials: vec![

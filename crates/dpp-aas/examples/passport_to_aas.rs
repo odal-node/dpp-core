@@ -22,6 +22,7 @@ fn main() {
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Berlin, DE".into(),
+            country: Some("DE".into()),
             did_web_url: Some("https://greenthread.example.com/.well-known/did.json".into()),
         },
         materials: vec![

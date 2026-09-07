@@ -109,6 +109,7 @@ fn draft_passport(name: &str) -> Passport {
         manufacturer: ManufacturerInfo {
             name: "Brand".into(),
             address: "Berlin, DE".into(),
+            country: None,
             did_web_url: None,
         },
         schema_version: "1.1.0".into(),

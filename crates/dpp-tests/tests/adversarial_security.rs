@@ -512,6 +512,7 @@ fn passport_validate_catches_bad_fibre_sum() {
         manufacturer: ManufacturerInfo {
             name: "Factory GmbH".into(),
             address: "Berlin, DE".into(),
+            country: None,
             did_web_url: None,
         },
         materials: vec![],

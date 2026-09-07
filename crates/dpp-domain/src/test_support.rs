@@ -26,6 +26,7 @@ pub(crate) fn sample_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "Test Manufacturer".into(),
             address: "Berlin, DE".into(),
+            country: None,
             did_web_url: None,
         },
         materials: vec![],
