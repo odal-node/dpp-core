@@ -17,6 +17,13 @@ use crate::ruleset::{Effectivity, Ruleset};
 /// Used by CI checks (e.g. `expired_rulesets_have_superseded_by`) that must
 /// iterate over all rulesets regardless of methodology. When a new ruleset is
 /// added anywhere in `dpp-calc`, add a row here so the CI check covers it.
+///
+/// Forgetting is caught rather than trusted:
+/// `every_ruleset_impl_reaches_the_registry` scans this crate for
+/// `impl Ruleset` and fails on any type missing from this list. That matters
+/// because two safety properties are asserted by *iterating* it — the
+/// `ParameterBasis::Sourced` tripwire and the empty-parameters check — so a
+/// ruleset nobody registers escapes both while looking entirely normal.
 pub fn all_rulesets() -> &'static [&'static dyn Ruleset] {
     &[
         &SimplifiedRepairabilityHeuristic,
