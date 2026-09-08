@@ -40,4 +40,21 @@ impl crate::product_group::payload::ProductGroupPayload for AluminiumData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         None
     }
+
+    /// This group models no product category.
+    ///
+    /// The catalog lists `primary`, `secondary-recycled` and `mixed` under
+    /// `productCategories`, and those are not categories — they are three of
+    /// the seven [`ProductionRoute`] variants, copied from this group's
+    /// `productionRoute` schema enum. How metal was made is a different axis
+    /// from what the product is, and answering with the route would let a
+    /// credential scoped to a *category* be satisfied by a *process*.
+    ///
+    /// So the catalog entry is wrong rather than this answer being incomplete.
+    /// It survived because the catalog-versus-schema drift guard covers only
+    /// the groups whose schema has a category-shaped property, and aluminium's
+    /// has none.
+    fn product_category(&self) -> Option<&str> {
+        None
+    }
 }

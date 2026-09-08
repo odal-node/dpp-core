@@ -53,4 +53,11 @@ impl crate::product_group::payload::ProductGroupPayload for FurnitureData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
+
+    /// The furniture type. Constrained by the `productType` enum in this
+    /// group's schema — which no longer offers `mattress`, since a mattress is
+    /// its own product group rather than a value here.
+    fn product_category(&self) -> Option<&str> {
+        Some(&self.product_type)
+    }
 }

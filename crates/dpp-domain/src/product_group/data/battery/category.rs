@@ -24,3 +24,21 @@ pub enum BatteryType {
     #[serde(rename = "starting-lighting-ignition")]
     Sli,
 }
+
+impl BatteryType {
+    /// The serde wire tag for this category, e.g. `"ev"`,
+    /// `"starting-lighting-ignition"`.
+    ///
+    /// Equivalent to `serde_json::to_value(self)` but without the allocation
+    /// and `Value` round trip. `battery_type_wire_str_matches_serde` pins the
+    /// two together.
+    pub const fn wire_str(&self) -> &'static str {
+        match self {
+            Self::Portable => "portable",
+            Self::Industrial => "industrial",
+            Self::Ev => "ev",
+            Self::Lmt => "lmt",
+            Self::Sli => "starting-lighting-ignition",
+        }
+    }
+}

@@ -79,4 +79,10 @@ impl crate::product_group::payload::ProductGroupPayload for ElectronicsData {
     fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
+
+    /// Reg. (EU) 2023/1670 Art. 1(1)'s four device types. Always present: the
+    /// field is required and the enum is closed.
+    fn product_category(&self) -> Option<&str> {
+        Some(self.product_category.wire_str())
+    }
 }

@@ -1,6 +1,8 @@
 //! Battery (EU Battery Regulation 2023/1542).
 
 mod category;
+#[cfg(test)]
+mod category_tests;
 mod chemistry;
 #[cfg(test)]
 mod chemistry_tests;

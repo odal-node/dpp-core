@@ -303,6 +303,49 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A credential could narrow itself to a product category, and nothing could
+  read one off a passport.** New `ProductGroupPayload::product_category` and
+  `ProductGroupData::product_category`, answered by all twelve product groups.
+
+  `verify_credential_claims_with_trust` has taken a `required_product_category`
+  all along and there was nothing to pass it. This is the missing half.
+
+  **Which field is the category is a fact about the act, not about the data.**
+  Seven groups carry one and name it five different things — `batteryType`,
+  `productFamily`, `productType`, `productCategory`, `tyreClass` — because each
+  act names its own axis and none of them agreed. So each group answers for
+  itself, the same arrangement `model_identifier` already uses. The method is
+  required rather than defaulted, so a thirteenth product group is a compile
+  error until someone has read its act and written the answer down.
+
+  **`None` is not "unscoped".** Five groups model no category, and `Other` is an
+  untyped payload this build cannot interpret. A caller enforcing scope must
+  read an unanswerable axis as *unsatisfied* — a restriction that cannot be
+  evaluated has not been met — never as satisfied, which reads the restriction
+  as its opposite. Said on the accessor, where the `None` comes from, rather
+  than left for the caller to infer.
+
+  The authority on legal values is the group's own schema enum, **not** the
+  catalog's `productCategories`, which is a curated subset: a furniture passport
+  may lawfully be a `bed`, which the schema allows and the catalog does not
+  list. Each `None` records why in the group's own file, including the two
+  catalog entries that were wrong — aluminium's categories were its
+  `productionRoute` enum, and textile's were defined by no schema at all.
+
+  Answering a category is also checked to *read the record*: each `Some` must
+  appear in the serialised payload, so an accessor returning a constant that
+  happens to match the fixture fails. That is what separates reading the
+  category field from returning something that looks like one.
+
+  Also fixed: the conformance gate
+  `every_product_group_with_an_embedded_schema_round_trips_through_its_current_schema`
+  carried `assert_eq!(samples.len(), 11)` with a comment saying it existed so
+  that a product group added to the enum without a sample could not silently
+  skip the gate. **Mattress was that group** — it has a variant and an embedded
+  schema, and the count had been carried to 11 rather than the sample added, so
+  the one group the gate skipped was one it was named to cover. Fixture added,
+  count at 12.
+
 - **A schema version bump now leaves a record of what it changed.**
   `docs/architecture/SCHEMA-CHANGES.md` is generated from the schema files —
   one section per product group, one table per version bump, naming every

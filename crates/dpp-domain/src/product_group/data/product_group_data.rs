@@ -304,4 +304,25 @@ impl ProductGroupData {
     pub fn svhc_substances(&self) -> Option<&[super::common::SvhcSubstance]> {
         self.payload()?.svhc_substances()
     }
+
+    /// The product category this passport's data declares, if its group has
+    /// one.
+    ///
+    /// This is what makes a credential's product-category scope enforceable: a
+    /// credential may narrow itself to a category, and until something could
+    /// read one off a passport there was nothing to compare it against.
+    ///
+    /// **`None` does not mean "unscoped".** Five groups model no category and a
+    /// sixth ([`ProductGroupData::Other`]) is an untyped payload whose keys
+    /// this build cannot interpret. A caller enforcing scope must treat an
+    /// unanswerable axis as *unsatisfied* — a restriction that cannot be
+    /// evaluated has not been met — never as satisfied, which would read the
+    /// restriction as its opposite.
+    ///
+    /// See [`ProductGroupPayload::product_category`] for which field each group
+    /// answers with and why.
+    #[must_use]
+    pub fn product_category(&self) -> Option<&str> {
+        self.payload()?.product_category()
+    }
 }
