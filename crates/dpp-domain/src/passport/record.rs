@@ -583,6 +583,7 @@ impl Passport {
     /// - `product_name` is non-empty
     /// - `manufacturer.name` is non-empty
     /// - `manufacturer.address` is non-empty
+    /// - `manufacturer.country`, if present, is an assigned ISO 3166-1 alpha-2 code
     /// - `schema_version` follows semver pattern (x.y.z)
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
@@ -621,6 +622,14 @@ impl Passport {
             errors.push(FieldError {
                 field: "/manufacturer/address".to_owned(),
                 message: "manufacturer.address must not be empty".to_owned(),
+            });
+        }
+        if let Err(code) = self.manufacturer.validate_country() {
+            errors.push(FieldError {
+                field: "/manufacturer/country".to_owned(),
+                message: format!(
+                    "manufacturer.country must be an ISO 3166-1 alpha-2 code, got {code:?}"
+                ),
             });
         }
 

@@ -64,6 +64,7 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".into(),
             address: "123 Main St, Berlin, DE".into(),
+            country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
         },
         materials: vec![MaterialEntry {

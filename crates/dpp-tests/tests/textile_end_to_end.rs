@@ -32,6 +32,7 @@ fn make_textile_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "EcoTextile GmbH".into(),
             address: "Friedrichstraße 123, 10117 Berlin, DE".into(),
+            country: Some("DE".into()),
             did_web_url: Some("https://ecotextile.example.com/.well-known/did.json".into()),
         },
         materials: vec![

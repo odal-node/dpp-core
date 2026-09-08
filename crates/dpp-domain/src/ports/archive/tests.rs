@@ -13,6 +13,7 @@ fn make_test_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "Test Brand".into(),
             address: "Berlin, DE".into(),
+            country: None,
             did_web_url: Some("https://test.example.com/.well-known/did.json".into()),
         },
         co2e_per_unit: Some(CarbonFootprint::from_kg(3.5)),

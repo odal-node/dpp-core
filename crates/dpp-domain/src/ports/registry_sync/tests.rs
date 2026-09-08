@@ -13,6 +13,7 @@ fn make_published_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "ACME".into(),
             address: "Berlin".into(),
+            country: None,
             did_web_url: None,
         },
         status: PassportStatus::Published,

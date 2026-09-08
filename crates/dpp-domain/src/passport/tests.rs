@@ -15,6 +15,7 @@ pub(crate) fn make_passport() -> Passport {
         manufacturer: ManufacturerInfo {
             name: "ACME Corp".to_owned(),
             address: "123 Main St, Berlin, DE".to_owned(),
+            country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".to_owned()),
         },
         materials: vec![MaterialEntry {

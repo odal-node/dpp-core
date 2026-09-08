@@ -53,6 +53,7 @@ pub fn base_passport(
         manufacturer: ManufacturerInfo {
             name: "Acme Manufacturing GmbH".into(),
             address: "Hauptstraße 1, 10115 Berlin, DE".into(),
+            country: Some("DE".into()),
             did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
         },
         materials: vec![MaterialEntry {

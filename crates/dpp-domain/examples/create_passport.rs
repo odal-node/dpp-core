@@ -66,6 +66,10 @@ fn main() {
         manufacturer: ManufacturerInfo {
             name: "GreenThread GmbH".into(),
             address: "Torstrasse 12, 10119 Berlin, DE".into(),
+            // ISO 3166-1 alpha-2, and its own field: which country an operator
+            // is established in decides who carries the passport obligation, so
+            // it cannot live inside the address string.
+            country: Some("DE".into()),
             did_web_url: Some("https://greenthread.example.com/.well-known/did.json".into()),
         },
         materials: vec![
