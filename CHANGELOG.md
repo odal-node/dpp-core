@@ -303,6 +303,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **The bound a continuity snapshot states was signed, and then read by
+  nobody.** New `dpp_vc::snapshot` — `verify_snapshot_bound` and
+  `SnapshotBound`. An expired snapshot verified as valid, because the deadline
+  was written into the document, signed with it, and never checked.
+
+  Four outcomes, and deliberately **no `is_valid()`**: `Absent` (no outer proof
+  — every live read, and every passport signed before bounds existed),
+  `Current`, `Expired`, and `Unproven` with a reason. Two different questions
+  get asked of a snapshot — *is a bound claimed here, and does it hold?* and
+  *may this copy be served?* — and only the caller knows which it means, since
+  the second depends on where the copy came from and this crate cannot see
+  that. An `is_valid()` would have to guess, and whichever it guessed would be
+  silently wrong for the other. `VerificationResult` one module away carries
+  `Expired` alongside `is_valid()`; this deliberately does not follow it. The
+  two accessors that exist are `is_expired()` and `proven()`; everything else
+  is a `match`.
+
+  **The content is re-canonicalised, not merely signature-checked.** A valid
+  signature over other bytes is still a valid signature, so a verifier that only
+  checked the signature would accept a rewritten `validUntil` — which is the
+  attack the outer proof exists to stop. The JCS bytes are recomputed from the
+  parsed document and compared against the proof's payload segment, and a probe
+  confirms that removing the recompute makes the forged-deadline case pass.
+
+  **`Absent` is the sharp edge.** Strip the proof from an expired snapshot and
+  keep the dates, and the answer is `Absent`, not `Expired`: an unverified
+  `validUntil` is attacker-editable text, so the pair is treated as absent
+  rather than trusted. That is correct for a live read and means *the bound was
+  stripped* for a copy off a static tier — and only the caller knows which it
+  fetched. Written on the type, with a test named for it.
+
+  `CLOCK_SKEW_TOLERANCE` is 5 minutes and public, so it is a number someone can
+  disagree with. Zero would make a verifier a few seconds fast reject a snapshot
+  renewed moments ago, and the failure would look like expiry rather than skew.
+
+  `Unproven` folds tampering, a wrong key, a non-string proof and unreadable
+  timestamps into one variant: they are one thing to a caller — *something
+  asserted a bound and the assertion does not hold* — and none of them is
+  expiry, which is the distinction that had to survive.
+
+  This checks the **outer** proof only. The publish-time `publicJwsSignature` is
+  a separate question with a separate answer, and a caller serving a passport
+  needs both — said in the function's own docs so the split is not inferred.
+  Additive: a document with no outer proof verifies exactly as it did before
+  this module existed, which is asserted rather than assumed.
+
 - **A credential could narrow itself to a product category, and nothing could
   read one off a passport.** New `ProductGroupPayload::product_category` and
   `ProductGroupData::product_category`, answered by all twelve product groups.

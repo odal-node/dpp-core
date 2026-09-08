@@ -29,6 +29,7 @@ pub mod did_builder;
 pub mod jsonld;
 pub mod local_service;
 pub mod passport_credential;
+pub mod snapshot;
 pub mod status_list;
 
 #[cfg(test)]
@@ -47,6 +48,7 @@ pub use did_builder::build_did_document;
 pub use jsonld::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 pub use local_service::LocalIdentityService;
 pub use passport_credential::{PassportCredential, PassportCredentialSubject};
+pub use snapshot::{CLOCK_SKEW_TOLERANCE, SnapshotBound, verify_snapshot_bound};
 pub use status_list::StatusList;
 
 /// Compile-checks this crate's README examples.
