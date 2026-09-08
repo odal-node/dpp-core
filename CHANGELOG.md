@@ -13,40 +13,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
-### Added
-
-- **A schema version bump now leaves a record of what it changed.**
-  `docs/architecture/SCHEMA-CHANGES.md` is generated from the schema files —
-  one section per product group, one table per version bump, naming every
-  property added, removed, retyped or re-constrained, plus what became required.
-  Regenerate with `just schema-changes`; the test that produces it fails if the
-  committed copy has drifted, so the record cannot fall behind.
-
-  Until now the only account of a bump was the CHANGELOG entry beside it, which
-  is written by hand — a restatement of a fact that lives in the JSON, and
-  restatements drift. Three readers wanted the answer and none had it: a reviewer
-  worked out whether a bump was additive by reading raw JSON, the prose record
-  was also the only thing that could be wrong, and a downstream consumer
-  repinning had no way to see which product groups a bump touched.
-
-  Committed rather than attached to a CI run, for the reason the engine commits
-  its bundled OpenAPI: an artifact reviewable in the diff that causes it gets
-  read.
-
-  New public surface in `dpp-domain::schemas`: `diff_schemas`, `SchemaDiff`,
-  `PropertyChange`, `ChangeKind`. The walk recurses through nested objects and
-  array `items`, so a field added inside a sub-object is reported at its full
-  path rather than as a change to its container.
-
-  **Two things it deliberately does not do.** It is not a compatibility verdict —
-  `is_purely_additive()` is a statement about *shape*, while whether stored
-  documents still read is answered by the frozen fixtures in `schema_compat.rs`,
-  which test it rather than infer it. Two answers to one question is how they
-  come to disagree. And it does not walk `oneOf`/`anyOf`/`allOf` branches:
-  battery's `stateOfHealth` is the live example, and a field added inside one
-  branch shows as no change. Pairing branches across two versions can be got
-  wrong, and a confidently wrong diff is worse than a gap that is written down.
-
 ### Breaking
 
 - **The SVHC candidate list had no consumer, and no way to be given a newer one.**
@@ -336,6 +302,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   records why that licence is temporary and what the next envelope rename owes.
 
 ### Added
+
+- **A schema version bump now leaves a record of what it changed.**
+  `docs/architecture/SCHEMA-CHANGES.md` is generated from the schema files —
+  one section per product group, one table per version bump, naming every
+  property added, removed, retyped or re-constrained, plus what became required.
+  Regenerate with `just schema-changes`; the test that produces it fails if the
+  committed copy has drifted, so the record cannot fall behind.
+
+  Until now the only account of a bump was the CHANGELOG entry beside it, which
+  is written by hand — a restatement of a fact that lives in the JSON, and
+  restatements drift. Three readers wanted the answer and none had it: a reviewer
+  worked out whether a bump was additive by reading raw JSON, the prose record
+  was also the only thing that could be wrong, and a downstream consumer
+  repinning had no way to see which product groups a bump touched.
+
+  Committed rather than attached to a CI run, for the reason the engine commits
+  its bundled OpenAPI: an artifact reviewable in the diff that causes it gets
+  read.
+
+  New public surface in `dpp-domain::schemas`: `diff_schemas`, `SchemaDiff`,
+  `PropertyChange`, `ChangeKind`. The walk recurses through nested objects and
+  array `items`, so a field added inside a sub-object is reported at its full
+  path rather than as a change to its container.
+
+  **Two things it deliberately does not do.** It is not a compatibility verdict —
+  `is_purely_additive()` is a statement about *shape*, while whether stored
+  documents still read is answered by the frozen fixtures in `schema_compat.rs`,
+  which test it rather than infer it. Two answers to one question is how they
+  come to disagree. And it does not walk `oneOf`/`anyOf`/`allOf` branches:
+  battery's `stateOfHealth` is the live example, and a field added inside one
+  branch shows as no change. Pairing branches across two versions can be got
+  wrong, and a confidently wrong diff is worse than a gap that is written down.
 
 - **Product-life status had nowhere to live.** New `LifeStatus` on
   `dpp-domain::passport`, carried by `Passport::life_status`.
