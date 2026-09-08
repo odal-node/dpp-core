@@ -11,9 +11,19 @@
 #
 #   @coderabbitai review
 #
-# on the pull request. What CI already decides is not what this is for: fmt,
-# clippy, the test tiers and the doc build are gates, and a gate that passes
-# needs no second opinion.
+# on the pull request.
+#
+# What CI already decides is not what this is for. fmt, clippy, the test tiers,
+# the doc build and the layout tripwires are gates, and a gate that passes needs
+# no second opinion. Everything below is deliberately the complement: the rules
+# that hold here, that cost something when broken, and that nothing mechanical
+# checks.
+#
+# NOTE FOR WHOEVER EDITS THIS FILE NEXT: this file is itself published. The
+# publication boundary described below binds it too. `filePatterns` can point at
+# a document in another repository of the same organisation, and that is
+# deliberately not used here — naming a non-public sibling would be this config
+# violating the rule it exists to enforce.
 language: en-US
 
 reviews:
@@ -24,10 +34,164 @@ reviews:
   auto_review:
     enabled: false
 
+  # With auto-review off, the default status message would post "Review skipped"
+  # on every pull request. At this repo's merge rate that is precisely the noise
+  # the on-demand setting exists to avoid.
+  review_status: false
+
   path_instructions:
+    - path: "**"
+      instructions: >-
+        PUBLICATION BOUNDARY. This repository is public and is published to
+        crates.io. A leak cannot be un-pushed and a released version can never
+        be unpublished, so treat every line in the diff — code, comments, docs,
+        CHANGELOG, test fixtures, the pull request body itself — as already read
+        by an outsider. Flag anything that names or points at material outside
+        this repository: (a) ADR numbers, titles or section references, such as
+        "ADR-012 §3" or "see the ADR for X" — their existence, numbering and
+        structure are themselves private; (b) the name of, or any path into, a
+        repository that is not this one, including its internal directory
+        layout, even inside a code comment or a doc link; (c) commercial state
+        — pricing, quotes, contract terms, minimums, per-unit rates, negotiation
+        status, vendor lead times; (d) named third parties in a non-public
+        arrangement, including a real company name used in a test fixture, which
+        implies a relationship that may not exist.
+        The remedy is always the same and is worth stating in the review: inline
+        the substance and drop the pointer. The regulatory and technical
+        reasoning is nearly always public-safe and belongs in the code — this
+        crate's whole value is that its citations are checkable against primary
+        sources. Cite the OJ text, the standard, or a vendor's published
+        documentation; never the internal record that decided how to read them.
+
+        INDEPENDENCE — a different rule from the one above, and conflating the
+        two has produced the wrong remediation more than once, reporting a
+        coupling problem as a leak. Someone who vendors this crate from
+        crates.io must never need a sibling repository to make sense of it. This
+        binds the published artifact: crates/*/src, doc comments, each crate's
+        README, and the CHANGELOG. It applies even when the thing referenced is
+        itself public, because the fault is the dependency on outside context
+        rather than the disclosure.
+
+        DIFF DISCIPLINE. Every changed line should trace to the stated purpose
+        of the pull request. Flag adjacent "improvements", drive-by
+        reformatting, and refactors of code that was not broken. Flag
+        speculative generality: an abstraction over a single call site,
+        configurability nobody asked for, error handling for a case that cannot
+        occur. Removing pre-existing dead code is out of scope unless the PR
+        says so — worth noting, not worth deleting. Do not reference internal
+        planning taxonomy (roadmap phase letters, review chunk numbers, priority
+        tags such as N-1, P0 or R-phase) in code or doc comments; those belong
+        only in the planning docs.
+
     - path: "crates/**/*.rs"
       instructions: >-
-        dpp-core is the tenant-agnostic domain core: the platform consumes it,
-        never the reverse. Flag any tenant identifier, audit trail, API key,
-        quota, or HTTP/transport concept introduced here, since those belong to
-        the consuming layer.
+        CORE PURITY. dpp-core is the pure, stateless, tenant-agnostic domain
+        core: the platform consumes it and it knows nothing of the platform.
+        Flag any tenant identifier, audit trail, API key, quota or transport
+        concept introduced here — each belongs to the consuming layer. No crate
+        in this workspace may depend on axum, tokio, tower, sqlx, redis, reqwest
+        or any other HTTP, database or infrastructure crate; if a dependency
+        pulls in an async runtime or network I/O it does not belong here. The
+        standing test is that `cargo build --workspace` succeeds with zero
+        infrastructure running — no database, no Redis, no environment
+        variables. The one accepted exception is `KeyStore` in dpp-crypto, which
+        uses std::fs for key persistence: that is configuration I/O, reading a
+        local file the operator placed there, not business I/O.
+        The governing question for whether code belongs here at all: would it
+        change because an EU regulation changed?
+
+        DEPENDENCY GRAPH. The internal graph is strictly acyclic. dpp-rules and
+        dpp-plugin-traits are standalone with no internal dependencies, and
+        dpp-rules is additionally no_std and zero-dependency. dpp-domain depends
+        on dpp-rules; dpp-crypto on nothing; dpp-vc on dpp-domain and
+        dpp-crypto; dpp-digital-link, dpp-aas, dpp-registry and dpp-calc on
+        dpp-domain; dpp-plugin-sdk on dpp-plugin-traits and dpp-rules. Flag any
+        edge that is not in that list, and in particular any new dependency
+        between dpp-domain and the Wasm plugins, which are kept apart by design
+        so that neither depends on the other.
+
+        ERRORS, LOGGING, PANICS. Library crates define typed error enums with
+        thiserror — no String errors in domain code, so callers can
+        pattern-match. All crates log through tracing, and secrets never reach
+        log output: not API keys, not private keys, not passphrases. No
+        `unwrap()` or `expect()` on a library code path; those belong in tests
+        only. No hardcoded secrets anywhere, tests included. No `unsafe`.
+
+        PUBLISH SAFETY. Never `include_str!` a path outside the crate directory.
+        `cargo publish` excludes it, so the crate builds here and then fails to
+        build for every downstream consumer.
+
+    - path: "crates/dpp-domain/src/**/*.rs"
+      instructions: >-
+        PERSISTED SHAPES — the one place a pre-1.0 break is not free. The
+        `Passport` struct and every `ProductGroupData` variant are the on-disk
+        shape of stored passports. A non-additive change to either breaks no
+        caller at compile time; it makes already-written documents
+        undeserialisable at runtime, per request, on upgrade. That has cost 244
+        of 276 stored passports once already. Treat any rename, removal, retype
+        or newly-required field on these types as a data-migration question, say
+        so explicitly rather than reviewing it as an ordinary struct edit, and
+        check it against docs/architecture/PERSISTED-SHAPES.md.
+        Two specifics have each already shipped as a bug. The lens escape hatch
+        covers `productGroupData` and never the envelope, so renaming an
+        envelope key fails silently rather than loudly. And a field in the
+        signed public view has two compatibility surfaces, not one: it must be
+        judged by what a *fetched* passport can do — which is nothing, since it
+        is signed and belongs to someone else and can never be rewritten — and
+        not by what a stored one can. Judging only the stored surface once
+        nearly shipped a false tamper accusation.
+
+    - path: "crates/dpp-domain/schemas/**/*.json"
+      instructions: >-
+        Versioned JSON schemas ship inside the crate so that they survive
+        `cargo publish`, and the registry embeds them with `include_str!`.
+        Adding a schema version should be a single file addition. Editing an
+        existing published version in place is the thing to question: passports
+        already validated against it exist. Check the change against
+        docs/architecture/SCHEMA-CHANGES.md.
+
+  pre_merge_checks:
+    custom_checks:
+      - name: "Publication boundary"
+        mode: error
+        instructions: >-
+          FAIL if the diff or the pull request description introduces any of the
+          following into this public, published-to-crates.io repository: an ADR
+          reference by number, title or section; the name of, or a filesystem
+          path into, any repository other than this one; pricing, quotes,
+          contract terms, per-unit rates, vendor lead times or negotiation
+          status; the name of a real company or individual in a non-public
+          arrangement, including inside a test fixture. Naming a public sibling
+          repository is permitted where it genuinely helps a reader here.
+          PASS otherwise. When it fails, say which line and give the fix:
+          inline the substance, drop the pointer, and cite the primary source
+          instead of the internal record.
+
+      - name: "Persisted shape migration"
+        mode: warning
+        instructions: >-
+          Applies only when the diff changes the `Passport` struct or a
+          `ProductGroupData` variant in dpp-domain. PASS if every change to
+          those types is purely additive with an optional or defaulted field, or
+          if the pull request description explains what happens to passports
+          already written in the old shape. FAIL if a field is renamed, removed,
+          retyped or made newly required and the description is silent on
+          already-stored documents. PASS trivially when the diff does not touch
+          those types.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # The standards live in these documents and are maintained there. Listing
+    # them here rather than restating their contents in this file is the point:
+    # a rule copied into YAML is a rule with two homes and one of them goes
+    # stale. The path_instructions above are the complement — they say what to
+    # *flag*, where these documents say what to *do*.
+    filePatterns:
+      - "**/CLAUDE.md"
+      - "CONTRIBUTING.md"
+      - "docs/architecture/CODE-LAYOUT.md"
+      - "docs/architecture/PERSISTED-SHAPES.md"
+      - "docs/architecture/SCHEMA-CHANGES.md"
+      - "docs/architecture/DESIGN-PATTERNS.md"
+      - "docs/architecture/PORTS.md"
