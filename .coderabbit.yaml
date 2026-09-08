@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+
+# Reviews here are asked for, not ambient.
+#
+# The open-source plan's review rate limit scales with a repository's star
+# count, and at one star this repo sits at the bottom of that band. Merge waves
+# reach double digits inside a single hour, so automatic review would queue
+# behind itself and land after the merge it was meant to inform. Ask for one
+# where it earns the wait — a cross-cutting refactor, a branch open long enough
+# that main moved underneath it — by commenting
+#
+#   @coderabbitai review
+#
+# on the pull request. What CI already decides is not what this is for: fmt,
+# clippy, the test tiers and the doc build are gates, and a gate that passes
+# needs no second opinion.
+language: en-US
+
+reviews:
+  # A review that was requested deliberately should say everything it has. The
+  # noise argument for a quieter profile applies to review you did not ask for.
+  profile: assertive
+
+  auto_review:
+    enabled: false
+
+  path_instructions:
+    - path: "crates/**/*.rs"
+      instructions: >-
+        dpp-core is the tenant-agnostic domain core: the platform consumes it,
+        never the reverse. Flag any tenant identifier, audit trail, API key,
+        quota, or HTTP/transport concept introduced here, since those belong to
+        the consuming layer.
