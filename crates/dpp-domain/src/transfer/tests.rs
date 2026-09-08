@@ -1,6 +1,7 @@
 //! Transfer state-machine, chain-tracking, and serde tests.
 
 use super::*;
+use crate::operator::{OperatorRole, ResponsibleOperator};
 use crate::passport::PassportId;
 use chrono::Utc;
 use uuid::Uuid;
@@ -13,6 +14,9 @@ fn make_operator(did: &str, name: &str, role: OperatorRole) -> ResponsibleOperat
         eu_operator_id: None,
         eu_operator_id_scheme: None,
         country: "DE".into(),
+        registered_trade_name: None,
+        postal_address: None,
+        electronic_address: None,
     }
 }
 

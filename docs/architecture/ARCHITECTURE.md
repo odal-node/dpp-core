@@ -92,6 +92,7 @@ what each module does.
 | `instrument` | 3 | The legal acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair. **This is where the law lives** |
 | `manufacturer` | 2 | `ManufacturerInfo` — the economic operator that placed the product on the market |
 | `material` | 2 | `MaterialEntry` — one declared constituent material |
+| `operator` | 2 | `ResponsibleOperator` and the `ResponsibilityBasis` that makes it answerable — Annex III(k). Shared by `passport` and `transfer`, so owned by neither |
 | `passport` | 4 | The aggregate root, its id, reference and audience-filtered view |
 | `product` | 5 | `ProductIdentity` — what identifies a product, independent of its passport |
 | `product_group` | 4 | The typed per-group payloads and the `ProductGroupData` union |
@@ -131,6 +132,7 @@ instrument
 lint
 manufacturer
 material
+operator
 passport
 passthrough
 ports

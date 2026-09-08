@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::error::TransferError;
-use super::operator::ResponsibleOperator;
 use super::status::TransferStatus;
+use crate::operator::ResponsibleOperator;
 use crate::passport::PassportId;
 
 /// The reason for a transfer of DPP responsibility.

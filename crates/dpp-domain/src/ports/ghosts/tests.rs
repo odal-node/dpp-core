@@ -130,7 +130,8 @@ async fn ghost_check_status_returns_not_found() {
 
 #[tokio::test]
 async fn ghost_notify_transfer_returns_not_found() {
-    use crate::transfer::{OperatorRole, ResponsibleOperator, TransferReason, TransferRecord};
+    use crate::operator::{OperatorRole, ResponsibleOperator};
+    use crate::transfer::{TransferReason, TransferRecord};
 
     let operator = |did: &str, name: &str| ResponsibleOperator {
         did: did.to_owned(),
@@ -139,6 +140,9 @@ async fn ghost_notify_transfer_returns_not_found() {
         eu_operator_id: None,
         eu_operator_id_scheme: None,
         country: "DE".to_owned(),
+        registered_trade_name: None,
+        postal_address: None,
+        electronic_address: None,
     };
     let record = TransferRecord {
         transfer_id: Uuid::now_v7(),

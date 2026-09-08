@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use super::error::TransferError;
-use super::operator::ResponsibleOperator;
 use super::record::TransferRecord;
 use super::status::TransferStatus;
+use crate::operator::ResponsibleOperator;
 use crate::passport::PassportId;
 
 /// The complete history of responsibility transfers for a DPP.

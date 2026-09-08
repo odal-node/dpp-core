@@ -101,6 +101,7 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
         product_id: None,
         commodity_code: None,
         operator_identifier: None,
+        responsible_operator: None,
         facility: None,
         seal: None,
     }

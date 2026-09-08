@@ -555,6 +555,7 @@ const TIERS: &[(&str, u8)] = &[
     ("field_error", 2),
     ("manufacturer", 2),
     ("material", 2),
+    ("operator", 2),
     ("seal", 2),
     ("status", 2),
     // 3 reference — the embedded, data-driven registries.

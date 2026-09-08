@@ -47,7 +47,18 @@ fn passport_every_wire_key_is_classified() {
         ),
         (
             "manufacturer",
-            "Annex III(k): name and contact details of the operator",
+            "Annex III(g) and Art. 27(6)(a), which puts the manufacturer's name, \
+             postal address and electronic contact on the public part of the DPP \
+             in terms. (This entry read \"Annex III(k)\" until 2026-09-07; (k) is \
+             the responsible operator below, a different party.)",
+        ),
+        (
+            "responsibleOperator",
+            "Annex III(k): the name, contact details and unique operator identifier \
+             of whoever is answerable for the product. Public because the point of \
+             recording it is that a reader holding the product — a consumer, a \
+             repairer, a market surveillance authority — can reach that party \
+             without going out of band",
         ),
         ("materials", "Annex III material content is consumer-facing"),
         ("co2ePerUnit", "a declared environmental figure"),
