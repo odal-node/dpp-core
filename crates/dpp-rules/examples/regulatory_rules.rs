@@ -7,7 +7,7 @@
 use dpp_rules::batteries::chemistry::mercury_content_prohibited;
 use dpp_rules::batteries::recycled_content::{RecycledContentInput, art8_shortfalls_2031};
 use dpp_rules::{
-    FibreInput, SvhcInput, check_svhc_declarations, country_code_valid, fibre_sum_ok,
+    FibreInput, SvhcInput, check_svhc_declarations_embedded, country_code_valid, fibre_sum_ok,
     validate_fibre_composition, validate_svhc_substances,
 };
 
@@ -60,7 +60,7 @@ fn main() {
         "  structural validation = {:?}",
         validate_svhc_substances(&svhcs)
     );
-    for finding in check_svhc_declarations(&svhcs) {
+    for finding in check_svhc_declarations_embedded(&svhcs) {
         println!(
             "  finding[{}]: {} ({}) at {:.2}% -> {:?}",
             finding.index,

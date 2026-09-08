@@ -105,4 +105,10 @@ impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
     fn model_identifier(&self) -> Option<&str> {
         None
     }
+
+    /// A discard-event report describes a disposal, not an article, so it
+    /// carries no substance declaration for one.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+        None
+    }
 }

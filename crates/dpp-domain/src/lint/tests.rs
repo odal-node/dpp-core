@@ -115,3 +115,97 @@ fn lint_result_serde_round_trip() {
     let back: LintResult = serde_json::from_value(json).unwrap();
     assert_eq!(back, result);
 }
+
+// ── SVHC, the cross-product-group pack ───────────────────────────────────────
+
+fn svhc(cas: &str, name: &str, pct: f64) -> crate::product_group::SvhcSubstance {
+    crate::product_group::SvhcSubstance {
+        cas_number: cas.to_owned(),
+        substance_name: name.to_owned(),
+        concentration_pct: pct,
+        location_in_product: None,
+        scip_notification_id: None,
+    }
+}
+
+/// The point of the change: the candidate list is consulted at all. Before this,
+/// `check_svhc_declarations` had no caller and a declared SVHC above the Art. 33
+/// threshold was indistinguishable from any other well-formed entry.
+#[test]
+fn a_declared_svhc_above_the_threshold_reaches_the_passport_as_a_finding() {
+    let mut t = crate::test_support::sample_textile_data();
+    t.svhc_substances = Some(vec![svhc("80-05-7", "Bisphenol A", 0.5)]);
+    let data = ProductGroupData::Textile(Box::new(t));
+
+    let codes: Vec<String> = lint_product_group_data(&data, Utc::now())
+        .into_iter()
+        .map(|f| f.code)
+        .collect();
+    assert!(
+        codes
+            .iter()
+            .any(|c| c == "svhc.article_33_communication_owed"),
+        "expected the Art. 33 notice, got {codes:?}"
+    );
+}
+
+/// The lint runs on product groups that have no pack of their own — which is why
+/// it sits outside the product-group match rather than inside five arms.
+#[test]
+fn the_svhc_pack_reaches_a_product_group_with_no_pack_of_its_own() {
+    let toy = crate::product_group::ToyData {
+        gtin: crate::Gtin::parse("09506000134352").unwrap(),
+        age_group: "3-6".to_owned(),
+        primary_material: "plastic".to_owned(),
+        ce_marking: true,
+        country_of_origin: "DE".to_owned(),
+        svhc_substances: Some(vec![svhc("117-81-7", "DEHP", 1.0)]),
+        contains_battery: None,
+        repairability_info: None,
+    };
+    let data = ProductGroupData::Toy(toy);
+
+    let codes: Vec<String> = lint_product_group_data(&data, Utc::now())
+        .into_iter()
+        .map(|f| f.code)
+        .collect();
+    assert!(
+        codes
+            .iter()
+            .any(|c| c == "svhc.article_33_communication_owed"),
+        "toy has no lint pack; the SVHC checks must still run: {codes:?}"
+    );
+}
+
+/// A group whose schema never asks for the declaration must not be rendered as
+/// having answered it. `None` and `Some(&[])` are different claims.
+#[test]
+fn a_group_that_declares_no_substances_field_produces_no_svhc_findings() {
+    let data = ProductGroupData::Battery(Box::new(battery()));
+    assert!(
+        !lint_product_group_data(&data, Utc::now())
+            .iter()
+            .any(|f| f.code.starts_with("svhc.")),
+        "battery carries no svhcSubstances field, so it was never asked"
+    );
+}
+
+/// The completeness caveat is the finding that makes list currency visible.
+#[test]
+fn the_partial_list_caveat_is_attached_when_anything_was_checked() {
+    let mut t = crate::test_support::sample_textile_data();
+    // Below the threshold, so the only finding left is the caveat itself.
+    t.svhc_substances = Some(vec![svhc("80-05-7", "Bisphenol A", 0.01)]);
+    let data = ProductGroupData::Textile(Box::new(t));
+
+    let findings = lint_product_group_data(&data, Utc::now());
+    let caveat = findings
+        .iter()
+        .find(|f| f.code == "svhc.candidate_list_partial")
+        .expect("a partial list must qualify its own clean result");
+    assert!(
+        caveat.message.contains("2026-02-04"),
+        "the caveat must name the revision it checked against: {}",
+        caveat.message
+    );
+}

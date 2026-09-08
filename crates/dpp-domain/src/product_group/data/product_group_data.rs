@@ -294,4 +294,14 @@ impl ProductGroupData {
     pub fn gtin(&self) -> Option<&str> {
         self.payload()?.gtin()
     }
+
+    /// Substances of very high concern declared by this product group's typed
+    /// data, where its schema carries them.
+    ///
+    /// `None` distinguishes "this group was never asked" from `Some(&[])`,
+    /// "asked and none present" — the SVHC lints run on the second and stay
+    /// silent on the first, so an unasked group is never rendered as cleared.
+    pub fn svhc_substances(&self) -> Option<&[super::common::SvhcSubstance]> {
+        self.payload()?.svhc_substances()
+    }
 }

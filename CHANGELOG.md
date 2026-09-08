@@ -15,6 +15,76 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The SVHC candidate list had no consumer, and no way to be given a newer one.**
+  *(Breaking: `check_svhc_declarations` takes a second argument, a
+  `&CandidateList`. `CandidateListProvenance` and `candidate_list_provenance()`
+  are removed, folded into the new `CandidateList` in
+  `dpp-rules::chemicals::svhc`. `SvhcFindingKind::NotInEmbeddedList` is renamed
+  `NotOnCheckedList`. `ProductGroupPayload` gains a required
+  `svhc_substances()`. `LINT_PACK_VERSION` is now `1.1.0`.)*
+
+  Two problems, and the second was the larger one.
+
+  `ECHA_CANDIDATE_LIST` was a compiled-in constant, so the only way to deliver a
+  newer list was a crate release. ECHA adds to the Candidate List on no fixed
+  calendar and each addition starts a six-month SCIP notification deadline, so an
+  operator who skips a version keeps checking against a stale list with no signal
+  that they are behind.
+
+  But nothing was checking anything. `check_svhc_declarations` had **no caller**
+  outside a doc example — not in this workspace, not in the Wasm plugins. What
+  ran was `validate_svhc_substances`, which is structural only: CAS format,
+  non-empty name, concentration in range. A well-formed declaration of a listed
+  substance at 5% was indistinguishable from one of a substance that is not on
+  the list at all.
+
+  **The list is now consulted.** Three lints in the new
+  `dpp-rules::lint::svhc`, dispatched from `lint_product_group_data` for every
+  product group whose schema carries a declaration — electronics, furniture,
+  mattress, textile and toy:
+
+  - `svhc.article_33_communication_owed` — on the list, at or above the 0.1% w/w
+    threshold, so REACH Art. 33 downstream communication is implied
+  - `svhc.not_on_checked_list` — not on the list that ran, which is a question
+    and never a clearance
+  - `svhc.candidate_list_partial` — attached once when the list that ran was
+    incomplete, so a clean result cannot be read as "no SVHCs present"
+
+  **Lints, not validation errors, and the reason is the completeness.** The
+  embedded snapshot holds 32 of the 253 substances on the official list at the
+  same revision. A check that partial must not refuse a publish in either
+  direction: it cannot say "this is not an SVHC", because absence from the
+  snapshot is absence of knowledge, and it must not block a declaration it does
+  recognise, because declaring is the correct behaviour. `LintResult` is
+  non-binding by design, which is the honest strength for this check.
+
+  These run outside the product-group match, so the four groups with no lint pack
+  of their own get them without having to grow one. That is what makes REACH
+  Art. 33 reaching every article expressible here at all.
+
+  **`CandidateList` binds the list to its own provenance.** They were two things —
+  a `const` slice and a separate `CandidateListProvenance` describing it — which
+  is safe only while exactly one list exists. Once a newer one can be supplied, a
+  provenance value travelling separately can describe a different list than the
+  one a finding set came from, and a finding set means nothing except with
+  respect to a specific list. Every finding now states the revision that produced
+  it.
+
+  **What this is not.** No bundle delivery. Nothing here loads a list from
+  anywhere; `check_svhc_declarations` takes one so that a caller *can*, and
+  `lint_product_group_data` passes `CandidateList::embedded()`. Threading a
+  supplied list to that call site is the follow-up, and it is a smaller step now
+  that there is a consumer to thread it to.
+
+  **Migration.** `check_svhc_declarations(&subs)` becomes
+  `check_svhc_declarations_embedded(&subs)` for identical behaviour, or
+  `check_svhc_declarations(&subs, &list)` to supply one. `candidate_list_provenance()`
+  becomes `CandidateList::embedded()`; `.embedded_count` becomes `.entry_count()`,
+  `.as_of` and `.official_count` and `.is_complete()` are unchanged. A payload
+  implementing `ProductGroupPayload` must add `svhc_substances()` — return `None`
+  where the group's schema declares no such field, which is a different answer
+  from `Some(&[])` and is why there is no default implementation.
+
 - **The manufacturer's country had no field, so it was written into the address.**
   *(Breaking: `ManufacturerInfo` gains `country: Option<String>`. The struct is
   not `#[non_exhaustive]`, so every struct-literal construction must add the

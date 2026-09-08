@@ -161,4 +161,9 @@ impl crate::product_group::payload::ProductGroupPayload for TextileData {
     fn model_identifier(&self) -> Option<&str> {
         None
     }
+
+    /// This group's schema carries a REACH candidate-list declaration.
+    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+        self.svhc_substances.as_deref()
+    }
 }
