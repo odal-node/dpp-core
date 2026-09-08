@@ -132,6 +132,39 @@ If you are unsure whether something is private, it is — ask the operator rathe
 5. NEVER commit before running the full check suite (`just check`) locally and confirming it is green — a commit is not ready because the code looks right, it is ready because the same gate CI runs has already passed
 6. Do not reference internal planning taxonomy (roadmap phase letters, review chunk numbers, priority tags like N-1/P0/R-phase) in commit messages or in code/doc comments outside the planning docs themselves — describe what the change does, not which internal tracking item it closes
 
+## Asking for a Code Review
+
+CodeRabbit reviews this repository **on request, never automatically**. A pull
+request is reviewed when it carries the `review-ready` label, or when someone
+comments `@coderabbitai review` on it. Nothing else triggers one, and an
+unlabelled pull request gets no comment at all. What it reviews against is in
+`.coderabbit.yaml` and in the documents that file points at — this one included.
+
+**Apply the label when the branch is genuinely finished, and not before.**
+Finished means all of:
+
+- the work covers the scope the branch was opened for, with nothing left
+  stubbed, `TODO`-ed, or deferred to "a follow-up";
+- `just check` has been run locally and is green — not `just test`, which skips
+  the doc build and the plugin tests;
+- the pull request title is a conventional commit, since it becomes the squash
+  subject on `main` and cannot be corrected once a release is published from
+  that commit;
+- the pull request is not a draft.
+
+Labelling a half-finished branch spends a review on code that is about to
+change. The open-source plan rate-limits reviews, and re-review on push is
+deliberately off, so a labelled pull request gets **one** pass — ask again with
+`@coderabbitai review` if a later push earns another.
+
+**Label the changes where a second read earns its cost, and leave the rest
+unlabelled.** Worth a review: anything spanning more than one crate; any change
+to `Passport`, a `ProductGroupData` variant, an envelope key, the signed public
+view, or a published JSON schema; anything in `dpp-crypto` or the signing and
+verification paths; a new direct dependency; a new edge in the crate graph; and
+a branch open long enough that `main` has moved underneath it. Not worth one: a
+single-crate mechanical change, a doc typo, a version bump, a dependency bump.
+
 ## Overview
 
 **dpp-core** is the pure, stateless core library for the Odal Node Digital Product Passport system. It contains domain types, cryptographic primitives, schema validation, and port traits — all publishable under Apache-2.0. No database, no HTTP framework, no infrastructure dependencies.
