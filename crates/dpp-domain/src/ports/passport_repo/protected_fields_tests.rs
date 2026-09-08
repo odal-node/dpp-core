@@ -2,7 +2,8 @@
 
 use super::protected_fields::PROTECTED_PATCH_FIELDS;
 use crate::passport::{
-    ComponentRef, DerivationRef, FacilitySnapshot, PassportId, PassportRef, SecondLifeOperation,
+    ComponentRef, DerivationRef, FacilitySnapshot, LifeStatus, PassportId, PassportRef,
+    SecondLifeOperation,
 };
 use crate::seal::{SealFormat, SealedEnvelope};
 use crate::test_support::sample_passport;
@@ -42,6 +43,7 @@ fn every_protected_key_is_a_real_passport_field() {
         quantity: None,
         role: None,
     }];
+    passport.life_status = Some(LifeStatus::Repurposed);
     passport.operator_identifier = Some("DE123456789".to_owned());
     passport.facility = Some(FacilitySnapshot {
         scheme: "gln".to_owned(),

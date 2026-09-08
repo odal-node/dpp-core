@@ -14,13 +14,14 @@ fn all_lists_every_variant() {
             | TransferReason::Repurposing
             | TransferReason::PreparationForReuse
             | TransferReason::PreparationForRepurposing
+            | TransferReason::WasteHandover
             | TransferReason::Import
             | TransferReason::InsolvencySuccession => {}
         }
     }
     assert_eq!(
         TransferReason::ALL.len(),
-        8,
+        9,
         "a variant was added to the match above but not to ALL"
     );
 }
