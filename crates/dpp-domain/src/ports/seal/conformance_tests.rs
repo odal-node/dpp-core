@@ -46,7 +46,7 @@ impl SealPort for SubstitutesFormat {
         &self,
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
-        Ok(SealVerification::passed(SealChecks::FullValidation))
+        Ok(SealVerification::passed(SealChecks::AdesValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {
@@ -157,7 +157,7 @@ impl SealPort for ShortLivedOnly {
         &self,
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
-        Ok(SealVerification::passed(SealChecks::FullValidation))
+        Ok(SealVerification::passed(SealChecks::AdesValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {
@@ -292,7 +292,7 @@ impl SealPort for FormatWithNoPackaging {
         &self,
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
-        Ok(SealVerification::passed(SealChecks::FullValidation))
+        Ok(SealVerification::passed(SealChecks::AdesValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {
@@ -349,7 +349,7 @@ impl SealPort for MisrecordsLevel {
         &self,
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
-        Ok(SealVerification::passed(SealChecks::FullValidation))
+        Ok(SealVerification::passed(SealChecks::AdesValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {
@@ -416,7 +416,7 @@ impl SealPort for MisrecordsOnlyTheSecondLevel {
         &self,
         _env: &SealedEnvelope,
     ) -> Result<SealVerification, crate::error::dpp::DppError> {
-        Ok(SealVerification::passed(SealChecks::FullValidation))
+        Ok(SealVerification::passed(SealChecks::AdesValidation))
     }
     fn capabilities(&self) -> SealCapabilities {
         SealCapabilities {

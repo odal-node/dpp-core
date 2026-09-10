@@ -15,6 +15,62 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`is_qualified_pass` set a bar below what makes a seal qualified.**
+  *(Breaking: `SealChecks::FullValidation` is renamed `AdesValidation` and a new
+  `QualifiedValidation` sits above it. `is_qualified_pass` now requires the
+  latter. A new `is_ades_pass` answers the weaker question.)*
+
+  `is_qualified_pass` exists to prevent one mistake — reading `TotalPassed`
+  alone as "this is a valid qualified seal" when the check behind it may have
+  been a bare signature comparison against a self-signed certificate. The guard
+  was well placed and the bar was wrong.
+
+  It required `FullValidation`, defined as *"certificate path to a trust anchor,
+  revocation status and timestamp, as well as the signature."* Regulation (EU)
+  No 910/2014 **Art. 40** applies **Art. 32** *mutatis mutandis* to seals, and
+  Art. 32(1) additionally requires that the certificate was a **qualified**
+  certificate complying with Annex III **(a)**, **issued by a QTSP (b)**, and
+  that the seal was created by a **qualified creation device (f)**. A path to
+  *some* trust anchor answers none of those: a certificate can chain, be
+  unrevoked and carry a valid timestamp while coming from a CA that is not a
+  QTSP, or while its key never went near a qualified device.
+
+  Commission Implementing Regulation (EU) 2025/1945 lays the same distinction
+  out structurally: Art. 32(3)/40 gets its own Annex I and Art. 32a(3)/40a — the
+  validation of *advanced* seals based on a qualified certificate — its own
+  Annex II. Both annexes reference ETSI TS 119 612 *Trusted Lists*.
+
+  That places the rungs precisely, and not where a first reading puts them. A
+  generic AdES validation consults no Trusted List at all; **Art. 32a/40a** does,
+  but omits the creation-device leg; **Art. 32/40** adds it. So the trusted-list
+  requirement separates the bottom rung from the middle, and the device leg
+  separates the middle from the top.
+
+  The middle rung is deliberately **not** modelled. Nothing produces it, and a
+  variant no adapter reaches is a distinction every caller must handle and none
+  can test. The reasoning and the name it should take are recorded on
+  `QualifiedValidation` for whoever adds it.
+
+  **Nothing was broken.** No shipped adapter returns that verdict — the local
+  backend reports `SignatureOnly`, the hosted one takes the refusing default,
+  the ghost reports `None` — so `is_qualified_pass` could not return `true`
+  outside tests. That is what made it worth fixing now rather than later: the
+  first real validator integration satisfies an AdES-complete check *by
+  construction*, and the method would have begun returning `true` for seals
+  nobody had shown to be qualified, with nothing at the call site looking amiss.
+
+  No kit can check that an adapter claiming `QualifiedValidation` truly
+  consulted a Trusted List; that is work done elsewhere. What the split buys is
+  that the claim must now be made deliberately rather than arriving as a
+  by-product.
+
+  **Migration.** Rename `FullValidation` to `AdesValidation` at every site.
+  Then decide, per adapter, whether it belongs there or at
+  `QualifiedValidation` — if it does not consult a Trusted List and read the
+  Annex III(j) creation-device indication, it belongs at `AdesValidation`.
+  Callers asking "did this verify?" rather than "may a compliance claim rest on
+  it?" should move to `is_ades_pass`.
+
 - **A seal recorded everything about itself except the one property that cannot
   be fixed later.**
   *(Breaking: `SealedEnvelope` gains a required field `conformance_level:
