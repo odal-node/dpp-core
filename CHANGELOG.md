@@ -51,7 +51,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `None` means **not recorded**, never that the level was low. Adapters that
   cannot tell what their provider produced are entitled to say so, and rule 6
   permits it; what rule 6 refuses is an envelope recording a level that
-  disagrees with the request it answered. That is rule 2
+  disagrees with the request it answered.
+
+  Adding that rule also changed what the kit has to probe. It previously asked
+  for `supported_levels.first()` and left the rest to the refusal sweep, which
+  is the wrong half: a level outside the advertisement is *refused*, so no
+  envelope comes back and nothing can be misrecorded. A misrecording only
+  happens on a request the adapter accepts. So `check_seal_port` now probes
+  every advertised **(format, mode, level)** triple rather than every
+  (format, mode) pair, and `ConformanceReport::combinations_checked` counts
+  triples accordingly. That is rule 2
   (`seal.substituted_format`) on the axis where a wrong value is permanent: a
   specific, false claim about long-term verifiability, written into a record
   that is retention-locked the moment it lands.
