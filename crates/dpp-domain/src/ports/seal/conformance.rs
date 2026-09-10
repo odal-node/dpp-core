@@ -149,6 +149,12 @@ pub(super) fn profiled_request(
 ///    `SealChecks::None`, a pass over nothing checked.
 /// 5. **`verify.placeholder_passed`** — a placeholder envelope never satisfies
 ///    [`SealVerification::is_qualified_pass`].
+/// 6. **`seal.misrecorded_level`** — where the envelope records a conformance
+///    level, it is the level that was asked for. Rule 2 on the axis that cannot
+///    be corrected later: recording the wrong level puts a specific, false claim
+///    about long-term verifiability into a retention-locked record, which is
+///    worse than recording nothing. An absent level is permitted — an adapter
+///    that does not know what it produced is entitled to say so.
 ///
 /// The adapter is expected to be a test or development instance: this calls
 /// `seal` once per advertised pair and would spend real money against a live
@@ -238,6 +244,22 @@ async fn check_advertised<P: SealPort + ?Sized>(
                         "asked for {format:?}, received {:?} — a substituted attestation, \
                          not the one the caller chose",
                         envelope.format
+                    ),
+                );
+            }
+
+            // Rule 6. The same defect as rule 2, on the axis that cannot be
+            // corrected later. A recorded level that disagrees with the request
+            // is worse than an absent one: it puts a specific, wrong claim about
+            // long-term verifiability into a retention-locked record.
+            if let Some(recorded) = envelope.conformance_level
+                && recorded != level
+            {
+                report.fail(
+                    "seal.misrecorded_level",
+                    format!(
+                        "asked for {level:?}, envelope records {recorded:?} — the stored level \
+                         must say what was requested, and this passport is retention-locked"
                     ),
                 );
             }

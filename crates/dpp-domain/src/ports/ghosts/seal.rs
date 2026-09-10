@@ -41,6 +41,11 @@ impl SealPort for GhostSeal {
                 &req.payload_hash[..8.min(req.payload_hash.len())]
             ),
             signing_cert_ref: None,
+            // Echoed for the same reason `format` is: the ghost exists to catch
+            // a consumer that trusts an envelope without reading it, and an
+            // envelope that silently dropped the level would train callers to
+            // expect `None` from every adapter.
+            conformance_level: Some(req.conformance_level),
             sealed_at: Utc::now(),
             placeholder: true,
         })
