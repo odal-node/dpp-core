@@ -421,6 +421,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`dpp_domain::trusted_list` — qualified status is a question about a moment,
+  not about now.**
+
+  Regulation (EU) No 910/2014 **Art. 22** requires Member States to publish
+  trusted lists "in a form suitable for automated processing". That is what makes
+  qualified status a fact software can establish rather than a claim it has to
+  take from a vendor — and nothing here could read one. `SealChecks::QualifiedValidation`
+  is consequently unreachable: no adapter can honestly produce it.
+
+  This adds the half that is fixed by regulation rather than by deployment:
+  `TrustServiceType` and `TrustServiceStatus` from ETSI TS 119 612 V2.3.1 — the
+  standard Commission Implementing Regulations (EU) 2025/1945 and 2025/1946 both
+  name normatively — and `TrustServiceHistory`, which answers what a service's
+  status was at a given time.
+
+  **The point-in-time rule is the reason this is a type and not a boolean.**
+  Art. 40 applies Art. 32 to seals, and Art. 32(1)(b) asks whether the
+  certificate *"was issued by a qualified trust service provider and was valid at
+  the time of signing"*. A passport sealed in 2027 by a provider whose status was
+  withdrawn in 2029 is still validly sealed; a present-tense check reports it as
+  unqualified and is wrong. The reverse is worse — a provider granted in 2029
+  would certify a 2027 seal that never was qualified. Trusted lists retain
+  history indefinitely (TS 119 612 clause 5.3.12, retention `65535`) precisely so
+  the past question can be asked, and both directions are pinned by tests.
+
+  `status_at` returns `Option` rather than defaulting to withdrawn: *"the list
+  does not reach back that far"* and *"the service was not qualified"* are
+  different findings, and only the first leaves room for another source.
+
+  Two modelling notes. `TrustServiceStatus` names only `Granted` and `Withdrawn`
+  because clause 5.5.4 permits only those two for any service type that confers
+  qualified status; the other eleven URIs belong to national or pre-eIDAS axes
+  and are kept readable, not comparable — `undersupervision` is not a lesser
+  `granted`. And `TrustServiceType` is a URI newtype rather than an enum, because
+  ETSI adds service types as the Regulation grows trust services, and eIDAS 2 did
+  exactly that.
+
+  `TrustServiceType::REMOTE_QSEAL_CD_MANAGEMENT` is the **Art. 39a** entry — the
+  service a cloud-sealing arrangement needs, whose Art. 51(3) transitional
+  expired on 21 May 2026. It differs from its non-qualified twin by four
+  characters and completely in legal effect, which a test pins.
+
+  **Nothing fetches or parses a list yet**, and no verdict in this crate rests on
+  one. That is stated in the module documentation rather than left to be
+  discovered.
+
 - **The bound a continuity snapshot states was signed, and then read by
   nobody.** New `dpp_vc::snapshot` — `verify_snapshot_bound` and
   `SnapshotBound`. An expired snapshot verified as valid, because the deadline

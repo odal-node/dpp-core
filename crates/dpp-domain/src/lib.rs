@@ -44,6 +44,7 @@ pub mod status;
 #[cfg(test)]
 mod test_support;
 pub mod transfer;
+pub mod trusted_list;
 pub mod validation;
 
 pub use catalog::{
