@@ -133,6 +133,49 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   adapters that do not should pass `None` rather than guess. Stored envelopes
   need no migration — the field is optional on read.
 
+- **`PROTECTED_PATCH_FIELDS` was a deny-list, so a modelled envelope field was
+  patchable unless someone remembered to add it.** Eleven were on the wrong side
+  of that default: `granularity`, `productGroup`, `productId`, `commodityCode`,
+  `placedOnMarketDate`, `responsibleOperator`, `batchId`, `manufacturer`,
+  `qrCodeUrl`, `updatedAt` and `materials`. All eleven are now protected.
+
+  *(Breaking: `patch_fields` rejects deltas touching any of them. `just semver`
+  does not flag it — the constant's type is unchanged and only its value grew —
+  which is precisely why it is recorded here by hand. Migration: set these at
+  create, through `update()`, or through the transition that owns them; a
+  published record's identity, registration data or legal timing is corrected by
+  superseding it, not by patching it.)*
+
+  Each entry earns its place for a reason the deny-list default never made anyone
+  state. `granularity` is checked independently by the registry — IR (EU)
+  2026/1778 Art. 8(7)(c) has the Commission confirm a passport's conformity with
+  the level it was registered at, and Arts. 8(4)–(5) hang the batch and model
+  identifier links off that level, so a level that moves after registration
+  desynchronises the record from a check already performed on it.
+  `commodityCode` is registration data the registry validates against the ranges
+  its product group permits. `productGroup` decides which schema validates the
+  passport and which instruments apply. `placedOnMarketDate` is what every
+  effectivity and retention calculation keys on. `responsibleOperator` was the
+  odd one out beside `operatorIdentifier` and `facility`, its two neighbours in
+  the same snapshot. `materials` is inside the signed public view, so the
+  `componentRefs` argument applies unchanged: patching it leaves the served body
+  no longer verifying against its own signature.
+
+  🚨 **No shipped path was reachable**, and that is the point rather than a
+  mitigation. The one consumer that patches through a user-facing route builds
+  its delta from an allow-list of its own, so none of the eleven could be
+  written through it. But that guard lives in a consumer, and this list is the
+  contract every other implementor inherits — including the PostgreSQL backend
+  that derives from it.
+
+  **The durable half is a test, not the eleven entries.** `PASSPORT_WIRE_KEYS` is
+  now checked against the protected list and a declared patchable one: every
+  serialised envelope key must be classified, nothing may be in both, and neither
+  list may name a key that is not a wire key. Adding a field to `Passport` fails
+  that test until someone deliberately places it. The previous default answered
+  the question by saying nothing, and a permission granted by silence is the one
+  nobody reviews.
+
 - **The SVHC candidate list had no consumer, and no way to be given a newer one.**
   *(Breaking: `check_svhc_declarations` takes a second argument, a
   `&CandidateList`. `CandidateListProvenance` and `candidate_list_provenance()`
