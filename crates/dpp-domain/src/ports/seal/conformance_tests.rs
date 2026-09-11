@@ -35,6 +35,9 @@ impl SealPort for SubstitutesFormat {
             format: SealFormat::Cades,
             seal_value: "synthetic".into(),
             signing_cert_ref: None,
+            // Unknown to this fake — it never reads the request. `None` keeps
+            // rule 6 silent so the test isolates the defect it is named for.
+            conformance_level: None,
             sealed_at: Utc::now(),
             placeholder: false,
         })
@@ -86,6 +89,7 @@ impl SealPort for PassesOverNothing {
             format: req.sig_format,
             seal_value: "synthetic".into(),
             signing_cert_ref: None,
+            conformance_level: Some(req.conformance_level),
             sealed_at: Utc::now(),
             placeholder: false,
         })
@@ -144,6 +148,7 @@ impl SealPort for ShortLivedOnly {
             format: req.sig_format,
             seal_value: "synthetic".into(),
             signing_cert_ref: None,
+            conformance_level: Some(req.conformance_level),
             sealed_at: Utc::now(),
             placeholder: false,
         })
@@ -223,6 +228,10 @@ impl SealPort for SealsButCannotVerify {
             format: req.sig_format,
             seal_value: "synthetic".into(),
             signing_cert_ref: None,
+            // Records no level, and that is conformant — see
+            // `an_absent_level_is_not_a_misrecording`. An adapter that cannot
+            // tell what its provider produced says so rather than guessing.
+            conformance_level: None,
             sealed_at: Utc::now(),
             placeholder: false,
         })
@@ -272,6 +281,9 @@ impl SealPort for FormatWithNoPackaging {
             format: SealFormat::Pades,
             seal_value: "synthetic".into(),
             signing_cert_ref: None,
+            // Unknown to this fake — it never reads the request. `None` keeps
+            // rule 6 silent so the test isolates the defect it is named for.
+            conformance_level: None,
             sealed_at: Utc::now(),
             placeholder: false,
         })
@@ -303,5 +315,160 @@ async fn a_format_with_no_advertised_packaging_is_caught() {
             .iter()
             .any(|f| f.rule == "capabilities.format_without_envelope"),
         "an unrequestable format is a defect in the advertisement, not in a request: {report}"
+    );
+}
+
+/// Honours the request, then records a different level on the envelope.
+///
+/// Otherwise conformant on purpose, so this isolates the misrecording rather
+/// than also tripping the format or refusal rules. The shape is not
+/// hypothetical: an adapter that derives the level from its own configuration
+/// rather than from the request it was handed produces exactly this, and the
+/// derivation looks reasonable at every step.
+struct MisrecordsLevel;
+
+#[async_trait]
+impl SealPort for MisrecordsLevel {
+    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
+        if !self.capabilities().can_produce(&req) {
+            return Err(crate::error::dpp::DppError::Validation(
+                crate::field_error::ValidationErrors::message("profile not advertised"),
+            ));
+        }
+        Ok(SealedEnvelope {
+            format: req.sig_format,
+            seal_value: "synthetic".into(),
+            signing_cert_ref: None,
+            // Asked for B-LT, told the record it was B-B.
+            conformance_level: Some(SealConformanceLevel::BaselineB),
+            sealed_at: Utc::now(),
+            placeholder: false,
+        })
+    }
+    async fn verify(
+        &self,
+        _env: &SealedEnvelope,
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
+        Ok(SealVerification::passed(SealChecks::FullValidation))
+    }
+    fn capabilities(&self) -> SealCapabilities {
+        SealCapabilities {
+            supported_formats: vec![SealFormat::Cades],
+            supported_modes: vec![SealMode::ProviderSeal],
+            supported_levels: vec![SealConformanceLevel::BaselineLt],
+            supported_envelopes: vec![SealEnvelope::Detached],
+        }
+    }
+}
+
+/// An envelope that misrecords its level is caught.
+///
+/// The failure this rule exists for is silent and permanent. The seal itself may
+/// be perfectly good B-LT; what is wrong is the record beside it, and the record
+/// is what an auditor reads. Because the passport is retention-locked, a wrong
+/// level cannot be corrected once written — so it has to be refused when it is
+/// produced, which is here.
+#[tokio::test]
+async fn an_envelope_that_misrecords_its_level_is_caught() {
+    let report = check_seal_port(&MisrecordsLevel).await;
+    assert!(!report.is_conformant(), "{report}");
+    assert!(
+        report
+            .failures
+            .iter()
+            .any(|f| f.rule == "seal.misrecorded_level"),
+        "a level that disagrees with the request is a substitution on the axis that \
+         cannot be corrected later: {report}"
+    );
+}
+
+/// Records the first advertised level faithfully and the second wrongly.
+///
+/// The shape the kit used to miss entirely. It probed only
+/// `supported_levels.first()`, and the refusal sweep covers the levels an
+/// adapter does *not* advertise — which is the wrong half, because a request
+/// outside the advertisement is refused and produces no envelope to misrecord.
+struct MisrecordsOnlyTheSecondLevel;
+
+#[async_trait]
+impl SealPort for MisrecordsOnlyTheSecondLevel {
+    async fn seal(&self, req: SealRequest) -> Result<SealedEnvelope, crate::error::dpp::DppError> {
+        if !self.capabilities().can_produce(&req) {
+            return Err(crate::error::dpp::DppError::Validation(
+                crate::field_error::ValidationErrors::message("profile not advertised"),
+            ));
+        }
+        Ok(SealedEnvelope {
+            format: req.sig_format,
+            seal_value: "synthetic".into(),
+            signing_cert_ref: None,
+            conformance_level: Some(match req.conformance_level {
+                // Honest about the first advertised level.
+                SealConformanceLevel::BaselineT => SealConformanceLevel::BaselineT,
+                // …and wrong about every other, in the dangerous direction.
+                _ => SealConformanceLevel::BaselineB,
+            }),
+            sealed_at: Utc::now(),
+            placeholder: false,
+        })
+    }
+    async fn verify(
+        &self,
+        _env: &SealedEnvelope,
+    ) -> Result<SealVerification, crate::error::dpp::DppError> {
+        Ok(SealVerification::passed(SealChecks::FullValidation))
+    }
+    fn capabilities(&self) -> SealCapabilities {
+        SealCapabilities {
+            supported_formats: vec![SealFormat::Cades],
+            supported_modes: vec![SealMode::ProviderSeal],
+            supported_levels: vec![
+                SealConformanceLevel::BaselineT,
+                SealConformanceLevel::BaselineLt,
+            ],
+            supported_envelopes: vec![SealEnvelope::Detached],
+        }
+    }
+}
+
+/// Every advertised level is probed, not just the first.
+///
+/// The one that matters most is the one furthest down the list: `B-LT` is where
+/// a passport's seal starts surviving its signing certificate, so an adapter
+/// that quietly records `B-B` there is misdescribing the only property that
+/// cannot be corrected after the passport is locked.
+#[tokio::test]
+async fn a_misrecorded_level_is_caught_on_a_level_that_is_not_the_first() {
+    let report = check_seal_port(&MisrecordsOnlyTheSecondLevel).await;
+    assert!(!report.is_conformant(), "{report}");
+    assert!(
+        report
+            .failures
+            .iter()
+            .any(|f| f.rule == "seal.misrecorded_level"),
+        "a level advertised but never asked for is a level never checked: {report}"
+    );
+    assert!(
+        report.combinations_checked >= 2,
+        "both advertised levels must actually be requested: {report}"
+    );
+}
+
+/// An adapter that records no level at all is conformant.
+///
+/// Deliberately permitted. `GhostSeal` echoes the request, but an adapter that
+/// genuinely does not know what its provider produced has one honest answer, and
+/// it is `None` — the same standing as an absent `signingCertRef`. Failing it
+/// would push adapters into guessing, which is the defect the rule above exists
+/// to catch.
+#[tokio::test]
+async fn an_absent_level_is_not_a_misrecording() {
+    let report = check_seal_port(&SealsButCannotVerify).await;
+    assert!(
+        !report
+            .failures
+            .iter()
+            .any(|f| f.rule == "seal.misrecorded_level"),
+        "an adapter that records no level must not be failed for it: {report}"
     );
 }

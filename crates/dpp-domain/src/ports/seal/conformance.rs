@@ -149,10 +149,18 @@ pub(super) fn profiled_request(
 ///    `SealChecks::None`, a pass over nothing checked.
 /// 5. **`verify.placeholder_passed`** — a placeholder envelope never satisfies
 ///    [`SealVerification::is_qualified_pass`].
+/// 6. **`seal.misrecorded_level`** — where the envelope records a conformance
+///    level, it is the level that was asked for. Rule 2 on the axis that cannot
+///    be corrected later: recording the wrong level puts a specific, false claim
+///    about long-term verifiability into a retention-locked record, which is
+///    worse than recording nothing. An absent level is permitted — an adapter
+///    that does not know what it produced is entitled to say so.
 ///
 /// The adapter is expected to be a test or development instance: this calls
-/// `seal` once per advertised pair and would spend real money against a live
-/// QTSP.
+/// `seal` once per advertised **(format, mode, level)** triple and would spend
+/// real money against a live QTSP. Rule 6 is why the level is part of that —
+/// a misrecording can only occur on a request the adapter accepts, so every
+/// advertised level has to be asked for at least once.
 pub async fn check_seal_port<P: SealPort + ?Sized>(adapter: &P) -> ConformanceReport {
     let mut report = ConformanceReport::default();
     let capabilities = adapter.capabilities();
@@ -189,16 +197,22 @@ async fn check_advertised<P: SealPort + ?Sized>(
 
     for format in &capabilities.supported_formats {
         for mode in &capabilities.supported_modes {
-            report.combinations_checked = report.combinations_checked.saturating_add(1);
-            // The first advertised level and envelope, so every advertised
-            // format/mode pair is still exercised exactly once. The remaining
-            // level and envelope combinations are covered by the refusal sweep
-            // below, which is where a mismatch actually shows.
-            let level = capabilities
-                .supported_levels
-                .first()
-                .copied()
-                .unwrap_or(SealConformanceLevel::BaselineLt);
+            // Every advertised level, not just the first. The refusal sweep
+            // below covers the levels an adapter does **not** advertise, which
+            // is the wrong half for rule 6: a level outside the advertisement is
+            // refused, so no envelope comes back and nothing is recorded. A
+            // misrecording can only happen on a request the adapter *accepts*,
+            // and that is exactly this list. Probing one of them left an adapter
+            // that recorded its first level correctly and its second wrongly
+            // reported as conformant.
+            //
+            // An empty advertisement still gets one probe, so the refusal rules
+            // are exercised rather than skipped.
+            let levels: &[SealConformanceLevel] = if capabilities.supported_levels.is_empty() {
+                &[SealConformanceLevel::BaselineLt]
+            } else {
+                &capabilities.supported_levels
+            };
             // The first advertised packaging *this format defines*. Picking the
             // first advertised one outright would hand the adapter a pair the
             // protocol has no way to express — a JAdES seal packaged
@@ -218,36 +232,57 @@ async fn check_advertised<P: SealPort + ?Sized>(
                 );
                 continue;
             };
-            let req = profiled_request(format.clone(), mode.clone(), level, packaging);
+            for &level in levels {
+                report.combinations_checked = report.combinations_checked.saturating_add(1);
+                let req = profiled_request(format.clone(), mode.clone(), level, packaging);
 
-            let envelope = match adapter.seal(req).await {
-                Ok(envelope) => envelope,
-                Err(e) => {
+                let envelope = match adapter.seal(req).await {
+                    Ok(envelope) => envelope,
+                    Err(e) => {
+                        report.fail(
+                            "seal.refused_advertised",
+                            format!("advertised {format:?}/{mode:?}/{level:?} but refused it: {e}"),
+                        );
+                        continue;
+                    }
+                };
+
+                if envelope.format != *format {
                     report.fail(
-                        "seal.refused_advertised",
-                        format!("advertised {format:?}/{mode:?} but refused it: {e}"),
+                        "seal.substituted_format",
+                        format!(
+                            "asked for {format:?}, received {:?} — a substituted attestation, \
+                             not the one the caller chose",
+                            envelope.format
+                        ),
                     );
-                    continue;
                 }
-            };
 
-            if envelope.format != *format {
-                report.fail(
-                    "seal.substituted_format",
-                    format!(
-                        "asked for {format:?}, received {:?} — a substituted attestation, \
-                         not the one the caller chose",
-                        envelope.format
-                    ),
-                );
-            }
+                // Rule 6. The same defect as rule 2, on the axis that cannot be
+                // corrected later. A recorded level that disagrees with the
+                // request is worse than an absent one: it puts a specific, wrong
+                // claim about long-term verifiability into a retention-locked
+                // record.
+                if let Some(recorded) = envelope.conformance_level
+                    && recorded != level
+                {
+                    report.fail(
+                        "seal.misrecorded_level",
+                        format!(
+                            "asked for {level:?}, envelope records {recorded:?} — the stored \
+                             level must say what was requested, and this passport is \
+                             retention-locked"
+                        ),
+                    );
+                }
 
-            match adapter.verify(&envelope).await {
-                Ok(verification) => audit_verdict(&verification, format, mode, report),
-                // Permitted: the trait does not require an adapter to verify.
-                // Recorded once, because "can seal, cannot check" is a position
-                // an operator should know they are in.
-                Err(_) => verify_unsupported = true,
+                match adapter.verify(&envelope).await {
+                    Ok(verification) => audit_verdict(&verification, format, mode, report),
+                    // Permitted: the trait does not require an adapter to verify.
+                    // Recorded once, because "can seal, cannot check" is a
+                    // position an operator should know they are in.
+                    Err(_) => verify_unsupported = true,
+                }
             }
         }
     }

@@ -207,3 +207,58 @@ fn can_produce_refuses_a_pair_no_format_defines() {
     assert!(capabilities.can_produce(&request(SealFormat::Xades, SealEnvelope::Enveloping)));
     assert!(capabilities.can_produce(&request(SealFormat::Jades, SealEnvelope::Detached)));
 }
+
+/// A stored envelope written before `conformanceLevel` existed still reads.
+///
+/// `SealedEnvelope` is persisted onto `Passport::seal` and travels on the wire,
+/// so this is a compatibility surface with a hard property: **a published
+/// passport is retention-locked, and its seal can never be rewritten.** Every
+/// envelope sealed before this field was added is therefore permanent, and a
+/// deserialiser that required the field would make those passports unreadable —
+/// not degraded, unreadable, with no repair available.
+#[test]
+fn an_envelope_without_a_level_still_deserialises() {
+    let legacy = serde_json::json!({
+        "format": "CADES",
+        "sealValue": "MIIB",
+        "sealedAt": "2026-08-14T00:00:00Z",
+        "placeholder": false,
+    });
+
+    let env: SealedEnvelope = serde_json::from_value(legacy).expect("legacy envelope reads");
+    assert_eq!(
+        env.conformance_level, None,
+        "an absent level must read as `not recorded`, never as a default"
+    );
+}
+
+/// The level survives the round trip, at every level and when absent.
+///
+/// Absent is included deliberately: `skip_serializing_if` means a `None` must
+/// vanish from the JSON rather than serialising as `null`, and a passport whose
+/// seal grew a `"conformanceLevel": null` key would be a content change on a
+/// retention-locked document.
+#[test]
+fn the_conformance_level_round_trips_including_absent() {
+    let envelope = |level| SealedEnvelope {
+        format: SealFormat::Cades,
+        seal_value: "MIIB".to_owned(),
+        signing_cert_ref: None,
+        conformance_level: level,
+        sealed_at: chrono::Utc::now(),
+        placeholder: false,
+    };
+
+    for level in SealConformanceLevel::ALL {
+        let json = serde_json::to_value(envelope(Some(*level))).unwrap();
+        assert_eq!(json["conformanceLevel"], serde_json::json!(level));
+        let back: SealedEnvelope = serde_json::from_value(json).unwrap();
+        assert_eq!(back.conformance_level, Some(*level));
+    }
+
+    let json = serde_json::to_value(envelope(None)).unwrap();
+    assert!(
+        json.get("conformanceLevel").is_none(),
+        "an unrecorded level must be absent from the JSON, not null: {json}"
+    );
+}

@@ -225,6 +225,7 @@ fn passport_with_every_proof() -> Passport {
     p.seal = Some(crate::seal::SealedEnvelope {
         format: crate::seal::SealFormat::Cades,
         seal_value: "cGtjczctYmxvYg==".into(),
+        conformance_level: Some(crate::seal::SealConformanceLevel::BaselineLt),
         sealed_at: chrono::Utc::now(),
         placeholder: false,
         signing_cert_ref: None,

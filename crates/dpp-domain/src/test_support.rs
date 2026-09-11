@@ -186,7 +186,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
         SecondLifeOperation,
     };
     use crate::product_group::{CarbonFootprint, RepairabilityScore};
-    use crate::seal::{SealFormat, SealedEnvelope};
+    use crate::seal::{SealConformanceLevel, SealFormat, SealedEnvelope};
 
     let now = Utc::now();
     let reference = PassportRef {
@@ -258,6 +258,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
         format: SealFormat::Cades,
         seal_value: "MIIB".to_owned(),
         signing_cert_ref: Some("urn:cert:1".to_owned()),
+        conformance_level: Some(SealConformanceLevel::BaselineLt),
         sealed_at: now,
         placeholder: false,
     });

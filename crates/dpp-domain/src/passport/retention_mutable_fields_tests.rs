@@ -26,6 +26,7 @@ fn every_mutable_key_is_a_real_passport_field() {
         format: crate::seal::SealFormat::Cades,
         seal_value: "MIIB".to_owned(),
         signing_cert_ref: None,
+        conformance_level: Some(crate::seal::SealConformanceLevel::BaselineLt),
         sealed_at: chrono::Utc::now(),
         placeholder: true,
     });

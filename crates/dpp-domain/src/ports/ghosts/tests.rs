@@ -191,6 +191,7 @@ async fn ghost_verify_returns_invalid_placeholder() {
         format: SealFormat::Jades,
         seal_value: "GHOST-SEAL-abc123".into(),
         signing_cert_ref: None,
+        conformance_level: Some(SealConformanceLevel::BaselineLt),
         sealed_at: Utc::now(),
         placeholder: true,
     };

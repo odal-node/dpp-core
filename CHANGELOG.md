@@ -15,6 +15,68 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A seal recorded everything about itself except the one property that cannot
+  be fixed later.**
+  *(Breaking: `SealedEnvelope` gains a required field `conformance_level:
+  Option<SealConformanceLevel>`, so every struct literal must name it. On the
+  wire it is `conformanceLevel`, optional in both directions — an envelope
+  written before this field reads back with `None`, and a `None` is omitted
+  rather than serialised as `null`. The seal port conformance kit gains rule 6,
+  `seal.misrecorded_level`.)*
+
+  `SealConformanceLevel` already carried the argument for why the level belongs
+  on the request: a `BaselineB` seal stops verifying when its signing
+  certificate expires, ESPR retention outlives certificate lifetimes
+  comfortably, the seal is bought once, and the document it covers is
+  retention-locked — so the choice cannot be corrected afterwards.
+
+  Every word of that is about the *stored* seal, and the stored seal did not
+  record it. `SealedEnvelope` carried the format, the certificate reference, the
+  time and the placeholder flag. `survives_certificate_expiry` existed on the
+  enum and could not be answered for any individual passport, because nothing
+  persisted said which level that passport's seal was bought at. Recovering it
+  meant parsing the `.p7s` by hand.
+
+  The failure compounds over time rather than staying still. A node that runs a
+  development backend at `B`, then moves to a hosted provider at `T`, then to
+  `LT`, leaves behind three populations of passport that are indistinguishable
+  in storage — and the ones that will stop verifying first are the ones nobody
+  can now identify.
+
+  The field is deliberately a **record of what was requested, not proof of what
+  arrived** — the same standing as `signingCertRef`, which names the certificate
+  the seal claims rather than one anybody verified. What the bytes actually
+  carry is the validator's answer, and the two agreeing is the cross-check.
+
+  `None` means **not recorded**, never that the level was low. Adapters that
+  cannot tell what their provider produced are entitled to say so, and rule 6
+  permits it; what rule 6 refuses is an envelope recording a level that
+  disagrees with the request it answered.
+
+  Adding that rule also changed what the kit has to probe. It previously asked
+  for `supported_levels.first()` and left the rest to the refusal sweep, which
+  is the wrong half: a level outside the advertisement is *refused*, so no
+  envelope comes back and nothing can be misrecorded. A misrecording only
+  happens on a request the adapter accepts. So `check_seal_port` now probes
+  every advertised **(format, mode, level)** triple rather than every
+  (format, mode) pair, and `ConformanceReport::combinations_checked` counts
+  triples accordingly. That is rule 2
+  (`seal.substituted_format`) on the axis where a wrong value is permanent: a
+  specific, false claim about long-term verifiability, written into a record
+  that is retention-locked the moment it lands.
+
+  `sealed_at` is also documented properly for the first time. It is this node's
+  clock at the moment the backend answered — not a trusted timestamp, and not
+  necessarily when the signature was formed. A seal carries an independently
+  established signing time only from `BaselineT` upward, where a timestamp
+  authority attests it; at `BaselineB` there is no such token anywhere in the
+  envelope. No behaviour change, but the field read as evidence and was not.
+
+  **Migration.** Add `conformance_level` to every `SealedEnvelope` literal.
+  Adapters that know what they asked for should echo the request's level;
+  adapters that do not should pass `None` rather than guess. Stored envelopes
+  need no migration — the field is optional on read.
+
 - **The SVHC candidate list had no consumer, and no way to be given a newer one.**
   *(Breaking: `check_svhc_declarations` takes a second argument, a
   `&CandidateList`. `CandidateListProvenance` and `candidate_list_provenance()`

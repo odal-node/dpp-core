@@ -5,7 +5,7 @@ use crate::passport::{
     ComponentRef, DerivationRef, FacilitySnapshot, LifeStatus, PassportId, PassportRef,
     SecondLifeOperation,
 };
-use crate::seal::{SealFormat, SealedEnvelope};
+use crate::seal::{SealConformanceLevel, SealFormat, SealedEnvelope};
 use crate::test_support::sample_passport;
 use chrono::Utc;
 
@@ -56,6 +56,7 @@ fn every_protected_key_is_a_real_passport_field() {
         format: SealFormat::Cades,
         seal_value: "MIIB".to_owned(),
         signing_cert_ref: None,
+        conformance_level: Some(SealConformanceLevel::BaselineLt),
         sealed_at: now,
         placeholder: true,
     });
