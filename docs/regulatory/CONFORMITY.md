@@ -16,7 +16,7 @@ programme evaluators.
 | CEN/CLC JTC 24 system standards | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | **No conformance assessed or claimed.** The standard texts have not been purchased, so no clause-by-clause mapping exists. Absent an OJEU citation there is also no presumption of conformity available to claim |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Pending — an ESPR working-plan priority | `TextileData` struct held provisional; validated structurally until the act finalises |
-| GS1 Digital Link v1.2 | Published | `DigitalLink` parser covers AI 01, 21, 10 |
+| GS1 Digital Link URI Syntax | Published | `DigitalLink` parser covers AI 01, 21, 10. 🔶 **The revision implemented is not established** — see the note below |
 | IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `aas` module maps DPP to AAS Submodel |
 | W3C VC Data Model v2.0 | CR | `DppAccessCredential` follows VC envelope structure |
 
@@ -135,8 +135,11 @@ Integration test: `crates/dpp-tests/tests/schema_conformity.rs` asserts field co
 
 ## GS1 Interoperability
 
-- **Digital Link** — Full AI 01/21/10 parsing and building, compliant with
-  GS1 Digital Link URI Syntax v1.2.
+- **Digital Link** — Full AI 01/21/10 parsing and building against the GS1
+  Digital Link URI Syntax. 🔶 **Which revision is not established** — this
+  document claimed *v1.2* with no recorded source, while EN 18219:2026 clause
+  6.3.2 names **1.6.0:2022** as the version its scheme 1 requires. The parser has
+  been diffed against neither. See the module-level note in `dpp-digital-link`.
 - **Link-type Negotiation** — Content negotiation returning different DPP
   representations (JSON-LD, HTML, AAS) based on the `linkType` query parameter.
 - **AAS Submodel Mapping** — Automatic conversion of DPP JSON to IDTA AAS
@@ -158,7 +161,14 @@ ISO parts.
 
 **What is verified.** The AI 21 serial is exactly 20 characters from `[0-9a-f]`,
 within the GS1 General Specifications limit that the `DigitalLink` parser
-enforces; the URI syntax is GS1 Digital Link v1.2. Both are covered by tests.
+enforces, and that is covered by tests.
+
+🔶 **The URI syntax revision is not.** This document previously asserted
+"GS1 Digital Link v1.2" here and in two other places, with no source recorded for
+the figure. EN 18219:2026 clause 6.3.2 names **1.6.0:2022** as the revision its
+scheme 1 requires, so there are two candidate versions and evidence for neither.
+Do not restate either as verified until the parser and builder have been diffed
+against 1.6.0:2022.
 
 **What is not.** 🔶 The ISO/IEC 15459 parts are paywalled and have **not** been
 read against primary text. The claim above rests on GS1's registration as an
