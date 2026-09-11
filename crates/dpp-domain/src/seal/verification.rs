@@ -18,9 +18,63 @@ pub enum SealChecks {
     /// seal, and nothing else: no certificate path, no revocation, no timestamp,
     /// no Trusted List.
     SignatureOnly,
-    /// A full AdES validation: certificate path to a trust anchor, revocation
-    /// status and timestamp, as well as the signature.
-    FullValidation,
+    /// A complete **AdES** validation: certificate path to a trust anchor,
+    /// revocation status and timestamp, as well as the signature.
+    ///
+    /// What an ordinary AdES validation library gives you, and the level at
+    /// which the seal is cryptographically sound and its certificate is
+    /// current.
+    ///
+    /// **It does not establish that the seal is qualified**, and the gap is not
+    /// a matter of degree — see [`Self::QualifiedValidation`]. A certificate can
+    /// chain to a trust anchor, be unrevoked and carry a valid timestamp while
+    /// being an ordinary organisational certificate from a CA that is not a
+    /// QTSP.
+    AdesValidation,
+    /// An AdES validation **plus** the two legs that make a seal qualified.
+    ///
+    /// Named for the legal outcome rather than the mechanism, because the
+    /// mechanism is what keeps getting mistaken for sufficient.
+    ///
+    /// # What this requires beyond [`Self::AdesValidation`]
+    ///
+    /// Regulation (EU) No 910/2014 as amended. **Art. 40** applies **Art. 32**
+    /// *mutatis mutandis* to seals, so Art. 32(1) is the definition — read with
+    /// Annex III in place of Annex I and Art. 36 in place of Art. 26. The
+    /// conditions an AdES validation does not reach:
+    ///
+    /// - **Art. 32(1)(a)–(b)** — the certificate was, at the time of sealing, a
+    ///   **qualified** certificate complying with Annex III, **issued by a
+    ///   QTSP**. That is a Trusted List question (**Art. 22**), and a path to
+    ///   *some* trust anchor does not answer it.
+    /// - **Art. 32(1)(f)** — the seal was created by a **qualified electronic
+    ///   seal creation device**. **Annex III(j)** makes this machine-detectable:
+    ///   the certificate carries an indication, in a form suitable for automated
+    ///   processing, that the creation data resides in such a device.
+    ///
+    /// # There is a third level in the law, and this pair does not model it
+    ///
+    /// Worth stating, because the boundary is easy to put in the wrong place.
+    /// eIDAS 2 inserted **Art. 40a** — validation of *advanced* seals based on a
+    /// **qualified certificate** — separately from Art. 40. Its conditions
+    /// mirror Art. 32(1)(a)–(b) but **omit the creation-device leg**, because an
+    /// advanced seal is not required to use a qualified device.
+    ///
+    /// So the ladder is really: a generic AdES validation, which consults no
+    /// Trusted List at all → Art. 32a/40a, which does → Art. 32/40, which adds
+    /// the device leg. Commission Implementing Regulation (EU) 2025/1945 lays
+    /// the last two out in exactly that shape, giving Art. 32(3)/40 its own
+    /// Annex I and Art. 32a(3)/40a its own Annex II — and **both** annexes
+    /// reference ETSI TS 119 612 *Trusted Lists*, which is what places the
+    /// trusted-list leg below the middle rung rather than at the top.
+    ///
+    /// [`Self::AdesValidation`] is the bottom rung and this variant is the top.
+    /// The middle one is deliberately not modelled: nothing produces it, and a
+    /// variant no adapter reaches is a distinction callers have to handle
+    /// without ever being able to test it. Add it when an adapter genuinely
+    /// implements Art. 40a and stops there — at which point it wants the name
+    /// `QualifiedCertificateValidation` and the reasoning above.
+    QualifiedValidation,
 }
 
 /// Result of verifying a `SealedEnvelope`.
@@ -96,10 +150,55 @@ impl SealVerification {
     /// check behind it may have been a bare signature comparison against a
     /// self-signed certificate. Requiring both parts at every call site would
     /// work exactly as well right up until one site forgot.
+    ///
+    /// # It requires [`SealChecks::QualifiedValidation`], not merely a complete AdES one
+    ///
+    /// This method used to accept what is now [`SealChecks::AdesValidation`] —
+    /// certificate path, revocation, timestamp, signature. That is everything an
+    /// AdES validation library returns, and it is **below the bar for
+    /// qualified**: it establishes neither that the certificate was a qualified
+    /// certificate issued by a QTSP (Art. 32(1)(a)–(b) via Art. 40, a Trusted
+    /// List question) nor that a qualified creation device was used
+    /// (Art. 32(1)(f), detectable via Annex III(j)).
+    ///
+    /// Nothing was wrong at the time, because no adapter produced that verdict.
+    /// The hazard was ahead: the first real validator integration satisfies an
+    /// AdES-complete check by construction, and this method would then have
+    /// started returning `true` for seals nobody had shown to be qualified,
+    /// with nothing at the call site looking amiss.
+    ///
+    /// No kit can check that an adapter claiming `QualifiedValidation` really
+    /// consulted a Trusted List — that is a claim about work done elsewhere, and
+    /// [`crate::ports::seal::conformance`] only reaches the verdicts it can
+    /// falsify (a pass over nothing checked, a placeholder that passes). What
+    /// the split buys is that the claim now has to be *made* deliberately
+    /// instead of arriving as a by-product of an ordinary AdES validation.
     #[must_use]
     pub fn is_qualified_pass(&self) -> bool {
         !self.placeholder
-            && self.checks == SealChecks::FullValidation
+            && self.checks == SealChecks::QualifiedValidation
+            && self.indication == SealIndication::TotalPassed
+    }
+
+    /// Whether the seal is cryptographically sound and its certificate current,
+    /// without any claim that it is qualified.
+    ///
+    /// The honest reading of an [`SealChecks::AdesValidation`] pass, and the
+    /// answer to a genuinely different question: *did this seal verify?* rather
+    /// than *may a compliance claim rest on it?* An adapter that reaches only
+    /// this far is not defective — it is most AdES tooling — and a caller that
+    /// wants the weaker statement should be able to ask for it by name rather
+    /// than by comparing enum variants and getting the boundary wrong.
+    ///
+    /// True for [`SealChecks::QualifiedValidation`] as well, since that is
+    /// strictly more.
+    #[must_use]
+    pub fn is_ades_pass(&self) -> bool {
+        !self.placeholder
+            && matches!(
+                self.checks,
+                SealChecks::AdesValidation | SealChecks::QualifiedValidation
+            )
             && self.indication == SealIndication::TotalPassed
     }
 

@@ -19,10 +19,13 @@ fn seal_format_serde_round_trips() {
 /// A pass is not a pass is not a pass.
 ///
 /// The whole reason the verdict is not a boolean: `TotalPassed` over a bare
-/// signature check and `TotalPassed` over a full AdES validation are
-/// different claims, and only the second is one a compliance decision may
-/// rest on. If these ever collapse, a self-signed development seal satisfies
-/// the same test a qualified one does.
+/// signature check and `TotalPassed` over a qualified validation are different
+/// claims, and only the second is one a compliance decision may rest on. If
+/// these ever collapse, a self-signed development seal satisfies the same test
+/// a qualified one does.
+///
+/// There is a third claim between them, which is the subject of
+/// [`a_complete_ades_validation_is_not_yet_a_qualified_pass`].
 #[test]
 fn a_signature_check_is_not_a_qualified_pass() {
     let signature_only = SealVerification {
@@ -35,18 +38,63 @@ fn a_signature_check_is_not_a_qualified_pass() {
         "a signature check says nothing about the certificate behind it"
     );
 
-    let full = SealVerification {
-        checks: SealChecks::FullValidation,
+    let qualified = SealVerification {
+        checks: SealChecks::QualifiedValidation,
         ..signature_only.clone()
     };
-    assert!(full.is_qualified_pass());
+    assert!(qualified.is_qualified_pass());
 
     // And a placeholder never passes, however it is labelled.
     let placeholder = SealVerification {
         placeholder: true,
-        ..full.clone()
+        ..qualified.clone()
     };
     assert!(!placeholder.is_qualified_pass());
+}
+
+/// A complete AdES validation is a pass, and still not a *qualified* pass.
+///
+/// The boundary this split exists to draw, asserted rather than described. An
+/// AdES-complete check — certificate path, revocation, timestamp, signature —
+/// is what any AdES library returns, and it establishes neither that the
+/// certificate was qualified and QTSP-issued (Art. 32(1)(a)–(b) via Art. 40,
+/// answerable only against a Trusted List) nor that a qualified creation device
+/// was used (Art. 32(1)(f), via Annex III(j)).
+///
+/// Before the split there was one variant covering both, so this assertion
+/// could not be written: the same verdict that meant "it verified" also meant
+/// "a compliance claim may rest on it".
+#[test]
+fn a_complete_ades_validation_is_not_yet_a_qualified_pass() {
+    let ades = SealVerification::passed(SealChecks::AdesValidation);
+
+    assert!(
+        ades.is_ades_pass(),
+        "path, revocation and timestamp did check out"
+    );
+    assert!(
+        !ades.is_qualified_pass(),
+        "but nothing here consulted a Trusted List or looked for the Annex III(j) \
+         creation-device indication"
+    );
+
+    let qualified = SealVerification::passed(SealChecks::QualifiedValidation);
+    assert!(qualified.is_qualified_pass());
+    assert!(
+        qualified.is_ades_pass(),
+        "the qualified check is strictly more than the AdES one, so it satisfies both"
+    );
+}
+
+/// A signature-only pass is not an AdES pass either.
+///
+/// Guards the lower boundary of `is_ades_pass` the way the test above guards
+/// its upper one. Without this, the new method could accept everything that
+/// passed and the split would have moved the trap rather than closed it.
+#[test]
+fn a_signature_check_is_not_an_ades_pass() {
+    assert!(!SealVerification::passed(SealChecks::SignatureOnly).is_ades_pass());
+    assert!(!SealVerification::placeholder("nothing to validate").is_ades_pass());
 }
 
 /// Indeterminate is neither pass nor fail, and must not be read as either.
@@ -54,7 +102,7 @@ fn a_signature_check_is_not_a_qualified_pass() {
 fn indeterminate_is_not_a_pass() {
     let unresolved = SealVerification {
         indication: SealIndication::Indeterminate("revocation data unreachable".into()),
-        checks: SealChecks::FullValidation,
+        checks: SealChecks::QualifiedValidation,
         placeholder: false,
     };
     assert!(!unresolved.is_qualified_pass());

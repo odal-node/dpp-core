@@ -98,6 +98,7 @@ what each module does.
 | `product_group` | 4 | The typed per-group payloads and the `ProductGroupData` union |
 | `seal` | 2 | eIDAS seal value objects — format, mode, envelope, verification |
 | `status` | 2 | `PassportStatus`, the lifecycle state machine |
+| `trusted_list` | 2 | EU Trusted List vocabulary (ETSI TS 119 612) — service types, statuses, and status at a past moment |
 | `transfer` | 5 | Transfer of responsibility between operators |
 | `access` | 6 | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
 | `lint` | 6 | Non-binding plausibility findings. Never gates publish |
@@ -142,6 +143,7 @@ schemas
 seal
 status
 transfer
+trusted_list
 validation
 ```
 <!-- DOMAIN-CONCERNS:END -->

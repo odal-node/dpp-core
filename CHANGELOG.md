@@ -15,6 +15,62 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`is_qualified_pass` set a bar below what makes a seal qualified.**
+  *(Breaking: `SealChecks::FullValidation` is renamed `AdesValidation` and a new
+  `QualifiedValidation` sits above it. `is_qualified_pass` now requires the
+  latter. A new `is_ades_pass` answers the weaker question.)*
+
+  `is_qualified_pass` exists to prevent one mistake — reading `TotalPassed`
+  alone as "this is a valid qualified seal" when the check behind it may have
+  been a bare signature comparison against a self-signed certificate. The guard
+  was well placed and the bar was wrong.
+
+  It required `FullValidation`, defined as *"certificate path to a trust anchor,
+  revocation status and timestamp, as well as the signature."* Regulation (EU)
+  No 910/2014 **Art. 40** applies **Art. 32** *mutatis mutandis* to seals, and
+  Art. 32(1) additionally requires that the certificate was a **qualified**
+  certificate complying with Annex III **(a)**, **issued by a QTSP (b)**, and
+  that the seal was created by a **qualified creation device (f)**. A path to
+  *some* trust anchor answers none of those: a certificate can chain, be
+  unrevoked and carry a valid timestamp while coming from a CA that is not a
+  QTSP, or while its key never went near a qualified device.
+
+  Commission Implementing Regulation (EU) 2025/1945 lays the same distinction
+  out structurally: Art. 32(3)/40 gets its own Annex I and Art. 32a(3)/40a — the
+  validation of *advanced* seals based on a qualified certificate — its own
+  Annex II. Both annexes reference ETSI TS 119 612 *Trusted Lists*.
+
+  That places the rungs precisely, and not where a first reading puts them. A
+  generic AdES validation consults no Trusted List at all; **Art. 32a/40a** does,
+  but omits the creation-device leg; **Art. 32/40** adds it. So the trusted-list
+  requirement separates the bottom rung from the middle, and the device leg
+  separates the middle from the top.
+
+  The middle rung is deliberately **not** modelled. Nothing produces it, and a
+  variant no adapter reaches is a distinction every caller must handle and none
+  can test. The reasoning and the name it should take are recorded on
+  `QualifiedValidation` for whoever adds it.
+
+  **Nothing was broken.** No shipped adapter returns that verdict — the local
+  backend reports `SignatureOnly`, the hosted one takes the refusing default,
+  the ghost reports `None` — so `is_qualified_pass` could not return `true`
+  outside tests. That is what made it worth fixing now rather than later: the
+  first real validator integration satisfies an AdES-complete check *by
+  construction*, and the method would have begun returning `true` for seals
+  nobody had shown to be qualified, with nothing at the call site looking amiss.
+
+  No kit can check that an adapter claiming `QualifiedValidation` truly
+  consulted a Trusted List; that is work done elsewhere. What the split buys is
+  that the claim must now be made deliberately rather than arriving as a
+  by-product.
+
+  **Migration.** Rename `FullValidation` to `AdesValidation` at every site.
+  Then decide, per adapter, whether it belongs there or at
+  `QualifiedValidation` — if it does not consult a Trusted List and read the
+  Annex III(j) creation-device indication, it belongs at `AdesValidation`.
+  Callers asking "did this verify?" rather than "may a compliance claim rest on
+  it?" should move to `is_ades_pass`.
+
 - **A seal recorded everything about itself except the one property that cannot
   be fixed later.**
   *(Breaking: `SealedEnvelope` gains a required field `conformance_level:
@@ -364,6 +420,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   records why that licence is temporary and what the next envelope rename owes.
 
 ### Added
+
+- **`dpp_domain::trusted_list` — qualified status is a question about a moment,
+  not about now.**
+
+  Regulation (EU) No 910/2014 **Art. 22** requires Member States to publish
+  trusted lists "in a form suitable for automated processing". That is what makes
+  qualified status a fact software can establish rather than a claim it has to
+  take from a vendor — and nothing here could read one. `SealChecks::QualifiedValidation`
+  is consequently unreachable: no adapter can honestly produce it.
+
+  This adds the half that is fixed by regulation rather than by deployment:
+  `TrustServiceType` and `TrustServiceStatus` from ETSI TS 119 612 V2.3.1 — the
+  standard Commission Implementing Regulations (EU) 2025/1945 and 2025/1946 both
+  name normatively — and `TrustServiceHistory`, which answers what a service's
+  status was at a given time.
+
+  **The point-in-time rule is the reason this is a type and not a boolean.**
+  Art. 40 applies Art. 32 to seals, and Art. 32(1)(b) asks whether the
+  certificate *"was issued by a qualified trust service provider and was valid at
+  the time of signing"*. A passport sealed in 2027 by a provider whose status was
+  withdrawn in 2029 is still validly sealed; a present-tense check reports it as
+  unqualified and is wrong. The reverse is worse — a provider granted in 2029
+  would certify a 2027 seal that never was qualified. Trusted lists retain
+  history indefinitely (TS 119 612 clause 5.3.12, retention `65535`) precisely so
+  the past question can be asked, and both directions are pinned by tests.
+
+  `status_at` returns `Option` rather than defaulting to withdrawn: *"the list
+  does not reach back that far"* and *"the service was not qualified"* are
+  different findings, and only the first leaves room for another source.
+
+  Two modelling notes. `TrustServiceStatus` names only `Granted` and `Withdrawn`
+  because clause 5.5.4 permits only those two for any service type that confers
+  qualified status; the other eleven URIs belong to national or pre-eIDAS axes
+  and are kept readable, not comparable — `undersupervision` is not a lesser
+  `granted`. And `TrustServiceType` is a URI newtype rather than an enum, because
+  ETSI adds service types as the Regulation grows trust services, and eIDAS 2 did
+  exactly that.
+
+  `TrustServiceType::REMOTE_QSEAL_CD_MANAGEMENT` is the **Art. 39a** entry — the
+  service a cloud-sealing arrangement needs, whose Art. 51(3) transitional
+  expired on 21 May 2026. It differs from its non-qualified twin by four
+  characters and completely in legal effect, which a test pins.
+
+  **Nothing fetches or parses a list yet**, and no verdict in this crate rests on
+  one. That is stated in the module documentation rather than left to be
+  discovered.
 
 - **The bound a continuity snapshot states was signed, and then read by
   nobody.** New `dpp_vc::snapshot` — `verify_snapshot_bound` and
