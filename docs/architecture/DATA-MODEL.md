@@ -121,11 +121,20 @@ Elements of `Passport.materials` — bill of materials entries.
 | Product group | Field | Source |
 |---|---|---|
 | `battery` | `battery_type` | Battery Reg. 2023/1542 Art. 1(3) — closed, five categories, required |
+| `construction` | `product_family` | CPR calls the axis a product family: `"cement"` / `"concrete"` / … |
+| `detergent` | `product_type` | `"laundry"` / `"dishwashing"` / … — not `format`, which is the physical presentation of the same type |
 | `steel` | `product_category` | `"flat"` / `"long"` / … |
 | `electronics` | `product_category` | `"smartphone"` / `"other-mobile-phone"` / `"cordless-phone"` / `"tablet"` — closed, Reg. (EU) 2023/1670 Art. 1(1) |
 | `unsold-goods` | *(none)* | Removed in schema v2.0.0. Impl. Reg. (EU) 2026/2 Art. 3 delimits a disclosure by **CN code**, so its lines carry `cnCategories`, not a category word of ours. See §4.4 |
 | `furniture` | `product_type` | — |
 | `tyre` | `tyre_class` | `"C1"` / … |
+| `aluminium` · `textile` · `mattress` · `toy` | *(none)* | No act defines a category axis for these. `aluminium` and `textile` declared one in the catalog anyway until it was removed — aluminium's values were its `productionRoute` enum, textile's were defined by no schema at all |
+
+This table is the third place the same fact is written down, after each group's
+`productCategories` and `CATEGORY_ENUM_PROPERTY`. Three hand-maintained lists of
+one fact is two too many, and they had drifted apart in both directions before
+this was reconciled. Anything that can check them against each other is worth
+more than another list.
 
 **Rules:**
 1. The host dispatches compliance **only** on `ProductGroup`. A plugin is selected by product group, never by a product group-internal field.

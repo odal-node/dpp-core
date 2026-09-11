@@ -854,6 +854,42 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Two product groups declared product categories no act defines.** `aluminium`
+  and `textile` now declare none, and the `("aluminium", "productionRoute")` row
+  is gone from the drift guard's table.
+
+  Aluminium listed `primary`, `secondary-recycled` and `mixed` — three of the
+  seven `ProductionRoute` variants, its `productionRoute` schema enum verbatim.
+  How the metal was made is a different axis from what the product is. Textile
+  listed `apparel`, `footwear` and `home_textile`; the textile schema has no
+  enum-valued property at v1.0.0, v1.1.0 or v1.2.0, so all three were values
+  nothing could set and nothing could validate. Both acts are unadopted, so
+  neither group has a category axis to declare yet. Each manifest's `notes`
+  records what was removed and why, so the next reader does not restore it.
+
+  **The aluminium case was checked and passing.** `CATEGORY_ENUM_PROPERTY`
+  carried a row pointing the drift guard at `productionRoute`, so the guard
+  confirmed those values were legal — of the wrong property. A guard aimed at
+  the wrong axis is worse than no guard, because it reports the axis as
+  verified.
+
+  New `every_product_group_declaring_categories_is_cross_checked` closes the
+  direction the existing guard cannot run. That table's own header used to say a
+  group absent from it "is simply not cross-checked", naming textile as the
+  example — so absence was a documented, silent opt-out, and textile had spent
+  it. Absence is now available only to a group that declares no categories.
+
+  **It does not close the aluminium case**, and the limitation is measured
+  rather than assumed: put the row back and both tests pass. Completeness
+  catches *nothing checks this group*; it cannot catch *this group is checked
+  against the wrong property*, which needs something that knows which property
+  is a group's category axis.
+
+  `DATA-MODEL.md` §3.4 holds the same fact a third time and was missing
+  `construction` (`product_family`) and `detergent` (`product_type`), both of
+  which do carry a category field. Added, with a note that three
+  hand-maintained lists of one fact is two too many.
+
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
   plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the
   same branch as `NotCovered`, emitting nothing at all.
