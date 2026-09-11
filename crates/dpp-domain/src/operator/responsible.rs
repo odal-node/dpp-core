@@ -30,6 +30,14 @@ use serde::{Deserialize, Serialize};
 /// 2023/988, or similar tasks pursuant to other Union law applicable to the
 /// product". Contact details are never a free string in any of the four.
 ///
+/// ⚠️ **That quote's "Article 15" is the Regulation's own cross-reference, and
+/// it points at the wrong article** — Art. 15 of 2023/988 is *Cooperation of
+/// economic operators with market surveillance authorities*; the
+/// responsible-person provision is Art. 16. The quote is left exactly as
+/// enacted, and
+/// [`ResponsibilityBasis::GeneralProductSafety`](crate::operator::ResponsibilityBasis::GeneralProductSafety)
+/// carries the explanation, including why it changes nothing in substance.
+///
 /// All three are `Option` because this type is a persisted shape — it is stored
 /// inside the transfer chain — and the envelope rule is additive-only. `None`
 /// means not stated, never "has none".
