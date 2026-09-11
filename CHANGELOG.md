@@ -1005,6 +1005,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   both candidates, and that the question is open, and the three unsourced *v1.2*
   assertions are marked accordingly.
 
+- **Three published schema versions cite regulation wrongly, and a published
+  version can never be rewritten.** Known errata are now recorded in the module
+  documentation of `dpp_domain::schemas`, beside the table that embeds the
+  versions — not in a repository document, because the note has to reach a reader
+  who vendored this crate from crates.io and has nothing else to consult.
+
+  `battery/v2.0.0` cites *"Annex XIII §6"*. **Annex XIII of Regulation (EU)
+  2023/1542 has four sections and no §6**; dismantling information is point 2(c).
+  Corrected from `v2.1.0` onward.
+
+  `battery/v2.6.0` cites the marking requirements to Art. 13(4) alone, and states
+  that `hazardSymbol` is not an Annex XIII point 1(q) item. **Corrigendum C4
+  (OJ L, 10.4.2026) moved point 1(q) from "Article 13(3) and (4)" to "Article
+  13(4) and (5)"**, which brings the Cd/Pb symbol inside it. Art. 13 splits at the
+  verb — paragraphs 1–3 label, 4 and 5 mark — so the corrected text is the
+  coherent reading of a point whose own words are "the marking requirements". Both
+  descriptions were right when written; the act moved underneath them. The
+  `BatteryData` field documentation is corrected, and the published schema keeps
+  its text with an erratum.
+
+  `textile/v1.1.0` and `v1.2.0` describe `allergens` as *"contact allergens …
+  REACH Annex XVII entry 72 (e.g. certain disperse dyes, chromium VI, **nickel in
+  accessories**)"*. **Nickel is not in entry 72** — nickel release in prolonged
+  skin contact is entry 27, a separate and older restriction, so this is
+  structural rather than a stale-consolidation question. And *"contact allergens"*
+  mischaracterises the entry: Appendix 12 is predominantly a **CMR and PAH** list,
+  of which only chromium VI and C.I. Disperse Blue 1 are sensitisers, so the
+  description asks an operator for a narrower and differently-aimed class of
+  substance than the entry restricts.
+
+  ⚠️ Every erratum is a **field description**. None is a constant, threshold or
+  enumerated category, and nothing branches on any of them, so no validation
+  behaviour changes in any version. A wrong *constant* would not be an erratum —
+  it would need a new schema version.
+
 - **The additive-only rule for persisted structs was enforced but never written
   down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
   offered the sanctioned way around it, but the rule itself appeared in no

@@ -400,12 +400,23 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cycle_life_test_c_rate: Option<f64>,
 
-    /// The markings applied under Art. 13(4) — Annex XIII point 1(q).
+    /// The markings applied under **Art. 13(4) and (5)** — Annex XIII point 1(q).
+    ///
+    /// Point 1(q) was amended by **corrigendum C4, OJ L, 10.4.2026**, from
+    /// "Article 13(3) and (4)" to "Article 13(4) and (5)". Art. 13 splits at the
+    /// verb — paragraphs 1–3 say a battery *"shall bear a label"*, paragraphs 4
+    /// and 5 say it *"shall be marked"* — so the corrigendum moves the point onto
+    /// the two **marking** paragraphs, which is the coherent reading of a point
+    /// whose own words are "the marking requirements".
+    ///
+    /// `battery/v2.6.0` and earlier are published and cite only Art. 13(4); see
+    /// the errata note in `crate::schemas`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub marking_information: Option<String>,
 
-    /// The Art. 13(5) chemical symbol, where one applies — Annex XIII point
-    /// 1(q). The article names exactly two, so this is closed.
+    /// The Art. 13(5) chemical symbol, where one applies — **an Annex XIII point
+    /// 1(q) item**, since corrigendum C4 brought Art. 13(5) inside that point.
+    /// The article names exactly two symbols, so this is closed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hazard_symbol: Option<HazardSymbol>,
 
