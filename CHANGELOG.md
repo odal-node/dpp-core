@@ -15,6 +15,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`ProductGroupPayload` gained a required method.**
+  *(Breaking: `product_category(&self) -> Option<&str>` has no default
+  implementation and the trait is not sealed, so any implementation outside this
+  crate stops compiling. Migration: answer it. `None` is a real answer — it says
+  the group has no category a passport can state, not that a value is missing.)*
+
+  The method is **deliberately** required rather than defaulted, so a thirteenth
+  product group is a compile error until someone has read its act and written the
+  answer down. That reasoning stands; what was missing was saying out loud that it
+  breaks downstream implementors. The full rationale is under **Added**, where
+  this was originally and incompletely filed.
+
+  🚨 **Found by the release checklist, not by review.** `cargo semver-checks`
+  reported `trait_method_added` for it while the CHANGELOG called it an addition
+  — which is exactly the mismatch step 3 of `docs/governance/RELEASE.md` exists to
+  catch, and the reason that step requires the tool's list to *match* the
+  Breaking section rather than merely be consistent with the version bump.
+
+  The sibling method `svhc_substances()` landed the same way and **was** recorded
+  as breaking; this one was not, which is what made the gap visible.
+
 - **`is_qualified_pass` set a bar below what makes a seal qualified.**
   *(Breaking: `SealChecks::FullValidation` is renamed `AdesValidation` and a new
   `QualifiedValidation` sits above it. `is_qualified_pass` now requires the
@@ -559,6 +580,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **A credential could narrow itself to a product category, and nothing could
   read one off a passport.** New `ProductGroupPayload::product_category` and
   `ProductGroupData::product_category`, answered by all twelve product groups.
+
+  ⚠️ **Also breaking, and listed under **Breaking** as well** — see
+  *"`ProductGroupPayload` gained a required method"*. `cargo semver-checks`
+  reports `trait_method_added` for it: the trait is not sealed and the method has
+  no default, so an implementation outside this crate stops compiling. That is
+  deliberate, for the reason given below, but it is a break and belongs in both
+  places.
 
   `verify_credential_claims_with_trust` has taken a `required_product_category`
   all along and there was nothing to pass it. This is the missing half.
