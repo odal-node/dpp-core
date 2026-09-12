@@ -63,4 +63,49 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     // mis-recorded set is corrected by superseding the passport, never by
     // patching a published record's legal basis.
     "applicableInstruments",
+    // ── Added after an audit found the deny-list default had let ten modelled
+    // envelope fields through. None was ever reachable via `PUT /dpp/{id}` on
+    // the only consumer that ships — it builds its delta from an allow-list —
+    // but that guard lives in a consumer, and this list is the contract every
+    // other implementor inherits. See `protected_fields_tests`, which now makes
+    // an unclassified wire key a compile-time-adjacent failure rather than a
+    // silent permission.
+    //
+    // The registry independently checks this one. IR (EU) 2026/1778 Art. 8(7)(c)
+    // has the Commission confirm a passport's conformity with the granularity
+    // level it was registered at, and Arts. 8(4)-(5) hang the batch and model
+    // identifier links off that level. A level that can move after registration
+    // desynchronises the record from a check already performed on it.
+    "granularity",
+    // Decides which schema validates the passport and which instruments apply.
+    // Changing it on a published record reinterprets the whole document.
+    "productGroup",
+    // Product identity. Same class as `id`, one level down.
+    "productId",
+    // Registration data the registry validates against the commodity-code ranges
+    // its product group permits — IR (EU) 2026/1778 Art. 8(7)(d).
+    "commodityCode",
+    // Every effectivity and retention calculation keys on this date. Moving it
+    // silently moves which obligations a passport is judged against.
+    "placedOnMarketDate",
+    // The Annex III(k) actor, and the odd one out until now: `operatorIdentifier`
+    // and `facility`, its two neighbours in the same snapshot, were already here.
+    "responsibleOperator",
+    // Which physical units the passport covers. Set at create.
+    "batchId",
+    // Who made the product — a point-in-time fact, like `facility`, not a field
+    // any flow updates in place.
+    "manufacturer",
+    // The carrier's address. Repointing it silently redirects a QR code already
+    // printed on a physical product.
+    "qrCodeUrl",
+    // Record metadata owned by the repository, alongside `createdAt`,
+    // `publishedAt` and `version` — all three of which were already protected.
+    // Leaving this one writable let a caller forge the modification time.
+    "updatedAt",
+    // The material composition, and the same argument as `componentRefs`: it is
+    // inside the signed public view, so changing a published one is a new
+    // passport version via `supersedesId`, not an in-place edit. Patching it
+    // would leave the served body no longer verifying against its own signature.
+    "materials",
 ];

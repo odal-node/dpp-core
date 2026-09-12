@@ -67,16 +67,26 @@ fn mutable_and_protected_overlap_is_deliberate() {
         .collect();
     // Every one of these is written by the system after publish and must
     // never be written by a user patch — that is why it is in both.
+    //
+    // `updatedAt` and `qrCodeUrl` joined the overlap when the protected list
+    // stopped defaulting a modelled field to patchable. Both fit the rule this
+    // test states rather than bending it: the repository owns the modification
+    // time the way it owns `createdAt` and `version`, and the QR URL is serving
+    // metadata a host migration rewrites — neither is content a caller supplies,
+    // and a caller able to set either could forge a modification time or
+    // silently repoint a code already printed on a physical product.
     assert_eq!(
         both,
         vec![
             "status",
             "publishedAt",
             "retentionLocked",
+            "updatedAt",
             "jwsSignature",
             "publicJwsSignature",
             "disclosureSignatures",
             "seal",
+            "qrCodeUrl",
         ],
         "the overlap between system-writable-after-publish and \
          not-user-patchable changed; confirm the new shape is intended"
