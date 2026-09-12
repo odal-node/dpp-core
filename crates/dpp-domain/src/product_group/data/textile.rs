@@ -91,9 +91,23 @@ pub struct TextileData {
     pub svhc_substances: Option<Vec<SvhcSubstance>>,
 
     // ── Substances of concern (beyond SVHC) ──────────────────────────────
-    /// Allergens or sensitising substances present in the textile.
-    /// Covers contact allergens regulated under REACH Annex XVII entry 72
-    /// (e.g. certain disperse dyes, chromium VI, nickel in accessories).
+    /// Substances present in the textile that are restricted by **REACH Annex
+    /// XVII entry 72** — the substances listed in its Appendix 12, in clothing,
+    /// skin-contact textiles and footwear, at or above the concentration given
+    /// for each, measured in homogeneous material.
+    ///
+    /// Appendix 12 is predominantly a **CMR and PAH** list: cadmium, arsenic,
+    /// lead, benzene and seven polycyclic aromatic hydrocarbons, plus chromium VI
+    /// and C.I. Disperse Blue 1. Only the last two are skin sensitisers, so the
+    /// field name is narrower than what it carries — kept because it is the
+    /// published wire name and renaming it would break stored documents.
+    ///
+    /// ⚠️ **Nickel does not belong here.** Nickel release from articles in
+    /// prolonged skin contact is **Annex XVII entry 27**, a separate restriction
+    /// with its own migration-limit regime. An earlier version of this comment
+    /// gave "nickel in accessories" as an entry 72 example; it never was one.
+    /// `v1.1.0` and `v1.2.0` are published and carry that error in their field
+    /// description — see the errata note in `crate::schemas`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allergens: Option<Vec<String>>,
 

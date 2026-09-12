@@ -83,6 +83,18 @@ Published schema versions are **never modified**. If a regulation changes
 requirements, a new version is created. This ensures that passports validated
 against v1 remain valid against v1 indefinitely, even after v2 is published.
 
+**Where a citation in a published version turns out to be wrong**, that version
+keeps it and the correction is recorded as a known erratum in the module
+documentation of `dpp_domain::schemas` — beside the table that embeds the
+versions, so it reaches a reader who vendored the crate from crates.io and has
+nothing else to consult. Three are recorded today: `battery/v2.0.0`'s
+"Annex XIII §6", `battery/v2.6.0`'s Art. 13(4) marking citations, and the
+`textile` `allergens` description in v1.1.0 and v1.2.0.
+
+⚠️ **Errata cover field descriptions only.** A wrong *constant*, threshold or
+enumerated category is not an erratum — it is a defect that needs a new schema
+version, because something branches on it.
+
 ## Compliance Architecture
 
 dpp-core exposes a pluggable determination seam for product-group-specific compliance:
