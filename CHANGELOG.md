@@ -985,6 +985,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   enacted and now points at `ResponsibilityBasis::GeneralProductSafety`, which
   already explained the discrepancy and why it changes nothing in substance.
 
+- **`dpp-digital-link` named no version of the standard it implements, and the
+  one document that did had no source for it.** EN 18219:2026 — cited by
+  Commission Implementing Decision (EU) 2026/1736, and a presumption route under
+  Art. 41(2) of Regulation (EU) 2024/1781 — requires a unique product identifier
+  to comply with one of its Clause 5 ID schemes. The scheme this crate's
+  `/01/{gtin}/21/{serial}` form sits in requires conformance with the **GS1
+  Digital Link URI Syntax at a specifically named version**, and clause 6.3.2
+  names **1.6.0:2022**.
+
+  A versioned normative requirement cannot be met by an unversioned
+  implementation claim — not because the parser is wrong, but because nobody can
+  check it, and it cannot go stale visibly.
+
+  🔶 **The version is deliberately not asserted.** `docs/regulatory/CONFORMITY.md`
+  had long claimed *v1.2* with no recorded source; EN 18219 names 1.6.0:2022; the
+  parser has been diffed against neither. Naming one would trade an invisible gap
+  for a false claim. The crate's module documentation now states the requirement,
+  both candidates, and that the question is open, and the three unsourced *v1.2*
+  assertions are marked accordingly.
+
 - **The additive-only rule for persisted structs was enforced but never written
   down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
   offered the sanctioned way around it, but the rule itself appeared in no
