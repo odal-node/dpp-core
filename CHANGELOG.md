@@ -954,6 +954,37 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Documentation
 
+- **Two operator-identifier citations were read off incomplete text.** Both are
+  doc comments; neither changes behaviour. They are corrected because this
+  crate's argument is that its citations are checkable against primary sources,
+  and these two were checkable and wrong.
+
+  `operator/basis.rs` enumerated the closed list in **Art. 4(5) of Regulation
+  (EU) 2019/1020** and omitted **Regulation (EU) 2023/1542** (batteries) and
+  **Regulation (EU) 2024/1252** (the Critical Raw Materials Act), each of which
+  amended 2019/1020 to insert itself — batteries on **28 July 2023**. The list
+  was read off the *original* act rather than the consolidation, and the
+  conclusion drawn from it, that "construction and toys fall inside it; the rest
+  do not", was therefore false for the product group with the most code in this
+  workspace. The Art. 4 limb reaches construction, toys **and battery**.
+
+  `dpp-registry::identifiers` named the ESPR Annex III unique operator
+  identifiers as "points (g) and (h)". Annex III's second paragraph names
+  **(g), (h) and (k)** and subjects all three to the same ISO/IEC 15459
+  conformity. Point (k) is the EU-established operator answerable for the
+  Art. 4 of 2019/1020 or Art. 16 of 2023/988 tasks — the class this workspace
+  models as `ResponsibleOperator`. The module now also records the consequence
+  it does not yet carry: (g) and (h) travel as `OperatorIdentifier` while (k)'s
+  identifier is a bare `String`, so only two of the three are shaped to express
+  a rule that binds all three.
+
+  `operator/responsible.rs` quotes Annex III(k) verbatim, including the
+  Regulation's own cross-reference to "Article 15" of 2023/988 — which is
+  *Cooperation of economic operators with market surveillance authorities*, not
+  the responsible-person provision at Art. 16. The quote is left exactly as
+  enacted and now points at `ResponsibilityBasis::GeneralProductSafety`, which
+  already explained the discrepancy and why it changes nothing in substance.
+
 - **The additive-only rule for persisted structs was enforced but never written
   down.** `schema_compat.rs` failed a build that broke it and `LensRegistry`
   offered the sanctioned way around it, but the rule itself appeared in no
@@ -1096,6 +1127,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `construction` (`product_family`) and `detergent` (`product_type`), both of
   which do carry a category field. Added, with a note that three
   hand-maintained lists of one fact is two too many.
+
+- **The ELV passport date was four years early, and the manifest was right to
+  refuse to record it.** `elv-2026-1738.json` carried no passport date at all,
+  noting that the only figure available — "two years after entry into force" —
+  came from a secondary source and had not been read out of the OJ text.
+
+  It has now been read. **Art. 13(1): "From 1 September 2032, each vehicle placed
+  on the market shall have a Digital Circularity Vehicle Passport".** The
+  secondary source's ≈August 2028 matches the Regulation's *general* application
+  date under Art. 59(2), not the passport obligation. Recording it would have put
+  a passport duty on the calendar four years early.
+
+  Three further corrections to the same manifest: the instrument is the **Digital**
+  Circularity Vehicle Passport, and "digital product passport" appears **zero**
+  times in the Regulation — it is a differently-named instrument, not an ESPR
+  DPP; it amends **four** acts rather than two (Regulations (EU) No 168/2013,
+  (EU) 2018/858, (EU) 2019/1020 and (EU) 2023/1542, each on its own date); and
+  the vehicle-category scope is staged from 2029 to 2031 if a vehicle product
+  group is ever modelled.
 
 - **An Art. 8(4) exemption was indistinguishable from silence.** The battery
   plugin computed `Art8Phase::ExemptSecondLife` and then discarded it down the

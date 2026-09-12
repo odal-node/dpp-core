@@ -4,12 +4,26 @@
 //! **Where these come from.** ESPR (EU) 2024/1781 **Annex III** ("Digital
 //! product Passport", referred to in Articles 9 to 12) is what specifies the
 //! data elements, including the unique product identifier (point (b)), the
-//! GTIN (point (c)), unique operator identifiers (points (g) and (h)) and
-//! unique facility identifiers (point (i)). **Art. 12** imposes standards
+//! GTIN (point (c)), unique operator identifiers (points **(g), (h) and (k)**)
+//! and unique facility identifiers (point (i)). **Art. 12** imposes standards
 //! conformity on the operator and facility identifiers; **Art. 13** sets up the
 //! registry that *stores* them. Annex III names three identifier *types* —
 //! product, operator, facility — so "the four Article 13 identifiers" was wrong
 //! on both the count and the article, and is corrected here.
+//!
+//! **Point (k) belongs in that enumeration and was missing.** Annex III's second
+//! paragraph names it explicitly alongside (g) and (h): "the unique operator
+//! identifiers referred to in points (g), (h) and (k) … shall, where relevant
+//! for the products concerned, comply with standards ISO/IEC 15459-1:2014 …".
+//! Point (k) is the EU-established operator answerable for the Art. 4 of
+//! Regulation (EU) 2019/1020 or Art. 16 of Regulation (EU) 2023/988 tasks, so
+//! there are **three** classes of operator identifier, not two.
+//!
+//! ⚠️ That has a consequence this module does not yet carry: (g) and (h) travel
+//! as [`OperatorIdentifier`], while point (k)'s identifier is a bare `String` on
+//! `dpp_domain::operator::ResponsibleOperator`. Annex III subjects all three to
+//! the same conformity rule, and only two of them are shaped to express it.
+//! Closing that is a persisted-shape change, not a doc fix.
 //!
 //! [`ProductItemIdentifier`] is not a fourth Annex III class: it is the product
 //! identifier at item granularity, which Annex III point (b) leaves to "the

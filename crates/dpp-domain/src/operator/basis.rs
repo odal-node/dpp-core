@@ -15,14 +15,27 @@ use serde::{Deserialize, Serialize};
 /// applies is a fact about the product.
 ///
 /// It is not derivable in general. **Art. 4(5) of Regulation (EU) 2019/1020**
-/// limits that article to a closed list of instruments: Regulations 305/2011,
-/// 2016/425 and 2016/426, and Directives 2000/14/EC, 2006/42/EC, 2009/48/EC,
+/// limits that article to a closed list of instruments — verbatim from the
+/// consolidated text (`02019R1020 — EN — 12.08.2026 — 003.001`): Regulations
+/// (EU) No 305/2011, (EU) 2016/425, (EU) 2016/426, **(EU) 2023/1542** and
+/// **(EU) 2024/1252**, and Directives 2000/14/EC, 2006/42/EC, 2009/48/EC,
 /// 2009/125/EC, 2011/65/EU, 2013/29/EU, 2013/53/EU, 2014/29/EU, 2014/30/EU,
 /// 2014/31/EU, 2014/32/EU, 2014/34/EU, 2014/35/EU, 2014/53/EU and 2014/68/EU.
-/// Of the product groups this crate models, construction (305/2011) and toys
-/// (2009/48/EC) fall inside it; the rest do not. So for most passports the
-/// Art. 4 limb does not bite, and a model that assumed it would be recording a
-/// citation that is simply false.
+///
+/// The two emphasised Regulations put themselves on that list: batteries by
+/// Reg. (EU) 2023/1542 (amendment marker `M1`, **28 July 2023**) and the
+/// Critical Raw Materials Act by Reg. (EU) 2024/1252 (marker `M2`, 3 May 2024).
+///
+/// An earlier version of this note omitted both and concluded that "construction
+/// (305/2011) and toys (2009/48/EC) fall inside it; the rest do not". It was
+/// read off the **original** 2019/1020 rather than the consolidation, and it is
+/// false: of the product groups this crate models, construction, toys **and
+/// battery** fall inside, battery since 28 July 2023.
+///
+/// So the Art. 4 limb reaches more passports than that note implied. It is still
+/// not derivable in general, which is the reason the basis is stated rather than
+/// inferred — the correction narrows how wrong an inference would be, it does
+/// not make inference safe.
 ///
 /// Stating the basis is cheap and checkable. Inferring it from the product group
 /// works for two groups and is a guess for every other.
