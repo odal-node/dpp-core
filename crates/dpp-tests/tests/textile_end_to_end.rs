@@ -34,6 +34,8 @@ fn make_textile_passport() -> Passport {
             address: "Friedrichstraße 123, 10117 Berlin, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://ecotextile.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {

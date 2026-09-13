@@ -44,6 +44,8 @@ fn make_battery_passport() -> Passport {
             address: "Industriestraße 7, 80807 München, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://voltdynamics.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {
