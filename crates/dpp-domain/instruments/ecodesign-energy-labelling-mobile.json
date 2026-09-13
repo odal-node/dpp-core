@@ -4,6 +4,7 @@
   "celex": "32023R1670",
   "kind": "adjacent",
   "status": "adopted",
+  "currency": { "state": "consolidated", "asOf": "02023R1670-20250620", "checkedOn": "2026-09-11" },
   "passport": {
     "obligation": "displacedBy",
     "system": "EPREL",

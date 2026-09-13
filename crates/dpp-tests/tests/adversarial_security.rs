@@ -515,6 +515,8 @@ fn passport_validate_catches_bad_fibre_sum() {
             address: "Berlin, DE".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![],
         co2e_per_unit: None,

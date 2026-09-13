@@ -67,6 +67,8 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
             address: "123 Main St, Berlin, DE".into(),
             country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "Aluminium".into(),

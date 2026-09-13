@@ -15,6 +15,8 @@ fn make_published_passport() -> Passport {
             address: "Berlin".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         status: PassportStatus::Published,
         qr_code_url: Some("https://id.odal-node.io/01/09506000134352".into()),

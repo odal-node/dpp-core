@@ -18,6 +18,8 @@ pub(crate) fn make_passport() -> Passport {
             address: "123 Main St, Berlin, DE".to_owned(),
             country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".to_owned()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "Recycled Aluminium".to_owned(),

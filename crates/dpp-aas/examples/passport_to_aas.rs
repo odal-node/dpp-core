@@ -25,6 +25,8 @@ fn main() {
             address: "Berlin, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://greenthread.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {

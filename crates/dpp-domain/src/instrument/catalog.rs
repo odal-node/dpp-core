@@ -4,6 +4,7 @@ use super::act::Instrument;
 use super::binding::InstrumentBinding;
 use super::obligation::ObligationDate;
 use super::reference::InstrumentRef;
+use super::status::InstrumentStatus;
 use crate::catalog::error::CatalogError;
 use crate::catalog::granularity::Granularity;
 use crate::catalog::retention::RetentionBasis;
@@ -309,6 +310,37 @@ impl InstrumentCatalog {
         keys.sort_unstable();
         keys.dedup();
         keys
+    }
+
+    /// Instruments whose currency was last checked before `date`, plus every
+    /// adopted instrument that has never been checked at all.
+    ///
+    /// The input to a staleness **report**. `date` is a cutoff the caller
+    /// chooses — "not looked at this year" is
+    /// `currency_checked_before("2026-01-01")`.
+    ///
+    /// # Why this is a query and not a test
+    ///
+    /// The obvious alternative is a gate: fail the build when a check passes
+    /// some age. That makes the build fail on the calendar rather than on a
+    /// change — nobody touched the repository, and one morning it is red. A
+    /// failure with no commit behind it gets silenced rather than fixed, and
+    /// the silencing outlives the staleness it was meant to surface.
+    ///
+    /// What *is* gated is structural: that an adopted act carries a dated check
+    /// at all. That one fails when someone adds a manifest, which is a change,
+    /// and the person who caused it is the person who can answer it.
+    ///
+    /// Dates are compared as ISO-8601 strings — the same convention as
+    /// [`Self::passport_due_for`], and why the format is fixed by the field's
+    /// contract.
+    #[must_use]
+    pub fn currency_checked_before(&self, date: &str) -> Vec<&Instrument> {
+        self.entries
+            .iter()
+            .filter(|i| i.status == InstrumentStatus::Adopted)
+            .filter(|i| i.currency.as_ref().is_none_or(|c| c.is_older_than(date)))
+            .collect()
     }
 
     /// All instrument ids, sorted.

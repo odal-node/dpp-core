@@ -24,6 +24,8 @@ fn battery_passport() -> Passport {
             address: "1 Bench Way, Berlin, DE".into(),
             country: None,
             did_web_url: Some("https://bench.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "LFP".into(),
