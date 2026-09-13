@@ -4,6 +4,7 @@
   "celex": "32024R1781",
   "kind": "framework",
   "status": "adopted",
+  "currency": { "state": "consolidated", "asOf": "02024R1781-20240628", "checkedOn": "2026-09-11" },
   "passport": { "obligation": "required" },
   "retentionYears": 10,
   "retentionYearsBasis": "assumed",

@@ -4,6 +4,7 @@
   "celex": "32026R0002",
   "kind": "implementing",
   "status": "adopted",
+  "currency": { "state": "inForce", "checkedOn": "2026-09-11" },
   "parent": "espr",
   "passport": { "obligation": "notRequired" },
   "productGroups": [
