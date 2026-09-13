@@ -35,6 +35,18 @@ pub enum Disclosure {
 /// Fields absent from this list are [`Disclosure::Public`].
 pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     ("batchId", Disclosure::Restricted),
+    // The item-level twin of `batchId`, and classified to match it.
+    //
+    // NOT `Individual`: that tier is "legitimate interest only, and
+    // explicitly **not** authorities", and a market surveillance authority
+    // holding a unit has to be able to identify it. `Restricted` reaches both
+    // non-public audiences, which is the shape this needs.
+    //
+    // NOT `Public` either: a per-unit serial on an anonymous view is what
+    // lets one physical object be tracked across readers, and keeping the
+    // printed label from leaking per-unit facts is the same concern that moved
+    // the carrier serial off the UUIDv7 timestamp bytes in 0.11.0.
+    ("serialNumber", Disclosure::Restricted),
     // Annex XIII point 4(c) of Reg. (EU) 2023/1542, and point 4's heading is
     // "INFORMATION AND DATA RELATING TO AN INDIVIDUAL BATTERY ACCESSIBLE ONLY TO
     // PERSONS WITH A LEGITIMATE INTEREST". Classified rather than left to

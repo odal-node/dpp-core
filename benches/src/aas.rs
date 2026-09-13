@@ -17,6 +17,7 @@ fn battery_passport() -> Passport {
     let now = Utc::now();
     Passport {
         batch_id: Some("LOT-BENCH-1".into()),
+        serial_number: None,
         product_name: "Bench Battery".into(),
         manufacturer: ManufacturerInfo {
             name: "Bench Manufacturing".into(),

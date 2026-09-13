@@ -12,6 +12,7 @@ fn base_passport(
 ) -> Passport {
     Passport {
         batch_id: Some("BATCH-1".into()),
+        serial_number: None,
         product_name: "Test".into(),
         product_group,
         manufacturer: ManufacturerInfo {

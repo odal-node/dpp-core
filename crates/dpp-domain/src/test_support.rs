@@ -19,6 +19,7 @@ pub(crate) fn sample_passport() -> Passport {
     Passport {
         id: PassportId::new(),
         batch_id: None,
+        serial_number: None,
         product_name: "Test Product".into(),
         product_group: ProductGroup::Textile,
         applicable_instruments: vec![crate::instrument::InstrumentRef::from_catalog("espr")],
@@ -213,6 +214,9 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.published_at = Some(now);
     passport.placed_on_market_date = Some(now.date_naive());
     passport.supersedes_id = Some(PassportId::new());
+    // `skip_serializing_if`, so a `None` here would stop the passport emitting
+    // the key and every wire-key gate would pass without ever seeing the field.
+    passport.serial_number = Some("SN-2026-00042".to_owned());
     passport.derived_from = vec![DerivationRef {
         reference: reference.clone(),
         operation: SecondLifeOperation::Repurposing,

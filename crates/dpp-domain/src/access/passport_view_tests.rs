@@ -167,6 +167,7 @@ fn public_view_omits_every_non_public_passport_field() {
     // Populate every non-public field so absence in the view proves redaction,
     // not that the field was simply unset.
     passport.batch_id = Some("BATCH-42".into());
+    passport.serial_number = Some("SN-2026-00042".into());
     passport.jws_signature = Some("eyJhbGci.test.signature".into());
     passport.retention_locked = true;
     passport.lint_result = Some(crate::lint::LintResult {

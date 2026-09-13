@@ -57,6 +57,7 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
     Passport {
         id: PassportId::new(),
         batch_id: Some("BATCH-001".into()),
+        serial_number: None,
         product_name: "Test Product".into(),
         product_group,
         applicable_instruments: Vec::new(),
