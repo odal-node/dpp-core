@@ -19,7 +19,7 @@ Anyone building DPP tooling can use this library as the foundation. It is the st
 
 ## Why This Exists
 
-EU law is switching on machine-readable Digital Product Passports product group by product_group: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow in 2029, and the ESPR working plan queues textiles, steel and more behind them. The first six European DPP system standards (EN 18216/18219/18220/18221/18222/18223) were published in May 2026; the remaining two (EN 18239 access/security, EN 18246 authentication) are at FprEN stage, expected around September 2026. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
+EU law is switching on machine-readable Digital Product Passports product group by product group: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow on 23 September 2029 (Reg. 2026/405), and the ESPR working plan queues textiles, steel and more behind them. Six European DPP system standards were cited in the Official Journal on **15 July 2026** by Commission Implementing Decision (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222 and 18223. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
 
 **Odal is that infrastructure**: sovereign, standards-compliant, self-hostable. No vendor lock-in, no black-box algorithms, no enterprise-tier licensing.
 
@@ -65,8 +65,8 @@ dpp-core/
 | **ESPR** (EU 2024/1781) | In force; unsold-goods rules (Art. 24/25) apply since Jul 2026 | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), unsold-goods product group, transfer-of-responsibility design (not a distinct ESPR article — see below) |
 | **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, product group schema |
 | **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
-| **CEN/CLC JTC 24 system standards** | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | **No conformance claimed.** The standard texts have not been purchased, so no clause-by-clause assessment exists. Without an OJEU citation there is also no presumption of conformity to claim |
-| **GS1 Digital Link v1.2** | Published | AI 01/21/10 parsing, link-type negotiation |
+| **CEN/CLC JTC 24 system standards** | Six cited in the OJ on 15 Jul 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it requires an assessment we have not published — not merely a citation, which now exists |
+| **GS1 Digital Link** | Published | AI 01/21/10 parsing, link-type negotiation. **No URI Syntax revision is claimed** — see `dpp-digital-link`'s module docs: an earlier *v1.2* claim had no recorded basis, the parser has not been diffed against 1.6.0:2022, and naming either would assert something unverified |
 | **IDTA AAS Metamodel** | Published | Passport-to-AAS shell and submodel mapping. AAS-shaped output carrying **our own** semantics — every emitted `semanticId` is `urn:odal-node:*`; no IDTA conformance is claimed |
 | **W3C VC Data Model v2.0** | Published | `DppAccessCredential` mapping operator roles to an `Audience` |
 
@@ -112,18 +112,23 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.
 
 | Product group | Versions | Key Fields |
 |---|---|---|
+| battery | v1.0.0, v2.0.0 – v2.6.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
 | textile | v1.0.0 – v1.2.0 | Fibre composition, SVHC, durability, microplastics |
-| battery | v1.0.0 – v2.4.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
-| electronics | v1.0.0 | Repairability, spare parts, substances of concern |
-| steel | v1.0.0 | CO2 intensity, scrap content, production method |
-| unsold-goods | v1.0.0 | Art. 25 destruction ban compliance |
-| aluminium, construction, detergent, furniture, toy, tyre | v1.0.0 each | Product group-specific delegated-act fields |
+| electronics | v1.0.0 – v1.2.0 | Repairability, spare parts, substances of concern |
+| furniture | v1.0.0 – v1.2.0 | Product group-specific delegated-act fields |
+| aluminium, construction, detergent, steel, toy | v1.0.0 – v1.1.0 each | Product group-specific delegated-act fields; steel adds CO2 intensity, scrap content, production method |
+| unsold-goods | v2.0.0 | Art. 25 destruction ban compliance |
+| mattress, tyre | v1.0.0 each | Product group-specific delegated-act fields |
+
+Twelve product groups. `unsold-goods` starts at v2.0.0: its v1 shape was
+replaced outright when the disclosure was rebuilt to Impl. Reg. (EU) 2026/2
+Annex I, so there is no v1 left to compare against.
 
 The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtime hot-reload for new versions. Read-time **upcast lenses** (`schemas::lens`) transform an old record's product group data to a newer schema version on read, so signed passports stay byte-identical yet remain consumable as delegated acts evolve the schema (upcast only).
 
 ### GS1 & Industry 4.0 Interoperability
 
-- **Digital Link** — Full AI 01/21/10 parsing and building (GS1 URI Syntax v1.2)
+- **Digital Link** — Full AI 01/21/10 parsing and building. No GS1 URI Syntax revision is claimed, deliberately: see the note in the Regulatory Coverage table
 - **Link-type Negotiation** — Content negotiation returning JSON, JSON-LD, HTML, or AAS representations
 - **AAS Submodel Mapping** — Passport-to-AAS shells and submodels for Industry 4.0 data spaces, carrying `urn:odal-node:*` semantics rather than a standards body's
 
@@ -146,7 +151,7 @@ Plugin ABI supports capability negotiation and semantic versioning with compatib
 
 ## Port Traits
 
-The 7 port traits define the core/platform boundary. Any downstream project implements these against its own infrastructure:
+The eight port traits define the core/platform boundary. Any downstream project implements these against its own infrastructure:
 
 | Trait | Kind | Purpose |
 |---|---|---|
