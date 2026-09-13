@@ -13,7 +13,49 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-13
+
 ### Breaking
+
+- **Three more breaks were filed as additions.** Same mismatch the
+  `ProductGroupPayload` entry below records, found the same way — `just semver`
+  against the CHANGELOG, per step 3 of `docs/governance/RELEASE.md`. That entry
+  called its own discovery a one-off; it was not. Recorded here with the
+  reasoning left where it was written, under **Added**.
+
+  - **`Passport` gained `life_status`.**
+    *(Breaking: `life_status: Option<LifeStatus>` has no default in a struct
+    literal, so every construction site must name it. On the wire it is
+    `lifeStatus`, optional in both directions, and classified
+    `Disclosure::Individual`. Migration: add the field; `None` is correct for a
+    record that has never had a life-status transition.)*
+    Filed under **Added** as *"Product-life status had nowhere to live"*, which
+    is the right description of the feature and the wrong section for its cost.
+
+  - **`CalculationReceipt` gained two required fields and lost both its
+    constructors.**
+    *(Breaking: `ruleset_content_sha256` and `bundle_content_sha256` are
+    required fields, and `CalculationReceipt::new` and
+    `CalculationReceipt::with_bundle_version` are gone. Migration: build receipts
+    through `CalculationReceipt::for_ruleset`, which reads the provenance and the
+    parameter hash from one object — that is the point of the change, since a
+    receipt must not be able to name a bundle while its hash describes the
+    baseline.)*
+    The reasoning is under **Added**, at *"The signed ruleset-bundle channel had
+    nothing on the other end"* and *"Nothing distinguished a threshold taken from
+    the Official Journal from one this project invented"*.
+
+  - **`Ruleset` gained a required method, `parameters()`.**
+    *(Breaking: no default implementation and the trait is not sealed, so any
+    `Ruleset` implemented outside this crate stops compiling. Migration: return
+    the same statics the ruleset actually computes with, rather than restating
+    their values — the two drift otherwise and the receipt then describes numbers
+    that were never used.)*
+    Deliberately required rather than defaulted, and the method's own doc says
+    why: `parameter_basis` can default safely because forgetting it
+    over-protects, while forgetting this one would hollow out every receipt that
+    hashes over it. That argument is sound and it is exactly what makes the
+    change breaking — which is what went unrecorded.
 
 - **An item-level passport could not state which item it was.**
   *(Breaking: `Passport` gains `serial_number: Option<String>`, so every struct
