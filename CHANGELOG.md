@@ -15,6 +15,61 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The manufacturer's contact details were two fields short of ESPR
+  Art. 27(6).**
+  *(Breaking: `ManufacturerInfo` gains `registered_trade_name:
+  Option<String>` and `electronic_address: Option<String>`, so every struct
+  literal must name them. On the wire they are `registeredTradeName` and
+  `electronicAddress`, optional in both directions — a document written before
+  them reads back with `None`, and a `None` is omitted rather than serialised as
+  `null`.)*
+
+  Art. 27(6) names four elements — *"name, registered trade name or registered
+  trade mark, postal address at which, and electronic means of communication
+  through which, they can be contacted"* — and puts them **on the public part of
+  the digital product passport**. Two of the four had no field.
+
+  This is not a conditional Annex III entry. Most of Annex III lists what a
+  delegated act *may* specify for a product group; Art. 27(6) is a direct duty on
+  the manufacturer for any product a delegated act covers, and the act's only
+  role is the "where applicable" of whether the product has a passport at all.
+  It was the strongest data-content claim in the Regulation on this type, and
+  the one satisfied least.
+
+  - **`registered_trade_name`** — `name` was one string doing duty for the legal
+    name and the trading name, which routinely differ, and which the provision
+    names separately. A consumer holding the product sees the trading one, and a
+    single field cannot say which it holds.
+  - **`electronic_address`** — `did_web_url` is **not** this. A DID document
+    resolves keys; nothing in it is required to be a mailbox or a form, so it is
+    not a channel through which a person can be contacted. Reading it as one
+    satisfies the article on paper and not in fact.
+
+  Both are `Public` and stay that way. `manufacturer` carries no entry in
+  `PASSPORT_FIELD_DISCLOSURE`, so it and its nested keys default to public —
+  which for these two is the requirement rather than an oversight, since
+  Art. 27(6)(a) is specifically about the public part.
+  `the_public_view_keeps_the_contact_details` pins it, so a later pass
+  classifying nested keys "for safety" fails instead of quietly breaking the
+  obligation.
+
+  The field **names** are lifted from `ResponsibleOperator`, which already
+  carries this same four-element floor — it appears identically in ESPR
+  Art. 29(3) (importer), Art. 4(4) of Regulation (EU) 2019/1020 and Art. 16(3)
+  of Regulation (EU) 2023/988. A shared *type* was considered and not taken: the
+  two records differ in what else they carry and in which fields are required, so
+  one type would be fitted to a single consumer and speculatively shaped for the
+  others.
+
+  **Still not enforceable, and stated so rather than implied away.** Art. 27(6)
+  closes with *"The address shall indicate a single point where the manufacturer
+  can be contacted."* `address` is a free string, and a structured one could not
+  check it either — "single point" is a property of the content, not the shape.
+
+  **Migration.** Add both fields to any `ManufacturerInfo` literal. `None` is
+  correct wherever the legal name is the trading name and no electronic contact
+  is recorded.
+
 - **The instrument catalog tracked whether an act was adopted, never whether it
   is still law.**
   *(Breaking: `Instrument` gains a field `currency: Option<CurrencyCheck>`, so

@@ -15,6 +15,8 @@ fn make_test_passport() -> Passport {
             address: "Berlin, DE".into(),
             country: None,
             did_web_url: Some("https://test.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         co2e_per_unit: Some(CarbonFootprint::from_kg(3.5)),
         repairability_score: Some(RepairabilityScore::from_scalar(7.0)),

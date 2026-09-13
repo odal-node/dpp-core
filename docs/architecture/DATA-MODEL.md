@@ -99,9 +99,19 @@ Nested struct within `Passport.manufacturer`.
 
 | Field | Rust Type | JSON name | Description |
 |---|---|---|---|
-| `name` | `String` | `"name"` | Legal entity name |
-| `address` | `String` | `"address"` | Business address or country code |
+| `name` | `String` | `"name"` | Legal entity name. The **legal** one — the trading name is `registered_trade_name` |
+| `address` | `String` | `"address"` | Postal address at which the manufacturer can be contacted |
+| `country` | `Option<String>` | `"country"` | ISO 3166-1 alpha-2. Membership-checked against the assigned set, so `XX` is refused |
+| `registered_trade_name` | `Option<String>` | `"registeredTradeName"` | Registered trade name or trade mark, where it differs from `name` (ESPR Art. 27(6)) |
+| `electronic_address` | `Option<String>` | `"electronicAddress"` | Electronic means of communication — email or contact URL. **Not** `did_web_url`, which resolves keys and is not a channel to reach a person |
 | `did_web_url` | `Option<String>` | `"didWebUrl"` | `did:web` URL for DID document resolution |
+
+ESPR **Art. 27(6)** requires name, registered trade name or trade mark, postal
+address and electronic means of communication **on the public part** of the
+passport. `manufacturer` has no `PASSPORT_FIELD_DISCLOSURE` entry and so defaults
+to `Public` — for these fields that is the requirement, not an omission.
+Art. 27(6)'s *"the address shall indicate a single point"* is a property of the
+content and is **not** enforced.
 
 ### 3.3 MaterialEntry
 
