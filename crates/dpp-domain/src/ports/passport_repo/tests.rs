@@ -111,6 +111,8 @@ fn draft_passport(name: &str) -> Passport {
             address: "Berlin, DE".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         schema_version: "1.1.0".into(),
         ..crate::test_support::sample_passport()

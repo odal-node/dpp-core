@@ -10,6 +10,7 @@ pub(crate) fn make_passport() -> Passport {
     Passport {
         id: PassportId(uuid::Uuid::nil()),
         batch_id: Some("BATCH-001".to_owned()),
+        serial_number: None,
         product_name: "Eco Widget".to_owned(),
         product_group: ProductGroup::Electronics,
         manufacturer: ManufacturerInfo {
@@ -17,6 +18,8 @@ pub(crate) fn make_passport() -> Passport {
             address: "123 Main St, Berlin, DE".to_owned(),
             country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".to_owned()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "Recycled Aluminium".to_owned(),
@@ -196,4 +199,65 @@ fn transition_re_publish_does_not_overwrite_published_at() {
 
     // published_at should retain the original timestamp
     assert_eq!(p.published_at, first_published);
+}
+
+// ── Item-level serial number ─────────────────────────────────────────────────
+
+/// The envelope is additive-only and has no lens, so this is the property that
+/// matters most: every passport written before this release must still read.
+#[test]
+fn a_passport_stored_before_the_serial_existed_reads_with_none() {
+    let mut json = serde_json::to_value(make_passport()).expect("serialises");
+    json.as_object_mut()
+        .expect("object")
+        .remove("serialNumber")
+        .is_none()
+        .then_some(())
+        .expect("a minimal passport omits the key, so removing it is a no-op");
+
+    let back: Passport = serde_json::from_value(json).expect("pre-field document reads");
+    assert_eq!(back.serial_number, None);
+}
+
+#[test]
+fn an_item_serial_round_trips_and_is_omitted_when_unstated() {
+    let mut passport = make_passport();
+    passport.serial_number = Some("SN-2026-00042".into());
+
+    let json = serde_json::to_value(&passport).expect("serialises");
+    assert_eq!(json["serialNumber"], "SN-2026-00042");
+
+    let back: Passport = serde_json::from_value(json).expect("deserialises");
+    assert_eq!(back.serial_number.as_deref(), Some("SN-2026-00042"));
+
+    let bare = serde_json::to_value(make_passport()).expect("serialises");
+    assert!(
+        bare.get("serialNumber").is_none(),
+        "an unstated serial is omitted, not nulled: {bare}"
+    );
+}
+
+/// 🚨 The carrier does **not** adopt the manufacturer's serial.
+///
+/// A GS1 Digital Link carrier is `/01/{gtin}/21/{serial}`, and AI 21 *is* the
+/// serial number — so the obvious move is to put the real one there once it
+/// exists. That would be wrong twice over: the resolver is GTIN-keyed and
+/// ignores AI 21 entirely, so it buys nothing; and a per-unit serial in a public
+/// URL is exactly the printed-label disclosure the 0.11.0 change to
+/// `short_serial` removed.
+///
+/// Asserted by construction rather than argued in prose, because the change
+/// would be a one-line "improvement" to whoever builds the carrier next.
+#[test]
+fn an_item_serial_does_not_change_the_carrier() {
+    let mut passport = make_passport();
+    let before = serde_json::to_value(&passport).expect("serialises")["qrCodeUrl"].clone();
+
+    passport.serial_number = Some("SN-2026-00042".into());
+    let after = serde_json::to_value(&passport).expect("serialises")["qrCodeUrl"].clone();
+
+    assert_eq!(
+        before, after,
+        "setting a manufacturer serial must not move the carrier"
+    );
 }

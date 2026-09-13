@@ -12,6 +12,7 @@ fn base_passport(
 ) -> Passport {
     Passport {
         batch_id: Some("BATCH-1".into()),
+        serial_number: None,
         product_name: "Test".into(),
         product_group,
         manufacturer: ManufacturerInfo {
@@ -19,6 +20,8 @@ fn base_passport(
             address: "1 Street".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         product_group_data,
         ..crate::test_support::sample_passport()

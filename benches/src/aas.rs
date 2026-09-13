@@ -17,12 +17,15 @@ fn battery_passport() -> Passport {
     let now = Utc::now();
     Passport {
         batch_id: Some("LOT-BENCH-1".into()),
+        serial_number: None,
         product_name: "Bench Battery".into(),
         manufacturer: ManufacturerInfo {
             name: "Bench Manufacturing".into(),
             address: "1 Bench Way, Berlin, DE".into(),
             country: None,
             did_web_url: Some("https://bench.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "LFP".into(),

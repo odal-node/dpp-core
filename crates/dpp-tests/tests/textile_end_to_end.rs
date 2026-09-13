@@ -28,12 +28,15 @@ fn make_textile_passport() -> Passport {
     let now = Utc::now();
     Passport {
         batch_id: Some("LOT-2026-T-0451".into()),
+        serial_number: None,
         product_name: "EcoWeave Organic Cotton T-Shirt".into(),
         manufacturer: ManufacturerInfo {
             name: "EcoTextile GmbH".into(),
             address: "Friedrichstraße 123, 10117 Berlin, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://ecotextile.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {

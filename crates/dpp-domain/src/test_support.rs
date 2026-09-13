@@ -19,6 +19,7 @@ pub(crate) fn sample_passport() -> Passport {
     Passport {
         id: PassportId::new(),
         batch_id: None,
+        serial_number: None,
         product_name: "Test Product".into(),
         product_group: ProductGroup::Textile,
         applicable_instruments: vec![crate::instrument::InstrumentRef::from_catalog("espr")],
@@ -28,6 +29,8 @@ pub(crate) fn sample_passport() -> Passport {
             address: "Berlin, DE".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![],
         co2e_per_unit: None,
@@ -213,6 +216,12 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.published_at = Some(now);
     passport.placed_on_market_date = Some(now.date_naive());
     passport.supersedes_id = Some(PassportId::new());
+    // All three are `skip_serializing_if`, so leaving any of them `None` would
+    // stop the passport emitting that key at all — and anything reasoning over
+    // this instance's JSON would then pass while never having seen the field.
+    passport.serial_number = Some("SN-2026-00042".to_owned());
+    passport.manufacturer.registered_trade_name = Some("GreenCell".to_owned());
+    passport.manufacturer.electronic_address = Some("contact@greencell.example".to_owned());
     passport.derived_from = vec![DerivationRef {
         reference: reference.clone(),
         operation: SecondLifeOperation::Repurposing,

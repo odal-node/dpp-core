@@ -38,12 +38,15 @@ fn make_battery_passport() -> Passport {
     let now = Utc::now();
     Passport {
         batch_id: Some("LOT-2027-B-0917".into()),
+        serial_number: None,
         product_name: "PowerCell EV Module 4680".into(),
         manufacturer: ManufacturerInfo {
             name: "Volt Dynamics GmbH".into(),
             address: "Industriestraße 7, 80807 München, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://voltdynamics.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {

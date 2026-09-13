@@ -57,6 +57,7 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
     Passport {
         id: PassportId::new(),
         batch_id: Some("BATCH-001".into()),
+        serial_number: None,
         product_name: "Test Product".into(),
         product_group,
         applicable_instruments: Vec::new(),
@@ -66,6 +67,8 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
             address: "123 Main St, Berlin, DE".into(),
             country: None,
             did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "Aluminium".into(),

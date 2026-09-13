@@ -27,6 +27,48 @@ pub struct Passport {
     pub id: PassportId,
     /// Optional batch or lot identifier.
     pub batch_id: Option<String>,
+    /// The manufacturer's own serial number for this physical unit, where the
+    /// passport is item-level.
+    ///
+    /// # Why the carrier's serial is not this
+    ///
+    /// A GS1 Digital Link carrier is `/01/{gtin}/21/{serial}`, and AI 21 *is*
+    /// the serial number — but the value put there is derived from the
+    /// passport's own UUID by `dpp_digital_link::short_serial`, which
+    /// hex-encodes the random tail of the UUIDv7 to fit GS1's 20-character cap.
+    ///
+    /// That derivation is deliberate and stays. It was moved off the *leading*
+    /// bytes in 0.11.0 because a UUIDv7 opens with a millisecond timestamp, so
+    /// the old serial sorted in creation order and its first twelve hex
+    /// characters decoded to the passport's creation instant — a disclosure
+    /// through the printed label.
+    ///
+    /// Opaque-by-design is exactly the point, and exactly why it cannot serve
+    /// here: it identifies the **record**, not the product. It is not the serial
+    /// stamped on the unit and not the serial in the manufacturer's ERP, and
+    /// nothing can reconcile the two. An item-level passport that cannot state
+    /// the manufacturer's serial cannot be matched back to the object by anyone
+    /// holding it — which is most of the people a passport exists for.
+    ///
+    /// **The carrier does not switch to this value when it is present**, and
+    /// `an_item_serial_does_not_change_the_carrier` pins that. The resolver is
+    /// GTIN-keyed and ignores AI 21 entirely, so putting a real serial in a
+    /// public URL would buy nothing and would reintroduce the printed-label
+    /// disclosure the 0.11.0 change removed.
+    ///
+    /// # Why it is not required at item level
+    ///
+    /// [`Granularity::Item`] does not force
+    /// it. `granularity` is a delegated-act decision and no adopted act has
+    /// fixed a level for any product group we carry, so a hard publish-time
+    /// requirement would be enforcing a rule no act has made. It is advisory
+    /// until one does.
+    ///
+    /// `Option`, because the envelope is additive-only: a document written
+    /// before this field existed reads back as `None`. `None` means "not an
+    /// item-level record, or not stated" — never that the unit has no serial.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serial_number: Option<String>,
     pub product_name: String,
     /// EU ESPR product group — the delegated-act bucket that selects the applicable
     /// schema and plugin. (Replaces the former misnamed `product_category`
@@ -367,6 +409,7 @@ pub const REMOVED_ENVELOPE_KEYS: &[(&str, &str)] = &[("parentPassportRef", "deri
 pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "id",
     "batchId",
+    "serialNumber",
     "productName",
     "productGroup",
     "applicableInstruments",

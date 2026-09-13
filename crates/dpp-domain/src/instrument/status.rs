@@ -35,6 +35,13 @@ impl InstrumentStatus {
     /// Used by the catalog's own provenance test rather than by business logic:
     /// an instrument that claims to be adopted must name the act it was read
     /// from, or the claim has no basis.
+    ///
+    /// **Deliberately blind to whether the act is still law.** A repealed act
+    /// still has a citable text — that is what makes it quotable for history —
+    /// so narrowing this would fail the provenance check on precisely the
+    /// records that most need a CELEX against them. The separate question of
+    /// whether an obligation may rest on the act is
+    /// [`Instrument::is_current_law`](crate::instrument::Instrument::is_current_law).
     #[must_use]
     pub fn has_citable_text(&self) -> bool {
         matches!(self, Self::Adopted | Self::Proposed)

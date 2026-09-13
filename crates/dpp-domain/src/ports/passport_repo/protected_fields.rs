@@ -31,6 +31,11 @@
 /// one.
 pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     "id",
+    // Which physical object this record is about. Re-pointing a published,
+    // signed record at a different unit is an identity change, not a content
+    // correction, and identity changes go through supersession here — the
+    // same reasoning that protects `batchId` one level up.
+    "serialNumber",
     "status",
     "retentionLocked",
     "retentionUntil",

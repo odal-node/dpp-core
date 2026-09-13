@@ -508,12 +508,15 @@ fn passport_validate_catches_bad_fibre_sum() {
     let now = Utc::now();
     let mut passport = Passport {
         batch_id: None,
+        serial_number: None,
         product_name: "Test Shirt".into(),
         manufacturer: ManufacturerInfo {
             name: "Factory GmbH".into(),
             address: "Berlin, DE".into(),
             country: None,
             did_web_url: None,
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![],
         co2e_per_unit: None,

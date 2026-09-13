@@ -45,6 +45,7 @@ pub fn base_passport(
     Passport {
         id: PassportId::new(),
         batch_id: Some("LOT-X-0001".into()),
+        serial_number: None,
         product_name: format!("{} reference product", product_group.catalog_key()),
         applicable_instruments: dpp_domain::InstrumentCatalog::new()
             .instrument_refs_for(product_group.catalog_key()),
@@ -55,6 +56,8 @@ pub fn base_passport(
             address: "Hauptstraße 1, 10115 Berlin, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://acme.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![MaterialEntry {
             name: "Primary material".into(),

@@ -15,6 +15,7 @@ fn main() {
     let passport = Passport {
         id: PassportId::new(),
         batch_id: Some("LOT-Q2-2026".into()),
+        serial_number: None,
         product_name: "EcoWear Organic T-Shirt".into(),
         product_group: ProductGroup::Textile,
         applicable_instruments: vec![dpp_domain::InstrumentRef::from_catalog("espr")],
@@ -24,6 +25,8 @@ fn main() {
             address: "Berlin, DE".into(),
             country: Some("DE".into()),
             did_web_url: Some("https://greenthread.example.com/.well-known/did.json".into()),
+            registered_trade_name: None,
+            electronic_address: None,
         },
         materials: vec![
             MaterialEntry {

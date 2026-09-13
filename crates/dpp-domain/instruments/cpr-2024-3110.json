@@ -4,6 +4,7 @@
   "celex": "32024R3110",
   "kind": "direct",
   "status": "adopted",
+  "currency": { "state": "inForce", "checkedOn": "2026-09-11" },
   "passport": {
     "obligation": "required",
     "from": { "date": "2026-01-08", "basis": "sourced" }
