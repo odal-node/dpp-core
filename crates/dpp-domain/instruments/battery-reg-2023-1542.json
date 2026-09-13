@@ -4,6 +4,7 @@
   "celex": "32023R1542",
   "kind": "direct",
   "status": "adopted",
+  "currency": { "state": "consolidated", "asOf": "02023R1542-20260813", "checkedOn": "2026-09-11" },
   "passport": {
     "obligation": "required",
     "from": { "date": "2027-02-18", "basis": "sourced" }

@@ -166,7 +166,7 @@ Three records replace what used to be one:
 
 | Record | Answers |
 |---|---|
-| `Instrument` | *What is this act?* — id, CELEX, `InstrumentKind` (Framework · Delegated · Direct · Adjacent), `InstrumentStatus`, and its `PassportObligation` |
+| `Instrument` | *What is this act?* — id, CELEX, `InstrumentKind` (Framework · Delegated · Direct · Adjacent), `InstrumentStatus`, `CurrencyCheck`, and its `PassportObligation` |
 | `ProductGroup­Descriptor` | *What is this group and how do we serve it?* — key, title, schema versions, product categories, disclosure, plugin |
 | `InstrumentBinding` | *What does this act do to this group?* — one per pair: status, legal basis, dates, retention, granularity |
 
@@ -187,6 +187,17 @@ returns the (instrument, binding) pairs, not a yes/no, because a determination i
 always made *under a named act* — a caller that only learns "yes" cannot say what
 it is asserting against. That is exactly how a determination once came to be
 emitted against an obligation that did not exist.
+
+**`InstrumentStatus` says an act exists; `CurrencyCheck` says it is still law.**
+The first is legislative progress and never moves once an act is adopted — a
+repealed act stays `Adopted` for ever. The second records what a status check
+found and **when**: `InForce` · `Consolidated { asOf }` · `Repealed { by, on }`,
+plus a `checkedOn` date, because a currency claim without one decays silently and
+a check made two years ago reads exactly like a check made this morning. Recorded
+for every adopted act and for no other, which is a tested invariant. `None` means
+*not checked*, never *current* — `Instrument::is_current_law` fails closed on it,
+while `InstrumentStatus::has_citable_text` deliberately stays true for a repealed
+act, since quoting one for history is the case it exists to permit.
 
 **`PassportObligation` is a three-way answer**, not an optional date:
 `Required { from }` · `NotRequired` · `DisplacedBy { system, basis }`. The third

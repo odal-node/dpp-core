@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::binding::InstrumentBinding;
+use super::currency::CurrencyCheck;
 use super::kind::InstrumentKind;
 use super::obligation::PassportObligation;
 use super::status::InstrumentStatus;
@@ -53,6 +54,19 @@ pub struct Instrument {
     pub kind: InstrumentKind,
     /// How far through the legislative process the act is.
     pub status: InstrumentStatus,
+    /// What a status check found, and when — whether the act is still law, and
+    /// which text carries it.
+    ///
+    /// Orthogonal to [`Self::status`], which never changes once an act is
+    /// adopted: a repealed act stays `Adopted` for ever. Recorded for every
+    /// adopted instrument and for no other — a proposal is not law and has no
+    /// in-force status to check, and an anticipated act has no text. That
+    /// correspondence is a tested invariant rather than a convention.
+    ///
+    /// `None` therefore means **not checked**, never "current". Everything that
+    /// gates on currency treats it as such; see [`Self::is_current_law`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<CurrencyCheck>,
     /// Whether the act requires a passport, and if not, why not. A binding may
     /// override this per product group.
     pub passport: PassportObligation,
@@ -81,6 +95,34 @@ pub struct Instrument {
 }
 
 impl Instrument {
+    /// Whether this act is adopted **and** last known to be law.
+    ///
+    /// # Why this is separate from `has_citable_text`
+    ///
+    /// [`InstrumentStatus::has_citable_text`] asks whether a text exists to
+    /// cite, and a repealed act still has one — for history. Its callers are
+    /// provenance checks asserting that an adopted instrument names the act it
+    /// was read from, and for that purpose the answer is still yes. Folding
+    /// currency into it would break that check on exactly the acts it most
+    /// needs to describe.
+    ///
+    /// So the two questions get two methods. *"Can I quote this?"* and *"may an
+    /// obligation rest on it?"* have different answers for a repealed act, and
+    /// a single predicate would have to pick one caller to be wrong for.
+    ///
+    /// # Unchecked is not current
+    ///
+    /// An adopted act with no [`Self::currency`] answers `false`. That is the
+    /// fail-closed direction, and it is the same reasoning that makes an
+    /// unmarked retention figure [`Assumed`](crate::catalog::RetentionBasis)
+    /// rather than sourced: the safe default for a claim about someone else's
+    /// legal obligation is the one that refuses to assert it.
+    #[must_use]
+    pub fn is_current_law(&self) -> bool {
+        self.status == InstrumentStatus::Adopted
+            && self.currency.as_ref().is_some_and(|c| c.state.is_law())
+    }
+
     /// This act's binding for a product group, if it reaches it.
     #[must_use]
     pub fn binding(&self, product_group: &str) -> Option<&InstrumentBinding> {

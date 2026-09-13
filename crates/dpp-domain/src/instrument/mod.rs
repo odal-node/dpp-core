@@ -12,6 +12,7 @@ pub mod act;
 mod axis_tests;
 pub mod binding;
 pub mod catalog;
+pub mod currency;
 pub mod kind;
 #[cfg(test)]
 mod kind_tests;
@@ -26,6 +27,7 @@ mod tests;
 pub use act::Instrument;
 pub use binding::InstrumentBinding;
 pub use catalog::InstrumentCatalog;
+pub use currency::{CurrencyCheck, CurrencyState};
 pub use kind::InstrumentKind;
 pub use obligation::{DateBasis, ObligationDate, PassportObligation};
 pub use reference::{InstrumentRef, RecordedBasis};
