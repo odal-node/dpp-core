@@ -666,6 +666,54 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **Nothing could say whether a battery owed a passport at all.**
+  `dpp_rules::batteries::passport_scope` answers Reg. (EU) 2023/1542
+  **Art. 77(1)**, read verbatim from the consolidated text
+  `02023R1542 -- EN -- 31.07.2025 -- 002.004`, **p. 82**:
+
+  > "From 18 February 2027 each LMT battery, each industrial battery with a
+  > capacity greater than 2 kWh and each electric vehicle battery placed on the
+  > market or put into service shall have an electronic record ('battery
+  > passport')."
+
+  The Regulation defines five battery categories; that article reaches **three**.
+  Nothing in this workspace could express the distinction, and the consequences
+  ran in both directions.
+
+  A **portable or SLI** battery could carry a "battery passport".
+  `annex_xiii_requirement` answers `Unknown` for both — correctly, since the
+  Commission's data-point guidance does not cover them — but a content gate
+  reading `Unknown` demands nothing, so such a record published with almost no
+  data while appearing to discharge an obligation that does not exist. And an
+  **industrial battery at or below 2 kWh**, which Art. 77(1) exempts outright,
+  was held to the full industrial data set. The 2 kWh figure existed only in
+  `dpp-calc`, scoping **Art. 8** recycled content — a different article for a
+  different purpose.
+
+  `passport_scope(battery_type, capacity_kwh, placed_on_market)` returns five
+  outcomes rather than a `bool`, on the same reasoning as
+  `Art8Phase`: `NotCovered` · `BelowThreshold` · `CapacityUnknown` ·
+  `NotYetBinding` · `Required`. "This category never owes one", "this unit is
+  under the threshold", "we cannot tell" and "not yet" are four different
+  sentences to put in front of an operator.
+
+  🚨 **`CapacityUnknown` is the load-bearing one.** An industrial battery with no
+  stated capacity is *undetermined*, never exempt — answering `NotCovered` would
+  excuse a battery on the strength of a missing field. A `NaN` capacity lands
+  there too rather than slipping into "below the threshold", which is where it
+  would otherwise go, since `NaN` compares false against every bound.
+
+  🚨 **Art. 77(1) says "each industrial battery", not "each *rechargeable*
+  industrial battery".** Arts. 7(2) and 10(5) both add "rechargeable" where they
+  mean it; this one does not, so narrowing the scope would exempt batteries the
+  article covers. The threshold constant is restated here rather than shared with
+  Art. 8's: three articles that agree today can be amended separately, and one
+  constant would hide the day one of them moves.
+
+  Not wired into the publish gate here — this crate is pure and the gate is the
+  platform's. It exists so that side can enforce the scope without restating the
+  law, which is what the crate boundary is for.
+
 - **`dpp_domain::trusted_list` — qualified status is a question about a moment,
   not about now.**
 

@@ -3,4 +3,7 @@
 pub mod chemistry;
 pub mod degradation;
 pub mod passport_content;
+pub mod passport_scope;
+#[cfg(test)]
+mod passport_scope_tests;
 pub mod recycled_content;
