@@ -55,6 +55,7 @@ fn main() {
     let mut passport = Passport {
         id: PassportId::new(),
         batch_id: Some("BATCH-2026-Q2-001".into()),
+        serial_number: None,
         product_name: "EcoWear Organic T-Shirt".into(),
         product_group: ProductGroup::Textile,
         // Recorded once, from the catalog, at the moment of issuance — never

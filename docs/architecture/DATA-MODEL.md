@@ -60,6 +60,7 @@ constant is right.
 |---|---|---|---|
 | `id` | `PassportId` | `"id"` | Unique passport identifier |
 | `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9) |
+| `serial_number` | `Option<String>` | `"serialNumber"` | The **manufacturer's** serial for this physical unit, where the passport is item-level. Distinct from the carrier's AI 21, which is derived from the passport id and identifies the record. `Restricted`, and protected from patching |
 | `product_name` | `String` | `"productName"` | Human-readable product name (ESPR Art. 9) |
 | `product_group` | `ProductGroup` | `"productGroup"` | EU ESPR product group — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
 | `applicable_instruments` | `Vec<InstrumentRef>` | `"applicableInstruments"` | The acts that applied at issuance, **recorded not computed**, and immutable thereafter (see §3.5) |

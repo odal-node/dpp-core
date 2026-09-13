@@ -45,6 +45,7 @@ pub fn base_passport(
     Passport {
         id: PassportId::new(),
         batch_id: Some("LOT-X-0001".into()),
+        serial_number: None,
         product_name: format!("{} reference product", product_group.catalog_key()),
         applicable_instruments: dpp_domain::InstrumentCatalog::new()
             .instrument_refs_for(product_group.catalog_key()),

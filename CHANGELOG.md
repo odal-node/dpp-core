@@ -15,6 +15,56 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **An item-level passport could not state which item it was.**
+  *(Breaking: `Passport` gains `serial_number: Option<String>`, so every struct
+  literal must name it. On the wire it is `serialNumber`, optional in both
+  directions — a passport stored before this field reads back with `None`, and a
+  `None` is omitted rather than serialised as `null`.)*
+
+  `Granularity::Item` — "one passport per physical unit" — was modelled and
+  carried on `Passport`, while nothing on the record could say *which* unit.
+
+  **The carrier's serial was never a substitute.** A GS1 Digital Link carrier is
+  `/01/{gtin}/21/{serial}` and AI 21 *is* the serial number, but the value there
+  is derived from the passport's own UUID by `dpp_digital_link::short_serial`,
+  which hex-encodes the random tail of the UUIDv7 to fit GS1's 20-character cap.
+  That derivation is deliberate and stays — it was moved off the *leading* bytes
+  in 0.11.0 because a UUIDv7 opens with a millisecond timestamp, so the old
+  serial sorted in creation order and its first twelve hex characters decoded to
+  the passport's creation instant, through the printed label.
+
+  Opaque-by-design is the point, and it is why it cannot serve here: it
+  identifies the **record**, not the product. It is not the serial stamped on the
+  unit, not the serial in the manufacturer's ERP, and nothing reconciles the two.
+  An item-level passport that cannot state the manufacturer's serial cannot be
+  matched back to the object by anyone holding it.
+
+  **The carrier does not adopt the new value**, and
+  `an_item_serial_does_not_change_the_carrier` asserts it by construction rather
+  than trusting prose. The resolver is GTIN-keyed and ignores AI 21 entirely, so
+  the switch would buy nothing, and a real per-unit serial in a public URL
+  reintroduces exactly the printed-label disclosure 0.11.0 removed.
+
+  **Classified `Restricted`, deliberately not `Individual`.** The tempting read
+  is that a per-unit serial is Annex XIII point 4 data. But that class is
+  *"legitimate interest only, and explicitly **not** authorities"*, and a market
+  surveillance authority holding a unit must be able to identify it — so
+  `Individual` would break the case the field exists for. `Restricted` reaches
+  both non-public audiences and keeps the serial off the anonymous view, which is
+  also how `batchId`, the level-up analogue, is classified.
+
+  In `PROTECTED_PATCH_FIELDS` for the matching reason: re-pointing a published,
+  signed record at a different physical object is an identity change, not a
+  content correction, and identity changes go through supersession here.
+
+  **`Granularity::Item` does not make it required.** `granularity` is an ESPR
+  Art. 9(2)(d) delegated-act decision and no adopted act has fixed a level for
+  any product group we carry, so a publish-time requirement would enforce a rule
+  no act has made. Advisory until one does.
+
+  **Migration.** Add `serial_number` to any `Passport` literal; `None` is correct
+  for every model- and batch-level record.
+
 - **The manufacturer's contact details were two fields short of ESPR
   Art. 27(6).**
   *(Breaking: `ManufacturerInfo` gains `registered_trade_name:
