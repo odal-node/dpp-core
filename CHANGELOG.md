@@ -982,6 +982,47 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Documentation
 
+- **The README carried eleven claims that had gone stale, and one that must not
+  be made at all.** A release-checklist accuracy pass over the root README —
+  every claim re-checked against the tree or a primary source rather than
+  re-read.
+
+  **Wrong about the standards.** The six CEN/CLC DPP system standards were said
+  to be *"published May 2026"* with an *"OJEU harmonisation citation pending"*.
+  The citation exists: **Commission Implementing Decision (EU) 2026/1736**, OJ L
+  of **15 July 2026**, citing EN 18216, 18219, 18220, 18221, 18222 and 18223.
+  May 2026 is when CEN approved them, which is a different event. The
+  no-conformance position is unchanged and its reasoning is now correct — the
+  ESPR **Art. 41(2)** presumption attaches to the cited standards, and claiming
+  it needs a published assessment, not merely a citation.
+
+  A claim about EN 18239 and EN 18246 being *"at FprEN stage, expected around
+  September 2026"* is removed. 2026/1736 does not mention either standard, so
+  neither its stage nor its date had a source.
+
+  **Wrong about GS1.** *"GS1 Digital Link v1.2"* appeared in two places, while
+  `dpp-digital-link`'s own module docs say that claim has no recorded basis, that
+  the parser has not been diffed against 1.6.0:2022, and that naming either
+  revision would assert something unverified. The README now claims no revision
+  and points at that note — the crate and the README had been contradicting each
+  other.
+
+  **Wrong about the schemas.** The version table understated six of the twelve
+  product groups (battery stopped at v2.4.0 against a shipped v2.6.0;
+  electronics, furniture, aluminium, construction, detergent, steel and toy were
+  all listed a minor behind), said `unsold-goods` was v1.0.0 when it ships only
+  **v2.0.0**, and omitted **mattress** entirely.
+
+  **Wrong about the traits.** "The 7 port traits" over a table of seven rows
+  covering **eight** traits — `ComplianceRegistry` and `ComplianceStrategy` share
+  a row.
+
+  **A find-replace residue.** *"product group by product_group"*, left by the
+  sector→product-group rename.
+
+  Verified and left alone: the crate list, the plugin count (10), the product
+  group count (12), every documentation link, and all five runnable examples.
+
 - **Two operator-identifier citations were read off incomplete text.** Both are
   doc comments; neither changes behaviour. They are corrected because this
   crate's argument is that its citations are checkable against primary sources,
