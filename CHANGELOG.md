@@ -15,6 +15,82 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The instrument catalog tracked whether an act was adopted, never whether it
+  is still law.**
+  *(Breaking: `Instrument` gains a field `currency: Option<CurrencyCheck>`, so
+  every struct literal must name it. On the wire it is `currency`, optional in
+  both directions — a manifest written before this field reads back with `None`,
+  and a `None` is omitted rather than serialised as `null`.)*
+
+  `InstrumentStatus` is `Adopted | Proposed | Anticipated` — a **legislative
+  progress** axis, answering *"does a text exist that can be cited by CELEX?"*.
+  Nothing answered *"is that text still the law?"*. An act adopted and later
+  repealed stayed `Adopted` for ever, and `has_citable_text()` kept returning
+  true for it.
+
+  The failure this prevents has already happened once here, outside this
+  catalog: an act was cited as current on the day it proved to have been
+  repealed seven months earlier. Nothing in the Official Journal PDF, the
+  filename or the CELEX number changes when an act is repealed. The **more
+  common** variant is worse, because the citation still resolves — an act in
+  force but amended, cited from its pre-amendment text, where the article
+  numbers are real and no longer say what they said.
+
+  Two facts are now recorded, neither derivable from what was stored:
+
+  - **`CurrencyState`** — `InForce` · `Consolidated { asOf }` ·
+    `Repealed { by, on }`, internally tagged on `state`.
+  - **`checkedOn`** — an ISO-8601 date, because a status is a claim with a date
+    on it. A currency field alone decays silently: a check made two years ago
+    reads exactly like one made this morning, and there is no way to ask what
+    has not been looked at.
+
+  `Consolidated` deliberately does **not** separate an amendment from a
+  corrigendum. It is the state EUR-Lex expresses by generating a consolidated
+  text, and the consequence for a citer is identical either way. Regulation (EU)
+  2024/1781 is the worked example: its consolidation's provenance line reads
+  `02024R1781 -- EN -- 28.06.2024 -- 000.001` under the heading *"Corrected
+  by:"* — consolidation number `000`, so no amendment has been folded in at all.
+  It is a corrigendum, and it still moves the text a reader must quote. A model
+  that recorded only amendments would call that act unchanged and send the
+  reader to the superseded version.
+
+  `asOf` carries the **consolidated CELEX** (`02023R1542-20260813`) rather than
+  a bare date, because that identifier is what someone needs in order to fetch
+  the right text — and getting it wrong is silent: EUR-Lex does not answer 404
+  for a consolidation that was never generated, it answers with the published
+  original. `a_consolidated_citation_names_a_consolidation_of_its_own_act`
+  checks the identifier is a consolidation of the act it hangs off, since a
+  transposed digit names a real consolidation of a *different* regulation, which
+  resolves and reads authoritatively.
+
+  **`has_citable_text()` is deliberately unchanged.** A repealed act still has a
+  citable text — that is what makes it quotable for history — and the method's
+  callers are provenance checks asserting that an adopted instrument names the
+  act it was read from. Narrowing it would fail those checks on precisely the
+  records that most need a CELEX against them. The separate question gets a
+  separate method, `Instrument::is_current_law`, which also **fails closed**: an
+  adopted act with no recorded check answers `false`, on the same reasoning that
+  makes an unmarked retention figure `Assumed` rather than `Sourced`.
+
+  **Staleness is a report, not a gate.** `InstrumentCatalog::currency_checked_before`
+  is a query the caller supplies a cutoff to. No test fails on the calendar —
+  that makes the build go red with no commit behind it, and a failure nobody
+  caused gets silenced rather than fixed, with the silencing outliving the
+  staleness. What *is* gated is structural: an adopted act carries a dated check
+  and a non-adopted one carries none. That fails when someone adds a manifest,
+  which is a change with an author attached.
+
+  All ten adopted manifests carry a check dated 2026-09-11. Three are
+  `Consolidated` — Regulation (EU) 2023/1542 at `02023R1542-20260813`,
+  Regulation (EU) 2024/1781 at `02024R1781-20240628`, Regulation (EU) 2023/1670
+  at `02023R1670-20250620`. The two anticipated horizontal measures carry none:
+  they have no text, so there is nothing to check.
+
+  **Migration.** Add `currency` to any `Instrument` literal. `None` is
+  compilable and honest — it says the act's currency has not been checked — but
+  it makes `is_current_law()` answer `false`, which is the intended pressure.
+
 - **`ProductGroupPayload` gained a required method.**
   *(Breaking: `product_category(&self) -> Option<&str>` has no default
   implementation and the trait is not sealed, so any implementation outside this
