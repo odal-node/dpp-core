@@ -45,7 +45,9 @@
 
 use std::collections::BTreeSet;
 
-use super::prose_act_reference_tests::{CITED_NOT_MODELLED, act_refs, cites_article_or_annex};
+use super::prose_act_reference_tests::{
+    CITED_NOT_MODELLED, CitationBasis, act_refs, cites_article_or_annex,
+};
 use crate::instrument::InstrumentCatalog;
 use crate::schemas::VersionedSchemaRegistry;
 
@@ -113,7 +115,7 @@ fn every_act_cited_in_prose_is_known() {
         .iter()
         .filter_map(|i| i.celex.as_deref())
         .collect();
-    let inventoried: BTreeSet<&str> = CITED_NOT_MODELLED.iter().map(|(celex, _)| *celex).collect();
+    let inventoried: BTreeSet<&str> = CITED_NOT_MODELLED.iter().map(|e| e.celex).collect();
 
     let mut unknown: Vec<String> = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
@@ -155,6 +157,40 @@ fn every_act_cited_in_prose_is_known() {
         "CITED_NOT_MODELLED lists {} act(s) no schema cites any more — remove \
          them: {stale:?}",
         stale.len()
+    );
+}
+
+/// **Rule B2 — a `Sourced` reason names the article or annex it was read from.**
+///
+/// Rule B checks that a cited act is one this crate knows. This checks the thing
+/// the inventory's own reasons are for: that a reason claiming to have been read
+/// against the Official Journal can be re-checked by the next reader without
+/// re-reading the whole act.
+///
+/// An article or annex number is the cheapest possible evidence of a visit, and
+/// the only kind that survives being copied. It is not proof — nothing here can
+/// prove someone opened a PDF — but a `Sourced` reason with no anchor is the
+/// exact shape that let a reason written from recall pass as one written from
+/// the text, which is the defect this basis was added to expose.
+///
+/// [`CitationBasis::Assumed`] entries are unconstrained on purpose: an entry
+/// saying plainly that nobody has read the act is honest, and demanding a
+/// citation from it would only encourage inventing one.
+#[test]
+fn a_sourced_reason_cites_an_article_or_annex() {
+    let unanchored: Vec<&str> = CITED_NOT_MODELLED
+        .iter()
+        .filter(|e| e.basis == CitationBasis::Sourced)
+        .filter(|e| !cites_article_or_annex(e.reason))
+        .map(|e| e.celex)
+        .collect();
+
+    assert!(
+        unanchored.is_empty(),
+        "{} CITED_NOT_MODELLED entr(ies) are marked Sourced but their reason \
+         names no article or annex, so nothing records where the claim was read \
+         — either add the anchor or mark them Assumed: {unanchored:?}",
+        unanchored.len()
     );
 }
 

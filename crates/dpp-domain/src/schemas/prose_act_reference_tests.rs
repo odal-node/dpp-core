@@ -228,6 +228,48 @@ fn the_detectors_catch_what_they_are_for() {
     }
 }
 
+/// Whether an inventory entry's *reason* was read out of the primary text, or
+/// written from something weaker.
+///
+/// The same distinction `ParameterBasis` draws for calculation inputs and
+/// `RetentionBasis` and `DateBasis` draw elsewhere in this workspace, applied to
+/// the claim a reason makes. Reusing the vocabulary rather than inventing a
+/// marker convention is deliberate: a bespoke one would be understood only by
+/// the rule that reads it.
+///
+/// # The default runs the other way here, and that is not an oversight
+///
+/// `ParameterBasis` defaults to `Sourced`, because treating law as ours silently
+/// replaces a legal threshold while treating ours as law only leaves a visible
+/// placeholder. **The asymmetry inverts for a citation reason.** Marking an
+/// unverified reason `Sourced` asserts that someone read the Official Journal
+/// when nobody did, and that assertion is invisible — the reasons read
+/// identically either way, which is the whole defect this inventory was found to
+/// have. So an entry is [`Assumed`](Self::Assumed) until a reader has been to the
+/// text, and `Sourced` costs an article or annex number that
+/// [`a_sourced_reason_cites_an_article_or_annex`] checks for.
+///
+/// [`a_sourced_reason_cites_an_article_or_annex`]: super::prose_citation_tests
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CitationBasis {
+    /// Read against the Official Journal text of the act it describes. The
+    /// reason names the article or annex it was read from.
+    Sourced,
+    /// Written from recall, a secondary source, or an adjacent act's account of
+    /// this one. It may well be right; nobody has been to the text.
+    Assumed,
+}
+
+/// One act cited in schema prose that the instrument catalog does not model.
+pub(super) struct CitedNotModelled {
+    /// CELEX identifier of the cited act.
+    pub(super) celex: &'static str,
+    /// Why prose legitimately cites an act no binding describes.
+    pub(super) reason: &'static str,
+    /// Whether that reason was read out of the primary text.
+    pub(super) basis: CitationBasis,
+}
+
 /// Acts cited in schema prose that the instrument catalog does not model.
 ///
 /// Not a suppression list — an inventory. An act appears here because prose
@@ -238,63 +280,101 @@ fn the_detectors_catch_what_they_are_for() {
 ///
 /// Adding an entry is a deliberate act with a reason attached. Removing one
 /// happens when the instrument gets modelled.
-pub(super) const CITED_NOT_MODELLED: &[(&str, &str)] = &[
-    (
-        "32004R0648",
-        "The old Detergents Regulation. Cited only as the act Regulation (EU) \
-         2026/405 repeals with effect from 23 September 2029 — a repealed act is \
-         still worth naming, because the transition is what a reader needs.",
-    ),
-    (
-        "32006R1907",
-        "REACH. Cited for Art. 33 (SVHC communication duty above 0,1 % w/w) and \
-         Annex XVII entry 72 (restricted substances in textiles). A horizontal \
-         chemicals regime rather than a passport instrument, so it binds no \
-         product group in the catalog sense.",
-    ),
-    (
-        "32009L0048",
-        "Toy Safety Directive. Cited for CE marking. Superseded for passport \
-         purposes by Regulation (EU) 2025/2509, which is modelled.",
-    ),
-    (
-        "32009R0661",
-        "General safety of motor vehicles. Cited only as the source of the tyre \
-         noise limit values (LV) that Regulation (EU) 2020/740 Annex I Part C \
-         grades against — a threshold this crate reads, not an obligation it \
-         carries.",
-    ),
-    (
-        "32009R1222",
-        "The old tyre labelling regulation. Cited only as the act Regulation \
-         (EU) 2020/740 replaced, repealed with effect from 1 May 2021.",
-    ),
-    (
-        "32011L0065",
-        "RoHS. Cited for the substance restrictions an electronics declaration \
-         references. Not a passport instrument.",
-    ),
-    (
-        "32017L1132",
-        "Company law directive. Cited for Art. 16, which establishes the unique \
-         company identifier the unsold-goods schema uses for the EUID.",
-    ),
-    (
-        "32020R0740",
-        "Tyre labelling. Cited for the Annex I grading scales. A labelling \
-         regime, not a passport obligation — the tyre passport duty, when one \
-         exists, will come from an ESPR delegated act.",
-    ),
-    (
-        "32023R1669",
-        "Energy labelling for smartphones and slate tablets. The sibling of \
-         Regulation (EU) 2023/1670, which is modelled; this one sets label \
-         classes rather than passport content.",
-    ),
-    (
-        "32024R1252",
-        "Critical Raw Materials Act. Cited as the source of the canonical CRM \
-         list. It defines which materials are critical; it does not govern \
-         their disclosure.",
-    ),
+///
+/// # Why each entry carries a basis
+///
+/// **A reason is a claim.** The reasons are what make this inventory reviewable
+/// rather than a list of exemptions, and several of them assert substantive
+/// content about acts — a repeal date, an annex part, the absence of an
+/// obligation across a whole regulation. Nothing used to distinguish a reason
+/// verified against the Official Journal from one written from recall, and they
+/// read identically. This repository has already had a citation inverted by
+/// exactly that gap, when an act was described as current on the day it turned
+/// out to have been repealed.
+pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
+    CitedNotModelled {
+        celex: "32004R0648",
+        reason: "The old Detergents Regulation. Cited only as the act Regulation \
+                 (EU) 2026/405 repeals: its Art. 36 reads 'Regulation (EC) No \
+                 648/2004 is repealed with effect from 23 September 2029.' The \
+                 same article carries a grandfathering window to 23 September \
+                 2030 for product placed on the market in the preceding year, so \
+                 'repealed' on its own overstates how cleanly it ends — which is \
+                 the transition a reader needs.",
+        basis: CitationBasis::Sourced,
+    },
+    CitedNotModelled {
+        celex: "32006R1907",
+        reason: "REACH. Cited for Art. 33 (SVHC communication duty above 0,1 % \
+                 w/w) and Annex XVII entry 72 (restricted substances in \
+                 textiles). A horizontal chemicals regime rather than a passport \
+                 instrument, so it binds no product group in the catalog sense.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32009L0048",
+        reason: "Toy Safety Directive. Cited for CE marking. Superseded for \
+                 passport purposes by Regulation (EU) 2025/2509, which is \
+                 modelled.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32009R0661",
+        reason: "General safety of motor vehicles. Cited only as the source of \
+                 the tyre noise limit values (LV) that Regulation (EU) 2020/740 \
+                 grades against — a threshold this crate reads, not an \
+                 obligation it carries. 2020/740's own Annex I Part C says so: \
+                 'The external rolling noise class shall be determined … on the \
+                 basis of the limit values (LV) set out in Part C of Annex II to \
+                 Regulation (EC) No 661/2009.'",
+        basis: CitationBasis::Sourced,
+    },
+    CitedNotModelled {
+        celex: "32009R1222",
+        reason: "The old tyre labelling regulation. Cited only as the act \
+                 Regulation (EU) 2020/740 replaced. Its Art. 17 reads \
+                 'Regulation (EC) No 1222/2009 is repealed with effect from 1 \
+                 May 2021', and directs that references to it be read against \
+                 the correlation table in Annex VIII.",
+        basis: CitationBasis::Sourced,
+    },
+    CitedNotModelled {
+        celex: "32011L0065",
+        reason: "RoHS. Cited for the substance restrictions an electronics \
+                 declaration references. Not a passport instrument.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32017L1132",
+        reason: "Company law directive. Cited for Art. 16, which establishes the \
+                 unique company identifier the unsold-goods schema uses for the \
+                 EUID.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32020R0740",
+        reason: "Tyre labelling. Cited for the Annex I grading scales. A \
+                 labelling regime, not a passport obligation — the tyre passport \
+                 duty, when one exists, will come from an ESPR delegated act.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32023R1669",
+        reason: "Energy labelling for smartphones and slate tablets. The sibling \
+                 of Regulation (EU) 2023/1670, which is modelled; this one sets \
+                 label classes rather than passport content.",
+        basis: CitationBasis::Assumed,
+    },
+    CitedNotModelled {
+        celex: "32024R1252",
+        reason: "Critical Raw Materials Act. Cited as the source of the \
+                 canonical CRM list. The claim that it defines which materials \
+                 are critical without governing their disclosure is the hardest \
+                 kind to hold — it asserts the absence of an obligation across a \
+                 whole regulation — and nobody holds the text. This entry is the \
+                 one the inventory most needs read, because the claim also \
+                 ships, in every battery and electronics schema description \
+                 naming the act.",
+        basis: CitationBasis::Assumed,
+    },
 ];
