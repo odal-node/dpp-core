@@ -93,6 +93,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   is why it was cheap to do now — the first real caller picks a variant off this
   enum.
 
+- **Rule B2 — a `Sourced` reason must name the article or annex it was read
+  from.** An article number is the cheapest evidence of a visit and the only kind
+  that survives being copied. `Assumed` entries are unconstrained on purpose: an
+  entry saying plainly that nobody has read the act is honest, and demanding a
+  citation from it would only encourage inventing one.
+
 ### Fixed
 
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record
@@ -117,6 +123,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   product not yet on the market has none, and reading that as "before 2027"
   would exempt every draft), and any `PassportScope` variant added later, which
   falls to a catch-all that gates.
+
+- **The citation inventory now records whether its reasons were read, and three
+  of them have been.** `CITED_NOT_MODELLED` lists acts that schema prose cites
+  and no instrument binding models, each with a written reason. **A reason is a
+  claim**, and several make substantive assertions — a repeal date, an annex
+  part, the absence of an obligation across a whole regulation. Nothing
+  distinguished a reason verified against the Official Journal from one written
+  from recall, and they read identically either way.
+
+  Each entry now carries a `CitationBasis` of `Sourced` or `Assumed`, reusing the
+  vocabulary `ParameterBasis`, `RetentionBasis` and `DateBasis` already use in
+  this workspace rather than a marker convention only one rule would understand.
+  **The default runs the opposite way to `ParameterBasis`**, deliberately: that
+  type defaults to `Sourced` because treating law as ours silently replaces a
+  legal threshold, whereas marking an *unread* reason `Sourced` asserts a visit
+  to the text that never happened, invisibly. So an entry is `Assumed` until
+  someone has been to the act.
+
+  Verified and moved to `Sourced`, each now quoting the article it was read from:
+
+  - **`32009R1222`** — Regulation (EU) 2020/740 **Art. 17**: *"Regulation (EC) No
+    1222/2009 is repealed with effect from 1 May 2021."* The date the inventory
+    asserted is right, and the article also directs that references to the
+    repealed act be read against the correlation table in Annex VIII.
+  - **`32004R0648`** — Regulation (EU) 2026/405 **Art. 36**, repealing it with
+    effect from 23 September 2029. The reason now also carries the grandfathering
+    window to 23 September 2030, which the bare word "repealed" overstated.
+  - **`32009R0661`** — 2020/740's own **Annex I Part C** names it as the source
+    of the tyre noise limit values, confirming both the annex part and the act.
+
+  **`32024R1252` (the Critical Raw Materials Act) stays `Assumed`**, and its
+  reason now says so plainly instead of stating the conclusion. It is a negative
+  claim across a whole regulation — the hardest kind to hold — and the text is
+  not held. It is also the one that **ships**, in every battery and electronics
+  schema description naming the act.
 
 ## [0.20.0] - 2026-09-13
 
