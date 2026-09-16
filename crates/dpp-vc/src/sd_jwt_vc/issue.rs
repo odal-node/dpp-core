@@ -17,14 +17,28 @@ use super::error::SdJwtVcError;
 /// classes apply everywhere.
 const PRODUCT_GROUP_DATA: &str = "productGroupData";
 
-/// Claims the profile requires to be present and readable, which therefore must
-/// never be concealed however they are classified.
+/// Claims that must never be concealed, however the disclosure policy classes
+/// them.
 ///
-/// draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2: `iss` and `vct` must be present
-/// in the Unsecured Payload, and clause 3.6 of RFC 9901 forbids selectively
-/// disclosing claims a verifier needs to process the token at all. Concealing
-/// `vct` in particular would produce a credential that cannot say what it is.
-const NEVER_CONCEALED: [&str; 4] = ["iss", "vct", "iat", "_sd_alg"];
+/// Two reasons, and the second is a `MUST NOT`.
+///
+/// **Structural.** draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2 requires `iss` and
+/// `vct` in the Unsecured Payload; `_sd_alg` is how a reader knows which hash to
+/// recompute. A credential that concealed `vct` could not say what it is.
+///
+/// **Validity-controlling.** RFC 9901 clause 9.7: *"An Issuer MUST NOT allow any
+/// content to be selectively disclosable that is critical for evaluating the
+/// SD-JWT's authenticity or validity"*, and it names `iss`, `aud`, `exp`, `nbf`
+/// and `cnf`. A concealable `exp` is one the holder can simply decline to
+/// present, turning an expired credential into an unbounded one — the party the
+/// expiry constrains is exactly the party choosing what to reveal.
+///
+/// These are listed rather than left to the policy because the policy's default
+/// is `Public`, so today they survive by *accident*: nothing in a product
+/// group's schema names them, so nothing classes them, so nothing conceals them.
+/// That is not a guarantee — it is the absence of a counterexample, and it would
+/// end the day a schema declared one of these names or the default changed.
+const NEVER_CONCEALED: [&str; 8] = ["iss", "vct", "iat", "_sd_alg", "aud", "exp", "nbf", "cnf"];
 
 /// Build and sign an SD-JWT VC over `payload`.
 ///
@@ -76,7 +90,7 @@ pub fn issue(
         DocumentScope::Envelope,
         &mut segments,
         &mut disclosures,
-    );
+    )?;
     for (key, value) in concealed {
         claims.entry(key).or_insert(value);
     }
@@ -100,7 +114,7 @@ fn conceal_object(
     scope: DocumentScope,
     segments: &mut Vec<String>,
     disclosures: &mut Vec<Disclosure>,
-) -> Map<String, Value> {
+) -> Result<Map<String, Value>, SdJwtVcError> {
     // Classify first, so the predicate handed to `conceal` is a lookup rather
     // than a policy call — `conceal` decides nothing about disclosure, and this
     // keeps it that way.
@@ -119,7 +133,7 @@ fn conceal_object(
         }
     }
 
-    let (mut kept, mut produced) = conceal(object, |name| hide.iter().any(|h| h == name));
+    let (mut kept, mut produced) = conceal(object, |name| hide.iter().any(|h| h == name))?;
     disclosures.append(&mut produced);
 
     // Descend into the members that stayed in cleartext.
@@ -137,11 +151,11 @@ fn conceal_object(
             DocumentScope::Envelope
         };
         segments.push(key.clone());
-        descend(value, policy, child_scope, segments, disclosures);
+        descend(value, policy, child_scope, segments, disclosures)?;
         segments.pop();
     }
 
-    kept
+    Ok(kept)
 }
 
 /// Walk into a value that stayed in cleartext.
@@ -155,16 +169,17 @@ fn descend(
     scope: DocumentScope,
     segments: &mut Vec<String>,
     disclosures: &mut Vec<Disclosure>,
-) {
+) -> Result<(), SdJwtVcError> {
     match value {
         Value::Object(map) => {
-            *map = conceal_object(map, policy, scope, segments, disclosures);
+            *map = conceal_object(map, policy, scope, segments, disclosures)?;
         }
         Value::Array(items) => {
             for item in items {
-                descend(item, policy, scope, segments, disclosures);
+                descend(item, policy, scope, segments, disclosures)?;
             }
         }
         _ => {}
     }
+    Ok(())
 }

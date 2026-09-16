@@ -59,6 +59,13 @@ pub enum SdJwtError {
     /// Clause 7.1 step 4: every disclosure must be used. The count is reported
     /// rather than the disclosure itself, which carries a claim value.
     UnusedDisclosures(usize),
+    /// The same digest appeared more than once.
+    ///
+    /// RFC 9901 clause 4.1: *"The same digest value MUST NOT appear more than
+    /// once in the SD-JWT."* Repetition is how a token smuggles a second
+    /// meaning past a reader that de-duplicates, so it is refused rather than
+    /// collapsed.
+    DuplicateDigest(String),
     /// A disclosure would overwrite a claim already present in cleartext.
     ///
     /// Clause 7.1 makes this a rejection condition: the token would otherwise
@@ -77,6 +84,7 @@ impl std::fmt::Display for SdJwtError {
             Self::UnusedDisclosures(n) => {
                 write!(f, "{n} disclosure(s) matched nothing in the token")
             }
+            Self::DuplicateDigest(d) => write!(f, "digest {d} appears more than once"),
             Self::ClaimCollision(name) => {
                 write!(f, "disclosure for '{name}' collides with a cleartext claim")
             }

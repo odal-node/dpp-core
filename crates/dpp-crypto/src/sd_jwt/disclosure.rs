@@ -52,7 +52,13 @@ impl Disclosure {
     /// the same claim name occurs at different places in the structure** — so
     /// this takes no cache and offers no way to reuse one. A reused salt across
     /// two credentials for the same field is a correlation handle.
-    pub fn new(claim_name: impl Into<String>, claim_value: Value) -> Self {
+    /// # Errors
+    ///
+    /// [`DisclosureError::ReservedClaimName`] for `_sd` or `...`. Clause 4.2.1
+    /// forbids them, and [`Disclosure::parse`] refuses them — so without this
+    /// check a constructor could build a value that this crate's own parser
+    /// rejects, and the disclosure would fail only at the verifier.
+    pub fn new(claim_name: impl Into<String>, claim_value: Value) -> Result<Self, DisclosureError> {
         let mut salt_bytes = [0u8; SALT_BYTES];
         crate::os_rng().fill_bytes(&mut salt_bytes);
         Self::with_salt(b64().encode(salt_bytes), claim_name, claim_value)
@@ -63,8 +69,20 @@ impl Disclosure {
     /// Exists for tests and for re-encoding a disclosure whose salt is already
     /// fixed. Production issuance uses [`Disclosure::new`], which is the only
     /// path that guarantees the clause 9.3 property.
-    pub fn with_salt(salt: String, claim_name: impl Into<String>, claim_value: Value) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// [`DisclosureError::ReservedClaimName`], on the same terms as
+    /// [`Disclosure::new`].
+    pub fn with_salt(
+        salt: String,
+        claim_name: impl Into<String>,
+        claim_value: Value,
+    ) -> Result<Self, DisclosureError> {
         let claim_name = claim_name.into();
+        if RESERVED.contains(&claim_name.as_str()) {
+            return Err(DisclosureError::ReservedClaimName);
+        }
         // RFC 9901 clause 4.2.1: base64url of the UTF-8 bytes of the JSON array.
         let encoded = b64().encode(
             Value::Array(vec![
@@ -74,12 +92,12 @@ impl Disclosure {
             ])
             .to_string(),
         );
-        Self {
+        Ok(Self {
             salt,
             claim_name,
             claim_value,
             encoded,
-        }
+        })
     }
 
     /// Read a disclosure produced elsewhere, keeping its original bytes.

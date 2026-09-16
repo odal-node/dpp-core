@@ -386,13 +386,28 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the keys by value with the same `kid` the signed token names. The published
   `did:web` document is untouched and still serves the W3C credential path.
 
-  Two requirements that are easy to miss are enforced and tested. RFC 9901
+  Requirements that are easy to miss are enforced and tested. RFC 9901
   clause 4.2.4.1: *"The Issuer MUST hide the original order of the claims in the
   array"* — digests are sorted, because publishing them in the order the fields
   were walked leaks the source structure from a token that discloses nothing.
   Clause 7.1: a disclosure whose digest matches nothing makes the **whole
   credential** unreadable rather than the claim quietly disappearing, which is
-  what makes tampering with a revealed value fail loudly.
+  what makes tampering with a revealed value fail loudly. Clause 4.1: the same
+  digest twice is refused, checked against every occurrence rather than against
+  whatever survived a map keyed by digest. Clause 9.7: `iss`, `aud`, `exp`,
+  `nbf` and `cnf` are never issued as disclosures — a concealable `exp` is one
+  the holder can decline to present, and the holder is the party it constrains.
+
+  **A presentation selects disclosures by digest, not by claim name.** One claim
+  name can belong to several disclosures — clause 9.3 says so, which is why each
+  occurrence is separately salted — so selecting by name would release values
+  the holder did not choose, through the door built to prevent exactly that.
+
+  **Verification takes the time to check against**, as the snapshot verifier
+  already does, and enforces `exp` and `nbf` when present. Both are optional in
+  the profile, so absence means "no bound"; a malformed temporal claim is
+  refused rather than ignored, since ignoring one would read as absent and
+  absent is the unbounded case.
 
 - **`ProductGroupAccessPolicy::for_passport`** — the policy for a whole passport
   at a schema version: the product group's classes from its schema, plus the
@@ -407,7 +422,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   protected-header parameter, which SD-JWT VC mandates as `dc+sd-jwt`. Threaded
   through the signer rather than added afterwards because the header is
   protected: a parameter added after signing invalidates the signature. `sign`
-  delegates to it with `None` and produces exactly the header it always has.
+  delegates to it with `None` and produces exactly the header it always has —
+  the protected header is now built with `serde_json` rather than string
+  interpolation, so a `typ` containing a quote cannot write extra members into a
+  header that is about to be signed. Byte output is unchanged: members serialise
+  in lexicographic order, which is the order the literal already used.
 
 ### Fixed
 

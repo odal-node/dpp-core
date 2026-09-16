@@ -46,14 +46,14 @@ const HIDDEN: [&str; 4] = [
 ];
 
 fn issue() -> SdJwt {
-    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name));
+    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
     let payload = build_payload(concealed, !disclosures.is_empty());
     SdJwt::new(stub_jwt(&payload), disclosures)
 }
 
 #[test]
 fn concealed_claims_leave_no_cleartext_in_the_payload() {
-    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name));
+    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
 
     assert_eq!(disclosures.len(), 4);
     assert!(concealed.contains_key("batteryChemistry"));
@@ -72,7 +72,7 @@ fn concealed_claims_leave_no_cleartext_in_the_payload() {
 /// original structure from a token that discloses nothing.
 #[test]
 fn digest_order_does_not_follow_claim_order() {
-    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name));
+    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
 
     let published: Vec<&str> = concealed["_sd"]
         .as_array()
@@ -91,7 +91,7 @@ fn digest_order_does_not_follow_claim_order() {
     // Salts are random, so a single draw could coincide; repeat until one
     // differs, which is overwhelmingly the first iteration.
     let reordered = (0..32).any(|_| {
-        let (c, d) = conceal(&sample(), |name| HIDDEN.contains(&name));
+        let (c, d) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
         let pub_order: Vec<String> = c["_sd"]
             .as_array()
             .unwrap()
@@ -109,7 +109,7 @@ fn digest_order_does_not_follow_claim_order() {
 fn salts_are_unique_and_128_bits() {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let (_, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name));
+    let (_, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
 
     let mut salts: Vec<&str> = disclosures.iter().map(Disclosure::salt).collect();
     let count = salts.len();
@@ -126,8 +126,8 @@ fn salts_are_unique_and_128_bits() {
 /// of the same data must not be linkable by their digests.
 #[test]
 fn two_issuances_of_the_same_claims_share_no_digest() {
-    let (first, _) = conceal(&sample(), |name| HIDDEN.contains(&name));
-    let (second, _) = conceal(&sample(), |name| HIDDEN.contains(&name));
+    let (first, _) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
+    let (second, _) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
 
     let a: Vec<&Value> = first["_sd"].as_array().unwrap().iter().collect();
     let b: Vec<&Value> = second["_sd"].as_array().unwrap().iter().collect();
@@ -145,8 +145,8 @@ fn the_same_claim_name_at_two_places_gets_two_salts() {
     let outer = json!({ "serialNumber": "A" }).as_object().unwrap().clone();
     let inner = json!({ "serialNumber": "A" }).as_object().unwrap().clone();
 
-    let (_, a) = conceal(&outer, |n| n == "serialNumber");
-    let (_, b) = conceal(&inner, |n| n == "serialNumber");
+    let (_, a) = conceal(&outer, |n| n == "serialNumber").unwrap();
+    let (_, b) = conceal(&inner, |n| n == "serialNumber").unwrap();
 
     assert_ne!(a[0].salt(), b[0].salt());
     assert_ne!(a[0].digest(), b[0].digest());
@@ -176,7 +176,12 @@ fn a_two_of_four_presentation_does_not_carry_the_withheld_two() {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
     let issued = issue();
-    let presentation = issued.present(&["cathodeMaterial", "stateOfHealthPct"]);
+    let reveal: Vec<String> = ["cathodeMaterial", "stateOfHealthPct"]
+        .iter()
+        .flat_map(|n| issued.digests_for_claim(n))
+        .collect();
+    let reveal: Vec<&str> = reveal.iter().map(String::as_str).collect();
+    let presentation = issued.present(&reveal);
     let wire = presentation.serialise();
 
     assert_eq!(presentation.disclosures().len(), 2);
@@ -223,7 +228,8 @@ fn a_tampered_disclosure_is_refused_not_ignored() {
         original.salt().to_owned(),
         original.claim_name(),
         json!("forged"),
-    );
+    )
+    .unwrap();
     assert_ne!(forged.digest(), original.digest());
 
     let tampered = SdJwt::new(issued.jwt().to_owned(), vec![forged]);
@@ -236,7 +242,7 @@ fn a_tampered_disclosure_is_refused_not_ignored() {
 #[test]
 fn a_disclosure_naming_a_cleartext_claim_is_refused() {
     let issued = issue();
-    let collides = Disclosure::new("batteryChemistry", json!("NMC"));
+    let collides = Disclosure::new("batteryChemistry", json!("NMC")).unwrap();
     // Put its digest in the token so it is *found*, which is what isolates the
     // collision check from the unused-disclosure one.
     let payload = json!({
@@ -264,7 +270,7 @@ fn a_present_but_unsupported_sd_alg_is_refused_rather_than_assumed() {
 
 #[test]
 fn an_absent_sd_alg_means_sha_256() {
-    let d = Disclosure::new("x", json!(1));
+    let d = Disclosure::new("x", json!(1)).unwrap();
     let payload = json!({ "_sd": [d.digest()] });
     let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
     assert_eq!(sd.disclosed_payload().unwrap()["x"], json!(1));
@@ -272,7 +278,7 @@ fn an_absent_sd_alg_means_sha_256() {
 
 #[test]
 fn nothing_concealed_means_no_sd_claim() {
-    let (concealed, disclosures) = conceal(&sample(), |_| false);
+    let (concealed, disclosures) = conceal(&sample(), |_| false).unwrap();
     assert!(disclosures.is_empty());
     assert!(!concealed.contains_key("_sd"));
     let payload = build_payload(concealed, false);
@@ -281,7 +287,7 @@ fn nothing_concealed_means_no_sd_claim() {
 
 #[test]
 fn a_disclosure_survives_a_parse_and_reencode_unchanged() {
-    let d = Disclosure::new("cathodeMaterial", json!(["LiFePO4"]));
+    let d = Disclosure::new("cathodeMaterial", json!(["LiFePO4"])).unwrap();
     let back = Disclosure::parse(d.encoded()).unwrap();
     assert_eq!(back, d);
     assert_eq!(back.digest(), d.digest());
@@ -330,6 +336,111 @@ fn a_key_binding_segment_is_seen_and_not_read_as_a_disclosure() {
 
 #[test]
 fn digest_of_matches_the_disclosures_own_digest() {
-    let d = Disclosure::new("x", json!("y"));
+    let d = Disclosure::new("x", json!("y")).unwrap();
     assert_eq!(digest_of(d.encoded()), d.digest());
+}
+
+// ── Properties added after review ────────────────────────────────────────────
+
+/// Selecting a presentation by claim name over-discloses when one name occurs
+/// at two places, which RFC 9901 clause 9.3 says it may. Selection is therefore
+/// by digest, and this is the case that proves the difference: two disclosures
+/// share a name, and revealing one must not carry the other.
+#[test]
+fn revealing_one_of_two_same_named_claims_withholds_the_other() {
+    let outer = json!({ "serialNumber": "OUTER" })
+        .as_object()
+        .unwrap()
+        .clone();
+    let inner = json!({ "serialNumber": "INNER" })
+        .as_object()
+        .unwrap()
+        .clone();
+
+    let (mut kept, mut disclosures) = conceal(&outer, |n| n == "serialNumber").unwrap();
+    let (inner_kept, mut inner_disclosures) = conceal(&inner, |n| n == "serialNumber").unwrap();
+    kept.insert("nested".to_owned(), Value::Object(inner_kept));
+    disclosures.append(&mut inner_disclosures);
+
+    let sd = SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures);
+    assert_eq!(
+        sd.digests_for_claim("serialNumber").len(),
+        2,
+        "fixture must be genuinely ambiguous or this proves nothing"
+    );
+
+    // Reveal only the outer one.
+    let outer_digest = sd.disclosures()[0].digest();
+    let presentation = sd.present(&[outer_digest.as_str()]);
+
+    assert_eq!(presentation.disclosures().len(), 1);
+    let wire = presentation.serialise();
+    assert!(wire.contains(sd.disclosures()[0].encoded()));
+    assert!(
+        !wire.contains(sd.disclosures()[1].encoded()),
+        "the same-named sibling rode along — selection is matching on name"
+    );
+}
+
+/// RFC 9901 clause 4.1: "The same digest value MUST NOT appear more than once
+/// in the SD-JWT." Twice among the disclosures supplied.
+#[test]
+fn the_same_disclosure_supplied_twice_is_refused() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest()], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d.clone(), d.clone()]);
+
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::DuplicateDigest(d.digest()))
+    );
+}
+
+/// The same clause, in the direction a `HashMap` hides: the digest repeats in
+/// the token's own `_sd` arrays rather than among the disclosures. Unmatched,
+/// so a count-based check still balances and accepts it.
+#[test]
+fn a_digest_repeated_across_two_sd_arrays_is_refused() {
+    let orphan = Disclosure::new("ghost", json!("boo")).unwrap();
+    let payload = json!({
+        "_sd": [orphan.digest()],
+        "_sd_alg": "sha-256",
+        "nested": { "_sd": [orphan.digest()] },
+    });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::DuplicateDigest(orphan.digest()))
+    );
+}
+
+/// A constructor must not be able to build a value this crate's own parser
+/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names.
+#[test]
+fn constructors_refuse_reserved_claim_names() {
+    for name in ["_sd", "..."] {
+        assert_eq!(
+            Disclosure::new(name, json!(1)),
+            Err(DisclosureError::ReservedClaimName)
+        );
+        assert_eq!(
+            Disclosure::with_salt("salt".to_owned(), name, json!(1)),
+            Err(DisclosureError::ReservedClaimName)
+        );
+    }
+}
+
+/// Everything a constructor builds must survive `parse`, which is the round
+/// trip the reserved-name check exists to keep total.
+#[test]
+fn every_constructed_disclosure_round_trips() {
+    for (name, value) in [
+        ("plain", json!("v")),
+        ("nested", json!({"a": [1, 2, {"b": null}]})),
+        ("unicode", json!("ü \" \\ 🔐")),
+    ] {
+        let d = Disclosure::new(name, value).unwrap();
+        assert_eq!(Disclosure::parse(d.encoded()).unwrap(), d);
+    }
 }

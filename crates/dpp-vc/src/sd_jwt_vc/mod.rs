@@ -67,7 +67,13 @@ mod vct;
 mod verify;
 
 #[cfg(test)]
+mod issuer_metadata_tests;
+#[cfg(test)]
+mod test_fixtures;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod validity_tests;
 #[cfg(test)]
 mod vct_tests;
 

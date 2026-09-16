@@ -42,6 +42,14 @@
 //!   requires every disclosure to be used; one whose digest is absent from the
 //!   token means the credential and the disclosures disagree, and the safe
 //!   reading is refusal. [`SdJwt::disclosed_payload`] refuses.
+//! - **A repeated digest is an error.** Clause 4.1: *"The same digest value MUST
+//!   NOT appear more than once in the SD-JWT."* A map keyed by digest quietly
+//!   satisfies a count-based check while collapsing the repeat, so the check is
+//!   made against every occurrence rather than against what survived a
+//!   deduplicating collection.
+//! - **A presentation selects disclosures by digest, not by claim name.** One
+//!   name can belong to several disclosures, so selecting by name reveals values
+//!   the holder did not choose. See [`SdJwt::present`].
 
 pub mod disclosure;
 pub mod error;

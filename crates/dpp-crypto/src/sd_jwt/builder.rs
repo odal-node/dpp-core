@@ -29,13 +29,13 @@ pub(crate) const SD_ALG_CLAIM: &str = "_sd_alg";
 pub fn conceal(
     object: &Map<String, Value>,
     mut conceal_if: impl FnMut(&str) -> bool,
-) -> (Map<String, Value>, Vec<Disclosure>) {
+) -> Result<(Map<String, Value>, Vec<Disclosure>), SdJwtError> {
     let mut kept = Map::new();
     let mut disclosures = Vec::new();
 
     for (name, value) in object {
         if conceal_if(name) {
-            disclosures.push(Disclosure::new(name.clone(), value.clone()));
+            disclosures.push(Disclosure::new(name.clone(), value.clone())?);
         } else {
             kept.insert(name.clone(), value.clone());
         }
@@ -57,7 +57,7 @@ pub fn conceal(
         kept.insert(SD_CLAIM.to_owned(), Value::Array(digests));
     }
 
-    (kept, disclosures)
+    Ok((kept, disclosures))
 }
 
 /// A parsed SD-JWT: the issuer-signed JWT, verbatim, plus the disclosures that
@@ -133,24 +133,48 @@ impl SdJwt {
         self.key_binding_jwt.is_some()
     }
 
-    /// A presentation carrying only the claims named in `reveal`.
+    /// The digests of every disclosure carrying `claim_name`.
+    ///
+    /// Plural on purpose. One claim name can occur at several places in a
+    /// credential — RFC 9901 clause 9.3 says so explicitly, which is why each
+    /// occurrence gets its own salt — so "the disclosure for `name`" is not
+    /// always a single thing. A caller that gets two digests back is being told
+    /// that revealing "name" is an ambiguous instruction, and has to choose.
+    pub fn digests_for_claim(&self, claim_name: &str) -> Vec<String> {
+        self.disclosures
+            .iter()
+            .filter(|d| d.claim_name() == claim_name)
+            .map(Disclosure::digest)
+            .collect()
+    }
+
+    /// A presentation carrying only the disclosures whose digests are listed.
     ///
     /// The signed JWT is forwarded unchanged, so the result still verifies
-    /// against the issuer's key. Claims not named keep their digests in the
-    /// token and their values do not travel — which is the whole point, and is
-    /// asserted over the presentation bytes in this module's tests rather than
-    /// inferred from this being the intent.
+    /// against the issuer's key. Disclosures not listed keep their digests in
+    /// the token and their values do not travel — which is the whole point, and
+    /// is asserted over the presentation bytes in this module's tests rather
+    /// than inferred from this being the intent.
     ///
-    /// Names that are not disclosable here are ignored rather than rejected: a
-    /// holder asking for a claim that was issued in cleartext is asking for
-    /// something it already has.
-    pub fn present(&self, reveal: &[&str]) -> Self {
+    /// # Why digests and not claim names
+    ///
+    /// A digest identifies one disclosure; a claim name may identify several.
+    /// Selecting by name meant that revealing a claim also revealed every
+    /// *other* disclosure that happened to share its name — a value the holder
+    /// did not choose to release, leaving by the door built to stop exactly
+    /// that. Use [`Self::digests_for_claim`] to go from a name to the digests,
+    /// where the ambiguity is visible instead of silently resolved.
+    ///
+    /// Digests that match nothing are ignored rather than rejected: asking for
+    /// a claim that was issued in cleartext is asking for something the
+    /// presentation already carries.
+    pub fn present(&self, reveal_digests: &[&str]) -> Self {
         Self {
             jwt: self.jwt.clone(),
             disclosures: self
                 .disclosures
                 .iter()
-                .filter(|d| reveal.contains(&d.claim_name()))
+                .filter(|d| reveal_digests.contains(&d.digest().as_str()))
                 .cloned()
                 .collect(),
             key_binding_jwt: self.key_binding_jwt.clone(),
@@ -169,6 +193,10 @@ impl SdJwt {
     /// from the token. That is the tamper signal: change a disclosed value and
     /// its digest stops matching, so the disclosure goes unused and the whole
     /// credential is refused rather than the claim quietly vanishing.
+    ///
+    /// [`SdJwtError::DuplicateDigest`] if one digest appears twice — whether in
+    /// the disclosures supplied or in the token's own `_sd` arrays. Clause 4.1:
+    /// *"The same digest value MUST NOT appear more than once in the SD-JWT."*
     pub fn disclosed_payload(&self) -> Result<Map<String, Value>, SdJwtError> {
         let payload = decode_jwt_payload(&self.jwt)?;
 
@@ -179,15 +207,23 @@ impl SdJwt {
             }
         }
 
-        let by_digest: std::collections::HashMap<String, &Disclosure> = self
-            .disclosures
-            .iter()
-            .map(|d| (digest_of(d.encoded()), d))
-            .collect();
+        // Built one at a time rather than `collect`ed, because a map silently
+        // keeps the last of two equal keys — so collecting would *implement*
+        // the duplicate-tolerance clause 4.1 forbids, and hide it behind a
+        // disclosure count that still added up.
+        let mut by_digest: std::collections::HashMap<String, &Disclosure> =
+            std::collections::HashMap::new();
+        for d in &self.disclosures {
+            let digest = digest_of(d.encoded());
+            if by_digest.insert(digest.clone(), d).is_some() {
+                return Err(SdJwtError::DuplicateDigest(digest));
+            }
+        }
 
         let mut used = 0usize;
+        let mut seen_digests = std::collections::HashSet::new();
         let mut object = Value::Object(payload);
-        substitute(&mut object, &by_digest, &mut used)?;
+        substitute(&mut object, &by_digest, &mut used, &mut seen_digests)?;
 
         if used != by_digest.len() {
             return Err(SdJwtError::UnusedDisclosures(by_digest.len() - used));
@@ -206,6 +242,7 @@ fn substitute(
     value: &mut Value,
     by_digest: &std::collections::HashMap<String, &Disclosure>,
     used: &mut usize,
+    seen_digests: &mut std::collections::HashSet<String>,
 ) -> Result<(), SdJwtError> {
     match value {
         Value::Object(map) => {
@@ -223,6 +260,15 @@ fn substitute(
                 let Some(digest) = digest.as_str() else {
                     continue;
                 };
+                // Clause 4.1's "MUST NOT appear more than once" is about the
+                // whole SD-JWT, not one `_sd` array, so the set spans the walk.
+                // Checked for *every* embedded digest, matched or not: an
+                // unmatched digest repeated across two objects is still a
+                // malformed token, and removing the arrays would otherwise make
+                // it indistinguishable from a well-formed one.
+                if !seen_digests.insert(digest.to_owned()) {
+                    return Err(SdJwtError::DuplicateDigest(digest.to_owned()));
+                }
                 if let Some(d) = by_digest.get(digest) {
                     if map.contains_key(d.claim_name()) {
                         return Err(SdJwtError::ClaimCollision(d.claim_name().to_owned()));
@@ -235,13 +281,13 @@ fn substitute(
             // Descend after substituting, so a disclosure whose value is itself
             // an object carrying `_sd` is opened too.
             for (_, v) in map.iter_mut() {
-                substitute(v, by_digest, used)?;
+                substitute(v, by_digest, used, seen_digests)?;
             }
             Ok(())
         }
         Value::Array(items) => {
             for item in items {
-                substitute(item, by_digest, used)?;
+                substitute(item, by_digest, used, seen_digests)?;
             }
             Ok(())
         }

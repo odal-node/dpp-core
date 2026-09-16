@@ -1,67 +1,22 @@
-//! SD-JWT VC issuance, presentation and verification.
+//! SD-JWT VC issuance and holder presentation.
 //!
 //! The properties asserted here are the merge gate for this feature, restated
 //! against RFC 9901 and draft-ietf-oauth-sd-jwt-vc-19 as read on 2026-09-16.
 //! Where the two differ from what was originally sketched, the specification
 //! wins and the deviation is named in the test that proves it.
+//!
+//! Issuer metadata is `issuer_metadata_tests.rs`; the validity window is
+//! `validity_tests.rs`.
 
 use base64::Engine;
 use serde_json::{Value, json};
 
-use dpp_crypto::keystore::KeyStore;
 use dpp_domain::ProductGroup;
-use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
+use dpp_domain::access::DocumentScope;
 
-use super::{SdJwtVcError, TYP, build_issuer_metadata, issue, vct_for, verify};
+use super::test_fixtures::*;
+use super::{SdJwtVcError, TYP, vct_for, verify};
 use crate::test_support::temp_store;
-
-const KEY_ID: &str = "sd-jwt-issuer";
-const ISSUER: &str = "https://passports.operator.example";
-const SCHEMA_VERSION: &str = "2.6.0";
-
-fn policy() -> ProductGroupAccessPolicy {
-    ProductGroupAccessPolicy::for_passport("battery", SCHEMA_VERSION)
-        .expect("battery 2.6.0 schema is embedded")
-}
-
-/// A passport-shaped payload: an envelope with a product-group payload beneath
-/// it, carrying fields from each of the four disclosure classes.
-fn payload() -> Value {
-    json!({
-        "id": "018f3a4c-0000-7000-8000-000000000001",
-        "productGroup": "battery",
-        "schemaVersion": SCHEMA_VERSION,
-        "batchId": "BATCH-7781",
-        "productGroupData": {
-            "batteryChemistry": "LFP",
-            "cathodeMaterial": ["LiFePO4"],
-            "stateOfHealthPct": 87.5,
-            "testReportResults": "report-4471",
-            "safetyMeasures": ["Do not puncture"],
-        }
-    })
-}
-
-fn public_key_b64(store: &KeyStore) -> String {
-    let info = store.public_key(KEY_ID).expect("key present");
-    // `verify_jws` decodes with URL_SAFE_NO_PAD, so the caller must encode the
-    // same way — a STANDARD-encoded key silently fails to verify.
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(hex::decode(&info.verifying_key_hex).unwrap())
-}
-
-fn issued(store: &KeyStore) -> dpp_crypto::sd_jwt::SdJwt {
-    issue(
-        store,
-        KEY_ID,
-        &payload(),
-        &policy(),
-        ISSUER,
-        &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        1_789_000_000,
-    )
-    .expect("issue")
-}
 
 /// The four classes are not a guess — they come from the embedded schema, and
 /// this asserts the fixture actually spans them. Without it, a later schema
@@ -88,6 +43,7 @@ fn a_passport_issues_as_an_sd_jwt_vc_and_the_full_credential_verifies() {
         &credential,
         &public_key_b64(&store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+        now(),
     )
     .expect("full credential verifies");
 
@@ -161,12 +117,13 @@ fn a_two_of_four_presentation_verifies_and_withholds_the_other_two() {
     let credential = issued(&store);
     let vct = vct_for(ProductGroup::Battery, SCHEMA_VERSION);
 
+    let reveal = digests(&credential, &["cathodeMaterial", "stateOfHealthPct"]);
     let presentation = credential
-        .present(&["cathodeMaterial", "stateOfHealthPct"])
+        .present(&reveal.iter().map(String::as_str).collect::<Vec<_>>())
         .serialise();
 
     let disclosed =
-        verify(&presentation, &public_key_b64(&store), &vct).expect("presentation verifies");
+        verify(&presentation, &public_key_b64(&store), &vct, now()).expect("presentation verifies");
 
     let pgd = disclosed["productGroupData"].as_object().unwrap();
     assert_eq!(pgd["cathodeMaterial"], json!(["LiFePO4"]));
@@ -211,11 +168,20 @@ fn withholding_a_claim_needs_no_new_signature() {
     let credential = issued(&store);
     let vct = vct_for(ProductGroup::Battery, SCHEMA_VERSION);
 
-    let everything = verify(&credential.serialise(), &public_key_b64(&store), &vct).unwrap();
+    let everything = verify(
+        &credential.serialise(),
+        &public_key_b64(&store),
+        &vct,
+        now(),
+    )
+    .unwrap();
     assert!(everything["productGroupData"]["stateOfHealthPct"].is_number());
 
-    let withheld = credential.present(&["cathodeMaterial"]).serialise();
-    let after = verify(&withheld, &public_key_b64(&store), &vct).expect("still verifies");
+    let reveal = digests(&credential, &["cathodeMaterial"]);
+    let withheld = credential
+        .present(&reveal.iter().map(String::as_str).collect::<Vec<_>>())
+        .serialise();
+    let after = verify(&withheld, &public_key_b64(&store), &vct, now()).expect("still verifies");
     assert!(
         !after["productGroupData"]
             .as_object()
@@ -243,14 +209,16 @@ fn tampering_with_a_revealed_value_refuses_the_credential() {
         original.salt().to_owned(),
         original.claim_name(),
         json!(12.0),
-    );
+    )
+    .unwrap();
     let tampered = SdJwt::new(credential.jwt().to_owned(), vec![forged]).serialise();
 
     assert_eq!(
         verify(
             &tampered,
             &public_key_b64(&store),
-            &vct_for(ProductGroup::Battery, SCHEMA_VERSION)
+            &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            now()
         ),
         Err(SdJwtVcError::SdJwt(SdJwtError::UnusedDisclosures(1)))
     );
@@ -266,7 +234,8 @@ fn a_credential_signed_by_another_key_does_not_verify() {
         verify(
             &credential,
             &public_key_b64(&other),
-            &vct_for(ProductGroup::Battery, SCHEMA_VERSION)
+            &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            now()
         ),
         Err(SdJwtVcError::BadSignature)
     );
@@ -292,7 +261,8 @@ fn a_mutated_signature_is_refused_before_the_claims_are_read() {
         verify(
             &mutated,
             &public_key_b64(&store),
-            &vct_for(ProductGroup::Battery, SCHEMA_VERSION)
+            &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            now()
         ),
         Err(SdJwtVcError::BadSignature)
     );
@@ -307,6 +277,7 @@ fn a_credential_of_another_type_is_refused() {
         &credential,
         &public_key_b64(&store),
         &vct_for(ProductGroup::Battery, "2.5.0"),
+        now(),
     )
     .unwrap_err();
 
@@ -331,61 +302,4 @@ fn two_issuances_of_one_passport_share_no_digest() {
     );
     // And the signed tokens therefore differ too.
     assert_ne!(first.jwt(), second.jwt());
-}
-
-// ── JWT VC Issuer Metadata ───────────────────────────────────────────────────
-
-#[test]
-fn issuer_metadata_carries_the_issuer_and_exactly_one_key_source() {
-    let store = temp_store("sdjwtvc-meta", KEY_ID);
-    let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
-
-    assert_eq!(metadata["issuer"], json!(ISSUER));
-    // Clause 4.2: either `jwks` or `jwks_uri`, "but not both".
-    assert!(metadata.get("jwks").is_some());
-    assert!(metadata.get("jwks_uri").is_none());
-
-    let keys = metadata["jwks"]["keys"].as_array().unwrap();
-    assert_eq!(keys.len(), 1);
-    assert_eq!(keys[0]["kty"], json!("OKP"));
-    assert_eq!(keys[0]["crv"], json!("Ed25519"));
-    assert_eq!(keys[0]["alg"], json!("EdDSA"));
-    assert_eq!(keys[0]["use"], json!("sig"));
-}
-
-/// The `kid` a verifier looks the key up by must be the one the token names,
-/// or the recommendation in clause 4.2 is satisfied in name only.
-#[test]
-fn the_metadata_kid_matches_the_kid_in_the_signed_token() {
-    let store = temp_store("sdjwtvc-kid", KEY_ID);
-    let jwt = issued(&store).jwt().to_owned();
-    let header: Value = serde_json::from_slice(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(jwt.split('.').next().unwrap())
-            .unwrap(),
-    )
-    .unwrap();
-
-    let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).unwrap();
-    assert_eq!(metadata["jwks"]["keys"][0]["kid"], header["kid"]);
-}
-
-#[test]
-fn issuer_metadata_is_none_for_a_key_the_store_does_not_have() {
-    let store = temp_store("sdjwtvc-nokey", KEY_ID);
-    assert!(build_issuer_metadata(&store, ISSUER, "absent").is_none());
-}
-
-/// A private key must never reach the published document.
-#[test]
-fn issuer_metadata_carries_no_private_key_material() {
-    let store = temp_store("sdjwtvc-private", KEY_ID);
-    let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).unwrap();
-    let serialised = metadata.to_string();
-    for private_member in ["\"d\"", "\"p\"", "\"q\"", "privateKey"] {
-        assert!(
-            !serialised.contains(private_member),
-            "{private_member} in published metadata"
-        );
-    }
 }

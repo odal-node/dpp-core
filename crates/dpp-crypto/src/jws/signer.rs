@@ -43,19 +43,26 @@ pub fn sign_typed(
     typ: Option<&str>,
 ) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
-    let header_json = match typ {
-        Some(typ) => format!(
-            r#"{{"alg":"{}","kid":"{}","typ":"{}"}}"#,
-            key.algorithm.jose_alg(),
-            key.fingerprint,
-            typ
-        ),
-        None => format!(
-            r#"{{"alg":"{}","kid":"{}"}}"#,
-            key.algorithm.jose_alg(),
-            key.fingerprint
-        ),
-    };
+    // Serialised rather than interpolated. `typ` is caller-supplied, and a value
+    // containing a quote or a backslash would otherwise escape the string it
+    // sits in — producing malformed JSON at best, and at worst letting a caller
+    // write additional members into a header that is about to be *signed*.
+    //
+    // The byte output is unchanged for `typ: None`: `serde_json::Map` is a
+    // `BTreeMap` here (no `preserve_order` feature in this workspace), so
+    // members serialise in lexicographic order, and `alg` < `kid` < `typ` is
+    // the order the hand-written literal already used. Existing signatures and
+    // the verifiers that check them are unaffected.
+    let mut header = serde_json::Map::new();
+    header.insert(
+        "alg".to_owned(),
+        Value::String(key.algorithm.jose_alg().to_owned()),
+    );
+    header.insert("kid".to_owned(), Value::String(key.fingerprint.clone()));
+    if let Some(typ) = typ {
+        header.insert("typ".to_owned(), Value::String(typ.to_owned()));
+    }
+    let header_json = serde_json::to_string(&header)?;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let canonical = super::canonical::canonicalize(payload)?;
     let header_b64 = b64.encode(header_json.as_bytes());
