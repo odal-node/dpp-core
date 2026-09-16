@@ -8,6 +8,7 @@
 //! Runtime schemas are registered via [`VersionedSchemaRegistry::register`].
 
 mod change;
+pub mod citation;
 #[cfg(test)]
 mod conformance_shape_tests;
 #[cfg(test)]

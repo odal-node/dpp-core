@@ -99,6 +99,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   entry saying plainly that nobody has read the act is honest, and demanding a
   citation from it would only encourage inventing one.
 
+- **The act-citation gate now reads Rust doc comments, not only schema prose.**
+  `//!` module headers and `///` item docs carried act citations that no gate had
+  ever checked, **including numeric thresholds** — the same defect class as the
+  schema-prose rules, one surface along, and the surface where a number lives
+  immediately before it becomes a constant.
+
+  The rule distinguishes naming an act from attributing a quantity to one.
+  Naming is free: *"carried forward from Directive 2006/66/EC"* is provenance,
+  and a gate demanding a source for it would produce noise and then be switched
+  off. A doc comment that cites an act **and** states a share, a period in years
+  or months, or a calendar date must carry a `COMPLIANCE-PIN` — in either its ✅
+  or its ⚠️ PENDING form, because the gate's job is to force the question *where
+  did this number come from*, not to pretend a pending answer is a bad one.
+
+  Nineteen files predate the gate and are listed in `UNPINNED_LEGACY`, an
+  inventory that may only shrink: a file not listed fails the moment it is
+  written, and a listed file that has since gained a pin fails a staleness check
+  until it is removed, so the list cannot become a permanent exemption.
+
+- **`dpp_domain::schemas::citation`** — `act_refs` and `cites_article_or_annex`,
+  the detectors the schema-prose gate was already built on, moved out of a
+  `#[cfg(test)]` module and made public. The doc-comment gate must see
+  `dpp-rules`, which `dpp-domain` deliberately does not depend on, so it lives in
+  the cross-crate test tier and could not otherwise reach them. Sharing beats
+  copying: a second implementation would drift, and the drift would show up as
+  one surface being checked to a standard the other is not.
 ### Fixed
 
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record
@@ -123,6 +149,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   product not yet on the market has none, and reading that as "before 2027"
   would exempt every draft), and any `PassportScope` variant added later, which
   falls to a catch-all that gates.
+
+- **`dpp-rules::electronics::spare_parts` no longer asserts periods nobody
+  read.** Its module header carried a table of minimum spare-parts availability
+  periods — "10 years", "7–10 years" — attributed to Regulations (EU) 2019/2022,
+  2019/2019 and 2019/2021, with an "(in force)" column beside each. **None of
+  those three acts has been read against its Official Journal text.**
+
+  The table is removed rather than annotated. The module's own note said what
+  would have happened next — implement `validate_spare_parts_period(years,
+  category)` *"using the category-keyed minimum periods above"* — so the numbers
+  would have become live thresholds at that moment, sourced from a doc comment
+  nobody verified, in a crate whose releases cannot be unpublished. A placeholder
+  is allowed to say *we have not established this*; it is not allowed to assert a
+  number and a source it has not read. What remains states which acts are the
+  ones to read and marks itself `COMPLIANCE-PIN PENDING`.
 
 - **The citation inventory now records whether its reasons were read, and three
   of them have been.** `CITED_NOT_MODELLED` lists acts that schema prose cites
