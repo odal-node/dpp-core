@@ -318,7 +318,7 @@ fn a_non_publish_transition_is_not_gated() {
     // operator cannot abandon one they decided not to finish.
     let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
     battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
-    p.transition_to(PassportStatus::Archived)
+    p.transition_to(PassportStatus::Retired)
         .expect("archiving an incomplete draft is not a compliance claim");
 }
 

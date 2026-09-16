@@ -803,9 +803,9 @@ impl Passport {
     ///
     /// Valid transitions:
     /// ```text
-    /// Draft → Published | Archived
-    /// Published → Suspended | Archived
-    /// Suspended → Published | Archived
+    /// Draft → Published | Retired
+    /// Published → Suspended | Retired
+    /// Suspended → Published | Retired
     /// ```
     ///
     /// On the first `Draft → Published` transition this method also:

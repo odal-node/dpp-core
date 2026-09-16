@@ -21,10 +21,10 @@ This document defines the canonical data structures for all Digital Product Pass
 ## 2. Passport Lifecycle
 
 ```
-Draft  -->  Published (Active)  -->  Suspended  -->  Archived
+Draft  -->  Published (Active)  -->  Suspended  -->  Retired
   |                                      |
   +--------------------------------------+
-                  (can also archive directly)
+                  (can also retire directly)
 ```
 
 | State | Wire name | Publicly Resolvable | Meaning |
@@ -32,13 +32,13 @@ Draft  -->  Published (Active)  -->  Suspended  -->  Archived
 | `Draft` | `"draft"` | No | Under construction; not yet visible via QR |
 | `Published` | `"active"` | Yes | Published; signed; JWS signature is set; `retention_locked = true` |
 | `Suspended` | `"suspended"` | No | Temporarily hidden — recall, regulatory hold, or dispute; JWS is preserved |
-| `Archived` | `"archived"` | Read-only | Product end-of-life; retained for regulatory record-keeping; immutable |
+| `Retired` | `"retired"` | Read-only | Publication life over; retained for regulatory record-keeping; immutable. **Not EN 18221 clause 4.2 archiving**, which is the retention of historical versions of a still-live passport |
 
 **Transition rules:**
 - `Draft -> Published`: Requires all `strict` fields for the declared product group to be present and valid.
 - `Published -> Suspended`: Requires an authenticated action with a stated reason.
 - `Suspended -> Published`: Requires re-validation of all `strict` fields.
-- `Any -> Archived`: Irreversible.
+- `Any -> Retired`: Irreversible.
 
 Custom serde: domain `Published` serialises to wire `"active"` (and back). This matches the EU registry's terminology.
 

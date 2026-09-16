@@ -23,17 +23,17 @@ The domain is a set of pure Rust functions and trait definitions. Every external
 Every passport follows this state machine:
 
 ```
-Draft  -->  Active (Published)  -->  Suspended  -->  Archived
+Draft  -->  Active (Published)  -->  Suspended  -->  Retired
   |                                      |
   +--------------------------------------+
-                  (can also archive directly)
+                  (can also retire directly)
 ```
 
 | Transition | Precondition | Side Effect |
 |---|---|---|
 | Draft -> Active | All mandatory fields present and valid | Signed with issuer's Ed25519 key; JWS produced |
 | Active -> Suspended | Reason required (recall, investigation, etc.) | Signature retained; resolver returns 410 |
-| Any -> Archived | Irreversible | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
+| Any -> Retired | Irreversible | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
 
 Every transition is recorded by the platform layer (audit logging is a platform concern, not a domain concern).
 

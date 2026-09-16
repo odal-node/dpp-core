@@ -180,10 +180,10 @@ fn transition_invalid_returns_error() {
 fn transition_archived_is_terminal() {
     let mut p = make_passport();
     p.transition_to(PassportStatus::Published).unwrap();
-    p.transition_to(PassportStatus::Archived).unwrap();
-    assert_eq!(p.status, PassportStatus::Archived);
+    p.transition_to(PassportStatus::Retired).unwrap();
+    assert_eq!(p.status, PassportStatus::Retired);
 
-    // Archived → anything is invalid
+    // Retired → anything is invalid
     assert!(p.transition_to(PassportStatus::Published).is_err());
     assert!(p.transition_to(PassportStatus::Draft).is_err());
 }

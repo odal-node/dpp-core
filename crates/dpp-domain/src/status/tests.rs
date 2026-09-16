@@ -5,12 +5,12 @@ use super::lifecycle::*;
 #[test]
 fn valid_transitions() {
     assert!(PassportStatus::Draft.can_transition_to(&PassportStatus::Published));
-    assert!(PassportStatus::Draft.can_transition_to(&PassportStatus::Archived));
+    assert!(PassportStatus::Draft.can_transition_to(&PassportStatus::Retired));
     assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Suspended));
-    assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Archived));
+    assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Retired));
     assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Superseded));
     assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Published));
-    assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Archived));
+    assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Retired));
     assert!(PassportStatus::Published.can_transition_to(&PassportStatus::Deactivated));
     assert!(PassportStatus::Suspended.can_transition_to(&PassportStatus::Deactivated));
 }
@@ -19,18 +19,18 @@ fn valid_transitions() {
 fn invalid_transitions() {
     assert!(!PassportStatus::Draft.can_transition_to(&PassportStatus::Suspended));
     assert!(!PassportStatus::Draft.can_transition_to(&PassportStatus::Superseded));
-    assert!(!PassportStatus::Archived.can_transition_to(&PassportStatus::Draft));
-    assert!(!PassportStatus::Archived.can_transition_to(&PassportStatus::Published));
+    assert!(!PassportStatus::Retired.can_transition_to(&PassportStatus::Draft));
+    assert!(!PassportStatus::Retired.can_transition_to(&PassportStatus::Published));
     assert!(!PassportStatus::Published.can_transition_to(&PassportStatus::Draft));
     assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Published));
     assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Draft));
-    assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Archived));
+    assert!(!PassportStatus::Superseded.can_transition_to(&PassportStatus::Retired));
     // Deactivated is terminal.
     assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Published));
-    assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Archived));
+    assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Retired));
     // Cannot deactivate a draft or archived record.
     assert!(!PassportStatus::Draft.can_transition_to(&PassportStatus::Deactivated));
-    assert!(!PassportStatus::Archived.can_transition_to(&PassportStatus::Deactivated));
+    assert!(!PassportStatus::Retired.can_transition_to(&PassportStatus::Deactivated));
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn all_variants_serialise_to_their_wire_string() {
         (PassportStatus::Draft, "draft"),
         (PassportStatus::Published, "active"),
         (PassportStatus::Suspended, "suspended"),
-        (PassportStatus::Archived, "archived"),
+        (PassportStatus::Retired, "retired"),
         (PassportStatus::Superseded, "superseded"),
         (PassportStatus::Deactivated, "deactivated"),
     ] {
@@ -79,19 +79,19 @@ fn any_status() -> impl Strategy<Value = PassportStatus> {
         Just(PassportStatus::Draft),
         Just(PassportStatus::Published),
         Just(PassportStatus::Suspended),
-        Just(PassportStatus::Archived),
+        Just(PassportStatus::Retired),
         Just(PassportStatus::Superseded),
         Just(PassportStatus::Deactivated),
     ]
 }
 
 proptest! {
-    /// Terminal states (Archived, Superseded, Deactivated) have no outgoing
+    /// Terminal states (Retired, Superseded, Deactivated) have no outgoing
     /// transition to any target — no path resurrects a terminal record.
     #[test]
     fn terminal_states_never_transition_out(to in any_status()) {
         for from in [
-            PassportStatus::Archived,
+            PassportStatus::Retired,
             PassportStatus::Superseded,
             PassportStatus::Deactivated,
         ] {
@@ -105,5 +105,38 @@ proptest! {
         let json = serde_json::to_string(&s).unwrap();
         let back: PassportStatus = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(s, back);
+    }
+}
+
+#[test]
+fn the_old_archived_wire_value_is_refused_and_says_what_replaced_it() {
+    // Not an alias. `"published"` is kept as one for `"active"` because that
+    // word means the same thing; `"archived"` is refused because it does not —
+    // EN 18221 clause 4.2 uses "archiving" for the retention of historical
+    // versions of a *live* passport, and accepting it here would put the
+    // ambiguous word back on the wire the rename removed it from.
+    let err = serde_json::from_str::<PassportStatus>("\"archived\"")
+        .expect_err("`archived` is no longer a status this build accepts");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("renamed to `retired`"),
+        "the refusal must name the replacement, not just reject: {msg}"
+    );
+    assert!(
+        msg.contains("EN 18221"),
+        "and must say why, or it reads as churn: {msg}"
+    );
+}
+
+#[test]
+fn no_status_serialises_to_the_vacated_word() {
+    // A property rather than a case: whatever variants exist, none may take the
+    // word back. This keeps meaning something if a variant is added later.
+    for status in PassportStatus::ALL {
+        assert_ne!(
+            serde_json::to_value(status).unwrap().as_str().unwrap(),
+            "archived",
+            "{status:?} re-uses the word EN 18221 clause 4.2 needs"
+        );
     }
 }

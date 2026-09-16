@@ -13,6 +13,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`PassportStatus::Archived` is now `PassportStatus::Retired`, and its wire
+  value is `"retired"`.** *(Breaking twice over: the variant rename breaks
+  anything matching on `PassportStatus`, and the wire value change breaks
+  anything reading stored records. `"archived"` is **not** accepted on
+  deserialisation — see below.)*
+
+  **Migration:** rename the variant at every match site and construction site,
+  and change any persisted or transmitted `"archived"` to `"retired"`. There is
+  nothing else to do: the variant's meaning is unchanged — post-retention,
+  immutable, still readable — and every transition into and out of it is the
+  same.
+
+  **Why.** EN 18221:2026 (*Digital product passport — Data storage, archiving and
+  data persistence*), one of the six standards cited by Commission Implementing
+  Decision (EU) 2026/1736, uses "archiving" for something else: its clause 4.2
+  is the retention of **historical versions of a passport that is still live**,
+  beginning at the first change to the initial passport, kept for the passport's
+  lifetime, each version carrying the same access restrictions as the
+  corresponding current one. This variant was a terminal *publication* state
+  reached once a record stops changing. The collision is between a status and a
+  functionality, so no doc comment on the variant could remove it — anyone
+  mapping this vocabulary onto EN 18221 by name ticks a box that is not ticked.
+
+  **Why the old wire value is refused rather than aliased.** `"published"` is
+  kept as an alias for `"active"` because the two words mean the same thing.
+  `"archived"` does not, and keeping it would put the ambiguous word back on the
+  wire the rename removed it from. It is refused with a message naming `retired`
+  and saying why, rather than with a bare unknown-variant error, because a reader
+  meeting that refusal needs the answer and not a list.
+
+  **Why now.** This is the cheapest it will ever be and it gets monotonically
+  more expensive: nothing is deployed, so the set of records carrying the old
+  value is empty. `no_status_serialises_to_the_vacated_word` keeps the word
+  vacated as a property, so a variant added later cannot quietly take it back.
+
 ### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
