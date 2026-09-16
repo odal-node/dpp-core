@@ -217,15 +217,22 @@ longer sufficient:
   `ComponentRef` carries an optional `quantity` and `role`, both of which core
   transports and never interprets (G8).
 
-### G5 — No product-life status axis
+### G5 — No product-life status axis — **CLOSED**
 
 `PassportStatus` (`Draft`/`Published`/`Suspended`/`Archived`/`Superseded`/
 `Deactivated`) is a **publication** lifecycle. Annex XIII point 4(c) wants a
 **product-life** status — `original` / `repurposed` / `re-used` /
 `remanufactured` / `waste`, now pinned in §2.2. These are orthogonal: a repurposed
-unit's passport is `Published`. Today the second axis does not exist, so the
-change-of-status information has nowhere to live. `Deactivated` matches Art.
-77(8)'s post-recycling end state and should stay as-is.
+unit's passport is `Published`. `Deactivated` matches Art. 77(8)'s post-recycling
+end state and stays as-is.
+
+Closed in Phase 5: `LifeStatus` carries the second axis, with the Official
+Journal spellings as its wire forms — note `re-used`, hyphenated, which is the
+annex's own rendering and not a typo to be tidied. It is `Option` because only
+Reg. (EU) 2023/1542 defines this vocabulary: a textile passport asserting
+`original` would be borrowing a battery term for a question its own instrument
+does not ask. §4.2 records why this field is governed by a different rule from
+the lineage edges above it.
 
 ### G6 — Neither field was protected from `patch_fields` — **CLOSED**
 
