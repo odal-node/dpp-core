@@ -13,6 +13,56 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **`PassportRepository` can resolve forward through an amendment.**
+  `supersedes_id` answered "what does this passport supersede?" and nothing
+  answered the reverse. That direction is the one a reader needs: a superseded
+  passport keeps its identifier forever, so where the identifier is the product's
+  printed data carrier, anyone holding the physical product arrives at the
+  **predecessor** after an amendment.
+
+  The forward pointer cannot simply be stored on the predecessor —
+  `supersedesId` is in `PROTECTED_PATCH_FIELDS` and the published body is frozen
+  and signed, so writing one is either refused or invalidates the proof. The edge
+  exists only as the successor's backward pointer, and reading it usefully is a
+  query.
+
+  - **`find_superseding(id)`** — one hop, no status filter (a `Draft` or
+    already-superseded successor is still a successor, and which statuses an
+    audience may see is domain policy, not storage's). Default body is an
+    unindexed `list()` scan for correctness, as `find_by_identity` already does;
+    the natural index is on `supersedes_id`, so a real store should override it
+    with one read.
+  - **`find_superseding_head(id)`** — walks to the head of the chain, which is
+    what a carrier resolution actually wants. Written in terms of
+    `find_superseding`, so it needs no separate implementation and inherits
+    whatever indexed read that gets. It carries the two things every caller would
+    otherwise have to get right on its own: a visited set, so a cycle terminates,
+    and a hop cap, so an inconsistent store cannot turn one lookup into an
+    unbounded sequence of queries.
+  - **`MAX_SUCCESSION_HOPS`** (256) — the cap. Deliberately **not** derived from
+    any legal limit; no instrument caps how often a passport may be amended.
+    Reaching it is an error, never a truncated answer: handing back the furthest
+    record reached would hand back a non-head as though it were the head, which
+    is the one wrong answer a caller cannot detect.
+  - **`DppError::SuccessionUnresolvable`** — the three shapes that have no
+    answer: two records claiming one predecessor, a cycle, and a chain past the
+    cap. Distinct from `Ok(None)`, which is the ordinary "nothing supersedes
+    this". Where two records claim one predecessor, both are equally entitled to
+    the claim, so naming a winner would be arbitrary and indistinguishable from a
+    real answer.
+
+  *(`DppError` is `#[non_exhaustive]`, and both trait methods have default
+  bodies, so nothing stops compiling.)*
+
+- **`Passport::check_category_content`** — the content gate without the Art.
+  77(1) scope question, which is what `check_mandatory_content` did before the
+  fix above. A node publishing a passport the Regulation does not require is
+  better served by a complete one than an unchecked one, but that is the
+  operator's call rather than this crate's, so it is a separate function instead
+  of the default.
+
 ### Fixed
 
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record
@@ -38,14 +88,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   would exempt every draft), and any `PassportScope` variant added later, which
   falls to a catch-all that gates.
 
-### Added
-
-- **`Passport::check_category_content`** — the content gate without the Art.
-  77(1) scope question, which is what `check_mandatory_content` did before the
-  fix above. A node publishing a passport the Regulation does not require is
-  better served by a complete one than an unchecked one, but that is the
-  operator's call rather than this crate's, so it is a separate function instead
-  of the default.
 
 ## [0.20.0] - 2026-09-13
 
