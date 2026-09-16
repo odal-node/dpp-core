@@ -30,7 +30,7 @@ Three neighbouring concerns live elsewhere, and the boundaries are deliberate:
 | Concern | Home | Why not here |
 |---|---|---|
 | Cryptographic primitives — JWS, keys, keystore | `dpp-crypto` | Signing bytes is a different job from deciding whose signature means what |
-| The disclosure contract — `Audience`, `Disclosure`, the per-field map and its filter | `dpp-crypto::access` today; `dpp-domain` once that crate is analysed | Which fields a role may see describes what a passport *is*, not who is asking |
+| The disclosure contract — `Audience`, `Disclosure`, the per-field map and its filter | `dpp-domain` | Which fields a role may see describes what a passport *is*, not who is asking |
 | Projections — GS1, AAS | `dpp-digital-link`, `dpp-aas` | Rendering a passport for an ecosystem says nothing about trust |
 
 The seam this crate sits on: **a credential establishes which `Audience` a
