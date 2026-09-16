@@ -45,9 +45,8 @@
 
 use std::collections::BTreeSet;
 
-use super::prose_act_reference_tests::{
-    CITED_NOT_MODELLED, CitationBasis, act_refs, cites_article_or_annex,
-};
+use super::citation::{act_refs, cites_article_or_annex};
+use super::prose_act_reference_tests::{CITED_NOT_MODELLED, CitationBasis};
 use crate::instrument::InstrumentCatalog;
 use crate::schemas::VersionedSchemaRegistry;
 
