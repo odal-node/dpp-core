@@ -22,6 +22,11 @@ depends on `dpp-crypto`, whose RNG requires a platform entropy source.
 - You are building the JSON-LD envelope for a passport or a credential.
 - You are reading a *copy* of a passport's public view and need to know whether
   its time bound still holds — see `snapshot`.
+- You are issuing a passport as an **SD-JWT VC** so a holder can present part of
+  it to a third party without the issuing node being reachable — see
+  `sd_jwt_vc`. That door resolves issuer keys through JWT VC Issuer Metadata
+  rather than `did:web`, because the credential profile defines no DID
+  mechanism.
 
 ## What this crate is *not*
 

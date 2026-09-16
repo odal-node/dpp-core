@@ -389,6 +389,35 @@ impl ProductGroupAccessPolicy {
         Self::from_schema(product_group_key, version, json)
     }
 
+    /// The policy for a **whole passport** at a given schema version: the
+    /// product group's own classes, plus the envelope's.
+    ///
+    /// [`Self::for_schema_version`] reads a product group's schema, so its
+    /// envelope classes are only the universal conformity ones — a passport
+    /// envelope field such as `batchId` is not in a product group's schema and
+    /// is therefore unclassified by it, which
+    /// [`Self::disclosure_for_path`] then resolves to
+    /// [`Self::default_disclosure`], `Public`. Filtering a full passport through
+    /// that policy serves every envelope field.
+    ///
+    /// So a caller holding a whole passport needs both halves, and composing
+    /// them is not a judgement call: envelope classes come from
+    /// [`Self::passport_default`] and the payload's from the schema. Written
+    /// here because two callers now need it and a composition done twice is a
+    /// composition that can disagree with itself.
+    ///
+    /// Returns `None` on the same terms as [`Self::for_schema_version`] — an
+    /// unknown product group or an unparseable version fails closed.
+    #[must_use]
+    pub fn for_passport(product_group_key: &str, version: &str) -> Option<Self> {
+        let product_group = Self::for_schema_version(product_group_key, version)?;
+        let mut policy = Self::passport_default();
+        policy.name = product_group.name.clone();
+        policy.product_group = product_group.product_group.clone();
+        policy.field_disclosure = product_group.field_disclosure;
+        Some(policy)
+    }
+
     /// Build the policy from the catalog's single, unversioned disclosure map.
     ///
     /// **Deprecated in favour of [`Self::for_schema_version`].** The catalog

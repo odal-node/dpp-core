@@ -335,6 +335,80 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   rest is new surface. The one behavioural change is that `validate` now rejects
   an identifier above the cap, which no realistic carrier URL approaches.
 
+- **A passport can be issued as an SD-JWT VC, and a holder can present part of
+  it.** `dpp_crypto::sd_jwt` implements the mechanism of **IETF RFC 9901**
+  (Selective Disclosure for JSON Web Tokens, Standards Track, November 2025);
+  `dpp_vc::sd_jwt_vc` implements the credential profile of
+  **draft-ietf-oauth-sd-jwt-vc-19** (31 August 2026), read on 2026-09-16. The
+  issuer signs once over salted digests and hands the cleartext to the holder as
+  disclosures; the holder forwards the signed token plus whichever disclosures it
+  chooses; a third party verifies the subset without the issuing node being
+  reachable.
+
+  **No conformance is claimed.** The profile is an Internet-Draft — submitted to
+  the IESG, not published — and an Internet-Draft is explicitly not reference
+  material. The honest statement is the one above: which documents, read when.
+
+  Nothing existing changes. The per-audience `disclosure_signatures` stay exactly
+  as they were, and this is a second door rather than a replacement: the filtered
+  read endpoint is for callers who want the node to decide, the credential for
+  holders who want to prove something without it.
+
+  **Every non-public claim is concealed, not only the ones some audience is
+  currently denied.** A passport's signed views are frozen at publish and
+  publishing is one-way, so a field reclassified from public to restricted
+  afterwards cannot be withdrawn from a passport already issued — its cleartext
+  sits inside a signature that cannot be remade. Under selective disclosure,
+  withdrawal costs nothing: stop releasing that disclosure and the signature still
+  verifies. That property only exists for claims that were disclosable from the
+  start, which is why the classification decides concealment and no audience does.
+  The limit, stated plainly: it constrains a party that has not already been given
+  the disclosure, not a holder who has.
+
+  **`vct` is a `tag:` URI (RFC 4151)** — `tag:odal-node.io,2026:vct:battery:2.6.0`
+  — and deliberately not an HTTPS URL. A published passport is not rewritable and
+  has to stay readable for years, so an HTTPS type identifier binds a DNS name
+  into an immutable artefact for that whole period; a dereferenceable one puts a
+  third party back into every verification, which is the coupling the credential
+  exists to remove; and the type is not the issuer's, so minting it per operator
+  would make two operators' credentials disagree about what they are. A `tag:`
+  URI is collision-resistant as the profile requires, needs no registration
+  (unlike a `urn:` NID), and is non-dereferenceable by design. The version
+  segment is the passport's stored schema version — the same version that selects
+  the disclosure classes a signature was produced under — so the credential names
+  the exact ruleset it was issued against.
+
+  **Key discovery is JWT VC Issuer Metadata, not `did:web`.** Clause 2.5 of the
+  profile defines two mechanisms — this document, and an inline `x5c` chain — and
+  names no DID method at all; `did:` does not occur in the draft. A verifier built
+  to the profile will not resolve a DID, so `dpp_vc::sd_jwt_vc::build_issuer_metadata`
+  builds the configuration a node serves at `/.well-known/jwt-vc-issuer`, carrying
+  the keys by value with the same `kid` the signed token names. The published
+  `did:web` document is untouched and still serves the W3C credential path.
+
+  Two requirements that are easy to miss are enforced and tested. RFC 9901
+  clause 4.2.4.1: *"The Issuer MUST hide the original order of the claims in the
+  array"* — digests are sorted, because publishing them in the order the fields
+  were walked leaks the source structure from a token that discloses nothing.
+  Clause 7.1: a disclosure whose digest matches nothing makes the **whole
+  credential** unreadable rather than the claim quietly disappearing, which is
+  what makes tampering with a revealed value fail loudly.
+
+- **`ProductGroupAccessPolicy::for_passport`** — the policy for a whole passport
+  at a schema version: the product group's classes from its schema, plus the
+  envelope's. `for_schema_version` reads a product group's schema, so an envelope
+  field such as `batchId` is unclassified by it and resolves to the `Public`
+  default; filtering a full passport through that policy serves every envelope
+  field. Composing the two halves is not a judgement call, and it was already
+  being done outside this crate — now that a second caller needs it, it has one
+  home.
+
+- **`dpp_crypto::jws::sign_typed`** — `sign` with an optional `typ`
+  protected-header parameter, which SD-JWT VC mandates as `dc+sd-jwt`. Threaded
+  through the signer rather than added afterwards because the header is
+  protected: a parameter added after signing invalidates the signature. `sign`
+  delegates to it with `None` and produces exactly the header it always has.
+
 ### Fixed
 
 - **`CertificateRef::is_eu_recognised_profile` no longer answers `true` for a

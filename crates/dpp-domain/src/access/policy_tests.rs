@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{Audience, Disclosure, ProductGroupCatalog};
 
-use super::policy::ProductGroupAccessPolicy;
+use super::policy::{DocumentScope, ProductGroupAccessPolicy};
 use super::tests::{battery_policy, filter_payload};
 
 /// The schema-sourced policy agrees with the catalog map it will replace.
@@ -326,4 +326,45 @@ fn one_reclassified_field_is_enough_to_move_the_served_bytes() {
         serde_json::to_string(&served_after).unwrap(),
         "if these were equal the version axis would buy nothing"
     );
+}
+
+/// `for_schema_version` classifies a product group's payload and nothing else,
+/// so a full passport filtered through it serves every envelope field. That is
+/// the gap `for_passport` closes, and the assertion below is the reason it
+/// exists rather than a preference about where composition lives.
+#[test]
+fn for_passport_classifies_the_envelope_where_for_schema_version_does_not() {
+    let product_group_only = ProductGroupAccessPolicy::for_schema_version("battery", "2.6.0")
+        .expect("battery 2.6.0 is embedded");
+    let whole_passport =
+        ProductGroupAccessPolicy::for_passport("battery", "2.6.0").expect("same schema");
+
+    // `batchId` is an envelope field. A product group's schema never mentions
+    // it, so the schema-only policy resolves it to its `Public` default.
+    assert_eq!(
+        product_group_only.disclosure_for_path(&["batchId"], DocumentScope::Envelope),
+        Disclosure::Public,
+        "if this is ever non-public, `for_passport` has stopped being necessary"
+    );
+    assert_eq!(
+        whole_passport.disclosure_for_path(&["batchId"], DocumentScope::Envelope),
+        Disclosure::Restricted
+    );
+
+    // And the product group's own classes survive the composition — the point
+    // is to gain the envelope's without losing the payload's.
+    assert_eq!(
+        whole_passport.disclosure_for_path(&["cathodeMaterial"], DocumentScope::ProductGroupData),
+        Disclosure::Restricted
+    );
+    assert_eq!(
+        whole_passport.disclosure_for_path(&["batteryChemistry"], DocumentScope::ProductGroupData),
+        Disclosure::Public
+    );
+}
+
+#[test]
+fn for_passport_fails_closed_on_an_unknown_product_group_or_version() {
+    assert!(ProductGroupAccessPolicy::for_passport("battery", "not-a-version").is_none());
+    assert!(ProductGroupAccessPolicy::for_passport("no-such-group", "1.0.0").is_none());
 }

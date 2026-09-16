@@ -28,6 +28,11 @@ needs a domain type to do its job.
   value comes from somewhere else — a remote signing service, typically. The
   `jades` module derives the signing input and assembles the compact form; it
   never signs.
+- You need **selective disclosure** over a JSON payload — replacing claim values
+  with salted hashes so a holder can reveal a subset later. The `sd_jwt` module
+  implements the mechanism of IETF RFC 9901; it knows nothing about which claims
+  are sensitive, which is `dpp-domain`'s question, or about credentials, which
+  are `dpp-vc`'s.
 
 ## Example
 

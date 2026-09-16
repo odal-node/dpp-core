@@ -23,12 +23,39 @@ use crate::keystore::KeyStore;
 /// `crv` as a JWK member, not a registered header parameter. It lives on the
 /// DID document's `publicKeyJwk` instead, where it is the spec-correct place.
 pub fn sign(store: &KeyStore, key_id: &str, payload: &Value) -> anyhow::Result<String> {
+    sign_typed(store, key_id, payload, None)
+}
+
+/// [`sign`], with an optional `typ` protected-header parameter.
+///
+/// `typ` exists because some JWS profiles require the token to declare what it
+/// is — SD-JWT VC is one, and mandates `dc+sd-jwt`. It is threaded through here
+/// rather than bolted on afterwards because the header is *protected*: adding a
+/// parameter after signing would invalidate the signature, so the only place it
+/// can be set is before the signing input is built.
+///
+/// `None` produces exactly the header [`sign`] has always produced, so existing
+/// signatures and their verifiers are unaffected.
+pub fn sign_typed(
+    store: &KeyStore,
+    key_id: &str,
+    payload: &Value,
+    typ: Option<&str>,
+) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
-    let header_json = format!(
-        r#"{{"alg":"{}","kid":"{}"}}"#,
-        key.algorithm.jose_alg(),
-        key.fingerprint
-    );
+    let header_json = match typ {
+        Some(typ) => format!(
+            r#"{{"alg":"{}","kid":"{}","typ":"{}"}}"#,
+            key.algorithm.jose_alg(),
+            key.fingerprint,
+            typ
+        ),
+        None => format!(
+            r#"{{"alg":"{}","kid":"{}"}}"#,
+            key.algorithm.jose_alg(),
+            key.fingerprint
+        ),
+    };
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let canonical = super::canonical::canonicalize(payload)?;
     let header_b64 = b64.encode(header_json.as_bytes());

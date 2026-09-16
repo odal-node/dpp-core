@@ -16,6 +16,7 @@
 pub mod jades;
 pub mod jws;
 pub mod keystore;
+pub mod sd_jwt;
 
 #[cfg(test)]
 mod test_support;
