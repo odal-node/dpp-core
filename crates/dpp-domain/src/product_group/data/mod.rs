@@ -29,7 +29,10 @@ pub use battery::{
 pub use common::{CriticalRawMaterial, ProductionRoute, SvhcSubstance};
 pub use construction::ConstructionData;
 pub use detergent::{DetergentData, SurfactantEntry};
-pub use electronics::{DeviceType, ElectronicsData, EnergyEfficiencyClass};
+pub use electronics::{
+    DeviceType, ElectronicsData, EnergyEfficiencyClass, IndexScopeExclusion, PriorityPartScores,
+    RepairabilityIndexDeclaration,
+};
 pub use furniture::FurnitureData;
 pub use mattress::MattressData;
 pub use product_group_data::ProductGroupData;

@@ -7,6 +7,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::index_scope_exclusion::IndexScopeExclusion;
+use super::repairability_index::RepairabilityIndexDeclaration;
 use crate::identifier::Gtin;
 use crate::product_group::repairability_score::RepairabilityScore;
 use crate::product_group::{DeviceType, EnergyEfficiencyClass};
@@ -31,8 +33,42 @@ pub struct ElectronicsData {
 
     /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
     /// `overall` ≥ 6.0 = good; < 4.0 = fails minimum standard.
+    ///
+    /// **Not comparable to the enacted index.** Where both are present they are
+    /// two different numbers on two different scales, and only
+    /// [`repairability_index_inputs`](Self::repairability_index_inputs) feeds the
+    /// one Reg. (EU) 2023/1669 defines.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repairability_score: Option<RepairabilityScore>,
+    /// The Annex IV point 5 parameters an operator declares, from which the
+    /// enacted repairability index of Reg. (EU) 2023/1669 is computed.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1669, Annex IV point 5 (OJ L 214, 31.8.2023,
+    /// p. 26). Declared values, not a score — see
+    /// [`RepairabilityIndexDeclaration`] for why the two are kept apart, and for
+    /// the Annex IX Table 10 verification tolerance that makes the split the
+    /// same shape the Regulation itself describes.
+    ///
+    /// `None` is the ordinary case and always will be for a device type the act
+    /// does not reach. **Nothing obliges a passport to carry this** — the word
+    /// "passport" does not occur in Reg. (EU) 2023/1669, which puts the index on
+    /// the energy label and in the product information sheet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repairability_index_inputs: Option<RepairabilityIndexDeclaration>,
+    /// A declaration that Art. 1(a) or Art. 1(b) of Reg. (EU) 2023/1669 carves
+    /// this unit out of the index's scope.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1669, Art. 1 (OJ L 214, 31.8.2023, p. 12). A
+    /// rollable-display phone and a high-security smartphone are both
+    /// [`DeviceType::Smartphone`], so without this the index would be claimed
+    /// over two product classes the Regulation expressly disclaims.
+    ///
+    /// `None` means **not excluded**, never "unknown": the carve-out is what
+    /// removes the obligation, so an operator who declares nothing has claimed
+    /// nothing, and reading silence as an exclusion would exempt a product on a
+    /// missing field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_scope_exclusion: Option<IndexScopeExclusion>,
     /// Whether spare parts are commercially available from the manufacturer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spare_parts_available: Option<bool>,

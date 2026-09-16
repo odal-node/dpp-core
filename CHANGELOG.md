@@ -15,6 +15,54 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
+  passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
+  unreachable: it needs the ten priority parts scored across three part-level
+  parameters plus three product-level scores, and `ElectronicsData` carried a
+  single declared `repairability_score` — a non-regulatory heuristic on a scale
+  the enacted index is not comparable to.
+
+  - **`RepairabilityIndexDeclaration`**, **`PriorityPartScores`** and
+    **`ElectronicsData::repairability_index_inputs`** carry the six parameters as
+    an operator declares them. Declared values, not a score: nothing here
+    computes `R`. That split is the Regulation's own — **Annex IX Table 10** sets
+    a verification tolerance, *"The determined value shall not be more than 4 %
+    lower than the declared value"*, so the structure is declared-by-supplier,
+    re-determined-by-authority.
+  - Two checks the annex needs and a schema cannot express:
+    `foldable_is_consistent` (the hinge assembly selects between two weight sets,
+    so a declaration scoring it under one parameter and omitting it under another
+    describes no product the annex can grade) and `scores_are_in_range`.
+  - **Electronics schema v1.3.0**, additive. `repairabilityIndexInputs` and
+    `indexScopeExclusion` are both optional.
+
+  **No obligation attaches to any of this.** The word "passport" does not occur
+  in Reg. (EU) 2023/1669 — the index belongs on the energy label and in the
+  product information sheet. Carrying it is a product decision, recorded on the
+  types so nobody later cites the Regulation for a duty it does not create.
+
+- **`IndexScopeExclusion` and `dpp_rules::electronics::repairability_index_scope`
+  make Art. 1's two carve-outs expressible.** Art. 1 of Reg. (EU) 2023/1669
+  excludes *"mobile phones and tablets with a flexible main display which the
+  user can unroll and roll up"* and *"smartphones for high security
+  communication"*. Both are `DeviceType::Smartphone`, and nothing distinguished
+  them, so a determination keyed on the device type alone claimed scope over two
+  product classes the Regulation expressly disclaims.
+
+  The predicate also holds the scope difference between the two sibling acts:
+  2023/1669 reaches **smartphones and slate tablets only**, while `DeviceType`'s
+  four values come from 2023/1670's wider Art. 1(1). A cordless phone and a
+  non-smart mobile phone answer `NotCovered`.
+
+  **An undeclared exclusion means *not excluded*, never "unknown".** The
+  carve-out is what removes the obligation, so silence cannot grant it — and an
+  unrecognised exclusion string does not either. That is the same fail-closed
+  direction as `PassportScope::CapacityUnknown` and the opposite arithmetic:
+  there the obligation turns on a number, so an unstated number cannot exempt;
+  here the exemption is what is stated, so an unstated one does not exist.
+
+### Added
+
 - **`PassportRepository` can resolve forward through an amendment.**
   `supersedes_id` answered "what does this passport supersede?" and nothing
   answered the reverse. That direction is the one a reader needs: a superseded
