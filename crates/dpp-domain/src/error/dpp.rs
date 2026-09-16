@@ -55,6 +55,24 @@ pub enum DppError {
     #[error("passport is retention-locked: published passports cannot be deleted")]
     RetentionLocked,
 
+    /// The forward walk from a passport to the record that replaced it could not
+    /// produce one answer.
+    ///
+    /// Distinct from `Ok(None)`, which is the ordinary "nothing supersedes this"
+    /// and is not an error. This is the store holding a shape the succession
+    /// edge does not permit — two records claiming one predecessor, a cycle, or
+    /// a chain longer than the walk will follow. Each is a reason the question
+    /// has **no** answer rather than a negative one, and returning the
+    /// first-sorted row instead would answer "which record am I holding" wrongly
+    /// and silently.
+    #[error("cannot resolve what supersedes passport {id}: {reason}")]
+    SuccessionUnresolvable {
+        /// The passport the walk started from.
+        id: String,
+        /// Which of the three shapes was met.
+        reason: String,
+    },
+
     #[error("internal error: {0}")]
     Internal(String),
 }

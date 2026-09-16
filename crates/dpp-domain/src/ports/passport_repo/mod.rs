@@ -33,5 +33,5 @@ mod protected_fields_tests;
 #[cfg(test)]
 mod tests;
 
-pub use port::PassportRepository;
+pub use port::{MAX_SUCCESSION_HOPS, PassportRepository};
 pub use protected_fields::PROTECTED_PATCH_FIELDS;
