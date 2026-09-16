@@ -13,6 +13,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Fixed
+
+- **The mandatory-content gate now asks whether Art. 77(1) reaches the record
+  before asking what the record must contain.** `Passport::check_mandatory_content`
+  read the battery type and nothing else, so it demanded the full 38-data-point
+  industrial content list of *every* industrial battery — including one at or
+  below 2 kWh, which Art. 77(1) of Regulation (EU) 2023/1542 does not reach
+  ("each industrial battery with a capacity **greater than** 2 kWh"), and one
+  placed on the market before 18 February 2027, which it does not reach either.
+  `dpp_rules::batteries::passport_scope` has answered that question since 0.20.0
+  and the gate did not consult it.
+
+  *(Behaviour change, not an API change: a record the article exempts now
+  publishes where it was previously refused. Nothing stops compiling. A caller
+  that wants the old, unconditional answer — holding a **voluntary** passport to
+  its category's content anyway — calls `check_category_content`, below.)*
+
+  Three cases deliberately do **not** exempt, because each is a way a statutory
+  gate could switch itself off in silence: an industrial battery that states no
+  capacity (`PassportScope::CapacityUnknown` is not an exemption and says so in
+  its own documentation), a record that states no placing date (a draft for a
+  product not yet on the market has none, and reading that as "before 2027"
+  would exempt every draft), and any `PassportScope` variant added later, which
+  falls to a catch-all that gates.
+
+### Added
+
+- **`Passport::check_category_content`** — the content gate without the Art.
+  77(1) scope question, which is what `check_mandatory_content` did before the
+  fix above. A node publishing a passport the Regulation does not require is
+  better served by a complete one than an unchecked one, but that is the
+  operator's call rather than this crate's, so it is a separate function instead
+  of the default.
+
 ## [0.20.0] - 2026-09-13
 
 ### Breaking
