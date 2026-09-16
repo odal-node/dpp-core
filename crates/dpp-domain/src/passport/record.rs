@@ -839,7 +839,22 @@ impl Passport {
     }
 
     /// Refuse a first publish that omits content the battery's category makes
-    /// mandatory.
+    /// mandatory — **where Art. 77(1) reaches the record at all**.
+    ///
+    /// # Two questions, asked in order
+    ///
+    /// *Is a passport owed?* comes first, and only then *what must it contain?*
+    /// [`dpp_rules::batteries::passport_scope`] answers the first from the
+    /// category, the capacity and the placing date; this function answers the
+    /// second. Asking only the second holds an industrial battery at or below
+    /// 2 kWh to the full industrial content list, which Art. 77(1) does not
+    /// impose on it — the article reaches industrial batteries with "a capacity
+    /// **greater than** 2 kWh", and a category-keyed table cannot see the
+    /// difference.
+    ///
+    /// [`check_category_content`](Self::check_category_content) asks the second
+    /// question alone, for a caller holding a voluntary passport to its
+    /// category's content anyway.
     ///
     /// # Asking without attempting
     ///
@@ -884,6 +899,98 @@ impl Passport {
     /// it is deliberate; it closes when a source covering those categories
     /// exists.
     pub fn check_mandatory_content(&self) -> Result<(), crate::error::dpp::DppError> {
+        if self.art_77_1_exempts_this_record() {
+            return Ok(());
+        }
+        self.check_category_content()
+    }
+
+    /// Whether Art. 77(1) can be shown **not** to reach this record.
+    ///
+    /// Deliberately phrased as "can be shown not to", not "does not". Every
+    /// path that cannot establish an exemption answers `false`, so the content
+    /// gate runs. Three of those paths are worth naming, because each is a way
+    /// a statutory gate could otherwise switch itself off in silence:
+    ///
+    /// - **An unstated capacity is not an exemption.**
+    ///   [`PassportScope::CapacityUnknown`] says so in its own documentation —
+    ///   the obligation turns on a number the record does not carry, and reading
+    ///   the absence as "under the threshold" would exempt a battery on the
+    ///   strength of a missing field.
+    /// - **An unstated placing date is not an exemption either.** The date is
+    ///   substituted with [`PASSPORT_REQUIRED_FROM`] rather than with today,
+    ///   which is not a determination of when the product was placed on the
+    ///   market — it is the one value that makes the date limb a no-op, leaving
+    ///   only the two date-independent exemptions (`NotCovered`,
+    ///   `BelowThreshold`) reachable. `NotYetBinding` can never be concluded
+    ///   from a date nobody stated, which is the point: a draft for a product
+    ///   not yet on the market carries no date, and reading that as "before
+    ///   2027" would exempt every draft.
+    /// - **A variant added to [`PassportScope`] later is not an exemption.**
+    ///   The type is `#[non_exhaustive]`, so the match needs a catch-all, and
+    ///   the catch-all gates. A new outcome that *should* exempt then has to say
+    ///   so here on purpose, which is the direction that fails safely.
+    ///
+    /// Answers `false` for a non-battery record and for a battery carrying no
+    /// product group data, leaving both to
+    /// [`check_category_content`](Self::check_category_content) — the first is
+    /// waved through there and the second is a refusal, and neither is Art.
+    /// 77(1)'s question to answer.
+    ///
+    /// [`PassportScope`]: dpp_rules::batteries::passport_scope::PassportScope
+    /// [`PassportScope::CapacityUnknown`]: dpp_rules::batteries::passport_scope::PassportScope::CapacityUnknown
+    /// [`PASSPORT_REQUIRED_FROM`]: dpp_rules::batteries::passport_scope::PASSPORT_REQUIRED_FROM
+    fn art_77_1_exempts_this_record(&self) -> bool {
+        use chrono::Datelike;
+        use dpp_rules::batteries::passport_scope::{
+            PASSPORT_REQUIRED_FROM, PassportScope, passport_scope,
+        };
+        use dpp_rules::common::date::CalendarDate;
+
+        let Some(crate::product_group::ProductGroupData::Battery(battery)) =
+            self.product_group_data.as_ref()
+        else {
+            return false;
+        };
+
+        // The envelope's date is the authoritative one; the product group's copy
+        // is the legacy home and `validate` already refuses a record where the
+        // two disagree, so reading either is reading the same value.
+        let placed = self
+            .placed_on_market_date
+            .or(battery.placed_on_market_date)
+            .map_or(PASSPORT_REQUIRED_FROM, |d| {
+                CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)
+            });
+
+        match passport_scope(
+            battery.battery_type.wire_str(),
+            battery.rated_capacity_kwh,
+            placed,
+        ) {
+            PassportScope::NotCovered
+            | PassportScope::BelowThreshold
+            | PassportScope::NotYetBinding => true,
+            // `Required`, `CapacityUnknown`, and anything added later.
+            _ => false,
+        }
+    }
+
+    /// Refuse a first publish that omits content the battery's category makes
+    /// mandatory, **without** asking whether Art. 77(1) reaches the record.
+    ///
+    /// The strict answer, and the behaviour
+    /// [`check_mandatory_content`](Self::check_mandatory_content) had before it
+    /// learned to consult scope. It exists because a node may reasonably hold a
+    /// *voluntary* passport to its category's content — an industrial battery
+    /// at 1,5 kWh owes no passport, and an operator who publishes one anyway is
+    /// better served by a complete one than by an unchecked one. That is the
+    /// operator's call, so it is a separate function rather than the default.
+    ///
+    /// Everything `check_mandatory_content` documents about previewing, about
+    /// naming every missing field at once, and about the portable/SLI hole
+    /// applies here unchanged — this is the same body.
+    pub fn check_category_content(&self) -> Result<(), crate::error::dpp::DppError> {
         use crate::field_error::{FieldError, ValidationErrors};
 
         if self.product_group != crate::product_group::ProductGroup::Battery {
