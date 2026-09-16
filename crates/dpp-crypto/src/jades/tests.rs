@@ -616,3 +616,55 @@ fn the_combined_constructor_refuses_an_empty_chain() {
         JadesError::EmptyCertificateChain
     );
 }
+
+// ── The EU profile, which lives in a Regulation and not in the standard ──────
+
+#[test]
+fn only_the_chain_with_thumbprint_form_is_in_the_eu_recognised_profile() {
+    // Commission Implementing Regulation (EU) 2026/248 Annex I makes `x5c`
+    // mandatory; TS 119 182-1 Table 1 makes a digest reference mandatory. Each
+    // of the other two variants satisfies exactly one.
+    assert!(
+        !CertificateRef::thumbprint_of_der(FAKE_DER).is_eu_recognised_profile(),
+        "x5t#S256 alone carries no x5c, so Annex I does not reach it"
+    );
+    assert!(
+        !CertificateRef::Chain(vec!["Y2VydA==".into()]).is_eu_recognised_profile(),
+        "x5c alone fails Table 1's certificate-reference service"
+    );
+    assert!(
+        CertificateRef::chain_of_der(std::slice::from_ref(&FAKE_DER.to_vec()))
+            .expect("one certificate")
+            .is_eu_recognised_profile()
+    );
+}
+
+#[test]
+fn the_eu_recognised_form_actually_emits_x5c() {
+    // Pins the adaptation itself rather than the variant name. The requirement
+    // lives in a Regulation, so a reader checking this module against the ETSI
+    // document alone would never meet it — this is where it is written down in a
+    // form that fails if the emitted header changes.
+    let header = JadesHeader::now(
+        "EdDSA",
+        CertificateRef::chain_of_der(std::slice::from_ref(&FAKE_DER.to_vec()))
+            .expect("one certificate"),
+    );
+    let bytes = header.to_json_bytes().expect("header builds");
+    let protected: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_slice(&bytes).expect("the protected header is a JSON object");
+
+    assert!(
+        header.certificate.is_eu_recognised_profile(),
+        "the form under test must be the one Annex I lists"
+    );
+    assert!(
+        protected.contains_key("x5c"),
+        "Annex I: the x5c header parameter shall be present — got {:?}",
+        protected.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        protected.contains_key("x5t#S256"),
+        "TS 119 182-1 Table 1 still wants a digest reference alongside it"
+    );
+}

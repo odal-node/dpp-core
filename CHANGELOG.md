@@ -63,6 +63,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   operator's call rather than this crate's, so it is a separate function instead
   of the default.
 
+- **`CertificateRef::is_eu_recognised_profile`** — whether a JAdES signature
+  carrying this certificate reference is in a format a Member State public sector
+  body is obliged to recognise.
+
+  Commission Implementing Regulation (EU) 2026/248 (OJ L, 2026/248 of 3.2.2026),
+  which repealed Commission Implementing Decision (EU) 2015/1506, lists JAdES in
+  its **Annex I** with one adaptation: it replaces TS 119 182-1 clause 5.1.8 so
+  that the `x5c` header parameter **shall be present**, as a signed or unsigned
+  header parameter. The unadapted standard leaves `x5c` optional — clause 5.1.7
+  asks for *at least one* of `x5t#S256`, `x5c`, `sigX5ts` or `x5t#o`.
+
+  So `Thumbprint` satisfies clause 5.1.7 and Table 1 and carries no `x5c`,
+  `Chain` carries `x5c` and fails Table 1, and only `ChainWithThumbprint`
+  satisfies both. `Thumbprint` is the first variant, the compact and obvious
+  choice, and nothing in the type said that picking it puts the signature outside
+  that list — the requirement lives in a **Regulation**, not in the ETSI document
+  the module is written against, so a reader checking the code against the
+  standard alone would find it perfectly conformant and have no reason to look
+  further.
+
+  Naming the property rather than making callers decode the variants follows
+  `SealConformanceLevel::survives_certificate_expiry`. `Thumbprint`'s doc comment
+  now carries the warning, and a test pins that the EU-recognised form actually
+  emits `x5c` — the adaptation itself, not the variant name.
+
+  Nothing is producing a non-conformant signature today: `CertificateRef` has no
+  production caller, and `chain_of_der` can only build the conformant form. That
+  is why it was cheap to do now — the first real caller picks a variant off this
+  enum.
+
 ### Fixed
 
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record
@@ -87,7 +117,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   product not yet on the market has none, and reading that as "before 2027"
   would exempt every draft), and any `PassportScope` variant added later, which
   falls to a catch-all that gates.
-
 
 ## [0.20.0] - 2026-09-13
 
