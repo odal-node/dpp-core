@@ -15,8 +15,7 @@
 //!   job from deciding whose signature means what.
 //! - **The disclosure contract** — `Audience`, `Disclosure`, the per-field
 //!   disclosure map and the filter that applies it — describes what a passport
-//!   *is*, not who is asking. It currently lives in `dpp-crypto::access`; its
-//!   settled home is `dpp-domain`.
+//!   *is*, not who is asking. It lives in `dpp-domain`.
 //! - **Projections** — GS1, AAS — render a passport for an ecosystem. They say
 //!   nothing about trust.
 //!
