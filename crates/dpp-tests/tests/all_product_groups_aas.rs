@@ -48,6 +48,8 @@ fn crm() -> CriticalRawMaterial {
 
 fn electronics_data() -> ElectronicsData {
     ElectronicsData {
+        repairability_index_inputs: None,
+        index_scope_exclusion: None,
         gtin: Gtin::parse(VALID_GTIN).unwrap(),
         product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,
