@@ -790,9 +790,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     chemical composition; Art. 28(6) says that where a product passport is
     required under another Union act, that information *"shall be included in
     that product passport"*; Art. 29 requires a recycled-content share published
-    on a free-access website. The act is a passport-content instrument. Filed
-    separately as the substantive question — the inventory reason now says what
-    the articles say.
+    on a free-access website. The act is a passport-content instrument, not a
+    list of materials.
+
+    Both duties are narrower than they read, and the inventory reason now says
+    so. Art. 28 binds an exhaustive list of products — MRI devices, wind energy
+    generators, industrial robots, motor vehicles, light means of transport,
+    cooling generators, heat pumps, electric motors including where integrated,
+    washing machines, tumble driers, microwaves, vacuum cleaners, dishwashers —
+    and **none of the product groups modelled here is among them**. It applies
+    two years after an implementing act due 24 November 2026, and from 24 May
+    2029 for MRI devices, motor vehicles and category-L vehicles. Art. 29 is
+    narrower again: only those products, only magnet types (i) to (iii), and only
+    where the magnets' total weight exceeds 0,2 kg — a threshold that is Art.
+    29's, not Art. 28's — from 24 May 2027 or two years after its delegated act,
+    whichever is later. Art. 28(8) lets Union harmonisation legislation displace
+    Art. 28 for a listed product, so the answer is per product group.
   - **`32009R0661`** and **`32009R1222`** — read and confirmed accurate,
     including the Annex I Part C quotation and the 1 May 2021 repeal date.
 

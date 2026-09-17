@@ -278,7 +278,24 @@ pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
                  product on the market. Art. 29 requires the recycled share of \
                  eight named elements to be published on a free-access website. \
                  The act is still not *modelled* — no binding describes it — but \
-                 it is a passport-content instrument, not a list of materials.",
+                 it is a passport-content instrument, not a list of materials. \
+                 \
+                 Scope, because these duties are narrower than they read. Art. 28 \
+                 binds an exhaustive list of products — MRI devices, wind energy \
+                 generators, industrial robots, motor vehicles, light means of \
+                 transport, cooling generators, heat pumps, electric motors \
+                 including where integrated, washing machines, tumble driers, \
+                 microwaves, vacuum cleaners, dishwashers — and none of the \
+                 product groups this crate models is among them. It applies two \
+                 years after an implementing act due 24 November 2026, and from \
+                 24 May 2029 for MRI devices, motor vehicles and category-L \
+                 vehicles. Art. 29 is narrower again: only those products, only \
+                 magnet types (i) to (iii), and only where the magnets' total \
+                 weight exceeds 0,2 kg — a threshold that is Art. 29's and not \
+                 Art. 28's — from 24 May 2027 or two years after its delegated \
+                 act, whichever is later. Art. 28(8) lets Union harmonisation \
+                 legislation displace Art. 28 for a listed product, so the answer \
+                 is per product group rather than global.",
         basis: CitationBasis::Sourced,
     },
 ];
