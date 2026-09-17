@@ -95,6 +95,14 @@ pub struct RegistrationRequest {
     /// none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_url: Option<String>,
+    /// Who hosts that back-up — ESPR Annex III point (l).
+    ///
+    /// Separate from the URL because the act lists them separately, and a URL
+    /// cannot stand in for a party. Where a `backup_url` is declared this is
+    /// not optional in substance: Art. 10(4) says the back-up is made available
+    /// *through* a service provider, so one exists whenever a link does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_provider: Option<super::ServiceProviderRef>,
 }
 
 impl RegistrationRequest {
@@ -146,6 +154,9 @@ impl RegistrationRequest {
             // Set by the caller: whether a published back-up exists is a
             // deployment fact, not something the passport records.
             backup_url: None,
+            // Same: the provider is a contractual fact the passport does not
+            // record, and inventing one would name a party that may not exist.
+            service_provider: None,
         }
     }
 }

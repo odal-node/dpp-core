@@ -222,6 +222,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   build stops, where a wildcard arm would hand it one silently. `RegistryBasis`
   has no `Default` for the same reason.
 
+- **A registration can now say *who* hosts the back-up, not just where it is.**
+  ESPR Annex III point **(l)** is a passport data point in its own right — *"the
+  reference of the digital product passport service provider hosting the back-up
+  copy"* — and IR (EU) 2026/1778 Art. 8(9)(c) makes it registration data the
+  Commission stores. `RegistrationPayload` carried only `backup_url`, which
+  answers a different question: two providers can serve from one domain, one
+  provider can serve from many, and a provider can be engaged with no link
+  declared at all. The act lists them in consecutive paragraphs — Art. 8(7)(e)
+  confirms the link, Art. 8(9)(c) stores the reference.
+
+  `ServiceProviderReference` carries a **name**, plus an optional scheme/value
+  pair and country. `RegistrationRequest` gains the matching
+  `ServiceProviderRef`, so the field can be populated from the port rather than
+  existing and never being reachable.
+
+  **A name alone is a complete reference, and that is the act's doing.** Annex
+  III's second paragraph puts the data carrier, the point (b) product
+  identifier, the points (g)/(h)/(k) operator identifiers and the point (i)
+  facility identifiers under ISO/IEC 15459 conformity — **point (l) is absent
+  from that list**. Art. 2(32) defines the role as *"an independent third-party
+  authorised by the economic operator"*, a relationship rather than a
+  registration. Requiring a scheme would impose a conformity rule the annex
+  declines to. 🚨 And there is no registry-issued provider identifier to reuse:
+  Art. 3(f) has the registry holding a list of *verified* providers, but that
+  Regulation lays down verification only for economic operators (Art. 4) and
+  value chain actors (Art. 5); the provider criteria sit in an ESPR Art. 11
+  delegated act that has not been adopted.
+
+  🚨 **A declared `backup_url` with no provider named is now refused.** ESPR
+  **Art. 10(4)** is unconditional and names the party: *"The economic operator,
+  when placing the product on the market, shall make available a back-up copy of
+  the digital product passport **through a digital product passport service
+  provider**."* So a payload that declares the link has, as a matter of law, a
+  provider to reference, and omitting it drops a data point the declaration
+  itself proves exists. **Not the converse** — a provider with no link is lawful,
+  because Art. 8(7)(e) confirms the link only *"where relevant"*.
+
+  Where a scheme *is* given it must arrive with its value, and goes through the
+  same per-scheme check an operator identifier does. The reason is the one
+  `OperatorIdentifier::validate` already records: a value with no scheme does not
+  say whether it is a VAT number, an LEI or a DID, so it identifies nobody while
+  looking as though it does — and the per-scheme check accepts any unrecognised
+  scheme, including the empty one, so without this it would pass.
+
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
   passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
   unreachable: it needs the ten priority parts scored across three part-level

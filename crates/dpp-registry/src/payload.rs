@@ -8,6 +8,7 @@ use super::error::RegistryValidationError;
 use super::granularity::{Granularity, RegistrationLevel};
 use super::identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
+    ServiceProviderReference,
 };
 use super::submission::MAX_PRODUCT_IDENTIFIER_CHARS;
 
@@ -56,8 +57,28 @@ pub struct RegistrationPayload {
     pub commodity_code: Option<String>,
     /// Public URL of a back-up of this passport, hosted independently of the
     /// issuing node. Verified by the registry where one is declared.
+    ///
+    /// A **location**. The party is
+    /// [`service_provider`](Self::service_provider), and the two are not
+    /// interchangeable — IR (EU) 2026/1778 lists them in consecutive paragraphs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_url: Option<String>,
+    /// The digital product passport service provider hosting the back-up —
+    /// ESPR Annex III point **(l)**, IR (EU) 2026/1778 Art. 8(9)(c).
+    ///
+    /// `Option` because Art. 8(9)(c) stores it *"where relevant"* and this crate
+    /// cannot tell when it is: a registration whose back-up the operator has not
+    /// declared to the registry is not thereby a registration with no provider.
+    ///
+    /// 🚨 **But a declared [`backup_url`](Self::backup_url) makes it relevant,
+    /// and `validate` enforces that.** ESPR Art. 10(4) is unconditional and
+    /// names the party: *"The economic operator, when placing the product on the
+    /// market, shall make available a back-up copy of the digital product
+    /// passport **through a digital product passport service provider**."* So a
+    /// URL with no provider beside it describes a back-up that, as a matter of
+    /// law, someone is hosting — and Annex III(l) is the point that says who.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_provider: Option<ServiceProviderReference>,
 }
 
 impl RegistrationPayload {
@@ -103,6 +124,24 @@ impl RegistrationPayload {
             && !url.starts_with("https://")
         {
             return Err(RegistryValidationError::InsecureBackupUrl { value: url.clone() });
+        }
+        // ESPR Art. 10(4): a back-up copy is made available *through* a service
+        // provider, unconditionally. Declaring the link while naming nobody
+        // therefore leaves out an Annex III(l) data point that the declaration
+        // itself proves exists — so the pair is checked together rather than the
+        // provider being validated only when someone remembers to send it.
+        //
+        // Not the converse. A provider with no link declared is lawful: Art.
+        // 8(7)(e) confirms the link "where relevant", and a node may hold the
+        // relationship without publishing the URL to the registry.
+        match (&self.backup_url, &self.service_provider) {
+            (Some(_), None) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "serviceProvider".into(),
+                ));
+            }
+            (_, Some(provider)) => provider.validate()?,
+            (None, None) => {}
         }
         for (name, value) in [
             ("productGroup", &self.product_group),

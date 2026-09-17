@@ -14,6 +14,7 @@ mod port;
 mod record;
 mod registering_operator;
 mod request;
+mod service_provider;
 mod status;
 #[cfg(test)]
 mod tests;
@@ -24,6 +25,7 @@ pub use port::RegistrySyncPort;
 pub use record::RegistryRecord;
 pub use registering_operator::RegisteringOperator;
 pub use request::RegistrationRequest;
+pub use service_provider::ServiceProviderRef;
 pub use status::RegistryStatus;
 
 /// No-op implementation for use before the EU Central Registry API is published.

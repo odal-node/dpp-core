@@ -94,6 +94,7 @@ pub use error::{
 pub use granularity::{Granularity, RegistrationLevel};
 pub use identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
+    ServiceProviderReference,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};

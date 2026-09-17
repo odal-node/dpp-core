@@ -115,6 +115,7 @@ async fn ghost_register_returns_pending() {
         model_id: None,
         commodity_code: None,
         backup_url: None,
+        service_provider: None,
     };
     let record = sync.register(request).await.unwrap();
     assert_eq!(record.status, RegistryStatus::Pending);

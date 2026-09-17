@@ -31,6 +31,10 @@
 //! because serialised products need a distinct shape (batch/lot alongside the
 //! serial), not because the Regulation lists it apart.
 //!
+//! [`ServiceProviderReference`] is Annex III **point (l)**, and is here for the
+//! same reason: it names a party, with the same scheme/value/metadata shape.
+//! It is deliberately *not* called an identifier — see the type.
+//!
 //! Grouped in one file rather than split per-type: they are one vocabulary
 //! with symmetric shape (scheme + value + metadata), and share the
 //! country-code / checksum validation helpers below.
@@ -279,4 +283,128 @@ fn has_country_prefix(s: &str, max_body: usize) -> bool {
         && s[2..]
             .bytes()
             .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+}
+
+/// The digital product passport service provider hosting the back-up copy —
+/// ESPR Annex III point **(l)**.
+///
+/// ✅ COMPLIANCE-PIN: Regulation (EU) 2024/1781 Annex III(l), verbatim — *"the
+/// reference of the digital product passport service provider hosting the
+/// back-up copy of the digital product passport."* Commission Implementing
+/// Regulation (EU) 2026/1778 **Art. 8(9)(c)** makes it registration data the
+/// Commission stores: *"where relevant, reference to the digital product
+/// passport service provider"*.
+///
+/// # A reference, not an identifier, and the distinction is the act's
+///
+/// Annex III's second paragraph subjects the data carrier, the unique product
+/// identifier of point (b), the operator identifiers of points (g), (h) and (k)
+/// and the facility identifiers of point (i) to ISO/IEC 15459 conformity.
+/// **Point (l) is not in that list.** No scheme is mandated for it, and
+/// [Art. 2(32)](https://eur-lex.europa.eu/eli/reg/2024/1781/oj) imposes none on
+/// the role either — a provider is *"an independent third-party authorised by
+/// the economic operator"*, which is a legal relationship rather than a
+/// registration.
+///
+/// So this carries a **name**, which is what makes the reference a reference,
+/// and an optional scheme/value pair for providers that do hold a registry
+/// identifier. Requiring a scheme would invent a conformity rule the annex
+/// deliberately does not impose.
+///
+/// 🚨 **There is no registry-issued provider identifier to reuse.** IR
+/// 2026/1778 Art. 3(f) says the registry holds *"a list of verified digital
+/// product passport service providers"*, but that Regulation lays down
+/// verification processes for economic operators (Art. 4) and value chain actors
+/// (Art. 5) only. The criteria are empowered by ESPR Art. 11's penultimate
+/// subparagraph as a delegated act that has not been adopted. A design assuming
+/// such an identifier would be inventing one.
+///
+/// # Why it is not the back-up URL
+///
+/// `RegistrationPayload::backup_url` is a location; this is the party. IR
+/// 2026/1778 lists them in consecutive paragraphs — Art. 8(7)(e) confirms
+/// *"the link to the back-up hosted by a digital product passport service
+/// provider"*, Art. 8(9)(c) stores the reference to the provider — and a URL
+/// cannot stand in for the other. Two providers can serve from one domain, one
+/// provider can serve from many, and a provider can be engaged with no link
+/// declared to the registry at all.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceProviderReference {
+    /// The provider's legal name.
+    ///
+    /// Required: a reference that names nobody references nothing, and the name
+    /// is the only element Annex III(l) can be read to compel.
+    pub name: String,
+    /// The identifier scheme, where the provider holds one — `"vat"`, `"lei"`,
+    /// `"eori"`, `"duns"`, `"did"`, as for an economic operator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<String>,
+    /// The identifier value under [`scheme`](Self::scheme).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// ISO 3166-1 alpha-2 country of establishment, where known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
+impl ServiceProviderReference {
+    /// A reference carrying only the provider's name.
+    ///
+    /// The floor Annex III(l) sets, and lawful on its own because the annex
+    /// mandates no scheme for point (l).
+    #[must_use]
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            scheme: None,
+            value: None,
+            country: None,
+        }
+    }
+
+    /// Validate the reference.
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::MissingRequiredField`] if the name is empty,
+    /// or if a scheme and a value do not arrive together;
+    /// [`RegistryValidationError::InvalidCountryCode`] if a country is present
+    /// and is not ISO 3166-1 alpha-2; and whatever the per-scheme check refuses.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.name.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "serviceProvider.name".into(),
+            ));
+        }
+        // 🚨 All or nothing, for the reason `OperatorIdentifier::validate`
+        // already gives: a value with no scheme does not say whether it is a VAT
+        // number, an LEI or a DID, so it identifies nobody while looking as
+        // though it does. A scheme with no value is the same defect mirrored.
+        match (self.scheme.as_deref(), self.value.as_deref()) {
+            (None, None) => {}
+            (Some(scheme), Some(value)) => {
+                if scheme.trim().is_empty() {
+                    return Err(RegistryValidationError::MissingRequiredField(
+                        "serviceProvider.scheme".into(),
+                    ));
+                }
+                validate_operator_scheme(scheme, value)?;
+            }
+            (Some(_), None) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "serviceProvider.value".into(),
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "serviceProvider.scheme".into(),
+                ));
+            }
+        }
+        if let Some(country) = &self.country {
+            validate_country_code(country)?;
+        }
+        Ok(())
+    }
 }
