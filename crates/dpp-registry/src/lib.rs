@@ -66,6 +66,9 @@
 //! - [`basis`] — [`RegistryBasis`]: whether a wire detail was observed on a
 //!   date or is ours. The observed/invented split the constants state in prose,
 //!   in a form a mock and a conformance test can act on.
+//! - [`proof`] — [`ProofOfRegistration`]: the Art. 9 artefact evidencing that
+//!   the registration obligation was discharged, and the Art. 9(4) ninety-day
+//!   window the registry serves it for.
 //! - [`endpoint`] — [`RegistryEndpoint`], [`RegistryAuthority`] (keeps the
 //!   ⚠️ COMPLIANCE-PIN block visible in one small file).
 
@@ -75,6 +78,7 @@ pub mod error;
 pub mod granularity;
 pub mod identifiers;
 pub mod payload;
+pub mod proof;
 pub mod response;
 pub mod submission;
 #[cfg(test)]
@@ -97,6 +101,7 @@ pub use identifiers::{
     ServiceProviderReference,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
+pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,

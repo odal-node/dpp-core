@@ -276,6 +276,56 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   looking as though it does — and the per-scheme check accepts any unrecognised
   scheme, including the empty one, so without this it would pass.
 
+- **The Art. 9 proof of registration is modelled.** Commission Implementing
+  Regulation (EU) 2026/1778 Art. 9 creates the artefact that evidences the
+  registration obligation was discharged — *"evidence, including vis-à-vis third
+  parties, that the registration obligation for that digital product passport has
+  been fulfilled"* — and nothing in this workspace carried it.
+
+  It is the only artefact in the registration flow bearing **the Commission's own
+  qualified electronic seal and electronic time stamp**, and it binds a hash of a
+  **specific passport version** to a registration event. That is the provenance
+  chain this workspace already builds locally, terminating in an external
+  qualified anchor rather than our own signature. It is what an operator hands a
+  market surveillance authority.
+
+  `ProofOfRegistration` carries the five Art. 9(2) points, the generation
+  instant, and the seal. `available_until` and `is_available_at` answer the
+  Art. 9(4) window.
+
+  🚨 **The ninety days are the registry's retention, not the document's
+  validity** — a distinction the issue that asked for this got wrong, and the
+  article settles. Art. 9(4) governs what the Commission *makes available*: *"The
+  Commission shall make available in the registry … That proof shall remain
+  available for a period of 90 calendar days from the date of its generation."* A
+  proof already downloaded does not stop being evidence on day 91 and its seal
+  goes on verifying. The methods are named for availability so a caller reaching
+  for an expiry check has to notice it is asking something else.
+
+  🚨 **And the field list is a floor.** Art. 9(2) says the proof *"shall contain
+  at least the following data"*, so the five points are a minimum the Commission
+  may exceed. Unknown fields deserialise away rather than being refused:
+  rejecting a proof for carrying more than the article compels would refuse a
+  lawful document.
+
+  The seal, the Commission time stamp and the version hash are carried opaquely.
+  Art. 9(3) requires a qualified electronic seal *"as provided for in Article 38
+  of Regulation (EU) No 910/2014"*, and verifying one is a trust-list question
+  this crate is in no position to answer — a type that appeared to understand a
+  seal would invite a caller to believe it had been checked. Art. 9(2)(e) says
+  *"a hash of the version"* and names no algorithm, so parsing it into a typed
+  digest would read a choice into the text.
+
+  Nothing generates a proof. Art. 9(1) puts that on the registry and Art. 9(4)
+  on the Commission; one this workspace constructed would carry no Commission
+  seal and evidence nothing. Validation therefore asks whether what arrived
+  carries the Art. 9(2) minimum, not whether it is fit to send — including the
+  one internal contradiction the points can express between them, a registration
+  that postdates the proof reporting it.
+
+  **Not included:** the retrieval call and where a proof is surfaced. Those sit
+  behind the same unpublished-specification door as the rest of the client.
+
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
   passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
   unreachable: it needs the ten priority parts scored across three part-level
