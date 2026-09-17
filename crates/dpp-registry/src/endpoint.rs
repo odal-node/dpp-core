@@ -1,6 +1,58 @@
-//! [`RegistryEndpoint`] configuration and [`RegistryAuthority`].
+//! [`RegistryEndpoint`] configuration, [`RegistryAuthority`], and the resource
+//! paths beneath a base URL.
+//!
+//! # Where these paths come from, and what that is worth
+//!
+//! There is no published API specification. What exists is the registry's own
+//! **unauthenticated web client**, which ships its endpoints as constants, and
+//! reading it is how the `/api/v1` prefix was first learned. Re-read
+//! **2026-09-16**, it also names the registration endpoint.
+//!
+//! That is better evidence than an invention and it is **not a specification**.
+//! It is one consumer's behaviour on one date, and a client can change without
+//! notice — the registry's own User Guide changed a stated identifier limit by a
+//! factor of forty between two versions in under a month. So each constant below
+//! says which of the two it is, and nothing here should be read as *the registry
+//! requires*.
 
 use serde::{Deserialize, Serialize};
+
+/// Registration submission, relative to [`RegistryEndpoint::base_url`].
+///
+/// 👁️ **Observed 2026-09-16**, as `submitDppRegistrationRequest` in the
+/// registry's web client. It replaces `/registrations`, which was invented and
+/// is now known to be wrong rather than merely unverified.
+pub const REGISTRATION_PATH: &str = "/dpp-registration-requests";
+
+/// Registration status polling, relative to [`RegistryEndpoint::base_url`].
+///
+/// ⚠️ **Invented.** No constant for a status or polling route exists in the web
+/// client, so unlike [`REGISTRATION_PATH`] this has nothing behind it. Kept
+/// because the asynchronous flow needs *a* path and a caller must be able to
+/// name one; it is a placeholder, not an observation.
+pub const STATUS_PATH_TEMPLATE: &str = "/registrations/{id}/status";
+
+/// Transfer notification, relative to [`RegistryEndpoint::base_url`].
+///
+/// ⚠️ **Invented**, on the same terms as [`STATUS_PATH_TEMPLATE`]. IR (EU)
+/// 2026/1778 Art. 6a establishes that transfers happen; it says nothing about
+/// the route they travel.
+pub const TRANSFER_PATH_TEMPLATE: &str = "/registrations/{id}/transfer";
+
+/// The HTTP header carrying the request's idempotency key.
+///
+/// 👁️ **Observed 2026-09-16.** The web client sets this header, with a UUID
+/// value, on every POST to registration and enrolment. A replayed key returns
+/// **409** with `subCode` `CONFLICT_IDEMPOTENCY_KEY_ALREADY_USED`, and the
+/// client deliberately *keeps* the key on that response rather than minting a
+/// new one — it reads a conflict as "this already succeeded", not as "try
+/// again differently".
+///
+/// This is a **header**, which is the correction it carries: idempotency was
+/// previously assumed to ride on the envelope body. See
+/// [`EuRegistryEnvelope::request_id`](crate::EuRegistryEnvelope::request_id),
+/// which is ours and is a different thing.
+pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
 
 /// Known EU registry authority types.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,10 +93,10 @@ impl RegistryEndpoint {
             // host). The earlier `sandbox.eudpp-registry.europa.eu` was invented
             // and resolves to nothing.
             //
-            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): the `/api/v1` prefix is
-            // observed on the registry's own web client, not read from a
-            // published specification, and the resource paths beneath it
-            // (`/registrations`, …) remain guesses.
+            // 👁️ The `/api/v1` prefix is observed on the registry's own web
+            // client — re-confirmed 2026-09-16 — not read from a published
+            // specification. The resource paths beneath it are module
+            // constants, each marked observed or invented.
             base_url: "https://registry.acc.product-passport.ec.europa.eu/api/v1".into(),
             // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): api_version "1.0" is provisional.
             // Update once the registry API specification is obtained — whether it is
@@ -84,9 +136,8 @@ impl RegistryEndpoint {
             // registry at this address. The earlier `eudpp-registry.europa.eu`
             // was invented and resolves to nothing.
             //
-            // ⚠️ COMPLIANCE-PIN PENDING (watchlist 🟠): as for the sandbox, the
-            // `/api/v1` prefix is observed rather than specified, and the
-            // resource paths beneath it remain guesses.
+            // 👁️ As for the sandbox: the `/api/v1` prefix is observed rather
+            // than specified, and the paths beneath it are module constants.
             base_url: "https://registry.product-passport.ec.europa.eu/api/v1".into(),
             api_version: "1.0".into(),
             mtls_required: true,

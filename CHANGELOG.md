@@ -259,6 +259,82 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the cross-crate test tier and could not otherwise reach them. Sharing beats
   copying: a second implementation would drift, and the drift would show up as
   one surface being checked to a standard the other is not.
+
+- **Four registry facts moved from guess to observation, and the types now say
+  which is which.** There is still no published API specification. What exists
+  is the registry's own unauthenticated web client, which ships its endpoints as
+  constants, and the Commission's *User Guide for Economic Operators*. Both were
+  read on **2026-09-16** and neither is a specification, so every constant below
+  records whether it was **observed** or remains **invented** rather than
+  presenting a uniform confidence the evidence does not support.
+
+  - **`REGISTRATION_PATH` is `/dpp-registration-requests`.** Observed as
+    `submitDppRegistrationRequest` in the web client. The previous
+    `/registrations` was invented and is now known to be *wrong* rather than
+    merely unverified. `STATUS_PATH_TEMPLATE` and `TRANSFER_PATH_TEMPLATE` are
+    published beside it and are still inventions — no constant for either exists
+    in the client — and they say so at their own definition.
+
+  - **`IDEMPOTENCY_KEY_HEADER`** — the registry takes an idempotency key as an
+    HTTP header, `Idempotency-Key`, on registration and enrolment POSTs. A
+    replayed key returns **409** with `subCode`
+    `CONFLICT_IDEMPOTENCY_KEY_ALREADY_USED`, and the client keeps the key on
+    that response rather than minting a new one: a conflict means *this already
+    succeeded*, not *try again differently*.
+
+    `EuRegistryEnvelope::request_id` was documented as that key. It is not, and
+    a value carried there de-duplicates nothing. It is kept — minted once and
+    replayed unchanged, it lets an outbox recognise its own retries without
+    depending on the registry — and its documentation now says whose identifier
+    it is.
+
+  - **`SubmissionOutcome`** — `PROCESSING` / `SUCCESS` / `FAILURE`, with
+    `SubmissionReceipt` carrying the correlation identifier the registry assigns.
+    Deliberately a separate type from `RegistryStatusCode`, which is unchanged:
+    one answers *what became of the request I sent*, the other *what became of a
+    registered passport*. A submission that fails validation produces **no
+    records at all**, so there is nothing for a record status to describe and the
+    correlation identifier is the only handle a caller has left.
+
+  - **`RegistryErrorBody`** — `subCode`, `traceId` and a free-text message, the
+    two named fields being ones the web client reads. Everything else about the
+    body is unknown, so nothing else is modelled.
+
+- **`MAX_PRODUCT_IDENTIFIER_CHARS`, and the risk it retires.** The User Guide
+  caps the unique product identifier, and `RegistrationPayload::validate` now
+  enforces it. The number matters more than the check: **v1.01 (2026-07-28) said
+  50 characters; v1.02 (2026-08-24) says 2000.**
+
+  A 50-character cap would have been shorter than any GS1 Digital Link this
+  workspace can build — 64 characters for a host, GTIN-14 and a 20-character
+  serial — and would have forced the carrier URL shape to change for every
+  printed label. That risk is gone, and it is worth being precise about how: the
+  constraint was **lifted by the Commission**, not misread here. Nobody has an
+  analysis to unwind.
+
+  🚨 **2000 is current, not settled.** It moved by a factor of forty inside a
+  month, silently, in a document with no OJ number, no ELI and no consolidation,
+  whose only version marker is a line on its first page. The length is counted in
+  `char`s rather than bytes, so an internationalised host is not measured as
+  longer than the registry counts it.
+
+- **`MAX_PASSPORTS_PER_SUBMISSION` (100) and `MAX_SUBMISSION_BYTES` (1 GiB)**,
+  with the rule that governs them: a submission is **all-or-nothing**. The guide
+  is explicit — *"if a single DPP has an error, all the DPPs in the same
+  submission will be rejected"* — so there is no partial success to reconcile.
+
+  **The batch payload itself is deliberately not modelled.** Its shape is exactly
+  the part no published material describes, and inventing it is what this crate's
+  open questions exist to prevent. A single-passport submission is a batch of
+  one, so the current shape stays correct under either answer, and the limits are
+  recorded here so an implementation inherits them rather than rediscovering
+  them at the registry.
+
+  Nothing here is breaking: `RegistryValidationError` is `#[non_exhaustive]` and
+  gains `ProductIdentifierTooLong`, `RegistryStatusCode` is untouched, and the
+  rest is new surface. The one behavioural change is that `validate` now rejects
+  an identifier above the cap, which no realistic carrier URL approaches.
+
 ### Fixed
 
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record

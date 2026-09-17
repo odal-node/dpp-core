@@ -9,6 +9,7 @@ use super::granularity::{Granularity, RegistrationLevel};
 use super::identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
 };
+use super::submission::MAX_PRODUCT_IDENTIFIER_CHARS;
 
 /// The full data payload sent to the EU registry when registering a DPP.
 ///
@@ -112,6 +113,17 @@ impl RegistrationPayload {
                 return Err(RegistryValidationError::MissingRequiredField(name.into()));
             }
         }
+        // The registry caps the unique product identifier. Counted in `char`s
+        // rather than bytes: the guide says "chars", and a host with a non-ASCII
+        // internationalised domain would otherwise be measured as longer than
+        // what the registry counts.
+        let identifier_chars = self.digital_link_url.chars().count();
+        if identifier_chars > MAX_PRODUCT_IDENTIFIER_CHARS {
+            return Err(RegistryValidationError::ProductIdentifierTooLong {
+                chars: identifier_chars,
+                max: MAX_PRODUCT_IDENTIFIER_CHARS,
+            });
+        }
         Ok(())
     }
 }
@@ -126,7 +138,19 @@ impl RegistrationPayload {
 pub struct EuRegistryEnvelope {
     /// API version of the registry protocol (e.g. `"1.0"`).
     pub api_version: String,
-    /// Unique request ID for idempotency and tracing.
+    /// **Our** request identifier, for correlating a retry with the attempt it
+    /// repeats.
+    ///
+    /// 🚨 **This is not the registry's idempotency key**, and it used to be
+    /// documented as though it were. The registry takes one as an HTTP header —
+    /// [`IDEMPOTENCY_KEY_HEADER`](crate::IDEMPOTENCY_KEY_HEADER), observed
+    /// 2026-09-16 — so a value carried here reaches it as ordinary payload and
+    /// de-duplicates nothing.
+    ///
+    /// Kept because it is independently useful: minted once and replayed
+    /// unchanged, it lets an outbox recognise its own retries without depending
+    /// on anything the registry does. An adapter must send the header as well,
+    /// and may reasonably send this same value in it.
     pub request_id: Uuid,
     /// ISO 8601 timestamp of when the request was created.
     pub timestamp: DateTime<Utc>,

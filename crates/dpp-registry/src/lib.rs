@@ -11,8 +11,15 @@
 //! (IR (EU) 2026/1778 Arts. 4–5). Those are different mechanisms and one does
 //! not stand in for the other. The field exists so an adapter compiles, and is
 //! marked wrong at its own definition. **Do not treat it as an implementation
-//! target.** Endpoint paths and `api_version` are likewise our own construction,
-//! each flagged at the point of use.
+//! target.**
+//!
+//! `api_version` is likewise our own construction. Endpoint paths are now a
+//! mix: some are **observed** in the registry's own published web client, some
+//! remain invented, and [`endpoint`] says which is which for each one. An
+//! observation is better evidence than an invention and is still not a
+//! specification — the registry's User Guide changed a stated identifier limit
+//! by a factor of forty between two versions inside a month, and a web client
+//! can move the same way.
 //!
 //! What the OJ text fixes *has* been reconciled against it — registration
 //! granularity and identifier linking, commodity codes, the operator-identifier
@@ -65,18 +72,29 @@ pub mod granularity;
 pub mod identifiers;
 pub mod payload;
 pub mod response;
+pub mod submission;
 #[cfg(test)]
 mod tests;
 pub mod transfer;
 
-pub use endpoint::{RegistryAuthority, RegistryEndpoint};
-pub use error::{EuRegistryError, EuRegistryErrorKind, RegistryValidationError};
+pub use endpoint::{
+    IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
+    STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
+};
+pub use error::{
+    EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
+    SUB_CODE_IDEMPOTENCY_KEY_REUSED,
+};
 pub use granularity::{Granularity, RegistrationLevel};
 pub use identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
+pub use submission::{
+    MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
+    SubmissionOutcome, SubmissionReceipt,
+};
 pub use transfer::TransferNotification;
 
 /// Compile-checks this crate's README examples.
