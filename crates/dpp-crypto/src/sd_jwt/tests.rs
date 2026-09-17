@@ -444,3 +444,54 @@ fn every_constructed_disclosure_round_trips() {
         assert_eq!(Disclosure::parse(d.encoded()).unwrap(), d);
     }
 }
+
+/// RFC 9901 clause 9.3 as a **property**, not as one sample.
+///
+/// The three tests above pin uniqueness within a credential, across two
+/// issuances, and for one name at two places — each over a single fixed object
+/// of five claims. That is the shape of the requirement, checked once. What it
+/// cannot see is uniqueness failing at a claim count nobody wrote a fixture for,
+/// or a salt repeating on the fourth issuance rather than the second, which is
+/// what a correlation leak would actually look like in the field: rare, and
+/// invisible to any example chosen in advance.
+///
+/// So: arbitrary claim sets, issued repeatedly, with every salt ever produced
+/// held in one set. A single repeat anywhere fails.
+#[test]
+fn no_salt_ever_repeats_across_claims_or_issuances() {
+    use base64::Engine;
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    proptest!(|(
+        names in prop::collection::hash_set("[a-z][a-z0-9]{0,12}", 1..12),
+        issuances in 2usize..6,
+    )| {
+        // Prefixed so the generator cannot stumble onto a registered claim
+        // name, which `conceal` refuses by design — that refusal is
+        // `reserved_claim_names_are_refused`'s to test, not this one's.
+        let object: Map<String, Value> = names
+            .iter()
+            .map(|n| (format!("f_{n}"), json!("v")))
+            .collect();
+
+        let mut seen: HashSet<String> = HashSet::new();
+        for _ in 0..issuances {
+            let (_, disclosures) = conceal(&object, |_| true).unwrap();
+            prop_assert_eq!(disclosures.len(), object.len());
+            for d in &disclosures {
+                prop_assert_eq!(
+                    b64.decode(d.salt()).unwrap().len(),
+                    16,
+                    "salt is not 128 bits"
+                );
+                prop_assert!(
+                    seen.insert(d.salt().to_owned()),
+                    "a salt repeated — two credentials for the same field are linkable"
+                );
+            }
+        }
+    });
+}

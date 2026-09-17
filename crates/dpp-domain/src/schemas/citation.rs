@@ -57,11 +57,17 @@ pub fn cites_article_or_annex(prose: &str) -> bool {
 /// plausible four-digit year is taken as the year — there is no act numbered
 /// above 9999 in a year below 1950, so this is unambiguous in practice.
 ///
-/// Directives are distinguished from regulations by the trailing `/EU` `/EC`
-/// form (`2011/65/EU`), and otherwise by whichever of the words "directive" and
-/// "regulation" sits closer in front of the number. That matters because
-/// `Directive (EU) 2017/1132` and `Regulation (EU) 2017/1132` differ only in the
-/// word, and they are different acts.
+/// The act **type** — the sector letter in the CELEX — is taken from whichever
+/// of the words "directive", "regulation", "decision" and "recommendation" sits
+/// closer in front of the number. That matters because `Directive (EU)
+/// 2017/1132` and `Regulation (EU) 2017/1132` differ only in the word, and they
+/// are different acts.
+///
+/// Failing that, the trailing `/EU` `/EC` form (`2011/65/EU`) is read as a
+/// Directive, which is the commonest act carrying it. 🚨 It is only a fallback,
+/// because **Decisions carry the same form** — `Commission Decision 2011/833/EU`
+/// is `32011D0833`, not `32011L0833`. The form was the primary signal once, and
+/// the word had to agree with it; that read every such Decision as a Directive.
 pub fn act_refs(prose: &str) -> Vec<ActRef> {
     let bytes = prose.as_bytes();
     let mut found = Vec::new();
@@ -143,11 +149,11 @@ pub fn act_refs(prose: &str) -> Vec<ActRef> {
             continue;
         }
 
-        let kind = if directive_by_form || nearest_kind_word_is_directive(&prose[..first_start]) {
+        let kind = nearest_kind_word(&prose[..first_start]).unwrap_or(if directive_by_form {
             'L'
         } else {
             'R'
-        };
+        });
 
         found.push(ActRef {
             celex: format!("3{year}{kind}{number:04}"),
@@ -159,18 +165,31 @@ pub fn act_refs(prose: &str) -> Vec<ActRef> {
     found
 }
 
-/// Whether "directive" sits closer than "regulation" in the text preceding an
-/// act number, within a clause's reach.
-fn nearest_kind_word_is_directive(before: &str) -> bool {
+/// The CELEX sector letter for whichever act-type word sits closest in front of
+/// an act number, within a clause's reach, or `None` if none does.
+///
+/// 🚨 **The set has to be complete, because the fallback is silently wrong.** A
+/// type with no arm here does not fail to resolve — it resolves to the default
+/// and produces a CELEX for a *different act*, which is precisely what this gate
+/// exists to prevent. `Recommendation` is listed although nothing cites one
+/// today: leaving it out would fix the instance and not the defect.
+fn nearest_kind_word(before: &str) -> Option<char> {
+    const KINDS: [(&str, char); 4] = [
+        ("directive", 'L'),
+        ("regulation", 'R'),
+        ("decision", 'D'),
+        ("recommendation", 'H'),
+    ];
+
     let lowered = before.to_lowercase();
-    let within_reach = |found: Option<usize>| {
-        found.filter(|position| lowered.len().saturating_sub(*position) <= 60)
-    };
-    let directive = within_reach(lowered.rfind("directive"));
-    let regulation = within_reach(lowered.rfind("regulation"));
-    match (directive, regulation) {
-        (Some(d), Some(r)) => d > r,
-        (Some(_), None) => true,
-        _ => false,
-    }
+    KINDS
+        .iter()
+        .filter_map(|(word, sector)| {
+            // No kind word contains another, so the rightmost match per word and
+            // then the maximum across words is unambiguous.
+            let position = lowered.rfind(word)?;
+            (lowered.len().saturating_sub(position) <= 60).then_some((position, *sector))
+        })
+        .max_by_key(|(position, _)| *position)
+        .map(|(_, sector)| sector)
 }

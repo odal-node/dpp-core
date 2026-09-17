@@ -510,6 +510,69 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Every Decision cited in prose resolved to a Regulation's CELEX.**
+  `schemas::citation` chose between two act types, Directive and Regulation, with
+  no third branch — so *Commission Implementing Decision (EU) 2026/1736* became
+  `32026R1736` and *(EU) 2015/1506* became `32015R1506`. Both are cited in this
+  workspace today, and both CELEXes point at a different act or at nothing.
+
+  The failure was silent in the safe direction and loud in the wrong one: a
+  Decision in schema prose trips the gate as unknown, which is recoverable, but
+  quieting it by inventorying the derived CELEX would have recorded a wrong
+  identifier permanently. The gate exists so citations are checkable against
+  primary sources, and a wrong CELEX is the thing it is meant to prevent.
+
+  The act type is now taken from whichever of "directive", "regulation",
+  "decision" and "recommendation" sits nearest the number. The trailing `/EU`
+  `/EC` form is a fallback rather than the primary signal, because **Decisions
+  carry it too** — `Commission Decision 2011/833/EU` is `32011D0833`, and the old
+  rule read the form as proof of a Directive. `Recommendation` is wired although
+  nothing cites one: the cost of a missing arm is a wrong CELEX, not a failure,
+  so fixing only the instance would leave the defect.
+
+- **`battery` had no lens chain between v2.0.0 and v2.4.0.** Four consecutive
+  hops were simply absent. Nothing failed, because all four versions sit in
+  `schema_compat.rs`'s expected refusals and refuse at 2.4.0 → 2.5.0 anyway — the
+  missing chain and the documented refusal produced the same outcome, so the hole
+  hid behind the exemption, and the comment recording *why* those versions refuse
+  described a mechanism that only two of the six ever reached.
+
+  All four hops add optional fields only: `required` is byte-identical across
+  v2.0.0–v2.4.0, and `batteryType` is the single addition at v2.5.0. Each is
+  registered with what its version changed and why nothing needs deriving.
+
+  **A completed chain changes one answer.** `upcast_toward` on a v1.0.0 battery
+  record used to stop at v2.0.0 and say nothing about why; it now walks to v2.4.0
+  and meets the `batteryType` refusal, which is the real reason such a record
+  cannot reach the current schema. No stored document changes status — the
+  expected-refusal set is unchanged — but the refusal now names the mandate
+  instead of a partial view naming nothing.
+
+- **The compatibility gate checked the last link, not the chain.**
+  `every_frozen_document_still_reads_through_from_stored` asks only whether a
+  stored document reaches the *current* version, which a complete chain and a
+  record that happens to survive the jump both answer "yes". So a hop missing
+  from the middle stayed invisible until a later version made the final hop
+  mandatory — three have been found that way after the fact, `electronics`
+  1.0.0→1.1.0 and 1.2.0→1.3.0 and the battery gap above.
+
+  A new test walks every consecutive version pair and requires each to **arrive
+  or refuse**. The third outcome — `Ok`, having silently stopped where it
+  started, which is what best-effort upcasting returns for a gap — now fails.
+  Distinguishing `NoPath` from a lens that ran and declined is the whole of it:
+  the first draft accepted any error and passed against the very gaps it was
+  written for.
+
+- **Salt uniqueness under RFC 9901 clause 9.3 is now a property, not a sample.**
+  Three tests pinned it — within a credential, across two issuances, and for one
+  claim name at two paths — each over one fixed object of five claims. None could
+  see uniqueness failing at a claim count nobody wrote a fixture for, or a salt
+  repeating on a fourth issuance rather than a second, which is what a
+  correlation leak looks like in the field: rare, and invisible to any example
+  chosen in advance. Arbitrary claim sets are now issued repeatedly with every
+  salt held in one set, and the test was checked against a stubbed-out CSPRNG to
+  confirm it fails when salts repeat.
+
 - **The `electronics` catalog entry declared four of its five schema versions.**
   `v1.3.0` was embedded, validated against and reachable by a lens, but absent
   from `product-groups/electronics.json` — so `ProductGroupDescriptor`, which is

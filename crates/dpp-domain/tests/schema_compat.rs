@@ -200,6 +200,13 @@ fn every_frozen_document_still_reads_through_from_stored() {
     // that predates the mandate. There is no correct value to supply, so the
     // honest outcome is a refusal.
     //
+    // 🚨 That reason is now true of all six. It was not: v2.0.0–v2.3.0 had no
+    // lens chain to v2.4.0 at all, so four of these refused for a completely
+    // different reason than the one written here, and the comment covered the
+    // hole rather than exposing it. The hops are registered now, and
+    // `every_consecutive_version_pair_has_a_hop_or_a_refusal` is what keeps a
+    // missing one from hiding behind an expected refusal again.
+    //
     // Listed exactly, so this fails if the set grows *or* shrinks. A new orphan
     // is a regression; a fixed one that stays listed is a stale exemption.
     let expected_refusals = [
@@ -428,4 +435,78 @@ fn resolve_ref(reference: &str, root: &Value) -> Option<Value> {
         node = node.get(segment)?;
     }
     Some(node.clone())
+}
+
+/// **The chain, not just its last link.**
+///
+/// [`every_frozen_document_still_reads_through_from_stored`] asks whether a
+/// stored document reaches the *current* version. That question is answered
+/// "yes" by a complete chain and also by a record whose shape happens to survive
+/// the jump, so a hop missing from the middle of a catalogue is invisible until
+/// some later version makes the final hop mandatory. Three gaps have been found
+/// that way, each after the fact: `electronics` 1.0.0→1.1.0 and 1.2.0→1.3.0,
+/// and `battery` 2.0.0→2.4.0, which hid for four versions behind a refusal at
+/// 2.4.0→2.5.0 that produced the same outcome for a different reason.
+///
+/// So this asks the question directly, one consecutive pair at a time. Upcasting
+/// toward the next version must **either** arrive there **or** refuse. What must
+/// not happen is the third outcome: `Ok`, having silently stopped where it
+/// started, because `upcast_toward` is best-effort and reaching nothing is not
+/// an error to it.
+///
+/// A refusal is a legitimate answer and is not counted against a product group —
+/// `battery` 2.4.0→2.5.0 refuses on purpose rather than invent a `batteryType`
+/// for a record predating the mandate. The distinction this draws is between a
+/// hop that declines and a hop that is not there.
+#[test]
+fn every_consecutive_version_pair_has_a_hop_or_a_refusal() {
+    use dpp_domain::schemas::lens::{LensRegistry, UpcastError};
+
+    let lenses = LensRegistry::new();
+    let mut per_group: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for (product_group, version) in declared_versions() {
+        per_group.entry(product_group).or_default().push(version);
+    }
+
+    let mut missing: Vec<String> = Vec::new();
+    for (product_group, mut versions) in per_group {
+        versions.sort_by_key(|v| v.parse::<semver::Version>().expect("a declared version"));
+
+        for pair in versions.windows(2) {
+            let (from, to) = (&pair[0], &pair[1]);
+            let Some(fixture) = load_fixture(&product_group, from) else {
+                continue; // reported by the fixture-presence test
+            };
+
+            match lenses.upcast_str_toward(&product_group, &fixture, from, to) {
+                // Arrived.
+                Ok(view) if view.to == *to => {}
+                // 🚨 `NoPath` is the hole itself, and it is the reason this test
+                // had to distinguish the two error variants rather than accept
+                // any `Err`. A hop that runs and declines returns `Transform`;
+                // `NoPath` means nothing ran, because nothing is registered.
+                // Treating every `Err` as "refused on purpose" made the first
+                // draft of this test pass against the very gaps it was written
+                // for.
+                Err(UpcastError::NoPath { .. }) => {
+                    missing.push(format!("{product_group}: nothing bridges v{from} → v{to}"))
+                }
+                // A lens ran and refused for a stated reason — a legitimate
+                // answer, and not this test's business.
+                Err(_) => {}
+                Ok(view) => missing.push(format!(
+                    "{product_group}: upcasting v{from} → v{to} stopped short at v{}",
+                    view.to
+                )),
+            }
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "the lens catalogue has holes in the middle of a chain. Each is a version \
+         whose records reach the current schema only by accident of shape, and will \
+         stop reaching it the moment a later version needs a real transform:\n  {}",
+        missing.join("\n  ")
+    );
 }
