@@ -41,6 +41,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::basis::RegistryBasis;
 use super::error::RegistryValidationError;
 
 fn validate_country_code(code: &str) -> Result<(), RegistryValidationError> {
@@ -426,5 +427,93 @@ impl ServiceProviderReference {
             validate_country_code(country)?;
         }
         Ok(())
+    }
+}
+
+// ── EN 18219 clause 5 → the registry's product identifier ────────────────────
+
+/// The registry `scheme` value for an EN 18219 **scheme 1** identifier.
+///
+/// `"gtin"` rather than `"gs1"`: the registry's `scheme` names *what the value
+/// is*, and its own examples are value kinds — `"gtin"`, `"gln"`, `"did"`.
+/// [`ProductIdentifier::validate`] already branches on this exact string to
+/// check the mod-10, so it is the one scheme value with behaviour attached.
+///
+/// The domain enum's own persisted tag is `"gs1"`, which names the *scheme*
+/// rather than the value. Two vocabularies, deliberately not collapsed: the
+/// clause 5 scheme and the kind of the value it carries are different questions
+/// and only coincide for schemes 2 and 3.
+pub const SCHEME_GTIN: &str = "gtin";
+
+/// The registry `scheme` value for an EN 18219 **scheme 2** identification link.
+///
+/// 🚨 The one of the three with no precedent anywhere. The registry names no
+/// value kind for an EN IEC 61406 URL, so this reuses the domain enum's own
+/// persisted tag — already shipped in eleven published schemas — rather than
+/// inventing a third spelling for a thing that now has two.
+pub const SCHEME_IDENTIFICATION_LINK: &str = "identificationLink";
+
+/// The registry `scheme` value for an EN 18219 **scheme 3** DID.
+///
+/// The one string both vocabularies already agree on: it appears in this
+/// crate's own scheme examples and is the domain enum's tag.
+pub const SCHEME_DID: &str = "did";
+
+/// Every product-identifier scheme value this crate emits, with what backs it.
+///
+/// 🚨 **All three are [`RegistryBasis::Assumed`], and the table exists to say so
+/// where code can read it** rather than in prose nobody can assert against. No
+/// published specification names any of them and none has been observed on the
+/// wire; `"gtin"` and `"did"` have in-crate precedent, which is a convention of
+/// ours and not evidence about the registry.
+pub const PRODUCT_SCHEME_BASIS: [(&str, RegistryBasis); 3] = [
+    (SCHEME_GTIN, RegistryBasis::Assumed),
+    (SCHEME_IDENTIFICATION_LINK, RegistryBasis::Assumed),
+    (SCHEME_DID, RegistryBasis::Assumed),
+];
+
+impl TryFrom<&dpp_domain::identifier::ProductIdentifier> for ProductIdentifier {
+    type Error = RegistryValidationError;
+
+    /// Carry an EN 18219 clause 5 identifier into the registry's shape.
+    ///
+    /// The conversion every consumer registering a passport had to write for
+    /// itself, and the `scheme` string is where an invented one goes wrong
+    /// **without failing**: [`ProductIdentifier::validate`] only checks
+    /// structure when the scheme is `"gtin"`, so a DID mislabelled `"gtn"`
+    /// passes validation and is submitted as though it identified something.
+    ///
+    /// # Why `TryFrom` and not `From`
+    ///
+    /// 🚨 `dpp_domain::identifier::ProductIdentifier` is `#[non_exhaustive]`, so
+    /// a match on it **cannot** be exhaustive from this crate — the compiler
+    /// requires a wildcard arm, and a wildcard that produced a scheme string
+    /// would label a clause 5 scheme nobody has mapped as though it had been.
+    /// A fallible conversion turns that into a refusal naming the value, which
+    /// is the loudest a downstream crate is able to be.
+    ///
+    /// The GS1 arm yields the bare 14-digit GTIN, not a Digital Link URL:
+    /// building the URL needs a resolver host, which is a deployment fact this
+    /// tier does not know.
+    fn try_from(
+        identifier: &dpp_domain::identifier::ProductIdentifier,
+    ) -> Result<Self, Self::Error> {
+        use dpp_domain::identifier::ProductIdentifier as Clause5;
+
+        let scheme = match identifier {
+            Clause5::Gs1 { .. } => SCHEME_GTIN,
+            Clause5::IdentificationLink { .. } => SCHEME_IDENTIFICATION_LINK,
+            Clause5::Did { .. } => SCHEME_DID,
+            unmapped => {
+                return Err(RegistryValidationError::UnmappedIdentifierScheme {
+                    identifier: unmapped.as_str().to_owned(),
+                });
+            }
+        };
+        Ok(Self {
+            scheme: scheme.to_owned(),
+            value: identifier.as_str().to_owned(),
+            label: None,
+        })
     }
 }

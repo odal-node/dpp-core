@@ -1094,3 +1094,98 @@ fn a_provider_country_is_optional_and_checked_when_given() {
         Err(RegistryValidationError::InvalidCountryCode { .. })
     ));
 }
+
+// ── EN 18219 clause 5 → registry scheme ──────────────────────────────────────
+
+/// Each clause 5 scheme converts to its own scheme value, and carries the
+/// identifier verbatim.
+///
+/// 🚨 The GS1 arm yields the **bare 14-digit GTIN**, not a Digital Link URL.
+/// Building the URL needs a resolver host, which this tier does not know — and
+/// a conversion that guessed one would put a resolver nobody configured into a
+/// registration.
+#[test]
+fn each_clause_5_scheme_converts_to_its_own_registry_scheme() {
+    use dpp_domain::identifier::ProductIdentifier as Clause5;
+
+    let cases = [
+        (
+            Clause5::gs1(dpp_domain::Gtin::parse("09506000134352").unwrap()),
+            SCHEME_GTIN,
+            "09506000134352",
+        ),
+        (
+            Clause5::identification_link("https://id.example.com/p/1").unwrap(),
+            SCHEME_IDENTIFICATION_LINK,
+            "https://id.example.com/p/1",
+        ),
+        (
+            Clause5::did("did:web:example.com:p:1").unwrap(),
+            SCHEME_DID,
+            "did:web:example.com:p:1",
+        ),
+    ];
+
+    for (clause5, expected_scheme, expected_value) in cases {
+        let converted = ProductIdentifier::try_from(&clause5).expect("a mapped scheme");
+        assert_eq!(converted.scheme, expected_scheme);
+        assert_eq!(converted.value, expected_value);
+        assert_eq!(converted.label, None);
+    }
+}
+
+/// The scheme values must be distinct, or two schemes register as one.
+///
+/// Worth its own assertion because the failure is invisible: a copy-paste
+/// leaving two constants equal produces conversions that validate, serialise and
+/// round-trip, while filing a DID and a link under one name.
+#[test]
+fn no_two_schemes_share_a_registry_value() {
+    let mut values: Vec<&str> = PRODUCT_SCHEME_BASIS.iter().map(|(v, _)| *v).collect();
+    let count = values.len();
+    values.sort_unstable();
+    values.dedup();
+    assert_eq!(
+        values.len(),
+        count,
+        "two clause 5 schemes share a scheme value"
+    );
+}
+
+/// 🚨 None of the three is observed, and the table says so where code can read it.
+///
+/// `"gtin"` and `"did"` have in-crate precedent, which is a convention of ours
+/// and not evidence about the registry; scheme 2's has none at all. If one is
+/// ever read off a real response this fails, which is the point — the upgrade
+/// should be deliberate.
+#[test]
+fn every_scheme_value_is_assumed_not_observed() {
+    for (value, basis) in PRODUCT_SCHEME_BASIS {
+        assert!(
+            !basis.is_observed(),
+            "{value} claims to be observed; no registry response has been seen naming any scheme"
+        );
+    }
+}
+
+/// A converted scheme 1 identifier still passes the mod-10 check the registry
+/// crate applies to `"gtin"` — the one scheme value with behaviour attached.
+#[test]
+fn a_converted_gtin_still_validates_as_one() {
+    use dpp_domain::identifier::ProductIdentifier as Clause5;
+
+    let good = Clause5::gs1(dpp_domain::Gtin::parse("09506000134352").unwrap());
+    let converted = ProductIdentifier::try_from(&good).unwrap();
+    assert!(converted.validate().is_ok());
+
+    // And the check really is keyed on the scheme string: relabel a DID as a
+    // GTIN and the same validator refuses it, which is why the conversion must
+    // not be left to each consumer to spell.
+    let did = Clause5::did("did:web:example.com:p:1").unwrap();
+    let mut mislabelled = ProductIdentifier::try_from(&did).unwrap();
+    mislabelled.scheme = SCHEME_GTIN.to_owned();
+    assert!(matches!(
+        mislabelled.validate(),
+        Err(RegistryValidationError::InvalidGtin { .. })
+    ));
+}

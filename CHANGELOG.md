@@ -232,6 +232,41 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **An EN 18219 identifier converts into the registry's product identifier.**
+  Two types shared a name across a crate boundary —
+  `dpp_domain::identifier::ProductIdentifier`, the clause 5 scheme enum, and
+  `dpp_registry::ProductIdentifier`, the wire struct — and nothing converted
+  between them. Every consumer registering a passport wrote the mapping itself.
+
+  🚨 **The `scheme` string is where an invented mapping goes wrong without
+  failing.** `ProductIdentifier::validate` checks structure only when the scheme
+  is `"gtin"`, so a DID mislabelled `"gtin"` is refused loudly while one
+  mislabelled `"gtn"` passes validation and is submitted as though it identified
+  something.
+
+  `SCHEME_GTIN`, `SCHEME_IDENTIFICATION_LINK` and `SCHEME_DID` state the values
+  once. `"gtin"` rather than `"gs1"`, because the registry's `scheme` names *what
+  the value is* and its own examples are value kinds — the domain enum's `"gs1"`
+  tag names the clause 5 *scheme*, which is a different question and coincides
+  only for schemes 2 and 3. Scheme 2 has no precedent anywhere, so it reuses the
+  domain's own persisted tag rather than inventing a third spelling for something
+  that already has two.
+
+  `PRODUCT_SCHEME_BASIS` records that **all three are `RegistryBasis::Assumed`**
+  — no published specification names any of them and none has been observed;
+  `"gtin"` and `"did"` have in-crate precedent, which is a convention of ours and
+  not evidence about the registry. A test fails if one is ever quietly relabelled
+  as observed, and another fails if two schemes come to share a value, which
+  would file a DID and a link under one name while validating and round-tripping
+  perfectly.
+
+  `TryFrom` rather than `From`, because
+  `dpp_domain::identifier::ProductIdentifier` is `#[non_exhaustive]`: a match on
+  it cannot be exhaustive from another crate, so a scheme added upstream and not
+  mapped here arrives as a wildcard. A wildcard producing a scheme string would
+  label it as though it had been mapped; `UnmappedIdentifierScheme` refuses and
+  names the value instead, which is the loudest a downstream crate can be.
+
 - **`dpp-registry` now states what backs each of its wire details, as data.**
   Every endpoint path, header and status code in that crate already said in prose
   whether it had been observed somewhere or invented to fill a gap — 👁️ against

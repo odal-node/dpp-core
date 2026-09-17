@@ -61,6 +61,19 @@ pub enum RegistryValidationError {
         /// Why that passport was refused.
         source: Box<RegistryValidationError>,
     },
+    /// An EN 18219 clause 5 scheme this crate has no registry scheme value for.
+    ///
+    /// Reachable only because `dpp_domain::identifier::ProductIdentifier` is
+    /// `#[non_exhaustive]`: a match on it cannot be exhaustive from here, so a
+    /// scheme added upstream and not mapped here arrives as a wildcard. Refusing
+    /// is the loudest this crate can be — the alternative is labelling it with
+    /// whatever string the wildcard arm happened to choose.
+    UnmappedIdentifierScheme {
+        /// The identifier, as [`as_str`](dpp_domain::identifier::ProductIdentifier::as_str)
+        /// renders it — the only thing knowable about a variant this crate does
+        /// not recognise.
+        identifier: String,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -121,6 +134,12 @@ impl std::fmt::Display for RegistryValidationError {
                 write!(
                     f,
                     "passport at index {index} is invalid, so the whole submission is refused: {source}"
+                )
+            }
+            Self::UnmappedIdentifierScheme { identifier } => {
+                write!(
+                    f,
+                    "'{identifier}' is under an EN 18219 scheme this crate has no registry scheme value for"
                 )
             }
         }
