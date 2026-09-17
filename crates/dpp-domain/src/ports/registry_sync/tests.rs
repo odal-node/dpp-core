@@ -200,3 +200,33 @@ fn a_product_group_without_a_model_identifier_reports_none() {
         .is_none()
     );
 }
+
+/// 🚨 `Some("")` is the same absence wearing an `Option::Some`.
+///
+/// `Passport`'s fields are public and it deserialises from stored documents, so
+/// nothing stops a blank value being written where `None` belongs. Checking
+/// presence alone would have left this constructor doing exactly what it was
+/// changed to stop doing — producing a request that looks complete and carries
+/// nothing — one layer in from where the defect was found.
+///
+/// Whitespace counts as blank: a value of `" "` identifies no more than `""`
+/// does, and is the form a trimmed-input bug actually produces.
+#[test]
+fn a_present_but_blank_field_is_as_absent_as_a_missing_one() {
+    let mut passport = make_published_passport();
+    passport.operator_identifier = Some(String::new());
+    passport.qr_code_url = Some("   ".into());
+    if let Some(facility) = passport.facility.as_mut() {
+        facility.value = String::new();
+    }
+
+    let refused = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect_err("blank is not a value the passport carried");
+
+    let fields: Vec<&str> = refused.errors.iter().map(|e| e.field.as_str()).collect();
+    assert_eq!(fields, ["/operatorIdentifier", "/facility", "/qrCodeUrl"]);
+}

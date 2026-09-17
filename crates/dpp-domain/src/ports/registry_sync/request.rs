@@ -169,19 +169,26 @@ impl RegistrationRequest {
                 });
             }
         };
+        // 🚨 Present **and non-blank**. `Some("")` is not a value the passport
+        // carried — it is the same absence wearing an `Option::Some`, and
+        // `Passport`'s fields are public so nothing stops one being written
+        // directly or deserialised from a stored document. Checking `is_some`
+        // alone would have left this constructor doing exactly what it was
+        // changed to stop doing, one layer in.
+        let stated = |value: &str| !value.trim().is_empty();
         require(
-            passport.operator_identifier.is_some(),
+            passport.operator_identifier.as_deref().is_some_and(stated),
             "/operatorIdentifier",
             "the registry records the responsible economic operator; a registration \
              cannot name one the passport never carried",
         );
         require(
-            passport.facility.is_some(),
+            passport.facility.as_ref().is_some_and(|f| stated(&f.value)),
             "/facility",
             "Annex III point (i) makes the facility identifier registration data",
         );
         require(
-            passport.qr_code_url.is_some(),
+            passport.qr_code_url.as_deref().is_some_and(stated),
             "/qrCodeUrl",
             "the data carrier URI is what the registration resolves to",
         );
