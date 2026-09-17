@@ -188,12 +188,15 @@ pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
     CitedNotModelled {
         celex: "32004R0648",
         reason: "The old Detergents Regulation. Cited only as the act Regulation \
-                 (EU) 2026/405 repeals: its Art. 36 reads 'Regulation (EC) No \
-                 648/2004 is repealed with effect from 23 September 2029.' The \
-                 same article carries a grandfathering window to 23 September \
-                 2030 for product placed on the market in the preceding year, so \
-                 'repealed' on its own overstates how cleanly it ends — which is \
-                 the transition a reader needs.",
+                 (EU) 2026/405 repeals: its Art. 35 reads 'Regulation (EC) No \
+                 648/2004 is repealed with effect from 23 September 2029', and \
+                 directs that references be read against the correlation table in \
+                 Annex VIII. The *next* article, Art. 36, carries the transition: \
+                 product placed before 23 September 2029 may be made available \
+                 indefinitely, and product placed in the following year until 23 \
+                 September 2030 — so 'repealed' on its own overstates how cleanly \
+                 it ends, which is what a reader needs. This entry said Art. 36 \
+                 for both, while marked as read against the Official Journal.",
         basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
@@ -260,14 +263,39 @@ pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
     },
     CitedNotModelled {
         celex: "32024R1252",
-        reason: "Critical Raw Materials Act. Cited as the source of the \
-                 canonical CRM list. The claim that it defines which materials \
-                 are critical without governing their disclosure is the hardest \
-                 kind to hold — it asserts the absence of an obligation across a \
-                 whole regulation — and nobody holds the text. This entry is the \
-                 one the inventory most needs read, because the claim also \
-                 ships, in every battery and electronics schema description \
-                 naming the act.",
-        basis: CitationBasis::Assumed,
+        reason: "Critical Raw Materials Act. Cited as the source of the canonical \
+                 CRM list, which Annexes I and II supply and which is why prose \
+                 names it. 🚨 It was also recorded here as an act that 'does not \
+                 govern disclosure'. That is false. Art. 28 requires a label \
+                 stating whether a product incorporates permanent magnets and of \
+                 which type, and a data carrier linked to a unique product \
+                 identifier giving access to each magnet's weight, location and \
+                 chemical composition; Art. 28(6) says that where a product \
+                 passport is required under another Union act, 'the information \
+                 referred to in paragraph 4 shall be included in that product \
+                 passport'. Art. 28(7) puts that information's accuracy and a \
+                 lifetime-plus-ten-years retention on the person placing the \
+                 product on the market. Art. 29 requires the recycled share of \
+                 eight named elements to be published on a free-access website. \
+                 The act is still not *modelled* — no binding describes it — but \
+                 it is a passport-content instrument, not a list of materials. \
+                 \
+                 Scope, because these duties are narrower than they read. Art. 28 \
+                 binds an exhaustive list of products — MRI devices, wind energy \
+                 generators, industrial robots, motor vehicles, light means of \
+                 transport, cooling generators, heat pumps, electric motors \
+                 including where integrated, washing machines, tumble driers, \
+                 microwaves, vacuum cleaners, dishwashers — and none of the \
+                 product groups this crate models is among them. It applies two \
+                 years after an implementing act due 24 November 2026, and from \
+                 24 May 2029 for MRI devices, motor vehicles and category-L \
+                 vehicles. Art. 29 is narrower again: only those products, only \
+                 magnet types (i) to (iii), and only where the magnets' total \
+                 weight exceeds 0,2 kg — a threshold that is Art. 29's and not \
+                 Art. 28's — from 24 May 2027 or two years after its delegated \
+                 act, whichever is later. Art. 28(8) lets Union harmonisation \
+                 legislation displace Art. 28 for a listed product, so the answer \
+                 is per product group rather than global.",
+        basis: CitationBasis::Sourced,
     },
 ];
