@@ -33,6 +33,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// ticked. `Retired` keeps the meaning — post-retention, immutable, still
 /// readable — and vacates the word.
 ///
+/// **Vacated, not abolished.** Clause 4.2 archiving is a real obligation and the
+/// word is the right one for it; what it is not is a status. So "archive",
+/// "archiving" and "archived version" remain this domain's vocabulary for the
+/// retention of a live passport's historical versions, and are now free to mean
+/// only that. A reader who meets either word in this crate outside
+/// [`ArchivePort`](crate::ports::archive::ArchivePort) — which is a third
+/// concept again, the ESPR Art. 10(4) back-up copy — should be reading about
+/// versions of something still live, never about a state a record is in.
+///
 /// # Serialisation
 /// Serialises to the API wire format: `"draft"`, `"active"`, `"suspended"`,
 /// `"retired"`, `"superseded"`, `"deactivated"`. The domain uses `Published`
@@ -40,7 +49,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 ///
 /// `"archived"` is **not** accepted on the way in. Keeping it as an alias, the
 /// way `"published"` is kept for `"active"`, would put the ambiguous word back
-/// on the wire and leave a reader believing it still means something here. It is
+/// on the wire — and it is precisely because the word still means something in
+/// this domain, just not this, that it cannot also be read as a status. It is
 /// refused with a message naming its replacement rather than with a bare
 /// unknown-variant error, because a reader meeting that refusal needs the answer
 /// and not a list.
@@ -123,11 +133,12 @@ impl<'de> Deserialize<'de> for PassportStatus {
             // `unknown_variant` would list the valid set and leave the reader to
             // guess which of them replaced this one.
             "archived" => Err(serde::de::Error::custom(
-                "`archived` was renamed to `retired`: EN 18221 clause 4.2 uses \
-                 \"archiving\" for the retention of historical versions of a live \
-                 passport, which is a different thing from this terminal lifecycle \
-                 status. It is not accepted as an alias, because keeping it would \
-                 put the ambiguous word back on the wire",
+                "this status is now `retired`. `archived` was not dropped — it \
+                 still names what EN 18221 clause 4.2 means by it, the retention \
+                 of historical versions of a passport that is still live, which \
+                 is a different thing from a terminal lifecycle status. That is \
+                 why it is refused here rather than accepted as an alias: one \
+                 word cannot carry both meanings on the same wire",
             )),
             other => Err(serde::de::Error::unknown_variant(
                 other,

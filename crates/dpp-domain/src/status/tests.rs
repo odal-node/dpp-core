@@ -28,7 +28,7 @@ fn invalid_transitions() {
     // Deactivated is terminal.
     assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Published));
     assert!(!PassportStatus::Deactivated.can_transition_to(&PassportStatus::Retired));
-    // Cannot deactivate a draft or archived record.
+    // Cannot deactivate a draft or retired record.
     assert!(!PassportStatus::Draft.can_transition_to(&PassportStatus::Deactivated));
     assert!(!PassportStatus::Retired.can_transition_to(&PassportStatus::Deactivated));
 }
@@ -119,12 +119,21 @@ fn the_old_archived_wire_value_is_refused_and_says_what_replaced_it() {
         .expect_err("`archived` is no longer a status this build accepts");
     let msg = err.to_string();
     assert!(
-        msg.contains("renamed to `retired`"),
+        msg.contains("`retired`"),
         "the refusal must name the replacement, not just reject: {msg}"
     );
     assert!(
         msg.contains("EN 18221"),
         "and must say why, or it reads as churn: {msg}"
+    );
+    // The distinction is the point, and a refusal that reads as a deletion
+    // teaches the opposite of it: someone told only that `archived` is gone
+    // concludes this system does not archive, when clause 4.2 archiving is a
+    // live obligation that kept the word. The message has to say both halves.
+    assert!(
+        msg.contains("not dropped"),
+        "the refusal must say the word survives for clause 4.2, or it reads as \
+         a removal: {msg}"
     );
 }
 

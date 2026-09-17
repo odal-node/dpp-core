@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// # Not the same thing as `PassportStatus`
 ///
 /// [`PassportStatus`](crate::status::PassportStatus) is a
-/// **publication** lifecycle: draft, published, suspended, archived, superseded,
+/// **publication** lifecycle: draft, published, suspended, retired, superseded,
 /// deactivated. This is a **product-life** status. They are orthogonal, and the
 /// clearest case is a repurposed unit, whose passport is perfectly ordinarily
 /// `Published` while its life status is `Repurposed`. Before this type existed

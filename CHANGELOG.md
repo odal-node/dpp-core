@@ -38,12 +38,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   functionality, so no doc comment on the variant could remove it — anyone
   mapping this vocabulary onto EN 18221 by name ticks a box that is not ticked.
 
+  **Nothing was removed — the word changed owner.** Clause 4.2 archiving is a
+  real obligation and "archiving" is the right word for it; what it is not is a
+  status. So the vocabulary is now one word per meaning rather than one word for
+  three: **archiving** is the retention of a live passport's historical versions,
+  **retired** is the terminal publication state, and the ESPR **Art. 10(4)
+  back-up copy** — the independent third-party replica behind
+  `ports::archive::ArchivePort` — is the third, a copy of a record rather than a
+  history of one. Two uses elsewhere are compound and stay as they are: the
+  keystore's *archived keys* and a seal's *archival timestamp*.
+
   **Why the old wire value is refused rather than aliased.** `"published"` is
   kept as an alias for `"active"` because the two words mean the same thing.
-  `"archived"` does not, and keeping it would put the ambiguous word back on the
-  wire the rename removed it from. It is refused with a message naming `retired`
-  and saying why, rather than with a bare unknown-variant error, because a reader
-  meeting that refusal needs the answer and not a list.
+  `"archived"` does not — and it is precisely because the word still means
+  something here, just not this, that it cannot also be read as a status. It is
+  refused with a message that names `retired`, says why, **and says the word was
+  not dropped**, rather than with a bare unknown-variant error: a reader told
+  only that `archived` is gone concludes this system does not archive, which is
+  the opposite of true.
 
   **Why now.** This is the cheapest it will ever be and it gets monotonically
   more expensive: nothing is deployed, so the set of records carrying the old

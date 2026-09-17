@@ -177,7 +177,7 @@ fn transition_invalid_returns_error() {
 }
 
 #[test]
-fn transition_archived_is_terminal() {
+fn transition_retired_is_terminal() {
     let mut p = make_passport();
     p.transition_to(PassportStatus::Published).unwrap();
     p.transition_to(PassportStatus::Retired).unwrap();
