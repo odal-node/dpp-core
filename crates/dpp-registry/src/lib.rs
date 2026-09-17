@@ -63,9 +63,13 @@
 //! - [`transfer`] — [`TransferNotification`].
 //! - [`error`] — [`RegistryValidationError`], [`EuRegistryError`],
 //!   [`EuRegistryErrorKind`].
+//! - [`basis`] — [`RegistryBasis`]: whether a wire detail was observed on a
+//!   date or is ours. The observed/invented split the constants state in prose,
+//!   in a form a mock and a conformance test can act on.
 //! - [`endpoint`] — [`RegistryEndpoint`], [`RegistryAuthority`] (keeps the
 //!   ⚠️ COMPLIANCE-PIN block visible in one small file).
 
+pub mod basis;
 pub mod endpoint;
 pub mod error;
 pub mod granularity;
@@ -77,12 +81,14 @@ pub mod submission;
 mod tests;
 pub mod transfer;
 
+pub use basis::RegistryBasis;
 pub use endpoint::{
-    IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
+    ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
     STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
+    STATUS_IDEMPOTENCY_KEY_REUSED, STATUS_IDEMPOTENCY_KEY_REUSED_BASIS,
     SUB_CODE_IDEMPOTENCY_KEY_REUSED,
 };
 pub use granularity::{Granularity, RegistrationLevel};

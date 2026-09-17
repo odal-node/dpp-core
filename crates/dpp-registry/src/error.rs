@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::basis::RegistryBasis;
+
 /// Error returned when a bridge identifier fails structural validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -114,6 +116,41 @@ pub enum EuRegistryErrorKind {
     Timeout,
 }
 
+impl EuRegistryErrorKind {
+    /// The HTTP status this kind is reported as, and what backs the choice.
+    ///
+    /// `None` for the kinds that describe something other than a response: a
+    /// connection that never completed and a timeout have no status because no
+    /// status arrived, and [`InvalidResponse`](Self::InvalidResponse) is *this
+    /// crate's* verdict on a response whose own status could be anything. A
+    /// caller inventing a number for those would be putting a value on the wire
+    /// that no registry chose.
+    ///
+    /// 🚨 **Every status here is [`RegistryBasis::Assumed`] and that is not a
+    /// placeholder to be quietly upgraded.** It exists so a mock and a real
+    /// adapter make the *same* choice rather than each guessing — the mock being
+    /// the only oracle the adapter is tested against, a disagreement between
+    /// them is invisible. Agreement is all this buys; it is not knowledge of
+    /// what the registry sends. The one status anyone has seen is
+    /// [`STATUS_IDEMPOTENCY_KEY_REUSED`].
+    ///
+    /// Matched exhaustively on purpose. The enum is `#[non_exhaustive]` to
+    /// downstream, but inside this crate a new kind must be given a status here
+    /// or this stops compiling — a wildcard arm would hand it one silently.
+    #[must_use]
+    pub fn http_status(&self) -> Option<(u16, RegistryBasis)> {
+        let status = match self {
+            Self::Unauthorized => 401,
+            Self::RegistrationRejected => 422,
+            Self::RateLimited => 429,
+            Self::NotFound => 404,
+            Self::RegistryInternalError => 500,
+            Self::ConnectionFailed | Self::Timeout | Self::InvalidResponse => return None,
+        };
+        Some((status, RegistryBasis::Assumed))
+    }
+}
+
 /// Error returned by EU registry operations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -161,6 +198,19 @@ pub struct RegistryErrorBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
+
+/// The HTTP status accompanying [`SUB_CODE_IDEMPOTENCY_KEY_REUSED`].
+///
+/// 👁️ **The only status in this crate that anyone has actually seen.** Every
+/// other one is [`EuRegistryErrorKind::http_status`]'s, and is ours. Stated as a
+/// constant rather than left inside that mapping because it does not belong to
+/// any [`EuRegistryErrorKind`] — a replayed key is reported by the body's
+/// `subCode`, and there is no `Conflict` kind for it to hang on.
+pub const STATUS_IDEMPOTENCY_KEY_REUSED: u16 = 409;
+
+/// What backs [`STATUS_IDEMPOTENCY_KEY_REUSED`].
+pub const STATUS_IDEMPOTENCY_KEY_REUSED_BASIS: RegistryBasis =
+    RegistryBasis::Observed { on: "2026-09-16" };
 
 /// The `subCode` accompanying **409** when an idempotency key is replayed.
 ///

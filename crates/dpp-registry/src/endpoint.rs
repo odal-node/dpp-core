@@ -17,6 +17,15 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::basis::RegistryBasis;
+
+/// The date the registry's web client was last read.
+///
+/// One constant rather than a literal per entry: every observation below came
+/// from the same reading, and repeating the date invites the entries to drift
+/// apart when the next reading updates some of them and not others.
+const LAST_READ: &str = "2026-09-16";
+
 /// Registration submission, relative to [`RegistryEndpoint::base_url`].
 ///
 /// 👁️ **Observed 2026-09-16**, as `submitDppRegistrationRequest` in the
@@ -53,6 +62,40 @@ pub const TRANSFER_PATH_TEMPLATE: &str = "/registrations/{id}/transfer";
 /// [`EuRegistryEnvelope::request_id`](crate::EuRegistryEnvelope::request_id),
 /// which is ours and is a different thing.
 pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
+
+/// Every wire constant this module declares, with what backs it.
+///
+/// The same observed/invented split the constants state in prose, in a form
+/// code can act on — a mock can report the basis of each route it serves, and a
+/// test can assert it exercised nothing [`RegistryBasis::Assumed`]. See
+/// [`crate::basis`] for why that matters.
+///
+/// 🚨 **This table is the contract, and a test holds it to the constants.** A
+/// path added to this module and not to the table would be a route with no
+/// stated provenance, which is the state the module was in before the table
+/// existed — so `every_wire_constant_declares_a_basis` fails until both agree.
+pub const ENDPOINT_BASIS: [(&str, RegistryBasis); 4] = [
+    (REGISTRATION_PATH, RegistryBasis::Observed { on: LAST_READ }),
+    (STATUS_PATH_TEMPLATE, RegistryBasis::Assumed),
+    (TRANSFER_PATH_TEMPLATE, RegistryBasis::Assumed),
+    (
+        IDEMPOTENCY_KEY_HEADER,
+        RegistryBasis::Observed { on: LAST_READ },
+    ),
+];
+
+/// What backs `value`, or `None` if this module does not declare it.
+///
+/// `None` is not "invented" — it is "this crate never said this". A caller
+/// getting `None` for a route it believes it took from here has a typo or a
+/// stale copy, and answering `Assumed` would hide that behind a plausible one.
+#[must_use]
+pub fn basis_of(value: &str) -> Option<RegistryBasis> {
+    ENDPOINT_BASIS
+        .iter()
+        .find(|(declared, _)| *declared == value)
+        .map(|(_, basis)| *basis)
+}
 
 /// Known EU registry authority types.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
