@@ -13,8 +13,8 @@ use crate::ports::backup::{
 /// No-op back-up copy for development and standalone deployments.
 ///
 /// All operations succeed without performing any I/O. Returns synthetic
-/// receipts with `backup_id = "ghost-{uuid}"`. Use in tests and in the
-/// standalone `dpp-vault` binary where object storage is not configured.
+/// receipts with `backup_id = "GHOST-{uuid}"`. Use in tests and wherever no
+/// provider is configured.
 pub struct GhostBackup;
 
 #[async_trait]
