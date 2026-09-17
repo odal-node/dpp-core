@@ -16,6 +16,7 @@ pub mod cn_category;
 pub mod commodity_code;
 pub mod gln;
 pub mod gtin;
+pub mod product_identifier;
 #[cfg(test)]
 mod tests;
 
@@ -24,3 +25,4 @@ pub use cn_category::{CnCategory, CnCategoryError};
 pub use commodity_code::{CommodityCode, CommodityCodeError};
 pub use gln::{Gln, GlnError};
 pub use gtin::{Gtin, GtinError};
+pub use product_identifier::{ProductIdentifier, ProductIdentifierError};

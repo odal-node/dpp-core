@@ -101,6 +101,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`ProductIdentifier` names all three unique-product-identifier schemes
+  EN 18219 admits, not only the one that costs money.** Additive: the type is
+  introduced and nothing consumes it yet — the persisted-shape swap is a
+  separate change, deliberately.
+
+  ✅ COMPLIANCE-PIN: **EN 18219:2026 clause 5.1** — an identifier satisfies
+  clause 4's general principles **and** complies with **one of** clause 5's ID
+  schemes. They are alternatives. EN 18219 is one of the six standards cited by
+  Commission Implementing Decision (EU) 2026/1736 and a presumption route under
+  ESPR **Art. 41(2)**.
+
+  | Variant | Scheme | External dependency |
+  |---|---|---|
+  | `Gs1 { gtin }` | 1, GS1 branch | a GS1 Company Identification Number — a paid subscription |
+  | `IdentificationLink { url }` | 2, EN IEC 61406-1/-2 | **none — self-issuing** |
+  | `Did { did }` | 3, W3C DID v1.0:2022 | **none — self-issuing** |
+
+  **Why.** Every product-group payload declares `gtin: Gtin`, not
+  `Option<Gtin>`, so a GTIN is structurally required to create a passport — which
+  means an operator without GS1 membership cannot create one at all: not a
+  degraded one, not one with a warning. The standard says such an operator can
+  hold a fully conformant identifier. Annex B Table B.4 settles the cost
+  argument — every scheme needs a registered web domain, and scheme 1
+  *additionally* needs the CIN, so scheme 3's prerequisites are a strict subset
+  of scheme 1's while rating highest for sovereignty over the identifier.
+
+  **Two limits, recorded on the type rather than left to be discovered.** Scheme
+  2's format is EN IEC 61406-1/-2, which this project does not hold — the value
+  is checked only to be an absolute `http(s)` URL, and passing that is *not* a
+  conformance claim. And scheme 1's ASC MH10.8.2 branch is not modelled, because
+  nothing here issues one and an unused variant would be a guess at a shape.
+
+  🚨 A known gap, pinned by a test that fails when it closes: `serde` builds the
+  two self-issuing arms field-by-field, so a *stored* identification link or DID
+  is not revalidated on read, where `Gtin` validates in its own `Deserialize`.
+  Harmless while nothing persists the type; it must be closed by the change that
+  does.
+
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
   passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
   unreachable: it needs the ten priority parts scored across three part-level
