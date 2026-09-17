@@ -35,7 +35,7 @@ pub const MAX_SUCCESSION_HOPS: usize = 256;
 /// and **Art. 11(e)** makes that availability an essential requirement holding
 /// even after insolvency, liquidation or cessation of activity. In practice
 /// that is a retention period of typically 10–15 years. Passports transition through statuses
-/// (Draft → Published → Suspended → Archived) but are never physically removed.
+/// (Draft → Published → Suspended → Retired) but are never physically removed.
 /// Any cleanup job or admin tooling MUST check `retention_locked` before
 /// removing a record from the database.
 #[async_trait]

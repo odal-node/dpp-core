@@ -219,7 +219,7 @@ longer sufficient:
 
 ### G5 — No product-life status axis — **CLOSED**
 
-`PassportStatus` (`Draft`/`Published`/`Suspended`/`Archived`/`Superseded`/
+`PassportStatus` (`Draft`/`Published`/`Suspended`/`Retired`/`Superseded`/
 `Deactivated`) is a **publication** lifecycle. Annex XIII point 4(c) wants a
 **product-life** status — `original` / `repurposed` / `re-used` /
 `remanufactured` / `waste`, now pinned in §2.2. These are orthogonal: a repurposed

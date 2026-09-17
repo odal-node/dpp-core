@@ -13,6 +13,55 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`PassportStatus::Archived` is now `PassportStatus::Retired`, and its wire
+  value is `"retired"`.** *(Breaking twice over: the variant rename breaks
+  anything matching on `PassportStatus`, and the wire value change breaks
+  anything reading stored records. `"archived"` is **not** accepted on
+  deserialisation — see below.)*
+
+  **Migration:** rename the variant at every match site and construction site,
+  and change any persisted or transmitted `"archived"` to `"retired"`. There is
+  nothing else to do: the variant's meaning is unchanged — post-retention,
+  immutable, still readable — and every transition into and out of it is the
+  same.
+
+  **Why.** EN 18221:2026 (*Digital product passport — Data storage, archiving and
+  data persistence*), one of the six standards cited by Commission Implementing
+  Decision (EU) 2026/1736, uses "archiving" for something else: its clause 4.2
+  is the retention of **historical versions of a passport that is still live**,
+  beginning at the first change to the initial passport, kept for the passport's
+  lifetime, each version carrying the same access restrictions as the
+  corresponding current one. This variant was a terminal *publication* state
+  reached once a record stops changing. The collision is between a status and a
+  functionality, so no doc comment on the variant could remove it — anyone
+  mapping this vocabulary onto EN 18221 by name ticks a box that is not ticked.
+
+  **Nothing was removed — the word changed owner.** Clause 4.2 archiving is a
+  real obligation and "archiving" is the right word for it; what it is not is a
+  status. So the vocabulary is now one word per meaning rather than one word for
+  three: **archiving** is the retention of a live passport's historical versions,
+  **retired** is the terminal publication state, and the ESPR **Art. 10(4)
+  back-up copy** — the independent third-party replica behind
+  `ports::archive::ArchivePort` — is the third, a copy of a record rather than a
+  history of one. Two uses elsewhere are compound and stay as they are: the
+  keystore's *archived keys* and a seal's *archival timestamp*.
+
+  **Why the old wire value is refused rather than aliased.** `"published"` is
+  kept as an alias for `"active"` because the two words mean the same thing.
+  `"archived"` does not — and it is precisely because the word still means
+  something here, just not this, that it cannot also be read as a status. It is
+  refused with a message that names `retired`, says why, **and says the word was
+  not dropped**, rather than with a bare unknown-variant error: a reader told
+  only that `archived` is gone concludes this system does not archive, which is
+  the opposite of true.
+
+  **Why now.** This is the cheapest it will ever be and it gets monotonically
+  more expensive: nothing is deployed, so the set of records carrying the old
+  value is empty. `no_status_serialises_to_the_vacated_word` keeps the word
+  vacated as a property, so a variant added later cannot quietly take it back.
+
 ### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a

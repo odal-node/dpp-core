@@ -17,7 +17,7 @@ fn all_lists_every_variant() {
             PassportStatus::Draft
             | PassportStatus::Published
             | PassportStatus::Suspended
-            | PassportStatus::Archived
+            | PassportStatus::Retired
             | PassportStatus::Superseded
             | PassportStatus::Deactivated => {}
         }
