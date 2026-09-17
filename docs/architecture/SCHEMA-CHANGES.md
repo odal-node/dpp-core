@@ -179,6 +179,13 @@ documents still read is answered by the frozen fixtures in
 |---|---|---|---|
 | `productCategory` | constraint changed | `enum=["smartphone","laptop","tablet","monitor","tv","server","router","charger","earphone","pcb","other"]` | `enum=["smartphone","other-mobile-phone","cordless-phone","tablet"]` |
 
+### v1.2.0 → v1.3.0 · additive
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `indexScopeExclusion` | added | — | `string\|null` |
+| `repairabilityIndexInputs` | added | — | `object\|null` |
+
 ## furniture
 
 

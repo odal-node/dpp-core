@@ -146,8 +146,8 @@ pub use compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
     gate_determination,
 };
-pub use ports::archive::{
-    ArchivePort, ArchiveReceipt, ArchiveStatus, ArchiveVerification, GhostArchive,
+pub use ports::backup::{
+    BackupCopyPort, BackupReceipt, BackupStatus, BackupVerification, GhostBackup,
 };
 pub use ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;

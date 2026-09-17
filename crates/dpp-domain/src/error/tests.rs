@@ -11,12 +11,12 @@ fn not_found_display() {
 #[test]
 fn invalid_transition_display() {
     let e = DppError::InvalidTransition {
-        current: "archived".to_owned(),
+        current: "retired".to_owned(),
         required: "draft".to_owned(),
     };
     let msg = e.to_string();
     assert!(
-        msg.contains("archived"),
+        msg.contains("retired"),
         "message should contain current state"
     );
     assert!(

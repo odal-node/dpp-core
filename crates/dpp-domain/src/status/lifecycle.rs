@@ -6,18 +6,54 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 ///
 /// Valid transitions:
 /// ```text
-/// Draft      → Published  | Archived
-/// Published  → Suspended  | Archived  | Superseded | Deactivated
-/// Suspended  → Published  | Archived  | Deactivated
+/// Draft      → Published  | Retired
+/// Published  → Suspended  | Retired  | Superseded | Deactivated
+/// Suspended  → Published  | Retired  | Deactivated
 /// ```
-/// `Archived`, `Superseded`, and `Deactivated` are terminal — no further
+/// `Retired`, `Superseded`, and `Deactivated` are terminal — no further
 /// transitions. A `Deactivated` passport is retained (the DPP outlives the
 /// product, EN 18221) but is end-of-life; the reason lives in the EOL event.
 ///
+/// # Why the terminal state is not called `Archived`
+///
+/// It was, and the word is EN 18221:2026's, which uses it for something else.
+/// That standard's clause 4.2 **archiving** is the retention of historical
+/// versions of a passport that is **still live** — a parallel store of past
+/// versions, beginning at the first change to the initial passport and kept for
+/// the passport's lifetime, with each archived version carrying the same access
+/// restrictions as the corresponding current one.
+///
+/// This variant is none of that. It is a *publication* lifecycle state, reached
+/// once the record has stopped changing.
+///
+/// The collision is between a **status** and a **functionality**, so no doc
+/// comment on the variant could remove it: the word was doing two jobs in one
+/// domain, and the standard's job is the one a reader arrives with. Anyone
+/// mapping this vocabulary onto EN 18221 by name would tick a box that is not
+/// ticked. `Retired` keeps the meaning — post-retention, immutable, still
+/// readable — and vacates the word.
+///
+/// **Vacated, not abolished.** Clause 4.2 archiving is a real obligation and the
+/// word is the right one for it; what it is not is a status. So "archive",
+/// "archiving" and "archived version" remain this domain's vocabulary for the
+/// retention of a live passport's historical versions, and are now free to mean
+/// only that. A reader who meets either word in this crate outside
+/// [`BackupCopyPort`](crate::ports::backup::BackupCopyPort) — which is a third
+/// concept again, the ESPR Art. 10(4) back-up copy — should be reading about
+/// versions of something still live, never about a state a record is in.
+///
 /// # Serialisation
 /// Serialises to the API wire format: `"draft"`, `"active"`, `"suspended"`,
-/// `"archived"`, `"superseded"`, `"deactivated"`. The domain uses `Published`
+/// `"retired"`, `"superseded"`, `"deactivated"`. The domain uses `Published`
 /// internally; the API and JSON use `"active"`.
+///
+/// `"archived"` is **not** accepted on the way in. Keeping it as an alias, the
+/// way `"published"` is kept for `"active"`, would put the ambiguous word back
+/// on the wire — and it is precisely because the word still means something in
+/// this domain, just not this, that it cannot also be read as a status. It is
+/// refused with a message naming its replacement rather than with a bare
+/// unknown-variant error, because a reader meeting that refusal needs the answer
+/// and not a list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PassportStatus {
@@ -27,8 +63,11 @@ pub enum PassportStatus {
     Published,
     /// Temporarily hidden from public access (e.g. data dispute, regulatory hold).
     Suspended,
-    /// Permanently archived. Immutable. Still accessible for historical queries.
-    Archived,
+    /// Permanently retired. Immutable. Still accessible for historical queries.
+    ///
+    /// **Not EN 18221 clause 4.2 archiving** — see the type's own note. This is
+    /// where a record's publication life ends, not a store of its past versions.
+    Retired,
     /// Replaced by a newer passport version. Terminal. The successor passport
     /// carries `supersedes_id` pointing back to this record.
     Superseded,
@@ -55,7 +94,7 @@ impl PassportStatus {
         Self::Draft,
         Self::Published,
         Self::Suspended,
-        Self::Archived,
+        Self::Retired,
         Self::Superseded,
         Self::Deactivated,
     ];
@@ -67,7 +106,7 @@ impl PassportStatus {
             PassportStatus::Draft => "draft",
             PassportStatus::Published => "active",
             PassportStatus::Suspended => "suspended",
-            PassportStatus::Archived => "archived",
+            PassportStatus::Retired => "retired",
             PassportStatus::Superseded => "superseded",
             PassportStatus::Deactivated => "deactivated",
         }
@@ -87,16 +126,27 @@ impl<'de> Deserialize<'de> for PassportStatus {
             "draft" => Ok(PassportStatus::Draft),
             "active" | "published" => Ok(PassportStatus::Published),
             "suspended" => Ok(PassportStatus::Suspended),
-            "archived" => Ok(PassportStatus::Archived),
+            "retired" => Ok(PassportStatus::Retired),
             "superseded" => Ok(PassportStatus::Superseded),
             "deactivated" => Ok(PassportStatus::Deactivated),
+            // Refused deliberately, and answered rather than merely rejected.
+            // `unknown_variant` would list the valid set and leave the reader to
+            // guess which of them replaced this one.
+            "archived" => Err(serde::de::Error::custom(
+                "this status is now `retired`. `archived` was not dropped — it \
+                 still names what EN 18221 clause 4.2 means by it, the retention \
+                 of historical versions of a passport that is still live, which \
+                 is a different thing from a terminal lifecycle status. That is \
+                 why it is refused here rather than accepted as an alias: one \
+                 word cannot carry both meanings on the same wire",
+            )),
             other => Err(serde::de::Error::unknown_variant(
                 other,
                 &[
                     "draft",
                     "active",
                     "suspended",
-                    "archived",
+                    "retired",
                     "superseded",
                     "deactivated",
                 ],
@@ -112,13 +162,13 @@ impl PassportStatus {
         matches!(
             (self, next),
             (Draft, Published)
-                | (Draft, Archived)
+                | (Draft, Retired)
                 | (Published, Suspended)
-                | (Published, Archived)
+                | (Published, Retired)
                 | (Published, Superseded)
                 | (Published, Deactivated)
                 | (Suspended, Published)
-                | (Suspended, Archived)
+                | (Suspended, Retired)
                 | (Suspended, Deactivated)
         )
     }

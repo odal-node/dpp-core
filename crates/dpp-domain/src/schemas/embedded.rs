@@ -179,6 +179,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/electronics/v1.2.0.json"),
     },
     EmbeddedSchema {
+        product_group: "electronics",
+        version: "1.3.0",
+        json: include_str!("../../schemas/electronics/v1.3.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "construction",
         version: "1.0.0",
         json: include_str!("../../schemas/construction/v1.0.0.json"),

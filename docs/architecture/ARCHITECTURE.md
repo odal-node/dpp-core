@@ -163,7 +163,7 @@ Trait definitions that downstream projects implement against their own infrastru
 | `ComplianceStrategy` | no | Validate product-group-specific compliance rules |
 | `IdentityPort` | yes | Sign and verify passport JWS |
 | `PluginHost` | no | Dispatch to Wasm product group plugins |
-| `ArchivePort` | yes | Immutable DPP archival with retention guarantees |
+| `BackupCopyPort` | yes | The ESPR Art. 10(4) third-party back-up copy |
 | `RegistrySyncPort` | yes | EU Central Registry registration and status sync |
 | `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 

@@ -43,6 +43,8 @@ fn sample_aluminium_data() -> ProductGroupData {
 
 fn sample_electronics_data() -> ProductGroupData {
     ProductGroupData::Electronics(ElectronicsData {
+        repairability_index_inputs: None,
+        index_scope_exclusion: None,
         gtin: Gtin::parse("09506000134352").unwrap(),
         product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,

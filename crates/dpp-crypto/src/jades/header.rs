@@ -58,6 +58,31 @@ pub enum CertificateRef {
     /// Compact, and it commits to exactly one certificate — but a verifier that
     /// does not already hold that certificate cannot obtain it from the
     /// signature.
+    ///
+    /// # 🚨 Conformant to the standard, and outside the EU profile
+    ///
+    /// This satisfies TS 119 182-1 clause 5.1.7 and Table 1, so it is a valid
+    /// JAdES baseline signature. It is **not** in the list a Member State public
+    /// sector body is obliged to recognise.
+    ///
+    /// Commission Implementing Regulation (EU) 2026/248 (OJ L, 2026/248 of
+    /// 3.2.2026), which repealed Commission Implementing Decision (EU) 2015/1506
+    /// and lays down the formats of advanced electronic signatures and seals
+    /// those bodies must recognise, lists JAdES in its **Annex I** with one
+    /// adaptation: it replaces clause 5.1.8 so that the `x5c` header parameter
+    /// **shall be present** in the JAdES signature, as a signed or unsigned
+    /// header parameter. Plain TS 119 182-1 leaves `x5c` optional — clause 5.1.7
+    /// asks for *at least one* of `x5t#S256`, `x5c`, `sigX5ts` or `x5t#o`. The
+    /// EU adaptation adds `x5c` on top of that.
+    ///
+    /// So this variant carries no `x5c` and falls outside Annex I, while
+    /// [`Chain`](Self::Chain) has `x5c` and fails Table 1, and
+    /// [`ChainWithThumbprint`](Self::ChainWithThumbprint) satisfies both. Ask
+    /// [`is_eu_recognised_profile`](Self::is_eu_recognised_profile) rather than
+    /// matching on the variant.
+    ///
+    /// It is kept because it is a legitimate JAdES signature and this crate is
+    /// not EU-only.
     Thumbprint(String),
     /// `x5c` — the certificate chain, each entry a **base64** (not base64url,
     /// and not padded differently) DER certificate, signing certificate first
@@ -103,6 +128,44 @@ pub enum CertificateRef {
 }
 
 impl CertificateRef {
+    /// Whether a signature carrying this reference is in the format a Member
+    /// State public sector body is obliged to recognise.
+    ///
+    /// The property that actually matters, named so a caller does not have to
+    /// know which JOSE header parameters mean what — the same shape as
+    /// `SealConformanceLevel::survives_certificate_expiry` in `dpp-domain`.
+    ///
+    /// `true` requires **both** legs, and they come from different documents:
+    ///
+    /// - **`x5c` present** — Commission Implementing Regulation (EU) 2026/248,
+    ///   Annex I, which replaces TS 119 182-1 clause 5.1.8 with a text reading
+    ///   that the `x5c` header parameter *"shall be present in the JAdES
+    ///   signature, either as a signed or unsigned header parameter"*. The
+    ///   unadapted standard leaves it optional.
+    /// - **a digest reference present** — TS 119 182-1 Table 1, where the
+    ///   baseline service "signing a reference of the signing certificate" has
+    ///   cardinality 1 and offers only the three digest forms. `x5c` is a
+    ///   separate row and does not satisfy it.
+    ///
+    /// Only [`ChainWithThumbprint`](Self::ChainWithThumbprint) has both, which
+    /// is why it is the form to use and why
+    /// [`chain_of_der`](Self::chain_of_der) can only produce it.
+    ///
+    /// # Why this is a method and not a comment
+    ///
+    /// The requirement lives in a **Regulation**, not in the ETSI document this
+    /// module is otherwise written against. Someone checking this code against
+    /// the standard alone would find `Thumbprint` perfectly conformant and have
+    /// no reason to look further. A named property is what survives that reader.
+    ///
+    /// It says nothing about whether the certificate is any good, whether the
+    /// seal is qualified, or whether it validates — only whether the format is
+    /// the one Annex I lists.
+    #[must_use]
+    pub const fn is_eu_recognised_profile(&self) -> bool {
+        matches!(self, Self::ChainWithThumbprint { .. })
+    }
+
     /// Compute an `x5t#S256` thumbprint from a DER-encoded certificate.
     ///
     /// The digest is over the DER bytes, base64url-encoded without padding, per

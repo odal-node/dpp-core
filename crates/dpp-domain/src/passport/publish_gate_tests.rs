@@ -318,6 +318,122 @@ fn a_non_publish_transition_is_not_gated() {
     // operator cannot abandon one they decided not to finish.
     let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
     battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
-    p.transition_to(PassportStatus::Archived)
-        .expect("archiving an incomplete draft is not a compliance claim");
+    p.transition_to(PassportStatus::Retired)
+        .expect("retiring an incomplete draft is not a compliance claim");
+}
+
+// ── Art. 77(1) scope: is a passport owed before asking what it must contain ──
+//
+// The content table is keyed on category alone, so on its own it holds every
+// industrial battery to the full industrial list. Art. 77(1) reaches industrial
+// batteries with "a capacity greater than 2 kWh", placed on the market from
+// 18 February 2027. These cover both directions of each boundary, because a gate
+// that exempts too much is the failure that does not announce itself.
+
+/// Build an industrial battery missing one field the category makes mandatory,
+/// so the only question left is whether Art. 77(1) reaches the record.
+fn deficient_industrial(capacity_kwh: Option<f64>) -> Passport {
+    let mut p = publishable_battery(crate::product_group::BatteryType::Industrial);
+    battery_field(&mut p, |b| {
+        b.rated_capacity_kwh = capacity_kwh;
+        b.usable_extinguishing_agent = None;
+    });
+    p
+}
+
+#[test]
+fn an_industrial_battery_at_or_below_two_kwh_is_not_held_to_industrial_content() {
+    // "greater than 2 kWh" is strict, so 2,0 kWh itself owes nothing.
+    for kwh in [1.0, 2.0] {
+        let mut p = deficient_industrial(Some(kwh));
+        p.placed_on_market_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+        p.transition_to(PassportStatus::Published)
+            .unwrap_or_else(|e| {
+                panic!("Art. 77(1) does not reach a {kwh} kWh industrial battery: {e}")
+            });
+    }
+}
+
+#[test]
+fn an_industrial_battery_above_two_kwh_is_still_gated() {
+    let mut p = deficient_industrial(Some(2.000_001));
+    p.placed_on_market_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+    let err = p
+        .transition_to(PassportStatus::Published)
+        .expect_err("just over the threshold is over it");
+    assert!(
+        err.to_string().contains("usableExtinguishingAgent"),
+        "{err}"
+    );
+}
+
+#[test]
+fn an_industrial_battery_that_states_no_capacity_is_still_gated() {
+    // The one that matters most. `CapacityUnknown` is not an exemption: the
+    // obligation turns on a number the record does not carry, and exempting on
+    // a missing field is how a statutory gate switches itself off in silence.
+    let mut p = deficient_industrial(None);
+    p.placed_on_market_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+    let err = p
+        .transition_to(PassportStatus::Published)
+        .expect_err("an unstated capacity must not exempt");
+    assert!(
+        err.to_string().contains("usableExtinguishingAgent"),
+        "{err}"
+    );
+}
+
+#[test]
+fn the_eighteenth_of_february_2027_is_inside_the_obligation_and_the_day_before_is_not() {
+    for (date, gated) in [
+        (chrono::NaiveDate::from_ymd_opt(2027, 2, 17).unwrap(), false),
+        (chrono::NaiveDate::from_ymd_opt(2027, 2, 18).unwrap(), true),
+    ] {
+        let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
+        battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
+        p.placed_on_market_date = Some(date);
+        let outcome = p.transition_to(PassportStatus::Published);
+        assert_eq!(
+            outcome.is_err(),
+            gated,
+            "Art. 77(1) applies from 18 February 2027; {date} answered {outcome:?}"
+        );
+    }
+}
+
+#[test]
+fn a_record_stating_no_placing_date_is_still_gated() {
+    // A draft for a product not yet on the market carries no date. Reading that
+    // as "before 2027" would exempt every draft, which is every passport at the
+    // moment the gate runs.
+    let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
+    battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
+    assert!(p.placed_on_market_date.is_none());
+    let err = p
+        .transition_to(PassportStatus::Published)
+        .expect_err("an unstated placing date must not exempt");
+    assert!(
+        err.to_string().contains("usableExtinguishingAgent"),
+        "{err}"
+    );
+}
+
+#[test]
+fn the_strict_check_still_answers_for_a_record_art_77_1_exempts() {
+    // A node holding a voluntary passport to its category's content has to be
+    // able to ask, or this change removes a capability instead of correcting
+    // one. The same record publishes and fails the strict check.
+    let mut p = deficient_industrial(Some(1.0));
+    p.placed_on_market_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap());
+
+    let err = p
+        .check_category_content()
+        .expect_err("the strict check ignores scope, and the field is still absent");
+    assert!(
+        err.to_string().contains("usableExtinguishingAgent"),
+        "{err}"
+    );
+
+    p.transition_to(PassportStatus::Published)
+        .expect("and the publish gate still lets it through");
 }

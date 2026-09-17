@@ -320,3 +320,141 @@ async fn default_create_and_update_batch_run_sequentially() {
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0].as_ref().unwrap().product_name, "A2");
 }
+
+// ── Resolving forward through an amendment ───────────────────────────────────
+//
+// `supersedes_id` points backwards, so the successor is only reachable by
+// querying for it. These exercise the trait's default bodies: the one-hop
+// lookup, the walk to the head, and the three shapes that have no answer.
+
+/// Store `count` passports in a chain, oldest first, each superseding the one
+/// before it. Returns their ids in that order.
+async fn superseding_chain(repo: &InMemoryRepo, count: usize) -> Vec<PassportId> {
+    let mut ids = Vec::with_capacity(count);
+    let mut previous: Option<PassportId> = None;
+    for n in 0..count {
+        let mut p = draft_passport(&format!("Version {n}"));
+        p.supersedes_id = previous;
+        let stored = repo.create(p).await.unwrap();
+        previous = Some(stored.id);
+        ids.push(stored.id);
+    }
+    ids
+}
+
+#[tokio::test]
+async fn nothing_supersedes_a_record_nothing_supersedes() {
+    let repo = InMemoryRepo::default();
+    let p = repo.create(draft_passport("Only")).await.unwrap();
+    assert!(repo.find_superseding(p.id).await.unwrap().is_none());
+    // The head walk agrees, and `None` there means "you are already holding it".
+    assert!(repo.find_superseding_head(p.id).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn one_hop_finds_the_immediate_successor_and_not_the_head() {
+    let repo = InMemoryRepo::default();
+    let ids = superseding_chain(&repo, 3).await;
+
+    let next = repo.find_superseding(ids[0]).await.unwrap().expect("v1");
+    assert_eq!(
+        next.id, ids[1],
+        "one hop must stop at the immediate successor"
+    );
+    assert_eq!(next.product_name, "Version 1");
+}
+
+#[tokio::test]
+async fn the_head_walk_reaches_the_last_record_in_the_chain() {
+    let repo = InMemoryRepo::default();
+    let ids = superseding_chain(&repo, 4).await;
+
+    let head = repo
+        .find_superseding_head(ids[0])
+        .await
+        .unwrap()
+        .expect("head");
+    assert_eq!(head.id, *ids.last().unwrap());
+    assert_eq!(head.product_name, "Version 3");
+
+    // Starting anywhere in the chain reaches the same head.
+    let from_middle = repo
+        .find_superseding_head(ids[2])
+        .await
+        .unwrap()
+        .expect("head");
+    assert_eq!(from_middle.id, *ids.last().unwrap());
+}
+
+#[tokio::test]
+async fn a_successor_is_returned_whatever_its_status() {
+    // Storage describes what is stored. A caller that cannot tell "no successor"
+    // from "a successor you may not see" has nothing to branch on.
+    for status in [PassportStatus::Draft, PassportStatus::Suspended] {
+        let repo = InMemoryRepo::default();
+        let ids = superseding_chain(&repo, 2).await;
+        repo.update_status(ids[1], status.clone()).await.unwrap();
+
+        let found = repo
+            .find_superseding(ids[0])
+            .await
+            .unwrap()
+            .unwrap_or_else(|| panic!("a {status:?} successor is still a successor"));
+        assert_eq!(found.status, status);
+    }
+}
+
+#[tokio::test]
+async fn two_records_claiming_one_predecessor_is_refused_not_arbitrated() {
+    let repo = InMemoryRepo::default();
+    let original = repo.create(draft_passport("Original")).await.unwrap();
+    for name in ["Claimant A", "Claimant B"] {
+        let mut p = draft_passport(name);
+        p.supersedes_id = Some(original.id);
+        repo.create(p).await.unwrap();
+    }
+
+    let err = repo
+        .find_superseding(original.id)
+        .await
+        .expect_err("both claims are equally entitled, so neither wins");
+    let msg = err.to_string();
+    assert!(msg.contains("2 records claim it"), "{msg}");
+    assert!(msg.contains(&original.id.to_string()), "{msg}");
+}
+
+#[tokio::test]
+async fn a_cycle_is_refused_rather_than_walked_forever() {
+    let repo = InMemoryRepo::default();
+    let a = repo.create(draft_passport("A")).await.unwrap();
+    let mut b = draft_passport("B");
+    b.supersedes_id = Some(a.id);
+    let b = repo.create(b).await.unwrap();
+
+    // Close the loop: A now claims to supersede B, which supersedes A.
+    let mut a_cyclic = a.clone();
+    a_cyclic.supersedes_id = Some(b.id);
+    repo.update(a_cyclic).await.unwrap();
+
+    let err = repo
+        .find_superseding_head(a.id)
+        .await
+        .expect_err("a cycle has no head");
+    assert!(err.to_string().contains("it is a cycle"), "{err}");
+}
+
+#[tokio::test]
+async fn a_chain_past_the_hop_cap_fails_rather_than_truncating() {
+    let repo = InMemoryRepo::default();
+    let ids = superseding_chain(&repo, MAX_SUCCESSION_HOPS + 2).await;
+
+    let err = repo
+        .find_superseding_head(ids[0])
+        .await
+        .expect_err("handing back a non-head as the head is undetectable by the caller");
+    assert!(
+        err.to_string()
+            .contains(&format!("longer than {MAX_SUCCESSION_HOPS} hops")),
+        "{err}"
+    );
+}

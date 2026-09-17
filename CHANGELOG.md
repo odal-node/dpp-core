@@ -13,6 +13,327 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`PassportStatus::Archived` is now `PassportStatus::Retired`, and its wire
+  value is `"retired"`.** *(Breaking twice over: the variant rename breaks
+  anything matching on `PassportStatus`, and the wire value change breaks
+  anything reading stored records. `"archived"` is **not** accepted on
+  deserialisation — see below.)*
+
+  **Migration:** rename the variant at every match site and construction site,
+  and change any persisted or transmitted `"archived"` to `"retired"`. There is
+  nothing else to do: the variant's meaning is unchanged — post-retention,
+  immutable, still readable — and every transition into and out of it is the
+  same.
+
+  **Why.** EN 18221:2026 (*Digital product passport — Data storage, archiving and
+  data persistence*), one of the six standards cited by Commission Implementing
+  Decision (EU) 2026/1736, uses "archiving" for something else: its clause 4.2
+  is the retention of **historical versions of a passport that is still live**,
+  beginning at the first change to the initial passport, kept for the passport's
+  lifetime, each version carrying the same access restrictions as the
+  corresponding current one. This variant was a terminal *publication* state
+  reached once a record stops changing. The collision is between a status and a
+  functionality, so no doc comment on the variant could remove it — anyone
+  mapping this vocabulary onto EN 18221 by name ticks a box that is not ticked.
+
+  **Nothing was removed — the word changed owner.** Clause 4.2 archiving is a
+  real obligation and "archiving" is the right word for it; what it is not is a
+  status. So the vocabulary is now one word per meaning rather than one word for
+  three: **archiving** is the retention of a live passport's historical versions,
+  **retired** is the terminal publication state, and the ESPR **Art. 10(4)
+  back-up copy** — the independent third-party replica behind
+  `ports::archive::ArchivePort` — is the third, a copy of a record rather than a
+  history of one. Two uses elsewhere are compound and stay as they are: the
+  keystore's *archived keys* and a seal's *archival timestamp*.
+
+  **Why the old wire value is refused rather than aliased.** `"published"` is
+  kept as an alias for `"active"` because the two words mean the same thing.
+  `"archived"` does not — and it is precisely because the word still means
+  something here, just not this, that it cannot also be read as a status. It is
+  refused with a message that names `retired`, says why, **and says the word was
+  not dropped**, rather than with a bare unknown-variant error: a reader told
+  only that `archived` is gone concludes this system does not archive, which is
+  the opposite of true.
+
+  **Why now.** This is the cheapest it will ever be and it gets monotonically
+  more expensive: nothing is deployed, so the set of records carrying the old
+  value is empty. `no_status_serialises_to_the_vacated_word` keeps the word
+  vacated as a property, so a variant added later cannot quietly take it back.
+
+- **`ports::archive` is now `ports::backup`, and `ArchivePort` is
+  `BackupCopyPort`.** *(Breaking: the module path, the trait, its two renamed
+  methods, three renamed types and two renamed receipt fields.)*
+
+  **Migration**, mechanical and compiler-caught in full:
+
+  | Was | Is |
+  |---|---|
+  | `ports::archive` | `ports::backup` |
+  | `ArchivePort` | `BackupCopyPort` |
+  | `ArchiveReceipt` / `ArchiveStatus` / `ArchiveVerification` | `BackupReceipt` / `BackupStatus` / `BackupVerification` |
+  | `GhostArchive` / `stub::InMemoryArchive` | `GhostBackup` / `stub::InMemoryBackup` |
+  | `ArchivePort::archive` / `::update_archive` | `BackupCopyPort::store` / `::update` |
+  | `ArchiveReceipt { archive_id, archived_at }` | `BackupReceipt { backup_id, stored_at }` |
+
+  `retention_until`, `verify` and `retrieve` are unchanged, as are
+  `BackupStatus`'s four variants and their `SCREAMING_SNAKE_CASE` wire forms.
+  Nothing persists these types today, so the field renames cost a recompile and
+  no data.
+
+  **Why.** This port is the one place the word "archive" was ours to choose, and
+  we chose wrong: Art. 10(4) calls the thing a **back-up copy**, lodged with the
+  Art. 2(32) independent provider. Renaming the status without renaming this
+  would have left two archives in one system — which is the collision the status
+  rename exists to end, moved rather than removed.
+
+  **One documented requirement is corrected with it, though not for the reason
+  it first looked like.** `update_archive` claimed the provider "MUST store the
+  new version while preserving the full version history". The duty is not
+  misattributed — EN 18221 clause 4.2 does expect archived versions to be held
+  by the back-up provider as well as by the main one, so a provider may well owe
+  a history. What was wrong is that the sentence sat on a method that cannot
+  discharge it: this trait's `retrieve` answers with one `Passport` and nothing
+  on it is versions-shaped, so a reader met a requirement stated as satisfied by
+  a port with no way to satisfy it. `BackupCopyPort::update` now says what it
+  does hold, and names the obligation it does not express.
+
+### Added
+
+- **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
+  passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
+  unreachable: it needs the ten priority parts scored across three part-level
+  parameters plus three product-level scores, and `ElectronicsData` carried a
+  single declared `repairability_score` — a non-regulatory heuristic on a scale
+  the enacted index is not comparable to.
+
+  - **`RepairabilityIndexDeclaration`**, **`PriorityPartScores`** and
+    **`ElectronicsData::repairability_index_inputs`** carry the six parameters as
+    an operator declares them. Declared values, not a score: nothing here
+    computes `R`. That split is the Regulation's own — **Annex IX Table 10** sets
+    a verification tolerance, *"The determined value shall not be more than 4 %
+    lower than the declared value"*, so the structure is declared-by-supplier,
+    re-determined-by-authority.
+  - Two checks the annex needs and a schema cannot express:
+    `foldable_is_consistent` (the hinge assembly selects between two weight sets,
+    so a declaration scoring it under one parameter and omitting it under another
+    describes no product the annex can grade) and `scores_are_in_range`.
+  - **Electronics schema v1.3.0**, additive. `repairabilityIndexInputs` and
+    `indexScopeExclusion` are both optional.
+
+  **No obligation attaches to any of this.** The word "passport" does not occur
+  in Reg. (EU) 2023/1669 — the index belongs on the energy label and in the
+  product information sheet. Carrying it is a product decision, recorded on the
+  types so nobody later cites the Regulation for a duty it does not create.
+
+- **`IndexScopeExclusion` and `dpp_rules::electronics::repairability_index_scope`
+  make Art. 1's two carve-outs expressible.** Art. 1 of Reg. (EU) 2023/1669
+  excludes *"mobile phones and tablets with a flexible main display which the
+  user can unroll and roll up"* and *"smartphones for high security
+  communication"*. Both are `DeviceType::Smartphone`, and nothing distinguished
+  them, so a determination keyed on the device type alone claimed scope over two
+  product classes the Regulation expressly disclaims.
+
+  The predicate also holds the scope difference between the two sibling acts:
+  2023/1669 reaches **smartphones and slate tablets only**, while `DeviceType`'s
+  four values come from 2023/1670's wider Art. 1(1). A cordless phone and a
+  non-smart mobile phone answer `NotCovered`.
+
+  **An undeclared exclusion means *not excluded*, never "unknown".** The
+  carve-out is what removes the obligation, so silence cannot grant it — and an
+  unrecognised exclusion string does not either. That is the same fail-closed
+  direction as `PassportScope::CapacityUnknown` and the opposite arithmetic:
+  there the obligation turns on a number, so an unstated number cannot exempt;
+  here the exemption is what is stated, so an unstated one does not exist.
+
+### Added
+
+- **`PassportRepository` can resolve forward through an amendment.**
+  `supersedes_id` answered "what does this passport supersede?" and nothing
+  answered the reverse. That direction is the one a reader needs: a superseded
+  passport keeps its identifier forever, so where the identifier is the product's
+  printed data carrier, anyone holding the physical product arrives at the
+  **predecessor** after an amendment.
+
+  The forward pointer cannot simply be stored on the predecessor —
+  `supersedesId` is in `PROTECTED_PATCH_FIELDS` and the published body is frozen
+  and signed, so writing one is either refused or invalidates the proof. The edge
+  exists only as the successor's backward pointer, and reading it usefully is a
+  query.
+
+  - **`find_superseding(id)`** — one hop, no status filter (a `Draft` or
+    already-superseded successor is still a successor, and which statuses an
+    audience may see is domain policy, not storage's). Default body is an
+    unindexed `list()` scan for correctness, as `find_by_identity` already does;
+    the natural index is on `supersedes_id`, so a real store should override it
+    with one read.
+  - **`find_superseding_head(id)`** — walks to the head of the chain, which is
+    what a carrier resolution actually wants. Written in terms of
+    `find_superseding`, so it needs no separate implementation and inherits
+    whatever indexed read that gets. It carries the two things every caller would
+    otherwise have to get right on its own: a visited set, so a cycle terminates,
+    and a hop cap, so an inconsistent store cannot turn one lookup into an
+    unbounded sequence of queries.
+  - **`MAX_SUCCESSION_HOPS`** (256) — the cap. Deliberately **not** derived from
+    any legal limit; no instrument caps how often a passport may be amended.
+    Reaching it is an error, never a truncated answer: handing back the furthest
+    record reached would hand back a non-head as though it were the head, which
+    is the one wrong answer a caller cannot detect.
+  - **`DppError::SuccessionUnresolvable`** — the three shapes that have no
+    answer: two records claiming one predecessor, a cycle, and a chain past the
+    cap. Distinct from `Ok(None)`, which is the ordinary "nothing supersedes
+    this". Where two records claim one predecessor, both are equally entitled to
+    the claim, so naming a winner would be arbitrary and indistinguishable from a
+    real answer.
+
+  *(`DppError` is `#[non_exhaustive]`, and both trait methods have default
+  bodies, so nothing stops compiling.)*
+
+- **`Passport::check_category_content`** — the content gate without the Art.
+  77(1) scope question, which is what `check_mandatory_content` did before the
+  fix above. A node publishing a passport the Regulation does not require is
+  better served by a complete one than an unchecked one, but that is the
+  operator's call rather than this crate's, so it is a separate function instead
+  of the default.
+
+- **`CertificateRef::is_eu_recognised_profile`** — whether a JAdES signature
+  carrying this certificate reference is in a format a Member State public sector
+  body is obliged to recognise.
+
+  Commission Implementing Regulation (EU) 2026/248 (OJ L, 2026/248 of 3.2.2026),
+  which repealed Commission Implementing Decision (EU) 2015/1506, lists JAdES in
+  its **Annex I** with one adaptation: it replaces TS 119 182-1 clause 5.1.8 so
+  that the `x5c` header parameter **shall be present**, as a signed or unsigned
+  header parameter. The unadapted standard leaves `x5c` optional — clause 5.1.7
+  asks for *at least one* of `x5t#S256`, `x5c`, `sigX5ts` or `x5t#o`.
+
+  So `Thumbprint` satisfies clause 5.1.7 and Table 1 and carries no `x5c`,
+  `Chain` carries `x5c` and fails Table 1, and only `ChainWithThumbprint`
+  satisfies both. `Thumbprint` is the first variant, the compact and obvious
+  choice, and nothing in the type said that picking it puts the signature outside
+  that list — the requirement lives in a **Regulation**, not in the ETSI document
+  the module is written against, so a reader checking the code against the
+  standard alone would find it perfectly conformant and have no reason to look
+  further.
+
+  Naming the property rather than making callers decode the variants follows
+  `SealConformanceLevel::survives_certificate_expiry`. `Thumbprint`'s doc comment
+  now carries the warning, and a test pins that the EU-recognised form actually
+  emits `x5c` — the adaptation itself, not the variant name.
+
+  Nothing is producing a non-conformant signature today: `CertificateRef` has no
+  production caller, and `chain_of_der` can only build the conformant form. That
+  is why it was cheap to do now — the first real caller picks a variant off this
+  enum.
+
+- **Rule B2 — a `Sourced` reason must name the article or annex it was read
+  from.** An article number is the cheapest evidence of a visit and the only kind
+  that survives being copied. `Assumed` entries are unconstrained on purpose: an
+  entry saying plainly that nobody has read the act is honest, and demanding a
+  citation from it would only encourage inventing one.
+
+- **The act-citation gate now reads Rust doc comments, not only schema prose.**
+  `//!` module headers and `///` item docs carried act citations that no gate had
+  ever checked, **including numeric thresholds** — the same defect class as the
+  schema-prose rules, one surface along, and the surface where a number lives
+  immediately before it becomes a constant.
+
+  The rule distinguishes naming an act from attributing a quantity to one.
+  Naming is free: *"carried forward from Directive 2006/66/EC"* is provenance,
+  and a gate demanding a source for it would produce noise and then be switched
+  off. A doc comment that cites an act **and** states a share, a period in years
+  or months, or a calendar date must carry a `COMPLIANCE-PIN` — in either its ✅
+  or its ⚠️ PENDING form, because the gate's job is to force the question *where
+  did this number come from*, not to pretend a pending answer is a bad one.
+
+  Nineteen files predate the gate and are listed in `UNPINNED_LEGACY`, an
+  inventory that may only shrink: a file not listed fails the moment it is
+  written, and a listed file that has since gained a pin fails a staleness check
+  until it is removed, so the list cannot become a permanent exemption.
+
+- **`dpp_domain::schemas::citation`** — `act_refs` and `cites_article_or_annex`,
+  the detectors the schema-prose gate was already built on, moved out of a
+  `#[cfg(test)]` module and made public. The doc-comment gate must see
+  `dpp-rules`, which `dpp-domain` deliberately does not depend on, so it lives in
+  the cross-crate test tier and could not otherwise reach them. Sharing beats
+  copying: a second implementation would drift, and the drift would show up as
+  one surface being checked to a standard the other is not.
+### Fixed
+
+- **The mandatory-content gate now asks whether Art. 77(1) reaches the record
+  before asking what the record must contain.** `Passport::check_mandatory_content`
+  read the battery type and nothing else, so it demanded the full 38-data-point
+  industrial content list of *every* industrial battery — including one at or
+  below 2 kWh, which Art. 77(1) of Regulation (EU) 2023/1542 does not reach
+  ("each industrial battery with a capacity **greater than** 2 kWh"), and one
+  placed on the market before 18 February 2027, which it does not reach either.
+  `dpp_rules::batteries::passport_scope` has answered that question since 0.20.0
+  and the gate did not consult it.
+
+  *(Behaviour change, not an API change: a record the article exempts now
+  publishes where it was previously refused. Nothing stops compiling. A caller
+  that wants the old, unconditional answer — holding a **voluntary** passport to
+  its category's content anyway — calls `check_category_content`, below.)*
+
+  Three cases deliberately do **not** exempt, because each is a way a statutory
+  gate could switch itself off in silence: an industrial battery that states no
+  capacity (`PassportScope::CapacityUnknown` is not an exemption and says so in
+  its own documentation), a record that states no placing date (a draft for a
+  product not yet on the market has none, and reading that as "before 2027"
+  would exempt every draft), and any `PassportScope` variant added later, which
+  falls to a catch-all that gates.
+
+- **`dpp-rules::electronics::spare_parts` no longer asserts periods nobody
+  read.** Its module header carried a table of minimum spare-parts availability
+  periods — "10 years", "7–10 years" — attributed to Regulations (EU) 2019/2022,
+  2019/2019 and 2019/2021, with an "(in force)" column beside each. **None of
+  those three acts has been read against its Official Journal text.**
+
+  The table is removed rather than annotated. The module's own note said what
+  would have happened next — implement `validate_spare_parts_period(years,
+  category)` *"using the category-keyed minimum periods above"* — so the numbers
+  would have become live thresholds at that moment, sourced from a doc comment
+  nobody verified, in a crate whose releases cannot be unpublished. A placeholder
+  is allowed to say *we have not established this*; it is not allowed to assert a
+  number and a source it has not read. What remains states which acts are the
+  ones to read and marks itself `COMPLIANCE-PIN PENDING`.
+
+- **The citation inventory now records whether its reasons were read, and three
+  of them have been.** `CITED_NOT_MODELLED` lists acts that schema prose cites
+  and no instrument binding models, each with a written reason. **A reason is a
+  claim**, and several make substantive assertions — a repeal date, an annex
+  part, the absence of an obligation across a whole regulation. Nothing
+  distinguished a reason verified against the Official Journal from one written
+  from recall, and they read identically either way.
+
+  Each entry now carries a `CitationBasis` of `Sourced` or `Assumed`, reusing the
+  vocabulary `ParameterBasis`, `RetentionBasis` and `DateBasis` already use in
+  this workspace rather than a marker convention only one rule would understand.
+  **The default runs the opposite way to `ParameterBasis`**, deliberately: that
+  type defaults to `Sourced` because treating law as ours silently replaces a
+  legal threshold, whereas marking an *unread* reason `Sourced` asserts a visit
+  to the text that never happened, invisibly. So an entry is `Assumed` until
+  someone has been to the act.
+
+  Verified and moved to `Sourced`, each now quoting the article it was read from:
+
+  - **`32009R1222`** — Regulation (EU) 2020/740 **Art. 17**: *"Regulation (EC) No
+    1222/2009 is repealed with effect from 1 May 2021."* The date the inventory
+    asserted is right, and the article also directs that references to the
+    repealed act be read against the correlation table in Annex VIII.
+  - **`32004R0648`** — Regulation (EU) 2026/405 **Art. 36**, repealing it with
+    effect from 23 September 2029. The reason now also carries the grandfathering
+    window to 23 September 2030, which the bare word "repealed" overstated.
+  - **`32009R0661`** — 2020/740's own **Annex I Part C** names it as the source
+    of the tyre noise limit values, confirming both the annex part and the act.
+
+  **`32024R1252` (the Critical Raw Materials Act) stays `Assumed`**, and its
+  reason now says so plainly instead of stating the conclusion. It is a negative
+  claim across a whole regulation — the hardest kind to hold — and the text is
+  not held. It is also the one that **ships**, in every battery and electronics
+  schema description naming the act.
+
 ## [0.20.0] - 2026-09-13
 
 ### Breaking

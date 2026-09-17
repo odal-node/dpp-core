@@ -188,7 +188,7 @@ fn superseded_is_terminal() {
     p.transition_to(PassportStatus::Published).unwrap();
     p.transition_to(PassportStatus::Superseded).unwrap();
     assert!(p.transition_to(PassportStatus::Published).is_err());
-    assert!(p.transition_to(PassportStatus::Archived).is_err());
+    assert!(p.transition_to(PassportStatus::Retired).is_err());
     assert!(p.transition_to(PassportStatus::Draft).is_err());
 }
 
