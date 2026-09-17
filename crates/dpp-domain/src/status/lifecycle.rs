@@ -38,7 +38,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// "archiving" and "archived version" remain this domain's vocabulary for the
 /// retention of a live passport's historical versions, and are now free to mean
 /// only that. A reader who meets either word in this crate outside
-/// [`ArchivePort`](crate::ports::archive::ArchivePort) — which is a third
+/// [`BackupCopyPort`](crate::ports::backup::BackupCopyPort) — which is a third
 /// concept again, the ESPR Art. 10(4) back-up copy — should be reading about
 /// versions of something still live, never about a state a record is in.
 ///

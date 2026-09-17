@@ -213,7 +213,7 @@ Port traits define the core/platform boundary:
 - `ComplianceRegistry` + `ComplianceStrategy` (non-async, product group dispatch)
 - `IdentityPort` (async, sign/verify)
 - `PluginHost` (non-async, Wasm dispatch)
-- `ArchivePort` (async, immutable archival with retention guarantees)
+- `BackupCopyPort` (async, the ESPR Art. 10(4) third-party back-up copy)
 - `RegistrySyncPort` (async, EU Central Registry registration/status sync)
 - `SealPort` (async, eIDAS qualified electronic seal — ESPR Art. 13 / eIDAS 910/2014)
 

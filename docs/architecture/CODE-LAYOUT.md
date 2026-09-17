@@ -88,7 +88,7 @@ edges, zero illegal, and an empty baseline**.
 
 This is the test for whether something is really tier 7.
 
-`ArchiveReceipt` passes: nothing but `ArchivePort` touches it, so it belongs
+`BackupReceipt` passes: nothing but `BackupCopyPort` touches it, so it belongs
 beside the trait. `SealedEnvelope` and `ComplianceResult` fail — both are fields
 on `Passport`, so filing them under `ports/` puts a tier-4 composition in the
 position of importing tier 7. They are model values that were misfiled, and

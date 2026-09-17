@@ -1,6 +1,6 @@
-//! Behaviour of the in-memory archive against the port contract.
+//! Behaviour of the in-memory back-up copy against the port contract.
 
-use super::stub::InMemoryArchive;
+use super::stub::InMemoryBackup;
 use super::*;
 use crate::passport::*;
 use crate::product_group::{CarbonFootprint, RepairabilityScore};
@@ -30,57 +30,57 @@ fn make_test_passport() -> Passport {
 }
 
 #[tokio::test]
-async fn archive_and_retrieve() {
-    let archive = InMemoryArchive::new();
+async fn backup_and_retrieve() {
+    let backup = InMemoryBackup::new();
     let passport = make_test_passport();
-    let receipt = archive.archive(&passport, 10).await.unwrap();
+    let receipt = backup.store(&passport, 10).await.unwrap();
     assert!(!receipt.content_hash.is_empty());
-    assert!(receipt.archive_id.starts_with("ARCHIVE-"));
+    assert!(receipt.backup_id.starts_with("BACKUP-"));
 
-    let retrieved = archive.retrieve(passport.id).await.unwrap();
+    let retrieved = backup.retrieve(passport.id).await.unwrap();
     assert!(retrieved.is_some());
     assert_eq!(retrieved.unwrap().id, passport.id);
 }
 
 #[tokio::test]
 async fn verify_integrity_ok() {
-    let archive = InMemoryArchive::new();
+    let backup = InMemoryBackup::new();
     let passport = make_test_passport();
-    let receipt = archive.archive(&passport, 10).await.unwrap();
+    let receipt = backup.store(&passport, 10).await.unwrap();
 
-    let verification = archive
+    let verification = backup
         .verify(passport.id, &receipt.content_hash)
         .await
         .unwrap();
     assert!(verification.integrity_ok);
     assert!(verification.accessible);
-    assert_eq!(verification.status, ArchiveStatus::Active);
+    assert_eq!(verification.status, BackupStatus::Active);
 }
 
 #[tokio::test]
 async fn verify_integrity_mismatch() {
-    let archive = InMemoryArchive::new();
+    let backup = InMemoryBackup::new();
     let passport = make_test_passport();
-    archive.archive(&passport, 10).await.unwrap();
+    backup.store(&passport, 10).await.unwrap();
 
-    let verification = archive.verify(passport.id, "bad-hash").await.unwrap();
+    let verification = backup.verify(passport.id, "bad-hash").await.unwrap();
     assert!(!verification.integrity_ok);
 }
 
 #[tokio::test]
-async fn update_archive_changes_hash() {
-    let archive = InMemoryArchive::new();
+async fn update_changes_hash() {
+    let backup = InMemoryBackup::new();
     let mut passport = make_test_passport();
-    let receipt1 = archive.archive(&passport, 10).await.unwrap();
+    let receipt1 = backup.store(&passport, 10).await.unwrap();
 
     passport.product_name = "Updated Textile".into();
-    let receipt2 = archive.update_archive(&passport).await.unwrap();
+    let receipt2 = backup.update(&passport).await.unwrap();
     assert_ne!(receipt1.content_hash, receipt2.content_hash);
 }
 
 #[tokio::test]
 async fn retrieve_nonexistent_returns_none() {
-    let archive = InMemoryArchive::new();
-    let result = archive.retrieve(PassportId::new()).await.unwrap();
+    let backup = InMemoryBackup::new();
+    let result = backup.retrieve(PassportId::new()).await.unwrap();
     assert!(result.is_none());
 }

@@ -62,6 +62,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   value is empty. `no_status_serialises_to_the_vacated_word` keeps the word
   vacated as a property, so a variant added later cannot quietly take it back.
 
+- **`ports::archive` is now `ports::backup`, and `ArchivePort` is
+  `BackupCopyPort`.** *(Breaking: the module path, the trait, its two renamed
+  methods, three renamed types and two renamed receipt fields.)*
+
+  **Migration**, mechanical and compiler-caught in full:
+
+  | Was | Is |
+  |---|---|
+  | `ports::archive` | `ports::backup` |
+  | `ArchivePort` | `BackupCopyPort` |
+  | `ArchiveReceipt` / `ArchiveStatus` / `ArchiveVerification` | `BackupReceipt` / `BackupStatus` / `BackupVerification` |
+  | `GhostArchive` / `stub::InMemoryArchive` | `GhostBackup` / `stub::InMemoryBackup` |
+  | `ArchivePort::archive` / `::update_archive` | `BackupCopyPort::store` / `::update` |
+  | `ArchiveReceipt { archive_id, archived_at }` | `BackupReceipt { backup_id, stored_at }` |
+
+  `retention_until`, `verify` and `retrieve` are unchanged, as are
+  `BackupStatus`'s four variants and their `SCREAMING_SNAKE_CASE` wire forms.
+  Nothing persists these types today, so the field renames cost a recompile and
+  no data.
+
+  **Why.** This port is the one place the word "archive" was ours to choose, and
+  we chose wrong: Art. 10(4) calls the thing a **back-up copy**, lodged with the
+  Art. 2(32) independent provider. Renaming the status without renaming this
+  would have left two archives in one system — which is the collision the status
+  rename exists to end, moved rather than removed.
+
+  **One documented requirement was wrong and is corrected with it.**
+  `update_archive` claimed the provider "MUST store the new version while
+  preserving the full version history". That is clause 4.2's obligation, it is
+  owed by the passport system rather than by a back-up provider, and stating it
+  here is exactly what let a reader believe this port discharged clause 4.2. It
+  cannot: it replicates the current record, so it has no past versions to serve.
+  `BackupCopyPort::update` now says so.
+
 ### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a

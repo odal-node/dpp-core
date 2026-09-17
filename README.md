@@ -159,7 +159,7 @@ The eight port traits define the core/platform boundary. Any downstream project 
 | `ComplianceRegistry` + `ComplianceStrategy` | sync | Product group-specific compliance dispatch |
 | `IdentityPort` | async | Sign and verify passport JWS |
 | `PluginHost` | sync | Wasm plugin dispatch |
-| `ArchivePort` | async | Immutable DPP archival with retention guarantees |
+| `BackupCopyPort` | async | The ESPR Art. 10(4) third-party back-up copy |
 | `RegistrySyncPort` | async | EU Central Registry registration and status sync |
 | `SealPort` | async | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 

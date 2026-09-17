@@ -1,4 +1,4 @@
-//! [`InMemoryArchive`] — a `HashMap`-backed archive for tests and local runs.
+//! [`InMemoryBackup`] — a `HashMap`-backed back-up copy for tests and local runs.
 
 use super::*;
 use crate::error::DppError;
@@ -9,11 +9,11 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-pub struct InMemoryArchive {
-    store: Mutex<HashMap<PassportId, (Passport, ArchiveReceipt)>>,
+pub struct InMemoryBackup {
+    store: Mutex<HashMap<PassportId, (Passport, BackupReceipt)>>,
 }
 
-impl InMemoryArchive {
+impl InMemoryBackup {
     pub fn new() -> Self {
         Self {
             store: Mutex::new(HashMap::new()),
@@ -27,27 +27,27 @@ impl InMemoryArchive {
     }
 }
 
-impl Default for InMemoryArchive {
+impl Default for InMemoryBackup {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl ArchivePort for InMemoryArchive {
-    async fn archive(
+impl BackupCopyPort for InMemoryBackup {
+    async fn store(
         &self,
         passport: &Passport,
         retention_years: u32,
-    ) -> Result<ArchiveReceipt, DppError> {
+    ) -> Result<BackupReceipt, DppError> {
         let now = Utc::now();
         let retention_until = retention_deadline(now, retention_years);
         let hash = Self::hash_passport(passport);
-        let receipt = ArchiveReceipt {
-            archive_id: format!("ARCHIVE-{}", uuid::Uuid::now_v7()),
+        let receipt = BackupReceipt {
+            backup_id: format!("BACKUP-{}", uuid::Uuid::now_v7()),
             passport_id: passport.id,
             content_hash: hash,
-            archived_at: now,
+            stored_at: now,
             retention_until,
         };
         let mut store = self.store.lock().unwrap();
@@ -55,7 +55,7 @@ impl ArchivePort for InMemoryArchive {
         Ok(receipt)
     }
 
-    async fn update_archive(&self, passport: &Passport) -> Result<ArchiveReceipt, DppError> {
+    async fn update(&self, passport: &Passport) -> Result<BackupReceipt, DppError> {
         let mut store = self.store.lock().unwrap();
         if let Some((stored, receipt)) = store.get_mut(&passport.id) {
             *stored = passport.clone();
@@ -63,7 +63,7 @@ impl ArchivePort for InMemoryArchive {
             Ok(receipt.clone())
         } else {
             Err(DppError::NotFound(format!(
-                "no archived record for {}",
+                "no backed-up record for {}",
                 passport.id
             )))
         }
@@ -73,18 +73,18 @@ impl ArchivePort for InMemoryArchive {
         &self,
         passport_id: PassportId,
         expected_hash: &str,
-    ) -> Result<ArchiveVerification, DppError> {
+    ) -> Result<BackupVerification, DppError> {
         let store = self.store.lock().unwrap();
         if let Some((_, receipt)) = store.get(&passport_id) {
-            Ok(ArchiveVerification {
+            Ok(BackupVerification {
                 integrity_ok: receipt.content_hash == expected_hash,
                 accessible: true,
-                status: ArchiveStatus::Active,
+                status: BackupStatus::Active,
                 last_verified_at: Utc::now(),
             })
         } else {
             Err(DppError::NotFound(format!(
-                "no archived record for {passport_id}"
+                "no backed-up record for {passport_id}"
             )))
         }
     }

@@ -10,7 +10,7 @@ drifts the moment another port lands). CI enforces agreement: the test
 
 | Module | Trait(s) | Concern |
 |---|---|---|
-| `archive` | `ArchivePort` | Immutable third-party archival with retention guarantees (ESPR **Art. 10(4)** back-up copy, **Art. 2(32)** independent third party, **Annex III(i)** availability period — *not* Art. 13, which is the registry). |
+| `backup` | `BackupCopyPort` | The third-party **back-up copy** of ESPR **Art. 10(4)**, lodged with the **Art. 2(32)** independent provider for the **Annex III(i)** availability period — *not* Art. 13, which is the registry, and *not* EN 18221 clause 4.2 archiving, which is a live passport's version history. |
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
@@ -31,7 +31,7 @@ so the inventory is complete, and are excluded from the machine block below.
 
 <!-- PORTS-INVENTORY:BEGIN (one module name per line; parsed by ports_inventory.rs) -->
 ```
-archive
+backup
 compliance
 identity
 passport_repo
