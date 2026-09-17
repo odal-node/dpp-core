@@ -37,13 +37,27 @@ pub const WELL_KNOWN_PATH: &str = "/.well-known/jwt-vc-issuer";
 /// keep resolving for the life of a passport, and a second thing to get wrong,
 /// for no benefit at this key count.
 ///
-/// Archived keys are included and revoked keys are excluded, exactly as the DID
-/// document does it — a credential signed before a rotation must keep verifying,
-/// and one signed with a revoked key must stop.
+/// Archived keys are included and revoked keys are excluded — **including the
+/// current one** — exactly as the DID document does it: a credential signed
+/// before a rotation must keep verifying, and one signed with a revoked key must
+/// stop. Returns `None` when nothing usable is left, rather than an empty key
+/// set, which would assert that this issuer signs nothing.
 pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Option<Value> {
     let current = store.public_key(key_id)?;
 
-    let mut keys = vec![jwk(&current)?];
+    // 🚨 The current key is filtered on `revoked` too, and it was not.
+    //
+    // The doc above says revoked keys are excluded; the code excluded them only
+    // from the *archived* list, and published whatever `public_key` returned.
+    // `revoked` is persisted on the record, so a store opened or migrated with a
+    // revoked current key would publish it here — and a verifier trusting this
+    // JWKS would go on accepting signatures from the one key an operator has
+    // said to stop trusting. That is the exact failure revocation exists to
+    // prevent, reached by the metadata document meant to convey it.
+    let mut keys: Vec<Value> = Vec::new();
+    if !current.revoked {
+        keys.push(jwk(&current)?);
+    }
     keys.extend(
         store
             .archived_public_keys(key_id)
@@ -51,6 +65,13 @@ pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Op
             .filter(|k| !k.revoked)
             .filter_map(jwk),
     );
+
+    // No usable key is not the same as an empty key set. A JWKS with `keys: []`
+    // reads as "this issuer signs nothing", which a verifier may cache; absent
+    // metadata reads as "ask again". Fail closed by saying nothing.
+    if keys.is_empty() {
+        return None;
+    }
 
     Some(json!({
         "issuer": issuer,

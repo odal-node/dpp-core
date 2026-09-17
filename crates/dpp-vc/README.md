@@ -24,9 +24,14 @@ depends on `dpp-crypto`, whose RNG requires a platform entropy source.
   its time bound still holds — see `snapshot`.
 - You are issuing a passport as an **SD-JWT VC** so a holder can present part of
   it to a third party without the issuing node being reachable — see
-  `sd_jwt_vc`. That door resolves issuer keys through JWT VC Issuer Metadata
-  rather than `did:web`, because the credential profile defines no DID
-  mechanism.
+  `sd_jwt_vc`. That door is keyed by JWT VC Issuer Metadata rather than
+  `did:web`, because the credential profile defines no DID mechanism.
+
+  It does not *resolve* those keys, and nothing in this crate does: there is no
+  I/O here. `build_issuer_metadata` produces the document an issuer publishes,
+  and `verify` takes the key the caller has already chosen. Fetching the
+  metadata, deciding whether to trust it, and picking the key out of it are the
+  application's, which is also where a network policy belongs.
 
 ## What this crate is *not*
 

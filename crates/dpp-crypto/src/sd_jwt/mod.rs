@@ -21,6 +21,15 @@
 //!   disclosure mechanism only. The JWS check is [`crate::jws::verifier`], and a
 //!   caller must do both — a credential whose digests all match but whose
 //!   signature is forged is worthless, and this module cannot tell.
+//! - **`parse` does not authenticate the disclosures either**, which is the
+//!   sharper half of the same point. It reads the serialisation; it does not
+//!   compare what arrived against the signed `_sd` digests. A validly signed,
+//!   entirely untouched JWT can be re-serialised with an extra forged
+//!   disclosure, and [`SdJwt::disclosures`] will hand it back — the signature
+//!   still verifies, because it never covered that list. Only
+//!   [`SdJwt::disclosed_payload`] recomputes the digests and drops what the
+//!   issuer did not commit to, so **read claims from its output, never from
+//!   `disclosures()`**.
 //! - **It does not implement key binding.** RFC 9901 clause 4.3's KB-JWT proves
 //!   the presenter holds a key the credential names. That needs holders to have
 //!   keys. The parser tolerates a trailing KB-JWT segment so that a presentation

@@ -16,6 +16,7 @@ name = "dpp_crypto"
 path = "src/lib.rs"
 
 [dependencies]
+thiserror  = { workspace = true }
 ed25519-dalek    = { workspace = true }
 zeroize          = { workspace = true }
 aes-gcm          = { workspace = true }

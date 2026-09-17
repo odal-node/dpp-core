@@ -123,7 +123,23 @@ impl SdJwt {
         &self.jwt
     }
 
-    /// The disclosures currently attached.
+    /// The disclosures currently attached, **unauthenticated**.
+    ///
+    /// 🚨 A disclosure here has not been matched against the signed `_sd`
+    /// digests. [`Self::parse`] reads the serialisation; it does not check that
+    /// what arrived is what the issuer committed to. So anyone can append a
+    /// forged disclosure to an untouched, validly signed credential, and it
+    /// comes back from this method looking exactly like a real one — the
+    /// signature still verifies, because the signature never covered this list.
+    ///
+    /// Treat every value here as attacker-supplied until
+    /// [`Self::disclosed_payload`] has succeeded, and read the claim from *its*
+    /// output rather than from here. That is the call which recomputes each
+    /// digest and admits only the disclosures the issuer signed over.
+    ///
+    /// This method exists for inspection — counting what travelled, rendering a
+    /// presentation, choosing what to reveal next — none of which is a trust
+    /// decision.
     pub fn disclosures(&self) -> &[Disclosure] {
         &self.disclosures
     }

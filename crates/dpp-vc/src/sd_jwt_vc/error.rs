@@ -7,32 +7,41 @@ use dpp_crypto::sd_jwt::SdJwtError;
 use super::TYP;
 
 /// Anything that can go wrong issuing or verifying an SD-JWT VC.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum SdJwtVcError {
     /// The payload handed to [`super::issue`] was not a JSON object.
+    #[error("payload is not a JSON object")]
     PayloadNotAnObject,
     /// The key store refused to sign.
+    #[error("signing failed: {0}")]
     Signing(String),
     /// The Issuer-signed JWT's signature did not verify against the given key.
+    #[error("issuer signature did not verify")]
     BadSignature,
     /// The disclosure mechanism rejected the token.
-    SdJwt(SdJwtError),
+    #[error(transparent)]
+    SdJwt(#[from] SdJwtError),
     /// `typ` is absent or is not [`TYP`].
+    #[error("typ is '{0}', expected '{TYP}'")]
     WrongTyp(String),
     /// A claim clause 2.2.2 requires is missing.
+    #[error("required claim '{0}' is absent")]
     MissingClaim(&'static str),
     /// A temporal claim is present but is not a JWT `NumericDate`.
     ///
     /// Refused rather than ignored: ignoring a malformed `exp` would read as an
     /// absent `exp`, which is the *unbounded* case.
+    #[error("claim '{0}' is not a NumericDate")]
     MalformedTemporalClaim(&'static str),
     /// `exp` has passed.
+    #[error("credential expired at {at}")]
     Expired {
         /// The instant the credential stopped being valid.
         at: DateTime<Utc>,
     },
     /// `nbf` has not been reached.
+    #[error("credential is not valid until {from}")]
     NotYetValid {
         /// The instant the credential starts being valid.
         from: DateTime<Utc>,
@@ -41,39 +50,11 @@ pub enum SdJwtVcError {
     ///
     /// Checked because a verifier that accepts any `vct` is accepting a
     /// credential whose claim semantics it has not agreed to.
+    #[error("vct is '{found}', expected '{expected}'")]
     UnexpectedVct {
         /// What the caller asked for.
         expected: String,
         /// What the credential declared.
         found: String,
     },
-}
-
-impl std::fmt::Display for SdJwtVcError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::PayloadNotAnObject => f.write_str("payload is not a JSON object"),
-            Self::Signing(e) => write!(f, "signing failed: {e}"),
-            Self::BadSignature => f.write_str("issuer signature did not verify"),
-            Self::SdJwt(e) => write!(f, "{e}"),
-            Self::WrongTyp(found) => write!(f, "typ is '{found}', expected '{TYP}'"),
-            Self::MissingClaim(c) => write!(f, "required claim '{c}' is absent"),
-            Self::MalformedTemporalClaim(c) => {
-                write!(f, "claim '{c}' is not a NumericDate")
-            }
-            Self::Expired { at } => write!(f, "credential expired at {at}"),
-            Self::NotYetValid { from } => write!(f, "credential is not valid until {from}"),
-            Self::UnexpectedVct { expected, found } => {
-                write!(f, "vct is '{found}', expected '{expected}'")
-            }
-        }
-    }
-}
-
-impl std::error::Error for SdJwtVcError {}
-
-impl From<SdJwtError> for SdJwtVcError {
-    fn from(e: SdJwtError) -> Self {
-        Self::SdJwt(e)
-    }
 }

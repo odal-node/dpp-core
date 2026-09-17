@@ -67,7 +67,11 @@ pub fn verify(
 
     let payload = sd_jwt.disclosed_payload()?;
 
-    if !payload.contains_key("iss") {
+    // Presence is not enough: `contains_key` accepts `"iss": null`, a number or
+    // an array, and the credential would then verify while naming no issuer at
+    // all. Checked the way `vct` below is checked, because a claim that has to
+    // be *read* has to be a string.
+    if payload.get("iss").and_then(Value::as_str).is_none() {
         return Err(SdJwtVcError::MissingClaim("iss"));
     }
     let Some(found) = payload.get("vct").and_then(Value::as_str) else {
@@ -102,10 +106,28 @@ fn check_validity_window(
         // RFC 7519 clause 2: a NumericDate is a JSON *number* of seconds since
         // the epoch. A string that looks like a date is not one, and accepting
         // it would read a claim the issuer did not make.
-        let Some(seconds) = value.as_i64() else {
+        //
+        // The clause also says so in as many words of non-integer values, which
+        // `as_i64` refused: a conformant `1789003600.5` was read as malformed
+        // and the credential rejected. Refusing a valid credential is the
+        // failure here, so the number is taken as `f64` and its fraction kept.
+        // Everything that is *not* a finite number stays refused, including a
+        // value too large to land on the timeline — the fail-closed direction
+        // below only holds while a malformed claim cannot read as an absent one.
+        let Some(seconds) = value.as_f64().filter(|s| s.is_finite()) else {
             return Err(SdJwtVcError::MalformedTemporalClaim(claim));
         };
-        let Some(instant) = DateTime::from_timestamp(seconds, 0) else {
+        let whole = seconds.floor();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "guarded: `whole` is finite and range-checked by from_timestamp below"
+        )]
+        let nanos = ((seconds - whole) * 1e9).round() as u32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "same guard; an out-of-range i64 cast is caught by from_timestamp"
+        )]
+        let Some(instant) = DateTime::from_timestamp(whole as i64, nanos.min(999_999_999)) else {
             return Err(SdJwtVcError::MalformedTemporalClaim(claim));
         };
         match claim {

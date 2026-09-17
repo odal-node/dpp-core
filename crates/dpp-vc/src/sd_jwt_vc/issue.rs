@@ -120,7 +120,15 @@ fn conceal_object(
     // keeps it that way.
     let mut hide = Vec::new();
     for key in object.keys() {
-        if NEVER_CONCEALED.contains(&key.as_str()) {
+        // 🚨 Root only. These are registered claims of the *token*, and the
+        // reason they are exempt — a verifier reads them before any disclosure
+        // is processed — is true of the payload root and nowhere else. Applied
+        // at every depth, as it was, the list silently exempted any nested
+        // field that happened to share one of these eight names: a
+        // `productGroupData` member called `exp` or `aud` would travel in
+        // cleartext however the policy classified it, which is precisely the
+        // over-disclosure this design exists to prevent.
+        if segments.is_empty() && NEVER_CONCEALED.contains(&key.as_str()) {
             continue;
         }
         segments.push(key.clone());
