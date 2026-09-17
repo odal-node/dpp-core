@@ -23,12 +23,46 @@ use crate::keystore::KeyStore;
 /// `crv` as a JWK member, not a registered header parameter. It lives on the
 /// DID document's `publicKeyJwk` instead, where it is the spec-correct place.
 pub fn sign(store: &KeyStore, key_id: &str, payload: &Value) -> anyhow::Result<String> {
+    sign_typed(store, key_id, payload, None)
+}
+
+/// [`sign`], with an optional `typ` protected-header parameter.
+///
+/// `typ` exists because some JWS profiles require the token to declare what it
+/// is — SD-JWT VC is one, and mandates `dc+sd-jwt`. It is threaded through here
+/// rather than bolted on afterwards because the header is *protected*: adding a
+/// parameter after signing would invalidate the signature, so the only place it
+/// can be set is before the signing input is built.
+///
+/// `None` produces exactly the header [`sign`] has always produced, so existing
+/// signatures and their verifiers are unaffected.
+pub fn sign_typed(
+    store: &KeyStore,
+    key_id: &str,
+    payload: &Value,
+    typ: Option<&str>,
+) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
-    let header_json = format!(
-        r#"{{"alg":"{}","kid":"{}"}}"#,
-        key.algorithm.jose_alg(),
-        key.fingerprint
+    // Serialised rather than interpolated. `typ` is caller-supplied, and a value
+    // containing a quote or a backslash would otherwise escape the string it
+    // sits in — producing malformed JSON at best, and at worst letting a caller
+    // write additional members into a header that is about to be *signed*.
+    //
+    // The byte output is unchanged for `typ: None`: `serde_json::Map` is a
+    // `BTreeMap` here (no `preserve_order` feature in this workspace), so
+    // members serialise in lexicographic order, and `alg` < `kid` < `typ` is
+    // the order the hand-written literal already used. Existing signatures and
+    // the verifiers that check them are unaffected.
+    let mut header = serde_json::Map::new();
+    header.insert(
+        "alg".to_owned(),
+        Value::String(key.algorithm.jose_alg().to_owned()),
     );
+    header.insert("kid".to_owned(), Value::String(key.fingerprint.clone()));
+    if let Some(typ) = typ {
+        header.insert("typ".to_owned(), Value::String(typ.to_owned()));
+    }
+    let header_json = serde_json::to_string(&header)?;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let canonical = super::canonical::canonicalize(payload)?;
     let header_b64 = b64.encode(header_json.as_bytes());
