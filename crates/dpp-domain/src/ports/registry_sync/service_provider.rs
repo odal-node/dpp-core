@@ -32,12 +32,25 @@ use serde::{Deserialize, Serialize};
 /// registration. Requiring a scheme here would impose a conformity rule the
 /// annex declines to.
 ///
-/// 🚨 And there is no registry-issued provider identifier to reuse yet.
-/// Implementing Regulation (EU) 2026/1778 Art. 3(f) has the registry holding a
-/// list of *verified* providers, but that Regulation lays down verification
-/// processes for economic operators (Art. 4) and value chain actors (Art. 5)
-/// only. The criteria sit in an ESPR Art. 11 delegated act that has not been
-/// adopted.
+/// 🚨 **A provider is verified, and being verified still does not give it an
+/// identifier.** Implementing Regulation (EU) 2026/1778 recital 4 names the role
+/// among value chain actors — *"each economic operator and value chain actor
+/// (such as digital product passport service provider, repairer, refurbisher,
+/// remanufacturer, recycler) should be identified through a verification
+/// process"* — so **Art. 5** applies: a legal person obtains verified status by
+/// proving identity and establishment with a qualified electronic seal or a
+/// qualified electronic attestation of attributes. Art. 3(f) then has the
+/// registry holding *"a list of verified digital product passport service
+/// providers"*.
+///
+/// What that produces is a **status**, evidenced by a seal, not a namespace. Art.
+/// 5 names the evidence and assigns no identifier, which is why point (l) still
+/// mandates nothing and why the scheme here stays optional.
+///
+/// And verified status lapses: Art. 5(4) caps it at the expiry of the electronic
+/// identification means or three years from verification, whichever comes first.
+/// A reference is a record of who was named, not a standing assertion that they
+/// are verified today.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceProviderRef {

@@ -244,11 +244,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   from that list**. Art. 2(32) defines the role as *"an independent third-party
   authorised by the economic operator"*, a relationship rather than a
   registration. Requiring a scheme would impose a conformity rule the annex
-  declines to. 🚨 And there is no registry-issued provider identifier to reuse:
-  Art. 3(f) has the registry holding a list of *verified* providers, but that
-  Regulation lays down verification only for economic operators (Art. 4) and
-  value chain actors (Art. 5); the provider criteria sit in an ESPR Art. 11
-  delegated act that has not been adopted.
+  declines to.
+
+  🚨 **A provider is verified, and verification still yields nothing to reuse.**
+  IR (EU) 2026/1778 recital 4 names the role among value chain actors — *"each
+  economic operator and value chain actor (such as digital product passport
+  service provider, repairer, refurbisher, remanufacturer, recycler) should be
+  identified through a verification process"* — so Art. 5 governs it: a legal
+  person obtains verified status by proving identity and establishment with a
+  qualified electronic seal or a qualified electronic attestation of attributes,
+  and Art. 3(f) has the registry holding the resulting list. That produces a
+  **status evidenced by a seal**, not a namespace; Art. 5 assigns no identifier,
+  so reaching for a registry-issued one would still be inventing it. And Art.
+  5(4) caps verified status at the expiry of the electronic identification means
+  or three years from verification, whichever comes first — a reference records
+  who was named, not that they are verified today.
 
   🚨 **A declared `backup_url` with no provider named is now refused.** ESPR
   **Art. 10(4)** is unconditional and names the party: *"The economic operator,

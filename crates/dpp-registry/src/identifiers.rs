@@ -311,13 +311,22 @@ fn has_country_prefix(s: &str, max_body: usize) -> bool {
 /// identifier. Requiring a scheme would invent a conformity rule the annex
 /// deliberately does not impose.
 ///
-/// 🚨 **There is no registry-issued provider identifier to reuse.** IR
-/// 2026/1778 Art. 3(f) says the registry holds *"a list of verified digital
-/// product passport service providers"*, but that Regulation lays down
-/// verification processes for economic operators (Art. 4) and value chain actors
-/// (Art. 5) only. The criteria are empowered by ESPR Art. 11's penultimate
-/// subparagraph as a delegated act that has not been adopted. A design assuming
-/// such an identifier would be inventing one.
+/// 🚨 **A provider is verified, and verification still yields no identifier to
+/// reuse.** IR (EU) 2026/1778 recital 4 names the role among value chain actors
+/// — *"each economic operator and value chain actor (such as digital product
+/// passport service provider, repairer, refurbisher, remanufacturer, recycler)
+/// should be identified through a verification process"* — so **Art. 5** governs
+/// it: a legal person obtains verified status by proving identity and
+/// establishment with a qualified electronic seal or a qualified electronic
+/// attestation of attributes. Art. 3(f) then has the registry holding *"a list
+/// of verified digital product passport service providers"*.
+///
+/// That produces a **status evidenced by a seal**, not a namespace. Art. 5 names
+/// the evidence and assigns nothing, so a design reaching for a registry-issued
+/// provider identifier would still be inventing one — and Art. 5(4) caps
+/// verified status at the expiry of the electronic identification means or three
+/// years from verification, whichever comes first, so a reference records who
+/// was named rather than asserting they are verified today.
 ///
 /// # Why it is not the back-up URL
 ///
@@ -387,6 +396,17 @@ impl ServiceProviderReference {
                 if scheme.trim().is_empty() {
                     return Err(RegistryValidationError::MissingRequiredField(
                         "serviceProvider.scheme".into(),
+                    ));
+                }
+                // 🚨 And the value, before the per-scheme check rather than
+                // through it. `validate_operator_scheme` accepts `"did"` and
+                // every unrecognised scheme without looking at the value, so a
+                // blank one reached `Ok` — which made `Some("did")` with an
+                // empty value pass while `Some("did")` with no value at all is
+                // refused two arms down. The same absence, two answers.
+                if value.trim().is_empty() {
+                    return Err(RegistryValidationError::MissingRequiredField(
+                        "serviceProvider.value".into(),
                     ));
                 }
                 validate_operator_scheme(scheme, value)?;

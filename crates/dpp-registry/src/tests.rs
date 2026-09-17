@@ -1050,6 +1050,15 @@ fn a_half_stated_identifier_is_refused() {
         (Some("lei"), None, "serviceProvider.value"),
         (None, Some("529900T8BM49AURSDO55"), "serviceProvider.scheme"),
         (Some("  "), Some("anything"), "serviceProvider.scheme"),
+        // 🚨 A blank value under a scheme nothing structurally checks.
+        // `validate_operator_scheme` accepts `"did"` and every unrecognised
+        // scheme without looking at the value, so these reached `Ok` — and
+        // `Some("did")` with an empty value is the same absence as
+        // `Some("did")` with no value, which the first case above refuses.
+        // Two answers for one state is the defect, not the leniency.
+        (Some("did"), Some(""), "serviceProvider.value"),
+        (Some("did"), Some("   "), "serviceProvider.value"),
+        (Some("something-new"), Some(""), "serviceProvider.value"),
     ] {
         assert!(
             matches!(
