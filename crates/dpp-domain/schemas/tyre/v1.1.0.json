@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://schema.odal-node.io/dpp/tyre-v1.0.0.json",
+  "$id": "https://schema.odal-node.io/dpp/tyre-v1.1.0.json",
   "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
-  "title": "Odal Node — Tyre Product Group Data (v1.0.0)",
-  "description": "v1.1.0 replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes: scheme 1 (GS1 Digital Link, keyed on a GTIN), scheme 2 (Identification Link, EN IEC 61406-1/-2) and scheme 3 (Decentralized Identifier, W3C DID v1.0:2022). Clause 5.1 requires compliance with one of the schemes and they are alternatives, so requiring a GTIN foreclosed the two that are self-issuing and kept the only one needing a paid GS1 Company Identification Number. A v1.0.0 record is read forward by a lens that wraps its gtin as scheme 1. Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. Applicability dates and regulatory status are held in the product group manifest, not here. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
+  "title": "Odal Node — Tyre Product Group Data (v1.1.0)",
+  "description": "v1.1.0 replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes: scheme 1 (GS1 Digital Link, keyed on a GTIN), scheme 2 (Identification Link, EN IEC 61406-1/-2) and scheme 3 (Decentralized Identifier, W3C DID v1.0:2022). Clause 5.1 requires compliance with one of the schemes and they are alternatives, so requiring a GTIN foreclosed the two that are self-issuing and kept the only one that additionally needs a GS1 Company Identification Number. A v1.0.0 record is read forward by a lens that wraps its gtin as scheme 1. Tyre fields per EU Regulation 2020/740 on tyre labelling (replacing 1222/2009, effective 1 May 2021) and ESPR Working Plan 2025-2030. Applicability dates and regulatory status are held in the product group manifest, not here. NOTE: fuel efficiency and wet grip classes are A-E (5 classes) per the 2021 label, NOT the old A-G scale.",
   "type": "object",
   "required": [
     "productIdentifier",
@@ -15,7 +15,7 @@
   "properties": {
     "productIdentifier": {
       "type": "object",
-      "description": "The unique product identifier, in whichever EN 18219:2026 clause 5 ID scheme issued it. Clause 5.1 requires compliance with one of the schemes; they are alternatives, not a hierarchy. Scheme 1 (GS1 branch) needs a GS1 Company Identification Number, a paid subscription; schemes 2 and 3 are self-issuing and need only a registered web domain. EN 18219 is one of the six harmonised DPP standards carrying the presumption of conformity of Regulation (EU) 2024/1781 Art. 41(2).",
+      "description": "The unique product identifier, in whichever EN 18219:2026 clause 5 ID scheme issued it. Clause 5.1 requires compliance with one of the schemes; they are alternatives, not a hierarchy. Scheme 1 (GS1 branch) additionally needs a GS1 Company Identification Number; schemes 2 and 3 are self-issuing and need only the registered web domain every scheme requires. EN 18219 is one of the six harmonised DPP standards carrying the presumption of conformity of Regulation (EU) 2024/1781 Art. 41(2).",
       "required": [
         "scheme"
       ],
@@ -56,7 +56,7 @@
             "url": {
               "type": "string",
               "pattern": "^https?://.+",
-              "description": "The identification link URL. Checked only to be an absolute http(s) URL: EN IEC 61406 is not held by this project, so its format rules are unverified here and passing this check is not a conformance claim.",
+              "description": "The identification link URL. Checked only to be an absolute http(s) URL: EN IEC 61406 format rules are not applied here, so passing this check is not a conformance claim.",
               "x-disclosure": "public"
             }
           },

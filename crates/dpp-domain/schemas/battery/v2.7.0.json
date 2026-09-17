@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://schema.odal-node.io/dpp/battery-v2.6.0.json",
-  "title": "Odal Node — Battery Product Group Data (v2.6.0)",
-  "description": "v2.7.0 replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes: scheme 1 (GS1 Digital Link, keyed on a GTIN), scheme 2 (Identification Link, EN IEC 61406-1/-2) and scheme 3 (Decentralized Identifier, W3C DID v1.0:2022). Clause 5.1 requires compliance with one of the schemes and they are alternatives, so requiring a GTIN foreclosed the two that are self-issuing and kept the only one needing a paid GS1 Company Identification Number. A v2.6.0 record is read forward by a lens that wraps its gtin as scheme 1. Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.6.0 adds the Annex XIII point 4 individual-battery tier, relaxes expectedLifetimeCycles out of required, and declares the four Annex VI Part A identity fields the Rust type had emitted since v2.0.0 with no schema version admitting them: place of manufacture (Part A point 3), date of manufacture (Part A point 4, month and year), the battery-identifying half of Part A point 2, and the Art. 77(3) unique identifier. Because this schema sets additionalProperties false, a passport populating any of them previously failed validation outright. All four are public via Annex XIII point 1(a). criticalRawMaterials and dueDiligenceUrl are public for the same reason — Annex XIII points 1(b) and 1(d) respectively place them in the publicly accessible tier; both were previously restricted. Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.5.0 makes batteryType required and closed: Annex VI Part A point 2, made public by Annex XIII point 1(a), lists the battery category as mandatory content of the publicly accessible tier, and Art. 1(3)'s strictest-requirements tie-break only functions over a closed set, so an unrecognised value is no longer accepted as null.",
+  "$id": "https://schema.odal-node.io/dpp/battery-v2.7.0.json",
+  "title": "Odal Node — Battery Product Group Data (v2.7.0)",
+  "description": "v2.7.0 replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes: scheme 1 (GS1 Digital Link, keyed on a GTIN), scheme 2 (Identification Link, EN IEC 61406-1/-2) and scheme 3 (Decentralized Identifier, W3C DID v1.0:2022). Clause 5.1 requires compliance with one of the schemes and they are alternatives, so requiring a GTIN foreclosed the two that are self-issuing and kept the only one that additionally needs a GS1 Company Identification Number. A v2.6.0 record is read forward by a lens that wraps its gtin as scheme 1. Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.6.0 adds the Annex XIII point 4 individual-battery tier, relaxes expectedLifetimeCycles out of required, and declares the four Annex VI Part A identity fields the Rust type had emitted since v2.0.0 with no schema version admitting them: place of manufacture (Part A point 3), date of manufacture (Part A point 4, month and year), the battery-identifying half of Part A point 2, and the Art. 77(3) unique identifier. Because this schema sets additionalProperties false, a passport populating any of them previously failed validation outright. All four are public via Annex XIII point 1(a). criticalRawMaterials and dueDiligenceUrl are public for the same reason — Annex XIII points 1(b) and 1(d) respectively place them in the publicly accessible tier; both were previously restricted. Battery-specific fields per EU Battery Regulation 2023/1542 Annex XIII. v2.5.0 makes batteryType required and closed: Annex VI Part A point 2, made public by Annex XIII point 1(a), lists the battery category as mandatory content of the publicly accessible tier, and Art. 1(3)'s strictest-requirements tie-break only functions over a closed set, so an unrecognised value is no longer accepted as null.",
   "type": "object",
   "required": [
     "productIdentifier",
@@ -415,7 +415,7 @@
     },
     "productIdentifier": {
       "type": "object",
-      "description": "The unique product identifier, in whichever EN 18219:2026 clause 5 ID scheme issued it. Clause 5.1 requires compliance with one of the schemes; they are alternatives, not a hierarchy. Scheme 1 (GS1 branch) needs a GS1 Company Identification Number, a paid subscription; schemes 2 and 3 are self-issuing and need only a registered web domain. EN 18219 is one of the six harmonised DPP standards carrying the presumption of conformity of Regulation (EU) 2024/1781 Art. 41(2).",
+      "description": "The unique product identifier, in whichever EN 18219:2026 clause 5 ID scheme issued it. Clause 5.1 requires compliance with one of the schemes; they are alternatives, not a hierarchy. Scheme 1 (GS1 branch) additionally needs a GS1 Company Identification Number; schemes 2 and 3 are self-issuing and need only the registered web domain every scheme requires. EN 18219 is one of the six harmonised DPP standards carrying the presumption of conformity of Regulation (EU) 2024/1781 Art. 41(2).",
       "required": [
         "scheme"
       ],
@@ -456,7 +456,7 @@
             "url": {
               "type": "string",
               "pattern": "^https?://.+",
-              "description": "The identification link URL. Checked only to be an absolute http(s) URL: EN IEC 61406 is not held by this project, so its format rules are unverified here and passing this check is not a conformance claim.",
+              "description": "The identification link URL. Checked only to be an absolute http(s) URL: EN IEC 61406 format rules are not applied here, so passing this check is not a conformance claim.",
               "x-disclosure": "public"
             }
           },

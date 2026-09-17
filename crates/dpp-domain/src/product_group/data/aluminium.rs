@@ -9,7 +9,8 @@ use crate::product_group::ProductionRoute;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AluminiumData {
-    /// 14-digit GTIN identifying the aluminium product.
+    /// The unique product identifier for the aluminium product, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Alloy series designation, e.g. `"1xxx"`, `"3xxx"`, `"5xxx"`, `"6xxx"`.
     pub alloy_grade: String,

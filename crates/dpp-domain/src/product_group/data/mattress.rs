@@ -32,7 +32,8 @@ use super::common::SvhcSubstance;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MattressData {
-    /// 14-digit GTIN identifying the mattress.
+    /// The unique product identifier for the mattress, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Primary material, e.g. `"solid-wood"`, `"metal"`, `"upholstered"`, `"mixed"`.
     pub primary_material: String,

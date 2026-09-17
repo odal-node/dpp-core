@@ -219,6 +219,21 @@ fn catalog_agrees_with_schema_registry() {
             d.current_schema_version,
             d.schema_versions
         );
+
+        // 🚨 And the other direction, which was missing: an embedded schema the
+        // catalog does not declare. `electronics` v1.3.0 was embedded, validated
+        // against and reachable by a lens while the manifest skipped it — so the
+        // catalog, which is what a caller asks "what versions are there", named
+        // four of five. One-directional parity could not see it, because every
+        // version the catalog *did* declare existed.
+        for v in &reg_versions {
+            assert!(
+                d.schema_versions.contains(v),
+                "registry has '{}' schema {v} but the catalog declares only {:?}",
+                d.key,
+                d.schema_versions
+            );
+        }
     }
 
     // No orphan schemas: every registry product group must have a catalog entry.

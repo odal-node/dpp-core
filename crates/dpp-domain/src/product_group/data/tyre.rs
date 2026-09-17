@@ -12,7 +12,8 @@ use crate::identifier::ProductIdentifier;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TyreData {
-    /// 14-digit GTIN identifying the tyre model.
+    /// The unique product identifier for the tyre model, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Tyre class per EU 2020/740: `"C1"` (passenger cars), `"C2"` (vans/light trucks), `"C3"` (heavy trucks).
     pub tyre_class: String,

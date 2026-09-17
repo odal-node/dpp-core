@@ -26,17 +26,17 @@ const DID_METHODS: [&str; 3] = ["web", "ethr", "ebsi"];
 ///
 /// Every product-group payload once declared `gtin: Gtin` — not `Option<Gtin>` —
 /// so a GTIN was structurally required to create a passport at all. A GTIN needs
-/// a GS1 Company Identification Number, which is a recurring paid subscription,
-/// and clause 5 admits four other schemes of which **two are self-issuing**. So
-/// the type foreclosed the schemes with no external dependency and kept the only
-/// one with an annual bill attached — a commercial position expressed as a
-/// compile error, which is not where such a position should live.
+/// a GS1 Company Identification Number, which only GS1 issues, and clause 5
+/// admits four other schemes of which **two are self-issuing**. So the type
+/// foreclosed the schemes that depend on no outside issuer and kept the one that
+/// does — a choice of issuer expressed as a compile error, which is not where
+/// such a choice should live.
 ///
-/// The standard's own informative Annex B, Table B.4, makes the comparison
-/// plainly: every scheme needs a registered web domain; scheme 1 *additionally*
-/// needs the CIN. Scheme 3's prerequisites are a strict subset of scheme 1's,
-/// and the same table rates its sovereignty over the identifier's data highest
-/// of the three — full control, verifiable cryptographically.
+/// The standard's own informative Annex B, Table B.4, sets the prerequisites
+/// side by side: every scheme needs a registered web domain; scheme 1
+/// *additionally* needs the CIN. Scheme 3's prerequisites are a strict subset of
+/// scheme 1's, and the same table rates its sovereignty over the identifier's
+/// data highest of the three — full control, verifiable cryptographically.
 ///
 /// # What each variant does and does not check
 ///
@@ -46,13 +46,17 @@ const DID_METHODS: [&str; 3] = ["web", "ethr", "ebsi"];
 /// weaker identifier, it is a typo nobody caught.
 ///
 /// 🚨 **Scheme 2 is deliberately under-validated, and that is recorded rather
-/// than hidden.** Its format is EN IEC 61406-1/-2, which this project does not
-/// hold. Checking only that the value is an absolute `http(s)` URL is what can
-/// be checked against a text in hand; asserting 61406 conformance would be a
-/// claim made from a standard nobody here has read. See
-/// [`Self::IdentificationLink`].
+/// than hidden.** Its format is specified by EN IEC 61406-1/-2. This type checks
+/// only that the value is an absolute `http(s)` URL, which is a shape check and
+/// not a conformance verdict — a caller needing conformance to that standard
+/// must establish it elsewhere. See [`Self::IdentificationLink`].
+///
+/// Whatever each variant does check, it checks on the way in **and** on the way
+/// back: deserialisation is routed through the constructors, so a stored
+/// identifier that could not have been built cannot be read either.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "scheme", rename_all = "camelCase")]
+#[serde(try_from = "Wire")]
 #[non_exhaustive]
 pub enum ProductIdentifier {
     /// **Scheme 1** — a web-enabled structured path/query identifier, GS1
@@ -70,11 +74,10 @@ pub enum ProductIdentifier {
     ///
     /// Self-issuing: the operator needs its own web domain and nothing else.
     ///
-    /// 🚨 Only checked to be an absolute `http`/`https` URL. EN IEC 61406 is not
-    /// held by this project, so its format rules are unverified here, and a
-    /// value that passes this check is **not** thereby conformant. Recorded on
-    /// the variant so a reader does not infer a conformance claim from the
-    /// absence of an error.
+    /// 🚨 Only checked to be an absolute `http`/`https` URL. EN IEC 61406's own
+    /// format rules are not applied here, so a value that passes this check is
+    /// **not** thereby conformant. Recorded on the variant so a reader does not
+    /// infer a conformance claim from the absence of an error.
     #[serde(rename_all = "camelCase")]
     IdentificationLink {
         /// The identification link URL.
@@ -107,22 +110,29 @@ impl ProductIdentifier {
     pub fn identification_link(url: &str) -> Result<Self, ProductIdentifierError> {
         let rest = url
             .strip_prefix("https://")
-            .or_else(|| url.strip_prefix("http://"));
-        match rest {
-            Some(host) if !host.is_empty() => Ok(Self::IdentificationLink {
-                url: url.to_owned(),
-            }),
-            _ => Err(ProductIdentifierError::NotAWebUrl(url.to_owned())),
+            .or_else(|| url.strip_prefix("http://"))
+            .ok_or_else(|| ProductIdentifierError::NotAWebUrl(url.to_owned()))?;
+
+        // 🚨 The authority ends at the first `/`, `?` or `#` — it is not simply
+        // "whatever follows the scheme". `https:///p/1` and `https://?q` each
+        // leave a non-empty remainder and no host whatsoever, so checking that
+        // remainder for emptiness accepted two values nothing can resolve.
+        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        if authority.is_empty() || url.contains(char::is_whitespace) {
+            return Err(ProductIdentifierError::NotAWebUrl(url.to_owned()));
         }
+        Ok(Self::IdentificationLink {
+            url: url.to_owned(),
+        })
     }
 
     /// Parse a scheme 3 DID.
     ///
     /// # Errors
     ///
-    /// [`ProductIdentifierError::NotADid`] if the value is not
-    /// `did:<method>:<id>`, [`ProductIdentifierError::UnsupportedDidMethod`] if
-    /// the method is not one clause 5 names, and
+    /// [`ProductIdentifierError::NotADid`] if the value does not satisfy the W3C
+    /// DID v1.0 clause 3.1 grammar, [`ProductIdentifierError::UnsupportedDidMethod`]
+    /// if the method is not one clause 5 names, and
     /// [`ProductIdentifierError::EmptyDidMethodId`] if nothing follows it.
     pub fn did(did: &str) -> Result<Self, ProductIdentifierError> {
         let rest = did
@@ -138,6 +148,9 @@ impl ProductIdentifier {
         }
         if method_id.is_empty() {
             return Err(ProductIdentifierError::EmptyDidMethodId(did.to_owned()));
+        }
+        if !is_method_specific_id(method_id) {
+            return Err(ProductIdentifierError::NotADid(did.to_owned()));
         }
         Ok(Self::Did {
             did: did.to_owned(),
@@ -167,6 +180,74 @@ impl ProductIdentifier {
             Self::Gs1 { gtin } => gtin.as_str(),
             Self::IdentificationLink { url } => url,
             Self::Did { did } => did,
+        }
+    }
+}
+
+/// W3C DID v1.0 clause 3.1: `method-specific-id = *( *idchar ":" ) 1*idchar`.
+///
+/// Colon-separated segments, of which only the last must be non-empty. Checked
+/// because the shape is the whole claim the type makes — a value carrying a raw
+/// space or a truncated `%` escape is not a DID with a formatting blemish, it is
+/// a string no resolver will accept, pointing at no passport.
+fn is_method_specific_id(id: &str) -> bool {
+    !id.is_empty() && !id.ends_with(':') && id.split(':').all(is_idchars)
+}
+
+/// `idchar = ALPHA / DIGIT / "." / "-" / "_" / pct-encoded`, where
+/// `pct-encoded = "%" HEXDIG HEXDIG`.
+fn is_idchars(segment: &str) -> bool {
+    let mut chars = segment.chars();
+    while let Some(c) = chars.next() {
+        let ok = match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-' | '_' => true,
+            '%' => matches!(
+                (chars.next(), chars.next()),
+                (Some(hi), Some(lo)) if hi.is_ascii_hexdigit() && lo.is_ascii_hexdigit()
+            ),
+            _ => false,
+        };
+        if !ok {
+            return false;
+        }
+    }
+    true
+}
+
+/// The wire shape a stored identifier is read into, before validation.
+///
+/// 🚨 Deriving `Deserialize` on [`ProductIdentifier`] itself built the two
+/// self-issuing arms field-by-field and never called their constructors, so a
+/// document holding an unresolvable DID or a hostless URL read back happily —
+/// exactly the values the constructors exist to refuse. `Gtin` does not have
+/// that problem, because it validates inside its own `Deserialize`; that is what
+/// made the gap easy to miss, since scheme 1 was safe and the other two were
+/// not. Reading goes through here so a document is held to the same rules as a
+/// constructor argument.
+///
+/// The variants and their serde attributes must mirror [`ProductIdentifier`]'s
+/// exactly: this type defines the wire form on read, and a divergence here is a
+/// silent rename.
+#[derive(Deserialize)]
+#[serde(tag = "scheme", rename_all = "camelCase")]
+enum Wire {
+    #[serde(rename_all = "camelCase")]
+    Gs1 { gtin: Gtin },
+    #[serde(rename_all = "camelCase")]
+    IdentificationLink { url: String },
+    #[serde(rename_all = "camelCase")]
+    Did { did: String },
+}
+
+impl TryFrom<Wire> for ProductIdentifier {
+    type Error = ProductIdentifierError;
+
+    fn try_from(wire: Wire) -> Result<Self, Self::Error> {
+        match wire {
+            // `Gtin` has already validated its own check digit by this point.
+            Wire::Gs1 { gtin } => Ok(Self::gs1(gtin)),
+            Wire::IdentificationLink { url } => Self::identification_link(&url),
+            Wire::Did { did } => Self::did(&did),
         }
     }
 }

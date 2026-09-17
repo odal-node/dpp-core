@@ -9,7 +9,8 @@ use crate::product_group::ProductionRoute;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SteelData {
-    /// 14-digit GTIN identifying the steel product.
+    /// The unique product identifier for the steel product, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Carbon intensity in tonne CO₂e per tonne of steel produced.
     pub co2e_per_tonne_steel: f64,

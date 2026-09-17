@@ -22,7 +22,8 @@ use super::super::common::{CriticalRawMaterial, SvhcSubstance};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ElectronicsData {
-    /// 14-digit GTIN identifying the product model.
+    /// The unique product identifier for the product model, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Device type per EU Regulation (EU) 2023/1670 Art. 1(1).
     pub product_category: DeviceType,

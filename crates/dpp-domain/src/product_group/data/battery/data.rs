@@ -51,7 +51,8 @@ use crate::product_group::{BatteryChemistry, BatteryStatus, BatteryType, CarbonF
 #[serde(rename_all = "camelCase")]
 pub struct BatteryData {
     // ── v1.0.0 mandatory fields ──────────────────────────────────────────
-    /// 14-digit Global Trade Item Number identifying the battery model.
+    /// The unique product identifier for the battery model, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
     pub product_identifier: ProductIdentifier,
     /// Battery electrochemical chemistry.
     pub battery_chemistry: BatteryChemistry,

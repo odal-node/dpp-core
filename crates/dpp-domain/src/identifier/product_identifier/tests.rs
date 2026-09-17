@@ -36,6 +36,13 @@ fn an_identification_link_must_be_an_absolute_web_url() {
         "ftp://example.com/p/1",
         "https://",
         "",
+        // 🚨 The near-misses. Each leaves a non-empty remainder after the
+        // scheme and carries no host at all, so a check for "something follows
+        // `https://`" let all four through.
+        "https:///p/1",
+        "https://?product=1",
+        "https://#fragment",
+        "https://exam ple.com/p/1",
     ] {
         assert!(
             matches!(
@@ -82,6 +89,48 @@ fn a_malformed_did_is_refused() {
     ));
 }
 
+/// W3C DID v1.0 clause 3.1: `method-specific-id = *( *idchar ":" ) 1*idchar`,
+/// `idchar = ALPHA / DIGIT / "." / "-" / "_" / pct-encoded`.
+///
+/// Checking the prefix, the method and "something follows it" accepted values
+/// the grammar excludes — `did:web: ` being the plainest, a DID whose identifier
+/// is one space. Nothing resolves it, and it would have been stored as though it
+/// identified a product.
+#[test]
+fn a_did_must_satisfy_the_did_core_grammar() {
+    for bad in [
+        "did:web: ",
+        "did:web:exam ple.com",
+        "did:web:example.com:",
+        "did:web:exa%mple",
+        "did:web:example%",
+        "did:web:example%zz",
+        "did:web:example.com/p/1",
+        "did:web:example.com?q=1",
+    ] {
+        assert!(
+            matches!(
+                ProductIdentifier::did(bad),
+                Err(ProductIdentifierError::NotADid(_))
+            ),
+            "{bad:?} was accepted as a DID"
+        );
+    }
+
+    // …and what the grammar does admit, including a percent-encoded port and an
+    // empty intermediate segment, which `*( *idchar ":" )` permits.
+    for good in [
+        "did:web:example.com%3A3000:p:1",
+        "did:web:example.com::p",
+        "did:web:a_b-c.d",
+    ] {
+        assert!(
+            ProductIdentifier::did(good).is_ok(),
+            "{good:?} was refused but the grammar admits it"
+        );
+    }
+}
+
 /// The wire form is the thing a stored passport will carry, so it is pinned as a
 /// literal rather than round-tripped — a round-trip agrees with whatever the
 /// type currently emits and cannot notice a rename.
@@ -120,26 +169,30 @@ fn deserialisation_still_rejects_an_invalid_gtin() {
     );
 }
 
-/// 🚨 A gap, asserted so it is not mistaken for coverage: `serde` builds the
-/// scheme 2 and 3 arms field-by-field and never calls the constructors, so a
-/// stored `identificationLink` or `did` is **not** revalidated on read.
+/// The self-issuing arms hold plain `String`s, so deriving `Deserialize` built
+/// them field-by-field and never called the constructors — a stored DID or
+/// identification link that the constructor refuses read back happily. `Gtin`
+/// never had the problem, because it validates in its own `Deserialize`, and
+/// that is what made the hole easy to miss: scheme 1 was safe and the other two
+/// were not.
 ///
-/// `Gtin` does not have this problem — it validates in its own `Deserialize`,
-/// which is why the test above passes. The two self-issuing arms hold plain
-/// `String`s, so there is nowhere for that check to live short of a custom
-/// `Deserialize` on each.
-///
-/// Left as it is for now because nothing persists this type yet. It has to be
-/// closed by the change that does — a document is an input, and an identifier
-/// that could not have been constructed must not be readable either.
+/// Every value below is one the constructor refuses. Read and construct must
+/// agree, because a document is as much an input as a constructor argument.
 #[test]
-fn a_stored_identifier_is_not_revalidated_and_this_is_the_known_gap() {
-    let unconstructable = json!({"scheme": "did", "did": "did:key:z6Mk"});
-    let read: ProductIdentifier = serde_json::from_value(unconstructable).unwrap();
-    assert_eq!(read.as_str(), "did:key:z6Mk");
-    assert!(
-        ProductIdentifier::did("did:key:z6Mk").is_err(),
-        "the constructor refuses what serde just accepted — if this line fails, \
-         the gap is closed and this test should be deleted"
-    );
+fn deserialisation_refuses_what_the_constructors_refuse() {
+    let unconstructable = [
+        json!({"scheme": "did", "did": "did:key:z6Mk"}),
+        json!({"scheme": "did", "did": "did:web: "}),
+        json!({"scheme": "did", "did": "did:web:"}),
+        json!({"scheme": "identificationLink", "url": "https:///p/1"}),
+        json!({"scheme": "identificationLink", "url": "ftp://example.com/p/1"}),
+        json!({"scheme": "identificationLink", "url": "example.com/p/1"}),
+    ];
+
+    for wire in unconstructable {
+        assert!(
+            serde_json::from_value::<ProductIdentifier>(wire.clone()).is_err(),
+            "{wire} was accepted through serde but the constructor refuses it"
+        );
+    }
 }

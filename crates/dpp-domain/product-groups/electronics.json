@@ -5,6 +5,7 @@
     "1.0.0",
     "1.1.0",
     "1.2.0",
+    "1.3.0",
     "1.4.0"
   ],
   "currentSchemaVersion": "1.4.0",
@@ -21,5 +22,5 @@
     "criticalRawMaterials": "restricted"
   },
   "plugin": "product-group-electronics",
-  "notes": "v1.2.0 (current) narrows productCategory to exactly the four Reg. (EU) 2023/1670 Art. 1(1) device types — laptop/monitor/tv/server/router/charger/earphone/pcb/other are removed: none of them has a DPP obligation, in force or dated, under any EU instrument. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 is kept for historical immutability, having declared repairabilityScore as a bare number."
+  "notes": "v1.4.0 (current) replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes; a v1.3.0 record is read forward by a lens that wraps its gtin as scheme 1. v1.3.0 adds repairabilityIndexInputs, the six Reg. (EU) 2023/1669 Annex IV point 5 parameters the enacted repairability index is computed from, and indexScopeExclusion for the Art. 1(a) and 1(b) carve-outs; it was absent from this list until v1.4.0 landed, though the schema has always been embedded. v1.2.0 narrows productCategory to exactly the four Reg. (EU) 2023/1670 Art. 1(1) device types — laptop/monitor/tv/server/router/charger/earphone/pcb/other are removed: none of them has a DPP obligation, in force or dated, under any EU instrument. v1.1.0 corrects repairabilityScore to the structured {overall, criteria} shape; v1.0.0 is kept for historical immutability, having declared repairabilityScore as a bare number."
 }
