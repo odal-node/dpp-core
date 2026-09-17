@@ -33,7 +33,7 @@ fn the_detectors_catch_what_they_are_for() {
         "Recycled content share as a percentage of total mass."
     ));
 
-    // Both numbering conventions, and the two act kinds.
+    // Both numbering conventions, and every act kind the sector letter can be.
     for (prose, expected) in [
         ("Regulation (EU) 2023/1670", "32023R1670"),
         ("Regulation (EC) No 1907/2006", "32006R1907"),
@@ -41,10 +41,60 @@ fn the_detectors_catch_what_they_are_for() {
         ("Directive (EU) 2017/1132", "32017L1132"),
         ("EU Battery Regulation 2023/1542", "32023R1542"),
         ("replacing 1222/2009", "32009R1222"),
+        // 🚨 Decisions. There was no arm for them, so every one resolved as a
+        // Regulation — a CELEX that points at a different act, or at nothing.
+        // Both of these are cited in this workspace today.
+        (
+            "Commission Implementing Decision (EU) 2026/1736",
+            "32026D1736",
+        ),
+        (
+            "Commission Implementing Decision (EU) 2015/1506",
+            "32015D1506",
+        ),
+        // The form the old rule got backwards: a Decision carrying the trailing
+        // `/EU` that used to be read as proof of a Directive.
+        ("Commission Decision 2011/833/EU", "32011D0833"),
+        // Nothing cites a Recommendation yet. Pinned anyway, because the cost of
+        // the missing arm is a wrong CELEX rather than a failure.
+        ("Commission Recommendation (EU) 2021/2279", "32021H2279"),
         // A sentence-ending act number. This was silently dropped while the
         // trailing-separator guard treated a full stop as a version separator,
         // which made a correctly anchored schema look unanchored.
         ("Toy fields per Regulation (EU) 2025/2509.", "32025R2509"),
+    ] {
+        assert_eq!(
+            act_refs(prose).first().map(|a| a.celex.as_str()),
+            Some(expected),
+            "{prose} should resolve to {expected}"
+        );
+    }
+
+    // Each act in a sentence takes the kind word nearest *it*, not the sentence's
+    // first one — the shape a real citation has once more than one act is named.
+    assert_eq!(
+        act_refs(
+            "Presumption under Regulation (EU) 2024/1781 Art. 41(2), via the \
+             standards cited by Commission Implementing Decision (EU) 2026/1736."
+        )
+        .iter()
+        .map(|a| a.celex.as_str())
+        .collect::<Vec<_>>(),
+        ["32024R1781", "32026D1736"],
+    );
+
+    // 🚨 A kind word must *start* a word. Matching inside one let "indecision"
+    // name a Decision and "deregulation" name a Regulation, which does not fail
+    // — it silently sets the sector letter from a word that is not an act type,
+    // and the result is a well-formed CELEX for a different act.
+    for (prose, expected) in [
+        ("Market indecision since 2023/1234", "32023R1234"),
+        (
+            "After deregulation, Directive 2011/65/EU applied",
+            "32011L0065",
+        ),
+        // Inflections are the same word and must still count.
+        ("Both regulations, including 2023/1670", "32023R1670"),
     ] {
         assert_eq!(
             act_refs(prose).first().map(|a| a.celex.as_str()),

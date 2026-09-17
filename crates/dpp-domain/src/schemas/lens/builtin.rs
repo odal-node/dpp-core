@@ -18,6 +18,64 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
              from v1 ratedCapacityKwh (kWh); every other v2 field is an optional addition.",
             battery_v1_to_v2,
         ),
+        // 🚨 v2.0.0 → v2.4.0 was a four-hop hole in the catalogue. Nothing
+        // failed, because every one of those versions is listed in
+        // `schema_compat.rs`'s expected refusals and refuses at 2.4.0 → 2.5.0
+        // anyway — so the missing chain and the documented refusal produced the
+        // same outcome, and the chain stayed invisible behind it. Each hop below
+        // adds only optional fields: `required` is byte-identical across
+        // v2.0.0–v2.4.0, and `batteryType` is the single addition at v2.5.0.
+        Lens::new(
+            "battery",
+            Version::new(2, 0, 0),
+            Version::new(2, 1, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Art. 7(2) v2.1.0: drops the invented A-E \
+             enumeration on carbonFootprintClass — Art. 7(2) defines no class labels — \
+             and adds the ruleset id and version that produced a label, both optional. \
+             Dropping an enumeration only widens what validates, so a v2.0.0 record \
+             carrying a former class value stays valid; a record with no ruleset \
+             recorded is one whose class came from a scale this crate cannot name, \
+             which is a fact about that record rather than something to invent.",
+            pass_through,
+        ),
+        Lens::new(
+            "battery",
+            Version::new(2, 1, 0),
+            Version::new(2, 2, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Annex VII Part A v2.2.0: adds stateOfHealth, \
+             optional, alongside the flat stateOfHealthPct it cannot replace. Nothing to \
+             carry forward — the flat figure is not one of Part A's parameters, so \
+             deriving the parameter set from it would state a measurement nobody made.",
+            pass_through,
+        ),
+        Lens::new(
+            "battery",
+            Version::new(2, 2, 0),
+            Version::new(2, 3, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Art. 8(1) v2.3.0: adds \
+             recycledContentReportingYear, optional. Art. 8(1) wants the shares 'for each \
+             battery model per year and per manufacturing plant', so a v2.2.0 record \
+             carries a share with one of its two anchors missing. The year cannot be \
+             inferred — placedOnMarketDate is when the battery was placed, not the year \
+             the recycled content was reported for — so the absence is carried forward \
+             rather than filled.",
+            pass_through,
+        ),
+        Lens::new(
+            "battery",
+            Version::new(2, 3, 0),
+            Version::new(2, 4, 0),
+            false,
+            "EU Battery Regulation 2023/1542 Annex VII Part B v2.4.0: adds \
+             expectedLifetime, optional, and narrower than Part A — stationary storage \
+             and LMT batteries only, not electric-vehicle ones. Distinct from \
+             expectedLifetimeCycles, the model-level figure Annex XIII point 1(j) makes \
+             public, which v2.3.0 already required and which is unchanged here.",
+            pass_through,
+        ),
         Lens::new(
             "battery",
             Version::new(2, 4, 0),

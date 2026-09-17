@@ -108,29 +108,33 @@ fn multi_hop_chain_composes_and_propagates_loss() {
 
 #[test]
 fn toward_reaches_the_newest_registered_version_short_of_the_target() {
-    // Battery's registered lens ends at 2.0.0 while the schema has since
-    // moved on additively, so no chain lands on the current version and
-    // none should have to: `upcast` refuses the gap outright, and a reader
-    // that only needs the data readable must not inherit that refusal.
-    let reg = LensRegistry::new();
-    let current: Version = crate::catalog::ProductGroupCatalog::new()
-        .current_schema_version("battery")
-        .expect("battery is in the catalog")
-        .parse()
-        .expect("catalog versions are semver");
-    assert!(
-        current > v("2.0.0"),
-        "this test is only meaningful while battery's current version is \
-         past its last lens — got {current}"
-    );
+    // `upcast` refuses a gap outright; a reader that only needs the data
+    // readable must not inherit that refusal, and gets the newest version the
+    // registered lenses actually reach.
+    //
+    // 🚨 Synthetic, and it has to be. This was written against `battery`, whose
+    // chain ended at 2.0.0 while the schema had moved past it — so the test
+    // asserted a property of the registry using a *hole in the catalogue* as its
+    // example, and broke the moment the hole was filled. That is the same trap
+    // `toward_still_refuses_a_gap_no_lens_touches_at_all` records for its own
+    // case, from when textile 1.0.0 → 1.1.0 was added.
+    let reg = LensRegistry::from_lenses(vec![Lens::new(
+        "demo",
+        v("1.0.0"),
+        v("2.0.0"),
+        false,
+        "add a",
+        add_a,
+    )]);
+    let data = serde_json::json!({ "dropped": 1 });
 
     assert!(matches!(
-        reg.upcast("battery", &battery_v1(), &v("1.0.0"), &current),
+        reg.upcast("demo", &data, &v("1.0.0"), &v("4.0.0")),
         Err(UpcastError::NoPath { .. })
     ));
 
     let derived = reg
-        .upcast_toward("battery", &battery_v1(), &v("1.0.0"), &current)
+        .upcast_toward("demo", &data, &v("1.0.0"), &v("4.0.0"))
         .expect("the 1.0.0 -> 2.0.0 hop must still be applied");
 
     // It reports the version actually reached, not the one asked for, and
@@ -141,7 +145,39 @@ fn toward_reaches_the_newest_registered_version_short_of_the_target() {
         derived.lens_chain,
         vec![["1.0.0".to_string(), "2.0.0".to_string()]]
     );
-    assert_eq!(derived.data["ratedEnergyWh"].as_f64(), Some(4800.0));
+    assert_eq!(derived.data["a"], Value::Bool(true));
+}
+
+/// The battery chain is complete now, and completing it changed what a v1.0.0
+/// record gets back — so the new answer is pinned rather than left implicit.
+///
+/// It used to stop at 2.0.0 with no statement of why, because that was as far as
+/// the lenses went. It now walks 1.0.0 → 2.4.0 and meets the 2.4.0 → 2.5.0
+/// refusal, which is the real reason such a record cannot reach the current
+/// schema: `batteryType` became mandatory and there is no lawful value to invent
+/// for a battery placed before the mandate. A refusal naming the mandate is a
+/// better answer than a partial view that names nothing.
+#[test]
+fn a_pre_mandate_battery_record_is_refused_with_the_mandate_as_the_reason() {
+    let reg = LensRegistry::new();
+    let current: Version = crate::catalog::ProductGroupCatalog::new()
+        .current_schema_version("battery")
+        .expect("battery is in the catalog")
+        .parse()
+        .expect("catalog versions are semver");
+
+    let refusal = reg
+        .upcast_toward("battery", &battery_v1(), &v("1.0.0"), &current)
+        .expect_err("batteryType is required from 2.5.0 and cannot be invented");
+
+    assert!(
+        matches!(refusal, UpcastError::Transform(_)),
+        "a hop ran and declined — this must not be reported as an absent chain: {refusal:?}"
+    );
+    assert!(
+        refusal.to_string().contains("batteryType"),
+        "the refusal must name what is missing, got: {refusal}"
+    );
 }
 
 #[test]

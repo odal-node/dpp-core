@@ -25,7 +25,7 @@ fn stub_jwt(payload: &Value) -> String {
     )
 }
 
-fn sample() -> Map<String, Value> {
+pub(super) fn sample() -> Map<String, Value> {
     json!({
         "batteryChemistry": "LFP",
         "cathodeMaterial": ["LiFePO4"],
@@ -38,7 +38,7 @@ fn sample() -> Map<String, Value> {
     .clone()
 }
 
-const HIDDEN: [&str; 4] = [
+pub(super) const HIDDEN: [&str; 4] = [
     "cathodeMaterial",
     "stateOfHealthPct",
     "testReportResults",
@@ -62,94 +62,6 @@ fn concealed_claims_leave_no_cleartext_in_the_payload() {
     }
     let digests = concealed["_sd"].as_array().unwrap();
     assert_eq!(digests.len(), 4);
-}
-
-/// RFC 9901 clause 4.2.4.1: "The Issuer MUST hide the original order of the
-/// claims in the array."
-///
-/// The failure this guards is silent and easy to write: pushing each digest as
-/// the field is walked puts the array in source order, so a reader learns the
-/// original structure from a token that discloses nothing.
-#[test]
-fn digest_order_does_not_follow_claim_order() {
-    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
-
-    let published: Vec<&str> = concealed["_sd"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_str().unwrap())
-        .collect();
-    let in_claim_order: Vec<String> = disclosures.iter().map(Disclosure::digest).collect();
-
-    let mut sorted = in_claim_order.clone();
-    sorted.sort();
-    assert_eq!(published, sorted, "digests must be published sorted");
-
-    // The sorted order must be a genuine reordering for at least one salt draw,
-    // otherwise this test would pass on an implementation that does not sort.
-    // Salts are random, so a single draw could coincide; repeat until one
-    // differs, which is overwhelmingly the first iteration.
-    let reordered = (0..32).any(|_| {
-        let (c, d) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
-        let pub_order: Vec<String> = c["_sd"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_owned())
-            .collect();
-        let claim_order: Vec<String> = d.iter().map(Disclosure::digest).collect();
-        pub_order != claim_order
-    });
-    assert!(reordered, "sorting never reordered — suspect a no-op sort");
-}
-
-/// RFC 9901 clause 9.3: a new salt for each claim, 128 bits recommended.
-#[test]
-fn salts_are_unique_and_128_bits() {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let (_, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
-
-    let mut salts: Vec<&str> = disclosures.iter().map(Disclosure::salt).collect();
-    let count = salts.len();
-    salts.sort_unstable();
-    salts.dedup();
-    assert_eq!(salts.len(), count, "a salt was reused across claims");
-
-    for d in &disclosures {
-        assert_eq!(b64.decode(d.salt()).unwrap().len(), 16);
-    }
-}
-
-/// Clause 9.3 again, in the direction that matters commercially: two issuances
-/// of the same data must not be linkable by their digests.
-#[test]
-fn two_issuances_of_the_same_claims_share_no_digest() {
-    let (first, _) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
-    let (second, _) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
-
-    let a: Vec<&Value> = first["_sd"].as_array().unwrap().iter().collect();
-    let b: Vec<&Value> = second["_sd"].as_array().unwrap().iter().collect();
-    assert!(
-        a.iter().all(|d| !b.contains(d)),
-        "a digest repeated across two issuances — salts are being reused"
-    );
-}
-
-/// Clause 9.3's same-name-different-place requirement. A `$ref`'d definition
-/// carries its disclosure class to every path that references it, so one leaf
-/// name legitimately appears at several paths.
-#[test]
-fn the_same_claim_name_at_two_places_gets_two_salts() {
-    let outer = json!({ "serialNumber": "A" }).as_object().unwrap().clone();
-    let inner = json!({ "serialNumber": "A" }).as_object().unwrap().clone();
-
-    let (_, a) = conceal(&outer, |n| n == "serialNumber").unwrap();
-    let (_, b) = conceal(&inner, |n| n == "serialNumber").unwrap();
-
-    assert_ne!(a[0].salt(), b[0].salt());
-    assert_ne!(a[0].digest(), b[0].digest());
 }
 
 #[test]
