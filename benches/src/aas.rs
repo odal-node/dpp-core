@@ -6,7 +6,7 @@ use chrono::Utc;
 use criterion::{Criterion, criterion_group, criterion_main};
 use dpp_aas::build_aas_from_passport;
 use dpp_domain::Audience;
-use dpp_domain::identifier::Gtin;
+use dpp_domain::identifier::{Gtin, ProductIdentifier};
 use dpp_domain::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroupData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, ProductGroup};
 use dpp_tests::fixtures::base_passport;
@@ -40,7 +40,7 @@ fn battery_passport() -> Passport {
         ..base_passport(
             ProductGroup::Battery,
             ProductGroupData::Battery(Box::new(BatteryData {
-                gtin: Gtin::parse(GTIN).unwrap(),
+                product_identifier: ProductIdentifier::gs1(Gtin::parse(GTIN).unwrap()),
                 battery_chemistry: BatteryChemistry::Lfp,
                 nominal_voltage_v: 3.2,
                 nominal_capacity_ah: 100.0,

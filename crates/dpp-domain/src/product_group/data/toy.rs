@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 use super::common::SvhcSubstance;
 
@@ -10,8 +10,9 @@ use super::common::SvhcSubstance;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ToyData {
-    /// 14-digit GTIN identifying the toy model.
-    pub gtin: Gtin,
+    /// The unique product identifier for the toy model, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
+    pub product_identifier: ProductIdentifier,
     /// Intended age group, e.g. `"0-3"`, `"3-6"`, `"6-12"`, `"12+"`.
     pub age_group: String,
     /// Primary material, e.g. `"plastic"`, `"wood"`, `"metal"`, `"textile"`, `"mixed"`.
@@ -33,8 +34,8 @@ pub struct ToyData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for ToyData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

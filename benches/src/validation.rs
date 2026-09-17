@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use dpp_domain::identifier::Gtin;
+use dpp_domain::identifier::{Gtin, ProductIdentifier};
 use dpp_domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };
@@ -7,7 +7,7 @@ use dpp_domain::validation::{validate_product_group_data, validate_product_group
 
 fn valid_battery() -> ProductGroupData {
     ProductGroupData::Battery(Box::new(BatteryData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 48.0,
         nominal_capacity_ah: 100.0,
@@ -80,7 +80,7 @@ fn valid_battery() -> ProductGroupData {
 
 fn valid_textile() -> ProductGroupData {
     ProductGroupData::Textile(Box::new(TextileData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),

@@ -97,7 +97,7 @@ fn known_product_groups_still_deserialize_to_their_typed_variants() {
     // lands on its struct, not in the untyped fallback.
     let battery = json!({
         "productGroup": "battery",
-        "gtin": "09506000134352",
+        "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
         "batteryChemistry": "lfp",
         "nominalVoltageV": 3.2,
         "nominalCapacityAh": 100.0,

@@ -15,7 +15,7 @@ fn textile_passport() -> Passport {
         product_group_data: Some(ProductGroupData::Textile(Box::new(
             crate::test_support::sample_textile_data(),
         ))),
-        schema_version: "1.2.0".into(),
+        schema_version: "1.3.0".into(),
         ..make_passport()
     }
 }
@@ -34,13 +34,27 @@ fn from_stored_reads_current_shape_directly() {
 
 #[test]
 fn from_stored_upcasts_a_legacy_country_field() {
-    // A real textile 1.1.0 document: same schema, old country-of-origin key.
-    // The 1.1.0 -> 1.2.0 lens exists for exactly this rename.
+    // A real textile 1.1.0 document: the old country-of-origin key, and a bare
+    // `gtin` — which is what every record written before 1.3.0 carried, because
+    // the schema required one. Both hops of the chain are therefore exercised:
+    // 1.1.0 -> 1.2.0 renames the country key, 1.2.0 -> 1.3.0 wraps the GTIN as
+    // an EN 18219 scheme 1 identifier.
+    //
+    // Building it by *relabelling* a current passport is what this used to do,
+    // and it stopped being a legacy document the moment the identifier changed
+    // shape: it claimed 1.1.0 while carrying 1.3.0's `productIdentifier`, and
+    // the lens rightly refused a record with no GTIN to wrap.
     let passport = textile_passport();
     let mut doc = serde_json::to_value(&passport).expect("serialise");
     doc["schemaVersion"] = "1.1.0".into();
     let country = doc["productGroupData"]["countryOfOrigin"].take();
     doc["productGroupData"]["countryOfManufacturing"] = country;
+    let gtin = doc["productGroupData"]["productIdentifier"]["gtin"].take();
+    doc["productGroupData"]
+        .as_object_mut()
+        .expect("product group data is an object")
+        .remove("productIdentifier");
+    doc["productGroupData"]["gtin"] = gtin;
 
     let lenses = LensRegistry::new();
     let catalog = ProductGroupCatalog::new();
@@ -88,12 +102,12 @@ fn from_stored_surfaces_a_same_version_mismatch_as_serialisation() {
     doc["productGroupData"]
         .as_object_mut()
         .unwrap()
-        .remove("gtin");
+        .remove("productIdentifier");
 
     let lenses = LensRegistry::new();
     let catalog = ProductGroupCatalog::new();
     let err = Passport::from_stored(doc, &lenses, &catalog)
-        .expect_err("gtin is required and there is no version gap to bridge");
+        .expect_err("productIdentifier is required and there is no version gap to bridge");
     assert!(
         matches!(err, DppError::Serialisation(_)),
         "expected a typed Serialisation error, got: {err}"

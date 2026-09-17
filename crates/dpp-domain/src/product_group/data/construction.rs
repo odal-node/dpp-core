@@ -2,14 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 /// Construction products product group data for EU CPR 2024/3110 compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConstructionData {
-    /// 14-digit GTIN identifying the construction product.
-    pub gtin: Gtin,
+    /// The unique product identifier for the construction product, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
+    pub product_identifier: ProductIdentifier,
     /// Product family, e.g. `"cement"`, `"concrete"`, `"structural-steel"`, `"glass"`.
     pub product_family: String,
     /// ISO 3166-1 alpha-2 country of manufacture.
@@ -31,8 +32,8 @@ pub struct ConstructionData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for ConstructionData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

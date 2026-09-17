@@ -286,11 +286,25 @@ impl ProductGroupData {
         }
     }
 
+    /// The unique product identifier carried by this product group's typed
+    /// data, if any — in whichever EN 18219 clause 5 scheme issued it.
+    ///
+    /// `UnsoldGoods` and `Other` answer `None`: a discard-event report and an
+    /// untyped catch-all respectively, neither of which identifies a single
+    /// product the way every other product group does. That is the **only**
+    /// reason this answers `None`, which is what makes it usable as a presence
+    /// check where [`Self::gtin`] no longer is.
+    pub fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        self.payload()?.product_identifier()
+    }
+
     /// The GTIN carried by this product group's typed data, if any.
     ///
-    /// `UnsoldGoods` and `Other` carry no GTIN field — a discard-event report
-    /// and an untyped catch-all respectively, neither of which identifies a
-    /// trade item the way every other product group does.
+    /// 🚨 `None` has two meanings now: the group carries no identifier at all,
+    /// **or** it carries one issued under EN 18219 scheme 2 or 3, which are
+    /// self-issuing and have no GTIN. A caller using this as a
+    /// "does this identify a product?" check is asking the wrong question —
+    /// [`Self::product_identifier`] is the one that always answers.
     pub fn gtin(&self) -> Option<&str> {
         self.payload()?.gtin()
     }

@@ -127,6 +127,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/battery/v2.6.0.json"),
     },
     EmbeddedSchema {
+        product_group: "battery",
+        version: "2.7.0",
+        json: include_str!("../../schemas/battery/v2.7.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "textile",
         version: "1.0.0",
         json: include_str!("../../schemas/textile/v1.0.0.json"),
@@ -140,6 +145,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         product_group: "textile",
         version: "1.2.0",
         json: include_str!("../../schemas/textile/v1.2.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "textile",
+        version: "1.3.0",
+        json: include_str!("../../schemas/textile/v1.3.0.json"),
     },
     // No v1.0.0. It predated Impl. Reg. (EU) 2026/2 and nothing can carry a
     // document forward from it: a financial year is not derivable from a
@@ -164,6 +174,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/steel/v1.1.0.json"),
     },
     EmbeddedSchema {
+        product_group: "steel",
+        version: "1.2.0",
+        json: include_str!("../../schemas/steel/v1.2.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "electronics",
         version: "1.0.0",
         json: include_str!("../../schemas/electronics/v1.0.0.json"),
@@ -184,6 +199,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/electronics/v1.3.0.json"),
     },
     EmbeddedSchema {
+        product_group: "electronics",
+        version: "1.4.0",
+        json: include_str!("../../schemas/electronics/v1.4.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "construction",
         version: "1.0.0",
         json: include_str!("../../schemas/construction/v1.0.0.json"),
@@ -194,9 +214,19 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/construction/v1.1.0.json"),
     },
     EmbeddedSchema {
+        product_group: "construction",
+        version: "1.2.0",
+        json: include_str!("../../schemas/construction/v1.2.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "tyre",
         version: "1.0.0",
         json: include_str!("../../schemas/tyre/v1.0.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "tyre",
+        version: "1.1.0",
+        json: include_str!("../../schemas/tyre/v1.1.0.json"),
     },
     EmbeddedSchema {
         product_group: "toy",
@@ -209,6 +239,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/toy/v1.1.0.json"),
     },
     EmbeddedSchema {
+        product_group: "toy",
+        version: "1.2.0",
+        json: include_str!("../../schemas/toy/v1.2.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "aluminium",
         version: "1.0.0",
         json: include_str!("../../schemas/aluminium/v1.0.0.json"),
@@ -217,6 +252,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         product_group: "aluminium",
         version: "1.1.0",
         json: include_str!("../../schemas/aluminium/v1.1.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "aluminium",
+        version: "1.2.0",
+        json: include_str!("../../schemas/aluminium/v1.2.0.json"),
     },
     EmbeddedSchema {
         product_group: "furniture",
@@ -234,9 +274,19 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/furniture/v1.2.0.json"),
     },
     EmbeddedSchema {
+        product_group: "furniture",
+        version: "1.3.0",
+        json: include_str!("../../schemas/furniture/v1.3.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "mattress",
         version: "1.0.0",
         json: include_str!("../../schemas/mattress/v1.0.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "mattress",
+        version: "1.1.0",
+        json: include_str!("../../schemas/mattress/v1.1.0.json"),
     },
     EmbeddedSchema {
         product_group: "detergent",
@@ -247,6 +297,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         product_group: "detergent",
         version: "1.1.0",
         json: include_str!("../../schemas/detergent/v1.1.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "detergent",
+        version: "1.2.0",
+        json: include_str!("../../schemas/detergent/v1.2.0.json"),
     },
 ];
 

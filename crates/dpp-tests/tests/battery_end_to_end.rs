@@ -17,6 +17,7 @@ use chrono::Utc;
 use dpp_aas::build_aas_from_passport;
 use dpp_digital_link::DigitalLink;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
+use dpp_domain::identifier::ProductIdentifier;
 use dpp_domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, Gtin,
@@ -69,7 +70,7 @@ fn make_battery_passport() -> Passport {
         ..base_passport(
             ProductGroup::Battery,
             ProductGroupData::Battery(Box::new(BatteryData {
-                gtin: Gtin::parse(VALID_GTIN).unwrap(),
+                product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
                 battery_chemistry: BatteryChemistry::Lfp,
                 nominal_voltage_v: 3.2,
                 nominal_capacity_ah: 100.0,
@@ -181,7 +182,10 @@ fn battery_passport_serialisation_round_trip() {
         assert_eq!(bd.battery_type, BatteryType::Ev);
         assert_eq!(bd.cathode_material.as_ref().unwrap().len(), 1);
         assert_eq!(bd.critical_raw_materials.as_ref().unwrap().len(), 1);
-        assert_eq!(bd.gtin.as_str(), VALID_GTIN);
+        assert_eq!(
+            bd.product_identifier.gtin().map(Gtin::as_str),
+            Some(VALID_GTIN)
+        );
     } else {
         panic!("expected BatteryData after round-trip");
     }
@@ -264,7 +268,7 @@ fn recycler_credential_unlocks_professional_battery_fields() {
         DocumentScope::ProductGroupData,
     );
     // Public sees the basics...
-    assert!(public.filtered_data.get("gtin").is_some());
+    assert!(public.filtered_data.get("productIdentifier").is_some());
     assert!(public.filtered_data.get("batteryChemistry").is_some());
     // ...including the point 1 fields that are publicly accessible in their own
     // right: 1(d) responsible sourcing, and 1(b) critical raw materials.
@@ -343,7 +347,7 @@ fn battery_annex_xiii_tiers_hold_through_the_audience_filter() {
     // opposite until the annex was read against it.
     let public = at(Audience::Public);
     let public_obj = public.as_object().expect("filtered data is an object");
-    assert!(public_obj.contains_key("gtin"));
+    assert!(public_obj.contains_key("productIdentifier"));
     assert!(public_obj.contains_key("dueDiligenceUrl"));
     assert!(public_obj.contains_key("criticalRawMaterials"));
     assert!(!public_obj.contains_key("disassemblyInstructionsUrl"));

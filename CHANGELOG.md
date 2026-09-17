@@ -99,6 +99,86 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a port with no way to satisfy it. `BackupCopyPort::update` now says what it
   does hold, and names the obligation it does not express.
 
+- **A GTIN is no longer required to create a passport: every product group's
+  identifier becomes `ProductIdentifier`, a union of the three EN 18219 clause 5
+  ID schemes.** *(Breaking: `pub gtin: Gtin` becomes
+  `pub product_identifier: ProductIdentifier` on all eleven typed payloads, the
+  wire key `gtin` becomes `productIdentifier`, and every product group gets a new
+  schema version. Stored documents are **not** broken — see the lens below.)*
+
+  ✅ COMPLIANCE-PIN: **EN 18219:2026 clause 5.1** — an identifier satisfies
+  clause 4's general principles **and** complies with **one of** clause 5's ID
+  schemes. They are alternatives.
+
+  | Variant | Scheme | External dependency |
+  |---|---|---|
+  | `Gs1 { gtin }` | 1, GS1 Digital Link | a GS1 Company Identification Number |
+  | `IdentificationLink { url }` | 2, EN IEC 61406-1/-2 | **none — self-issuing** |
+  | `Did { did }` | 3, W3C DID v1.0:2022 | **none — self-issuing** |
+
+  **Why.** `gtin: Gtin` — not `Option<Gtin>` — made a GTIN structurally
+  mandatory, so an operator without GS1 membership could not create a passport
+  at all: not a degraded one, not one with a warning. The standard says such an
+  operator can hold a fully conformant identifier, and its Annex B Table B.4 sets
+  the prerequisites side by side — every scheme needs a registered web domain,
+  and scheme 1 *additionally* needs the CIN. A choice of issuer was being
+  expressed as a compile error.
+
+  **Migration.** Construct with `ProductIdentifier::gs1(gtin)` where you built a
+  `Gtin`. Reads are unaffected: `ProductGroupPayload::gtin` and
+  `ProductGroupData::gtin` still exist and still return `Option<&str>`.
+
+  🚨 **Their `None` now means two things.** It meant "this group carries no
+  identifier"; it now also means "the identifier is scheme 2 or 3, which have no
+  GTIN". A caller reading `None` as *not a product* is wrong — use
+  `product_identifier()`, which always answers.
+
+  **Stored documents read forward, and that is tested rather than asserted.** One
+  lens per product group wraps a stored `gtin` as a scheme 1 identifier. It is
+  total: every record written against a previous version carried a GTIN because
+  the schema required one, and a GTIN *is* a scheme 1 identifier, so nothing is
+  invented and nothing is dropped. `schema_compat.rs`'s frozen fixtures — one per
+  `(product group, version)`, including every pre-existing one — all still read
+  through `Passport::from_stored`.
+
+  **Three lens gaps that predate this and it exposed.** `electronics`
+  1.0.0→1.1.0, `electronics` 1.2.0→1.3.0 and `furniture` 1.1.0→1.2.0 were missing
+  from the catalogue. They did no harm while a record's shape happened to survive
+  the jump, and the compat check only fails on a version whose *final* hop is
+  missing — so a broken middle stayed invisible until this made the last hop
+  mandatory for every group. Added, with the furniture one refusing a
+  `productType` of `mattress` rather than reclassifying a product the group no
+  longer covers.
+
+  **Two limits recorded on the type rather than left to be discovered.** Scheme
+  2's format is specified by EN IEC 61406-1/-2; those rules are not applied here.
+  The value is checked only to be an absolute `http(s)` URL, and passing that is
+  *not* a conformance claim. Scheme 1's ASC MH10.8.2 branch is not modelled,
+  because nothing here issues one.
+
+  **Reading is held to the same rules as constructing.** Deriving `Deserialize`
+  built the two self-issuing arms field-by-field and never called their
+  constructors, so a stored identification link or DID that `ProductIdentifier`
+  refuses to build read back happily; `Gtin` never had the problem, because it
+  validates inside its own `Deserialize`, which is what made scheme 1 look like
+  proof the other two were covered. Deserialisation now goes through the
+  constructors, closed here rather than left to the change that first persists
+  one — a document is as much an input as a constructor argument, and this is the
+  last moment at which no such document exists.
+
+  That made the two shape checks worth stating exactly, since they now also
+  decide what is *readable*. A scheme 2 link must carry an authority, not merely
+  something after `https://`: `https:///p/1` and `https://?q` were accepted. A
+  scheme 3 DID must satisfy the W3C DID v1.0 clause 3.1 grammar for
+  `method-specific-id`, so `did:web: ` and truncated `%` escapes are refused
+  rather than stored as identifiers nothing resolves.
+
+  The AAS projection's `gtin` property becomes `productIdentifier`, and
+  `gtin_enforcement.rs`'s structural tripwire now guards
+  `product_identifier: ProductIdentifier` — the check digit is validated one
+  level further in, so losing the type would lose the validation without losing
+  a field.
+
 ### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
@@ -429,6 +509,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   in lexicographic order, which is the order the literal already used.
 
 ### Fixed
+
+- **The `electronics` catalog entry declared four of its five schema versions.**
+  `v1.3.0` was embedded, validated against and reachable by a lens, but absent
+  from `product-groups/electronics.json` — so `ProductGroupDescriptor`, which is
+  what a caller asks *"which versions exist"*, silently omitted it. The catalog
+  ↔ registry parity test could not see this: it asserted that every version the
+  catalog declares is embedded, and that direction held. It now asserts the
+  reverse as well, so an embedded schema the catalog forgets fails the suite.
+
+  Both manifests whose `currentSchemaVersion` moved also still described the
+  superseded version as "(current)" in their `notes`.
+
+- **Every schema version added in this release announced its predecessor's
+  version in `$id` and `title`.** A new version is written by copying the one
+  before it, and eleven landed with the header unchanged. `$id` is the schema's
+  identity to anything that resolves or caches by it, so a v1.2.0 document
+  claiming to be v1.1.0 is not a typo, it is a different schema under the same
+  name. Corrected, and a test now walks the embedded table asserting each
+  schema's `$id` and `title` carry its own version.
 
 - **`CertificateRef::is_eu_recognised_profile` no longer answers `true` for a
   reference carrying nothing.** It was `matches!(self, ChainWithThumbprint { .. })`

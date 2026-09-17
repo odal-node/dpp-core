@@ -5,6 +5,7 @@
 use chrono::Utc;
 use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
 use dpp_domain::Audience;
+use dpp_domain::identifier::ProductIdentifier;
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, PassportId,
     PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
@@ -47,7 +48,9 @@ fn main() {
         compliance_result: None,
         lint_result: None,
         product_group_data: Some(ProductGroupData::Textile(Box::new(TextileData {
-            gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+            product_identifier: ProductIdentifier::gs1(
+                Gtin::parse("09506000134352").expect("valid GTIN literal"),
+            ),
             fibre_composition: vec![
                 FibreEntry {
                     fibre: "organic cotton".into(),

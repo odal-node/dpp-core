@@ -18,6 +18,7 @@ use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audi
 use dpp_domain::{
     CarbonFootprint, FibreEntry, Gtin, ManufacturerInfo, MaterialEntry, Passport, ProductGroup,
     ProductGroupData, RepairabilityScore, SvhcSubstance, TextileData,
+    identifier::ProductIdentifier,
 };
 use dpp_tests::fixtures::base_passport;
 use dpp_vc::credential::verify_credential_claims;
@@ -59,7 +60,9 @@ fn make_textile_passport() -> Passport {
         ..base_passport(
             ProductGroup::Textile,
             ProductGroupData::Textile(Box::new(TextileData {
-                gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                product_identifier: ProductIdentifier::gs1(
+                    Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                ),
                 fibre_composition: vec![
                     FibreEntry {
                         fibre: "cotton".into(),

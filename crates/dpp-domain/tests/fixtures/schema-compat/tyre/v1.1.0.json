@@ -1,0 +1,10 @@
+{
+  "externalRollingNoiseDb": 0.0,
+  "fuelEfficiencyClass": "A",
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  },
+  "tyreClass": "C1",
+  "wetGripClass": "A"
+}

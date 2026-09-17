@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 /// Tyre product group data for EU tyre labelling compliance.
 ///
@@ -12,8 +12,9 @@ use crate::identifier::Gtin;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TyreData {
-    /// 14-digit GTIN identifying the tyre model.
-    pub gtin: Gtin,
+    /// The unique product identifier for the tyre model, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
+    pub product_identifier: ProductIdentifier,
     /// Tyre class per EU 2020/740: `"C1"` (passenger cars), `"C2"` (vans/light trucks), `"C3"` (heavy trucks).
     pub tyre_class: String,
     /// Fuel efficiency class **A–E** per EU 2020/740 (A = lowest rolling resistance).
@@ -40,8 +41,8 @@ pub struct TyreData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for TyreData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

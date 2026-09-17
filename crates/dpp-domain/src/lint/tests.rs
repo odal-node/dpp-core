@@ -154,7 +154,9 @@ fn a_declared_svhc_above_the_threshold_reaches_the_passport_as_a_finding() {
 #[test]
 fn the_svhc_pack_reaches_a_product_group_with_no_pack_of_its_own() {
     let toy = crate::product_group::ToyData {
-        gtin: crate::Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         age_group: "3-6".to_owned(),
         primary_material: "plastic".to_owned(),
         ce_marking: true,

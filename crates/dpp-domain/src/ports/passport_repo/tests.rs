@@ -251,7 +251,7 @@ async fn default_find_by_identity_matches_across_draft_and_published() {
 
     let identity = ProductIdentity {
         product_group: ProductGroup::Battery,
-        gtin: "09506000134352".into(),
+        identifier: "09506000134352".into(),
         batch_id: Some("BATCH-1".into()),
     };
     let found = repo.find_by_identity(&identity).await.unwrap();
@@ -259,7 +259,7 @@ async fn default_find_by_identity_matches_across_draft_and_published() {
 
     let no_match = ProductIdentity {
         product_group: ProductGroup::Battery,
-        gtin: "00000000000000".into(),
+        identifier: "00000000000000".into(),
         batch_id: None,
     };
     assert!(repo.find_by_identity(&no_match).await.unwrap().is_none());

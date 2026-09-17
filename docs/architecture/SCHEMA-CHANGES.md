@@ -27,6 +27,17 @@ documents still read is answered by the frozen fixtures in
 
 **No longer required:** `countryOfProduction`
 
+### v1.1.0 → v1.2.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## battery
 
 
@@ -132,6 +143,17 @@ documents still read is answered by the frozen fixtures in
 
 **No longer required:** `expectedLifetimeCycles`
 
+### v2.6.0 → v2.7.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## construction
 
 
@@ -146,6 +168,17 @@ documents still read is answered by the frozen fixtures in
 
 **No longer required:** `countryOfManufacture`
 
+### v1.1.0 → v1.2.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## detergent
 
 
@@ -159,6 +192,17 @@ documents still read is answered by the frozen fixtures in
 **Newly required:** `countryOfOrigin`
 
 **No longer required:** `countryOfManufacture`
+
+### v1.1.0 → v1.2.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
 
 ## electronics
 
@@ -186,6 +230,17 @@ documents still read is answered by the frozen fixtures in
 | `indexScopeExclusion` | added | — | `string\|null` |
 | `repairabilityIndexInputs` | added | — | `object\|null` |
 
+### v1.3.0 → v1.4.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## furniture
 
 
@@ -206,9 +261,30 @@ documents still read is answered by the frozen fixtures in
 |---|---|---|---|
 | `productType` | constraint changed | `enum=["chair","table","sofa","mattress","shelf","bed","other"]` | `enum=["chair","table","sofa","shelf","bed","other"]` |
 
+### v1.2.0 → v1.3.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## mattress
 
-Only one version (v1.0.0) — nothing to compare against yet.
+
+### v1.0.0 → v1.1.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
 
 ## steel
 
@@ -223,6 +299,17 @@ Only one version (v1.0.0) — nothing to compare against yet.
 **Newly required:** `countryOfOrigin`
 
 **No longer required:** `countryOfProduction`
+
+### v1.1.0 → v1.2.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
 
 ## textile
 
@@ -260,6 +347,17 @@ Only one version (v1.0.0) — nothing to compare against yet.
 
 **No longer required:** `countryOfManufacturing`
 
+### v1.2.0 → v1.3.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## toy
 
 
@@ -274,9 +372,30 @@ Only one version (v1.0.0) — nothing to compare against yet.
 
 **No longer required:** `countryOfManufacture`
 
+### v1.1.0 → v1.2.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
+
 ## tyre
 
-Only one version (v1.0.0) — nothing to compare against yet.
+
+### v1.0.0 → v1.1.0
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `gtin` | removed | `string` | — |
+| `productIdentifier` | added | — | `object` |
+
+**Newly required:** `productIdentifier`
+
+**No longer required:** `gtin`
 
 ## unsold-goods
 

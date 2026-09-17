@@ -95,9 +95,10 @@ impl UnsoldGoodsReport {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
-    /// A disclosure covers a financial year across many products, so there is no
-    /// single trade item number. The CN categories are on the lines.
-    fn gtin(&self) -> Option<&str> {
+    /// A disclosure covers a financial year across many products, so it
+    /// identifies no single product under any scheme. The CN categories are on
+    /// the lines.
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
         None
     }
 
@@ -112,10 +113,11 @@ impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
         None
     }
 
-    /// Same reason as the GTIN above: a disclosure covers a financial year
-    /// across many products, so there is no single category to state. What
-    /// categorisation exists is per line and by CN code, which Impl. Reg. (EU)
-    /// 2026/2 Art. 3 makes the axis for this group — not a category name.
+    /// Same reason as the product identifier above: a disclosure covers a
+    /// financial year across many products, so there is no single category to
+    /// state. What categorisation exists is per line and by CN code, which
+    /// Impl. Reg. (EU) 2026/2 Art. 3 makes the axis for this group — not a
+    /// category name.
     fn product_category(&self) -> Option<&str> {
         None
     }

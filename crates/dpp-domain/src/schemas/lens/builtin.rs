@@ -132,6 +132,182 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
              countryOfOrigin. Pure rename, no information lost.",
             rename_country_of_manufacturing,
         ),
+        Lens::new(
+            "aluminium",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "battery",
+            Version::new(2, 6, 0),
+            Version::new(2, 7, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "construction",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "detergent",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "electronics",
+            Version::new(1, 3, 0),
+            Version::new(1, 4, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "furniture",
+            Version::new(1, 2, 0),
+            Version::new(1, 3, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "mattress",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "steel",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "textile",
+            Version::new(1, 2, 0),
+            Version::new(1, 3, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "toy",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "tyre",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "EN 18219:2026 clause 5.1: the unique product identifier becomes a union of the \
+             clause 5 schemes, so a GTIN is no longer structurally required. A record \
+             written against the previous version carried one, which is exactly a \
+             scheme 1 identifier, so this hop wraps it rather than asking for anything \
+             the record does not already have. Lossless and total.",
+            gtin_to_product_identifier,
+        ),
+        // ── Gaps that predate the identifier change and it exposed ─────────
+        //
+        // Each of these three hops was missing from the catalogue already. They
+        // did no harm while a record's shape happened to survive the jump, and
+        // `every_frozen_document_still_reads_through_from_stored` only fails on
+        // a version whose *final* hop is missing — so a broken middle stayed
+        // invisible until the identifier swap made the last hop mandatory for
+        // every group. Adding them is not part of EN 18219; it is the debt the
+        // swap surfaced.
+        Lens::new(
+            "electronics",
+            Version::new(1, 0, 0),
+            Version::new(1, 1, 0),
+            false,
+            "Regulation (EU) 2023/1669 v1.1.0: repairabilityScore becomes the structured \
+             {overall, criteria} shape. A v1.0.0 record declaring the bare number it \
+             specified is rewritten into that shape; one omitting the optional field \
+             passes through, which is every record this crate ever produced, since the \
+             Rust type never emitted the bare form.",
+            electronics_v1_0_to_v1_1,
+        ),
+        Lens::new(
+            "electronics",
+            Version::new(1, 2, 0),
+            Version::new(1, 3, 0),
+            false,
+            "Regulation (EU) 2023/1669 Annex IV point 5 v1.3.0: adds \
+             repairabilityIndexInputs and indexScopeExclusion, both optional. Nothing \
+             to carry forward — a v1.2.0 record is a v1.3.0 record that declares \
+             neither, and declaring neither is a lawful answer rather than a gap.",
+            pass_through,
+        ),
+        Lens::new(
+            "furniture",
+            Version::new(1, 1, 0),
+            Version::new(1, 2, 0),
+            true,
+            "ESPR Working Plan 2025-2030 v1.2.0: productType no longer admits `mattress` \
+             — the plan selects mattresses as a product group of their own, ranked and \
+             dated separately. A furniture record declaring `mattress` describes a \
+             product this group no longer covers, and there is no furniture type to \
+             substitute, so the hop refuses rather than silently reclassifying it.",
+            furniture_v1_1_to_v1_2,
+        ),
     ]
 }
 
@@ -264,4 +440,105 @@ fn electronics_v1_1_to_v1_2(v: &Value) -> Result<Value, LensError> {
                 .to_owned(),
         )),
     }
+}
+
+/// Every product group's hop to the EN 18219 clause 5 identifier: rewrites the
+/// record's `gtin` as a scheme 1 `productIdentifier`, in place.
+///
+/// Shared by all eleven groups because the change is the same one in each — the
+/// field is the same, the scheme it maps to is the same, and a per-group copy
+/// would be eleven chances to diverge on a transform with no group-specific
+/// content.
+///
+/// **Total, not lossy.** Every record written against a previous version
+/// carries a `gtin` — it was required — and a GTIN *is* a scheme 1 identifier,
+/// so there is nothing to invent and nothing to drop. A record reaching here
+/// without one was never valid against the version it claims, and refusing is
+/// the honest answer: the alternative is inventing an identifier for a product.
+///
+/// The key keeps `gtin`'s position so a diff of the derived view against the
+/// original reads as a substitution rather than a move.
+fn gtin_to_product_identifier(v: &Value) -> Result<Value, LensError> {
+    let Some(object) = v.as_object() else {
+        return Err(LensError(
+            "product group data must be a JSON object".to_owned(),
+        ));
+    };
+    let Some(gtin) = object.get("gtin") else {
+        return Err(LensError(
+            "this version required a gtin and the record carries none, so there is \
+             no scheme 1 identifier to derive and none may be invented"
+                .to_owned(),
+        ));
+    };
+
+    let mut out = serde_json::Map::with_capacity(object.len());
+    for (key, value) in object {
+        if key == "gtin" {
+            out.insert(
+                "productIdentifier".to_owned(),
+                serde_json::json!({ "scheme": "gs1", "gtin": gtin }),
+            );
+        } else {
+            out.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(Value::Object(out))
+}
+
+/// Electronics `v1.0.0 → v1.1.0`: rewrites a bare-number `repairabilityScore`
+/// into the structured `{ overall, criteria }` shape v1.1.0 specifies.
+///
+/// The field is optional, and this crate's type never produced the bare form —
+/// v1.0.0 declared it and the Rust struct did not follow. So the common case is
+/// a record that simply has no score, which passes straight through.
+fn electronics_v1_0_to_v1_1(v: &Value) -> Result<Value, LensError> {
+    let Some(object) = v.as_object() else {
+        return Err(LensError(
+            "electronics product group data must be a JSON object".to_owned(),
+        ));
+    };
+    let mut out = object.clone();
+    if let Some(score) = object.get("repairabilityScore")
+        && let Some(overall) = score.as_f64()
+    {
+        out.insert(
+            "repairabilityScore".to_owned(),
+            serde_json::json!({ "overall": overall }),
+        );
+    }
+    Ok(Value::Object(out))
+}
+
+/// Furniture `v1.1.0 → v1.2.0`: refuses a record whose `productType` is
+/// `mattress`, which v1.2.0 removed.
+///
+/// Lossy and refusing rather than lossy and guessing: a mattress is not a
+/// furniture type any more, and no other value describes the same product.
+fn furniture_v1_1_to_v1_2(v: &Value) -> Result<Value, LensError> {
+    let Some(object) = v.as_object() else {
+        return Err(LensError(
+            "furniture product group data must be a JSON object".to_owned(),
+        ));
+    };
+    if object.get("productType").and_then(Value::as_str) == Some("mattress") {
+        return Err(LensError(
+            "productType is 'mattress', which v1.2.0 removed because the ESPR \
+             working plan ranks mattresses as their own product group; no \
+             furniture type describes this product and none may be substituted"
+                .to_owned(),
+        ));
+    }
+    Ok(v.clone())
+}
+
+/// A hop that adds only optional fields: the record is already valid at the new
+/// version and there is nothing to derive.
+fn pass_through(v: &Value) -> Result<Value, LensError> {
+    if !v.is_object() {
+        return Err(LensError(
+            "product group data must be a JSON object".to_owned(),
+        ));
+    }
+    Ok(v.clone())
 }

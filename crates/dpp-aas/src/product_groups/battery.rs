@@ -8,7 +8,7 @@ use crate::semantic_ids;
 
 pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasSubmodel {
     let mut elements = vec![
-        string_property("gtin", b.gtin.as_str(), None),
+        string_property("productIdentifier", b.product_identifier.as_str(), None),
         string_property("batteryChemistry", b.battery_chemistry.wire_str(), None),
         double_property("nominalVoltageV", b.nominal_voltage_v, None),
         double_property("nominalCapacityAh", b.nominal_capacity_ah, None),

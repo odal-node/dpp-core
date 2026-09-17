@@ -25,17 +25,17 @@ fn get_battery_v1() {
 }
 
 #[test]
-fn latest_battery_returns_v2_6() {
+fn latest_battery_returns_v2_7() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("battery").expect("battery schema exists");
-    assert_eq!(*version, "2.6.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "2.7.0".parse::<Version>().unwrap());
 }
 
 #[test]
-fn latest_textile_returns_v1_2() {
+fn latest_textile_returns_v1_3() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("textile").expect("textile schema exists");
-    assert_eq!(*version, "1.2.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "1.3.0".parse::<Version>().unwrap());
 }
 
 #[test]
@@ -76,13 +76,14 @@ fn product_groups_returns_unique_sorted_list() {
 }
 
 #[test]
-fn versions_for_textile_returns_all_three() {
+fn versions_for_textile_returns_all_four() {
     let reg = VersionedSchemaRegistry::new();
     let versions = reg.versions_for("textile");
-    assert_eq!(versions.len(), 3);
+    assert_eq!(versions.len(), 4);
     assert_eq!(*versions[0], "1.0.0".parse::<Version>().unwrap());
     assert_eq!(*versions[1], "1.1.0".parse::<Version>().unwrap());
     assert_eq!(*versions[2], "1.2.0".parse::<Version>().unwrap());
+    assert_eq!(*versions[3], "1.3.0".parse::<Version>().unwrap());
 }
 
 // ── Hot-reload / runtime registration tests ───────────────────────────
@@ -218,3 +219,38 @@ fn unregister_nonexistent_returns_false() {
 }
 
 // ── Validation tests ──────────────────────────────────────────────────
+
+/// 🚨 A new schema version is written by copying its predecessor, so its `$id`
+/// and `title` arrive holding the *previous* version number unless someone
+/// remembers to change them. Eleven of them shipped that way in one branch.
+///
+/// `$id` is the schema's identity to any consumer that resolves or caches by
+/// it: a v1.2.0 document announcing itself as v1.1.0 is not a cosmetic slip,
+/// it is a different schema under the same name. Asserted over the whole table
+/// rather than per file, so the next version is covered without anyone adding
+/// a case.
+#[test]
+fn every_embedded_schema_announces_its_own_version() {
+    for schema in super::embedded::EMBEDDED {
+        let parsed: serde_json::Value =
+            serde_json::from_str(schema.json).expect("embedded schema is valid JSON");
+        let group = schema.product_group;
+        let version = schema.version;
+
+        let id = parsed["$id"].as_str().unwrap_or_else(|| {
+            panic!("{group} v{version} has no $id");
+        });
+        assert!(
+            id.ends_with(&format!("-v{version}.json")),
+            "{group} v{version} announces itself as {id}"
+        );
+
+        let title = parsed["title"].as_str().unwrap_or_else(|| {
+            panic!("{group} v{version} has no title");
+        });
+        assert!(
+            title.ends_with(&format!("(v{version})")),
+            "{group} v{version} is titled {title:?}"
+        );
+    }
+}

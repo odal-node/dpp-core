@@ -1,0 +1,10 @@
+{
+  "co2ePerFunctionalUnitKg": 0.0,
+  "countryOfOrigin": "DE",
+  "functionalUnit": "x",
+  "productFamily": "cement",
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  }
+}

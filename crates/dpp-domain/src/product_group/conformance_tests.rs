@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::catalog::ProductGroupCatalog;
-use crate::identifier::Gtin;
+
 use crate::schemas::VersionedSchemaRegistry;
 
 use super::tests::{minimal_battery_data, test_textile_data};
@@ -19,7 +19,9 @@ use super::tests::{minimal_battery_data, test_textile_data};
 
 fn sample_steel_data() -> ProductGroupData {
     ProductGroupData::Steel(SteelData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 35.0,
         product_category: "flat".into(),
@@ -31,7 +33,9 @@ fn sample_steel_data() -> ProductGroupData {
 
 fn sample_aluminium_data() -> ProductGroupData {
     ProductGroupData::Aluminium(AluminiumData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 1200.0,
@@ -45,7 +49,9 @@ fn sample_electronics_data() -> ProductGroupData {
     ProductGroupData::Electronics(ElectronicsData {
         repairability_index_inputs: None,
         index_scope_exclusion: None,
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 120.0,
@@ -72,7 +78,9 @@ fn sample_electronics_data() -> ProductGroupData {
 
 fn sample_construction_data() -> ProductGroupData {
     ProductGroupData::Construction(ConstructionData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         product_family: "cement".into(),
         country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.8,
@@ -85,7 +93,9 @@ fn sample_construction_data() -> ProductGroupData {
 
 fn sample_tyre_data() -> ProductGroupData {
     ProductGroupData::Tyre(TyreData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -99,7 +109,9 @@ fn sample_tyre_data() -> ProductGroupData {
 
 fn sample_toy_data() -> ProductGroupData {
     ProductGroupData::Toy(ToyData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
@@ -112,7 +124,9 @@ fn sample_toy_data() -> ProductGroupData {
 
 fn sample_furniture_data() -> ProductGroupData {
     ProductGroupData::Furniture(FurnitureData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
         country_of_origin: "DE".into(),
@@ -127,7 +141,9 @@ fn sample_furniture_data() -> ProductGroupData {
 
 fn sample_detergent_data() -> ProductGroupData {
     ProductGroupData::Detergent(DetergentData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {
@@ -146,7 +162,9 @@ fn sample_detergent_data() -> ProductGroupData {
 
 fn sample_mattress_data() -> ProductGroupData {
     ProductGroupData::Mattress(MattressData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").unwrap(),
+        ),
         primary_material: "upholstered".into(),
         country_of_origin: "DE".into(),
         co2e_per_unit_kg: None,

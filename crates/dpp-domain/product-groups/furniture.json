@@ -4,9 +4,10 @@
   "schemaVersions": [
     "1.0.0",
     "1.1.0",
-    "1.2.0"
+    "1.2.0",
+    "1.3.0"
   ],
-  "currentSchemaVersion": "1.2.0",
+  "currentSchemaVersion": "1.3.0",
   "productCategories": [
     "chair",
     "table",
@@ -18,5 +19,5 @@
     "disassemblyInstructionsUrl": "restricted"
   },
   "plugin": "product-group-furniture",
-  "notes": "Mattresses are a separate product group and not a category here — the working plan selects them separately from furniture. v1.2.0 (current) removes `mattress` from productType; v1.1.0 is kept for historical immutability and still accepts it."
+  "notes": "Mattresses are a separate product group and not a category here — the working plan selects them separately from furniture. v1.3.0 (current) replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes; a v1.2.0 record is read forward by a lens that wraps its gtin as scheme 1. v1.2.0 removes `mattress` from productType; v1.1.0 is kept for historical immutability and still accepts it."
 }

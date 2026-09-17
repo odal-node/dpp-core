@@ -16,6 +16,7 @@
 
 use chrono::Utc;
 use dpp_domain::access::{ProductGroupAccessPolicy, filter_by_audience};
+use dpp_domain::identifier::ProductIdentifier;
 use dpp_domain::{
     Disclosure, FibreEntry, Gtin, ManufacturerInfo, Passport, PassportId, ProductGroup,
     ProductGroupData, TextileData, TransferChain, TransferError, TransferReason, TransferRecord,
@@ -526,7 +527,9 @@ fn passport_validate_catches_bad_fibre_sum() {
         ..base_passport(
             ProductGroup::Textile,
             ProductGroupData::Textile(Box::new(TextileData {
-                gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                product_identifier: ProductIdentifier::gs1(
+                    Gtin::parse("09506000134352").expect("valid GTIN literal"),
+                ),
                 // sum = 50%, should be ~100%
                 fibre_composition: vec![FibreEntry {
                     fibre: "cotton".into(),

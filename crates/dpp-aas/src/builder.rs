@@ -30,14 +30,23 @@ impl std::fmt::Display for AasError {
 
 impl std::error::Error for AasError {}
 
-/// Map a [`Passport`] and its GS1 GTIN into a complete AAS shell + submodels,
-/// carrying only what `audience` may see.
+/// Map a [`Passport`] and a caller-chosen asset identity into a complete AAS
+/// shell + submodels, carrying only what `audience` may see.
 ///
 /// Returns `(AasShell, Vec<AasSubmodel>)`. The shell's `submodels` list
 /// contains only ID references; the payloads are in the `Vec`.
 ///
-/// `gtin` is the 14-digit GTIN identifying the product model. It becomes the
-/// `globalAssetId` and a `specificAssetId` entry for GS1 Digital Link routing.
+/// `gtin` becomes the `globalAssetId` and a `specificAssetId` entry for GS1
+/// Digital Link routing. It is a parameter, and not read off the passport, so
+/// that the asset identity stays the caller's to decide — the unsold-goods
+/// mapper's module note records the case that forced it.
+///
+/// 🚨 The `specificAssetId` it populates is named `gtin` unconditionally, so a
+/// caller passing anything else — an EN 18219 scheme 2 or 3 identifier, an
+/// internal asset key — gets that value under a GS1 label. Pre-existing, and
+/// wider than the passport's own identifier: it is the shell's asset identity,
+/// not `ProductGroupData::product_identifier`, which the product-group submodel
+/// emits separately as `productIdentifier`.
 ///
 /// # Masking
 ///

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 use super::common::SvhcSubstance;
 
@@ -35,8 +35,9 @@ pub struct FibreEntry {
 #[serde(rename_all = "camelCase")]
 pub struct TextileData {
     // ── Mandatory fields (v1.0.0) ──────────────────────────────────────────
-    /// 14-digit GTIN identifying the textile product.
-    pub gtin: Gtin,
+    /// The unique product identifier for the textile product, in whichever EN 18219
+    /// clause 5 scheme issued it — a 14-digit GTIN under scheme 1.
+    pub product_identifier: ProductIdentifier,
     /// List of fibres and their percentage composition. Must sum to ~100%.
     pub fibre_composition: Vec<FibreEntry>,
     /// ISO 3166-1 alpha-2 country code where the textile was manufactured.
@@ -167,8 +168,8 @@ pub struct TextileData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for TextileData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

@@ -1,0 +1,11 @@
+{
+  "co2ePerTonneSteel": 0.0,
+  "countryOfOrigin": "DE",
+  "productCategory": "flat",
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  },
+  "productionRoute": "blast-furnace",
+  "recycledScrapContentPct": 0.0
+}

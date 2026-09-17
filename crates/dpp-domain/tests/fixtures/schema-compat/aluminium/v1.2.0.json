@@ -1,0 +1,11 @@
+{
+  "alloyGrade": "x",
+  "co2ePerTonneKg": 0.0,
+  "countryOfOrigin": "DE",
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  },
+  "productionRoute": "primary",
+  "recycledContentPct": 0.0
+}

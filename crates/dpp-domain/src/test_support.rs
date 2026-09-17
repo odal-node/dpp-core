@@ -8,7 +8,6 @@
 
 use chrono::Utc;
 
-use crate::identifier::Gtin;
 use crate::passport::{ManufacturerInfo, Passport, PassportId};
 use crate::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroup, TextileData};
 use crate::status::PassportStatus;
@@ -68,7 +67,9 @@ pub(crate) fn sample_passport() -> Passport {
 pub(crate) fn sample_battery_data() -> BatteryData {
     BatteryData {
         // 09506000134352 — verified valid GTIN-14, used throughout the test suite.
-        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        ),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
@@ -143,7 +144,9 @@ pub(crate) fn sample_battery_data() -> BatteryData {
 /// exercising fibre-sum rules override `fibre_composition` explicitly.
 pub(crate) fn sample_textile_data() -> TextileData {
     TextileData {
-        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        ),
         fibre_composition: vec![],
         country_of_origin: "PT".into(),
         care_instructions: "Machine wash 30°C".into(),
