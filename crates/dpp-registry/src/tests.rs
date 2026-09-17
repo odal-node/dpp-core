@@ -1189,3 +1189,104 @@ fn a_converted_gtin_still_validates_as_one() {
         Err(RegistryValidationError::InvalidGtin { .. })
     ));
 }
+
+// ── A blank value is no value, under every scheme ────────────────────────────
+
+/// 🚨 The defect all four identifier types shared: *not verifying a scheme's
+/// structure* also meant not noticing there was no value.
+///
+/// `validate_operator_scheme` returned `true` for `"did"` and for every
+/// unrecognised scheme regardless of the value, so a blank identifier passed and
+/// would have been submitted as though it identified someone. An empty operator
+/// identifier failed under `"vat"` only because `has_country_prefix` happens to
+/// reject one — whether an absent value was caught at all depended on which
+/// scheme the operator was configured with.
+///
+/// Both forms, per type. `" "` is what a trimmed-input bug produces and is the
+/// one `is_empty` alone cannot see.
+#[test]
+fn a_blank_value_is_refused_under_every_scheme() {
+    for blank in ["", "   "] {
+        // The scheme with no structural check at all, and the one that made the
+        // original defect invisible.
+        for scheme in ["did", "something-nobody-taught-us"] {
+            let operator = OperatorIdentifier {
+                scheme: scheme.into(),
+                value: blank.into(),
+                name: "Example GmbH".into(),
+                country: "DE".into(),
+                did: None,
+            };
+            assert!(
+                matches!(
+                    operator.validate(),
+                    Err(RegistryValidationError::InvalidOperatorId { .. })
+                ),
+                "an operator identifier of {blank:?} under {scheme:?} was accepted"
+            );
+        }
+
+        let product = ProductIdentifier {
+            scheme: "did".into(),
+            value: blank.into(),
+            label: None,
+        };
+        assert!(
+            matches!(
+                product.validate(),
+                Err(RegistryValidationError::MissingRequiredField(ref f)) if f == "productId.value"
+            ),
+            "a product identifier of {blank:?} was accepted"
+        );
+
+        let item = ProductItemIdentifier {
+            scheme: "serial".into(),
+            value: blank.into(),
+            batch_id: None,
+        };
+        assert!(
+            matches!(
+                item.validate(),
+                Err(RegistryValidationError::MissingRequiredField(ref f)) if f == "itemId.value"
+            ),
+            "an item identifier of {blank:?} was accepted"
+        );
+
+        let facility = FacilityIdentifier {
+            scheme: "national".into(),
+            value: blank.into(),
+            name: Some("Plant".into()),
+            country: "DE".into(),
+            address: None,
+        };
+        assert!(
+            matches!(
+                facility.validate(),
+                Err(RegistryValidationError::MissingRequiredField(ref f)) if f == "facilityId.value"
+            ),
+            "a facility identifier of {blank:?} was accepted"
+        );
+    }
+}
+
+/// And a stated value under an unchecked scheme still passes — the fix requires
+/// a value, it does not start verifying schemes nobody has taught the validator
+/// about.
+#[test]
+fn an_unchecked_scheme_still_accepts_a_stated_value() {
+    let operator = OperatorIdentifier {
+        scheme: "something-nobody-taught-us".into(),
+        value: "OP-4471".into(),
+        name: "Example GmbH".into(),
+        country: "DE".into(),
+        did: None,
+    };
+    assert!(operator.validate().is_ok());
+
+    let product = ProductIdentifier {
+        scheme: "did".into(),
+        value: "did:web:example.com:p:1".into(),
+        label: None,
+    };
+    assert!(product.validate().is_ok());
+}
