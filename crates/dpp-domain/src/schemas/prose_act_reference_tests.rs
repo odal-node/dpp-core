@@ -83,6 +83,26 @@ fn the_detectors_catch_what_they_are_for() {
         ["32024R1781", "32026D1736"],
     );
 
+    // 🚨 A kind word must *start* a word. Matching inside one let "indecision"
+    // name a Decision and "deregulation" name a Regulation, which does not fail
+    // — it silently sets the sector letter from a word that is not an act type,
+    // and the result is a well-formed CELEX for a different act.
+    for (prose, expected) in [
+        ("Market indecision since 2023/1234", "32023R1234"),
+        (
+            "After deregulation, Directive 2011/65/EU applied",
+            "32011L0065",
+        ),
+        // Inflections are the same word and must still count.
+        ("Both regulations, including 2023/1670", "32023R1670"),
+    ] {
+        assert_eq!(
+            act_refs(prose).first().map(|a| a.celex.as_str()),
+            Some(expected),
+            "{prose} should resolve to {expected}"
+        );
+    }
+
     // Things that look like act numbers and are not. A false positive here would
     // make Rule B fail on correct prose, which is how a gate gets disabled.
     for prose in [

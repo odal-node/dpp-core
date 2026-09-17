@@ -469,6 +469,7 @@ fn every_consecutive_version_pair_has_a_hop_or_a_refusal() {
     }
 
     let mut missing: Vec<String> = Vec::new();
+    let mut fired: Vec<(String, String, String)> = Vec::new();
     for (product_group, mut versions) in per_group {
         versions.sort_by_key(|v| v.parse::<semver::Version>().expect("a declared version"));
 
@@ -491,15 +492,40 @@ fn every_consecutive_version_pair_has_a_hop_or_a_refusal() {
                 Err(UpcastError::NoPath { .. }) => {
                     missing.push(format!("{product_group}: nothing bridges v{from} → v{to}"))
                 }
-                // A lens ran and refused for a stated reason — a legitimate
-                // answer, and not this test's business.
-                Err(_) => {}
+                // 🚨 A lens ran and declined — legitimate, but only for a hop
+                // that is *listed* as declining, and only with the reason it is
+                // listed for. `apply` turns every transform failure into
+                // `Transform`, so accepting the variant on sight would let a hop
+                // that broke for an unrelated reason pass as a refusal on
+                // purpose, which is the same silence this test exists to remove.
+                Err(UpcastError::Transform(ref e))
+                    if expected_refusal(&product_group, from, to)
+                        .is_some_and(|reason| e.to_string().contains(reason)) =>
+                {
+                    fired.push((product_group.clone(), from.clone(), to.clone()));
+                }
+                Err(e) => missing.push(format!(
+                    "{product_group}: v{from} → v{to} failed and is not a listed refusal: {e}"
+                )),
                 Ok(view) => missing.push(format!(
                     "{product_group}: upcasting v{from} → v{to} stopped short at v{}",
                     view.to
                 )),
             }
         }
+    }
+
+    // And the other direction, on the same terms as `expected_refusals` above: a
+    // listed refusal that has quietly started succeeding is a stale exemption,
+    // and leaving it listed hides the next real one behind it.
+    for (product_group, from, to, _) in EXPECTED_HOP_REFUSALS {
+        assert!(
+            fired
+                .iter()
+                .any(|(g, f, t)| g == product_group && f == from && t == to),
+            "{product_group} v{from} → v{to} is listed as refusing and did not — \
+             remove the entry if the hop is now passable"
+        );
     }
 
     assert!(
@@ -509,4 +535,25 @@ fn every_consecutive_version_pair_has_a_hop_or_a_refusal() {
          stop reaching it the moment a later version needs a real transform:\n  {}",
         missing.join("\n  ")
     );
+}
+
+/// The consecutive hops that refuse on purpose, and the reason each must give.
+///
+/// Listed exactly, and matched on the reason rather than the variant: a hop that
+/// fails for a reason nobody wrote down is a defect wearing a refusal's clothes.
+const EXPECTED_HOP_REFUSALS: [(&str, &str, &str, &str); 1] = [(
+    "battery",
+    "2.4.0",
+    "2.5.0",
+    // Annex VI Part A point 2, via Annex XIII point 1(a): the battery category
+    // is mandatory public content from v2.5.0, and a record predating the
+    // mandate has no lawful value to supply.
+    "batteryType",
+)];
+
+fn expected_refusal(product_group: &str, from: &str, to: &str) -> Option<&'static str> {
+    EXPECTED_HOP_REFUSALS
+        .iter()
+        .find(|(g, f, t, _)| *g == product_group && *f == from && *t == to)
+        .map(|(_, _, _, reason)| *reason)
 }

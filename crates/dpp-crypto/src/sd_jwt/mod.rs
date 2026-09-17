@@ -68,6 +68,8 @@ pub mod error;
 mod builder;
 
 #[cfg(test)]
+mod salt_tests;
+#[cfg(test)]
 mod tests;
 
 pub use builder::{SdJwt, build_payload, conceal};

@@ -185,11 +185,35 @@ fn nearest_kind_word(before: &str) -> Option<char> {
     KINDS
         .iter()
         .filter_map(|(word, sector)| {
-            // No kind word contains another, so the rightmost match per word and
-            // then the maximum across words is unambiguous.
-            let position = lowered.rfind(word)?;
+            // 🚨 The rightmost match that starts a word. A bare `rfind` matches
+            // inside one: "indecision" contains "decision", and "deregulation"
+            // contains "regulation", so a sentence using either would have set
+            // the act type from a word that is not an act type at all. No kind
+            // word contains another, so once each match is anchored the maximum
+            // across words is unambiguous.
+            let position = word_start(&lowered, word)?;
             (lowered.len().saturating_sub(position) <= 60).then_some((position, *sector))
         })
         .max_by_key(|(position, _)| *position)
         .map(|(_, sector)| sector)
+}
+
+/// The rightmost index at which `word` occurs in `haystack` as a whole word.
+///
+/// Only the *leading* boundary is checked. "regulations" and "decision's" are
+/// the same kind word inflected, and refusing them would trade one false reading
+/// for another — whereas a preceding letter means a different word entirely.
+fn word_start(haystack: &str, word: &str) -> Option<usize> {
+    let mut search_end = haystack.len();
+    while let Some(position) = haystack[..search_end].rfind(word) {
+        let preceded_by_letter = haystack[..position]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_alphanumeric());
+        if !preceded_by_letter {
+            return Some(position);
+        }
+        search_end = position;
+    }
+    None
 }
