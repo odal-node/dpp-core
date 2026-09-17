@@ -337,6 +337,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Three defects found by reading the release diff, none of which had shipped.**
+  All three were in work already merged for this release and were caught by a
+  single review pass over `main` against `v0.20.0` — the twelve pull requests in
+  between had gone in unreviewed.
+
+  - **A conflicting placing date no longer exempts a battery from the
+    mandatory-content gate.** `art_77_1_exempts_this_record` read
+    `envelope.or(product_group)` on the grounds that `validate` already refuses
+    a record whose two placing dates disagree. `transition_to` never calls
+    `validate` — it calls `check_mandatory_content` directly — so a pre-2027
+    envelope date beside a later battery date answered `NotYetBinding` and the
+    content gate was skipped. An exemption obtained by the record contradicting
+    itself. Disagreement is now non-exempt in either direction, and the record
+    is still refused by `validate` wherever that runs.
+
+  - **`find_superseding_head` accepts a chain of exactly `MAX_SUCCESSION_HOPS`
+    hops.** The loop followed the full cap and then reported the chain as
+    *longer than* the cap without ever asking whether the record it landed on
+    had a successor, so the longest permitted chain resolved to an error and the
+    caller lost a head that exists. One inclusive probe tells "at the cap" from
+    "past it".
+
+  - **The frozen fixture for electronics v1.3.0 now carries the shape v1.3.0
+    added.** `repairabilityIndexInputs` and `indexScopeExclusion` are the whole
+    content of that version, both optional, and `just freeze-schema-fixtures`
+    writes only required fields — so the fixture was byte-identical to v1.2.0's
+    and the compat check could not have caught a rename or retype of either. It
+    now holds a populated inputs block, `foldingMechanism` included in all three
+    part-level parameters, and one exclusion value. Renaming either key in the
+    schema now fails `every_frozen_fixture_validates_against_its_own_schema`;
+    before, it passed.
+
 - **The mandatory-content gate now asks whether Art. 77(1) reaches the record
   before asking what the record must contain.** `Passport::check_mandatory_content`
   read the battery type and nothing else, so it demanded the full 38-data-point

@@ -955,15 +955,28 @@ impl Passport {
             return false;
         };
 
-        // The envelope's date is the authoritative one; the product group's copy
-        // is the legacy home and `validate` already refuses a record where the
-        // two disagree, so reading either is reading the same value.
-        let placed = self
-            .placed_on_market_date
-            .or(battery.placed_on_market_date)
-            .map_or(PASSPORT_REQUIRED_FROM, |d| {
-                CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)
-            });
+        // 🚨 Two dates, and this path cannot assume they have been reconciled.
+        //
+        // `validate` does refuse a record whose envelope and battery placing
+        // dates disagree — but `transition_to` never calls it. It calls
+        // `check_mandatory_content` directly, so a record with two answers
+        // reaches here unchecked, and `.or(…)` silently picked the envelope's.
+        // An envelope date before 18 February 2027 beside a later battery date
+        // therefore produced `NotYetBinding`, and the content gate a published
+        // battery has to pass was skipped — an exemption obtained by the record
+        // disagreeing with itself.
+        //
+        // Fail closed instead: disagreement is not an exemption. The record is
+        // still refused by `validate` wherever that runs, and until it does, the
+        // strict content check is the safe side to be on.
+        let placed = match (self.placed_on_market_date, battery.placed_on_market_date) {
+            (Some(envelope), Some(product_group)) if envelope != product_group => return false,
+            (envelope, product_group) => envelope
+                .or(product_group)
+                .map_or(PASSPORT_REQUIRED_FROM, |d| {
+                    CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)
+                }),
+        };
 
         match passport_scope(
             battery.battery_type.wire_str(),
