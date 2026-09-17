@@ -10,12 +10,13 @@ use sha2::{Digest, Sha256};
 
 /// Why a header could not be built.
 ///
-/// Deliberately one variant. The other rule worth breaking — omitting the
-/// signing-certificate reference entirely — is unrepresentable: [`JadesHeader`]
+/// Both variants are the same rule read twice: a header parameter that is
+/// present and empty is not a present header parameter. *Omitting* the
+/// signing-certificate reference entirely is unrepresentable — [`JadesHeader`]
 /// takes a [`CertificateRef`] rather than an `Option<CertificateRef>`, so the
-/// clause 5.1.7 requirement is carried by the type instead of by a check that
-/// could be forgotten. An error variant for it would be an error nobody can
-/// produce.
+/// clause 5.1.7 requirement is carried by the type — but the variants' fields
+/// are public, and an empty `Vec` or `String` is the one door the type cannot
+/// close.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum JadesError {
@@ -25,6 +26,12 @@ pub enum JadesError {
     /// signature with none — the case clause 5.1.7 forbids, reached through the
     /// one door the type cannot close.
     EmptyCertificateChain,
+    /// `x5t#S256` was supplied as an empty string.
+    ///
+    /// Table 1 gives the digest reference cardinality 1, and a parameter
+    /// serialised as `""` references no certificate — so the signature would
+    /// carry the header without carrying the reference.
+    EmptyThumbprint,
 }
 
 impl std::fmt::Display for JadesError {
@@ -33,6 +40,12 @@ impl std::fmt::Display for JadesError {
             Self::EmptyCertificateChain => write!(
                 f,
                 "x5c was supplied with no certificates, leaving the signature without                  the certificate reference TS 119 182-1 clause 5.1.7 requires"
+            ),
+            Self::EmptyThumbprint => write!(
+                f,
+                "x5t#S256 was supplied as an empty string, so the signature carries \
+                 the parameter without the signing-certificate reference TS 119 182-1 \
+                 Table 1 gives cardinality 1"
             ),
         }
     }
@@ -161,9 +174,38 @@ impl CertificateRef {
     /// It says nothing about whether the certificate is any good, whether the
     /// seal is qualified, or whether it validates — only whether the format is
     /// the one Annex I lists.
+    ///
+    /// # 🚨 Present means non-empty, and the variant alone did not say that
+    ///
+    /// This was `matches!(self, Self::ChainWithThumbprint { .. })` — the variant
+    /// and nothing else. [`chain_of_der`](Self::chain_of_der) cannot build an
+    /// empty one, but the variant's fields are public, so
+    /// `ChainWithThumbprint { chain: vec![], thumbprint: String::new() }` is a
+    /// value any caller can make — and it answered `true`.
+    ///
+    /// Both legs above are *presence* requirements: Annex I says `x5c` "shall be
+    /// present", and Table 1 wants a digest reference with cardinality 1. An
+    /// `x5c` that is present and empty carries no certificate, and an empty
+    /// `x5t#S256` references nothing, so neither leg was met by the value this
+    /// method called EU-recognised. A compliance caller could accept a header
+    /// identifying no certificate at all, and nothing downstream would disagree
+    /// until the header is serialised — which caught the empty chain
+    /// and not the empty thumbprint.
+    ///
+    /// Still deliberately **not** checked here: whether `thumbprint` is actually
+    /// the digest of `chain[0]`. That is a question about whether the reference
+    /// is *correct*, not whether the format is present, and this method's scope
+    /// is the second. A caller needing the first wants a verifier, not a
+    /// predicate — but see the type's tests, which pin that this is a known
+    /// boundary rather than an oversight.
     #[must_use]
-    pub const fn is_eu_recognised_profile(&self) -> bool {
-        matches!(self, Self::ChainWithThumbprint { .. })
+    pub fn is_eu_recognised_profile(&self) -> bool {
+        match self {
+            Self::ChainWithThumbprint { chain, thumbprint } => {
+                !chain.is_empty() && !thumbprint.is_empty()
+            }
+            _ => false,
+        }
     }
 
     /// Compute an `x5t#S256` thumbprint from a DER-encoded certificate.
@@ -209,6 +251,14 @@ impl CertificateRef {
             }
             Self::Chain(chain) | Self::ChainWithThumbprint { chain, .. } if chain.is_empty() => {
                 Err(JadesError::EmptyCertificateChain)
+            }
+            // The same rule for the other half. An `x5t#S256` serialised as `""`
+            // is a header parameter that is present and references nothing, and
+            // letting it through would leave this in step with
+            // `is_eu_recognised_profile` in one direction only: the predicate
+            // would say no while the serialiser wrote the header anyway.
+            Self::ChainWithThumbprint { thumbprint, .. } if thumbprint.is_empty() => {
+                Err(JadesError::EmptyThumbprint)
             }
             Self::Chain(chain) => {
                 map.insert("x5c".to_owned(), chain_value(chain));

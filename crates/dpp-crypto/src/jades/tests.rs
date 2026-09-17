@@ -668,3 +668,95 @@ fn the_eu_recognised_form_actually_emits_x5c() {
         "TS 119 182-1 Table 1 still wants a digest reference alongside it"
     );
 }
+
+/// 🚨 `is_eu_recognised_profile` answered on the variant alone, so a
+/// `ChainWithThumbprint` carrying nothing was reported as the EU-recognised
+/// format.
+///
+/// `chain_of_der` cannot build one — but the variant's fields are public, so
+/// this value is one any caller can make, and a compliance caller acting on the
+/// answer would have accepted a header identifying no certificate at all. Both
+/// legs the method documents are *presence* requirements: Annex I's `x5c`
+/// "shall be present", and Table 1's digest reference with cardinality 1. An
+/// empty one is present and references nothing.
+#[test]
+fn an_empty_chain_or_thumbprint_is_not_the_eu_recognised_profile() {
+    let cases = [
+        (
+            "empty chain",
+            CertificateRef::ChainWithThumbprint {
+                chain: vec![],
+                thumbprint: "abc".into(),
+            },
+        ),
+        (
+            "empty thumbprint",
+            CertificateRef::ChainWithThumbprint {
+                chain: vec!["Y2VydA==".into()],
+                thumbprint: String::new(),
+            },
+        ),
+        (
+            "both empty",
+            CertificateRef::ChainWithThumbprint {
+                chain: vec![],
+                thumbprint: String::new(),
+            },
+        ),
+    ];
+
+    for (name, reference) in cases {
+        assert!(
+            !reference.is_eu_recognised_profile(),
+            "{name} was reported as the format a Member State body must recognise"
+        );
+    }
+
+    // And the populated form still is, so the fix is not "always false".
+    assert!(
+        CertificateRef::ChainWithThumbprint {
+            chain: vec!["Y2VydA==".into()],
+            thumbprint: "abc".into(),
+        }
+        .is_eu_recognised_profile()
+    );
+}
+
+/// The serialiser has to refuse the same two, or it writes a header the
+/// predicate has just said is not conformant. It caught the empty chain and not
+/// the empty thumbprint.
+#[test]
+fn a_header_with_an_empty_thumbprint_is_refused_like_an_empty_chain() {
+    let h = JadesHeader {
+        certificate: CertificateRef::ChainWithThumbprint {
+            chain: vec!["Y2VydA==".into()],
+            thumbprint: String::new(),
+        },
+        ..header()
+    };
+    assert_eq!(
+        prepare(&h, b"payload").expect_err("an empty x5t#S256 references no certificate"),
+        JadesError::EmptyThumbprint
+    );
+}
+
+/// 🚨 The boundary, asserted so it is not read as coverage: a thumbprint that is
+/// present but is **not** the digest of `chain[0]` is still accepted.
+///
+/// That is a question about whether the reference is *correct*, where this
+/// method's scope is whether the format is *present*. Answering it needs the
+/// DER to hash, which a predicate on the header does not have. Recorded here so
+/// the next reader knows it was considered rather than missed — if this starts
+/// failing, the scope has widened and this test should be replaced by one
+/// asserting the match.
+#[test]
+fn a_thumbprint_that_does_not_match_the_chain_is_still_accepted_and_this_is_the_boundary() {
+    let mismatched = CertificateRef::ChainWithThumbprint {
+        chain: vec!["Y2VydA==".into()],
+        thumbprint: "not-the-digest-of-that-certificate".into(),
+    };
+    assert!(
+        mismatched.is_eu_recognised_profile(),
+        "if this now fails, the predicate checks correspondence and this test is stale"
+    );
+}

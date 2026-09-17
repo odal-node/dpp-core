@@ -337,6 +337,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **`CertificateRef::is_eu_recognised_profile` no longer answers `true` for a
+  reference carrying nothing.** It was `matches!(self, ChainWithThumbprint { .. })`
+  — the variant and nothing else — so
+  `ChainWithThumbprint { chain: vec![], thumbprint: String::new() }` was reported
+  as the format a Member State public sector body is obliged to recognise.
+
+  `chain_of_der` cannot build such a value, but the variant's fields are public,
+  so any caller can. Both legs the method documents are **presence**
+  requirements — Commission Implementing Regulation (EU) 2026/248 Annex I says
+  `x5c` *"shall be present"*, and TS 119 182-1 Table 1 gives the digest
+  reference cardinality 1 — and a parameter that is present and empty satisfies
+  neither. A compliance caller could accept a header identifying no certificate
+  at all.
+
+  `JadesHeader::to_json_bytes` now refuses an empty `x5t#S256` as well, with a new
+  `JadesError::EmptyThumbprint`; it already refused an empty `x5c`. Without it
+  the predicate and the serialiser disagreed — the first saying the reference
+  was not conformant, the second writing the header anyway.
+
+  🚨 **Still not checked, deliberately and now pinned by a test:** whether
+  `thumbprint` is the digest of `chain[0]`. That is whether the reference is
+  *correct*, where this method's scope is whether the format is *present* —
+  answering it needs the DER to hash, which a predicate on the header does not
+  have. `a_thumbprint_that_does_not_match_the_chain_is_still_accepted_and_this_is_the_boundary`
+  fails if that ever changes, so the boundary is recorded rather than assumed.
+
+  Found by the same pre-release audit as the three fixes above, and separated
+  from them because it moves a compliance predicate rather than closing a bug.
+
 - **Three defects found by reading the release diff, none of which had shipped.**
   All three were in work already merged for this release and were caught by a
   single review pass over `main` against `v0.20.0` — the twelve pull requests in
