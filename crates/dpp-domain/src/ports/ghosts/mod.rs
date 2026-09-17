@@ -9,7 +9,7 @@
 //! port types/trait files, which are addressed to implementers.
 //!
 //! Private module: each type is re-exported at its own port's module path
-//! (`ports::archive::GhostArchive`, `ports::registry_sync::GhostRegistrySync`,
+//! (`ports::backup::GhostBackup`, `ports::registry_sync::GhostRegistrySync`,
 //! `ports::seal::GhostSeal`) and from the crate root, which is the only
 //! public way to reach them.
 //!
@@ -24,12 +24,12 @@
 //! either way; revisit only if a ghost is ever caught reaching production
 //! silently.
 
-mod archive;
+mod backup;
 mod registry_sync;
 mod seal;
 #[cfg(test)]
 mod tests;
 
-pub use archive::GhostArchive;
+pub use backup::GhostBackup;
 pub use registry_sync::GhostRegistrySync;
 pub use seal::GhostSeal;

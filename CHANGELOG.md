@@ -62,6 +62,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   value is empty. `no_status_serialises_to_the_vacated_word` keeps the word
   vacated as a property, so a variant added later cannot quietly take it back.
 
+- **`ports::archive` is now `ports::backup`, and `ArchivePort` is
+  `BackupCopyPort`.** *(Breaking: the module path, the trait, its two renamed
+  methods, three renamed types and two renamed receipt fields.)*
+
+  **Migration**, mechanical and compiler-caught in full:
+
+  | Was | Is |
+  |---|---|
+  | `ports::archive` | `ports::backup` |
+  | `ArchivePort` | `BackupCopyPort` |
+  | `ArchiveReceipt` / `ArchiveStatus` / `ArchiveVerification` | `BackupReceipt` / `BackupStatus` / `BackupVerification` |
+  | `GhostArchive` / `stub::InMemoryArchive` | `GhostBackup` / `stub::InMemoryBackup` |
+  | `ArchivePort::archive` / `::update_archive` | `BackupCopyPort::store` / `::update` |
+  | `ArchiveReceipt { archive_id, archived_at }` | `BackupReceipt { backup_id, stored_at }` |
+
+  `retention_until`, `verify` and `retrieve` are unchanged, as are
+  `BackupStatus`'s four variants and their `SCREAMING_SNAKE_CASE` wire forms.
+  Nothing persists these types today, so the field renames cost a recompile and
+  no data.
+
+  **Why.** This port is the one place the word "archive" was ours to choose, and
+  we chose wrong: Art. 10(4) calls the thing a **back-up copy**, lodged with the
+  Art. 2(32) independent provider. Renaming the status without renaming this
+  would have left two archives in one system — which is the collision the status
+  rename exists to end, moved rather than removed.
+
+  **One documented requirement is corrected with it, though not for the reason
+  it first looked like.** `update_archive` claimed the provider "MUST store the
+  new version while preserving the full version history". The duty is not
+  misattributed — EN 18221 clause 4.2 does expect archived versions to be held
+  by the back-up provider as well as by the main one, so a provider may well owe
+  a history. What was wrong is that the sentence sat on a method that cannot
+  discharge it: this trait's `retrieve` answers with one `Passport` and nothing
+  on it is versions-shaped, so a reader met a requirement stated as satisfied by
+  a port with no way to satisfy it. `BackupCopyPort::update` now says what it
+  does hold, and names the obligation it does not express.
+
 ### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
