@@ -43,12 +43,19 @@ pub trait BackupCopyPort: Send + Sync {
     /// or when compliance data is corrected, so that what the provider holds
     /// is the record as it now stands.
     ///
-    /// **This is not a version history, and must not be mistaken for one.**
-    /// Art. 10(4) asks for a copy that outlives the operator, so what matters
-    /// here is that the current record is retrievable from somebody else. The
-    /// retention of *past* versions is EN 18221 clause 4.2's separate
-    /// obligation, it is owed by the passport system rather than by this
-    /// provider, and nothing on this port discharges it.
+    /// **This port holds one copy, not a history.** ESPR Art. 10(4) asks for a copy
+    /// that outlives the operator, so what matters here is that the *current*
+    /// record is retrievable from somebody else — and the trait is shaped to
+    /// that: [`retrieve`](Self::retrieve) answers with one [`Passport`].
+    ///
+    /// Say what that does *not* settle, because the obvious reading is wrong in
+    /// both directions. EN 18221 clause 4.2 expects a passport's archived
+    /// versions to be held by the back-up provider as well as by the main one,
+    /// so a provider may owe a history too — the duty is not somebody else's
+    /// merely because it is not ESPR Art. 10(4)'s. It is simply not expressible
+    /// here: no method on this port takes or returns a series. A caller that
+    /// reads this method as discharging clause 4.2 has read a promise this
+    /// trait cannot make.
     async fn update(&self, passport: &Passport) -> Result<BackupReceipt, DppError>;
 
     /// Verify that the provider holds an intact copy of the passport.

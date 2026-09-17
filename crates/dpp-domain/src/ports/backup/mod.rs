@@ -9,19 +9,27 @@
 //!
 //! It was, and the word was wanted elsewhere. **EN 18221:2026 clause 4.2**
 //! archiving is the retention of *historical versions of a passport that is
-//! still live* — a history of one record. This is a *copy* of one record, held
-//! by somebody else so that it survives the operator. The two answer different
-//! obligations and fail in different ways, and while they shared a word, a
-//! reader could satisfy themselves that this port discharged clause 4.2. It
-//! does not, and cannot: it replicates the current record, so it has no past
-//! versions to serve.
+//! still live* — a **history**, many versions of one record. This port is a
+//! **copy**, one version of one record, held by somebody else so that the
+//! passport survives its operator. Different shapes, answering different
+//! obligations: clause 4.2, and ESPR Art. 10(4).
 //!
-//! The Regulation supplies the name. Art. 10(4) says *back-up copy*, so that is
+//! **The line is drawn by shape, not by actor, and getting that backwards is
+//! the easy mistake.** Clause 4.2 expects a passport's archived versions to be
+//! held by the back-up provider as well as by the main one, so "the provider
+//! owes no history" is *false* — a provider may well owe one. What is true is
+//! narrower and is about this trait: nothing on it takes or returns a series,
+//! so a history is not expressible here whoever owes it. While the two shared
+//! a word, a reader could satisfy themselves that wiring this port had ticked
+//! clause 4.2. Wiring it cannot, and that is a statement about this interface
+//! rather than about anybody's duties.
+//!
+//! The Regulation supplies the name. ESPR Art. 10(4) says *back-up copy*, so that is
 //! what this is called, and "archiving" is left to mean only the thing the
 //! standard means by it. See [`PassportStatus`](crate::status::PassportStatus)
 //! for the third use the word had — a lifecycle status, now `Retired`.
 //!
-//! The obligation is **Art. 10(4)**: the economic operator "shall make available
+//! The obligation is **ESPR Art. 10(4)**: the economic operator "shall make available
 //! a back-up copy of the digital product passport through a digital product
 //! passport service provider", which **Art. 2(32)** defines as "an independent
 //! third-party authorised by the economic operator". The period is **Annex

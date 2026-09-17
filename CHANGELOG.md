@@ -88,13 +88,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   would have left two archives in one system — which is the collision the status
   rename exists to end, moved rather than removed.
 
-  **One documented requirement was wrong and is corrected with it.**
-  `update_archive` claimed the provider "MUST store the new version while
-  preserving the full version history". That is clause 4.2's obligation, it is
-  owed by the passport system rather than by a back-up provider, and stating it
-  here is exactly what let a reader believe this port discharged clause 4.2. It
-  cannot: it replicates the current record, so it has no past versions to serve.
-  `BackupCopyPort::update` now says so.
+  **One documented requirement is corrected with it, though not for the reason
+  it first looked like.** `update_archive` claimed the provider "MUST store the
+  new version while preserving the full version history". The duty is not
+  misattributed — EN 18221 clause 4.2 does expect archived versions to be held
+  by the back-up provider as well as by the main one, so a provider may well owe
+  a history. What was wrong is that the sentence sat on a method that cannot
+  discharge it: this trait's `retrieve` answers with one `Passport` and nothing
+  on it is versions-shaped, so a reader met a requirement stated as satisfied by
+  a port with no way to satisfy it. `BackupCopyPort::update` now says what it
+  does hold, and names the obligation it does not express.
 
 ### Added
 
