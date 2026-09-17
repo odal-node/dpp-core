@@ -351,7 +351,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   neither. A compliance caller could accept a header identifying no certificate
   at all.
 
-  `JadesHeader::protected` now refuses an empty `x5t#S256` as well, with a new
+  `JadesHeader::to_json_bytes` now refuses an empty `x5t#S256` as well, with a new
   `JadesError::EmptyThumbprint`; it already refused an empty `x5c`. Without it
   the predicate and the serialiser disagreed — the first saying the reference
   was not conformant, the second writing the header anyway.
