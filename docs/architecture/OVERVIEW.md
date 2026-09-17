@@ -164,7 +164,7 @@ trait IdentityPort          // Sign and verify JWS
 // Plugins
 trait PluginHost            // Dispatch to Wasm plugins
 
-// Archival & registry & sealing
+// Back-up copy & registry & sealing
 trait BackupCopyPort        // The ESPR Art. 10(4) third-party back-up copy
 trait RegistrySyncPort      // EU Central Registry registration / status sync
 trait SealPort              // eIDAS qualified electronic seal (ESPR Art. 13)
