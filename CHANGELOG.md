@@ -490,8 +490,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   there the obligation turns on a number, so an unstated number cannot exempt;
   here the exemption is what is stated, so an unstated one does not exist.
 
-### Added
-
 - **`PassportRepository` can resolve forward through an amendment.**
   `supersedes_id` answered "what does this passport supersede?" and nothing
   answered the reverse. That direction is the one a reader needs: a superseded
