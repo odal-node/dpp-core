@@ -98,26 +98,16 @@ fn operator() -> RegisteringOperator<'static> {
     }
 }
 
-/// The mapping every consumer has to write, written once here so the test says
-/// what it costs.
+/// Core's conversion, which this test used to have to write for itself.
 ///
-/// 🚨 **Core provides no helper for this.** `dpp_domain::identifier::ProductIdentifier`
-/// is the EN 18219 scheme enum; `dpp_registry::ProductIdentifier` is the wire
-/// struct the registry takes. They share a name and nothing else, and nothing
-/// converts between them — so each consumer invents this, and the scheme string
-/// is exactly where an invented mapping goes wrong silently.
+/// The hand-written version lived here with a note saying no helper existed —
+/// and writing it was the finding: the `scheme` string is where an invented
+/// mapping goes wrong *without failing*, because `ProductIdentifier::validate`
+/// checks structure only when the scheme is `"gtin"`. Now that `TryFrom` exists,
+/// this calls it, which is also the check that the conversion is the one a real
+/// consumer needs rather than one shaped to its own tests.
 fn registry_identifier(identifier: &SchemeIdentifier) -> ProductIdentifier {
-    let scheme = match identifier {
-        SchemeIdentifier::Gs1 { .. } => "gtin",
-        SchemeIdentifier::IdentificationLink { .. } => "identificationLink",
-        SchemeIdentifier::Did { .. } => "did",
-        _ => "unknown",
-    };
-    ProductIdentifier {
-        scheme: scheme.to_owned(),
-        value: identifier.as_str().to_owned(),
-        label: None,
-    }
+    ProductIdentifier::try_from(identifier).expect("every clause 5 scheme this test uses is mapped")
 }
 
 fn payload_from(
@@ -179,17 +169,17 @@ fn a_passport_under_any_en_18219_scheme_reaches_a_valid_submission() {
     let cases = [
         (
             SchemeIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
-            "gtin",
+            dpp_registry::SCHEME_GTIN,
             "09506000134352",
         ),
         (
             SchemeIdentifier::identification_link("https://id.ecotextile.de/p/1").unwrap(),
-            "identificationLink",
+            dpp_registry::SCHEME_IDENTIFICATION_LINK,
             "https://id.ecotextile.de/p/1",
         ),
         (
             SchemeIdentifier::did("did:web:ecotextile.de:p:1").unwrap(),
-            "did",
+            dpp_registry::SCHEME_DID,
             "did:web:ecotextile.de:p:1",
         ),
     ];

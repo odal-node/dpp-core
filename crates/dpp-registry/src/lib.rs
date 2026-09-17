@@ -99,7 +99,8 @@ pub use error::{
 };
 pub use granularity::{Granularity, RegistrationLevel};
 pub use identifiers::{
-    FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
+    FacilityIdentifier, OperatorIdentifier, PRODUCT_SCHEME_BASIS, ProductIdentifier,
+    ProductItemIdentifier, SCHEME_DID, SCHEME_GTIN, SCHEME_IDENTIFICATION_LINK,
     ServiceProviderReference,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
