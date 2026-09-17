@@ -126,3 +126,37 @@ fn a_submission_serialises_as_its_passports() {
     let back: RegistrationSubmission = serde_json::from_value(json).unwrap();
     assert_eq!(back, submission);
 }
+
+/// The file limit is inclusive, and the boundary is where a re-derived `<` vs
+/// `<=` would differ.
+///
+/// 👁️ The guide refuses a file that *"exceeds the maximum allowed size"*, so
+/// exactly the limit is accepted. A caller writing the comparison itself has a
+/// one-in-two chance of getting that right, which is the reason
+/// [`fits_file_limit`] exists at all.
+#[test]
+fn the_file_limit_is_inclusive() {
+    use super::{MAX_SUBMISSION_BYTES, fits_file_limit};
+
+    assert!(fits_file_limit(0));
+    assert!(fits_file_limit(MAX_SUBMISSION_BYTES - 1));
+    assert!(fits_file_limit(MAX_SUBMISSION_BYTES));
+    assert!(!fits_file_limit(MAX_SUBMISSION_BYTES + 1));
+}
+
+/// 🚨 The limit is binary, and the guide's sentence is decimal.
+///
+/// "1 GB" reads as 1 000 000 000 to anyone applying SI, and this crate uses
+/// 1 GiB. Pinned so the 7 % gap is a recorded choice rather than something a
+/// reader assumes was checked — a submission sized between the two is accepted
+/// here and may be refused by the registry.
+#[test]
+fn the_byte_limit_is_the_binary_reading_of_one_gigabyte() {
+    use super::{MAX_SUBMISSION_BYTES, fits_file_limit};
+
+    assert_eq!(MAX_SUBMISSION_BYTES, 1_073_741_824);
+    assert!(
+        fits_file_limit(1_000_000_000),
+        "a decimal gigabyte fits the binary limit; the reverse is the risk"
+    );
+}

@@ -107,7 +107,7 @@ pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
-    RegistrationSubmission, SubmissionOutcome, SubmissionReceipt,
+    RegistrationSubmission, SubmissionOutcome, SubmissionReceipt, fits_file_limit,
 };
 pub use transfer::TransferNotification;
 

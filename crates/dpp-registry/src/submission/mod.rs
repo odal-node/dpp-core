@@ -26,34 +26,10 @@
 //! states that interface reports and the limits it enforces; whether the API
 //! names them identically is unverified.
 
-/// The most passports one submission may carry.
-///
-/// 👁️ User Guide v1.02: *"The system accepts up to 100 registration requests
-/// per file. Files exceeding this limit cannot be processed."*
-pub const MAX_PASSPORTS_PER_SUBMISSION: usize = 100;
-
-/// The largest submission file the registry accepts, in bytes.
-///
-/// 👁️ User Guide v1.02: *"The file exceeds the maximum allowed size of 1 GB."*
-pub const MAX_SUBMISSION_BYTES: u64 = 1_073_741_824;
-
-/// The longest unique product identifier the registry accepts, in characters.
-///
-/// 👁️ User Guide v1.02: the UPI is *"a mandatory value conforming to a URL
-/// format compliant with JTC 24 standards. Max length is 2000 chars."*
-///
-/// 🚨 **This number moved, and it is the reason to distrust it.** v1.01
-/// (2026-07-28) stated **50**, which would have been shorter than any GS1
-/// Digital Link this workspace can build — a 65-character carrier URL, 77 with
-/// a batch segment — and would have forced the carrier shape to change for
-/// every printed label. v1.02 states 2000. The constraint was lifted by the
-/// Commission within a month, silently, in a document with no OJ number and no
-/// consolidation. Treat 2000 as current rather than settled.
-pub const MAX_PRODUCT_IDENTIFIER_CHARS: usize = 2000;
-
 mod batch;
 #[cfg(test)]
 mod batch_tests;
+mod limits;
 mod outcome;
 mod receipt;
 
@@ -61,5 +37,9 @@ mod receipt;
 mod tests;
 
 pub use batch::RegistrationSubmission;
+pub use limits::{
+    MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
+    fits_file_limit,
+};
 pub use outcome::SubmissionOutcome;
 pub use receipt::SubmissionReceipt;
