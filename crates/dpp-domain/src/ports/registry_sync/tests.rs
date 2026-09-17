@@ -53,7 +53,8 @@ fn from_published_passport_maps_all_fields() {
         &passport,
         acme(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect("the fixture passport is complete");
 
     assert_eq!(req.passport_id, passport.id);
     assert_eq!(req.operator_identifier, "did:web:acme.example.com");
@@ -86,13 +87,26 @@ fn from_published_passport_maps_all_fields() {
     assert_eq!(req.granularity, RegistrationGranularity::Item);
 }
 
+/// 🚨 An incomplete passport is refused, naming **every** field it lacks.
+///
+/// This test used to be called `from_published_passport_empty_optionals_produce_empty_strings`
+/// and asserted the opposite: that a passport with no operator identifier, no
+/// facility and no carrier URL produced a request with `""` in all three. It
+/// carried no reason, and the behaviour it pinned was the defect — a request
+/// that looks complete, refused downstream by an error naming the scheme it was
+/// given rather than the absence it was not.
+///
+/// All three at once, not the first: nothing has been sent yet, so the caller is
+/// fixing their own passport and a round-trip per missing field is a worse
+/// answer than a list.
 #[test]
-fn from_published_passport_empty_optionals_produce_empty_strings() {
+fn an_incomplete_passport_is_refused_with_every_missing_field_named() {
     let mut passport = make_published_passport();
     passport.operator_identifier = None;
     passport.facility = None;
     passport.qr_code_url = None;
-    let req = RegistrationRequest::from_published_passport(
+
+    let refused = RegistrationRequest::from_published_passport(
         &passport,
         RegisteringOperator {
             legal_name: "",
@@ -100,13 +114,33 @@ fn from_published_passport_empty_optionals_produce_empty_strings() {
             identifier_scheme: "",
         },
         RegistrationGranularity::Item,
-    );
+    )
+    .expect_err("a passport carrying none of the three cannot be registered");
 
-    assert!(req.operator_identifier.is_empty());
-    assert!(req.facility_identifier.is_empty());
-    assert!(req.facility.is_none());
-    assert!(req.data_carrier_uri.is_empty());
-    assert!(req.country_code.is_empty());
+    let fields: Vec<&str> = refused.errors.iter().map(|e| e.field.as_str()).collect();
+    assert_eq!(
+        fields,
+        ["/operatorIdentifier", "/facility", "/qrCodeUrl"],
+        "every missing field must be reported, not the first"
+    );
+}
+
+/// And one missing field is one error — the list is not all-or-nothing in the
+/// other direction either.
+#[test]
+fn a_passport_missing_only_its_carrier_url_reports_only_that() {
+    let mut passport = make_published_passport();
+    passport.qr_code_url = None;
+
+    let refused = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect_err("the carrier URI is what a registration resolves to");
+
+    assert_eq!(refused.errors.len(), 1);
+    assert_eq!(refused.errors[0].field, "/qrCodeUrl");
 }
 
 #[test]
@@ -144,7 +178,8 @@ fn the_model_identifier_reaches_the_registration() {
         &passport,
         acme(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect("the fixture passport is complete");
     assert_eq!(req.model_id.as_deref(), Some("BM-4815"));
 }
 
@@ -160,7 +195,38 @@ fn a_product_group_without_a_model_identifier_reports_none() {
             acme(),
             RegistrationGranularity::Item,
         )
+        .expect("the fixture passport is complete")
         .model_id
         .is_none()
     );
+}
+
+/// 🚨 `Some("")` is the same absence wearing an `Option::Some`.
+///
+/// `Passport`'s fields are public and it deserialises from stored documents, so
+/// nothing stops a blank value being written where `None` belongs. Checking
+/// presence alone would have left this constructor doing exactly what it was
+/// changed to stop doing — producing a request that looks complete and carries
+/// nothing — one layer in from where the defect was found.
+///
+/// Whitespace counts as blank: a value of `" "` identifies no more than `""`
+/// does, and is the form a trimmed-input bug actually produces.
+#[test]
+fn a_present_but_blank_field_is_as_absent_as_a_missing_one() {
+    let mut passport = make_published_passport();
+    passport.operator_identifier = Some(String::new());
+    passport.qr_code_url = Some("   ".into());
+    if let Some(facility) = passport.facility.as_mut() {
+        facility.value = String::new();
+    }
+
+    let refused = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect_err("blank is not a value the passport carried");
+
+    let fields: Vec<&str> = refused.errors.iter().map(|e| e.field.as_str()).collect();
+    assert_eq!(fields, ["/operatorIdentifier", "/facility", "/qrCodeUrl"]);
 }

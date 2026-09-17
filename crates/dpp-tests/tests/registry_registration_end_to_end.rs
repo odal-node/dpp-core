@@ -82,11 +82,19 @@ fn published_passport(identifier: SchemeIdentifier) -> dpp_domain::Passport {
     );
     passport.status = PassportStatus::Published;
     passport.published_at = Some(Utc::now());
-    // 🚨 Set explicitly, because `from_published_passport` defaults all three to
-    // `""` when the passport lacks them — see
-    // `a_passport_missing_its_operator_identifier_registers_as_an_empty_string`.
+    // The three a registration cannot be built without. `base_passport` leaves
+    // them unset, and `from_published_passport` now refuses rather than
+    // defaulting them to `""` — see
+    // `a_passport_missing_its_operator_identifier_cannot_be_registered`.
     passport.operator_identifier = Some("DE123456789".into());
     passport.qr_code_url = Some("https://id.ecotextile.de/01/09506000134352/21/ABC123".into());
+    passport.facility = Some(dpp_domain::passport::FacilitySnapshot {
+        scheme: "gln".into(),
+        value: "4012345000009".into(),
+        name: "Dhaka Unit 3".into(),
+        country: "BD".into(),
+        address: None,
+    });
     passport
 }
 
@@ -190,7 +198,8 @@ fn a_passport_under_any_en_18219_scheme_reaches_a_valid_submission() {
             &passport,
             operator(),
             RegistrationGranularity::Item,
-        );
+        )
+        .expect("the fixture passport carries all three");
         let payload = payload_from(&request, &identifier);
 
         assert_eq!(payload.product_id.scheme, expected_scheme);
@@ -219,7 +228,8 @@ fn a_back_up_declared_on_the_port_request_carries_its_provider_through() {
         &passport,
         operator(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect("the fixture passport carries all three");
     request.backup_url = Some("https://backup.example.com/dpp/1.json".into());
     request.service_provider = Some(ServiceProviderRef::named("Example Backup GmbH"));
 
@@ -250,7 +260,8 @@ fn one_bad_passport_refuses_a_hundred_registrations() {
         &passport,
         operator(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect("the fixture passport carries all three");
 
     let mut payloads: Vec<RegistrationPayload> = (0..99)
         .map(|_| payload_from(&request, &identifier))
@@ -284,7 +295,8 @@ fn a_successful_submission_is_acknowledged_per_passport() {
         &passport,
         operator(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect("the fixture passport carries all three");
     let submission = RegistrationSubmission::new(
         (0..3)
             .map(|_| payload_from(&request, &identifier))
@@ -306,47 +318,32 @@ fn a_successful_submission_is_acknowledged_per_passport() {
         "Art. 8(10) communicates an identifier for each specific product"
     );
 }
-
-/// 🚨 What the composition exposed: the port constructor manufactures empty
-/// strings for data the passport does not carry.
+/// 🚨 What this composition first exposed, now the other way round.
 ///
-/// `RegistrationRequest::from_published_passport` reads `operator_identifier`,
-/// the facility identifier and `data_carrier_uri` with `unwrap_or_default()`, so
-/// a passport published without them yields a request that *looks* complete —
-/// every field populated, nothing optional left unset — and fails at the
-/// registry with `InvalidOperatorId { scheme: "vat", value: "" }`, which names
-/// the scheme it was given and not the fact that nothing was given at all.
+/// This test used to assert that a passport with no operator identifier still
+/// produced a request — with `""` in the field — and travelled all the way to
+/// `InvalidOperatorId { scheme: "vat", value: "" }`, an error naming the scheme
+/// it was given rather than the absence it was not. Three of this file's cases
+/// failed on that when it was written, which is how the defect was found: every
+/// unit test in both crates passed throughout.
 ///
-/// The port's own transfer documentation warns about exactly this shape:
-/// *"passing only the new identifier left an adapter no way to express the
-/// outgoing operator … so it could only send empty strings for data the system
-/// had already collected."* Here the adapter has the room and the constructor
-/// fills it with nothing.
-///
-/// Pinned rather than fixed: the honest repair changes a public constructor's
-/// signature, which is its own decision. This asserts the current behaviour so
-/// the decision is made deliberately and not discovered during integration.
+/// The constructor now refuses, so the composition asserts the refusal instead.
+/// The value of keeping it here rather than only in `dpp-domain` is that this is
+/// the seam where the empty string used to escape — the registry crate would
+/// have accepted it under any scheme its validator does not recognise.
 #[test]
-fn a_passport_missing_its_operator_identifier_registers_as_an_empty_string() {
+fn a_passport_missing_its_operator_identifier_cannot_be_registered() {
     let identifier = SchemeIdentifier::did("did:web:ecotextile.de:p:1").unwrap();
-    let mut passport = published_passport(identifier.clone());
+    let mut passport = published_passport(identifier);
     passport.operator_identifier = None;
 
-    let request = RegistrationRequest::from_published_passport(
+    let refused = RegistrationRequest::from_published_passport(
         &passport,
         operator(),
         RegistrationGranularity::Item,
-    );
+    )
+    .expect_err("a registration cannot name an operator the passport never carried");
 
-    // No `Option`, no error — an empty identifier under a real scheme.
-    assert_eq!(request.operator_identifier, "");
-    assert_eq!(request.operator_identifier_scheme, "vat");
-
-    // And it survives all the way to a refusal that describes the wrong problem.
-    let submission = RegistrationSubmission::single(payload_from(&request, &identifier));
-    assert!(matches!(
-        submission.validate(),
-        Err(RegistryValidationError::SubmissionPassportInvalid { ref source, .. })
-            if matches!(**source, RegistryValidationError::InvalidOperatorId { ref value, .. } if value.is_empty())
-    ));
+    assert_eq!(refused.errors.len(), 1);
+    assert_eq!(refused.errors[0].field, "/operatorIdentifier");
 }
