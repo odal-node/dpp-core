@@ -135,7 +135,9 @@ impl SdJwt {
     /// Treat every value here as attacker-supplied until
     /// [`Self::disclosed_payload`] has succeeded, and read the claim from *its*
     /// output rather than from here. That is the call which recomputes each
-    /// digest and admits only the disclosures the issuer signed over.
+    /// digest — and it refuses the whole token when one matches nothing
+    /// ([`SdJwtError::UnusedDisclosures`]) rather than quietly leaving it out,
+    /// so its failure means tampering rather than a claim you did not get.
     ///
     /// This method exists for inspection — counting what travelled, rendering a
     /// presentation, choosing what to reveal next — none of which is a trust

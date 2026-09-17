@@ -27,9 +27,11 @@
 //!   entirely untouched JWT can be re-serialised with an extra forged
 //!   disclosure, and [`SdJwt::disclosures`] will hand it back — the signature
 //!   still verifies, because it never covered that list. Only
-//!   [`SdJwt::disclosed_payload`] recomputes the digests and drops what the
-//!   issuer did not commit to, so **read claims from its output, never from
-//!   `disclosures()`**.
+//!   [`SdJwt::disclosed_payload`] recomputes the digests, and it **refuses the
+//!   whole token** rather than filtering: a disclosure matching no `_sd` digest
+//!   is [`SdJwtError::UnusedDisclosures`], per clause 7.1 step 4. So **read
+//!   claims from its output, never from `disclosures()`** — and read a failure
+//!   from it as a tampered credential, not as a claim that was dropped.
 //! - **It does not implement key binding.** RFC 9901 clause 4.3's KB-JWT proves
 //!   the presenter holds a key the credential names. That needs holders to have
 //!   keys. The parser tolerates a trailing KB-JWT segment so that a presentation
