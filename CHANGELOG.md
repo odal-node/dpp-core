@@ -66,6 +66,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   because an identifier verification has not yet produced is one the registry
   cannot have sent.
 
+- **`RegistrationRequest::from_published_passport` returns a `Result`.** It
+  defaulted three fields to `""` when the passport did not carry them — the
+  operator identifier, the facility identifier and the data carrier URI — so an
+  incomplete passport produced a request that *looked* complete, with every
+  field populated and nothing optional left unset.
+
+  Downstream it was refused as `InvalidOperatorId { scheme: "vat", value: "" }`,
+  which names the scheme it was given rather than the absence it was not. 🚨 And
+  whether it was refused at all depended on the scheme:
+  `validate_operator_scheme` accepts every unrecognised scheme **without looking
+  at the value**, so the same empty identifier under `"did"` passed validation
+  entirely and would have been submitted as though it identified someone. A
+  registration is the one outbound surface where an empty value is a statement to
+  a public authority rather than a local mistake.
+
+  The port's own transfer documentation already recorded this shape — *"it could
+  only send empty strings for data the system had already collected"*. There the
+  adapter had no room; here the constructor had the room and filled it with
+  nothing.
+
+  It now returns `ValidationErrors` naming **every** missing field, not the
+  first. That is the opposite of `RegistrationSubmission::validate`, deliberately:
+  there the registry's own outcome is one refusal of the whole submission and
+  listing per-passport verdicts would misdescribe it, whereas here nothing has
+  been sent and the caller is fixing their own passport — a round-trip per
+  missing field is a worse answer than a list.
+
+  **Migration.** `?` or `.expect(…)` at the call site. The `operator` argument's
+  own fields are still not checked: they are the caller's input rather than
+  something derived from the passport, so an empty legal name is a different
+  class of mistake and is caught where the payload is validated.
+
 - **`PassportStatus::Archived` is now `PassportStatus::Retired`, and its wire
   value is `"retired"`.** *(Breaking twice over: the variant rename breaks
   anything matching on `PassportStatus`, and the wire value change breaks

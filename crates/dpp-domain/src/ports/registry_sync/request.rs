@@ -115,13 +115,81 @@ impl RegistrationRequest {
     /// `granularity` is set by the applicable delegated act for the product
     /// group; `model_id` is left unset here and linked by the caller where a
     /// model design exists for the product.
+    ///
+    /// # Errors
+    ///
+    /// [`ValidationErrors`](crate::field_error::ValidationErrors) naming **every**
+    /// field the passport does not carry that a registration cannot do without:
+    /// the operator identifier, the facility, and the data carrier URI.
+    ///
+    /// 🚨 **This used to return `Self`, defaulting all three to `""`.** A
+    /// passport published without them produced a request that *looked*
+    /// complete — every field populated, nothing optional left unset — and was
+    /// refused downstream as `InvalidOperatorId { scheme: "vat", value: "" }`,
+    /// which names the scheme it was given and not the fact that nothing was
+    /// given.
+    ///
+    /// Worse, whether it was refused at all depended on the scheme:
+    /// `validate_operator_scheme` accepts every unrecognised scheme **without
+    /// looking at the value**, so the same empty identifier under `"did"` passed
+    /// validation entirely and would have been submitted as though it identified
+    /// someone. A registration is the one outbound surface where an empty value
+    /// is a statement to a public authority rather than a local mistake.
+    ///
+    /// The port's own `notify_transfer` documentation
+    /// already recorded this shape — *"it could only send empty strings for data
+    /// the system had already collected"*. There the adapter had no room; here
+    /// the constructor had the room and filled it with nothing.
+    ///
+    /// The `operator`'s own fields are **not** checked: they are the caller's
+    /// input rather than something derived from the passport, so an empty legal
+    /// name is a different class of mistake and is caught where the payload is
+    /// validated.
     pub fn from_published_passport(
         passport: &crate::passport::Passport,
         operator: RegisteringOperator<'_>,
         granularity: RegistrationGranularity,
-    ) -> Self {
+    ) -> Result<Self, crate::field_error::ValidationErrors> {
         let product_category = passport.product_group.wire_str().to_owned();
-        Self {
+
+        // 🚨 Every missing field at once, not the first.
+        //
+        // The opposite of `RegistrationSubmission::validate`, which stops at the
+        // first bad passport because the registry's own outcome is one refusal
+        // of the whole submission and listing more would misdescribe it. Here
+        // nothing has been sent: the caller is fixing their own passport before
+        // it travels, and a second round-trip per missing field is a worse
+        // answer than a list.
+        let mut missing: Vec<crate::field_error::FieldError> = Vec::new();
+        let mut require = |present: bool, field: &str, message: &str| {
+            if !present {
+                missing.push(crate::field_error::FieldError {
+                    field: field.to_owned(),
+                    message: message.to_owned(),
+                });
+            }
+        };
+        require(
+            passport.operator_identifier.is_some(),
+            "/operatorIdentifier",
+            "the registry records the responsible economic operator; a registration \
+             cannot name one the passport never carried",
+        );
+        require(
+            passport.facility.is_some(),
+            "/facility",
+            "Annex III point (i) makes the facility identifier registration data",
+        );
+        require(
+            passport.qr_code_url.is_some(),
+            "/qrCodeUrl",
+            "the data carrier URI is what the registration resolves to",
+        );
+        if !missing.is_empty() {
+            return Err(crate::field_error::ValidationErrors { errors: missing });
+        }
+
+        Ok(Self {
             // Minted here, at the one moment a registration comes into
             // existence, and never again — see the field's docs.
             request_id: uuid::Uuid::now_v7(),
@@ -157,6 +225,6 @@ impl RegistrationRequest {
             // Same: the provider is a contractual fact the passport does not
             // record, and inventing one would name a party that may not exist.
             service_provider: None,
-        }
+        })
     }
 }
