@@ -106,6 +106,7 @@ async fn ghost_register_returns_pending() {
         facility_identifier: "FAC-001".into(),
         facility: None,
         product_category: "textile".into(),
+        product_identifier: None,
         data_carrier_uri: "https://id.example.com/01/09506000134352".into(),
         schema_version: "1.0.0".into(),
         jws_signature: None,

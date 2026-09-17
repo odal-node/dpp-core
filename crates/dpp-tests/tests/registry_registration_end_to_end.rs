@@ -118,13 +118,28 @@ fn registry_identifier(identifier: &SchemeIdentifier) -> ProductIdentifier {
     ProductIdentifier::try_from(identifier).expect("every clause 5 scheme this test uses is mapped")
 }
 
-fn payload_from(
-    request: &RegistrationRequest,
-    identifier: &SchemeIdentifier,
-) -> RegistrationPayload {
+/// 🚨 The identifier a real adapter has: the one **on the request**.
+///
+/// The payload builder below used to take the identifier as a separate argument,
+/// handed to it beside the request — which quietly assumed a consumer could get
+/// it from somewhere. It could not: `RegistrationRequest` carried no product
+/// identifier, so the only adapter doing this scraped a GTIN out of the carrier
+/// URI and fell back to the internal passport UUID when there was none, which is
+/// every scheme 2 and 3 passport. Taking it from the request is what makes this
+/// test exercise the path a consumer actually has.
+fn identifier_on(request: &RegistrationRequest) -> ProductIdentifier {
+    registry_identifier(
+        request
+            .product_identifier
+            .as_ref()
+            .expect("the constructor refuses a passport that identifies nothing"),
+    )
+}
+
+fn payload_from(request: &RegistrationRequest) -> RegistrationPayload {
     RegistrationPayload {
         passport_id: request.passport_id.0,
-        product_id: registry_identifier(identifier),
+        product_id: identifier_on(request),
         level: RegistrationLevel::new(Granularity::Item).with_model("MODEL-1"),
         item_id: Some(ProductItemIdentifier {
             scheme: "serial".into(),
@@ -200,7 +215,7 @@ fn a_passport_under_any_en_18219_scheme_reaches_a_valid_submission() {
             RegistrationGranularity::Item,
         )
         .expect("the fixture passport carries all three");
-        let payload = payload_from(&request, &identifier);
+        let payload = payload_from(&request);
 
         assert_eq!(payload.product_id.scheme, expected_scheme);
         assert_eq!(payload.product_id.value, expected_value);
@@ -233,7 +248,7 @@ fn a_back_up_declared_on_the_port_request_carries_its_provider_through() {
     request.backup_url = Some("https://backup.example.com/dpp/1.json".into());
     request.service_provider = Some(ServiceProviderRef::named("Example Backup GmbH"));
 
-    let payload = payload_from(&request, &identifier);
+    let payload = payload_from(&request);
     assert!(payload.validate().is_ok(), "{:?}", payload.validate());
 
     // …and dropping the provider on the way across is refused, rather than
@@ -263,10 +278,8 @@ fn one_bad_passport_refuses_a_hundred_registrations() {
     )
     .expect("the fixture passport carries all three");
 
-    let mut payloads: Vec<RegistrationPayload> = (0..99)
-        .map(|_| payload_from(&request, &identifier))
-        .collect();
-    let mut last = payload_from(&request, &identifier);
+    let mut payloads: Vec<RegistrationPayload> = (0..99).map(|_| payload_from(&request)).collect();
+    let mut last = payload_from(&request);
     last.item_id = None;
     payloads.push(last);
 
@@ -297,12 +310,8 @@ fn a_successful_submission_is_acknowledged_per_passport() {
         RegistrationGranularity::Item,
     )
     .expect("the fixture passport carries all three");
-    let submission = RegistrationSubmission::new(
-        (0..3)
-            .map(|_| payload_from(&request, &identifier))
-            .collect(),
-    )
-    .expect("within bounds");
+    let submission = RegistrationSubmission::new((0..3).map(|_| payload_from(&request)).collect())
+        .expect("within bounds");
     assert!(submission.validate().is_ok());
 
     let receipt = SubmissionReceipt {

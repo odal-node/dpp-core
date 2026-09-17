@@ -15,6 +15,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`RegistrationRequest` carries the passport's EN 18219 identifier, and
+  refuses to be built without one.** 🚨 Until now the request carried nothing
+  identifying the product — `passport_id`, operator, facility, carrier URI,
+  granularity, commodity code, back-up, provider, and no product identifier.
+
+  An adapter therefore had to invent one, and the one that exists scraped a GTIN
+  out of the carrier URI and fell back to the **internal passport UUID** when
+  there was none. That was harmless while every passport carried a GTIN; the
+  identifier work in this release makes the fallback reachable for exactly the
+  passports it introduced, so a scheme 2 or 3 passport would be registered with a
+  public authority under a value meaningless outside the issuing node. Nothing
+  catches it: `dpp_registry::ProductIdentifier::validate` checks structure only
+  for `"gtin"`, so an invented scheme passes unexamined.
+
+  `from_published_passport` now populates it from the product group data and
+  refuses a passport that identifies nothing, through the same `ValidationErrors`
+  path as the other required fields.
+
+  **`UnsoldGoods` is the case that refusal names**, and it is not a defect: an
+  Art. 24–25 discard disclosure covers a financial year across many products and
+  identifies no single one. A disclosure is not a product registration, and
+  saying so is better than an `Option` that lets it through unnamed.
+
+  The field is `Option` on the struct for the **wire**, not the rule: this type is
+  queued in a consumer's outbox across restarts, and a newly required field makes
+  every already-queued row undeserialisable. The rule lives in the constructor; a
+  `None` arriving at an adapter came from an older queue.
+
 - **`EuRegistryEnvelope::payload` is now `submission`, and carries a
   `RegistrationSubmission` rather than one `RegistrationPayload`.**
 
