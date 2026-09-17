@@ -10,7 +10,7 @@ use super::identifiers::{
     FacilityIdentifier, OperatorIdentifier, ProductIdentifier, ProductItemIdentifier,
     ServiceProviderReference,
 };
-use super::submission::MAX_PRODUCT_IDENTIFIER_CHARS;
+use super::submission::{MAX_PRODUCT_IDENTIFIER_CHARS, RegistrationSubmission};
 
 /// The full data payload sent to the EU registry when registering a DPP.
 ///
@@ -193,6 +193,24 @@ pub struct EuRegistryEnvelope {
     pub request_id: Uuid,
     /// ISO 8601 timestamp of when the request was created.
     pub timestamp: DateTime<Utc>,
-    /// The registration payload.
-    pub payload: RegistrationPayload,
+    /// The passports being registered, which succeed or fail together.
+    ///
+    /// Was a single `RegistrationPayload`. The registry's unit is the
+    /// submission — up to 100 passports, rejected as a whole if any one of them
+    /// is bad — so a one-passport envelope was a shape the registry does not
+    /// have, and it made both submission caps unenforceable. Use
+    /// [`RegistrationSubmission::single`] for the common case.
+    pub submission: RegistrationSubmission,
+}
+
+impl EuRegistryEnvelope {
+    /// Validate the submission this envelope carries.
+    ///
+    /// # Errors
+    ///
+    /// Whatever [`RegistrationSubmission::validate`] refuses — a single failing
+    /// passport refuses the envelope, naming its index.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        self.submission.validate()
+    }
 }

@@ -40,7 +40,7 @@ fn sample_operator_id() -> OperatorIdentifier {
     }
 }
 
-fn sample_payload() -> RegistrationPayload {
+pub(crate) fn sample_payload() -> RegistrationPayload {
     RegistrationPayload {
         passport_id: Uuid::nil(),
         product_id: sample_product_id(),
@@ -81,7 +81,7 @@ fn envelope_round_trip() {
         api_version: "1.0".into(),
         request_id: Uuid::nil(),
         timestamp: Utc::now(),
-        payload: sample_payload(),
+        submission: RegistrationSubmission::single(sample_payload()),
     };
     let json = serde_json::to_string(&envelope).unwrap();
     let back: EuRegistryEnvelope = serde_json::from_str(&json).unwrap();
@@ -741,7 +741,7 @@ fn idempotency_is_a_header_and_request_id_is_not_it() {
         api_version: "1.0".into(),
         request_id: Uuid::now_v7(),
         timestamp: Utc::now(),
-        payload: sample_payload(),
+        submission: RegistrationSubmission::single(sample_payload()),
     };
     let json = serde_json::to_value(&envelope).unwrap();
     // It travels as ordinary payload under our own name, and de-duplicates

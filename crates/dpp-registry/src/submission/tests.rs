@@ -43,6 +43,7 @@ fn submission_receipt_round_trips() {
     let receipt = SubmissionReceipt {
         correlation_id: "corr-8f31".into(),
         outcome: SubmissionOutcome::Processing,
+        registration_identifiers: Vec::new(),
     };
     let json = serde_json::to_value(&receipt).unwrap();
     assert_eq!(json["correlationId"], "corr-8f31");
