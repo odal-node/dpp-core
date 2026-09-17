@@ -773,6 +773,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Two `CITED_NOT_MODELLED` reasons asserted things the Official Journal does
+  not say.** The inventory's reasons are what make it reviewable rather than a
+  suppression list, and `CitationBasis` already distinguished a reason read
+  against the OJ from one written from recall. What had not happened was the
+  reading. All four flagged entries are now verified:
+
+  - **`32004R0648`** — the repeal sentence is Regulation (EU) 2026/405 **Art.
+    35**, not Art. 36, and the grandfathering is a *different* article, Art. 36,
+    not "the same article". The date, 23 September 2029, was right. 🚨 This entry
+    was marked `Sourced` while carrying a wrong article number, which is the
+    exact failure the marker exists to prevent.
+  - **`32024R1252`** — recorded as an act that "does not govern disclosure".
+    **False.** Art. 28 requires a label, a data carrier and a unique product
+    identifier giving access to each permanent magnet's weight, location and
+    chemical composition; Art. 28(6) says that where a product passport is
+    required under another Union act, that information *"shall be included in
+    that product passport"*; Art. 29 requires a recycled-content share published
+    on a free-access website. The act is a passport-content instrument. Filed
+    separately as the substantive question — the inventory reason now says what
+    the articles say.
+  - **`32009R0661`** and **`32009R1222`** — read and confirmed accurate,
+    including the Annex I Part C quotation and the 1 May 2021 repeal date.
+
+  No shipped schema description carried the false claim, so no erratum is owed:
+  the published prose sources only the *list* of critical materials, which
+  Annexes I and II do supply.
+
 - **A blank identifier passed validation under any scheme the validator did not
   know.** `validate_operator_scheme` returned `true` for `"did"` and for every
   unrecognised scheme **without looking at the value**, so an empty or
