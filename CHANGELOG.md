@@ -15,6 +15,57 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`EuRegistryEnvelope::payload` is now `submission`, and carries a
+  `RegistrationSubmission` rather than one `RegistrationPayload`.**
+
+  The registry's unit is the submission, and this crate already said so — in
+  `submission`'s module docs (*"a property of an act of submitting, which may
+  carry many passports and may fail as a whole"*), on `SubmissionOutcome::Failure`
+  (👁️ User Guide v1.02: *"if a single DPP has an error, all the DPPs in the same
+  submission will be rejected"*), and in `MAX_PASSPORTS_PER_SUBMISSION = 100` and
+  `MAX_SUBMISSION_BYTES`. What it did not have was a type that could hold more
+  than one passport, so both caps were unenforceable, the all-or-nothing rule had
+  nothing to apply across, and `SubmissionReceipt`'s single correlation
+  identifier covered a unit nothing could express.
+
+  A consumer built against a one-passport envelope meets batch rejection for the
+  first time in production, with retry logic written for the wrong failure unit.
+
+  **Migration.** `RegistrationSubmission::single(payload)` where you built an
+  envelope, and `::new(vec![…])` for a batch. The submission serialises as a bare
+  array — the wrapper is ours and does not reach the wire, so the envelope's JSON
+  gains a `submission` array in place of a `payload` object.
+
+  The bound is an invariant: the passports are private, `new` is the only way to
+  build a multi-passport submission, and deserialisation is routed through the
+  same check. A stored submission of two hundred passports is one the registry
+  would refuse, and a document is as much an input as a constructor argument.
+
+  🚨 **`validate` stops at the first failure and reports its index**, rather than
+  collecting every error. Collecting would be friendlier and would misdescribe
+  the registry: the outcome is refusal of the submission, not a list of
+  per-passport verdicts, and a caller handed several errors will build a UI
+  implying the rest were fine. They were not accepted either. The index is what
+  makes a total refusal actionable — the registry assigns no per-passport record
+  to point at, because there are no records.
+
+- **`SubmissionReceipt` gains `registration_identifiers`.** ✅ COMPLIANCE-PIN: IR
+  (EU) 2026/1778 **Art. 8(8)** — *"the registry shall generate and store a unique
+  and persistent registration identifier as part of the registration data"* — and
+  **Art. 8(10)**, which communicates it *"for that specific product … through the
+  user interface or the API response"*. Per product, so a hundred passports yield
+  a hundred identifiers and a receipt carrying one could not express them.
+
+  🚨 Correlation is **by submission order, and that is ours**: nothing published
+  says how the response ties an identifier to a passport, and position is the only
+  correspondence the article's text supports without inventing a key. Art. 8(10)
+  also sits awkwardly with 8(8) — it communicates the identifier *"upon
+  successful submission"* while 8(8) generates it *following successful
+  verification*, different moments in an asynchronous flow, and 8(10) cites
+  paragraph 9 for what paragraph 8 generates. The field models the later moment,
+  because an identifier verification has not yet produced is one the registry
+  cannot have sent.
+
 - **`PassportStatus::Archived` is now `PassportStatus::Retired`, and its wire
   value is `"retired"`.** *(Breaking twice over: the variant rename breaks
   anything matching on `PassportStatus`, and the wire value change breaks

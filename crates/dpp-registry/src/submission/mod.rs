@@ -51,11 +51,15 @@ pub const MAX_SUBMISSION_BYTES: u64 = 1_073_741_824;
 /// consolidation. Treat 2000 as current rather than settled.
 pub const MAX_PRODUCT_IDENTIFIER_CHARS: usize = 2000;
 
+mod batch;
+#[cfg(test)]
+mod batch_tests;
 mod outcome;
 mod receipt;
 
 #[cfg(test)]
 mod tests;
 
+pub use batch::RegistrationSubmission;
 pub use outcome::SubmissionOutcome;
 pub use receipt::SubmissionReceipt;

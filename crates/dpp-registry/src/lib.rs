@@ -58,6 +58,8 @@
 //!   batch / item level a registration declares and the higher-level
 //!   identifiers it must link.
 //! - [`payload`] — [`RegistrationPayload`] and its [`EuRegistryEnvelope`].
+//! - [`submission`] — [`RegistrationSubmission`]: the passports that travel and
+//!   fail together, and the caps and outcome of one act of submitting.
 //! - [`response`] — [`EuRegistryResponse`], [`StatusResponse`],
 //!   [`RegistryStatusCode`].
 //! - [`transfer`] — [`TransferNotification`].
@@ -105,7 +107,7 @@ pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
-    SubmissionOutcome, SubmissionReceipt,
+    RegistrationSubmission, SubmissionOutcome, SubmissionReceipt,
 };
 pub use transfer::TransferNotification;
 

@@ -40,6 +40,27 @@ pub enum RegistryValidationError {
         /// The most the registry accepts.
         max: usize,
     },
+    /// A submission carries no passports, so it would register nothing.
+    EmptySubmission,
+    /// A submission carries more passports than the registry accepts.
+    SubmissionTooLarge {
+        /// How many passports the submission carries.
+        count: usize,
+        /// The most one submission may carry.
+        max: usize,
+    },
+    /// One passport in a submission failed, so **the submission** failed.
+    ///
+    /// The index is what makes an all-or-nothing refusal actionable: without it
+    /// a caller holding a hundred passports is told only that one of them is
+    /// wrong, and the registry assigns no per-passport record to point at —
+    /// there are no records, which is the whole reason the refusal is total.
+    SubmissionPassportInvalid {
+        /// Zero-based position of the offending passport in the submission.
+        index: usize,
+        /// Why that passport was refused.
+        source: Box<RegistryValidationError>,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -85,6 +106,21 @@ impl std::fmt::Display for RegistryValidationError {
                 write!(
                     f,
                     "unique product identifier is {chars} characters; the registry accepts {max}"
+                )
+            }
+            Self::EmptySubmission => {
+                write!(f, "a submission must carry at least one passport")
+            }
+            Self::SubmissionTooLarge { count, max } => {
+                write!(
+                    f,
+                    "submission carries {count} passports; the registry accepts {max} per submission"
+                )
+            }
+            Self::SubmissionPassportInvalid { index, source } => {
+                write!(
+                    f,
+                    "passport at index {index} is invalid, so the whole submission is refused: {source}"
                 )
             }
         }
