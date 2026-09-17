@@ -181,6 +181,47 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`dpp-registry` now states what backs each of its wire details, as data.**
+  Every endpoint path, header and status code in that crate already said in prose
+  whether it had been observed somewhere or invented to fill a gap — 👁️ against
+  ⚠️. That is the right thing to record and the wrong place to keep it, because
+  nothing that acts on those values can read a doc comment.
+
+  `RegistryBasis` is `Observed { on }` or `Assumed`, reusing the
+  `Sourced`/`Assumed` distinction `CitationBasis` and `ParameterBasis` already
+  draw: *did anyone go and look*. `endpoint::ENDPOINT_BASIS` carries every wire
+  constant the module declares, `endpoint::basis_of` answers for one, and
+  `EuRegistryErrorKind::http_status` returns the status **with its basis**.
+
+  **Why it is worth a type.** A mock registry built on these types is
+  self-consistent by construction — it agrees with the client because both come
+  from the same source. That catches serialisation drift and state-machine
+  mistakes and is worth having; it is not evidence of registry conformance, and
+  a green run looks identical either way. A mock that can name the basis of each
+  route it serves can say which of the two it demonstrated, and a test claiming
+  conformance can assert it exercised nothing `Assumed` — currently unassertable,
+  and therefore currently untrue by accident.
+
+  Two decisions worth stating. `basis_of` answers `None`, not `Assumed`, for a
+  value this crate never declared: `Assumed` is a claim about a route we named,
+  and dressing an unrecognised one up as expected would hide a typo or a stale
+  pin. And `http_status` answers `None` for `ConnectionFailed`, `Timeout` and
+  `InvalidResponse` — no response arrived, or the verdict is this crate's, so
+  inventing a number would put a value on the wire no registry chose.
+
+  Every status is `Assumed`, and that is not a placeholder to be quietly
+  upgraded: it exists so a mock and a real adapter make the *same* choice rather
+  than each guessing, since the mock is the only oracle the adapter is tested
+  against and a disagreement between them is invisible. Agreement is all it
+  buys. The one status anyone has seen is the replayed-key **409**, which hangs
+  off `RegistryErrorBody` rather than any error kind and is now
+  `STATUS_IDEMPOTENCY_KEY_REUSED`.
+
+  `http_status` matches exhaustively although `EuRegistryErrorKind` is
+  `#[non_exhaustive]`: inside the crate a new kind must be given a status or the
+  build stops, where a wildcard arm would hand it one silently. `RegistryBasis`
+  has no `Default` for the same reason.
+
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
   passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and
   unreachable: it needs the ten priority parts scored across three part-level
