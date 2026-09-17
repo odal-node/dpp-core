@@ -38,7 +38,9 @@ Draft  -->  Published (Active)  -->  Suspended  -->  Retired
 - `Draft -> Published`: Requires all `strict` fields for the declared product group to be present and valid.
 - `Published -> Suspended`: Requires an authenticated action with a stated reason.
 - `Suspended -> Published`: Requires re-validation of all `strict` fields.
-- `Any -> Retired`: Irreversible.
+- `Draft | Published | Suspended -> Retired`: Irreversible. Not *any* — the
+  three terminal states (`Retired`, `Superseded`, `Deactivated`) accept no
+  transition at all.
 
 Custom serde: domain `Published` serialises to wire `"active"` (and back). This matches the EU registry's terminology.
 

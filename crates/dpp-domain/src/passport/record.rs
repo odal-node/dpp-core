@@ -801,12 +801,14 @@ impl Passport {
 
     /// Transition the passport to a new status, enforcing the state machine.
     ///
-    /// Valid transitions:
+    /// Valid transitions — the whole table, since this method decides nothing
+    /// itself and defers to [`PassportStatus::can_transition_to`]:
     /// ```text
-    /// Draft → Published | Retired
-    /// Published → Suspended | Retired
-    /// Suspended → Published | Retired
+    /// Draft     → Published | Retired
+    /// Published → Suspended | Retired | Superseded | Deactivated
+    /// Suspended → Published  | Retired | Deactivated
     /// ```
+    /// `Retired`, `Superseded` and `Deactivated` are terminal.
     ///
     /// On the first `Draft → Published` transition this method also:
     /// - Sets `retention_locked = true` (ESPR retention obligation).

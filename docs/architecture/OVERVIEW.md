@@ -33,7 +33,7 @@ Draft  -->  Active (Published)  -->  Suspended  -->  Retired
 |---|---|---|
 | Draft -> Active | All mandatory fields present and valid | Signed with issuer's Ed25519 key; JWS produced |
 | Active -> Suspended | Reason required (recall, investigation, etc.) | Signature retained; resolver returns 410 |
-| Any -> Retired | Irreversible | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
+| Draft \| Active \| Suspended -> Retired | Irreversible; the three terminal states accept no transition at all | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
 
 Every transition is recorded by the platform layer (audit logging is a platform concern, not a domain concern).
 
