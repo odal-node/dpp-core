@@ -1,6 +1,7 @@
 use super::*;
 use chrono::Utc;
 use dpp_domain::Audience;
+use dpp_domain::identifier::ProductIdentifier;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
@@ -303,7 +304,7 @@ fn shell_id_contains_passport_id() {
 
 fn battery_data_with_due_diligence() -> BatteryData {
     BatteryData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
@@ -474,7 +475,7 @@ fn restricted_audience_receives_the_restricted_battery_field() {
 fn build_aas_textile_has_fibre_composition_collection() {
     let mut passport = minimal_passport(ProductGroup::Textile);
     passport.product_group_data = Some(ProductGroupData::Textile(Box::new(TextileData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "organic cotton".into(),
@@ -730,7 +731,9 @@ fn build_aas_unsold_goods_produces_product_group_submodel() {
 fn a_product_group_without_a_typed_mapper_still_carries_its_data() {
     let mut passport = minimal_passport(ProductGroup::Steel);
     passport.product_group_data = Some(ProductGroupData::Steel(dpp_domain::SteelData {
-        gtin: dpp_domain::Gtin::parse("09506000134352").expect("valid gtin"),
+        product_identifier: dpp_domain::ProductIdentifier::gs1(
+            dpp_domain::Gtin::parse("09506000134352").expect("valid gtin"),
+        ),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 62.0,
         product_category: "flat".into(),

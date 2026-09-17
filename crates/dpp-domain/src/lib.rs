@@ -61,7 +61,7 @@ pub use crate::{
     disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     identifier::{
         CnCategory, CnCategoryError, CommodityCode, CommodityCodeError, Gln, GlnError, Gtin,
-        GtinError, gs1_check_digit,
+        GtinError, ProductIdentifier, ProductIdentifierError, gs1_check_digit,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     operator::{

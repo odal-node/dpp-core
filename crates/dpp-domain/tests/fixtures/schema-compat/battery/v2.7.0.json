@@ -1,0 +1,11 @@
+{
+  "batteryChemistry": "x",
+  "batteryType": "portable",
+  "co2ePerUnitKg": 0.0,
+  "nominalCapacityAh": 1.0,
+  "nominalVoltageV": 1.0,
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  }
+}

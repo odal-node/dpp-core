@@ -99,45 +99,75 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a port with no way to satisfy it. `BackupCopyPort::update` now says what it
   does hold, and names the obligation it does not express.
 
-### Added
-
-- **`ProductIdentifier` names all three unique-product-identifier schemes
-  EN 18219 admits, not only the one that costs money.** Additive: the type is
-  introduced and nothing consumes it yet — the persisted-shape swap is a
-  separate change, deliberately.
+- **A GTIN is no longer required to create a passport: every product group's
+  identifier becomes `ProductIdentifier`, a union of the three EN 18219 clause 5
+  ID schemes.** *(Breaking: `pub gtin: Gtin` becomes
+  `pub product_identifier: ProductIdentifier` on all eleven typed payloads, the
+  wire key `gtin` becomes `productIdentifier`, and every product group gets a new
+  schema version. Stored documents are **not** broken — see the lens below.)*
 
   ✅ COMPLIANCE-PIN: **EN 18219:2026 clause 5.1** — an identifier satisfies
   clause 4's general principles **and** complies with **one of** clause 5's ID
-  schemes. They are alternatives. EN 18219 is one of the six standards cited by
-  Commission Implementing Decision (EU) 2026/1736 and a presumption route under
-  ESPR **Art. 41(2)**.
+  schemes. They are alternatives.
 
   | Variant | Scheme | External dependency |
   |---|---|---|
-  | `Gs1 { gtin }` | 1, GS1 branch | a GS1 Company Identification Number — a paid subscription |
+  | `Gs1 { gtin }` | 1, GS1 Digital Link | a GS1 Company Identification Number — a paid subscription |
   | `IdentificationLink { url }` | 2, EN IEC 61406-1/-2 | **none — self-issuing** |
   | `Did { did }` | 3, W3C DID v1.0:2022 | **none — self-issuing** |
 
-  **Why.** Every product-group payload declares `gtin: Gtin`, not
-  `Option<Gtin>`, so a GTIN is structurally required to create a passport — which
-  means an operator without GS1 membership cannot create one at all: not a
-  degraded one, not one with a warning. The standard says such an operator can
-  hold a fully conformant identifier. Annex B Table B.4 settles the cost
-  argument — every scheme needs a registered web domain, and scheme 1
-  *additionally* needs the CIN, so scheme 3's prerequisites are a strict subset
-  of scheme 1's while rating highest for sovereignty over the identifier.
+  **Why.** `gtin: Gtin` — not `Option<Gtin>` — made a GTIN structurally
+  mandatory, so an operator without GS1 membership could not create a passport
+  at all: not a degraded one, not one with a warning. The standard says such an
+  operator can hold a fully conformant identifier, and its Annex B Table B.4
+  settles the cost argument — every scheme needs a registered web domain, and
+  scheme 1 *additionally* needs the CIN. A commercial position was being
+  expressed as a compile error.
 
-  **Two limits, recorded on the type rather than left to be discovered.** Scheme
+  **Migration.** Construct with `ProductIdentifier::gs1(gtin)` where you built a
+  `Gtin`. Reads are unaffected: `ProductGroupPayload::gtin` and
+  `ProductGroupData::gtin` still exist and still return `Option<&str>`.
+
+  🚨 **Their `None` now means two things.** It meant "this group carries no
+  identifier"; it now also means "the identifier is scheme 2 or 3, which have no
+  GTIN". A caller reading `None` as *not a product* is wrong — use
+  `product_identifier()`, which always answers.
+
+  **Stored documents read forward, and that is tested rather than asserted.** One
+  lens per product group wraps a stored `gtin` as a scheme 1 identifier. It is
+  total: every record written against a previous version carried a GTIN because
+  the schema required one, and a GTIN *is* a scheme 1 identifier, so nothing is
+  invented and nothing is dropped. `schema_compat.rs`'s frozen fixtures — one per
+  `(product group, version)`, including every pre-existing one — all still read
+  through `Passport::from_stored`.
+
+  **Three lens gaps that predate this and it exposed.** `electronics`
+  1.0.0→1.1.0, `electronics` 1.2.0→1.3.0 and `furniture` 1.1.0→1.2.0 were missing
+  from the catalogue. They did no harm while a record's shape happened to survive
+  the jump, and the compat check only fails on a version whose *final* hop is
+  missing — so a broken middle stayed invisible until this made the last hop
+  mandatory for every group. Added, with the furniture one refusing a
+  `productType` of `mattress` rather than reclassifying a product the group no
+  longer covers.
+
+  **Two limits recorded on the type rather than left to be discovered.** Scheme
   2's format is EN IEC 61406-1/-2, which this project does not hold — the value
   is checked only to be an absolute `http(s)` URL, and passing that is *not* a
-  conformance claim. And scheme 1's ASC MH10.8.2 branch is not modelled, because
-  nothing here issues one and an unused variant would be a guess at a shape.
+  conformance claim. Scheme 1's ASC MH10.8.2 branch is not modelled, because
+  nothing here issues one.
 
-  🚨 A known gap, pinned by a test that fails when it closes: `serde` builds the
-  two self-issuing arms field-by-field, so a *stored* identification link or DID
-  is not revalidated on read, where `Gtin` validates in its own `Deserialize`.
-  Harmless while nothing persists the type; it must be closed by the change that
-  does.
+  🚨 And a known gap, pinned by a test that fails when it closes: `serde` builds
+  the two self-issuing arms field-by-field, so a *stored* identification link or
+  DID is not revalidated on read, where a `Gtin` validates in its own
+  `Deserialize`. The GTIN arm is therefore safe and the other two are not yet.
+
+  The AAS projection's `gtin` property becomes `productIdentifier`, and
+  `gtin_enforcement.rs`'s structural tripwire now guards
+  `product_identifier: ProductIdentifier` — the check digit is validated one
+  level further in, so losing the type would lose the validation without losing
+  a field.
+
+### Added
 
 - **The enacted repairability index of Reg. (EU) 2023/1669 now has inputs a
   passport can carry.** `dpp-calc`'s Annex IV point 5 calculator was faithful and

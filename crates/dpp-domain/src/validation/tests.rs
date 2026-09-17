@@ -247,7 +247,7 @@ fn other_product_group_data_validator_errors_propagate() {
 fn validate_raw_product_group_data_known_product_group_succeeds() {
     // "battery" has an embedded schema — validate known-good raw JSON.
     let data = serde_json::json!({
-        "gtin": "09506000134352",
+        "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
         "batteryChemistry": "LFP",
         "nominalVoltageV": 48.0,
         "nominalCapacityAh": 100.0,
@@ -310,7 +310,7 @@ fn untyped_aluminium(recycled: serde_json::Value) -> ProductGroupData {
     ProductGroupData::Other {
         product_group: "aluminium".to_owned(),
         data: serde_json::json!({
-            "gtin": "09506000134352",
+            "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
             "alloyGrade": "6061",
             "productionRoute": "secondary-recycled",
             "co2ePerTonneKg": 4200.0,

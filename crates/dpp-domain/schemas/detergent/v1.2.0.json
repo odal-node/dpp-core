@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/detergent-v1.1.0.json",
+  "$comment": "DRAFT — NOT IN FORCE. No act binding this product group is in force: every act the instrument catalog records as reaching it is provisional or anticipated, so this schema is our best reading of an instrument that has not been ratified and its field set may change without a migration path. Structural validation against it is not evidence of compliance, and a passport issued against it may not be representable once the act lands. The go sign is a single edit: set that binding's \"status\" to \"in_force\" in crates/dpp-domain/instruments/<id>.json. CI then requires this marker to be removed.",
+  "title": "Odal Node — Detergent Product Group Data (v1.1.0)",
+  "description": "v1.2.0 replaces the mandatory gtin with productIdentifier, a union of the EN 18219:2026 clause 5 ID schemes: scheme 1 (GS1 Digital Link, keyed on a GTIN), scheme 2 (Identification Link, EN IEC 61406-1/-2) and scheme 3 (Decentralized Identifier, W3C DID v1.0:2022). Clause 5.1 requires compliance with one of the schemes and they are alternatives, so requiring a GTIN foreclosed the two that are self-issuing and kept the only one needing a paid GS1 Company Identification Number. A v1.1.0 record is read forward by a lens that wraps its gtin as scheme 1. Detergent and surfactant fields per EU Regulation 2026/405. Applicability dates and regulatory status are held in the product group manifest, not here. Surfactant concentrations use the EU-standard disclosure bands from Annex VII (same bands as Regulation 648/2004 labelling tradition). v1.1.0 renames countryOfManufacture to countryOfOrigin for cross-sector naming consistency.",
+  "type": "object",
+  "required": [
+    "productIdentifier",
+    "productType",
+    "format",
+    "surfactants",
+    "countryOfOrigin"
+  ],
+  "properties": {
+    "productIdentifier": {
+      "type": "object",
+      "description": "The unique product identifier, in whichever EN 18219:2026 clause 5 ID scheme issued it. Clause 5.1 requires compliance with one of the schemes; they are alternatives, not a hierarchy. Scheme 1 (GS1 branch) needs a GS1 Company Identification Number, a paid subscription; schemes 2 and 3 are self-issuing and need only a registered web domain. EN 18219 is one of the six harmonised DPP standards carrying the presumption of conformity of Regulation (EU) 2024/1781 Art. 41(2).",
+      "required": [
+        "scheme"
+      ],
+      "oneOf": [
+        {
+          "title": "Scheme 1 - GS1 Digital Link, keyed on a GTIN",
+          "type": "object",
+          "required": [
+            "scheme",
+            "gtin"
+          ],
+          "properties": {
+            "scheme": {
+              "const": "gs1",
+              "x-disclosure": "public"
+            },
+            "gtin": {
+              "type": "string",
+              "pattern": "^[0-9]{14}$",
+              "description": "14-digit Global Trade Item Number.",
+              "x-disclosure": "public"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "title": "Scheme 2 - Identification Link, EN IEC 61406-1/-2",
+          "type": "object",
+          "required": [
+            "scheme",
+            "url"
+          ],
+          "properties": {
+            "scheme": {
+              "const": "identificationLink",
+              "x-disclosure": "public"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://.+",
+              "description": "The identification link URL. Checked only to be an absolute http(s) URL: EN IEC 61406 is not held by this project, so its format rules are unverified here and passing this check is not a conformance claim.",
+              "x-disclosure": "public"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "title": "Scheme 3 - Decentralized Identifier, W3C DID v1.0:2022",
+          "type": "object",
+          "required": [
+            "scheme",
+            "did"
+          ],
+          "properties": {
+            "scheme": {
+              "const": "did",
+              "x-disclosure": "public"
+            },
+            "did": {
+              "type": "string",
+              "pattern": "^did:(web|ethr|ebsi):.+",
+              "description": "A DID using one of the three methods clause 5 names. A method no reader can resolve identifies nothing, so the set is closed.",
+              "x-disclosure": "public"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "x-disclosure": "public"
+    },
+    "productType": {
+      "type": "string",
+      "enum": [
+        "laundry",
+        "dishwashing",
+        "surface-cleaner",
+        "personal-care",
+        "other"
+      ],
+      "description": "Detergent product type.",
+      "x-disclosure": "public"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "liquid",
+        "powder",
+        "tablet",
+        "gel",
+        "concentrate",
+        "other"
+      ],
+      "description": "Physical format of the product.",
+      "x-disclosure": "public"
+    },
+    "surfactants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/surfactantEntry"
+      },
+      "description": "List of surfactants in the product formulation. All must be readily biodegradable per EU 2026/405 (no derogations).",
+      "x-disclosure": "public"
+    },
+    "countryOfOrigin": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 country of origin (manufacture).",
+      "x-disclosure": "public"
+    },
+    "co2ePerUnitKg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Carbon footprint in kg CO2e per product unit.",
+      "x-disclosure": "public"
+    },
+    "packagingRecyclable": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether the primary packaging is recyclable.",
+      "x-disclosure": "public"
+    },
+    "recommendedDosageMl": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Recommended dosage in millilitres (or grams for powder).",
+      "x-disclosure": "public"
+    },
+    "biodegradable": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Summary flag: whether all surfactants are readily biodegradable.",
+      "x-disclosure": "public"
+    }
+  },
+  "definitions": {
+    "surfactantEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "biodegradable",
+        "concentrationBand"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-disclosure": "public",
+          "minLength": 1,
+          "description": "INCI or IUPAC name of the surfactant."
+        },
+        "biodegradable": {
+          "type": "boolean",
+          "x-disclosure": "public",
+          "description": "Whether the surfactant is readily biodegradable per EU 2026/405 (ultimate biodegradability). All surfactants must be true; false triggers NON_COMPLIANT."
+        },
+        "concentrationBand": {
+          "type": "string",
+          "x-disclosure": "public",
+          "enum": [
+            "<5%",
+            "5-15%",
+            "15-30%",
+            ">=30%"
+          ],
+          "description": "Concentration band per EU detergent labelling convention (Annex VII). Use the band that contains the actual w/w percentage."
+        },
+        "casNumber": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "x-disclosure": "public"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

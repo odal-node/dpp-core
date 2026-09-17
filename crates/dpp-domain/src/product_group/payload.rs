@@ -25,11 +25,31 @@
 
 /// The questions any product-group payload can answer, whatever its act.
 pub trait ProductGroupPayload {
-    /// The GS1 trade item number, where this group's act requires one.
+    /// The unique product identifier this record carries, in whichever
+    /// EN 18219 clause 5 scheme issued it.
     ///
-    /// `None` is a real answer: a disclosure covering many products has no single
-    /// trade item number to give.
-    fn gtin(&self) -> Option<&str>;
+    /// `None` is a real answer: a disclosure covering many products identifies
+    /// no single product the way every other group does.
+    ///
+    /// This is the method a group implements. [`Self::gtin`] is derived from it
+    /// and is not overridden anywhere — asking a payload for its GTIN is asking
+    /// a question only one of the three schemes can answer.
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier>;
+
+    /// The GS1 trade item number, when this record's identifier was issued
+    /// under EN 18219 **scheme 1** and not otherwise.
+    ///
+    /// 🚨 `None` now has two meanings and a caller has to tolerate both: this
+    /// group carries no identifier at all, **or** it carries one from scheme 2
+    /// or 3, which are self-issuing and have no GTIN. Before the identifier
+    /// became a scheme this could only mean the first, so a caller reading
+    /// `None` as "not a product" is now wrong — see
+    /// [`Self::product_identifier`] for the answer that always exists.
+    fn gtin(&self) -> Option<&str> {
+        self.product_identifier()?
+            .gtin()
+            .map(crate::identifier::Gtin::as_str)
+    }
 
     /// The manufacturer's model identifier, where this group's act defines one.
     ///

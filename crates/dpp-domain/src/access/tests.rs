@@ -262,7 +262,7 @@ fn policy_round_trip() {
     let policy = textile_policy();
     let json = serde_json::to_value(&policy).unwrap();
     let back: ProductGroupAccessPolicy = serde_json::from_value(json).unwrap();
-    assert_eq!(back.name, "textile-1.2.0");
+    assert_eq!(back.name, "textile-1.3.0");
     assert_eq!(back.product_group, "textile");
     assert_eq!(
         back.disclosure_for_field("svhcSubstances"),

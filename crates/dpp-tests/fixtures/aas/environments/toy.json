@@ -123,7 +123,7 @@
           "modelType": "Property",
           "idShort": "schemaVersion",
           "valueType": "xs:string",
-          "value": "1.1.0"
+          "value": "1.2.0"
         }
       ]
     },
@@ -321,15 +321,27 @@
         },
         {
           "modelType": "Property",
-          "idShort": "gtin",
-          "valueType": "xs:string",
-          "value": "09506000134352"
-        },
-        {
-          "modelType": "Property",
           "idShort": "primaryMaterial",
           "valueType": "xs:string",
           "value": "wood"
+        },
+        {
+          "modelType": "SubmodelElementCollection",
+          "idShort": "productIdentifier",
+          "value": [
+            {
+              "modelType": "Property",
+              "idShort": "gtin",
+              "valueType": "xs:string",
+              "value": "09506000134352"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "scheme",
+              "valueType": "xs:string",
+              "value": "gs1"
+            }
+          ]
         },
         {
           "modelType": "Property",

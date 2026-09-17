@@ -11,7 +11,7 @@ use super::material_composition::MaterialComposition;
 use super::state_of_health::StateOfHealth;
 use super::temperature_range::TemperatureRange;
 use super::usage_history::UsageHistory;
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 use crate::product_group::{BatteryChemistry, BatteryStatus, BatteryType, CarbonFootprintClass};
 
 /// Battery-specific fields required by the EU Battery Regulation 2023/1542.
@@ -52,7 +52,7 @@ use crate::product_group::{BatteryChemistry, BatteryStatus, BatteryType, CarbonF
 pub struct BatteryData {
     // ── v1.0.0 mandatory fields ──────────────────────────────────────────
     /// 14-digit Global Trade Item Number identifying the battery model.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Battery electrochemical chemistry.
     pub battery_chemistry: BatteryChemistry,
     /// Nominal voltage in volts.
@@ -481,8 +481,8 @@ pub struct BatteryData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for BatteryData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// Annex XIII §1 — the manufacturer's battery model identifier, as it

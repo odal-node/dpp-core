@@ -1,0 +1,9 @@
+{
+  "co2ePerUnitKg": 0.0,
+  "energyEfficiencyClass": "A",
+  "productCategory": "smartphone",
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  }
+}

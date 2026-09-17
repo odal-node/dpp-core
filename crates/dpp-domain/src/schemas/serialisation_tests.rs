@@ -27,7 +27,6 @@ use super::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_fully_populated_battery_serialises_into_the_current_schema() {
-    use crate::identifier::Gtin;
     use crate::product_group::{
         BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprintClass,
         CriticalRawMaterial, DynamicPerformance, EnvironmentalReading, ExpectedLifetime,
@@ -44,7 +43,9 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
     let day = NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
 
     let data = BatteryData {
-        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        ),
         battery_chemistry: BatteryChemistry::Lfp,
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
@@ -190,11 +191,12 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn a_fully_populated_textile_serialises_into_the_current_schema() {
-    use crate::identifier::Gtin;
     use crate::product_group::{FibreEntry, SvhcSubstance, TextileData};
 
     let data = TextileData {
-        gtin: Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("09506000134352").expect("valid GTIN literal"),
+        ),
         fibre_composition: vec![
             FibreEntry {
                 fibre: "cotton".into(),

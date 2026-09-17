@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 use crate::product_group::ProductionRoute;
 
 /// Aluminium product group data for EU ESPR carbon intensity reporting.
@@ -10,7 +10,7 @@ use crate::product_group::ProductionRoute;
 #[serde(rename_all = "camelCase")]
 pub struct AluminiumData {
     /// 14-digit GTIN identifying the aluminium product.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Alloy series designation, e.g. `"1xxx"`, `"3xxx"`, `"5xxx"`, `"6xxx"`.
     pub alloy_grade: String,
     /// Aluminium production route — determines carbon intensity calculation basis.
@@ -27,8 +27,8 @@ pub struct AluminiumData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for AluminiumData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

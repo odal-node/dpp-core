@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 use crate::product_group::ProductionRoute;
 
 /// Iron and Steel product group data for EU ESPR carbon intensity reporting.
@@ -10,7 +10,7 @@ use crate::product_group::ProductionRoute;
 #[serde(rename_all = "camelCase")]
 pub struct SteelData {
     /// 14-digit GTIN identifying the steel product.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Carbon intensity in tonne CO₂e per tonne of steel produced.
     pub co2e_per_tonne_steel: f64,
     /// Recycled scrap content as a percentage of total input material (0.0–100.0).
@@ -27,8 +27,8 @@ pub struct SteelData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for SteelData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

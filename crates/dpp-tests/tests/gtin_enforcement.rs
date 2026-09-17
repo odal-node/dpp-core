@@ -1,29 +1,36 @@
-//! Tripwire: a payload's GTIN keeps the type that validates it.
+//! Tripwire: a payload's product identifier keeps the type that validates it.
 //!
 //! GTIN validity across every product group rests on one declaration per
-//! payload — `gtin: Gtin` — plus `Gtin`'s hand-written `Deserialize`, which
-//! calls `Gtin::parse`. Together those refuse a bad GS1 check digit while a
-//! document is being deserialised, for every product group at once, before any
-//! caller sees the value.
+//! payload — `product_identifier: ProductIdentifier`, whose scheme 1 arm holds a
+//! `Gtin` — plus `Gtin`'s hand-written `Deserialize`, which calls `Gtin::parse`.
+//! Together those refuse a bad GS1 check digit while a document is being
+//! deserialised, for every product group at once, before any caller sees the
+//! value.
 //!
 //! Nothing asserted that the arrangement holds, and it fails silently. Change
-//! one payload's field to `gtin: String` and validation for that product group
+//! one payload's field to a bare `String` and validation for that product group
 //! disappears without anything going red: the crate compiles, the schema's
-//! `^[0-9]{14}$` pattern still passes (it checks shape, not the check digit),
-//! and `ProductGroupPayload::gtin` still returns `Some(self.gtin.as_str())`
-//! because `String` has `as_str()` too. Every fixture in this workspace builds
-//! its GTIN through `Gtin::parse`, so all of them are valid by construction and
-//! none of them could catch it.
+//! digit pattern still passes because it checks shape rather than the check
+//! digit, and the payload still answers with a string. Every fixture in this
+//! workspace builds its identifier through `Gtin::parse`, so all of them are
+//! valid by construction and none of them could catch it.
 //!
 //! The invariant has two halves and this file pins both:
 //!
 //! 1. **The type refuses an invalid GTIN through serde** — behavioural, tested
 //!    directly on `Gtin`, so it needs no payload fixture.
-//! 2. **Every payload that declares a GTIN uses that type** — structural, read
-//!    from the source, so a new product group cannot be added without one.
+//! 2. **Every payload declares its identifier as `ProductIdentifier`** —
+//!    structural, read from the source, so a new product group cannot be added
+//!    without one.
 //!
 //! Neither half is sufficient alone: the first says the lock works, the second
 //! says every door has it fitted.
+//!
+//! 🚨 The second half now guards a *reachability* claim as well as a type. The
+//! check digit is validated inside `ProductIdentifier`'s scheme 1 arm, so a
+//! payload that declared some other identifier type would lose the validation
+//! without losing a field — which is exactly the silent failure above, one
+//! level further in.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -103,7 +110,7 @@ fn rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[test]
-fn every_declared_gtin_field_is_the_validating_type() {
+fn every_payload_identifier_field_is_the_validating_type() {
     let root = workspace_root().join("crates/dpp-domain/src/product_group/data");
     let mut files = Vec::new();
     rs_files(&root, &mut files);
@@ -123,14 +130,17 @@ fn every_declared_gtin_field_is_the_validating_type() {
         for line in src.lines() {
             let line = line.trim();
             // A struct field declaration, not a doc comment or a match arm.
-            let Some(rest) = line.strip_prefix("pub gtin:") else {
+            let Some(rest) = line.strip_prefix("pub product_identifier:") else {
                 continue;
             };
             declarations += 1;
             let declared = rest.trim().trim_end_matches(',').trim();
-            if declared != "Gtin" {
+            if declared != "ProductIdentifier" {
                 let name = path.strip_prefix(workspace_root()).unwrap_or(path);
-                wrong.push(format!("{}: pub gtin: {declared}", name.display()));
+                wrong.push(format!(
+                    "{}: pub product_identifier: {declared}",
+                    name.display()
+                ));
             }
         }
     }

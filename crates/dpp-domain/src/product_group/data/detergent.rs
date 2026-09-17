@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 /// A single surfactant ingredient in a detergent product.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,7 +26,7 @@ pub struct SurfactantEntry {
 #[serde(rename_all = "camelCase")]
 pub struct DetergentData {
     /// 14-digit GTIN identifying the detergent product.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Product type, e.g. `"laundry"`, `"dishwashing"`, `"surface-cleaner"`, `"personal-care"`, `"other"`.
     pub product_type: String,
     /// Physical format, e.g. `"liquid"`, `"powder"`, `"tablet"`, `"gel"`, `"concentrate"`.
@@ -51,8 +51,8 @@ pub struct DetergentData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for DetergentData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

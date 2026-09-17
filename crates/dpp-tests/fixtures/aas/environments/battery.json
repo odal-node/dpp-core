@@ -123,7 +123,7 @@
           "modelType": "Property",
           "idShort": "schemaVersion",
           "valueType": "xs:string",
-          "value": "2.6.0"
+          "value": "2.7.0"
         }
       ]
     },
@@ -306,7 +306,7 @@
       "submodelElements": [
         {
           "modelType": "Property",
-          "idShort": "gtin",
+          "idShort": "productIdentifier",
           "valueType": "xs:string",
           "value": "09506000134352"
         },

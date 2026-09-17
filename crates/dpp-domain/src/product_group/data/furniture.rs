@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 
 use super::common::SvhcSubstance;
 
@@ -11,7 +11,7 @@ use super::common::SvhcSubstance;
 #[serde(rename_all = "camelCase")]
 pub struct FurnitureData {
     /// 14-digit GTIN identifying the furniture product.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Product type, e.g. `"chair"`, `"table"`, `"sofa"`, `"mattress"`, `"shelf"`, `"other"`.
     pub product_type: String,
     /// Primary material, e.g. `"solid-wood"`, `"engineered-wood"`, `"metal"`, `"upholstered"`, `"mixed"`.
@@ -40,8 +40,8 @@ pub struct FurnitureData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for FurnitureData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

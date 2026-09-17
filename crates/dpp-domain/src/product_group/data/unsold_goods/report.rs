@@ -95,9 +95,10 @@ impl UnsoldGoodsReport {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
-    /// A disclosure covers a financial year across many products, so there is no
-    /// single trade item number. The CN categories are on the lines.
-    fn gtin(&self) -> Option<&str> {
+    /// A disclosure covers a financial year across many products, so it
+    /// identifies no single product under any scheme. The CN categories are on
+    /// the lines.
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
         None
     }
 

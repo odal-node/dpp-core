@@ -16,6 +16,7 @@ use dpp_aas::{
     product_group_submodel_template,
 };
 use dpp_domain::Audience;
+use dpp_domain::identifier::ProductIdentifier;
 use dpp_domain::product_group::CriticalRawMaterial;
 use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
@@ -50,7 +51,7 @@ fn electronics_data() -> ElectronicsData {
     ElectronicsData {
         repairability_index_inputs: None,
         index_scope_exclusion: None,
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         product_category: DeviceType::Smartphone,
         energy_efficiency_class: EnergyEfficiencyClass::B,
         co2e_per_unit_kg: 210.0,
@@ -77,7 +78,7 @@ fn electronics_data() -> ElectronicsData {
 
 fn textile_data() -> TextileData {
     TextileData {
-        gtin: Gtin::parse("09506000134352").unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
         fibre_composition: vec![FibreEntry {
             fibre: "cotton".into(),
             pct: 100.0,
@@ -112,7 +113,7 @@ fn textile_data() -> TextileData {
 
 fn steel_data() -> SteelData {
     SteelData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 85.0,
         product_category: "flat".into(),
@@ -124,7 +125,7 @@ fn steel_data() -> SteelData {
 
 fn construction_data() -> ConstructionData {
     ConstructionData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         product_family: "cement".into(),
         country_of_origin: "DE".into(),
         co2e_per_functional_unit_kg: 0.6,
@@ -137,7 +138,7 @@ fn construction_data() -> ConstructionData {
 
 fn tyre_data() -> TyreData {
     TyreData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         tyre_class: "C1".into(),
         fuel_efficiency_class: "B".into(),
         wet_grip_class: "A".into(),
@@ -151,7 +152,7 @@ fn tyre_data() -> TyreData {
 
 fn toy_data() -> ToyData {
     ToyData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         age_group: "3-6".into(),
         primary_material: "wood".into(),
         ce_marking: true,
@@ -164,7 +165,7 @@ fn toy_data() -> ToyData {
 
 fn aluminium_data() -> AluminiumData {
     AluminiumData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         alloy_grade: "6xxx".into(),
         production_route: ProductionRoute::SecondaryRecycled,
         co2e_per_tonne_kg: 4000.0,
@@ -176,7 +177,7 @@ fn aluminium_data() -> AluminiumData {
 
 fn furniture_data() -> FurnitureData {
     FurnitureData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         product_type: "chair".into(),
         primary_material: "solid-wood".into(),
         country_of_origin: "SE".into(),
@@ -191,7 +192,7 @@ fn furniture_data() -> FurnitureData {
 
 fn mattress_data() -> MattressData {
     MattressData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         primary_material: "upholstered".into(),
         country_of_origin: "SE".into(),
         co2e_per_unit_kg: Some(48.0),
@@ -205,7 +206,7 @@ fn mattress_data() -> MattressData {
 
 fn detergent_data() -> DetergentData {
     DetergentData {
-        gtin: Gtin::parse(VALID_GTIN).unwrap(),
+        product_identifier: ProductIdentifier::gs1(Gtin::parse(VALID_GTIN).unwrap()),
         product_type: "laundry".into(),
         format: "liquid".into(),
         surfactants: vec![SurfactantEntry {
@@ -1497,7 +1498,7 @@ fn pinned(
 fn battery_case() -> (ProductGroup, ProductGroupData, &'static str) {
     let data = serde_json::from_value(serde_json::json!({
         "productGroup": "battery",
-        "gtin": VALID_GTIN,
+        "productIdentifier": { "scheme": "gs1", "gtin": VALID_GTIN },
         "batteryChemistry": "LFP",
         "nominalVoltageV": 3.7,
         "nominalCapacityAh": 50.0,

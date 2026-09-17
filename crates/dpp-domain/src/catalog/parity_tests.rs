@@ -118,7 +118,7 @@ fn descriptor_round_trips_camel_case() {
     let catalog = ProductGroupCatalog::new();
     let battery = catalog.get("battery").unwrap();
     let json = serde_json::to_value(battery).unwrap();
-    assert_eq!(json["currentSchemaVersion"], "2.6.0");
+    assert_eq!(json["currentSchemaVersion"], "2.7.0");
     // The law is not here and must not come back: a descriptor carrying its own
     // status or date is a descriptor asserting that one act governs it.
     for absent in ["status", "regime", "dppAppliesFrom", "retentionYears"] {

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::index_scope_exclusion::IndexScopeExclusion;
 use super::repairability_index::RepairabilityIndexDeclaration;
-use crate::identifier::Gtin;
+use crate::identifier::ProductIdentifier;
 use crate::product_group::repairability_score::RepairabilityScore;
 use crate::product_group::{DeviceType, EnergyEfficiencyClass};
 
@@ -23,7 +23,7 @@ use super::super::common::{CriticalRawMaterial, SvhcSubstance};
 #[serde(rename_all = "camelCase")]
 pub struct ElectronicsData {
     /// 14-digit GTIN identifying the product model.
-    pub gtin: Gtin,
+    pub product_identifier: ProductIdentifier,
     /// Device type per EU Regulation (EU) 2023/1670 Art. 1(1).
     pub product_category: DeviceType,
     /// EU energy label class (A–G) per Energy Labelling Regulation 2017/1369.
@@ -102,8 +102,8 @@ pub struct ElectronicsData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for ElectronicsData {
-    fn gtin(&self) -> Option<&str> {
-        Some(self.gtin.as_str())
+    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+        Some(&self.product_identifier)
     }
 
     /// This act defines no model identifier.

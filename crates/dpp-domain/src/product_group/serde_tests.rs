@@ -2,7 +2,6 @@
 //! declares.
 
 use super::*;
-use crate::identifier::Gtin;
 
 use super::tests::test_textile_data;
 
@@ -24,7 +23,8 @@ fn product_group_data_battery_round_trip() {
         "product_group tag must be lowercase"
     );
     assert_eq!(json["batteryChemistry"], "LFP");
-    assert_eq!(json["gtin"], "09506000134352");
+    assert_eq!(json["productIdentifier"]["scheme"], "gs1");
+    assert_eq!(json["productIdentifier"]["gtin"], "09506000134352");
     let back: ProductGroupData = serde_json::from_value(json).unwrap();
     assert_eq!(data, back);
 }
@@ -184,7 +184,7 @@ fn textile_v1_data_deserializes_with_defaults() {
     // deserialize into the expanded struct with every optional field defaulted.
     let v1_json = serde_json::json!({
         "productGroup": "textile",
-        "gtin": "09506000134352",
+        "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
         "fibreComposition": [{"fibre": "cotton", "pct": 100.0}],
         "countryOfOrigin": "PT",
         "careInstructions": "Hand wash",
@@ -232,7 +232,9 @@ fn every_product_group_declares_a_catalog_key() {
 #[test]
 fn product_group_discriminant_matches_variant() {
     let battery = ProductGroupData::Battery(Box::new(BatteryData {
-        gtin: Gtin::parse("00000000000000").unwrap(),
+        product_identifier: crate::identifier::ProductIdentifier::gs1(
+            crate::Gtin::parse("00000000000000").unwrap(),
+        ),
         battery_chemistry: BatteryChemistry::Nmc,
         nominal_voltage_v: 4.0,
         nominal_capacity_ah: 50.0,
