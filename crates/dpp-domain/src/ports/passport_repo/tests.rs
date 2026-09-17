@@ -458,3 +458,28 @@ async fn a_chain_past_the_hop_cap_fails_rather_than_truncating() {
         "{err}"
     );
 }
+
+/// A chain of **exactly** `MAX_SUCCESSION_HOPS` hops is at the cap, not past it,
+/// and the contract says the error is for a chain "longer than" the cap.
+///
+/// The loop follows `MAX_SUCCESSION_HOPS` hops and then errored without ever
+/// asking whether the record it landed on has a successor — so the longest
+/// permitted chain was reported as too long, and the caller lost a head that
+/// exists. One inclusive probe tells the two cases apart.
+#[tokio::test]
+async fn a_chain_of_exactly_the_hop_cap_resolves_to_its_head() {
+    let repo = InMemoryRepo::default();
+    // `count` records is `count - 1` hops, so the cap in hops needs one more.
+    let ids = superseding_chain(&repo, MAX_SUCCESSION_HOPS + 1).await;
+
+    let head = repo
+        .find_superseding_head(ids[0])
+        .await
+        .expect("a chain at the cap is within it, not beyond it")
+        .expect("the chain has a head");
+    assert_eq!(
+        head.id,
+        *ids.last().unwrap(),
+        "resolved to the wrong record at exactly the cap"
+    );
+}

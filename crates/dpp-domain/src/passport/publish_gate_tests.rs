@@ -437,3 +437,47 @@ fn the_strict_check_still_answers_for_a_record_art_77_1_exempts() {
     p.transition_to(PassportStatus::Published)
         .expect("and the publish gate still lets it through");
 }
+
+/// 🚨 Two placing dates that disagree must not buy an exemption.
+///
+/// `validate` refuses a record whose envelope and battery dates differ — but
+/// `transition_to` never calls it, going straight to `check_mandatory_content`.
+/// The exemption helper read `envelope.or(battery)`, so the envelope's date won
+/// outright: a pre-2027 envelope date beside a 2030 battery date answered
+/// `NotYetBinding`, and the content gate a published EV battery has to pass was
+/// skipped. An exemption reached by the record contradicting itself.
+///
+/// Fail closed: disagreement is not an exemption, in either direction.
+#[test]
+fn placing_dates_that_disagree_do_not_exempt_the_content_gate() {
+    let before = chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let after = chrono::NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
+
+    for (envelope, product_group) in [(before, after), (after, before)] {
+        let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
+        battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
+        battery_field(&mut p, |b| b.placed_on_market_date = Some(product_group));
+        p.placed_on_market_date = Some(envelope);
+
+        assert!(
+            p.transition_to(PassportStatus::Published).is_err(),
+            "envelope {envelope} against product-group {product_group} was \
+             exempted from the content gate — a record disagreeing with itself \
+             must not publish incomplete content"
+        );
+    }
+}
+
+/// The other half, so the fix above is not simply "always gate": when the two
+/// dates agree and sit before 18 February 2027, the exemption still applies.
+#[test]
+fn placing_dates_that_agree_before_the_date_still_exempt() {
+    let before = chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
+    battery_field(&mut p, |b| b.usable_extinguishing_agent = None);
+    battery_field(&mut p, |b| b.placed_on_market_date = Some(before));
+    p.placed_on_market_date = Some(before);
+
+    p.transition_to(PassportStatus::Published)
+        .expect("Art. 77(1) does not reach a battery placed before 18 February 2027");
+}

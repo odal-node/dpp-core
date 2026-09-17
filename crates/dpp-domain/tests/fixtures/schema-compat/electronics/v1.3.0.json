@@ -2,5 +2,47 @@
   "co2ePerUnitKg": 0.0,
   "energyEfficiencyClass": "A",
   "gtin": "09506000134352",
-  "productCategory": "smartphone"
+  "indexScopeExclusion": "rollable-display",
+  "productCategory": "smartphone",
+  "repairabilityIndexInputs": {
+    "disassemblyDepth": {
+      "backCover": 5,
+      "battery": 5,
+      "chargingPort": 4,
+      "displayAssembly": 3,
+      "foldingMechanism": 2,
+      "frontCamera": 4,
+      "mechanicalButton": 4,
+      "microphone": 4,
+      "rearCamera": 4,
+      "speaker": 4
+    },
+    "fasteners": {
+      "backCover": 5,
+      "battery": 5,
+      "chargingPort": 3,
+      "displayAssembly": 3,
+      "foldingMechanism": 1,
+      "frontCamera": 3,
+      "mechanicalButton": 3,
+      "microphone": 3,
+      "rearCamera": 3,
+      "speaker": 3
+    },
+    "repairInformation": 4,
+    "softwareUpdates": 5,
+    "spareParts": 4,
+    "tools": {
+      "backCover": 5,
+      "battery": 5,
+      "chargingPort": 2,
+      "displayAssembly": 2,
+      "foldingMechanism": 1,
+      "frontCamera": 2,
+      "mechanicalButton": 2,
+      "microphone": 2,
+      "rearCamera": 2,
+      "speaker": 2
+    }
+  }
 }

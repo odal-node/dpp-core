@@ -213,6 +213,16 @@ pub trait PassportRepository: Send + Sync {
             head = Some(next);
         }
 
+        // 🚨 The loop has followed exactly `MAX_SUCCESSION_HOPS` hops, which is
+        // the cap — not past it. Erroring here refused a chain of *exactly* the
+        // permitted length, because the loop never got to ask whether the record
+        // it landed on has a successor. The contract above says the error is for
+        // a chain "longer than" the cap, and one probe is what tells the two
+        // apart.
+        if self.find_superseding(cursor).await?.is_none() {
+            return Ok(head);
+        }
+
         Err(DppError::SuccessionUnresolvable {
             id: id.to_string(),
             reason: format!("the chain is longer than {MAX_SUCCESSION_HOPS} hops"),
