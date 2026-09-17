@@ -773,6 +773,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **A blank identifier passed validation under any scheme the validator did not
+  know.** `validate_operator_scheme` returned `true` for `"did"` and for every
+  unrecognised scheme **without looking at the value**, so an empty or
+  whitespace-only identifier was accepted and would have been submitted as though
+  it identified someone.
+
+  🚨 **Whether an absent value was caught at all depended on the scheme.** An
+  empty operator identifier failed under `"vat"` only because
+  `has_country_prefix` happens to reject one; under `"did"` it sailed through.
+  That is why the same defect had to be found and patched three times at call
+  sites — on `ServiceProviderReference`, then on
+  `RegistrationRequest::from_published_passport` — before being fixed at the
+  validator every one of them leans on.
+
+  All four identifier types shared the shape and all four are fixed:
+  `OperatorIdentifier` (before the per-scheme match, so it holds for schemes
+  added later), `ProductIdentifier` (which checked only when the scheme was
+  `"gtin"`), `FacilityIdentifier` (country and GLN only), and
+  `ProductItemIdentifier` — the one that already required both fields, and
+  checked `is_empty` rather than trimming, so `" "` passed.
+
+  Not verifying a scheme's *structure* must not also mean not noticing there is
+  no value. An unchecked scheme with a stated value still passes: the fix
+  requires a value, it does not start verifying schemes nobody has taught the
+  validator about.
+
 - **Every Decision cited in prose resolved to a Regulation's CELEX.**
   `schemas::citation` chose between two act types, Directive and Regulation, with
   no third branch — so *Commission Implementing Decision (EU) 2026/1736* became

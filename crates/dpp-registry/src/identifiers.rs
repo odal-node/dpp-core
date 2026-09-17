@@ -82,7 +82,16 @@ impl ProductIdentifier {
     ///
     /// - `"gtin"`: value must be a structurally valid GTIN-14 (14 digits, mod-10 check).
     /// - Other schemes: no structural validation (formats vary; validate when EU spec is published).
+    ///
+    /// 🚨 Every scheme still requires a **value**. "No structural validation"
+    /// used to mean no check at all, so a blank identifier under any scheme but
+    /// `"gtin"` passed — identifying nothing while looking valid.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.value.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "productId.value".into(),
+            ));
+        }
         if self.scheme == "gtin" {
             dpp_domain::Gtin::parse(&self.value)
                 .map(|_| ())
@@ -113,15 +122,19 @@ pub struct ProductItemIdentifier {
 
 impl ProductItemIdentifier {
     /// Validate the item identifier: `scheme` and `value` must both be
-    /// non-empty. Scheme-specific structural checks (SGTIN layout, etc.) are
+    /// non-blank. Scheme-specific structural checks (SGTIN layout, etc.) are
     /// deferred until the EU fixes item-identifier formats.
+    ///
+    /// The only one of the four that already required both — it checked
+    /// `is_empty` rather than trimming, so `" "` passed. That is the form a
+    /// trimmed-input bug produces, and the one `is_empty` alone cannot see.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
-        if self.scheme.is_empty() {
+        if self.scheme.trim().is_empty() {
             return Err(RegistryValidationError::MissingRequiredField(
                 "itemId.scheme".into(),
             ));
         }
-        if self.value.is_empty() {
+        if self.value.trim().is_empty() {
             return Err(RegistryValidationError::MissingRequiredField(
                 "itemId.value".into(),
             ));
@@ -157,8 +170,18 @@ impl FacilityIdentifier {
     /// Checks the country code and, when `scheme == "gln"`, that the value is a
     /// structurally valid GS1 GLN (13 digits, mod-10 check). Other schemes
     /// (`"lei"`, `"national"`, …) are not structurally verified here.
+    ///
+    /// 🚨 All of them still require a **value** — Annex III point (i) makes the
+    /// facility identifier registration data, and a blank one under
+    /// `"national"` is not a facility identified by a scheme this crate cannot
+    /// check, it is no facility at all.
     pub fn validate(&self) -> Result<(), RegistryValidationError> {
         validate_country_code(&self.country)?;
+        if self.value.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "facilityId.value".into(),
+            ));
+        }
         if self.scheme == "gln" {
             dpp_domain::Gln::parse(&self.value)
                 .map(|_| ())
@@ -228,12 +251,32 @@ impl OperatorIdentifier {
 /// - `did`  — a DID; not structurally verified here (the crypto layer validates it).
 /// - any other scheme — accepted but **not** structurally verified.
 fn validate_operator_scheme(scheme: &str, value: &str) -> Result<(), RegistryValidationError> {
+    // 🚨 Before the per-scheme match, so it holds for `"did"` and for every
+    // scheme added later.
+    //
+    // Not verifying a scheme's *structure* must not also mean not noticing
+    // there is no value. This returned `true` for `"did"` and for anything
+    // unlisted regardless of `value`, so a blank identifier passed and was
+    // submitted as though it identified someone — and an empty operator
+    // identifier only failed under `"vat"` because `has_country_prefix` happens
+    // to reject one. Whether an absent value was caught depended on which
+    // scheme the operator was configured with.
+    //
+    // Whitespace counts. `" "` identifies no more than `""` and is the form a
+    // trimmed-input bug produces, which `is_empty` alone would pass.
+    if value.trim().is_empty() {
+        return Err(RegistryValidationError::InvalidOperatorId {
+            scheme: scheme.to_owned(),
+            value: value.to_owned(),
+        });
+    }
     let ok = match scheme {
         "lei" => lei_checksum_valid(value),
         "eori" => has_country_prefix(value, 15),
         "vat" => has_country_prefix(value, usize::MAX),
         "duns" => value.len() == 9 && value.bytes().all(|b| b.is_ascii_digit()),
-        // "did" and unknown schemes are accepted without structural verification.
+        // "did" and unknown schemes are accepted without structural
+        // verification — but never without a value. See the check above.
         _ => true,
     };
     if ok {
