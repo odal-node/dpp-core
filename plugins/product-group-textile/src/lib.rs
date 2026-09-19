@@ -14,7 +14,8 @@ mod unsold_goods;
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+    DppProductGroupPlugin, PluginError, PluginIdentity, PluginInput, PluginResult,
+    SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, str_of};
 use serde_json::Value;

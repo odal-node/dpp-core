@@ -91,12 +91,87 @@ bench:
 test-plugins:
     #!/usr/bin/env bash
     set -euo pipefail
+    ran=0
     for plugin in plugins/product-group-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         echo "Testing $plugin..."
         (cd "$plugin" && cargo test --quiet)
+        ran=$((ran + 1))
     done
-    echo "All plugin tests passed."
+    # 🚨 A loop over a glob that matches nothing succeeds. This recipe printed
+    # "All plugin tests passed." and exited 0 having tested nothing — and that
+    # is not hypothetical: these directories were once `plugins/sector-*`, and
+    # the CI job that globbed them went silently green at the rename. That job
+    # gained this guard; this recipe, which is what `just check` runs, did not.
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    echo "All $ran plugin test suites passed."
+
+# Formatting and lint for the product-group plugins.
+#
+# 🚨 The plugins are `exclude`d from the workspace, so `cargo fmt --all` and
+# `cargo clippy --workspace` do not reach them **at all**. Plugin code shipped
+# for months with no formatting check and no lint: seven of the ten crates were
+# unformatted when this recipe was first run. `test-plugins` covered their
+# behaviour and nothing covered their shape.
+fmt-check-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ran=0
+    for plugin in plugins/product-group-*; do
+        [ -f "$plugin/Cargo.toml" ] || continue
+        (cd "$plugin" && cargo fmt --check)
+        ran=$((ran + 1))
+    done
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    echo "$ran plugin crates formatted correctly."
+
+lint-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ran=0
+    for plugin in plugins/product-group-*; do
+        [ -f "$plugin/Cargo.toml" ] || continue
+        echo "Linting $plugin..."
+        (cd "$plugin" && cargo clippy --all-targets -- -D warnings)
+        ran=$((ran + 1))
+    done
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    echo "$ran plugin crates linted clean."
+
+# Format the plugins in place — the counterpart to `just fmt` for the crates
+# `cargo fmt --all` cannot see.
+fmt-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for plugin in plugins/product-group-*; do
+        [ -f "$plugin/Cargo.toml" ] || continue
+        (cd "$plugin" && cargo fmt)
+    done
+
+# Prove the vacuous-pass guards actually bite.
+#
+# Every looping gate above asserts it did some work, because the failure that
+# keeps recurring here is a gate that succeeds without running. A guard nobody
+# has watched fail is itself unverified, so this runs each loop against a glob
+# that matches nothing and requires a non-zero exit.
+plugin-gates-self-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for gate in test fmt-check lint; do
+        if bash -c '
+            set -euo pipefail
+            ran=0
+            for plugin in plugins/no-such-prefix-*; do
+                [ -f "$plugin/Cargo.toml" ] || continue
+                ran=$((ran + 1))
+            done
+            [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched"; exit 1; }
+        '; then
+            echo "SELF-TEST FAILED: the $gate-plugins guard passed on an empty match"
+            exit 1
+        fi
+    done
+    echo "Plugin gate guards fail on an empty match, as they must."
 
 # Ask the European Commission's AdES reference implementation (DSS) what our
 # JAdES signature actually is.
@@ -134,7 +209,7 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint test test-doc test-plugins doc audit
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test doc audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
@@ -198,21 +273,19 @@ build:
 build-plugins:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in \
-        plugins/product-group-battery \
-        plugins/product-group-textile \
-        plugins/product-group-steel \
-        plugins/product-group-electronics \
-        plugins/product-group-construction \
-        plugins/product-group-tyre \
-        plugins/product-group-toy \
-        plugins/product-group-aluminium \
-        plugins/product-group-furniture \
-        plugins/product-group-detergent; do
+    # Globbed, not listed. This recipe named its ten plugins one per line while
+    # `test-plugins` and the CI wasm job globbed the same directory — so an
+    # eleventh plugin would have been tested and linted here and never built,
+    # which is the drift a hand-maintained list always ends in.
+    built=0
+    for plugin in plugins/product-group-*; do
+        [ -f "$plugin/Cargo.toml" ] || continue
         echo "Building $plugin..."
         (cd "$plugin" && cargo build --target wasm32-wasip1 --release)
+        built=$((built + 1))
     done
-    echo "All plugins built."
+    [ "$built" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    echo "All $built plugins built."
 
 # Build a single product-group plugin and print the artifact path.
 # Usage: just build-plugin product-group-battery   or just build-plugin battery

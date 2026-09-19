@@ -109,3 +109,15 @@ jobs:
       # `just check`.
       - name: Sector plugin tests
         run: just test-plugins
+      # The same exclusion keeps them out of `cargo fmt --all` and `cargo
+      # clippy --workspace`, so plugin code had no formatting check and no lint
+      # at all — seven of ten crates were unformatted when this was added.
+      - name: Sector plugin formatting
+        run: just fmt-check-plugins
+      - name: Sector plugin lint
+        run: just lint-plugins
+      # Each loop above asserts it did some work. This proves that assertion
+      # fails on an empty match, because the failure that keeps recurring here
+      # is a gate that goes green without running.
+      - name: Plugin gate guards fail on an empty match
+        run: just plugin-gates-self-test
