@@ -249,6 +249,15 @@ impl RegistrationRequest {
         // identifies no single one, so it has no identifier to give. A
         // disclosure is not a product registration, and refusing it here says
         // so — rather than an `Option` that lets it through unnamed.
+        //
+        // 🚨 `Other` is refused too, and that case is *not* settled.
+        // `product_identifier()` answers `None` for it because the payload is
+        // untyped, not because it identifies nothing — an `Other` object can
+        // carry a usable `productIdentifier` and is still refused, because
+        // nothing reads one out of untyped data. That makes registering a
+        // product group added to the catalog after this crate shipped need a
+        // release, which is exactly the property `Other` exists to avoid.
+        // Fail-closed, so nothing is invented. Tracked in #321.
         let product_identifier = passport
             .product_group_data
             .as_ref()

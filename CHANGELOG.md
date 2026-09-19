@@ -50,6 +50,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   identifies no single one. A disclosure is not a product registration, and
   saying so is better than an `Option` that lets it through unnamed.
 
+  🚨 **`ProductGroupData::Other` is refused too, and that one is a real
+  narrowing.** `Other` is the forward-compatibility escape hatch — a passport
+  for a product group added to the catalog after this crate shipped round-trips
+  through it verbatim, which is what makes adding a product group *"a data
+  change rather than a release"*. `product_identifier()` answers `None` for it
+  because the payload is untyped, **not** because it identifies nothing: the
+  wire object can carry a perfectly good `productIdentifier` and is refused
+  anyway, since nothing reads it out. Until that is addressed, registering an
+  unmodelled product group needs a release.
+
+  This is still the better of the two available answers, and worth stating
+  plainly: **before this change such a passport was not rejected, it was
+  registered under the internal UUID** — the fallback above, reached exactly
+  because an untyped group rarely carries a GS1 carrier. Refusing is a
+  narrowing; registering a meaningless identifier with a public authority was a
+  defect. Tracked in #321.
+
   The field is `Option` on the struct for the **wire**, not the rule: this type is
   queued in a consumer's outbox across restarts, and a newly required field makes
   every already-queued row undeserialisable. The rule lives in the constructor; a
