@@ -33,6 +33,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   refuses a passport that identifies nothing, through the same `ValidationErrors`
   path as the other required fields.
 
+  **The refusal hangs on IR (EU) 2026/1778 Art. 9(2)(a), not Art. 8.** Art. 8
+  registers a *passport*: 8(8) generates the registry's own *registration*
+  identifier, and 8(9)(a) is a Commission storage duty qualified *"where
+  relevant"* — neither obliges an operator to supply a product identifier. Art.
+  9(2) does: a proof of registration *"shall contain at least … (a) the unique
+  product identifier"*, unqualified, where (b) and (c) beside it are both
+  *"where relevant"*. A registration that could never yield a valid proof is
+  defective when it is built. And the UUID fallback could not have stood in
+  anyway — ESPR Art. 2(30) defines the identifier as one *"enabling a web link
+  to the digital product passport"* and Art. 10(c) requires Annex III (EN 18219
+  clause 5) compliance, neither of which a node-local UUID meets.
+
   **`UnsoldGoods` is the case that refusal names**, and it is not a defect: an
   Art. 24–25 discard disclosure covers a financial year across many products and
   identifies no single one. A disclosure is not a product registration, and

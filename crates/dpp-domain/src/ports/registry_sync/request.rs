@@ -227,9 +227,22 @@ impl RegistrationRequest {
             "/qrCodeUrl",
             "the data carrier URI is what the registration resolves to",
         );
-        // 🚨 IR (EU) 2026/1778 Art. 8 registers a *unique product identifier*.
-        // A passport carrying none cannot be registered, and the honest answer
-        // is a refusal rather than an adapter substituting something.
+        // 🚨 IR (EU) 2026/1778 **Art. 9(2)(a)** is the unconditional hook, not
+        // Art. 8. Art. 8 registers a *passport*: 8(8) generates the registry's
+        // own *registration* identifier, and 8(9)(a) is a Commission storage
+        // duty qualified *"where relevant"* — neither requires the operator to
+        // supply a product identifier. Art. 9(2) does: a proof of registration
+        // *"shall contain at least … (a) the unique product identifier"*, with
+        // no *"where relevant"*, in deliberate contrast to (b) and (c) beside
+        // it, which carry one. A registration that could never yield a valid
+        // proof is defective at the moment it is built.
+        //
+        // What must be supplied is also constrained, which is why the internal
+        // UUID fallback was never a substitute: ESPR Art. 2(30) defines the
+        // identifier as one that *"enables a web link to the digital product
+        // passport"*, and Art. 10(c) requires it to comply with the Annex III
+        // standards — EN 18219 clause 5. A node-local UUID under an invented
+        // `"passport_id"` scheme satisfies neither.
         //
         // `UnsoldGoods` is the known case and is not a defect: an Art. 24–25
         // discard disclosure covers a financial year across many products and
@@ -244,9 +257,9 @@ impl RegistrationRequest {
         require(
             product_identifier.is_some(),
             "/productGroupData/productIdentifier",
-            "Art. 8 registers a unique product identifier; a product group that \
-             identifies no single product — an unsold-goods disclosure — is not \
-             a product registration",
+            "Art. 9(2)(a) requires the unique product identifier in a proof of \
+             registration; a product group that identifies no single product — \
+             an unsold-goods disclosure — is not a product registration",
         );
         if !missing.is_empty() {
             return Err(crate::field_error::ValidationErrors { errors: missing });
