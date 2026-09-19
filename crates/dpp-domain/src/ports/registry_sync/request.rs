@@ -55,7 +55,42 @@ pub struct RegistrationRequest {
     pub facility: Option<crate::passport::FacilitySnapshot>,
     /// Product category for product group routing within the registry.
     pub product_category: String,
+    /// The passport's unique product identifier, in whichever EN 18219 clause 5
+    /// scheme issued it.
+    ///
+    /// 🚨 **Without this an adapter has to invent one.** The registry payload
+    /// requires a product identifier, and before this field the only thing on
+    /// the request resembling one was
+    /// [`data_carrier_uri`](Self::data_carrier_uri) — so a consumer scraped the
+    /// GTIN out of it and, when there was none, fell back to the internal
+    /// passport UUID. That registers a product with a public authority under a
+    /// value meaningless outside the issuing node, and nothing catches it:
+    /// `dpp_registry::ProductIdentifier::validate` checks structure only for
+    /// `"gtin"`, so an invented scheme passes unexamined.
+    ///
+    /// Scheme 1 is the case that hid it. While every passport carried a GTIN the
+    /// scrape always succeeded; the moment a passport could be identified
+    /// without GS1, the fallback became reachable for exactly those passports.
+    ///
+    /// # Why `Option` when a registration cannot do without it
+    ///
+    /// The **wire**, not the rule. This type is queued: a consumer's outbox
+    /// holds serialised requests across restarts, and a newly required field
+    /// makes every already-queued row undeserialisable — a runtime failure
+    /// against data, discovered per retry. `Option` lets those rows read.
+    ///
+    /// The rule lives in
+    /// [`from_published_passport`](Self::from_published_passport), which refuses
+    /// to build a request without one. A request that reaches an adapter with
+    /// `None` came from an older queue, not from this constructor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_identifier: Option<crate::identifier::ProductIdentifier>,
     /// GS1 Digital Link URI or DID URI resolving to the DPP data.
+    ///
+    /// The **carrier**, not the identifier — see
+    /// [`product_identifier`](Self::product_identifier). A Digital Link happens
+    /// to contain a scheme 1 identifier; a scheme 2 or 3 carrier does not, and
+    /// reading one out of it is where the invented fallback came from.
     pub data_carrier_uri: String,
     /// The schema version used for this passport's product group data.
     pub schema_version: String,
@@ -192,6 +227,49 @@ impl RegistrationRequest {
             "/qrCodeUrl",
             "the data carrier URI is what the registration resolves to",
         );
+        // 🚨 IR (EU) 2026/1778 **Art. 9(2)(a)** is the unconditional hook, not
+        // Art. 8. Art. 8 registers a *passport*: 8(8) generates the registry's
+        // own *registration* identifier, and 8(9)(a) is a Commission storage
+        // duty qualified *"where relevant"* — neither requires the operator to
+        // supply a product identifier. Art. 9(2) does: a proof of registration
+        // *"shall contain at least … (a) the unique product identifier"*, with
+        // no *"where relevant"*, in deliberate contrast to (b) and (c) beside
+        // it, which carry one. A registration that could never yield a valid
+        // proof is defective at the moment it is built.
+        //
+        // What must be supplied is also constrained, which is why the internal
+        // UUID fallback was never a substitute: ESPR Art. 2(30) defines the
+        // identifier as one that *"enables a web link to the digital product
+        // passport"*, and Art. 10(c) requires it to comply with the Annex III
+        // standards — EN 18219 clause 5. A node-local UUID under an invented
+        // `"passport_id"` scheme satisfies neither.
+        //
+        // `UnsoldGoods` is the known case and is not a defect: an Art. 24–25
+        // discard disclosure covers a financial year across many products and
+        // identifies no single one, so it has no identifier to give. A
+        // disclosure is not a product registration, and refusing it here says
+        // so — rather than an `Option` that lets it through unnamed.
+        //
+        // 🚨 `Other` is refused too, and that case is *not* settled.
+        // `product_identifier()` answers `None` for it because the payload is
+        // untyped, not because it identifies nothing — an `Other` object can
+        // carry a usable `productIdentifier` and is still refused, because
+        // nothing reads one out of untyped data. That makes registering a
+        // product group added to the catalog after this crate shipped need a
+        // release, which is exactly the property `Other` exists to avoid.
+        // Fail-closed, so nothing is invented. Tracked in #321.
+        let product_identifier = passport
+            .product_group_data
+            .as_ref()
+            .and_then(|d| d.product_identifier())
+            .cloned();
+        require(
+            product_identifier.is_some(),
+            "/productGroupData/productIdentifier",
+            "Art. 9(2)(a) requires the unique product identifier in a proof of \
+             registration; a product group that identifies no single product — \
+             an unsold-goods disclosure — is not a product registration",
+        );
         if !missing.is_empty() {
             return Err(crate::field_error::ValidationErrors { errors: missing });
         }
@@ -211,6 +289,7 @@ impl RegistrationRequest {
                 .unwrap_or_default(),
             facility: passport.facility.clone(),
             product_category,
+            product_identifier,
             data_carrier_uri: passport.qr_code_url.clone().unwrap_or_default(),
             schema_version: passport.schema_version.clone(),
             jws_signature: passport.jws_signature.clone(),

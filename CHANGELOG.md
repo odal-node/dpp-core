@@ -15,6 +15,63 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`RegistrationRequest` carries the passport's EN 18219 identifier, and
+  refuses to be built without one.** 🚨 Until now the request carried nothing
+  identifying the product — `passport_id`, operator, facility, carrier URI,
+  granularity, commodity code, back-up, provider, and no product identifier.
+
+  An adapter therefore had to invent one, and the one that exists scraped a GTIN
+  out of the carrier URI and fell back to the **internal passport UUID** when
+  there was none. That was harmless while every passport carried a GTIN; the
+  identifier work in this release makes the fallback reachable for exactly the
+  passports it introduced, so a scheme 2 or 3 passport would be registered with a
+  public authority under a value meaningless outside the issuing node. Nothing
+  catches it: `dpp_registry::ProductIdentifier::validate` checks structure only
+  for `"gtin"`, so an invented scheme passes unexamined.
+
+  `from_published_passport` now populates it from the product group data and
+  refuses a passport that identifies nothing, through the same `ValidationErrors`
+  path as the other required fields.
+
+  **The refusal hangs on IR (EU) 2026/1778 Art. 9(2)(a), not Art. 8.** Art. 8
+  registers a *passport*: 8(8) generates the registry's own *registration*
+  identifier, and 8(9)(a) is a Commission storage duty qualified *"where
+  relevant"* — neither obliges an operator to supply a product identifier. Art.
+  9(2) does: a proof of registration *"shall contain at least … (a) the unique
+  product identifier"*, unqualified, where (b) and (c) beside it are both
+  *"where relevant"*. A registration that could never yield a valid proof is
+  defective when it is built. And the UUID fallback could not have stood in
+  anyway — ESPR Art. 2(30) defines the identifier as one *"enabling a web link
+  to the digital product passport"* and Art. 10(c) requires Annex III (EN 18219
+  clause 5) compliance, neither of which a node-local UUID meets.
+
+  **`UnsoldGoods` is the case that refusal names**, and it is not a defect: an
+  Art. 24–25 discard disclosure covers a financial year across many products and
+  identifies no single one. A disclosure is not a product registration, and
+  saying so is better than an `Option` that lets it through unnamed.
+
+  🚨 **`ProductGroupData::Other` is refused too, and that one is a real
+  narrowing.** `Other` is the forward-compatibility escape hatch — a passport
+  for a product group added to the catalog after this crate shipped round-trips
+  through it verbatim, which is what makes adding a product group *"a data
+  change rather than a release"*. `product_identifier()` answers `None` for it
+  because the payload is untyped, **not** because it identifies nothing: the
+  wire object can carry a perfectly good `productIdentifier` and is refused
+  anyway, since nothing reads it out. Until that is addressed, registering an
+  unmodelled product group needs a release.
+
+  This is still the better of the two available answers, and worth stating
+  plainly: **before this change such a passport was not rejected, it was
+  registered under the internal UUID** — the fallback above, reached exactly
+  because an untyped group rarely carries a GS1 carrier. Refusing is a
+  narrowing; registering a meaningless identifier with a public authority was a
+  defect. Tracked in #321.
+
+  The field is `Option` on the struct for the **wire**, not the rule: this type is
+  queued in a consumer's outbox across restarts, and a newly required field makes
+  every already-queued row undeserialisable. The rule lives in the constructor; a
+  `None` arriving at an adapter came from an older queue.
+
 - **`EuRegistryEnvelope::payload` is now `submission`, and carries a
   `RegistrationSubmission` rather than one `RegistrationPayload`.**
 

@@ -26,6 +26,9 @@ fn make_published_passport() -> Passport {
         schema_version: "1.1.0".into(),
         retention_locked: true,
         operator_identifier: Some("did:web:acme.example.com".into()),
+        product_group_data: Some(crate::product_group::ProductGroupData::Textile(Box::new(
+            crate::test_support::sample_textile_data(),
+        ))),
         facility: Some(crate::passport::FacilitySnapshot {
             scheme: "national".into(),
             value: "FAC-DE-001".into(),
@@ -187,8 +190,11 @@ fn the_model_identifier_reaches_the_registration() {
 /// and must not be confused with a lookup that was never wired.
 #[test]
 fn a_product_group_without_a_model_identifier_reports_none() {
-    let mut passport = make_published_passport();
-    passport.product_group_data = None;
+    // Textile: it identifies a product, and carries no model design. The case
+    // used to be built by clearing `product_group_data` entirely, which now
+    // refuses — a passport with no product group identifies nothing, which is a
+    // different statement from "this product has no model".
+    let passport = make_published_passport();
     assert!(
         RegistrationRequest::from_published_passport(
             &passport,
@@ -198,6 +204,72 @@ fn a_product_group_without_a_model_identifier_reports_none() {
         .expect("the fixture passport is complete")
         .model_id
         .is_none()
+    );
+}
+
+/// 🚨 The identifier reaches the port, whichever clause 5 scheme issued it.
+///
+/// Before this field the request carried nothing identifying the product, so an
+/// adapter scraped a GTIN out of the carrier URI and fell back to the internal
+/// passport UUID when there was none — which is every scheme 2 and 3 passport.
+/// That registers a product with a public authority under a value meaningless
+/// outside this node, and no structural check catches it.
+#[test]
+fn every_clause_5_scheme_reaches_the_request() {
+    use crate::identifier::ProductIdentifier;
+    use crate::product_group::ProductGroupData;
+
+    for identifier in [
+        ProductIdentifier::gs1(crate::identifier::Gtin::parse("09506000134352").unwrap()),
+        ProductIdentifier::identification_link("https://id.acme.example.com/p/1").unwrap(),
+        ProductIdentifier::did("did:web:acme.example.com:p:1").unwrap(),
+    ] {
+        let mut passport = make_published_passport();
+        let mut textile = crate::test_support::sample_textile_data();
+        textile.product_identifier = identifier.clone();
+        passport.product_group_data = Some(ProductGroupData::Textile(Box::new(textile)));
+
+        let req = RegistrationRequest::from_published_passport(
+            &passport,
+            acme(),
+            RegistrationGranularity::Item,
+        )
+        .expect("a passport that identifies itself can be registered");
+
+        assert_eq!(
+            req.product_identifier.as_ref(),
+            Some(&identifier),
+            "the identifier must travel, not be re-derived from the carrier"
+        );
+    }
+}
+
+/// A product group that identifies no single product cannot be registered.
+///
+/// `UnsoldGoods` is the known case and is not a defect: an Art. 24–25 discard
+/// disclosure covers a financial year across many products. Refused here rather
+/// than allowed through with nothing in the field, so the case is named instead
+/// of arriving at an adapter that has to invent something.
+#[test]
+fn a_product_group_that_identifies_nothing_is_refused() {
+    use crate::product_group::ProductGroupData;
+
+    let mut passport = make_published_passport();
+    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(
+        crate::test_support::sample_unsold_goods_report(),
+    ));
+
+    let refused = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect_err("a discard disclosure is not a product registration");
+
+    assert_eq!(refused.errors.len(), 1);
+    assert_eq!(
+        refused.errors[0].field,
+        "/productGroupData/productIdentifier"
     );
 }
 
