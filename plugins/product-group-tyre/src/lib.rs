@@ -29,13 +29,13 @@ impl DppProductGroupPlugin for TyrePlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.0.0".into(),
+            max_version: "1.1.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_enum("tyreClass", &["C1", "C2", "C3"])
             .require_enum("fuelEfficiencyClass", &["A", "B", "C", "D", "E"])
             .require_enum("wetGripClass", &["A", "B", "C", "D", "E"])
@@ -68,7 +68,7 @@ mod tests {
 
     fn valid() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "tyreClass": "C1",
             "fuelEfficiencyClass": "B",
             "wetGripClass": "A",

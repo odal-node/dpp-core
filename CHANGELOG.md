@@ -319,7 +319,54 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   level further in, so losing the type would lose the validation without losing
   a field.
 
+### Fixed
+
+- **🚨 The Wasm product group plugins still required a `gtin` the schemas had
+  stopped carrying, and the compliance determination silently stopped being
+  made.** The EN 18219 identifier work moved every product group's schema from a
+  bare top-level `gtin` to a `productIdentifier` object, and migrated the Rust
+  types, the catalog and the stored-data lens with it. **No file under
+  `plugins/` was touched.** Nine of the ten plugins went on calling
+  `require_gtin("gtin")`, which reads a flat top-level key, so fed a current
+  record they answered *"gtin is required"* — against data whose GTIN was
+  present the whole time, one level down inside `productIdentifier`.
+
+  The failure was silent rather than loud, which is the part worth keeping. Both
+  consumers of a determination discard the error: the publish-time compliance
+  gate reads `&& let Ok(determination) = …compute(…)`, so an `Err` makes the
+  whole condition false and **the gate that blocks a passport carrying binding
+  violations simply does not fire**. Passports published; nothing was evaluated.
+
+  Five gates were in a position to catch it and none did. `plugins/*` are
+  excluded from the workspace, so `cargo check --workspace` never compiled them
+  against the new shape. Their own tests passed because their fixtures still
+  carried `"gtin": "12345678901231"` — a test pinned to a shape that no longer
+  ships, the same defect class as the stale schema literal fixed earlier in this
+  release. The catalog↔schema parity test compares those two records to each
+  other and never asks what a plugin requires. Every plugin's declared
+  `schema_version_range` was stale, but that is dead metadata: the host calls
+  `check_compatibility(…, None, …)`, and `None` skips the schema check entirely.
+
+  Each plugin now calls `require_product_identifier("productIdentifier")`, and
+  the ten stale version ranges are bumped to the versions their product groups
+  actually serve.
+
 ### Added
+
+- **`Validator::require_product_identifier` — the EN 18219 clause 5 check that
+  replaces `require_gtin` for product group data.** Validates the object against
+  the scheme that issued it: scheme 1 keeps the GTIN check digit test the bare
+  field used to get, scheme 2 requires an absolute `url`, scheme 3 a `did` under
+  one of the three methods clause 5 names.
+
+  The three are **alternatives, not a hierarchy**, so the branch is chosen by
+  the declared scheme rather than every record being asked for a GTIN — which is
+  what made schemes 2 and 3 unusable. An unmapped scheme is refused rather than
+  skipped: `"passport_id"` is exactly the kind of invented scheme that otherwise
+  passes unexamined, and it now fails at the plugin tier too.
+
+  `require_gtin` remains, and is still correct for a bare GS1 field —
+  `require_product_identifier` uses it internally for the scheme 1 branch.
 
 - **An EN 18219 identifier converts into the registry's product identifier.**
   Two types shared a name across a crate boundary —

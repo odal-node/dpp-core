@@ -35,13 +35,13 @@ impl DppProductGroupPlugin for ElectronicsPlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.2.0".into(),
+            max_version: "1.4.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_enum(
                 "productCategory",
                 &["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
@@ -99,7 +99,7 @@ mod tests {
 
     fn base() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "productCategory": "smartphone",
             "energyEfficiencyClass": "A",
             "co2ePerUnitKg": 55.0

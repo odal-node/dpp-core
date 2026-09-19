@@ -207,3 +207,117 @@ fn macro_input_exports_pack_error_envelope_for_empty_input() {
         generate_passport_bytes(&DummyPlugin, &[]).len()
     );
 }
+
+// ── require_product_identifier ───────────────────────────────────────────────
+//
+// The check that replaced `require_gtin` for product group data. Each scheme is
+// exercised on its own, because the whole point of clause 5 is that the three
+// are alternatives: a check that only ever passes for GS1 is the defect this
+// method exists to remove.
+
+fn pi_errors(identifier: Value) -> Vec<(String, String)> {
+    let input = json!({ "productIdentifier": identifier });
+    match crate::validate::Validator::new(&input)
+        .require_product_identifier("productIdentifier")
+        .finish()
+    {
+        Ok(()) => vec![],
+        Err(PluginError::ValidationErrors(errors)) => {
+            errors.into_iter().map(|e| (e.field, e.code)).collect()
+        }
+        Err(other) => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn every_clause_5_scheme_is_accepted() {
+    for identifier in [
+        json!({ "scheme": "gs1", "gtin": "09506000134352" }),
+        json!({ "scheme": "identificationLink", "url": "https://id.acme.example.com/p/1" }),
+        json!({ "scheme": "did", "did": "did:web:acme.example.com:p:1" }),
+    ] {
+        assert!(
+            pi_errors(identifier.clone()).is_empty(),
+            "scheme 2 and 3 carry no GTIN and must still pass: {identifier}"
+        );
+    }
+}
+
+#[test]
+fn a_scheme_2_identifier_is_not_asked_for_a_gtin() {
+    // The regression that mattered: requiring a GTIN unconditionally rejected
+    // exactly the passports the identifier work introduced.
+    let errors = pi_errors(json!({ "scheme": "did", "did": "did:web:acme.example.com" }));
+    assert!(
+        !errors.iter().any(|(field, _)| field.contains("gtin")),
+        "a DID-identified product was asked for a GTIN: {errors:?}"
+    );
+}
+
+#[test]
+fn the_branch_field_is_required_by_its_own_scheme() {
+    assert_eq!(
+        pi_errors(json!({ "scheme": "gs1" })),
+        vec![("/productIdentifier/gtin".to_owned(), "missing".to_owned())]
+    );
+    assert_eq!(
+        pi_errors(json!({ "scheme": "identificationLink" })),
+        vec![("/productIdentifier/url".to_owned(), "missing".to_owned())]
+    );
+    assert_eq!(
+        pi_errors(json!({ "scheme": "did" })),
+        vec![("/productIdentifier/did".to_owned(), "missing".to_owned())]
+    );
+}
+
+#[test]
+fn a_malformed_branch_value_is_refused_per_scheme() {
+    // GS1 keeps the check-digit test the bare `gtin` field used to get.
+    assert_eq!(
+        pi_errors(json!({ "scheme": "gs1", "gtin": "09506000134353" })),
+        vec![("/productIdentifier/gtin".to_owned(), "checksum".to_owned())]
+    );
+    assert_eq!(
+        pi_errors(json!({ "scheme": "gs1", "gtin": "12-34" })),
+        vec![("/productIdentifier/gtin".to_owned(), "format".to_owned())]
+    );
+    assert_eq!(
+        pi_errors(json!({ "scheme": "identificationLink", "url": "acme.example.com" })),
+        vec![("/productIdentifier/url".to_owned(), "format".to_owned())]
+    );
+    assert_eq!(
+        pi_errors(json!({ "scheme": "did", "did": "did:key:z6Mk" })),
+        vec![("/productIdentifier/did".to_owned(), "format".to_owned())]
+    );
+}
+
+#[test]
+fn an_unmapped_scheme_is_refused_rather_than_skipped() {
+    // 🚨 The `passport_id` case. A scheme nobody has mapped is where an
+    // invented identifier passes unexamined, so it must fail rather than
+    // fall through to "no branch to check".
+    assert_eq!(
+        pi_errors(json!({ "scheme": "passport_id", "value": "0199...uuid" })),
+        vec![("/productIdentifier/scheme".to_owned(), "unknown".to_owned())]
+    );
+}
+
+#[test]
+fn an_absent_or_headless_identifier_is_refused() {
+    let empty = json!({});
+    let missing = match crate::validate::Validator::new(&empty)
+        .require_product_identifier("productIdentifier")
+        .finish()
+    {
+        Err(PluginError::ValidationErrors(e)) => e,
+        other => panic!("expected a refusal, got {other:?}"),
+    };
+    assert_eq!(missing[0].field, "/productIdentifier");
+    assert_eq!(missing[0].code, "missing");
+
+    assert_eq!(
+        pi_errors(json!({ "gtin": "09506000134352" })),
+        vec![("/productIdentifier/scheme".to_owned(), "missing".to_owned())],
+        "a GTIN with no scheme states nothing about which scheme issued it"
+    );
+}
