@@ -12,9 +12,9 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
-    PluginComplianceStatus, PluginError, PluginIdentity, PluginInput, PluginResult,
-    SchemaVersionRange,
+    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    METRIC_REPAIRABILITY_INDEX, PluginComplianceStatus, PluginError, PluginIdentity, PluginInput,
+    PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num, str_of};
 use serde_json::Value;
@@ -44,7 +44,12 @@ impl DppProductGroupPlugin for ElectronicsPlugin {
             .require_product_identifier("productIdentifier")
             .require_enum(
                 "productCategory",
-                &["smartphone", "other-mobile-phone", "cordless-phone", "tablet"],
+                &[
+                    "smartphone",
+                    "other-mobile-phone",
+                    "cordless-phone",
+                    "tablet",
+                ],
             )
             .require_enum(
                 "energyEfficiencyClass",
