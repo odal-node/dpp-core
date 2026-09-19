@@ -30,8 +30,32 @@ secrets/
 # per-member target dirs left over locally.
 plugins/target/
 plugins/*/target/
-Cargo.lock
 **/*.rs.bak
+
+# `Cargo.lock` is deliberately NOT ignored. The old "libraries don't commit a
+# lockfile" advice predates the current guidance and cost this repo a property
+# it needs more than a library usually does: without a committed lockfile,
+# `--locked` means nothing and `cargo audit` scans a graph resolved fresh on
+# every run, so an advisory can appear or vanish between two CI runs over an
+# identical tree. A regulatory library whose dependency set is not reproducible
+# cannot say what it was built from.
+#
+# The cost is real and accepted: a lockfile conflicts on concurrent dependency
+# changes, and this repo's strict-up-to-date rule already serialises merges.
+# Resolve a conflict by regenerating (`cargo update -w`), never by hand.
+#
+# Testing against the newest dependencies moves to the scheduled advisory run
+# rather than happening implicitly on every build.
+#
+# Three lockfiles are tracked, one per workspace: the root, `plugins/` (the ten
+# product-group crates share a workspace) and `fuzz/`.
+#
+# The per-plugin `plugins/*/Cargo.lock` files are **not** among them. They are
+# leftovers from before those crates shared a workspace and no longer govern
+# anything — `plugins/Cargo.lock` does. They are left on disk rather than
+# deleted here, since removing them is not this change's business, but
+# committing them would enshrine ten dead files as though they were policy.
+plugins/*/Cargo.lock
 
 # -----------------------------------------------------------------------------
 # EDITOR & OS
