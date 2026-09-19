@@ -36,9 +36,22 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
-# Run security audit against RustSec advisory database
+# Run security audit against RustSec advisory database, then the dependency
+# policy `cargo audit` cannot express.
+#
+# The split is deliberate: `cargo audit` owns advisories, `cargo deny` owns the
+# three questions it cannot answer — licences, duplicate/banned crates, and
+# where a dependency came from. `deny check advisories` is left out rather than
+# run twice.
+#
+# 🚨 Licences were unchecked until this was added, and the very first run
+# rejected one: `webpki-root-certs` (CDLA-Permissive-2.0), reaching a *published
+# Apache-2.0 library* as a runtime dependency. It is permissive and now
+# explicitly allowed — but nothing had ever looked, which for a crate other
+# people vendor is the part that mattered.
 audit:
-    cargo audit
+    cargo audit --deny yanked
+    cargo deny check bans licenses sources
 
 # Check the public API against the last published release.
 #

@@ -7,6 +7,10 @@ on:
     - cron: "0 3 * * *" # nightly 03:00 UTC
   workflow_dispatch:
 
+# Least privilege by default; see ci.yml.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -20,7 +24,7 @@ jobs:
       matrix:
         target: [digital_link_parse]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # The trailing comment is load-bearing, not decoration. `rust-toolchain`
       # keeps one branch per channel and bakes that channel into the `toolchain`
       # input's *default* on each branch — this SHA defaults to `nightly`, the
@@ -37,7 +41,7 @@ jobs:
         run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=60 -max_len=4096
       - name: Upload crash artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fuzz-artifacts-${{ matrix.target }}
           path: fuzz/artifacts/
