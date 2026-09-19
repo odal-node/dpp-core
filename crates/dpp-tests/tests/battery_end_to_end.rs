@@ -257,7 +257,20 @@ fn recycler_credential_unlocks_professional_battery_fields() {
     let battery_fields =
         serde_json::to_value(passport.product_group_data.as_ref().unwrap()).unwrap();
 
-    let policy = ProductGroupAccessPolicy::for_schema_version("battery", "2.6.0")
+    // 🚨 The version the catalog currently serves, not a literal.
+    //
+    // This read `"2.6.0"`, which was current when the test was written and was
+    // superseded by v2.7.0. Every leak assertion below was therefore evaluated
+    // against a schema that no longer ships: flipping `sohMethodology` to
+    // `public` in v2.7.0 left this test green, because it was asking v2.6.0.
+    //
+    // The guard has to follow the version it guards. This project has already
+    // shipped a state-of-health public leak once.
+    let current = dpp_domain::ProductGroupCatalog::new()
+        .current_schema_version("battery")
+        .expect("battery is in the catalog")
+        .to_owned();
+    let policy = ProductGroupAccessPolicy::for_schema_version("battery", &current)
         .expect("battery in catalog");
 
     // ── Public audience ─────────────────────────────────────────────────────
