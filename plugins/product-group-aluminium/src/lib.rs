@@ -5,8 +5,8 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError, PluginIdentity,
-    PluginInput, PluginResult, SchemaVersionRange,
+    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError,
+    PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num, str_of, threshold_status};
 use serde_json::{Value, json};
