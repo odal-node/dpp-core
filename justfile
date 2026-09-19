@@ -47,10 +47,10 @@ fmt-check:
 # Run security audit against RustSec advisory database, then the dependency
 # policy `cargo audit` cannot express.
 #
-# The split is deliberate and mirrors the one the platform repo settled on:
-# `cargo audit` owns advisories, `cargo deny` owns the three questions it cannot
-# answer — licences, duplicate/banned crates, and where a dependency came from.
-# `deny check advisories` is left out rather than run twice.
+# The split is deliberate: `cargo audit` owns advisories, `cargo deny` owns the
+# three questions it cannot answer — licences, duplicate/banned crates, and
+# where a dependency came from. `deny check advisories` is left out rather than
+# run twice.
 #
 # 🚨 Licences were unchecked until this was added, and the very first run
 # rejected one: `webpki-root-certs` (CDLA-Permissive-2.0), reaching a *published
