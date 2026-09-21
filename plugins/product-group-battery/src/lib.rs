@@ -45,17 +45,17 @@ impl DppProductGroupPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.5.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.7.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.6.0".into(),
+            max_version: "2.7.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_str("batteryChemistry")
             .require_positive("nominalVoltageV")
             .require_positive("nominalCapacityAh")
@@ -195,60 +195,60 @@ impl DppProductGroupPlugin for BatteryPlugin {
                 Some(date) => {
                     let (shortfalls, year, standing) =
                         match art8_phase_for(art8_category, date, art8_second_life(input)) {
-                        Art8Phase::Phase1 => (
-                            art8_shortfalls_2031(&scoped),
-                            "2031",
-                            "binding for this battery",
-                        ),
-                        Art8Phase::Phase2 => (
-                            art8_shortfalls_2036(&scoped),
-                            "2036",
-                            "binding for this battery",
-                        ),
-                        // In scope, but placed on the market before the phase
-                        // began. Reported as forward-looking guidance rather
-                        // than dropped: useful to know, but not a duty this
-                        // battery carries.
-                        Art8Phase::NotYetBinding => match art8_category {
-                            Art8Category::Lmt => (
-                                art8_shortfalls_2036(&scoped),
-                                "2036",
-                                "not binding for this battery — Art. 8(3) applies to LMT \
-                                 batteries placed on the market from 18 Aug 2036",
-                            ),
-                            _ => (
+                            Art8Phase::Phase1 => (
                                 art8_shortfalls_2031(&scoped),
                                 "2031",
-                                "not binding for this battery — Art. 8(2) applies to \
-                                 batteries placed on the market from 18 Aug 2031",
+                                "binding for this battery",
                             ),
-                        },
-                        // Art. 8(4): the paragraphs do not apply at all. No
-                        // shortfall is reportable, and reporting one would
-                        // assert a duty the Regulation removed.
-                        //
-                        // Said out loud rather than left silent. Absence of a
-                        // recycled-content finding is not a statement — it is
-                        // what a battery outside Art. 8, a battery whose shares
-                        // are all met, and a battery nobody assessed all look
-                        // like. An exemption an operator has to infer from
-                        // silence is one they cannot show an authority.
-                        Art8Phase::ExemptSecondLife => {
-                            warnings.push(PluginFinding::new(
-                                "battery.recycled_content.exempt_second_life",
-                                "/batteryStatus",
-                                "EU 2023/1542 Art. 8(4) disapplies the Art. 8(1)-(3) \
+                            Art8Phase::Phase2 => (
+                                art8_shortfalls_2036(&scoped),
+                                "2036",
+                                "binding for this battery",
+                            ),
+                            // In scope, but placed on the market before the phase
+                            // began. Reported as forward-looking guidance rather
+                            // than dropped: useful to know, but not a duty this
+                            // battery carries.
+                            Art8Phase::NotYetBinding => match art8_category {
+                                Art8Category::Lmt => (
+                                    art8_shortfalls_2036(&scoped),
+                                    "2036",
+                                    "not binding for this battery — Art. 8(3) applies to LMT \
+                                 batteries placed on the market from 18 Aug 2036",
+                                ),
+                                _ => (
+                                    art8_shortfalls_2031(&scoped),
+                                    "2031",
+                                    "not binding for this battery — Art. 8(2) applies to \
+                                 batteries placed on the market from 18 Aug 2031",
+                                ),
+                            },
+                            // Art. 8(4): the paragraphs do not apply at all. No
+                            // shortfall is reportable, and reporting one would
+                            // assert a duty the Regulation removed.
+                            //
+                            // Said out loud rather than left silent. Absence of a
+                            // recycled-content finding is not a statement — it is
+                            // what a battery outside Art. 8, a battery whose shares
+                            // are all met, and a battery nobody assessed all look
+                            // like. An exemption an operator has to infer from
+                            // silence is one they cannot show an authority.
+                            Art8Phase::ExemptSecondLife => {
+                                warnings.push(PluginFinding::new(
+                                    "battery.recycled_content.exempt_second_life",
+                                    "/batteryStatus",
+                                    "EU 2023/1542 Art. 8(4) disapplies the Art. 8(1)-(3) \
                                  recycled-content minimums to this battery: batteryStatus \
                                  records a second-life operation, and a battery reaching \
                                  that state was necessarily on the market before it. No \
                                  minimum share is assessed.",
-                            ));
-                            (Vec::new(), "", "")
-                        }
-                        // Nothing to say: the category was never in scope, so
-                        // there is no duty whose absence needs explaining.
-                        Art8Phase::NotCovered => (Vec::new(), "", ""),
-                    };
+                                ));
+                                (Vec::new(), "", "")
+                            }
+                            // Nothing to say: the category was never in scope, so
+                            // there is no duty whose absence needs explaining.
+                            Art8Phase::NotCovered => (Vec::new(), "", ""),
+                        };
                     for sf in shortfalls {
                         let field = match sf.material {
                             "cobalt" => "/recycledContentCobaltPct",
@@ -344,9 +344,7 @@ impl DppProductGroupPlugin for BatteryPlugin {
 /// error the operator can see and correct now.
 fn art8_second_life(input: &PluginInput) -> Art8SecondLife {
     match input.get("batteryStatus").and_then(Value::as_str) {
-        Some("repurposed" | "re-used" | "remanufactured") => {
-            Art8SecondLife::PlacedBeforeOperations
-        }
+        Some("repurposed" | "re-used" | "remanufactured") => Art8SecondLife::PlacedBeforeOperations,
         _ => Art8SecondLife::None,
     }
 }
@@ -453,7 +451,7 @@ mod tests {
 
     fn valid_battery() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -473,7 +471,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.6.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.7.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 
@@ -483,15 +481,15 @@ mod tests {
     }
 
     #[test]
-    fn missing_gtin_fails_with_field_error() {
+    fn missing_product_identifier_fails_with_field_error() {
         let mut data = valid_battery();
-        data.as_object_mut().unwrap().remove("gtin");
+        data.as_object_mut().unwrap().remove("productIdentifier");
         let err = BatteryPlugin.validate_input(&data).unwrap_err();
         match err {
             PluginError::ValidationErrors(errs) => {
                 assert!(
                     errs.iter()
-                        .any(|e| e.field == "/gtin" && e.code == "missing")
+                        .any(|e| e.field == "/productIdentifier" && e.code == "missing")
                 );
             }
             other => panic!("expected ValidationErrors, got {other:?}"),
@@ -501,9 +499,30 @@ mod tests {
     #[test]
     fn malformed_gtin_fails() {
         let mut data = valid_battery();
-        data["gtin"] = json!("12-34");
+        data["productIdentifier"]["gtin"] = json!("12-34");
         let err = BatteryPlugin.validate_input(&data).unwrap_err();
         assert!(matches!(err, PluginError::ValidationErrors(_)));
+    }
+
+    /// 🚨 A battery identified without GS1 is still a battery.
+    ///
+    /// Scheme 1 is what hid the old defect: while every record carried a bare
+    /// `gtin`, requiring one always succeeded. Schemes 2 and 3 carry no GTIN
+    /// at all, so a plugin that asks for one rejects exactly the passports the
+    /// identifier work introduced.
+    #[test]
+    fn a_battery_identified_without_gs1_is_accepted() {
+        for identifier in [
+            json!({"scheme": "identificationLink", "url": "https://id.acme.example.com/b/1"}),
+            json!({"scheme": "did", "did": "did:web:acme.example.com:b:1"}),
+        ] {
+            let mut data = valid_battery();
+            data["productIdentifier"] = identifier.clone();
+            assert!(
+                BatteryPlugin.validate_input(&data).is_ok(),
+                "scheme carrying no GTIN was refused: {identifier}"
+            );
+        }
     }
 
     #[test]
@@ -553,13 +572,13 @@ mod tests {
     fn generate_passport_is_passthrough_on_valid() {
         let data = valid_battery();
         let out = BatteryPlugin.generate_passport(data).unwrap();
-        assert_eq!(out["gtin"], "12345678901231");
+        assert_eq!(out["productIdentifier"]["gtin"], "12345678901231");
     }
 
     #[test]
     fn nmc_below_2031_cobalt_emits_advisory_warning_not_violation() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -595,7 +614,7 @@ mod tests {
     fn lfp_zero_cobalt_does_not_warn() {
         // LFP contains no cobalt; a defaulted 0.0 must not produce a shortfall.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -617,7 +636,7 @@ mod tests {
     #[test]
     fn portable_battery_skips_recycled_content_warnings() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "batteryType": "portable",
             "nominalVoltageV": 3.6,
@@ -637,7 +656,7 @@ mod tests {
     #[test]
     fn rated_capacity_unit_error_emits_advisory_warning() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0, // nominal = 4.8 kWh
@@ -660,7 +679,7 @@ mod tests {
     #[test]
     fn consistent_rated_capacity_no_warning() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -678,7 +697,7 @@ mod tests {
         // LMT (e-bike/e-scooter) batteries are out of Phase-1 scope (Phase 2
         // only, 2036), so a below-2031-target declaration must not be flagged.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "batteryType": "lmt",
             "nominalVoltageV": 36.0,
@@ -706,7 +725,7 @@ mod tests {
         // EU market in 2030, so that minimum never attaches to it. Deriving the
         // phase from "today" would report it as short from 18 Aug 2031 onwards.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -737,7 +756,7 @@ mod tests {
     #[test]
     fn missing_market_date_is_reported_rather_than_guessed() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -765,7 +784,7 @@ mod tests {
     #[test]
     fn malformed_market_date_is_treated_as_missing() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -788,7 +807,7 @@ mod tests {
     #[test]
     fn lmt_placed_after_2036_is_bound_by_phase_two() {
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "batteryType": "lmt",
             "nominalVoltageV": 36.0,
@@ -816,7 +835,7 @@ mod tests {
     fn small_industrial_below_target_gets_no_phase1_advisory() {
         // Industrial batteries ≤ 2 kWh are out of Phase-1 scope.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "batteryType": "industrial",
             "nominalVoltageV": 12.0,
@@ -840,7 +859,7 @@ mod tests {
     fn large_industrial_below_target_gets_phase1_advisory() {
         // > 2 kWh industrial IS in Phase-1 scope.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "batteryType": "industrial",
             "nominalVoltageV": 48.0,
@@ -866,7 +885,7 @@ mod tests {
         // LFP contains no cobalt; a positive cobalt declaration is a data
         // contradiction that must be surfaced, not silently accepted.
         let data = json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -1010,7 +1029,7 @@ mod art8_declaration_tests {
 
     fn shares_without_year() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -1062,7 +1081,7 @@ mod art8_declaration_tests {
     /// Without a second-life status this must produce a shortfall.
     fn ev_short_on_cobalt() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "batteryType": "ev",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 400.0,

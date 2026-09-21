@@ -31,15 +31,21 @@ use serde_json::{Value, json};
 /// Sum of one line's five treatment shares, widened so a malformed record
 /// cannot wrap into a plausible number.
 fn treatment_total(line: &Value) -> u32 {
-    ["preparingForReusePct", "recyclingPct", "otherRecoveryPct", "disposalPct", "unknownPct"]
-        .iter()
-        .map(|k| {
-            line.get("treatment")
-                .and_then(|t| t.get(*k))
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u32
-        })
-        .sum()
+    [
+        "preparingForReusePct",
+        "recyclingPct",
+        "otherRecoveryPct",
+        "disposalPct",
+        "unknownPct",
+    ]
+    .iter()
+    .map(|k| {
+        line.get("treatment")
+            .and_then(|t| t.get(*k))
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u32
+    })
+    .sum()
 }
 
 /// The Art. 2 point letter a reason maps to, for the point (h) subordination

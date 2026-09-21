@@ -1,18 +1,10 @@
 //! [`ProductIdentifier`] — a unique product identifier under EN 18219 clause 5.
 
+use dpp_rules::common::identifier::{DidRejection, check_did, is_absolute_web_url};
 use serde::{Deserialize, Serialize};
 
 use super::super::gtin::Gtin;
 use super::error::ProductIdentifierError;
-
-/// The DID methods EN 18219 scheme 3 names.
-///
-/// The standard describes scheme 3 as Decentralized Identifiers and names these
-/// three as the admissible methods, `did:web` being the lightweight non-DLT
-/// option. Closed rather than open because an identifier exists to be followed:
-/// a method no reader can resolve identifies nothing, and accepting one would
-/// let a passport be created that is unreachable by design.
-const DID_METHODS: [&str; 3] = ["web", "ethr", "ebsi"];
 
 /// A unique product identifier, in whichever EN 18219 clause 5 scheme issued it.
 ///
@@ -108,17 +100,9 @@ impl ProductIdentifier {
     /// [`ProductIdentifierError::NotAWebUrl`] if `url` is not an absolute
     /// `http`/`https` URL. See the variant's note on what is *not* checked.
     pub fn identification_link(url: &str) -> Result<Self, ProductIdentifierError> {
-        let rest = url
-            .strip_prefix("https://")
-            .or_else(|| url.strip_prefix("http://"))
-            .ok_or_else(|| ProductIdentifierError::NotAWebUrl(url.to_owned()))?;
-
-        // 🚨 The authority ends at the first `/`, `?` or `#` — it is not simply
-        // "whatever follows the scheme". `https:///p/1` and `https://?q` each
-        // leave a non-empty remainder and no host whatsoever, so checking that
-        // remainder for emptiness accepted two values nothing can resolve.
-        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-        if authority.is_empty() || url.contains(char::is_whitespace) {
+        // The syntax lives in `dpp_rules` so the plugin SDK checks the same
+        // thing this does — it previously had a weaker copy of its own.
+        if !is_absolute_web_url(url) {
             return Err(ProductIdentifierError::NotAWebUrl(url.to_owned()));
         }
         Ok(Self::IdentificationLink {
@@ -135,23 +119,16 @@ impl ProductIdentifier {
     /// if the method is not one clause 5 names, and
     /// [`ProductIdentifierError::EmptyDidMethodId`] if nothing follows it.
     pub fn did(did: &str) -> Result<Self, ProductIdentifierError> {
-        let rest = did
-            .strip_prefix("did:")
-            .ok_or_else(|| ProductIdentifierError::NotADid(did.to_owned()))?;
-        let (method, method_id) = rest
-            .split_once(':')
-            .ok_or_else(|| ProductIdentifierError::NotADid(did.to_owned()))?;
-        if !DID_METHODS.contains(&method) {
-            return Err(ProductIdentifierError::UnsupportedDidMethod(
-                method.to_owned(),
-            ));
-        }
-        if method_id.is_empty() {
-            return Err(ProductIdentifierError::EmptyDidMethodId(did.to_owned()));
-        }
-        if !is_method_specific_id(method_id) {
-            return Err(ProductIdentifierError::NotADid(did.to_owned()));
-        }
+        // The grammar lives in `dpp_rules` so the plugin SDK checks the same
+        // thing this does. Each rejection keeps its own error here: which of
+        // the three ways a DID is wrong is worth telling the caller.
+        check_did(did).map_err(|rejection| match rejection {
+            DidRejection::UnsupportedMethod(method) => {
+                ProductIdentifierError::UnsupportedDidMethod(method.to_owned())
+            }
+            DidRejection::EmptyMethodId => ProductIdentifierError::EmptyDidMethodId(did.to_owned()),
+            DidRejection::Malformed => ProductIdentifierError::NotADid(did.to_owned()),
+        })?;
         Ok(Self::Did {
             did: did.to_owned(),
         })
@@ -182,36 +159,6 @@ impl ProductIdentifier {
             Self::Did { did } => did,
         }
     }
-}
-
-/// W3C DID v1.0 clause 3.1: `method-specific-id = *( *idchar ":" ) 1*idchar`.
-///
-/// Colon-separated segments, of which only the last must be non-empty. Checked
-/// because the shape is the whole claim the type makes — a value carrying a raw
-/// space or a truncated `%` escape is not a DID with a formatting blemish, it is
-/// a string no resolver will accept, pointing at no passport.
-fn is_method_specific_id(id: &str) -> bool {
-    !id.is_empty() && !id.ends_with(':') && id.split(':').all(is_idchars)
-}
-
-/// `idchar = ALPHA / DIGIT / "." / "-" / "_" / pct-encoded`, where
-/// `pct-encoded = "%" HEXDIG HEXDIG`.
-fn is_idchars(segment: &str) -> bool {
-    let mut chars = segment.chars();
-    while let Some(c) = chars.next() {
-        let ok = match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '-' | '_' => true,
-            '%' => matches!(
-                (chars.next(), chars.next()),
-                (Some(hi), Some(lo)) if hi.is_ascii_hexdigit() && lo.is_ascii_hexdigit()
-            ),
-            _ => false,
-        };
-        if !ok {
-            return false;
-        }
-    }
-    true
 }
 
 /// The wire shape a stored identifier is read into, before validation.

@@ -5,8 +5,8 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError, PluginIdentity,
-    PluginInput, PluginResult, SchemaVersionRange,
+    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, PluginError,
+    PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num, str_of, threshold_status};
 use serde_json::{Value, json};
@@ -27,13 +27,13 @@ impl DppProductGroupPlugin for AluminiumPlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.1.0".into(),
+            max_version: "1.2.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_str("alloyGrade")
             .require_enum(
                 "productionRoute",
@@ -84,7 +84,7 @@ mod tests {
 
     fn valid() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "alloyGrade": "6xxx",
             "productionRoute": "secondary-recycled",
             "co2ePerTonneKg": 600.0,

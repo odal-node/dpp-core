@@ -11,6 +11,7 @@
 //! "measured value at or under threshold" classification they compare against.
 
 use dpp_plugin_traits::{PluginComplianceStatus, PluginError, PluginFieldError, PluginInput};
+use dpp_rules::common::identifier::{DidRejection, check_did, is_absolute_web_url};
 use serde_json::Value;
 
 /// A present, non-null value for `key`, or `None` if absent/null.
@@ -73,6 +74,19 @@ impl<'a> Validator<'a> {
         }
     }
 
+    /// Record a failure against an already-built field path.
+    ///
+    /// [`push_opt`](Self::push_opt) derives `/{key}` from a single field name,
+    /// which cannot name a field *inside* an object. A nested identifier
+    /// reports `/productIdentifier/gtin`, so the caller builds the path.
+    fn push_at(&mut self, field: String, code: &str, message: String) {
+        self.errors.push(PluginFieldError {
+            field,
+            code: code.to_owned(),
+            message,
+        });
+    }
+
     /// Require a present, non-empty string.
     pub fn require_str(&mut self, key: &str) -> &mut Self {
         let err = match present(self.input, key) {
@@ -112,6 +126,122 @@ impl<'a> Validator<'a> {
             Some(_) => Some(("format", format!("{key} must be 14 digits"))),
         };
         self.push_opt(key, err);
+        self
+    }
+
+    /// Require an EN 18219:2026 clause 5 unique product identifier object.
+    ///
+    /// 🚨 **This replaces [`require_gtin`](Self::require_gtin) for product group
+    /// data.** Product group records used to carry a bare top-level `gtin`, and
+    /// every plugin required it. They now carry a `productIdentifier` object
+    /// whose shape depends on the scheme that issued it, and the GTIN — when
+    /// there is one at all — lives *inside* it:
+    ///
+    /// ```json
+    /// { "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" } }
+    /// ```
+    ///
+    /// A plugin still asking for `gtin` therefore reports *"gtin is required"*
+    /// against data that identifies itself perfectly well. That is not a
+    /// hypothetical: it is what every non-textile plugin did once the schemas
+    /// moved, and because both host call sites discard a plugin error, the
+    /// compliance determination silently stopped being made rather than failing
+    /// loudly.
+    ///
+    /// # Why the scheme decides which field is checked
+    ///
+    /// Clause 5.1 offers three schemes as **alternatives, not a hierarchy**.
+    /// Only scheme 1 is GS1-keyed, so only scheme 1 has a GTIN; schemes 2 and 3
+    /// are self-issuing and carry a URL and a DID respectively. Validating a
+    /// GTIN unconditionally would reject exactly the passports the identifier
+    /// work exists to enable, which is the defect this method replaces.
+    ///
+    /// An unrecognised scheme is refused rather than skipped: a scheme string
+    /// nobody has mapped is where an invented identifier passes unexamined.
+    pub fn require_product_identifier(&mut self, key: &str) -> &mut Self {
+        let Some(object) = present(self.input, key).and_then(Value::as_object) else {
+            self.push_opt(key, Some(("missing", format!("{key} is required"))));
+            return self;
+        };
+        let Some(scheme) = object.get("scheme").and_then(Value::as_str) else {
+            self.push_at(
+                format!("/{key}/scheme"),
+                "missing",
+                format!("{key}.scheme is required"),
+            );
+            return self;
+        };
+        // Each arm names the one field its scheme is keyed on. The branch field
+        // is required *because* the scheme was declared, so a missing one is
+        // reported against the field, not against the scheme that implies it.
+        let (field, err) = match scheme {
+            "gs1" => (
+                "gtin",
+                match object.get("gtin").and_then(Value::as_str) {
+                    None => Some(("missing", format!("{key}.gtin is required for scheme gs1"))),
+                    Some(g) if g.len() == 14 && g.bytes().all(|b| b.is_ascii_digit()) => {
+                        if gs1_check_digit_valid(g) {
+                            None
+                        } else {
+                            Some((
+                                "checksum",
+                                format!("{key}.gtin has an invalid GS1 check digit"),
+                            ))
+                        }
+                    }
+                    Some(_) => Some(("format", format!("{key}.gtin must be 14 digits"))),
+                },
+            ),
+            "identificationLink" => (
+                "url",
+                match object.get("url").and_then(Value::as_str) {
+                    None => Some((
+                        "missing",
+                        format!("{key}.url is required for scheme identificationLink"),
+                    )),
+                    // Checked only to be an absolute http(s) URL with a host.
+                    // EN IEC 61406 format rules are not applied, so passing is
+                    // not a conformance claim — the schema says the same.
+                    Some(u) if is_absolute_web_url(u) => None,
+                    Some(_) => Some(("format", format!("{key}.url must be an absolute URL"))),
+                },
+            ),
+            "did" => (
+                "did",
+                match object.get("did").and_then(Value::as_str) {
+                    None => Some(("missing", format!("{key}.did is required for scheme did"))),
+                    // The method set is closed: a DID method no reader can
+                    // resolve identifies nothing.
+                    Some(d) => match check_did(d) {
+                        Ok(()) => None,
+                        Err(DidRejection::UnsupportedMethod(method)) => Some((
+                            "format",
+                            format!(
+                                "{key}.did method '{method}' is not did:web, did:ethr or did:ebsi"
+                            ),
+                        )),
+                        Err(DidRejection::EmptyMethodId) => Some((
+                            "format",
+                            format!("{key}.did names a method but no identifier"),
+                        )),
+                        Err(DidRejection::Malformed) => {
+                            Some(("format", format!("{key}.did is not a well-formed W3C DID")))
+                        }
+                    },
+                },
+            ),
+            other => {
+                self.push_at(
+                    format!("/{key}/scheme"),
+                    "unknown",
+                    format!("{key}.scheme '{other}' is not an EN 18219 clause 5 scheme"),
+                );
+                return self;
+            }
+        };
+        if let Some((code, message)) = err {
+            self.push_at(format!("/{key}/{field}"), code, message);
+        }
         self
     }
 

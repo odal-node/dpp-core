@@ -14,7 +14,8 @@ mod unsold_goods;
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, PluginError, PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
+    DppProductGroupPlugin, PluginError, PluginIdentity, PluginInput, PluginResult,
+    SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, str_of};
 use serde_json::Value;
@@ -43,7 +44,7 @@ impl DppProductGroupPlugin for TextilePlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.2.0".into(),
+            max_version: "1.3.0".into(),
         }
     }
 

@@ -28,13 +28,13 @@ impl DppProductGroupPlugin for ConstructionPlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.1.0".into(),
+            max_version: "1.2.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_str("productFamily")
             .require_country("countryOfOrigin")
             .require_non_negative("co2ePerFunctionalUnitKg")
@@ -68,7 +68,7 @@ mod tests {
 
     fn valid() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "productFamily": "cement",
             "countryOfOrigin": "PL",
             "co2ePerFunctionalUnitKg": 780.0,

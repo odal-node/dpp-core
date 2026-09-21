@@ -1,10 +1,46 @@
 name: CI
 
+# One run per change, and a button for everything else.
+#
+# 🚨 `push: ["**"]` alongside `pull_request` ran the whole suite **twice** for
+# every push to a branch with an open PR — two runners, same commit, at the same
+# time. Beyond the double spend, it took two independent samples of every
+# timing-sensitive gate, so a flaky-by-timing job had two chances to trip per
+# push and could put a red X on a PR whose sibling run was green.
+#
+# `push` is now `main` only (the post-merge run) and `pull_request` is the
+# pre-merge one. Exactly one fires for any given change.
+#
+# 🚨 `pull_request` deliberately carries **no branch filter**. The filter names
+# the branch a PR is *merging into*, so `branches: [main]` silently excludes
+# every **stacked** PR — one opened against another feature branch matches
+# nothing. Today that is masked by `push: ["**"]` running on all branches; drop
+# that trigger without also dropping the filter and stacked PRs get no CI at
+# all, which is worse than the double run being fixed here.
+#
+# `develop` is gone: no such branch exists on this remote. It was dead config
+# that read as though a second integration branch were gated.
+#
+# `workflow_dispatch` covers what `push: ["**"]` was really serving — running
+# the full suite on a branch before opening a PR.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+  workflow_dispatch:
+
+# Least privilege by default. Any job needing more asks for it locally rather
+# than every job inheriting a token that can write.
+permissions:
+  contents: read
+
+# Cancel a superseded run rather than paying for it. A rebase or a follow-up
+# push makes the in-flight run answer a question nobody is asking any more.
+# `main` is excluded from cancellation: the post-merge run is the record for
+# that commit, and cancelling it would leave a merged commit never fully built.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,7 +51,7 @@ jobs:
     name: Format check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           components: rustfmt
@@ -26,7 +62,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           components: clippy
@@ -38,7 +74,7 @@ jobs:
     name: Tests (unit + integration)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Install cargo-nextest
@@ -60,7 +96,7 @@ jobs:
     name: Docs (rustdoc + doctests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       # `just check` has always run both of these and CI never did, which left a
@@ -87,19 +123,41 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      # 🚨 Runs before the scanners, because a lockfile they trust is only worth
+      # tracking if something proves it still describes the manifests. Bump a
+      # version in a `Cargo.toml` without regenerating and the scans below — and
+      # the daily advisory run — keep reading the old graph, green and wrong.
+      # `fuzz/Cargo.lock` was already in that state when this check was added:
+      # it still pinned the workspace crates at 0.10.0.
+      - name: Lockfiles match their manifests
+        run: |
+          for ws in . plugins fuzz; do
+            (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null)
+          done
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: cargo audit
-        run: cargo audit
+        run: cargo audit --deny yanked
+      # The three questions `cargo audit` cannot answer — licences, duplicate or
+      # banned crates, and dependency provenance. Licences went unchecked here
+      # until this job existed, which for a published Apache-2.0 library is the
+      # gap that mattered: a consumer vendoring this crate inherits its graph's
+      # obligations.
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@3d23c1bbdafe696dfccad2664945a04f47d03dc3 # cargo-deny
+        with:
+          tool: cargo-deny
+      - name: cargo deny
+        run: cargo deny check bans licenses sources
 
   plugins:
     name: Sector plugin tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - uses: taiki-e/install-action@3d23c1bbdafe696dfccad2664945a04f47d03dc3 # just
@@ -109,3 +167,15 @@ jobs:
       # `just check`.
       - name: Sector plugin tests
         run: just test-plugins
+      # The same exclusion keeps them out of `cargo fmt --all` and `cargo
+      # clippy --workspace`, so plugin code had no formatting check and no lint
+      # at all — seven of ten crates were unformatted when this was added.
+      - name: Sector plugin formatting
+        run: just fmt-check-plugins
+      - name: Sector plugin lint
+        run: just lint-plugins
+      # Each loop above asserts it did some work. This proves that assertion
+      # fails on an empty match, because the failure that keeps recurring here
+      # is a gate that goes green without running.
+      - name: Plugin gate guards fail on an empty match
+        run: just plugin-gates-self-test

@@ -6,9 +6,9 @@
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
-    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT, METRIC_REPAIRABILITY_INDEX,
-    PluginComplianceStatus, PluginError, PluginIdentity, PluginInput, PluginResult,
-    SchemaVersionRange,
+    DppProductGroupPlugin, METRIC_CO2E_SCORE, METRIC_RECYCLED_CONTENT_PCT,
+    METRIC_REPAIRABILITY_INDEX, PluginComplianceStatus, PluginError, PluginIdentity, PluginInput,
+    PluginResult, SchemaVersionRange,
 };
 use dpp_plugin_sdk::validate::{Validator, num};
 use serde_json::Value;
@@ -29,13 +29,13 @@ impl DppProductGroupPlugin for FurniturePlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.1.0".into(),
+            max_version: "1.3.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_str("productType")
             .require_str("primaryMaterial")
             .require_country("countryOfOrigin")
@@ -71,7 +71,7 @@ mod tests {
 
     fn valid() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "productType": "chair",
             "primaryMaterial": "solid-wood",
             "countryOfOrigin": "SE",
