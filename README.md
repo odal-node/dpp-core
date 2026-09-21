@@ -106,19 +106,50 @@ When a product undergoes remanufacturing, repurposing, or preparation for reuse,
 
 A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a hosting-side feature, not part of this library: generating a dossier needs persistence and an audit trail, and checking one needs to fetch. What this crate contributes are the primitives that make either possible — `dpp-crypto`'s Ed25519/JWS, `dpp-vc`'s credentials and DID documents, and the domain types a dossier snapshots.
 
+### Product Identity — EN 18219 clause 5, not GS1 only
+
+A passport identifies its product under **one of three schemes**, which clause 5
+offers as alternatives rather than a hierarchy:
+
+| Scheme | Carries | Who can issue one |
+|---|---|---|
+| 1 — GS1 Digital Link | a 14-digit GTIN, check-digit validated | needs a GS1 Company Identification Number |
+| 2 — Identification Link (EN IEC 61406) | an absolute `https` URL | self-issuing: a registered web domain is enough |
+| 3 — DID (W3C DID v1.0) | a `did:web`, `did:ethr` or `did:ebsi` URI | self-issuing, same |
+
+`ProductIdentifier` is the typed home for all three. Deserialisation is routed
+through the constructors, so an identifier that could not have been built cannot
+be read back either.
+
+**Why this matters beyond tidiness:** requiring a GTIN is requiring GS1
+membership. Schemes 2 and 3 exist so a manufacturer without one can still issue a
+conformant passport, and modelling only scheme 1 quietly excludes them.
+
+The identifier travels on `RegistrationRequest` rather than being re-derived from
+the data carrier. 🚨 **A carrier is not an identifier** — a Digital Link happens
+to contain a scheme 1 GTIN, a scheme 2 or 3 carrier contains no such thing, and
+reading one out of the other is where an invented value gets submitted to a
+public authority. `ProductIdentifier: TryFrom<&identifier::ProductIdentifier>` in
+`dpp-registry` maps the three schemes and **refuses** an unmapped one rather than
+inventing a scheme string.
+
 ### Schema Validation
 
 Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.json` (embedded into the crate so they ship with it on publish):
 
 | Product group | Versions | Key Fields |
 |---|---|---|
-| battery | v1.0.0, v2.0.0 – v2.6.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
-| textile | v1.0.0 – v1.2.0 | Fibre composition, SVHC, durability, microplastics |
-| electronics | v1.0.0 – v1.2.0 | Repairability, spare parts, substances of concern |
-| furniture | v1.0.0 – v1.2.0 | Product group-specific delegated-act fields |
-| aluminium, construction, detergent, steel, toy | v1.0.0 – v1.1.0 each | Product group-specific delegated-act fields; steel adds CO2 intensity, scrap content, production method |
+| battery | v1.0.0, v2.0.0 – v2.7.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
+| electronics | v1.0.0 – v1.4.0 | Repairability, spare parts, substances of concern |
+| textile | v1.0.0 – v1.3.0 | Fibre composition, SVHC, durability, microplastics |
+| furniture | v1.0.0 – v1.3.0 | Product group-specific delegated-act fields |
+| aluminium, construction, detergent, steel, toy | v1.0.0 – v1.2.0 each | Product group-specific delegated-act fields; steel adds CO2 intensity, scrap content, production method |
+| mattress, tyre | v1.0.0 – v1.1.0 each | Product group-specific delegated-act fields |
 | unsold-goods | v2.0.0 | Art. 25 destruction ban compliance |
-| mattress, tyre | v1.0.0 each | Product group-specific delegated-act fields |
+
+The current version per group is the one the catalog serves
+(`product-groups/*.json`, `currentSchemaVersion`) — read it there rather than
+from this table, which is hand-maintained and has been behind before.
 
 Twelve product groups. `unsold-goods` starts at v2.0.0: its v1 shape was
 replaced outright when the disclosure was rebuilt to Impl. Reg. (EU) 2026/2
@@ -147,6 +178,31 @@ Highlights:
 
 Plugin ABI supports capability negotiation and semantic versioning with compatibility checking.
 
+**Writing a plugin's `validate_input`.** `dpp-plugin-sdk`'s `Validator` is a
+fluent collector that reports *every* failure rather than stopping at the first.
+For the product identifier, use `require_product_identifier` — it picks which
+field to check from the declared scheme, so a scheme 2 or 3 record is not asked
+for a GTIN it cannot have:
+
+```rust
+Validator::new(input)
+    .require_product_identifier("productIdentifier")
+    .require_str("batteryChemistry")
+    .require_positive("nominalVoltageV")
+    .finish()
+```
+
+🚨 **`require_gtin` is not the field-level equivalent.** It reads a flat
+top-level `gtin` key, which product group data no longer carries — the GTIN now
+lives *inside* `productIdentifier`, and only under scheme 1. A plugin still
+asking for the bare field reports *"gtin is required"* against a record that
+identifies itself perfectly well. `require_gtin` remains correct for a genuinely
+bare GS1 field, and is what `require_product_identifier` uses internally for the
+scheme 1 branch.
+
+An unrecognised scheme is **refused rather than skipped**: a scheme string nobody
+has mapped is exactly where an invented identifier otherwise passes unexamined.
+
 ---
 
 ## Port Traits
@@ -173,7 +229,7 @@ cd dpp-core
 
 cargo build --workspace          # zero infrastructure needed
 cargo nextest run --workspace    # full unit + integration suite
-just check                       # fmt + clippy + test + doctests + plugins + doc + audit
+just check                       # fmt + clippy + test + doctests + plugins + doc + lockfiles + audit
 ```
 
 No Docker, no database, no env vars.
