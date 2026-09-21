@@ -365,8 +365,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   skipped: `"passport_id"` is exactly the kind of invented scheme that otherwise
   passes unexamined, and it now fails at the plugin tier too.
 
-  `require_gtin` remains, and is still correct for a bare GS1 field —
-  `require_product_identifier` uses it internally for the scheme 1 branch.
+  `require_gtin` remains, and is still correct for a bare GS1 field — the
+  scheme 1 branch applies the same check-digit test it does.
+
+- **EN 18219 clause 5 identifier syntax has one home, `dpp-rules`.** The scheme
+  2 and 3 rules existed twice — in `dpp_domain::identifier::ProductIdentifier`
+  and, once the payloads moved to `productIdentifier`, again in the plugin SDK.
+  The copies disagreed: the plugin tier accepted `https:///acme/1` and
+  `did:web: ` because it tested a prefix and a non-empty remainder, where the
+  domain tested the authority and the W3C DID grammar. Since a plugin is the
+  first thing to see product group data, the weaker copy was the one on the
+  outside. `dpp_rules::common::identifier` now holds `is_absolute_web_url`,
+  `check_did` and `DID_METHODS`, and both tiers call it.
 
 - **An EN 18219 identifier converts into the registry's product identifier.**
   Two types shared a name across a crate boundary —

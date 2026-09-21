@@ -292,6 +292,41 @@ fn a_malformed_branch_value_is_refused_per_scheme() {
 }
 
 #[test]
+fn a_carrier_shaped_value_with_nothing_to_resolve_is_refused() {
+    // 🚨 These four passed. The plugin tier tested a prefix and a non-empty
+    // remainder, so a URL with no authority and a DID with a space in it were
+    // both accepted here while `dpp_domain::ProductIdentifier` refused them —
+    // and the plugin is the *first* thing to see product group data, so the
+    // weaker of the two copies was the one on the outside. Both tiers now call
+    // `dpp_rules::common::identifier`.
+    for url in [
+        "https:///acme/1",
+        "https://?q=1",
+        "https://",
+        "https://ac me.example.com",
+    ] {
+        assert_eq!(
+            pi_errors(json!({ "scheme": "identificationLink", "url": url })),
+            vec![("/productIdentifier/url".to_owned(), "format".to_owned())],
+            "{url} has no host to resolve"
+        );
+    }
+    for did in [
+        "did:web: ",
+        "did:web:",
+        "did:web:acme:",
+        "did:web:ac%2zme",
+        "did:web",
+    ] {
+        assert_eq!(
+            pi_errors(json!({ "scheme": "did", "did": did })),
+            vec![("/productIdentifier/did".to_owned(), "format".to_owned())],
+            "{did} is not a resolvable DID"
+        );
+    }
+}
+
+#[test]
 fn an_unmapped_scheme_is_refused_rather_than_skipped() {
     // 🚨 The `passport_id` case. A scheme nobody has mapped is where an
     // invented identifier passes unexamined, so it must fail rather than

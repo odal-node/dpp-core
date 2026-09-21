@@ -11,6 +11,7 @@
 //! "measured value at or under threshold" classification they compare against.
 
 use dpp_plugin_traits::{PluginComplianceStatus, PluginError, PluginFieldError, PluginInput};
+use dpp_rules::common::identifier::{DidRejection, check_did, is_absolute_web_url};
 use serde_json::Value;
 
 /// A present, non-null value for `key`, or `None` if absent/null.
@@ -198,16 +199,10 @@ impl<'a> Validator<'a> {
                         "missing",
                         format!("{key}.url is required for scheme identificationLink"),
                     )),
-                    // Checked only to be an absolute http(s) URL. EN IEC 61406
-                    // format rules are not applied, so passing is not a
-                    // conformance claim — the schema says the same.
-                    Some(u) if u.starts_with("http://") || u.starts_with("https://") => {
-                        if u.len() > "https://".len() {
-                            None
-                        } else {
-                            Some(("format", format!("{key}.url must be an absolute URL")))
-                        }
-                    }
+                    // Checked only to be an absolute http(s) URL with a host.
+                    // EN IEC 61406 format rules are not applied, so passing is
+                    // not a conformance claim — the schema says the same.
+                    Some(u) if is_absolute_web_url(u) => None,
                     Some(_) => Some(("format", format!("{key}.url must be an absolute URL"))),
                 },
             ),
@@ -217,17 +212,22 @@ impl<'a> Validator<'a> {
                     None => Some(("missing", format!("{key}.did is required for scheme did"))),
                     // The method set is closed: a DID method no reader can
                     // resolve identifies nothing.
-                    Some(d)
-                        if ["did:web:", "did:ethr:", "did:ebsi:"]
-                            .iter()
-                            .any(|m| d.starts_with(m) && d.len() > m.len()) =>
-                    {
-                        None
-                    }
-                    Some(_) => Some((
-                        "format",
-                        format!("{key}.did must use the did:web, did:ethr or did:ebsi method"),
-                    )),
+                    Some(d) => match check_did(d) {
+                        Ok(()) => None,
+                        Err(DidRejection::UnsupportedMethod(method)) => Some((
+                            "format",
+                            format!(
+                                "{key}.did method '{method}' is not did:web, did:ethr or did:ebsi"
+                            ),
+                        )),
+                        Err(DidRejection::EmptyMethodId) => Some((
+                            "format",
+                            format!("{key}.did names a method but no identifier"),
+                        )),
+                        Err(DidRejection::Malformed) => {
+                            Some(("format", format!("{key}.did is not a well-formed W3C DID")))
+                        }
+                    },
                 },
             ),
             other => {

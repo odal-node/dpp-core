@@ -45,7 +45,7 @@ impl DppProductGroupPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.5.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.7.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
