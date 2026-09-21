@@ -29,13 +29,13 @@ impl DppProductGroupPlugin for FurniturePlugin {
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "1.1.0".into(),
+            max_version: "1.3.0".into(),
         }
     }
 
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
-            .require_gtin("gtin")
+            .require_product_identifier("productIdentifier")
             .require_str("productType")
             .require_str("primaryMaterial")
             .require_country("countryOfOrigin")
@@ -71,7 +71,7 @@ mod tests {
 
     fn valid() -> Value {
         json!({
-            "gtin": "12345678901231",
+            "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
             "productType": "chair",
             "primaryMaterial": "solid-wood",
             "countryOfOrigin": "SE",
