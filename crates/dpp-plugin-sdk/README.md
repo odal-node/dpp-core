@@ -22,6 +22,7 @@ ABI (`alloc`/`dealloc`) and the standard exports (`metadata`, `describe`,
 
 ```rust
 use dpp_plugin_sdk::traits::*;
+use dpp_plugin_sdk::validate::Validator;
 
 #[derive(Default)]
 struct BatteryPlugin;
@@ -34,7 +35,19 @@ impl DppProductGroupPlugin for BatteryPlugin {
         todo!("the schema versions this plugin accepts")
     }
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
-        todo!("cross-field rules from dpp-rules")
+        // `Validator` collects every failure rather than stopping at the first,
+        // so a manufacturer sees the whole form's problems in one response.
+        //
+        // `require_product_identifier` picks which field to check from the
+        // declared EN 18219 clause 5 scheme. Do NOT reach for `require_gtin`
+        // here: it reads a flat top-level `gtin`, which product group data does
+        // not carry — the GTIN lives inside `productIdentifier`, and only under
+        // scheme 1. Schemes 2 and 3 have no GTIN at all.
+        Validator::new(input)
+            .require_product_identifier("productIdentifier")
+            .require_str("batteryChemistry")
+            .require_positive("nominalVoltageV")
+            .finish()
     }
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> {
         todo!("compliance determination")
