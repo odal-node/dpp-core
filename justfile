@@ -4,6 +4,14 @@
 # Usage:   just <recipe>
 # =============================================================================
 
+# The directory prefix the product-group plugin crates share.
+#
+# One home for it, and a parameter on every recipe that globs it, so
+# `plugin-gates-self-test` can drive those recipes against a prefix that
+# matches nothing. These directories were once `plugins/sector-*`, and the
+# rename is what silently emptied a glob before.
+PLUGIN_PREFIX := "product-group"
+
 # ---------------------------------------------------------------------------
 # Quality gates
 # ---------------------------------------------------------------------------
@@ -88,11 +96,11 @@ bench:
 # them: a plugin can be broken while the workspace gate is green. Runs on the
 # host (not wasm32) because these are ordinary #[cfg(test)] unit tests; the
 # wasm build is covered separately by `build-plugins`.
-test-plugins:
+test-plugins prefix=PLUGIN_PREFIX:
     #!/usr/bin/env bash
     set -euo pipefail
     ran=0
-    for plugin in plugins/product-group-*; do
+    for plugin in plugins/{{prefix}}-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         echo "Testing $plugin..."
         (cd "$plugin" && cargo test --quiet)
@@ -103,7 +111,7 @@ test-plugins:
     # is not hypothetical: these directories were once `plugins/sector-*`, and
     # the CI job that globbed them went silently green at the rename. That job
     # gained this guard; this recipe, which is what `just check` runs, did not.
-    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/{{prefix}}-*"; exit 1; }
     echo "All $ran plugin test suites passed."
 
 # Formatting and lint for the product-group plugins.
@@ -113,37 +121,37 @@ test-plugins:
 # for months with no formatting check and no lint: seven of the ten crates were
 # unformatted when this recipe was first run. `test-plugins` covered their
 # behaviour and nothing covered their shape.
-fmt-check-plugins:
+fmt-check-plugins prefix=PLUGIN_PREFIX:
     #!/usr/bin/env bash
     set -euo pipefail
     ran=0
-    for plugin in plugins/product-group-*; do
+    for plugin in plugins/{{prefix}}-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         (cd "$plugin" && cargo fmt --check)
         ran=$((ran + 1))
     done
-    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/{{prefix}}-*"; exit 1; }
     echo "$ran plugin crates formatted correctly."
 
-lint-plugins:
+lint-plugins prefix=PLUGIN_PREFIX:
     #!/usr/bin/env bash
     set -euo pipefail
     ran=0
-    for plugin in plugins/product-group-*; do
+    for plugin in plugins/{{prefix}}-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         echo "Linting $plugin..."
         (cd "$plugin" && cargo clippy --all-targets -- -D warnings)
         ran=$((ran + 1))
     done
-    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched plugins/{{prefix}}-*"; exit 1; }
     echo "$ran plugin crates linted clean."
 
 # Format the plugins in place — the counterpart to `just fmt` for the crates
 # `cargo fmt --all` cannot see.
-fmt-plugins:
+fmt-plugins prefix=PLUGIN_PREFIX:
     #!/usr/bin/env bash
     set -euo pipefail
-    for plugin in plugins/product-group-*; do
+    for plugin in plugins/{{prefix}}-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         (cd "$plugin" && cargo fmt)
     done
@@ -157,17 +165,17 @@ fmt-plugins:
 plugin-gates-self-test:
     #!/usr/bin/env bash
     set -euo pipefail
-    for gate in test fmt-check lint; do
-        if bash -c '
-            set -euo pipefail
-            ran=0
-            for plugin in plugins/no-such-prefix-*; do
-                [ -f "$plugin/Cargo.toml" ] || continue
-                ran=$((ran + 1))
-            done
-            [ "$ran" -gt 0 ] || { echo "ERROR: no plugins matched"; exit 1; }
-        '; then
-            echo "SELF-TEST FAILED: the $gate-plugins guard passed on an empty match"
+    # 🚨 This drives the REAL recipes against a prefix that matches nothing,
+    # which is why they take one. An earlier version re-implemented the guard
+    # inline and ran that copy three times — it proved a fact about bash, not a
+    # fact about these recipes, and would have stayed green if the guard were
+    # deleted from any of them. That is the same vacuous pass the guards exist
+    # to prevent, one level up.
+    #
+    # Each guard fires before the loop body, so no cargo invocation happens.
+    for gate in test-plugins fmt-check-plugins lint-plugins build-plugins; do
+        if just "$gate" no-such-prefix > /dev/null 2>&1; then
+            echo "SELF-TEST FAILED: $gate passed on an empty match"
             exit 1
         fi
     done
@@ -270,7 +278,7 @@ build:
     cargo build --workspace --release
 
 # Build all Wasm product-group plugins (requires wasm32-wasip1 target)
-build-plugins:
+build-plugins prefix=PLUGIN_PREFIX:
     #!/usr/bin/env bash
     set -euo pipefail
     # Globbed, not listed. This recipe named its ten plugins one per line while
@@ -278,13 +286,13 @@ build-plugins:
     # eleventh plugin would have been tested and linted here and never built,
     # which is the drift a hand-maintained list always ends in.
     built=0
-    for plugin in plugins/product-group-*; do
+    for plugin in plugins/{{prefix}}-*; do
         [ -f "$plugin/Cargo.toml" ] || continue
         echo "Building $plugin..."
         (cd "$plugin" && cargo build --target wasm32-wasip1 --release)
         built=$((built + 1))
     done
-    [ "$built" -gt 0 ] || { echo "ERROR: no plugins matched plugins/product-group-*"; exit 1; }
+    [ "$built" -gt 0 ] || { echo "ERROR: no plugins matched plugins/{{prefix}}-*"; exit 1; }
     echo "All $built plugins built."
 
 # Build a single product-group plugin and print the artifact path.
