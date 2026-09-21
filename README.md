@@ -229,7 +229,7 @@ cd dpp-core
 
 cargo build --workspace          # zero infrastructure needed
 cargo nextest run --workspace    # full unit + integration suite
-just check                       # fmt + clippy + test + doctests + plugins + doc + audit
+just check                       # fmt + clippy + test + doctests + plugins + doc + lockfiles + audit
 ```
 
 No Docker, no database, no env vars.
