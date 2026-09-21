@@ -195,60 +195,60 @@ impl DppProductGroupPlugin for BatteryPlugin {
                 Some(date) => {
                     let (shortfalls, year, standing) =
                         match art8_phase_for(art8_category, date, art8_second_life(input)) {
-                        Art8Phase::Phase1 => (
-                            art8_shortfalls_2031(&scoped),
-                            "2031",
-                            "binding for this battery",
-                        ),
-                        Art8Phase::Phase2 => (
-                            art8_shortfalls_2036(&scoped),
-                            "2036",
-                            "binding for this battery",
-                        ),
-                        // In scope, but placed on the market before the phase
-                        // began. Reported as forward-looking guidance rather
-                        // than dropped: useful to know, but not a duty this
-                        // battery carries.
-                        Art8Phase::NotYetBinding => match art8_category {
-                            Art8Category::Lmt => (
-                                art8_shortfalls_2036(&scoped),
-                                "2036",
-                                "not binding for this battery — Art. 8(3) applies to LMT \
-                                 batteries placed on the market from 18 Aug 2036",
-                            ),
-                            _ => (
+                            Art8Phase::Phase1 => (
                                 art8_shortfalls_2031(&scoped),
                                 "2031",
-                                "not binding for this battery — Art. 8(2) applies to \
-                                 batteries placed on the market from 18 Aug 2031",
+                                "binding for this battery",
                             ),
-                        },
-                        // Art. 8(4): the paragraphs do not apply at all. No
-                        // shortfall is reportable, and reporting one would
-                        // assert a duty the Regulation removed.
-                        //
-                        // Said out loud rather than left silent. Absence of a
-                        // recycled-content finding is not a statement — it is
-                        // what a battery outside Art. 8, a battery whose shares
-                        // are all met, and a battery nobody assessed all look
-                        // like. An exemption an operator has to infer from
-                        // silence is one they cannot show an authority.
-                        Art8Phase::ExemptSecondLife => {
-                            warnings.push(PluginFinding::new(
-                                "battery.recycled_content.exempt_second_life",
-                                "/batteryStatus",
-                                "EU 2023/1542 Art. 8(4) disapplies the Art. 8(1)-(3) \
+                            Art8Phase::Phase2 => (
+                                art8_shortfalls_2036(&scoped),
+                                "2036",
+                                "binding for this battery",
+                            ),
+                            // In scope, but placed on the market before the phase
+                            // began. Reported as forward-looking guidance rather
+                            // than dropped: useful to know, but not a duty this
+                            // battery carries.
+                            Art8Phase::NotYetBinding => match art8_category {
+                                Art8Category::Lmt => (
+                                    art8_shortfalls_2036(&scoped),
+                                    "2036",
+                                    "not binding for this battery — Art. 8(3) applies to LMT \
+                                 batteries placed on the market from 18 Aug 2036",
+                                ),
+                                _ => (
+                                    art8_shortfalls_2031(&scoped),
+                                    "2031",
+                                    "not binding for this battery — Art. 8(2) applies to \
+                                 batteries placed on the market from 18 Aug 2031",
+                                ),
+                            },
+                            // Art. 8(4): the paragraphs do not apply at all. No
+                            // shortfall is reportable, and reporting one would
+                            // assert a duty the Regulation removed.
+                            //
+                            // Said out loud rather than left silent. Absence of a
+                            // recycled-content finding is not a statement — it is
+                            // what a battery outside Art. 8, a battery whose shares
+                            // are all met, and a battery nobody assessed all look
+                            // like. An exemption an operator has to infer from
+                            // silence is one they cannot show an authority.
+                            Art8Phase::ExemptSecondLife => {
+                                warnings.push(PluginFinding::new(
+                                    "battery.recycled_content.exempt_second_life",
+                                    "/batteryStatus",
+                                    "EU 2023/1542 Art. 8(4) disapplies the Art. 8(1)-(3) \
                                  recycled-content minimums to this battery: batteryStatus \
                                  records a second-life operation, and a battery reaching \
                                  that state was necessarily on the market before it. No \
                                  minimum share is assessed.",
-                            ));
-                            (Vec::new(), "", "")
-                        }
-                        // Nothing to say: the category was never in scope, so
-                        // there is no duty whose absence needs explaining.
-                        Art8Phase::NotCovered => (Vec::new(), "", ""),
-                    };
+                                ));
+                                (Vec::new(), "", "")
+                            }
+                            // Nothing to say: the category was never in scope, so
+                            // there is no duty whose absence needs explaining.
+                            Art8Phase::NotCovered => (Vec::new(), "", ""),
+                        };
                     for sf in shortfalls {
                         let field = match sf.material {
                             "cobalt" => "/recycledContentCobaltPct",
@@ -344,9 +344,7 @@ impl DppProductGroupPlugin for BatteryPlugin {
 /// error the operator can see and correct now.
 fn art8_second_life(input: &PluginInput) -> Art8SecondLife {
     match input.get("batteryStatus").and_then(Value::as_str) {
-        Some("repurposed" | "re-used" | "remanufactured") => {
-            Art8SecondLife::PlacedBeforeOperations
-        }
+        Some("repurposed" | "re-used" | "remanufactured") => Art8SecondLife::PlacedBeforeOperations,
         _ => Art8SecondLife::None,
     }
 }
