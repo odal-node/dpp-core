@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-plugin-traits"
-description = "Host/guest contract for Odal Node Wasm sector plugins"
+description = "Host/guest contract for Odal Node Wasm product group plugins"
 keywords    = ["dpp", "wasm", "plugin", "product-group", "compliance"]
 categories  = ["wasm"]
 version.workspace     = true

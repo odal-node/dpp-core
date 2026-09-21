@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-plugin-sdk"
-description = "Guest-side SDK and ABI export macro for Odal Node Wasm sector plugins"
+description = "Guest-side SDK and ABI export macro for Odal Node Wasm product group plugins"
 keywords    = ["dpp", "wasm", "plugin", "sdk", "product-group"]
 categories  = ["wasm"]
 version.workspace      = true
