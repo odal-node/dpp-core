@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-rules"
-description = "Pure EU ESPR cross-field regulatory rules, shared by dpp-domain and the Wasm sector plugins"
+description = "Pure EU ESPR cross-field regulatory rules, shared by dpp-domain and the Wasm product group plugins"
 keywords    = ["dpp", "espr", "validation", "no-std"]
 categories  = ["no-std"]
 version.workspace      = true
