@@ -372,11 +372,35 @@ mod tests {
         // And they are reported by the helper the linter uses, rather than only
         // being absent from the mandatory set. No `Vec` here — this crate is
         // `no_std`.
-        let present = ["gtin", "dueDiligenceUrl", "carbonFootprintClass"];
+        // 🚨 The control is a field the table does not name, and the reason it
+        // is not flagged is [`Requirement::Unknown`] — **not** that it is
+        // mandatory. Only `NotApplicable` is barred, so anything the guidance
+        // has not been read against passes here, and reading that as approval
+        // is the mistake this control exists to make visible.
+        //
+        // It used to be `"gtin"`, which was doubly misleading: the assertion
+        // claimed the table answered `Mandatory` for it (the table has no such
+        // row — the identifier row is `batteryPassportNumber`), and product
+        // group data stopped carrying a bare `gtin` at all.
+        let present = [
+            "productIdentifier",
+            "dueDiligenceUrl",
+            "carbonFootprintClass",
+        ];
         let mut flagged = fields_not_applicable(&present, "ev");
         assert_eq!(flagged.next(), Some("dueDiligenceUrl"));
         assert_eq!(flagged.next(), Some("carbonFootprintClass"));
-        assert_eq!(flagged.next(), None, "gtin is mandatory, not barred");
+        assert_eq!(
+            flagged.next(),
+            None,
+            "productIdentifier is Unknown to this table, and Unknown is not barred"
+        );
+        assert_eq!(
+            annex_xiii_requirement("productIdentifier", "ev"),
+            Requirement::Unknown,
+            "if the guidance is ever read against the product identifier, this \
+             control stops being one and the line above needs rewriting"
+        );
     }
 
     #[test]
