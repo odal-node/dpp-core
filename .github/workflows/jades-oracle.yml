@@ -22,16 +22,17 @@
 # device and a QTSP together. None is a property of the bytes.
 name: JAdES conformance oracle
 
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
 on:
   push:
-    branches: ["**"]
+    branches: [main]
     paths:
       - "crates/dpp-crypto/src/jades/**"
       - "crates/dpp-crypto/tests/jades_oracle_artifact.rs"
       - ".github/oracle/jades/**"
       - ".github/workflows/jades-oracle.yml"
   pull_request:
-    branches: [main, develop]
     paths:
       - "crates/dpp-crypto/src/jades/**"
       - "crates/dpp-crypto/tests/jades_oracle_artifact.rs"
@@ -42,17 +43,21 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   validate:
     name: DSS recognises the signature as JAdES-BASELINE-B
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: "17"
@@ -81,7 +86,7 @@ jobs:
       # exact bytes DSS judged are recoverable.
       - name: Upload the artefact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: jades-artefact
           path: target/jades-oracle/

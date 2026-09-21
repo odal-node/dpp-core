@@ -44,9 +44,38 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
-# Run security audit against RustSec advisory database
+# Run security audit against RustSec advisory database, then the dependency
+# policy `cargo audit` cannot express.
+#
+# The split is deliberate: `cargo audit` owns advisories, `cargo deny` owns the
+# three questions it cannot answer — licences, duplicate/banned crates, and
+# where a dependency came from. `deny check advisories` is left out rather than
+# run twice.
+#
+# 🚨 Licences were unchecked until this was added, and the very first run
+# rejected one: `webpki-root-certs` (CDLA-Permissive-2.0), reaching a *published
+# Apache-2.0 library* as a runtime dependency. It is permissive and now
+# explicitly allowed — but nothing had ever looked, which for a crate other
+# people vendor is the part that mattered.
 audit:
-    cargo audit
+    cargo audit --deny yanked
+    cargo deny check bans licenses sources
+
+# The committed lockfiles must match the manifests.
+#
+# 🚨 Committing a lockfile that nothing checks buys less than it looks like.
+# Bump a version in a `Cargo.toml` without regenerating, and `cargo audit` and
+# the daily advisory run keep scanning the **old** graph — authoritative-looking
+# and wrong, which is the failure this whole branch is about. `--locked` fails
+# instead of silently re-resolving. Regenerate with `cargo update -w`, never by
+# hand. One per workspace, matching the three tracked lockfiles.
+lock-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for ws in . plugins fuzz; do
+        (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null)
+    done
+    echo "3 lockfiles match their manifests."
 
 # Check the public API against the last published release.
 #
@@ -217,7 +246,7 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test doc audit
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test doc lock-check audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
