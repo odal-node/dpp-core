@@ -4,6 +4,7 @@ use super::port::*;
 use async_trait::async_trait;
 
 use crate::error::DppError;
+use crate::identifier::ProductIdentifier;
 use crate::passport::ManufacturerInfo;
 use crate::product_group::ProductGroup;
 use crate::{
@@ -18,7 +19,7 @@ use std::sync::Mutex;
 /// (`patch_fields`, `create_batch`, `update_batch`). Only the methods those
 /// defaults call are functional; the rest satisfy the signature.
 #[derive(Default)]
-struct InMemoryRepo {
+pub(super) struct InMemoryRepo {
     store: Mutex<HashMap<PassportId, Passport>>,
 }
 
@@ -36,29 +37,6 @@ impl PassportRepository for InMemoryRepo {
     }
     async fn find_published_by_id(&self, id: PassportId) -> Result<Option<Passport>, DppError> {
         self.find_by_id(id).await
-    }
-    async fn find_published_by_gtin(&self, _gtin: &str) -> Result<Option<Passport>, DppError> {
-        Ok(None)
-    }
-    async fn find_by_gtin_any_status(&self, gtin: &str) -> Result<Option<Passport>, DppError> {
-        // Mirrors the indexed query: match the GS1 Digital Link path
-        // segment rather than a bare substring, and refuse a non-numeric
-        // value so a `LIKE` metacharacter cannot widen the match.
-        if gtin.is_empty() || !gtin.bytes().all(|b| b.is_ascii_digit()) {
-            return Ok(None);
-        }
-        let needle = format!("/01/{gtin}/");
-        Ok(self
-            .store
-            .lock()
-            .unwrap()
-            .values()
-            .find(|p| {
-                p.qr_code_url
-                    .as_deref()
-                    .is_some_and(|u| u.contains(&needle))
-            })
-            .cloned())
     }
     async fn find_by_id_any_status(&self, id: PassportId) -> Result<Option<Passport>, DppError> {
         self.find_by_id(id).await
@@ -86,13 +64,25 @@ impl PassportRepository for InMemoryRepo {
     }
     async fn list(
         &self,
-        _status: Option<PassportStatus>,
+        status: Option<PassportStatus>,
         _q: Option<&str>,
         _facility_id: Option<&str>,
         _limit: u32,
         _offset: u32,
     ) -> Result<Vec<Passport>, DppError> {
-        Ok(self.store.lock().unwrap().values().cloned().collect())
+        // 🚨 This ignored `status` entirely, which made it a double that does
+        // not model the contract it stands in for: every default implementation
+        // written in terms of `list(Some(..))` was exercised against a store
+        // that answered with everything. `None` is every status, matching the
+        // `facility_id` reading on the trait.
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|p| status.as_ref().is_none_or(|s| p.status == *s))
+            .cloned()
+            .collect())
     }
     async fn count(
         &self,
@@ -100,6 +90,24 @@ impl PassportRepository for InMemoryRepo {
         _facility_id: Option<&str>,
     ) -> Result<u64, DppError> {
         Ok(self.store.lock().unwrap().len() as u64)
+    }
+}
+
+/// The identifier every fixture below carries — the GTIN on
+/// `sample_battery_data`, so a lookup has something real to match.
+pub(super) fn fixture_identifier() -> ProductIdentifier {
+    ProductIdentifier::gs1(crate::Gtin::parse("09506000134352").expect("a GTIN"))
+}
+
+/// A draft passport that carries product group data, and therefore an
+/// identifier. `sample_passport` deliberately has none.
+pub(super) fn identified_passport(name: &str) -> Passport {
+    Passport {
+        product_group: crate::ProductGroup::Battery,
+        product_group_data: Some(crate::ProductGroupData::Battery(Box::new(
+            crate::test_support::sample_battery_data(),
+        ))),
+        ..draft_passport(name)
     }
 }
 
@@ -253,6 +261,7 @@ async fn default_find_by_identity_matches_across_draft_and_published() {
         product_group: ProductGroup::Battery,
         identifier: "09506000134352".into(),
         batch_id: Some("BATCH-1".into()),
+        serial_number: None,
     };
     let found = repo.find_by_identity(&identity).await.unwrap();
     assert_eq!(found.map(|p| p.id), Some(created.id));
@@ -261,48 +270,9 @@ async fn default_find_by_identity_matches_across_draft_and_published() {
         product_group: ProductGroup::Battery,
         identifier: "00000000000000".into(),
         batch_id: None,
+        serial_number: None,
     };
     assert!(repo.find_by_identity(&no_match).await.unwrap().is_none());
-}
-
-#[tokio::test]
-async fn any_status_gtin_lookup_still_finds_a_suspended_passport() {
-    // The distinction this method exists for: a withdrawn passport must stay
-    // reachable by GTIN so the scanned-code route can answer `410 Gone`
-    // rather than `404`. `find_published_by_gtin` cannot express it — its
-    // `None` means "unknown GTIN" and "withdrawn" at once.
-    let repo = InMemoryRepo::default();
-    let mut p = draft_passport("Suspended battery");
-    p.qr_code_url = Some("https://id.example/01/09506000134352/21/ABC123".into());
-    p.status = PassportStatus::Suspended;
-    let created = repo.create(p).await.unwrap();
-
-    let found = repo
-        .find_by_gtin_any_status("09506000134352")
-        .await
-        .unwrap();
-    assert_eq!(
-        found.map(|p| p.status),
-        Some(PassportStatus::Suspended),
-        "a suspended passport must remain findable by GTIN, and carry its status"
-    );
-    assert_eq!(
-        repo.find_by_gtin_any_status("09506000134352")
-            .await
-            .unwrap()
-            .map(|p| p.id),
-        Some(created.id)
-    );
-
-    // An unknown GTIN is the genuine `None` — the case 404 is for.
-    assert!(
-        repo.find_by_gtin_any_status("00000000000000")
-            .await
-            .unwrap()
-            .is_none()
-    );
-    // A non-numeric value is refused before it can act as a LIKE pattern.
-    assert!(repo.find_by_gtin_any_status("%").await.unwrap().is_none());
 }
 
 #[tokio::test]
