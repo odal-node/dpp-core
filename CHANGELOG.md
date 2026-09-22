@@ -48,6 +48,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Migration: pass `AssetIdentity::from_passport(&passport)` where you passed a
   GTIN, and decide explicitly what a passport without an identifier is.
 
+  🚨 **A caller-chosen value is validated, because nothing downstream is.**
+  Measured against `aas-core3.0` 1.1.4, the AAS reference implementation
+  **accepts** `urn:odal-node:product:asset 1` (a raw space),
+  `urn:odal-node:product:` (no namespace-specific string at all) and an
+  embedded tab — it verifies `globalAssetId`'s length, not its syntax. An empty
+  or whitespace-bearing `Named` value is therefore refused here with
+  `AasError::UnusableAssetIdentity` rather than percent-encoded, since encoding
+  would make the shell's identifier a different string from the one the caller
+  supplied — its own kind of false statement. A `Product` value needs no such
+  check: all three arms of `ProductIdentifier` already refuse whitespace.
+
 - **The shell's `serialId` carried the passport UUID; it now carries the
   serial.** `passport.serial_number` — a real envelope field — was never read by
   this crate at all, while the internal passport id, documented as an opaque

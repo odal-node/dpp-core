@@ -121,6 +121,49 @@ impl<'a> AssetIdentity<'a> {
         }
     }
 
+    /// Check that this identity can form an AAS `Identifier` at all.
+    ///
+    /// 🚨 **Nothing downstream does.** The AAS metamodel types `globalAssetId`
+    /// as an `Identifier`, but the reference implementation verifies only its
+    /// length — measured against `aas-core3.0` 1.1.4, which **accepts**
+    /// `urn:odal-node:product:asset 1` (a raw space), `urn:odal-node:product:`
+    /// (no namespace-specific string at all) and an embedded tab. So this is
+    /// the last place a value that cannot be an identifier can be stopped.
+    ///
+    /// Only [`Named`](Self::Named) needs checking. A
+    /// [`Product`](Self::Product) value comes from `ProductIdentifier`, whose
+    /// three arms already refuse whitespace: a GTIN is fourteen digits, a
+    /// scheme 2 link is an absolute URL rejected for any whitespace, and a DID
+    /// must satisfy the W3C `idchar` grammar.
+    ///
+    /// **Rejected rather than percent-encoded.** Encoding would make the
+    /// shell's identifier a different string from the one the caller supplied,
+    /// which is its own kind of false statement — and a caller choosing an
+    /// asset key is in a position to choose a usable one.
+    ///
+    /// # Errors
+    ///
+    /// [`AasError::ReservedAssetIdName`] if the name is one a scheme derives,
+    /// and [`AasError::UnusableAssetIdentity`] if the value cannot appear in a
+    /// URI.
+    pub fn validate(&self) -> Result<(), AasError> {
+        self.asset_id_name()?;
+        let Self::Named { value, .. } = self else {
+            return Ok(());
+        };
+        if value.trim().is_empty() {
+            return Err(AasError::UnusableAssetIdentity(String::from(
+                "an empty asset identity names nothing",
+            )));
+        }
+        if let Some(bad) = value.chars().find(|c| c.is_whitespace() || c.is_control()) {
+            return Err(AasError::UnusableAssetIdentity(format!(
+                "asset identity {value:?} contains {bad:?}, which cannot appear in a URI"
+            )));
+        }
+        Ok(())
+    }
+
     /// The shell's `globalAssetId`.
     ///
     /// 🚨 **A value that is already a URI is used as-is.** The AAS

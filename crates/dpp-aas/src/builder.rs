@@ -25,6 +25,12 @@ pub enum AasError {
     /// of value under another kind's label — the defect `AssetIdentity` exists
     /// to remove. See `RESERVED_ASSET_ID_NAMES`.
     ReservedAssetIdName(String),
+    /// A caller-chosen asset identity carries a value that cannot appear in a
+    /// URI, so no honest `globalAssetId` can be built from it.
+    ///
+    /// Checked here because nothing downstream does: the AAS reference
+    /// implementation verifies `globalAssetId`'s length and not its syntax.
+    UnusableAssetIdentity(String),
 }
 
 impl std::fmt::Display for AasError {
@@ -33,8 +39,12 @@ impl std::fmt::Display for AasError {
             Self::Masking(m) => write!(f, "passport did not survive masking: {m}"),
             Self::ReservedAssetIdName(n) => write!(
                 f,
-                "asset id name '{n}' is reserved for an identifier scheme and                  may not be chosen by a caller"
+                "asset id name '{n}' is reserved for an identifier scheme and may \
+                 not be chosen by a caller"
             ),
+            Self::UnusableAssetIdentity(m) => {
+                write!(f, "asset identity cannot form an identifier: {m}")
+            }
         }
     }
 }
@@ -92,6 +102,11 @@ pub fn build_aas_from_passport(
     identity: AssetIdentity<'_>,
     audience: Audience,
 ) -> Result<(AasShell, Vec<AasSubmodel>), AasError> {
+    // Before anything is built from it: a name no scheme derives, and a value
+    // that can appear in a URI. Fails closed rather than emitting a shell whose
+    // asset identifier is not one.
+    identity.validate()?;
+
     let passport = &mask(passport, audience)?;
     let passport_id = passport.id.to_string();
 

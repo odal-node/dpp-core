@@ -376,6 +376,49 @@ fn a_caller_chosen_key_may_not_impersonate_a_scheme() {
 }
 
 #[test]
+fn a_caller_chosen_key_that_cannot_be_a_uri_is_refused() {
+    // 🚨 Nothing downstream catches these. Measured against `aas-core3.0`
+    // 1.1.4, the AAS reference implementation **accepts**
+    // `urn:odal-node:product:asset 1`, `urn:odal-node:product:` and a value
+    // with an embedded tab — it verifies `globalAssetId`'s length, not its
+    // syntax. The name was already guarded and the value was not, which left
+    // the guard asymmetric in the one type whose job is that the shell cannot
+    // assert something false.
+    let passport = minimal_passport(ProductGroup::Textile);
+    for value in [
+        "",
+        "   ",
+        "asset 1",
+        "a	b",
+        "line
+break",
+    ] {
+        let identity = AssetIdentity::Named {
+            name: "internalAssetKey",
+            value,
+        };
+        match build_aas_from_passport(&passport, identity, Audience::Public) {
+            Err(AasError::UnusableAssetIdentity(_)) => {}
+            other => panic!(
+                "expected {value:?} to be refused, got {:?}",
+                other.map(|_| ())
+            ),
+        }
+    }
+}
+
+/// A `Product` identity needs no such check, and this says why rather than
+/// leaving it to be rediscovered: all three arms already refuse whitespace.
+#[test]
+fn a_scheme_issued_identity_cannot_carry_whitespace() {
+    use dpp_domain::identifier::ProductIdentifier;
+
+    assert!(ProductIdentifier::identification_link("https://acme.example.com/a b").is_err());
+    assert!(ProductIdentifier::did("did:web:acme.example.com:a b").is_err());
+    assert!(dpp_domain::Gtin::parse("0950600013 52").is_err());
+}
+
+#[test]
 fn a_caller_chosen_key_that_is_not_a_uri_is_wrapped() {
     // The safe direction: wrapping a non-URI yields a valid URN, while failing
     // to wrap one yields a `globalAssetId` that is not an identifier at all.
