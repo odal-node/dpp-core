@@ -46,7 +46,7 @@ All adapter implementations live downstream. The domain is testable with in-memo
 
 ## 2. Open-Core Boundary
 
-The `ComplianceRegistry` trait in `dpp-domain::ports` is the **extension seam** — the single point where product-group-specific compliance logic plugs in. It is a *technical* boundary: compliance calculation is open (Apache-2.0 Wasm plugins and the engine's calculators).
+The `ComplianceRegistry` trait in `dpp-domain::ports` is the **extension seam** — the single point where product-group-specific compliance logic plugs in. It is a *technical* boundary: compliance calculation is open (Apache-2.0 Wasm plugins and the platform's calculators).
 
 ```rust
 pub trait ComplianceRegistry: Send + Sync {

@@ -424,8 +424,8 @@ path steady. That holds for rules 1–14 and it is the normal case.
 
 **§1 is the exception, and deliberately so.** Placing a module in its tier can
 mean it stops being where it was — dissolving a wrapper module renames every path
-beneath it, and `dpp-engine` reaches 98 distinct paths into this crate, most of
-them deep. Those break.
+beneath it, and the consuming platform reaches 98 distinct paths into this
+crate, most of them deep. Those break.
 
 That is a real cost and it is accepted rather than hidden. Compatibility
 re-exports would keep it quiet, and they are refused on purpose: two ways to

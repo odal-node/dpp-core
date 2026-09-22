@@ -55,7 +55,7 @@ finding lists on `PluginResult` (ABI 1.1, backward-compatible):
 The plugin produces these by calling the shared regulatory rules the SDK
 re-exports as `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each
 `PluginFinding` to a `ComplianceFinding` on the core `ComplianceResult`
-(`plugin_result_to_compliance`), which the engine persists on the passport
+(`plugin_result_to_compliance`), which the host persists on the passport
 (`compliance_result`, part of the signed payload) and gates publish on.
 
 `product-group-battery` is the reference: it scopes EU 2023/1542 Art. 8(2) recycled-content
@@ -67,8 +67,8 @@ range) are hard **validation** errors raised in core `cross_field_errors`.
 **Recipe — add determination to a product group:** in that product group's plugin
 `calculate_metrics`, call the relevant `dpp_plugin_sdk::rules::<product group>` checks,
 push `PluginFinding`s onto `warnings` (not-yet-in-force / advisory) or
-`violations` (binding, in force), rebuild the `.wasm`. No engine change is
-required — the host routes by product group and the engine persists + gates the result.
+`violations` (binding, in force), rebuild the `.wasm`. No host change is
+required — the host routes by product group, then persists and gates the result.
 
 ---
 
