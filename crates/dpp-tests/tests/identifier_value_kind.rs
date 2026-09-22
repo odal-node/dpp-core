@@ -68,3 +68,30 @@ fn only_the_two_self_issuing_schemes_are_already_uris() {
     assert!(ids[1].is_uri(), "an identification link is a URL");
     assert!(ids[2].is_uri(), "a DID is a URI");
 }
+
+/// 🚨 The reserved list and the derived names are two statements of one set.
+///
+/// `AssetIdentity::Named` refuses the names a scheme derives, and that refusal
+/// is only as complete as the list. Add a clause 5 scheme — the enum is
+/// `#[non_exhaustive]` precisely because that is expected — and `value_kind`
+/// would return a fourth string that the escape hatch could then claim, which
+/// is the defect the reservation exists to prevent, reopened by omission.
+#[test]
+fn every_derived_name_is_reserved_against_the_escape_hatch() {
+    for identifier in one_of_each() {
+        assert!(
+            dpp_aas::RESERVED_ASSET_ID_NAMES.contains(&identifier.value_kind()),
+            "{} is a derived asset id name and must be reserved",
+            identifier.value_kind()
+        );
+    }
+    // And nothing is reserved that no scheme derives, which would refuse a
+    // caller-chosen name for no reason.
+    let derived: Vec<&str> = one_of_each().iter().map(|i| i.value_kind()).collect();
+    for reserved in dpp_aas::RESERVED_ASSET_ID_NAMES {
+        assert!(
+            derived.contains(&reserved),
+            "{reserved} is reserved but no scheme derives it"
+        );
+    }
+}

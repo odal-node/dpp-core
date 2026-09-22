@@ -22,7 +22,7 @@ use crate::product_group::payload::ProductGroupPayload;
 /// Serialises as an internally-tagged object where `"productGroup"` is the
 /// discriminant field, e.g.:
 /// ```json
-/// { "productGroup": "battery", "gtin": "09506000134352", "nominalVoltageV": 3.2, ... }
+/// { "productGroup": "battery", "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" }, "nominalVoltageV": 3.2, ... }
 /// ```
 /// ```json
 /// { "productGroup": "textile", "fibreComposition": [...], "countryOfOrigin": "BD" }
