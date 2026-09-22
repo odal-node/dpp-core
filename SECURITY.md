@@ -55,7 +55,7 @@ Issues in the following areas are particularly important:
 
 Security patches are issued for the **latest tagged release**. When a new minor or major version is released, the previous minor continues to receive security patches for **90 days**, after which support for it ends.
 
-The current release is on the [releases page](https://github.com/odal-node/dpp-core/releases/latest) and on [crates.io](https://crates.io/crates/dpp-core). This section names no version number on purpose: the previous wording hardcoded one, and it went on asserting `0.1.x` across the nineteen minor releases from 0.2 to 0.20, because nothing breaks when a policy document goes stale.
+The current version is on the [tags page](https://github.com/odal-node/dpp-core/tags), and on crates.io, where every crate in the workspace is published in lockstep under one version — [`dpp-domain`](https://crates.io/crates/dpp-domain) names it. (There is no `dpp-core` crate: that is the workspace, not a published artifact. GitHub Releases is not the pointer either — this repository tags its releases and does not publish release objects, so `/releases/latest` resolves to an empty page.) This section names no version number on purpose: the previous wording hardcoded one, and it went on asserting `0.1.x` across the nineteen minor releases from 0.2 to 0.20, because nothing breaks when a policy document goes stale.
 
 ## Recognition
 
