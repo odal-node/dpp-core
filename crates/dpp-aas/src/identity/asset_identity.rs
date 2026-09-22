@@ -39,8 +39,8 @@ use dpp_domain::identifier::ProductIdentifier;
 
 use crate::builder::AasError;
 
-/// The three `specificAssetId` names a [`ProductIdentity`](AssetIdentity)
-/// derives, which a caller-chosen one may therefore not use.
+/// The three `specificAssetId` names an [`AssetIdentity::Product`] derives,
+/// which a caller-chosen one may therefore not use.
 ///
 /// 🚨 Reserved because the escape hatch would otherwise reproduce the exact
 /// defect this type removes: `Named { name: "gtin", value: <a DID> }` is the
