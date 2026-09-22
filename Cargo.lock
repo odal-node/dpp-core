@@ -899,6 +899,7 @@ dependencies = [
  "dpp-digital-link",
  "dpp-domain",
  "dpp-registry",
+ "dpp-rules",
  "dpp-vc",
  "dpp-vocab",
  "jsonschema",

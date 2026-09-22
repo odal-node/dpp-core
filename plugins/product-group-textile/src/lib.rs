@@ -55,12 +55,20 @@ impl DppProductGroupPlugin for TextilePlugin {
             // rules that matter (the treatment split, and point (h)'s
             // subordination) are not answerable field by field.
             Validator::new(input)
+                .require_object("entity")
+                .require_object("financialYear")
                 .require_non_empty_array("lines")
                 .require_str("measuresTaken")
                 .require_str("measuresPlanned")
                 .finish()
         } else {
             Validator::new(input)
+                // 🚨 Textile never asked for a bare `gtin`, so when every other
+                // plugin's `require_gtin` had to be replaced by this call, this
+                // one had nothing to replace. It came through the identifier
+                // migration clean by accident — and the same accident left it
+                // the only plugin checking no identifier at all.
+                .require_product_identifier("productIdentifier")
                 .require_non_empty_array("fibreComposition")
                 .require_country("countryOfOrigin")
                 .require_str("careInstructions")
@@ -97,6 +105,10 @@ mod tests {
 
     fn textile() -> Value {
         json!({
+            // 🚨 The schema has required this since v1.3.0 and this fixture
+            // omitted it, so every textile test ran against a record the
+            // schema would refuse.
+            "productIdentifier": {"scheme": "gs1", "gtin": "09506000134352"},
             "fibreComposition": [
                 { "fibre": "cotton", "pct": 60.0 },
                 { "fibre": "polyester", "pct": 40.0 }
@@ -156,6 +168,59 @@ mod tests {
                 .compliance_status,
             PluginComplianceStatus::NonCompliant
         );
+    }
+
+    #[test]
+    fn a_textile_without_an_identifier_is_refused() {
+        let mut d = textile();
+        d.as_object_mut()
+            .expect("object")
+            .remove("productIdentifier");
+        match TextilePlugin.validate_input(&d) {
+            Err(PluginError::ValidationErrors(errors)) => assert!(
+                errors.iter().any(|e| e.field == "/productIdentifier"),
+                "the refusal must name the field: {errors:?}"
+            ),
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
+
+    /// 🚨 The assertion that keeps the two branches honest.
+    ///
+    /// This crate serves two product groups off one `productGroup`
+    /// discriminant, so a check added to the shared path would refuse every
+    /// unsold-goods report. An Art. 24–25 disclosure covers a financial year
+    /// across many products and identifies no single one — which is why
+    /// `ProductGroupData::product_identifier()` answers `None` for it and why
+    /// its schema requires no identifier. Putting the check in the textile
+    /// branch only is not a detail; it is the difference between validating
+    /// textiles and breaking disclosures.
+    #[test]
+    fn an_unsold_goods_report_still_needs_no_identifier() {
+        let d = unsold();
+        assert!(
+            d.get("productIdentifier").is_none(),
+            "the fixture must not carry one, or this proves nothing"
+        );
+        assert!(TextilePlugin.validate_input(&d).is_ok());
+    }
+
+    #[test]
+    fn a_disclosure_without_its_header_rows_is_refused() {
+        // `entity` and `financialYear` are Annex I header rows and top-level
+        // `required`, and this branch checked neither: a disclosure naming no
+        // discloser and no reporting period passed.
+        for field in ["entity", "financialYear"] {
+            let mut d = unsold();
+            d.as_object_mut().expect("object").remove(field);
+            match TextilePlugin.validate_input(&d) {
+                Err(PluginError::ValidationErrors(errors)) => assert!(
+                    errors.iter().any(|e| e.field == format!("/{field}")),
+                    "the refusal must name {field}: {errors:?}"
+                ),
+                other => panic!("expected a refusal without {field}, got {other:?}"),
+            }
+        }
     }
 
     #[test]

@@ -15,6 +15,7 @@
 //! never interchangeable as dispatch keys.
 
 use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::rules::batteries::category::BATTERY_TYPES;
 use dpp_plugin_sdk::rules::batteries::degradation::{
     Annex7ParameterSet, annex_vii_parameter_set_for,
 };
@@ -56,6 +57,14 @@ impl DppProductGroupPlugin for BatteryPlugin {
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> {
         Validator::new(input)
             .require_product_identifier("productIdentifier")
+            // 🚨 The category is not one field among several: it selects which
+            // obligations apply at all. Art. 8(2) does not reach LMT batteries,
+            // and the Art. 8(4) second-life carve-out turns on status, so a
+            // determination computed without it is computed against the wrong
+            // instrument. The schema has always required it; this tier did not,
+            // which let the plugin declare itself satisfied with input its own
+            // calculation then reads as `unwrap_or("")`.
+            .require_enum("batteryType", &BATTERY_TYPES)
             .require_str("batteryChemistry")
             .require_positive("nominalVoltageV")
             .require_positive("nominalCapacityAh")
@@ -452,6 +461,11 @@ mod tests {
     fn valid_battery() -> Value {
         json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            // 🚨 The schema has required this since v1.0.0 and this
+            // fixture omitted it, so every test built on it ran against
+            // a record the schema would refuse — a large part of how the
+            // missing check stayed invisible.
+            "batteryType": "industrial",
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -493,6 +507,48 @@ mod tests {
                 );
             }
             other => panic!("expected ValidationErrors, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_battery_without_a_category_is_refused() {
+        // The category decides which obligations apply, so a record without one
+        // cannot be assessed against anything. It used to pass this tier and
+        // reach `calculate_metrics`, where `unwrap_or("")` turned the absence
+        // into a category no rule matches.
+        let mut data = valid_battery();
+        data.as_object_mut().expect("object").remove("batteryType");
+        match BatteryPlugin.validate_input(&data) {
+            Err(PluginError::ValidationErrors(errors)) => assert!(
+                errors.iter().any(|e| e.field == "/batteryType"),
+                "the refusal must name the field: {errors:?}"
+            ),
+            other => panic!("expected a refusal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_category_outside_art_1_3_is_refused() {
+        // Art. 1(3) is a closed enumeration whose tie-break rule only works
+        // over a closed set, so an unrecognised category is a reason to reject
+        // the record rather than absorb it.
+        let mut data = valid_battery();
+        data["batteryType"] = json!("hypothetical");
+        assert!(BatteryPlugin.validate_input(&data).is_err());
+    }
+
+    #[test]
+    fn every_art_1_3_category_is_accepted() {
+        // The other direction, so the check cannot be tightened into refusing a
+        // lawful category. Driven from the shared vocabulary rather than a list
+        // written out here, which is the point of there being one.
+        for category in BATTERY_TYPES {
+            let mut data = valid_battery();
+            data["batteryType"] = json!(category);
+            assert!(
+                BatteryPlugin.validate_input(&data).is_ok(),
+                "{category} is an Art. 1(3) category and must be accepted"
+            );
         }
     }
 
@@ -579,6 +635,7 @@ mod tests {
     fn nmc_below_2031_cobalt_emits_advisory_warning_not_violation() {
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -615,6 +672,7 @@ mod tests {
         // LFP contains no cobalt; a defaulted 0.0 must not produce a shortfall.
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -626,8 +684,17 @@ mod tests {
             "recycledContentLithiumPct": 12.5
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+        // 🚨 Narrowed from `warnings.is_empty()`. That held only while this
+        // record carried no `batteryType`: an unknown category makes the Annex
+        // XIII mandatory-content check answer `Unknown` for every field and
+        // emit nothing, so a blanket assertion was silently resting on a
+        // determination that was not being made. This is a cobalt-on-LFP test;
+        // it now asserts about cobalt on LFP.
         assert!(
-            result.warnings.is_empty(),
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code.contains("not_in_chemistry")),
             "LFP cobalt 0.0 must not warn; got: {:?}",
             result.warnings
         );
@@ -657,6 +724,7 @@ mod tests {
     fn rated_capacity_unit_error_emits_advisory_warning() {
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0, // nominal = 4.8 kWh
@@ -680,6 +748,7 @@ mod tests {
     fn consistent_rated_capacity_no_warning() {
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -689,7 +758,16 @@ mod tests {
             "ratedCapacityKwh": 4.8
         });
         let result = BatteryPlugin.calculate_metrics(&data).unwrap();
-        assert!(result.warnings.is_empty(), "got: {:?}", result.warnings);
+        // Narrowed for the same reason as the cobalt test above: this asserts
+        // about the rated-capacity cross-check, not about every rule at once.
+        assert!(
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.code == "battery.rated_capacity.inconsistent_with_nominal"),
+            "got: {:?}",
+            result.warnings
+        );
     }
 
     #[test]
@@ -726,6 +804,7 @@ mod tests {
         // phase from "today" would report it as short from 18 Aug 2031 onwards.
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -757,6 +836,7 @@ mod tests {
     fn missing_market_date_is_reported_rather_than_guessed() {
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -785,6 +865,7 @@ mod tests {
     fn malformed_market_date_is_treated_as_missing() {
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -886,6 +967,7 @@ mod tests {
         // contradiction that must be surfaced, not silently accepted.
         let data = json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "LFP",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,
@@ -1030,6 +1112,7 @@ mod art8_declaration_tests {
     fn shares_without_year() -> Value {
         json!({
             "productIdentifier": {"scheme": "gs1", "gtin": "12345678901231"},
+            "batteryType": "industrial",
             "batteryChemistry": "NMC",
             "nominalVoltageV": 48.0,
             "nominalCapacityAh": 100.0,

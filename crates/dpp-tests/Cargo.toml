@@ -30,6 +30,11 @@ dpp-digital-link    = { workspace = true }
 dpp-aas             = { workspace = true }
 dpp-vocab           = { workspace = true }
 dpp-registry        = { workspace = true }
+# Read so a test can hold the shared battery-category vocabulary against the
+# domain enum and the JSON schema. Dev-only: nothing in `src/` uses it, and
+# this crate is `publish = false`, so the edge does not reach the crate graph
+# anyone vendors.
+dpp-rules           = { workspace = true }
 serde_json = { workspace = true }
 uuid       = { workspace = true }
 semver     = { workspace = true }
