@@ -101,9 +101,12 @@ fn validated_fields(src: &str) -> BTreeSet<String> {
 /// The top-level `required` list of a product group's current schema.
 fn required_fields(root: &Path, group: &str) -> Vec<String> {
     let dir = root.join("crates/dpp-domain/schemas").join(group);
+    // 🚨 Not `flatten()`. It discards the per-entry `io::Error`, and losing the
+    // newest schema here would make this read a real `required` list that is
+    // not the current one — the gate passing having checked the wrong version.
     let mut versions: Vec<(Vec<u64>, PathBuf)> = fs::read_dir(&dir)
         .unwrap_or_else(|e| panic!("reading {}: {e}", dir.display()))
-        .flatten()
+        .map(|e| e.unwrap_or_else(|err| panic!("reading an entry of {}: {err}", dir.display())))
         .filter_map(|e| {
             let p = e.path();
             let name = p.file_name()?.to_str()?;
@@ -183,7 +186,7 @@ fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    for entry in entries.flatten() {
+    for entry in entries.map(|e| e.expect("reading a plugin source directory entry")) {
         let path = entry.path();
         if path.is_dir() {
             collect_rs(&path, out);
@@ -199,9 +202,11 @@ fn the_plugin_list_covers_every_plugin_on_disk() {
     // reports nothing about it — the vacuous pass this file exists to prevent,
     // one level up.
     let root = workspace_root();
+    // A dropped entry shrinks one side of a set comparison, turning "these
+    // agree" into "these agree as far as I could read".
     let on_disk: BTreeSet<String> = fs::read_dir(root.join("plugins"))
         .expect("plugins/ is readable")
-        .flatten()
+        .map(|e| e.expect("reading an entry of plugins/"))
         .filter(|e| e.path().is_dir())
         .filter_map(|e| {
             let n = e.file_name().to_str()?.to_owned();

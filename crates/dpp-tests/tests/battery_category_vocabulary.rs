@@ -42,7 +42,9 @@ fn schema_categories(root: &Path) -> BTreeSet<String> {
     let dir = root.join("crates/dpp-domain/schemas/battery");
     let mut versions: Vec<(Vec<u64>, PathBuf)> = fs::read_dir(&dir)
         .expect("the battery schema directory is readable")
-        .flatten()
+        // Not `flatten()`: losing the newest entry would compare the shared
+        // vocabulary against a superseded schema and call that agreement.
+        .map(|e| e.expect("reading an entry of the battery schema directory"))
         .filter_map(|e| {
             let p = e.path();
             let core = p
