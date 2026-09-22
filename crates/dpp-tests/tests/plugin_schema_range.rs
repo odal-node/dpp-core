@@ -90,13 +90,23 @@ fn declared_bound(src: &str, field: &str) -> Option<String> {
 }
 
 /// Every version a product group ships, lowest first.
+///
+/// 🚨 A dropped directory entry is not a neutral loss here. Lose the newest
+/// file and the highest version this returns is a real version that is not the
+/// highest — so a stale `max_version` reads as correct and the gate passes
+/// having checked the wrong thing. `flatten()` would do exactly that, silently,
+/// because it discards the per-entry `io::Error`. A traversal failure must be
+/// loud; in a test, that means panicking rather than returning a short list.
 fn shipped_versions(root: &Path, group: &str) -> Vec<(u64, u64, u64)> {
     let dir = root.join("crates/dpp-domain/schemas").join(group);
     let Ok(entries) = fs::read_dir(&dir) else {
+        // A missing directory is a real answer — the caller reports it as a
+        // plugin naming a product group that ships nothing. An unreadable
+        // *entry* below is not.
         return Vec::new();
     };
     let mut out: Vec<(u64, u64, u64)> = entries
-        .flatten()
+        .map(|e| e.unwrap_or_else(|err| panic!("reading an entry of {}: {err}", dir.display())))
         .filter_map(|e| parse_version(e.file_name().to_str()?))
         .collect();
     out.sort_unstable();
@@ -117,7 +127,7 @@ fn every_plugin_declares_the_schema_versions_its_group_ships() {
 
     let entries = fs::read_dir(&plugins_dir).expect("plugins/ must be readable");
     let mut dirs: Vec<PathBuf> = entries
-        .flatten()
+        .map(|e| e.expect("reading an entry of plugins/"))
         .map(|e| e.path())
         .filter(|p| {
             p.is_dir()
@@ -205,16 +215,19 @@ fn every_plugin_declares_the_schema_versions_its_group_ships() {
 fn a_product_group_without_a_plugin_is_one_someone_chose() {
     let root = workspace_root();
 
+    // Not `flatten()`: a dropped entry silently shrinks one side of a set
+    // comparison, which is the difference between "these agree" and "these
+    // agree as far as I could read".
     let schema_groups: BTreeSet<String> = fs::read_dir(root.join("crates/dpp-domain/schemas"))
         .expect("the schema directory must be readable")
-        .flatten()
+        .map(|e| e.expect("reading an entry of the schema directory"))
         .filter(|e| e.path().is_dir())
         .filter_map(|e| e.file_name().to_str().map(str::to_owned))
         .collect();
 
     let plugin_groups: BTreeSet<String> = fs::read_dir(root.join("plugins"))
         .expect("plugins/ must be readable")
-        .flatten()
+        .map(|e| e.expect("reading an entry of plugins/"))
         .filter(|e| e.path().is_dir())
         .filter_map(|e| {
             e.file_name()
