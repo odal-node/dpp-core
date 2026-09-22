@@ -7,7 +7,7 @@
 Host/guest ABI contract for [Odal Node](https://odal-node.io) Wasm product group plugins.
 
 Uses `std` types (`String`, `Vec`, `HashMap`) — **not** `no_std`. Defines the
-interface between the platform runtime (the Wasmtime host in `dpp-engine`) and
+interface between the platform runtime (a Wasmtime host) and
 product-group-specific compliance rules compiled to `wasm32-wasip1`. This crate
 contains no business logic — only the shared types that both sides of the
 boundary agree on.

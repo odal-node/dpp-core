@@ -47,7 +47,7 @@ Issues in the following areas are particularly important:
 
 ## Out of Scope
 
-- Issues in the dpp-engine repository (report to the same email, but this policy covers dpp-core only)
+- Issues in software that consumes these crates — this policy covers the crates published from this repository only, so report those to that project's own security contact
 - **Vulnerabilities in upstream dependencies** — report these to the dependency maintainer and to [RustSec](https://rustsec.org/). We monitor advisories via `cargo audit`, both in CI and on a daily schedule, and will publish a patched release once a fix is available upstream. We cannot fix them ourselves, which is why they are out of scope for this policy rather than out of mind.
 - Feature requests or non-security bugs (use GitHub Issues)
 

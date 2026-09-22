@@ -7,7 +7,8 @@ use crate::seal::{SealCapabilities, SealRequest, SealVerification, SealedEnvelop
 
 /// Port trait for applying and verifying eIDAS qualified electronic seals.
 ///
-/// Implementations live in `dpp-engine` and call a QTSP over the CSC API.
+/// Implementations are supplied by the consuming application and call a QTSP
+/// over the CSC API.
 /// Until a QTSP is configured, wire `GhostSeal` so registration code compiles
 /// and runs against a stable contract.
 #[async_trait]

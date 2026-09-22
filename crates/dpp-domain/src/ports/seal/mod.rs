@@ -36,9 +36,9 @@
 //! - **Operator seal:** the operator obtains and manages their own qualified seal.
 //!
 //! The real adapter calls a QTSP over the CSC API (Cloud Signature Consortium)
-//! and lives in `dpp-engine`. Until a QTSP integration is configured,
-//! `GhostSeal` returns clearly-synthetic envelopes so registration code can be
-//! written and tested against this contract today.
+//! and is supplied by the consuming application. Until a QTSP integration is
+//! configured, `GhostSeal` returns clearly-synthetic envelopes so registration
+//! code can be written and tested against this contract today.
 //!
 //! The value objects this trait produces — [`SealedEnvelope`](crate::seal::SealedEnvelope) and friends — are
 //! domain values, not ports, and live in [`crate::seal`]. They are

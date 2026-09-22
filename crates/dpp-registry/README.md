@@ -9,8 +9,8 @@ Digital Product Passport system.
 
 Currently a **ghost connector**. This crate defines interface types (registration
 payloads, sync requests, response envelopes, error models) so that platform code
-can be written against a stable interface. The real HTTP adapter lives in
-`dpp-engine`.
+can be written against a stable interface. The real HTTP adapter belongs to the
+consuming application.
 
 ⚠️ **These shapes predate the published specification.** The registry became
 operational on 20 July 2026 under Commission Implementing Regulation (EU)
