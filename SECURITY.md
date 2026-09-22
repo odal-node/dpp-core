@@ -48,16 +48,14 @@ Issues in the following areas are particularly important:
 ## Out of Scope
 
 - Issues in the dpp-engine repository (report to the same email, but this policy covers dpp-core only)
-- Vulnerabilities in upstream dependencies (report to the dependency maintainer; we monitor via `cargo audit` in CI)
+- **Vulnerabilities in upstream dependencies** — report these to the dependency maintainer and to [RustSec](https://rustsec.org/). We monitor advisories via `cargo audit`, both in CI and on a daily schedule, and will publish a patched release once a fix is available upstream. We cannot fix them ourselves, which is why they are out of scope for this policy rather than out of mind.
 - Feature requests or non-security bugs (use GitHub Issues)
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.1.x (current) | Yes |
+Security patches are issued for the **latest tagged release**. When a new minor or major version is released, the previous minor continues to receive security patches for **90 days**, after which support for it ends.
 
-Only the latest release receives security patches. When a new minor or major version is released, the previous version receives security patches for 90 days, then support ends.
+The current version is on the [tags page](https://github.com/odal-node/dpp-core/tags), and on crates.io, where every crate in the workspace is published in lockstep under one version — [`dpp-domain`](https://crates.io/crates/dpp-domain) names it. (There is no `dpp-core` crate: that is the workspace, not a published artifact. GitHub Releases is not the pointer either — this repository tags its releases and does not publish release objects, so `/releases/latest` resolves to an empty page.) This section names no version number on purpose: the previous wording hardcoded one, and it went on asserting `0.1.x` across the nineteen minor releases from 0.2 to 0.20, because nothing breaks when a policy document goes stale.
 
 ## Recognition
 
