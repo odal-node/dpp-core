@@ -8,7 +8,7 @@
 //! this crate, one hand-rolled in the resolver, each pointing at a different
 //! dead URL.
 
-use dpp_domain::PassportCredential;
+use dpp_domain::{Gtin, PassportCredential, ProductIdentifier};
 use dpp_vc::credential::{CredentialBuilder, CredentialRole, DppCredentialSubject};
 use dpp_vc::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 use serde_json::{Value, json};
@@ -117,13 +117,25 @@ fn the_passport_vocabulary_is_inlined() {
         .find(|e| e.is_object())
         .expect("the context carries an inline term map");
 
-    for term in ["dpp", "gtin", "productGroup", "passportId"] {
+    for term in ["dpp", "productIdentifier", "productGroup", "passportId"] {
         assert!(
             inline.get(term).is_some(),
             "term '{term}' is not defined inline — a consumer would have to \
              fetch it from somewhere"
         );
     }
+
+    // 🚨 `gtin` is inline too, but **scoped to `productIdentifier`**, which is
+    // where the key now is. This loop used to look for it at the top level,
+    // and that is precisely the assertion that kept passing while the
+    // credential stopped carrying the identifier at all: a term is reachable
+    // only at the position its key occupies.
+    assert!(
+        inline["productIdentifier"]["@context"]
+            .get("gtin")
+            .is_some(),
+        "the GS1 term must be defined where the key is"
+    );
 }
 
 /// No dead URL from any previous definition comes back, in any context array.
@@ -233,4 +245,87 @@ fn framing_round_trips_a_passport() {
     assert!(framed.get("@context").is_some(), "framing adds the context");
     assert_eq!(framed["productName"], "EcoCell");
     assert_eq!(strip_context(framed), passport);
+}
+
+/// 🚨 Every key a product identifier carries has a term, at the position it
+/// occupies.
+///
+/// A JSON-LD term is only reachable where the key actually is. When the
+/// identifier moved from a bare `gtin` at the top of `productGroupData` to a
+/// `productIdentifier` object, the `gs1:gtin` term stayed behind and
+/// `productIdentifier` had no definition — so expansion dropped the node and
+/// everything inside it. Measured against a processor before the fix: the old
+/// shape expanded `productGroupData` to `{"https://ref.gs1.org/voc/gtin": …}`,
+/// the current one to `{}`. A credential whose semantic form carried no
+/// product identity at all, and nothing said so.
+///
+/// This asserts the terms rather than running an expansion, because the
+/// workspace has no JSON-LD processor — so it catches the drift that caused
+/// the defect without claiming to verify expansion. Two things are checked,
+/// because either alone lets the defect back: that every key the wire form
+/// actually carries has a term, and that each term names the IRI it should.
+/// A term aimed at the wrong IRI is as wrong as no term and is just as quiet.
+///
+/// 🚨 The key set is read off the serialised variants, never listed here. A
+/// literal list is the same mistake one level up — an assertion pinned to the
+/// keys that existed when it was written, which is precisely how the old
+/// top-level `gtin` check went on passing after the key moved.
+#[test]
+fn every_product_identifier_key_has_a_scoped_term() {
+    let ctx = context_value();
+    let terms = ctx
+        .as_array()
+        .expect("@context is an array")
+        .iter()
+        .find(|e| e.is_object())
+        .and_then(Value::as_object)
+        .expect("the context carries an inline term map");
+
+    let scoped = terms["productIdentifier"]["@context"]
+        .as_object()
+        .expect("productIdentifier defines a scoped context, or its node is dropped");
+
+    // 🚨 The keys are read off the serialised variants rather than listed
+    // here. A literal list would be one more assertion pinned to a position:
+    // a fourth clause 5 scheme would add a key, the list would not know, and
+    // the new key would be dropped on expansion exactly as `gtin` was.
+    for identifier in [
+        ProductIdentifier::gs1(Gtin::parse("09506000134352").expect("valid GTIN literal")),
+        ProductIdentifier::identification_link("https://example.com/p/1")
+            .expect("valid identification link"),
+        ProductIdentifier::did("did:web:example.com:p:1").expect("valid DID"),
+    ] {
+        let wire = serde_json::to_value(&identifier).expect("a product identifier serialises");
+        for key in wire.as_object().expect("a tagged object").keys() {
+            assert!(
+                scoped.contains_key(key),
+                "`{key}` appears inside productIdentifier and has no term: {scoped:?}"
+            );
+        }
+    }
+
+    // Presence alone is not enough: a term aimed at the wrong IRI passes every
+    // check above and still says something false about the identifier.
+    for (key, iri) in [
+        ("scheme", "dpp:identifierScheme"),
+        ("gtin", "gs1:gtin"),
+        ("url", "dpp:identificationLink"),
+        ("did", "dpp:decentralizedIdentifier"),
+    ] {
+        assert_eq!(scoped[key], json!(iri), "`{key}` maps to the wrong IRI");
+    }
+
+    // 🚨 And they must stay scoped. `scheme` is also a facility-snapshot field,
+    // so a global term would file a GLN scheme under the product identifier's
+    // meaning — two different things collapsed into one IRI.
+    for key in ["scheme", "url", "did"] {
+        assert!(
+            !terms.contains_key(key),
+            "`{key}` must not be a global term; it means different things elsewhere"
+        );
+    }
+
+    // Scoped contexts are a JSON-LD 1.1 feature; without the version marker a
+    // processor treats the inner `@context` as an error rather than a scope.
+    assert_eq!(terms["@version"], json!(1.1));
 }

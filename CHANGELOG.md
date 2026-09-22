@@ -427,6 +427,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **🚨 A credential's expanded form carried no product identity at all.** The
+  JSON-LD context defined `gtin` at the top level, which is where the key sat
+  before the identifier migration. When the identifier moved under
+  `productIdentifier`, that node had no term of its own — and an undefined term
+  is dropped on expansion, taking everything inside it. Measured against a
+  JSON-LD processor:
+
+  ```
+  old shape      productGroupData -> {"https://ref.gs1.org/voc/gtin": [{"@value": "09506000134352"}]}
+  current shape  productGroupData -> {}
+  ```
+
+  So the one deliberately evidence-backed term in the whole context — GS1's
+  `gtin`, whose provenance record `dpp-vocab` carries — had become unreachable,
+  and a consumer doing semantic processing received a passport that identified
+  nothing.
+
+  `productIdentifier` now carries a **scoped** context defining `scheme`,
+  `gtin`, `url` and `did`, so all three EN 18219 schemes survive expansion.
+  Scoped rather than global on purpose: `scheme` is also a facility-snapshot
+  field, and one global term would give a GLN scheme the product identifier's
+  meaning. Requires `"@version": 1.1`, without which a processor treats an
+  inner `@context` as an error rather than a scope.
+
+  🚨 The existing `the_passport_vocabulary_is_inlined` test asserted `gtin` at
+  the **top level** and passed throughout — an assertion at the position a key
+  used to occupy cannot notice the key moving. It now checks the term where the
+  key is.
+
 - **Every passport carries its product identifier into the AAS, not just the
   ones with a typed mapper.** Two of the four product-group mappers emitted
   `productIdentifier` into their own submodel and two did not, and the **eight**

@@ -92,6 +92,15 @@ pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
 /// [`Gtin`](dpp_domain::Gtin)'s shape exactly, which is why the term says
 /// something true.
 ///
+/// 🚨 It is now defined **inside `productIdentifier`**, not at the top level,
+/// because that is where the key is. A term is only reachable at the position
+/// the key occupies: when the identifier moved under `productIdentifier` and
+/// that node had no definition of its own, expansion dropped the node and
+/// carried `gtin` down with it. The scheme 2 and 3 terms are scoped the same
+/// way, and deliberately are **not** global — `scheme` is also a facility
+/// snapshot field, and one global term would give a GLN scheme the product
+/// identifier's meaning.
+///
 /// The other two stay `dpp:`. Schema.org is `tracked` in `dpp-vocab`: evaluated,
 /// not adopted, and its record does not permit emission. And note that what was
 /// read was **one term**, not the GS1 vocabulary — declaring the `gs1:` prefix
@@ -109,9 +118,38 @@ pub fn passport_context() -> Value {
                 "@context": [
                     REMOTE_CONTEXTS[0],
                     {
+                        // 🚨 JSON-LD 1.1, for the scoped context below. Without
+                        // it a processor treats `@context` inside a term
+                        // definition as an error rather than a scope.
+                        "@version": 1.1,
                         "dpp": OWN_JSONLD_NAMESPACE,
                         "gs1": gs1_namespace(),
-                        "gtin": "gs1:gtin",
+                        // 🚨 The identifier's terms are **scoped to it**, not
+                        // global. `scheme` is also a field on the facility
+                        // snapshot, so a global term would file a GLN scheme
+                        // under the product identifier's meaning — two
+                        // different things collapsed into one IRI.
+                        //
+                        // This is where `gtin` now lives, because this is where
+                        // the key now is. It used to sit at the top of
+                        // `productGroupData`, and when the identifier moved
+                        // under `productIdentifier` the term stayed behind:
+                        // `productIdentifier` had no definition, so expansion
+                        // dropped the whole node and everything in it.
+                        // Measured against a JSON-LD processor — the old shape
+                        // expanded `productGroupData` to
+                        // `{"https://ref.gs1.org/voc/gtin": [...]}` and the
+                        // current one expanded it to `{}`. A credential whose
+                        // semantic form carries no product identity at all.
+                        "productIdentifier": {
+                            "@id": "dpp:productIdentifier",
+                            "@context": {
+                                "scheme": "dpp:identifierScheme",
+                                "gtin": "gs1:gtin",
+                                "url": "dpp:identificationLink",
+                                "did": "dpp:decentralizedIdentifier"
+                            }
+                        },
                         "productGroup": "dpp:product_group",
                         "passportId": "dpp:passportId",
                         "status": "dpp:status",
