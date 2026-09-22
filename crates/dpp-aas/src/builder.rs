@@ -2,8 +2,10 @@
 //! a complete AAS shell + submodels.
 
 use dpp_domain::access::redact_passport;
+use dpp_domain::catalog::Granularity;
 use dpp_domain::{Audience, Passport};
 
+use super::identity::AssetIdentity;
 use super::model::{
     AasEnvironment, AasSemId, AasShell, AasSubmodel, AssetInformation, SpecificAssetId,
 };
@@ -18,12 +20,21 @@ pub enum AasError {
     /// requires to exist, so no honest projection can be produced for that
     /// audience. Fails closed rather than emitting a partial shell.
     Masking(String),
+    /// A caller-chosen asset identity claimed a `specificAssetId` name that a
+    /// clause 5 scheme derives, which would let the escape hatch file one kind
+    /// of value under another kind's label — the defect `AssetIdentity` exists
+    /// to remove. See `RESERVED_ASSET_ID_NAMES`.
+    ReservedAssetIdName(String),
 }
 
 impl std::fmt::Display for AasError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Masking(m) => write!(f, "passport did not survive masking: {m}"),
+            Self::ReservedAssetIdName(n) => write!(
+                f,
+                "asset id name '{n}' is reserved for an identifier scheme and                  may not be chosen by a caller"
+            ),
         }
     }
 }
@@ -78,7 +89,7 @@ impl std::error::Error for AasError {}
 /// defect rather than a caller error.
 pub fn build_aas_from_passport(
     passport: &Passport,
-    gtin: &str,
+    identity: AssetIdentity<'_>,
     audience: Audience,
 ) -> Result<(AasShell, Vec<AasSubmodel>), AasError> {
     let passport = &mask(passport, audience)?;
@@ -86,14 +97,25 @@ pub fn build_aas_from_passport(
 
     let mut specific_asset_ids = vec![
         SpecificAssetId {
-            name: "gtin".into(),
-            value: gtin.to_owned(),
+            name: identity.asset_id_name()?.to_owned(),
+            value: identity.value().to_owned(),
         },
+        // 🚨 Named for what it is. This slot used to be `serialId` and carried
+        // `passport.id` — an internal UUID, documented elsewhere as an opaque
+        // link and explicitly *not* a legal identifier, published in a document
+        // an integrator reads as the unit's serial number. `serial_number` is a
+        // real field on the envelope and was never read here at all.
         SpecificAssetId {
-            name: "serialId".into(),
+            name: "passportId".into(),
             value: passport_id.clone(),
         },
     ];
+    if let Some(serial) = &passport.serial_number {
+        specific_asset_ids.push(SpecificAssetId {
+            name: "serialId".into(),
+            value: serial.clone(),
+        });
+    }
     if let Some(batch) = &passport.batch_id {
         specific_asset_ids.push(SpecificAssetId {
             name: "batchId".into(),
@@ -120,8 +142,8 @@ pub fn build_aas_from_passport(
         id_short: "DigitalProductPassport".into(),
         model_type: "AssetAdministrationShell".into(),
         asset_information: AssetInformation {
-            asset_kind: "Instance".into(),
-            global_asset_id: format!("urn:odal-node:product:{gtin}"),
+            asset_kind: asset_kind_for(passport.granularity).into(),
+            global_asset_id: identity.global_asset_id(),
             specific_asset_ids,
         },
         submodels: submodels
@@ -167,13 +189,32 @@ fn mask(passport: &Passport, audience: Audience) -> Result<Passport, AasError> {
 /// Propagates [`AasError::Masking`] unchanged.
 pub fn build_aas_environment(
     passport: &Passport,
-    gtin: &str,
+    identity: AssetIdentity<'_>,
     audience: Audience,
 ) -> Result<AasEnvironment, AasError> {
-    let (shell, submodels) = build_aas_from_passport(passport, gtin, audience)?;
+    let (shell, submodels) = build_aas_from_passport(passport, identity, audience)?;
     Ok(AasEnvironment {
         asset_administration_shells: vec![shell],
         submodels,
         concept_descriptions: Vec::new(),
     })
+}
+
+/// The AAS `assetKind` a passport's registration level implies.
+///
+/// 🚨 `"Instance"` was hardcoded, under a doc comment asserting a passport
+/// "describes one manufactured item or batch, never a product type
+/// definition". [`Granularity::Model`] is exactly a product type definition —
+/// *one passport covering every unit sharing a model's specifications* — so
+/// the claim was false for one of the three levels the model admits.
+///
+/// `Batch` and `Item` both describe manufactured things and stay `"Instance"`.
+/// `None` also stays `"Instance"`: granularity is `Option` because the envelope
+/// is additive-only and no adopted act has fixed a level, so absence means "not
+/// stated" and the prior behaviour is the honest default for it.
+const fn asset_kind_for(granularity: Option<Granularity>) -> &'static str {
+    match granularity {
+        Some(g) if g.describes_a_type() => "Type",
+        _ => "Instance",
+    }
 }

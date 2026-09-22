@@ -6,14 +6,14 @@
       "modelType": "AssetAdministrationShell",
       "assetInformation": {
         "assetKind": "Instance",
-        "globalAssetId": "urn:odal-node:product:09506000134352",
+        "globalAssetId": "urn:odal-node:test-asset:1",
         "specificAssetIds": [
           {
-            "name": "gtin",
-            "value": "09506000134352"
+            "name": "assetKey",
+            "value": "urn:odal-node:test-asset:1"
           },
           {
-            "name": "serialId",
+            "name": "passportId",
             "value": "01234567-89ab-7cde-8f01-23456789abcd"
           }
         ]

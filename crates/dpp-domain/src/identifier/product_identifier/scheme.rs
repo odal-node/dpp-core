@@ -146,6 +146,45 @@ impl ProductIdentifier {
         }
     }
 
+    /// What **kind of value** this identifier carries — `"gtin"`,
+    /// `"identificationLink"` or `"did"`.
+    ///
+    /// 🚨 **Not the same question as the clause 5 scheme**, and the two answers
+    /// differ for scheme 1. The serde tag is `"gs1"`, which names the *scheme*
+    /// that issued the identifier; this names the *thing the value is*. They
+    /// coincide for schemes 2 and 3 and not for scheme 1, which is exactly
+    /// where a caller conflating them would go wrong without failing.
+    ///
+    /// # Why this lives here rather than in each consumer
+    ///
+    /// Every surface that labels an identifier needs it — the registry wire
+    /// `scheme`, an AAS `specificAssetId` name — and none of them can compute
+    /// it safely on its own: this enum is `#[non_exhaustive]`, so a match from
+    /// another crate must carry a wildcard arm, and a wildcard that produced a
+    /// label would name a scheme nobody has mapped as though it had been.
+    /// Authored here, the match is exhaustive and the function is total.
+    #[must_use]
+    pub fn value_kind(&self) -> &'static str {
+        match self {
+            Self::Gs1 { .. } => "gtin",
+            Self::IdentificationLink { .. } => "identificationLink",
+            Self::Did { .. } => "did",
+        }
+    }
+
+    /// Whether [`as_str`](Self::as_str) is already a resolvable URI.
+    ///
+    /// 🚨 Schemes 2 and 3 are URIs in their own right — an `http(s)` URL and a
+    /// DID. Scheme 1 is a bare 14-digit number and is not. A caller that needs
+    /// an identifier-shaped URI must wrap the third case and must **not** wrap
+    /// the other two: nesting a URI inside a URN produces
+    /// `urn:…:did:web:example.com`, which is a URN whose namespace-specific
+    /// string is another scheme, and no resolver treats that as either.
+    #[must_use]
+    pub const fn is_uri(&self) -> bool {
+        matches!(self, Self::IdentificationLink { .. } | Self::Did { .. })
+    }
+
     /// The identifier as a single string, whichever scheme issued it.
     ///
     /// For scheme 1 this is the 14-digit GTIN, not a Digital Link URL: building

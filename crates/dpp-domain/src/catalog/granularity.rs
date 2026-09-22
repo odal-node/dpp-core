@@ -45,4 +45,28 @@ impl Granularity {
     pub fn most_granular(self, other: Self) -> Self {
         self.max(other)
     }
+
+    /// Whether a passport at this level describes a **specification** rather
+    /// than manufactured things.
+    ///
+    /// [`Model`](Self::Model) covers every unit sharing a model's
+    /// specifications, so it describes a type. [`Batch`](Self::Batch) and
+    /// [`Item`](Self::Item) both describe things that were made — one run, or
+    /// one unit.
+    ///
+    /// # Why this is answered here
+    ///
+    /// A projection that has to classify the asset it is describing needs it,
+    /// and this enum is `#[non_exhaustive]`, so a match from another crate must
+    /// carry a wildcard. A wildcard would quietly file a future level as one
+    /// answer or the other — and "not stated" is a distinction this type takes
+    /// care to preserve elsewhere, so it should not be thrown away here.
+    /// Authored beside the variants, the match is exhaustive.
+    #[must_use]
+    pub const fn describes_a_type(self) -> bool {
+        match self {
+            Self::Model => true,
+            Self::Batch | Self::Item => false,
+        }
+    }
 }

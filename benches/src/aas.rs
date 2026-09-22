@@ -4,12 +4,18 @@
 
 use chrono::Utc;
 use criterion::{Criterion, criterion_group, criterion_main};
-use dpp_aas::build_aas_from_passport;
+use dpp_aas::{AssetIdentity, build_aas_from_passport};
 use dpp_domain::Audience;
 use dpp_domain::identifier::{Gtin, ProductIdentifier};
 use dpp_domain::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroupData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, ProductGroup};
 use dpp_tests::fixtures::base_passport;
+
+/// The identity the projection is asked for. Benchmarked on the real path: the
+/// shell names the asset after the scheme that issued its identifier.
+fn identity_of(p: &Passport) -> AssetIdentity<'_> {
+    AssetIdentity::from_passport(p).expect("the benchmark fixture carries an identifier")
+}
 
 const GTIN: &str = "09506000134352";
 
@@ -118,13 +124,17 @@ fn aas_benchmarks(c: &mut Criterion) {
     let passport = battery_passport();
 
     c.bench_function("aas_build_from_battery_passport", |b| {
-        b.iter(|| build_aas_from_passport(&passport, GTIN, Audience::Public).expect("masking"));
+        b.iter(|| {
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking")
+        });
     });
 
     c.bench_function("aas_build_and_serialise", |b| {
         b.iter(|| {
             let (shell, submodels) =
-                build_aas_from_passport(&passport, GTIN, Audience::Public).expect("masking");
+                build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                    .expect("masking");
             (
                 serde_json::to_string(&shell).unwrap(),
                 serde_json::to_string(&submodels).unwrap(),

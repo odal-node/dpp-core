@@ -11,6 +11,7 @@
 //! template registry stays in sync with the product groups.
 
 use chrono::{DateTime, Utc};
+use dpp_aas::AssetIdentity;
 use dpp_aas::{
     build_aas_environment, build_aas_from_passport, map_dpp_to_aas_submodel, placeholder_templates,
     product_group_submodel_template,
@@ -303,6 +304,79 @@ fn all_product_group_cases() -> Vec<(ProductGroup, ProductGroupData, &'static st
     ]
 }
 
+/// Product groups whose passport carries no product identifier, each for a
+/// stated reason — the written exception the shared emitter needs.
+///
+/// 🚨 Two different facts that look identical at the call site. `unsold-goods`
+/// identifies a *reporting period* rather than a trade item and has no
+/// identifier **by law**; an unmodelled group has none because it was reduced
+/// to its discriminant before any mapper ran. Only the first belongs here.
+const GROUPS_WITH_NO_PRODUCT_IDENTIFIER: [&str; 1] = ["unsold-goods"];
+
+/// 🚨 The identity travels with every passport, not with whichever product
+/// groups someone remembered.
+///
+/// Two of the four typed mappers emitted `productIdentifier` into their own
+/// submodel and two did not, and the **eight** catalogued groups with no typed
+/// mapper at all emitted it nowhere. Emitting it from `ProductIdentification`,
+/// which every passport gets, is what makes this assertable for all twelve
+/// rather than for the ones that happened to have a mapper.
+#[test]
+fn every_passport_carries_its_identifier_in_the_identification_submodel() {
+    let mut checked = 0usize;
+    // Battery is absent from `all_product_group_cases` by design — its mapping
+    // is exercised in `battery_end_to_end.rs` — so it is chained in here the
+    // same way the committed-Environment test does it. A claim about "every
+    // passport" that quietly skipped the reference product group would be the
+    // kind of exhaustive-looking gate this file already guards against.
+    let cases: Vec<(ProductGroup, ProductGroupData, &str)> = all_product_group_cases()
+        .into_iter()
+        .map(|(s, d, v, _)| (s, d, v))
+        .chain(std::iter::once(battery_case()))
+        .collect();
+    for (product_group, data, version) in cases {
+        let key = product_group.catalog_key().to_owned();
+        let passport = base(product_group, data, version);
+        let (_, submodels) =
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking");
+        checked += 1;
+
+        let identification = submodels
+            .iter()
+            .find(|s| s.id_short == "ProductIdentification")
+            .unwrap_or_else(|| panic!("{key} has no ProductIdentification submodel"));
+        let names: Vec<&str> = identification
+            .submodel_elements
+            .iter()
+            .filter_map(|e| match e {
+                dpp_aas::AasSubmodelElement::Property(p) => Some(p.id_short.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        if GROUPS_WITH_NO_PRODUCT_IDENTIFIER.contains(&key.as_str()) {
+            assert!(
+                !names.contains(&"productIdentifier"),
+                "{key} identifies no product and must not claim to: {names:?}"
+            );
+            continue;
+        }
+        assert!(
+            names.contains(&"productIdentifier"),
+            "{key} carries an identifier but the projection drops it: {names:?}"
+        );
+        // The scheme travels with it, or a consumer cannot tell a GTIN from a
+        // DID in the same slot.
+        assert!(
+            names.contains(&"productIdentifierKind"),
+            "{key} emits an identifier with no indication of what kind: {names:?}"
+        );
+    }
+    // A count, so an empty case list cannot pass this by vacuum.
+    assert_eq!(checked, 12, "expected all twelve product groups");
+}
+
 #[test]
 fn every_product_group_produces_a_valid_aas_shell() {
     for (product_group, data, version, _id_short) in all_product_group_cases() {
@@ -315,7 +389,8 @@ fn every_product_group_produces_a_valid_aas_shell() {
         );
         let passport = base(product_group, data, version);
         let (shell, submodels) =
-            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking");
 
         // Five core submodels + one product group submodel.
         assert_eq!(
@@ -324,7 +399,20 @@ fn every_product_group_produces_a_valid_aas_shell() {
             "product_group {key} should yield 6 submodels"
         );
         assert_eq!(shell.submodels.len(), 6);
-        assert!(shell.asset_information.global_asset_id.contains(VALID_GTIN));
+        // 🚨 Not `contains(VALID_GTIN)` any more. The shell now names the asset
+        // by whatever actually identifies it: a GTIN for the ten groups whose
+        // fixture carries one, and the caller-chosen key for unsold goods,
+        // which identifies a reporting period rather than a trade item.
+        let identity = identity_of(&passport);
+        assert!(
+            shell
+                .asset_information
+                .global_asset_id
+                .contains(identity.value()),
+            "{key}: globalAssetId {} does not carry the identity {}",
+            shell.asset_information.global_asset_id,
+            identity.value()
+        );
 
         // The whole environment serialises cleanly.
         let shell_json = serde_json::to_value(&shell).unwrap();
@@ -402,8 +490,9 @@ fn unknown_product_group_fields_never_reach_the_aas_output() {
             spacecraft(),
             "1.0.0",
         );
-        let (_shell, submodels) = build_aas_from_passport(&passport, VALID_GTIN, audience)
-            .expect("the redacted document still round-trips");
+        let (_shell, submodels) =
+            build_aas_from_passport(&passport, identity_of(&passport), audience)
+                .expect("the redacted document still round-trips");
 
         assert_eq!(
             submodels.len(),
@@ -452,7 +541,8 @@ fn a_known_product_group_is_not_caught_by_the_unknown_product_group_backstop() {
         "1.0.0",
     );
     let (_shell, submodels) =
-        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let product_group_submodel = submodels
         .iter()
         .find(|s| s.id_short == "ElectronicsProductData")
@@ -472,7 +562,8 @@ fn passport_without_product_group_data_has_five_core_submodels() {
     );
     passport.product_group_data = None;
     let (_shell, submodels) =
-        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     assert_eq!(submodels.len(), 5);
 }
 
@@ -594,6 +685,21 @@ fn every_catalog_product_group_has_an_aas_case() {
 // our namespace ends, because both defer to `dpp_vocab::is_own`.
 use dpp_vocab::VocabularyRegister;
 
+/// The identity a projection is asked for: the passport's own where it has
+/// one, a caller-chosen key where it does not.
+///
+/// 🚨 The `None` arm is not a fixture defect. An unsold-goods report covers a
+/// financial year across many products and identifies no single one, and an
+/// unmodelled product group is reduced to its discriminant before any mapper
+/// runs. Both reach here with no identifier, and both need the caller to say
+/// what the asset is instead.
+fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
+    AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
+        name: "assetKey",
+        value: "urn:odal-node:test-asset:1",
+    })
+}
+
 fn is_permitted(identifier: &str) -> bool {
     VocabularyRegister::new().verdict(identifier).is_permitted()
 }
@@ -640,7 +746,8 @@ fn every_emitted_semantic_id_is_ours_or_provenanced() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
         let (shell, submodels) =
-            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking");
 
         let document = serde_json::json!({
             "shell": serde_json::to_value(&shell).unwrap(),
@@ -765,7 +872,8 @@ fn only_in_force_product_groups_carry_a_typed_mapper() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
         let (_, submodels) =
-            build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking");
 
         let product_group_submodel = submodels
             .iter()
@@ -1342,8 +1450,9 @@ fn no_element_carries_a_member_outside_the_metamodel() {
     for (product_group, data, version, _) in all_product_group_cases() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
-        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
-            .expect("a public projection is buildable");
+        let environment =
+            build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+                .expect("a public projection is buildable");
         let document = serde_json::to_value(&environment).expect("serialises");
         check_object(&document, "", &key, &mut checked, &mut unknown);
     }
@@ -1374,8 +1483,9 @@ fn every_product_group_environment_is_schema_valid() {
     for (product_group, data, version, _) in all_product_group_cases() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
-        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
-            .expect("a public projection is buildable");
+        let environment =
+            build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+                .expect("a public projection is buildable");
         let document = serde_json::to_value(&environment).expect("serialises");
         assert_valid_aas(
             &document,
@@ -1402,8 +1512,8 @@ fn the_generic_product_group_environment_is_schema_valid() {
     }))
     .expect("spacecraft has no typed variant");
     let passport = base(ProductGroup::Other("spacecraft".into()), other, "1.0.0");
-    let environment =
-        build_aas_environment(&passport, VALID_GTIN, Audience::Public).expect("buildable");
+    let environment = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+        .expect("buildable");
     assert_valid_aas(
         &serde_json::to_value(&environment).expect("serialises"),
         "the generic-fallback Environment",
@@ -1428,8 +1538,8 @@ fn a_sparse_passport_environment_is_schema_valid() {
     passport.co2e_per_unit = None;
     passport.repairability_score = None;
 
-    let environment =
-        build_aas_environment(&passport, VALID_GTIN, Audience::Public).expect("buildable");
+    let environment = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+        .expect("buildable");
     let document = serde_json::to_value(&environment).expect("serialises");
     assert_valid_aas(&document, "a sparse passport's Environment");
 
@@ -1553,8 +1663,9 @@ fn committed_environments_match_what_the_mappers_produce() {
     for (product_group, data, version) in cases {
         let key = product_group.catalog_key().to_owned();
         let passport = pinned(product_group, data, version);
-        let environment = build_aas_environment(&passport, VALID_GTIN, Audience::Public)
-            .expect("a public projection is buildable");
+        let environment =
+            build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+                .expect("a public projection is buildable");
         // Pretty-printed, with a trailing newline: these are read by people and
         // diffed by git, not parsed by us.
         let rendered = format!(
@@ -1699,9 +1810,12 @@ fn public_aas_projection_emits_no_non_public_field() {
         checked_any_non_public = true;
 
         let passport = base(product_group, data, version);
-        let (_, submodels) =
-            build_aas_from_passport(&passport, VALID_GTIN, dpp_domain::Audience::Public)
-                .expect("a public projection is buildable");
+        let (_, submodels) = build_aas_from_passport(
+            &passport,
+            identity_of(&passport),
+            dpp_domain::Audience::Public,
+        )
+        .expect("a public projection is buildable");
         let emitted = emitted_id_shorts(&submodels);
 
         for field in &non_public {
@@ -1726,9 +1840,12 @@ fn public_aas_projection_still_carries_public_fields() {
     for (product_group, data, version, _) in all_product_group_cases() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
-        let (_, submodels) =
-            build_aas_from_passport(&passport, VALID_GTIN, dpp_domain::Audience::Public)
-                .expect("buildable");
+        let (_, submodels) = build_aas_from_passport(
+            &passport,
+            identity_of(&passport),
+            dpp_domain::Audience::Public,
+        )
+        .expect("buildable");
         assert!(
             !emitted_id_shorts(&submodels).is_empty(),
             "product_group '{key}': the public projection carries no fields at all"

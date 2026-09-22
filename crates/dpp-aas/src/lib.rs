@@ -55,6 +55,7 @@
 pub mod semantic_ids;
 
 mod builder;
+mod identity;
 mod mapper;
 mod model;
 mod product_groups;
@@ -64,6 +65,7 @@ mod templates;
 mod tests;
 
 pub use builder::{AasError, build_aas_environment, build_aas_from_passport};
+pub use identity::{AssetIdentity, RESERVED_ASSET_ID_NAMES};
 pub use mapper::map_dpp_to_aas_submodel;
 pub use model::{
     AasCollection, AasDataType, AasEnvironment, AasProperty, AasReference, AasSemId, AasSemIdKey,
