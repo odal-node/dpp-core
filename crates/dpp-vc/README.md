@@ -78,7 +78,11 @@ A runnable version covering issuance and transfer is in
 |---|---|
 | `dpp-domain` | Provides `Audience`, `Disclosure`, `PassportId` and `IdentityPort` — required by this crate |
 | `dpp-crypto` | Provides JWS signing/verification and the keystore — required by this crate |
-| `dpp-engine` (BSL-1.1) | Implements the HTTP surface that issues and verifies these credentials |
+
+The HTTP surface that issues and verifies these credentials is not here and is
+not part of this workspace: it belongs to the application consuming this crate.
+Everything below that boundary — the credential shapes, the signing, the status
+lists — is what this crate provides, and it is usable without one.
 
 ## Minimum Rust version
 

@@ -347,7 +347,11 @@ step-by-step guide. Short version:
 | `dpp-domain` | Domain types and port traits; `dpp-calc` does not depend on it |
 | `dpp-rules` | Field-level validation rules and regulatory thresholds (`no_std`, zero-dep). **`dpp-calc` depends on it**, never the reverse: a threshold like the Art. 8 minimum shares has one home, and it is there, because the Wasm product group plugins reach it too and cannot reach this crate. What `dpp-calc` adds on top is the ruleset identity, the effective period and the receipt — none of which a `no_std` crate can produce |
 | `dpp-plugin-sdk` | Does **not** re-export this crate, and is not planned to — see "When NOT to use this crate". Plugins reach regulatory thresholds through `dpp-rules` |
-| `dpp-engine` (BSL-1.1) | Stores `CalculationReceipt`, serves the verification endpoint, manages `FactorProvider` lifecycle |
+
+Storing a `CalculationReceipt`, serving an endpoint that verifies one, and
+managing `FactorProvider` lifecycle are all the consuming application's job, not
+this crate's. `dpp-calc` computes and returns the receipt; what happens to it
+afterwards is outside this workspace.
 
 ---
 

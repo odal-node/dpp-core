@@ -80,9 +80,12 @@ reviews:
         coupling problem as a leak. Someone who vendors this crate from
         crates.io must never need a sibling repository to make sense of it. This
         binds the published artifact: crates/*/src, doc comments, each crate's
-        README, and the CHANGELOG. It applies even when the thing referenced is
-        itself public, because the fault is the dependency on outside context
-        rather than the disclosure.
+        README, and the CHANGELOG — and the public-facing policy documents at
+        the repository root, which a reader reaches from the same crates.io
+        page. It applies even when the thing referenced is itself public,
+        because the fault is the dependency on outside context rather than the
+        disclosure. The direction is one-way: a consumer may name this
+        workspace freely, and this workspace names no consumer.
 
         DIFF DISCIPLINE. Every changed line should trace to the stated purpose
         of the pull request. Flag adjacent "improvements", drive-by
@@ -167,17 +170,34 @@ reviews:
       - name: "Publication boundary"
         mode: error
         instructions: >-
-          FAIL if the diff or the pull request description introduces any of the
-          following into this public, published-to-crates.io repository: an ADR
-          reference by number, title or section; the name of, or a filesystem
-          path into, any repository other than this one; pricing, quotes,
+          Two independent failures. Conflating them has produced the wrong
+          remediation more than once, and the second used to be waived by the
+          answer to the first. FAIL on either.
+
+          DISCLOSURE — the diff or the pull request description introduces any
+          of the following into this public, published-to-crates.io repository:
+          an ADR reference by number, title or section; the name of, or a
+          filesystem path into, a NON-PUBLIC repository; pricing, quotes,
           contract terms, per-unit rates, vendor lead times or negotiation
           status; the name of a real company or individual in a non-public
-          arrangement, including inside a test fixture. Naming a public sibling
-          repository is permitted where it genuinely helps a reader here.
+          arrangement, including inside a test fixture.
+
+          DIRECTION — the diff names a CONSUMER of this workspace, whether or
+          not that consumer is public. This repository is a general-purpose
+          library and does not name the products built on it. A reader who
+          vendored one of these crates from crates.io has no interest in one
+          particular deployment, and the pointer is the only part of such a
+          sentence that does not survive vendoring. This binds every surface a
+          consumer receives — `crates/*/src`, doc comments, each crate's
+          README, the CHANGELOG — and the public-facing policy documents at the
+          repository root. A sibling being public answers DISCLOSURE. It is
+          never an answer to DIRECTION.
+
           PASS otherwise. When it fails, say which line and give the fix:
           inline the substance, drop the pointer, and cite the primary source
-          instead of the internal record.
+          instead of the internal record. For DIRECTION the substance is what
+          an implementation must DO, which is almost always already sitting in
+          the same sentence as the pointer — keep that, drop the address.
 
       - name: "Persisted shape migration"
         mode: warning
