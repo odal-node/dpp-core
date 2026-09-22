@@ -80,10 +80,15 @@ fn an_untyped_payload_reports_no_gtin() {
         data: serde_json::json!({ "productGroup": "hypothetical", "gtin": BAD_CHECK_DIGIT }),
     };
     assert_eq!(data.gtin(), None);
+    // 🚨 And the question that actually distinguishes them. `gtin()` answers
+    // `None` for a scheme 2 or 3 payload too, so it can no longer tell "no
+    // identifier" from "an identifier with no GTIN" — only this can, which is
+    // why `Other` must answer `None` here and not merely there.
+    assert_eq!(data.product_identifier(), None);
 }
 
 // ---------------------------------------------------------------------------
-// Half 2 — every payload that declares a GTIN uses that type
+// Half 2 — every payload declares its identifier as the validating type
 // ---------------------------------------------------------------------------
 
 fn workspace_root() -> PathBuf {
@@ -147,19 +152,27 @@ fn every_payload_identifier_field_is_the_validating_type() {
 
     assert!(
         wrong.is_empty(),
-        "\nA payload declares its GTIN as something other than `Gtin`, which is \
-         the only type that validates the GS1 check digit:\n\n{}\n\n\
-         `String` compiles, satisfies `ProductGroupPayload::gtin` via `as_str()`, \
-         and passes the schema's shape pattern — so nothing else would fail.\n",
+        "\nA payload declares its identifier as something other than \
+         `ProductIdentifier`, which is the only type that validates it — the \
+         GS1 check digit inside its scheme 1 arm, and the URL and DID syntax \
+         in the other two:\n\n{}\n\n\
+         `String` compiles, satisfies `ProductGroupPayload::product_identifier` \
+         callers that only read it back out, and passes the schema's shape \
+         pattern — so nothing else would fail.\n",
         wrong.join("\n")
     );
 
     // A count, so deleting every declaration cannot pass this test by vacuum.
-    // Eleven of the twelve typed payloads carry a GTIN; unsold goods is a
-    // disclosure over a financial year and identifies no trade item.
+    // Eleven of the twelve typed payloads carry a product identifier; unsold
+    // goods is a disclosure over a financial year and identifies no trade item.
+    //
+    // 🚨 "Carries a product identifier" is not "carries a GTIN". Only scheme 1
+    // has one; schemes 2 and 3 are self-issuing and have none, so a count of
+    // GTINs would be a count of nothing in particular.
     assert_eq!(
         declarations, 11,
-        "expected 11 payloads to declare a GTIN, found {declarations} — if a \
-         product group was added or removed, update this count deliberately"
+        "expected 11 payloads to declare a product identifier, found \
+         {declarations} — if a product group was added or removed, update this \
+         count deliberately"
     );
 }

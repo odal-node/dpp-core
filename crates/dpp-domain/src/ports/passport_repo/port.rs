@@ -77,7 +77,8 @@ pub trait PassportRepository: Send + Sync {
     /// Used by public endpoints to distinguish between 404 and 410 (suspended).
     async fn find_by_id_any_status(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
 
-    /// Find a passport by exact compound identity — product group, GTIN, and batch —
+    /// Find a passport by exact compound identity — product group, unique product
+    /// identifier and batch —
     /// across `Draft` and `Published`. Used by the import delta-matcher to
     /// classify a row as create/update_draft/conflict_published before any
     /// write. Returns `None` on no match; `batch_id: None` matches only
