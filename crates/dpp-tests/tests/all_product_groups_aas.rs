@@ -1526,6 +1526,69 @@ fn the_generic_product_group_environment_is_schema_valid() {
 /// field is absent serialise to an empty `submodelElements`, and an empty array
 /// is invalid where an absent one is fine. Masking produces exactly this shape
 /// whenever a product group's public tier is thin, so it is not a hypothetical.
+/// 🚨 `assetKind: "Type"` is new, and no committed Environment carries it.
+///
+/// Granularity is `Option` and every fixture leaves it unset, so a value the
+/// projection can now emit would reach an integrator without ever having been
+/// held against the vendored AAS revisions or the loader oracle. A branch no
+/// golden exercises is a branch nothing validates.
+#[test]
+fn a_model_level_environment_is_schema_valid() {
+    use dpp_domain::catalog::Granularity;
+
+    let mut passport = base(
+        ProductGroup::Electronics,
+        ProductGroupData::Electronics(electronics_data()),
+        "1.0.0",
+    );
+    passport.granularity = Some(Granularity::Model);
+
+    let environment = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+        .expect("buildable");
+    let document = serde_json::to_value(&environment).expect("serialises");
+    assert_eq!(
+        document["assetAdministrationShells"][0]["assetInformation"]["assetKind"], "Type",
+        "the fixture must actually exercise the new branch"
+    );
+    assert_valid_aas(&document, "a model-granularity Environment");
+}
+
+/// The other half: a scheme 2 or 3 identity puts a bare URL or DID into
+/// `globalAssetId` rather than a `urn:odal-node:` string, and no golden carries
+/// one of those either.
+#[test]
+fn a_self_issued_identity_environment_is_schema_valid() {
+    use dpp_domain::identifier::ProductIdentifier;
+
+    let passport = base(
+        ProductGroup::Electronics,
+        ProductGroupData::Electronics(electronics_data()),
+        "1.0.0",
+    );
+    for identifier in [
+        ProductIdentifier::identification_link("https://id.acme.example.com/b/1")
+            .expect("a valid link"),
+        ProductIdentifier::did("did:web:acme.example.com:b:1").expect("a valid DID"),
+    ] {
+        let environment = build_aas_environment(
+            &passport,
+            AssetIdentity::Product(&identifier),
+            Audience::Public,
+        )
+        .expect("buildable");
+        let document = serde_json::to_value(&environment).expect("serialises");
+        assert_eq!(
+            document["assetAdministrationShells"][0]["assetInformation"]["globalAssetId"],
+            identifier.as_str(),
+            "an identity that is already a URI is not wrapped"
+        );
+        assert_valid_aas(
+            &document,
+            &format!("an Environment identified by {}", identifier.value_kind()),
+        );
+    }
+}
+
 #[test]
 fn a_sparse_passport_environment_is_schema_valid() {
     let mut passport = base(
@@ -1660,6 +1723,18 @@ fn committed_environments_match_what_the_mappers_produce() {
     cases.push(battery_case());
 
     let mut stale = Vec::new();
+    // 🚨 One scenario fixture beyond the per-product-group set, because two
+    // branches the projection can now take are reachable by no product group on
+    // its own: `assetKind: "Type"` (granularity is `Option` and every fixture
+    // leaves it unset) and a `globalAssetId` that is a bare DID rather than a
+    // `urn:odal-node:` string. The loader oracle globs this directory and runs
+    // the **reference implementation** over whatever it finds, so committing
+    // one is the difference between "our vendored schema copy accepts it" and
+    // "aas-core accepts it".
+    let self_issued =
+        dpp_domain::identifier::ProductIdentifier::did("did:web:acme.example.com:b:1")
+            .expect("a valid DID");
+
     for (product_group, data, version) in cases {
         let key = product_group.catalog_key().to_owned();
         let passport = pinned(product_group, data, version);
@@ -1692,6 +1767,37 @@ fn committed_environments_match_what_the_mappers_produce() {
             Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
             Ok(_) => stale.push(key),
             Err(_) => stale.push(format!("{key} (missing)")),
+        }
+    }
+
+    // The scenario fixture, rendered the same way and held to the same rule.
+    {
+        let mut passport = pinned(
+            ProductGroup::Electronics,
+            ProductGroupData::Electronics(electronics_data()),
+            "1.0.0",
+        );
+        passport.granularity = Some(dpp_domain::catalog::Granularity::Model);
+        let environment = build_aas_environment(
+            &passport,
+            AssetIdentity::Product(&self_issued),
+            Audience::Public,
+        )
+        .expect("a public projection is buildable");
+        let rendered = format!(
+            "{}
+",
+            serde_json::to_string_pretty(&environment).expect("serialises")
+        );
+        let path = environment_fixture_path("scenario-model-level-did");
+        if updating {
+            std::fs::write(&path, &rendered).expect("fixture is writable");
+        } else {
+            match std::fs::read_to_string(&path) {
+                Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
+                Ok(_) => stale.push("scenario-model-level-did".to_owned()),
+                Err(_) => stale.push("scenario-model-level-did (missing)".to_owned()),
+            }
         }
     }
 
