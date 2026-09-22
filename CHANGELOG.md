@@ -15,6 +15,51 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`PassportRepository` resolves a passport by its identifier, and the two
+  by-GTIN lookups are removed.** `find_published_by_gtin` and
+  `find_by_gtin_any_status` were the port's only single-identifier lookups and
+  were GS1-only, so a passport identified under EN 18219 scheme 2 or 3 could
+  not be looked up by its own identifier at all — only by internal
+  `PassportId`, which is documented as an opaque link and explicitly not a
+  legal identifier. `find_by_identity` is not a third: it needs the product
+  group, which a resolver holding a URL does not have.
+
+  `find_by_identifier(&ProductIdentifier, batch_id, serial_number)` replaces
+  both. Three things changed and each was a defect:
+
+  🚨 **An identifier does not name one passport.** `Granularity` admits
+  `Model`, `Batch` and `Item`, so one GTIN can have a model record, one per
+  production run and one per unit — measured, two published passports sharing
+  `09506000134352` across two batches. The old methods were documented as
+  returning *"the first"*, with no ordering defined: one arbitrary row of N.
+  Hence `Vec`, and hence the two narrowing arguments, which follow the shape of
+  the Digital Link being answered — `/01/{gtin}`, `/01/{gtin}/10/{lot}`,
+  `/01/{gtin}/21/{serial}`.
+
+  🚨 **Typed, not `&str`.** A bare string invites taking a value from one
+  namespace and looking it up in another because both are strings, which is how
+  a GTIN came to be scraped out of a carrier URI. The route being served
+  already determines the scheme.
+
+  🚨 **No status filter, and no `Option`.** `find_published_by_gtin` folded a
+  publication decision into a lookup, so `None` meant "no such product" and
+  "exists but unpublished" at once — and a public route must tell those apart
+  to serve `410 Gone` rather than `404`. `Option` would also encode an
+  invariant this tier cannot enforce: at most one match should be `Published`,
+  but nothing in a pure core holds storage to that, and silently picking one of
+  two is the defect being removed rather than a smaller version of it.
+
+  Migration: construct a `ProductIdentifier` at the route boundary, pass the
+  batch and serial the route carries, and filter the result on `status`.
+
+- **`ProductIdentity` carries `serial_number`.** 🚨 Without it the type's claim
+  to be an *exact* compound identity was false at item level: two published
+  passports differing only in serial produced the **identical** identity. That
+  is the key the import delta-matcher uses to classify a row as create /
+  update_draft / conflict_published **before any write**, so a second unit
+  matched the first and would have been written as a change to it. Additive on
+  the wire (`#[serde(default)]`), breaking for exhaustive struct literals.
+
 - **The AAS shell says what the asset *is*, and `build_aas_from_passport` takes
   an `AssetIdentity` instead of `gtin: &str`.** The shell wrote that string into
   two places that each assert something about it — a `specificAssetId` **named**

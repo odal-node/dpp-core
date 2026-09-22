@@ -112,3 +112,53 @@ fn a_group_with_no_identifier_still_yields_no_identity() {
     );
     assert!(ProductIdentity::from_passport(&p).is_none());
 }
+
+/// 🚨 Two item-level passports must not share an identity.
+///
+/// Before `serial_number` was part of the key they did: two published units of
+/// the same batch produced the *identical* `ProductIdentity`. `Granularity`
+/// admits `Item`, so that is a state the model invites rather than an exotic
+/// one — and the import delta-matcher keys on this to decide create vs update
+/// **before any write**, so a second unit was classified as a change to the
+/// first.
+#[test]
+fn two_units_of_one_batch_are_two_identities() {
+    let unit = |serial: &str| {
+        let mut p = crate::test_support::sample_passport();
+        p.product_group = crate::ProductGroup::Battery;
+        p.product_group_data = Some(crate::ProductGroupData::Battery(Box::new(
+            crate::test_support::sample_battery_data(),
+        )));
+        p.batch_id = Some("LOT-A".into());
+        p.serial_number = Some(serial.to_owned());
+        p
+    };
+
+    let a = ProductIdentity::from_passport(&unit("SN-0001")).expect("an identity");
+    let b = ProductIdentity::from_passport(&unit("SN-0002")).expect("an identity");
+
+    assert_eq!(a.identifier, b.identifier, "same product");
+    assert_eq!(a.batch_id, b.batch_id, "same production run");
+    assert_eq!(a.serial_number.as_deref(), Some("SN-0001"));
+    assert_ne!(a, b, "different units are different identities");
+}
+
+/// And the level above still collapses correctly: a batch record and a unit of
+/// that batch are not the same identity either.
+#[test]
+fn a_batch_record_and_a_unit_of_it_are_two_identities() {
+    let mut batch = crate::test_support::sample_passport();
+    batch.product_group = crate::ProductGroup::Battery;
+    batch.product_group_data = Some(crate::ProductGroupData::Battery(Box::new(
+        crate::test_support::sample_battery_data(),
+    )));
+    batch.batch_id = Some("LOT-A".into());
+
+    let mut unit = batch.clone();
+    unit.serial_number = Some("SN-0001".into());
+
+    let b = ProductIdentity::from_passport(&batch).expect("an identity");
+    let u = ProductIdentity::from_passport(&unit).expect("an identity");
+    assert_eq!(b.serial_number, None);
+    assert_ne!(b, u);
+}

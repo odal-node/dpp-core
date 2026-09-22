@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use super::protected_fields::PROTECTED_PATCH_FIELDS;
 use crate::error::DppError;
 use crate::{
+    identifier::ProductIdentifier,
     passport::{Passport, PassportId},
     product::ProductIdentity,
     status::PassportStatus,
@@ -48,30 +49,79 @@ pub trait PassportRepository: Send + Sync {
     /// Returns `None` if not found or not in Published state.
     async fn find_published_by_id(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
 
-    /// Find the first published passport whose GS1 Digital Link QR URL contains
-    /// the given 14-digit GTIN. Used by the `GET /01/{gtin}` resolver route.
+    /// Every passport whose product identifier is `identifier`, narrowed by
+    /// `batch_id` and `serial_number` when the caller has them.
     ///
-    /// Folds a publication-policy decision into a lookup: `None` means both "no
-    /// such GTIN" and "that GTIN resolves to a passport that is not published",
-    /// and a caller has nothing to branch on. A **public route must not use
-    /// this** — it cannot then tell a withdrawn passport from an unregistered
-    /// one, and so cannot serve `410 Gone`, which is the recall signal a
-    /// consumer scanning a product needs to see. Use
-    /// [`find_by_gtin_any_status`](PassportRepository::find_by_gtin_any_status)
-    /// there and branch on `status`, the way the by-id route already does.
-    async fn find_published_by_gtin(&self, gtin: &str) -> Result<Option<Passport>, DppError>;
-
-    /// Find the first passport whose GS1 Digital Link QR URL contains the given
-    /// 14-digit GTIN, regardless of status.
+    /// Replaces the two by-GTIN lookups this port used to carry. Three things
+    /// changed and each was a defect:
     ///
-    /// The by-GTIN counterpart of
-    /// [`find_by_id_any_status`](PassportRepository::find_by_id_any_status),
-    /// and it exists for the same reason: a public endpoint has to distinguish
-    /// 404 from 410 (suspended), and it can only do that if the lookup hands
-    /// back the passport and leaves the lifecycle decision to whoever is
-    /// answering the request. Storage describes what is stored; which statuses
-    /// are publicly visible is domain policy and does not belong here.
-    async fn find_by_gtin_any_status(&self, gtin: &str) -> Result<Option<Passport>, DppError>;
+    /// 🚨 **An identifier does not name one passport.** `Granularity` admits
+    /// `Model`, `Batch` and `Item`, so a single GTIN can have a model passport
+    /// and one per production run and one per unit. Measured: two published
+    /// passports sharing `09506000134352` across two batches. The old methods
+    /// were documented as returning *"the first"*, with no ordering defined —
+    /// one arbitrary row of N. Hence `Vec`, and hence the two narrowing
+    /// arguments: `(None, None)` is the model-level record, a batch narrows to
+    /// one run, a serial to one unit. That is the shape of the GS1 Digital Link
+    /// the caller is usually answering — `/01/{gtin}`, `/01/{gtin}/10/{lot}`,
+    /// `/01/{gtin}/21/{serial}`.
+    ///
+    /// 🚨 **Typed, not `&str`.** A bare string invites taking a value out of
+    /// one namespace and looking it up in another because both are strings,
+    /// which is how a GTIN came to be scraped out of a carrier URI. The route
+    /// being served already determines the scheme, so constructing a
+    /// [`ProductIdentifier`] at that boundary costs the caller nothing and
+    /// makes the knowledge explicit.
+    ///
+    /// 🚨 **No status filter, and no `Option`.** `find_published_by_gtin`
+    /// folded a publication-policy decision into a lookup, so `None` meant both
+    /// "no such product" and "it exists but is not published" — and a public
+    /// route needs to tell those apart to serve `410 Gone` rather than `404`,
+    /// which is the recall signal a consumer scanning a product has to see.
+    /// Storage describes what is stored; which statuses an audience may see is
+    /// domain policy and is applied by the caller.
+    ///
+    /// Returning `Option` here would also encode an invariant this tier cannot
+    /// enforce. At most one matching passport should be `Published` at a time —
+    /// a superseded predecessor moves to `Superseded` — but nothing in a pure
+    /// core can hold storage to that, and a signature that silently picks one
+    /// of two is the defect being removed, not a smaller version of it.
+    ///
+    /// # Ordering
+    ///
+    /// Unspecified. A caller wanting the current record filters on `status`
+    /// rather than taking the first element.
+    ///
+    /// Default implementation is an unindexed `list()` scan — correctness only,
+    /// suitable for tests and small in-memory stores. 🚨 A real implementation
+    /// **must index the identifier**, which is not free: it lives inside
+    /// `productGroupData`, so it needs a generated column or an expression
+    /// index rather than a plain one.
+    async fn find_by_identifier(
+        &self,
+        identifier: &ProductIdentifier,
+        batch_id: Option<&str>,
+        serial_number: Option<&str>,
+    ) -> Result<Vec<Passport>, DppError> {
+        // `None` is every status, by the same reading as `facility_id`
+        // below. One pass: a per-status loop would return the whole store once
+        // per status against any implementation whose filter is a no-op, which
+        // is a failure mode a default implementation should not depend on
+        // avoiding.
+        Ok(self
+            .list(None, None, None, u32::MAX, 0)
+            .await?
+            .into_iter()
+            .filter(|p| {
+                p.product_group_data
+                    .as_ref()
+                    .and_then(crate::ProductGroupData::product_identifier)
+                    .is_some_and(|id| id == identifier)
+                    && p.batch_id.as_deref() == batch_id
+                    && p.serial_number.as_deref() == serial_number
+            })
+            .collect())
+    }
 
     /// Fetch a passport by ID regardless of status.
     /// Used by public endpoints to distinguish between 404 and 410 (suspended).
@@ -126,10 +176,11 @@ pub trait PassportRepository: Send + Sync {
     /// **No status filter.** A successor that is itself superseded, or one still
     /// in `Draft`, is returned like any other. Storage describes what is stored;
     /// which statuses a given audience may see is domain policy, and folding it
-    /// in here would repeat the mistake
-    /// [`find_published_by_gtin`](PassportRepository::find_published_by_gtin)
-    /// documents — a caller that cannot tell "no successor" from "a successor it
-    /// is not allowed to see" has nothing to branch on.
+    /// in here would repeat the mistake the removed `find_published_by_gtin`
+    /// made — a caller that cannot tell "no successor" from "a successor it is
+    /// not allowed to see" has nothing to branch on. See
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier), which
+    /// now holds that reasoning.
     ///
     /// **One hop only.** A record amended more than once has a chain, and a
     /// reader usually wants its head; that is

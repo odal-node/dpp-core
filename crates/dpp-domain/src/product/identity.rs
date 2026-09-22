@@ -32,6 +32,21 @@ pub struct ProductIdentity {
     /// clause 5 scheme issued it — the 14-digit GTIN for scheme 1.
     pub identifier: String,
     pub batch_id: Option<String>,
+    /// The unit serial, for an item-level record.
+    ///
+    /// 🚨 **Without this the identity is not exact, and that was reachable.**
+    /// Two published item-level passports differing only in `serial_number`
+    /// produced the *identical* `ProductIdentity` — measured, not inferred —
+    /// so a caller matching on it saw one product where there were two. That
+    /// matters most in the import delta-matcher, which uses this to classify a
+    /// row as create / update_draft / conflict_published **before any write**:
+    /// a second unit would match the first and be written as an update to it.
+    ///
+    /// `Granularity` admits `Model`, `Batch` *and* `Item`, so all three levels
+    /// have to be expressible here or the type's own claim to be an exact
+    /// compound identity is false at one of them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serial_number: Option<String>,
 }
 
 impl ProductIdentity {
@@ -48,6 +63,7 @@ impl ProductIdentity {
             product_group: passport.product_group.clone(),
             identifier,
             batch_id: passport.batch_id.clone(),
+            serial_number: passport.serial_number.clone(),
         })
     }
 }
