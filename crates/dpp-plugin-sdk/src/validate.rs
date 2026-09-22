@@ -371,6 +371,31 @@ impl<'a> Validator<'a> {
         self
     }
 
+    /// Require a present, non-empty object.
+    ///
+    /// The counterpart to [`require_non_empty_array`](Self::require_non_empty_array)
+    /// for a schema-required field whose value is a nested object — an
+    /// unsold-goods report's `entity` and `financialYear`, for instance.
+    ///
+    /// 🚨 **Presence only. It does not reach inside.** `present` is
+    /// `input.get(key)` with no path traversal, so nothing here can assert a
+    /// field *within* the object; the nested `required` list is enforced by
+    /// schema validation at publish and not at this tier. An empty object is
+    /// refused because it satisfies "present" while carrying none of what made
+    /// the field required.
+    pub fn require_object(&mut self, key: &str) -> &mut Self {
+        let err = match present(self.input, key).and_then(Value::as_object) {
+            None => Some((
+                "missing",
+                format!("{key} is required and must be an object"),
+            )),
+            Some(o) if o.is_empty() => Some(("empty", format!("{key} must not be empty"))),
+            Some(_) => None,
+        };
+        self.push_opt(key, err);
+        self
+    }
+
     /// If present (and non-null), the value must be a finite number in `[0, 100]`.
     pub fn optional_pct(&mut self, key: &str) -> &mut Self {
         let err = match present(self.input, key) {

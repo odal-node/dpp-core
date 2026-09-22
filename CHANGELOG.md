@@ -321,6 +321,62 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **🚨 Three plugins declared themselves satisfied with input their own schema
+  would refuse.** A plugin's `validate_input` is what produces the compliance
+  determination, and three of them checked fewer fields than the schema makes
+  top-level `required`:
+
+  - **battery** never checked `batteryType`, and that field is not one among
+    several — it selects which obligations apply. Art. 8(2) does not reach LMT
+    batteries and the Art. 8(4) second-life carve-out turns on status, so the
+    determination was being computed against the wrong instrument. The plugin
+    read the field back as `unwrap_or("")`, which made an absent category look
+    like a category no rule matches, so the Annex XIII mandatory-content check
+    emitted nothing rather than failing.
+  - **textile** never checked `productIdentifier`. It is the one plugin that
+    never called `require_gtin`, so when every other plugin's call had to be
+    replaced it had nothing to replace — it came through the identifier
+    migration clean by accident, and the same accident left it the only plugin
+    checking no identifier at all.
+  - **unsold-goods** (served by the textile crate, dispatched on the in-payload
+    discriminant) checked neither `entity` nor `financialYear`, so a disclosure
+    naming no discloser and no reporting period passed. Found only by writing
+    the gate below.
+
+  Schema validation runs separately at publish, so none of these was an open
+  door. They were the two checks disagreeing, with the plugin being the one that
+  decides.
+
+  🚨 **The fixtures were invalid too, which is most of why this was invisible.**
+  `valid_battery()` and nine other battery test records carried no
+  `batteryType`, and the textile fixture carried no `productIdentifier` — every
+  test in both crates ran against records their own schemas would refuse. Two
+  battery tests asserted `warnings.is_empty()` and passed *because* the absent
+  category made the Annex XIII content check inert; both are now narrowed to the
+  rule they are actually about.
+
+- **The Art. 1(3) battery categories have one home, `dpp-rules`.** The closed
+  five-value enumeration is stated in the battery JSON schema's `enum`, in
+  `dpp_domain`'s `BatteryType` serde tags, and — to validate it at the plugin
+  tier — would have been written a third time. Two of those three cannot see
+  each other: the plugins are excluded from the workspace and reach `dpp-rules`,
+  never `dpp-domain`. `dpp_rules::batteries::category::BATTERY_TYPES` states it
+  once, and a test holds all three against each other. `"sli"` is deliberately
+  **not** a member: `passport_content` accepts it as an alias when answering
+  questions about a category, which is tolerance on the read path and not a
+  value a passport may carry.
+
+### Added
+
+- **`Validator::require_object`** in `dpp-plugin-sdk` — the counterpart to
+  `require_non_empty_array` for a schema-required field whose value is a nested
+  object. Presence only: `present` is `input.get(key)` with no path traversal,
+  so nothing at this tier can assert a field *inside* the object. An empty
+  object is refused, because it satisfies "present" while carrying none of what
+  made the field required.
+
+### Fixed
+
 - **🚨 The Wasm product group plugins still required a `gtin` the schemas had
   stopped carrying, and the compliance determination silently stopped being
   made.** The EN 18219 identifier work moved every product group's schema from a
