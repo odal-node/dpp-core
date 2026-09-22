@@ -1,4 +1,19 @@
 use super::*;
+use crate::identity::AssetIdentity;
+
+/// The identity a test asks for: the passport's own where it has one, and a
+/// caller-chosen key where it does not.
+///
+/// 🚨 Both arms are real. `minimal_passport` carries no product group data at
+/// all, so it has no product identifier — and that is not a defective fixture,
+/// it is the case the `Named` arm exists for. A helper that papered over it by
+/// inventing a GTIN would be the old behaviour wearing a new type.
+fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
+    AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
+        name: "assetKey",
+        value: "urn:odal-node:test-asset:1",
+    })
+}
 use chrono::Utc;
 use dpp_domain::Audience;
 use dpp_domain::identifier::ProductIdentifier;
@@ -207,7 +222,8 @@ fn reference_element_round_trip() {
 fn build_aas_produces_five_core_submodels() {
     let passport = minimal_passport(ProductGroup::Electronics);
     let (shell, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     assert_eq!(submodels.len(), 5);
     let id_shorts: Vec<&str> = submodels.iter().map(|s| s.id_short.as_str()).collect();
     assert!(id_shorts.contains(&"ProductIdentification"));
@@ -222,7 +238,8 @@ fn build_aas_produces_five_core_submodels() {
 fn shell_submodel_refs_match_submodel_ids() {
     let passport = minimal_passport(ProductGroup::Battery);
     let (shell, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let submodel_ids: Vec<&str> = submodels.iter().map(|s| s.id.as_str()).collect();
     for submodel_ref in &shell.submodels {
         // A shell's submodel list holds `ModelReference`s whose single key
@@ -241,11 +258,13 @@ fn shell_submodel_refs_match_submodel_ids() {
 #[test]
 fn shell_has_correct_asset_information() {
     let passport = minimal_passport(ProductGroup::Textile);
-    let (shell, _) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+    let (shell, _) = build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+        .expect("masking");
+    // `minimal_passport` carries no product group data, so the identity is the
+    // caller-chosen one — already a URI, so it is *not* wrapped.
     assert_eq!(
         shell.asset_information.global_asset_id,
-        "urn:odal-node:product:09506000134352"
+        "urn:odal-node:test-asset:1"
     );
     let names: Vec<&str> = shell
         .asset_information
@@ -253,8 +272,18 @@ fn shell_has_correct_asset_information() {
         .iter()
         .map(|id| id.name.as_str())
         .collect();
-    assert!(names.contains(&"gtin"));
-    assert!(names.contains(&"serialId"));
+    assert!(names.contains(&"assetKey"));
+
+    // 🚨 `passportId`, not `serialId`. This slot carried `passport.id` — an
+    // internal UUID, documented as an opaque link and explicitly not a legal
+    // identifier — under a name an integrator reads as the unit's serial. The
+    // envelope has a real `serial_number` field, which this fixture leaves
+    // unset, so there is no serial to report and none is reported.
+    assert!(names.contains(&"passportId"));
+    assert!(
+        !names.contains(&"serialId"),
+        "a passport with no serial number must not claim one: {names:?}"
+    );
 
     // `batchId` is `Restricted` in `PASSPORT_FIELD_DISCLOSURE`, so an anonymous
     // reader does not get one — and until the projection was wired through the
@@ -272,14 +301,222 @@ fn shell_has_correct_asset_information() {
     );
 }
 
+/// 🚨 The defect this type removes, pinned per scheme.
+///
+/// Measured before it existed: `specificAssetIds = ["gtin=did:web:acme…"]` and
+/// `globalAssetId = urn:odal-node:product:did:web:acme…` — a DID under a GS1
+/// label, inside a URN whose namespace-specific string is another URI scheme.
+#[test]
+fn the_asset_id_is_named_after_the_scheme_that_issued_it() {
+    use dpp_domain::identifier::ProductIdentifier;
+
+    let gs1 = ProductIdentifier::gs1(dpp_domain::Gtin::parse("09506000134352").unwrap());
+    let link = ProductIdentifier::identification_link("https://id.acme.example.com/b/1").unwrap();
+    let did = ProductIdentifier::did("did:web:acme.example.com:b:1").unwrap();
+
+    for (identifier, expected_name, expected_global) in [
+        (&gs1, "gtin", "urn:odal-node:product:09506000134352"),
+        (
+            &link,
+            "identificationLink",
+            "https://id.acme.example.com/b/1",
+        ),
+        (&did, "did", "did:web:acme.example.com:b:1"),
+    ] {
+        let passport = minimal_passport(ProductGroup::Textile);
+        let identity = AssetIdentity::Product(identifier);
+        let (shell, _) =
+            build_aas_from_passport(&passport, identity, Audience::Public).expect("masking");
+
+        let named: Vec<(&str, &str)> = shell
+            .asset_information
+            .specific_asset_ids
+            .iter()
+            .map(|id| (id.name.as_str(), id.value.as_str()))
+            .collect();
+        assert!(
+            named.contains(&(expected_name, identifier.as_str())),
+            "{expected_name} must carry its own value: {named:?}"
+        );
+        assert!(
+            !named
+                .iter()
+                .any(|(n, v)| *n == "gtin" && *v != identifier.as_str()),
+            "nothing may be filed under `gtin` that is not one: {named:?}"
+        );
+
+        // 🚨 A value that is already a URI is used as-is. Wrapping one produces
+        // `urn:odal-node:product:did:web:…`, and for a `urn:` value a URN
+        // nested inside a URN.
+        assert_eq!(
+            shell.asset_information.global_asset_id, expected_global,
+            "globalAssetId for {expected_name}"
+        );
+    }
+}
+
+#[test]
+fn a_caller_chosen_key_may_not_impersonate_a_scheme() {
+    // Without this the escape hatch reproduces the original defect exactly:
+    // `Named { name: "gtin", value: <a DID> }` is the old behaviour spelled out.
+    let passport = minimal_passport(ProductGroup::Textile);
+    for reserved in crate::identity::RESERVED_ASSET_ID_NAMES {
+        let identity = AssetIdentity::Named {
+            name: reserved,
+            value: "did:web:acme.example.com:b:1",
+        };
+        match build_aas_from_passport(&passport, identity, Audience::Public) {
+            Err(AasError::ReservedAssetIdName(n)) => assert_eq!(n, reserved),
+            other => panic!(
+                "expected {reserved} to be refused, got {:?}",
+                other.map(|_| ())
+            ),
+        }
+    }
+}
+
+#[test]
+fn a_caller_chosen_key_that_cannot_be_a_uri_is_refused() {
+    // 🚨 Nothing downstream catches these. Measured against `aas-core3.0`
+    // 1.1.4, the AAS reference implementation **accepts**
+    // `urn:odal-node:product:asset 1`, `urn:odal-node:product:` and a value
+    // with an embedded tab — it verifies `globalAssetId`'s length, not its
+    // syntax. The name was already guarded and the value was not, which left
+    // the guard asymmetric in the one type whose job is that the shell cannot
+    // assert something false.
+    let passport = minimal_passport(ProductGroup::Textile);
+    for value in [
+        "",
+        "   ",
+        "asset 1",
+        "a	b",
+        "line
+break",
+    ] {
+        let identity = AssetIdentity::Named {
+            name: "internalAssetKey",
+            value,
+        };
+        match build_aas_from_passport(&passport, identity, Audience::Public) {
+            Err(AasError::UnusableAssetIdentity(_)) => {}
+            other => panic!(
+                "expected {value:?} to be refused, got {:?}",
+                other.map(|_| ())
+            ),
+        }
+    }
+}
+
+/// A `Product` identity needs no such check, and this says why rather than
+/// leaving it to be rediscovered: all three arms already refuse whitespace.
+#[test]
+fn a_scheme_issued_identity_cannot_carry_whitespace() {
+    use dpp_domain::identifier::ProductIdentifier;
+
+    assert!(ProductIdentifier::identification_link("https://acme.example.com/a b").is_err());
+    assert!(ProductIdentifier::did("did:web:acme.example.com:a b").is_err());
+    assert!(dpp_domain::Gtin::parse("0950600013 52").is_err());
+}
+
+#[test]
+fn a_caller_chosen_key_that_is_not_a_uri_is_wrapped() {
+    // The safe direction: wrapping a non-URI yields a valid URN, while failing
+    // to wrap one yields a `globalAssetId` that is not an identifier at all.
+    let passport = minimal_passport(ProductGroup::Textile);
+    let (shell, _) = build_aas_from_passport(
+        &passport,
+        AssetIdentity::Named {
+            name: "internalAssetKey",
+            value: "PLANT-7/LINE-2",
+        },
+        Audience::Public,
+    )
+    .expect("masking");
+    assert_eq!(
+        shell.asset_information.global_asset_id,
+        "urn:odal-node:product:PLANT-7/LINE-2"
+    );
+}
+
+#[test]
+fn the_asset_kind_follows_the_registration_level() {
+    // 🚨 `"Instance"` was hardcoded under a doc comment claiming a passport
+    // "describes one manufactured item or batch, never a product type
+    // definition". `Granularity::Model` is exactly that — one passport covering
+    // every unit sharing a model's specifications.
+    use dpp_domain::catalog::Granularity;
+    for (granularity, expected) in [
+        (Some(Granularity::Model), "Type"),
+        (Some(Granularity::Batch), "Instance"),
+        (Some(Granularity::Item), "Instance"),
+        (None, "Instance"),
+    ] {
+        let mut passport = minimal_passport(ProductGroup::Textile);
+        passport.granularity = granularity;
+        let (shell, _) =
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("masking");
+        assert_eq!(
+            shell.asset_information.asset_kind, expected,
+            "granularity {granularity:?}"
+        );
+    }
+}
+
+#[test]
+fn a_real_serial_number_travels_through_the_disclosure_seam() {
+    // 🚨 `serial_number` is a non-public envelope field, so the masking strips
+    // it before the builder ever sees it and a public shell reports no serial.
+    // That is the correct answer, and it is also why the old code was wrong in
+    // a second way: it emitted `serialId` unconditionally, carrying the
+    // passport UUID — a value the disclosure policy never had a chance to
+    // classify, because it was not the field it claimed to be.
+    let mut passport = minimal_passport(ProductGroup::Textile);
+    passport.serial_number = Some("SN-0001".into());
+
+    let names = |audience| -> Vec<(String, String)> {
+        let (shell, _) =
+            build_aas_from_passport(&passport, identity_of(&passport), audience).expect("masking");
+        shell
+            .asset_information
+            .specific_asset_ids
+            .iter()
+            .map(|id| (id.name.clone(), id.value.clone()))
+            .collect()
+    };
+
+    let public = names(Audience::Public);
+    assert!(
+        !public.iter().any(|(n, _)| n == "serialId"),
+        "an anonymous reader must not receive the unit serial: {public:?}"
+    );
+    assert!(
+        public
+            .iter()
+            .any(|(n, v)| n == "passportId" && *v == passport.id.to_string()),
+        "the passport id stays, under a name that says what it is: {public:?}"
+    );
+
+    let credentialed = names(Audience::LegitimateInterest);
+    assert!(
+        credentialed
+            .iter()
+            .any(|(n, v)| n == "serialId" && v == "SN-0001"),
+        "a reader entitled to it gets the real serial, not a UUID: {credentialed:?}"
+    );
+}
+
 /// The credentialed audience does get it, so the assertion above is a redaction
 /// rather than the projection simply never emitting a batch id.
 #[test]
 fn batch_id_reaches_an_audience_entitled_to_it() {
     let passport = minimal_passport(ProductGroup::Textile);
-    let (shell, _) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::LegitimateInterest)
-            .expect("masking");
+    let (shell, _) = build_aas_from_passport(
+        &passport,
+        identity_of(&passport),
+        Audience::LegitimateInterest,
+    )
+    .expect("masking");
 
     let names: Vec<&str> = shell
         .asset_information
@@ -297,8 +534,8 @@ fn batch_id_reaches_an_audience_entitled_to_it() {
 fn shell_id_contains_passport_id() {
     let passport = minimal_passport(ProductGroup::Battery);
     let id_str = passport.id.to_string();
-    let (shell, _) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+    let (shell, _) = build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+        .expect("masking");
     assert!(shell.id.contains(&id_str));
 }
 
@@ -391,7 +628,8 @@ fn build_aas_with_battery_product_group_data_adds_sixth_submodel() {
     )));
 
     let (shell, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     assert_eq!(
         submodels.len(),
         6,
@@ -452,7 +690,7 @@ fn restricted_audience_receives_the_restricted_battery_field() {
 
     let (_, submodels) = build_aas_from_passport(
         &passport,
-        "09506000134352",
+        identity_of(&passport),
         dpp_domain::Audience::LegitimateInterest,
     )
     .expect("buildable");
@@ -515,7 +753,8 @@ fn build_aas_textile_has_fibre_composition_collection() {
     })));
 
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let textile_sub = submodels
         .iter()
         .find(|s| s.id_short == "TextileMaterialDeclaration")
@@ -544,7 +783,8 @@ fn build_aas_textile_has_fibre_composition_collection() {
 fn material_composition_entries_have_unit() {
     let passport = minimal_passport(ProductGroup::Electronics);
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let mat_sub = submodels
         .iter()
         .find(|s| s.id_short == "MaterialComposition")
@@ -566,7 +806,8 @@ fn material_composition_entries_have_unit() {
 fn environmental_impact_co2e_has_unit() {
     let passport = minimal_passport(ProductGroup::Battery);
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let env_sub = submodels
         .iter()
         .find(|s| s.id_short == "EnvironmentalImpact")
@@ -583,7 +824,8 @@ fn environmental_impact_co2e_has_unit() {
 fn manufacturer_submodel_has_did_reference() {
     let passport = minimal_passport(ProductGroup::Battery);
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let mfr_sub = submodels
         .iter()
         .find(|s| s.id_short == "ManufacturerInformation")
@@ -687,7 +929,8 @@ fn build_aas_unsold_goods_produces_product_group_submodel() {
     let mut passport = minimal_passport(ProductGroup::UnsoldGoods);
     passport.product_group_data = Some(ProductGroupData::UnsoldGoods(sample_unsold_goods_report()));
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let sub = submodels.iter().find(|s| s.id_short == "UnsoldGoods");
     assert!(sub.is_some(), "UnsoldGoods submodel missing");
 
@@ -743,7 +986,8 @@ fn a_product_group_without_a_typed_mapper_still_carries_its_data() {
     }));
 
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let product_group_submodel = submodels
         .iter()
         .find(|s| s.id_short == "ProductGroupData")
@@ -769,7 +1013,7 @@ fn environment_carries_the_shell_and_every_submodel() {
         battery_data_with_due_diligence(),
     )));
 
-    let env = build_aas_environment(&passport, "09506000134352", Audience::Public)
+    let env = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
         .expect("environment is buildable");
 
     assert_eq!(env.asset_administration_shells.len(), 1);
@@ -782,7 +1026,8 @@ fn environment_carries_the_shell_and_every_submodel() {
     // The envelope must carry exactly what the pair form carries — the whole
     // point of one builder is that the two cannot disagree.
     let (shell, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("pair form");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("pair form");
     assert_eq!(env.asset_administration_shells[0], shell);
     assert_eq!(env.submodels, submodels);
 }
@@ -794,7 +1039,7 @@ fn environment_is_masked_for_its_audience() {
         battery_data_with_due_diligence(),
     )));
 
-    let public = build_aas_environment(&passport, "09506000134352", Audience::Public)
+    let public = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
         .expect("public environment");
     let serialised = serde_json::to_string(&public).expect("serialises");
 
@@ -814,9 +1059,12 @@ fn environment_is_masked_for_its_audience() {
         "Annex XIII point 1(d) is public and must survive masking"
     );
 
-    let restricted =
-        build_aas_environment(&passport, "09506000134352", Audience::LegitimateInterest)
-            .expect("restricted environment");
+    let restricted = build_aas_environment(
+        &passport,
+        identity_of(&passport),
+        Audience::LegitimateInterest,
+    )
+    .expect("restricted environment");
     let restricted = serde_json::to_string(&restricted).expect("serialises");
     assert!(
         restricted.contains("cathodeMaterial"),
@@ -831,8 +1079,8 @@ fn environment_is_masked_for_its_audience() {
 #[test]
 fn environment_serialises_with_idta_field_names() {
     let passport = minimal_passport(ProductGroup::Battery);
-    let env =
-        build_aas_environment(&passport, "09506000134352", Audience::Public).expect("buildable");
+    let env = build_aas_environment(&passport, identity_of(&passport), Audience::Public)
+        .expect("buildable");
     let value = serde_json::to_value(&env).expect("serialises");
 
     for key in ["assetAdministrationShells", "submodels"] {
@@ -881,8 +1129,12 @@ fn a_product_group_field_the_declared_version_does_not_know_is_dropped() {
         Audience::LegitimateInterest,
         Audience::Authority,
     ] {
-        let (_, submodels) = build_aas_from_passport(&smuggled, "09506000134352", audience)
-            .expect("masking succeeds");
+        let (_, submodels) = build_aas_from_passport(
+            &smuggled,
+            AssetIdentity::from_passport(&smuggled).expect("the fixture carries an identifier"),
+            audience,
+        )
+        .expect("masking succeeds");
         let serialised = serde_json::to_string(&submodels).expect("serialises");
         assert!(
             !serialised.contains("smuggledField"),
@@ -914,7 +1166,8 @@ fn a_carbon_footprint_class_projects_with_its_ruleset() {
     let mut passport = minimal_passport(ProductGroup::Battery);
     passport.product_group_data = Some(ProductGroupData::Battery(Box::new(data)));
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let json = serde_json::to_string(&submodels).expect("serialises");
 
     assert!(
@@ -964,7 +1217,8 @@ fn the_point_1_conditions_and_safety_data_project() {
     let mut passport = minimal_passport(ProductGroup::Battery);
     passport.product_group_data = Some(ProductGroupData::Battery(Box::new(data)));
     let (_, submodels) =
-        build_aas_from_passport(&passport, "09506000134352", Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
     let json = serde_json::to_string(&submodels).expect("serialises");
 
     for id in [

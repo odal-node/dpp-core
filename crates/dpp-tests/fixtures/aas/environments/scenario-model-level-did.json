@@ -5,12 +5,12 @@
       "idShort": "DigitalProductPassport",
       "modelType": "AssetAdministrationShell",
       "assetInformation": {
-        "assetKind": "Instance",
-        "globalAssetId": "urn:odal-node:product:09506000134352",
+        "assetKind": "Type",
+        "globalAssetId": "did:web:acme.example.com:b:1",
         "specificAssetIds": [
           {
-            "name": "gtin",
-            "value": "09506000134352"
+            "name": "did",
+            "value": "did:web:acme.example.com:b:1"
           },
           {
             "name": "passportId",

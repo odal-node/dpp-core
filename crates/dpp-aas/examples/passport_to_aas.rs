@@ -3,6 +3,7 @@
 //! Run with: `cargo run --example passport_to_aas`
 
 use chrono::Utc;
+use dpp_aas::AssetIdentity;
 use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
 use dpp_domain::Audience;
 use dpp_domain::identifier::ProductIdentifier;
@@ -113,9 +114,12 @@ fn main() {
         seal: None,
     };
 
-    let gtin = "09506000134352";
+    // The shell names the asset after the scheme that issued its identifier, so
+    // the label cannot disagree with the value it labels.
+    let identity =
+        AssetIdentity::from_passport(&passport).expect("this fixture carries an identifier");
     let (shell, submodels) =
-        build_aas_from_passport(&passport, gtin, Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity, Audience::Public).expect("masking");
 
     println!("AAS Shell");
     println!("  ID:             {}", shell.id);

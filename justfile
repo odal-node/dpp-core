@@ -108,6 +108,20 @@ lock-check:
 # because it had no crates.io baseline to compare against; it shipped in that
 # release, so the exclusion is gone. A crate left excluded is a crate whose API
 # nobody is checking, which is the same silence this recipe exists to break.
+#
+# 🚨 **It does not see a changed function parameter type, so the list it prints
+# is a floor and not the answer.** Measured on 0.20.0 -> unreleased:
+# `dpp_aas::build_aas_from_passport` went from `(&Passport, &str, Audience)` to
+# `(&Passport, AssetIdentity<'_>, Audience)` — a change that breaks every caller
+# — and the crate reported **"no semver update required"**. cargo-semver-checks
+# has lints for items appearing and disappearing, not for a signature rewritten
+# in place.
+#
+# So a release's `### Breaking` section cannot be assembled from this output
+# alone: read the diff for signature changes as well. Writing that down because
+# the comment above promises the opposite, and a break this cannot see is
+# indistinguishable here from no break at all — which is the exact failure this
+# recipe was added to prevent, one level up.
 semver:
     cargo semver-checks check-release --workspace --release-type patch
 

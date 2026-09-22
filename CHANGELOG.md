@@ -15,6 +15,67 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The AAS shell says what the asset *is*, and `build_aas_from_passport` takes
+  an `AssetIdentity` instead of `gtin: &str`.** The shell wrote that string into
+  two places that each assert something about it — a `specificAssetId` **named**
+  `gtin`, and a `globalAssetId` of the form `urn:odal-node:product:{value}` —
+  and checked neither. While every product carried a GTIN both happened to be
+  true. EN 18219 admits two self-issuing schemes that have none, so both became
+  false for exactly the passports the identifier work exists to enable.
+  Measured before the change:
+
+  ```text
+  specificAssetIds = ["gtin=did:web:acme.example.com:b:1", …]
+  globalAssetId    = urn:odal-node:product:did:web:acme.example.com:b:1
+  ```
+
+  A DID filed under a GS1 label, inside a URN whose namespace-specific string is
+  another URI scheme — and for a `urn:` value, a URN nested inside a URN.
+
+  `AssetIdentity::Product(&ProductIdentifier)` derives the name from
+  `ProductIdentifier::value_kind`, so the label cannot disagree with the value.
+  `AssetIdentity::Named { name, value }` keeps the caller-chosen identity that a
+  file export, an AASX package or an unsold-goods disclosure needs — and
+  **refuses the three names a scheme derives**, because
+  `Named { name: "gtin", value: <a DID> }` is the old defect spelled out.
+  `AssetIdentity::from_passport` covers the common case; its `None` is a real
+  answer, not a failure.
+
+  🚨 **A value that is already a URI is no longer wrapped.** Scheme 2 links and
+  scheme 3 DIDs are identifiers in their own right; only a bare GTIN needs the
+  URN.
+
+  Migration: pass `AssetIdentity::from_passport(&passport)` where you passed a
+  GTIN, and decide explicitly what a passport without an identifier is.
+
+  🚨 **A caller-chosen value is validated, because nothing downstream is.**
+  Measured against `aas-core3.0` 1.1.4, the AAS reference implementation
+  **accepts** `urn:odal-node:product:asset 1` (a raw space),
+  `urn:odal-node:product:` (no namespace-specific string at all) and an
+  embedded tab — it verifies `globalAssetId`'s length, not its syntax. An empty
+  or whitespace-bearing `Named` value is therefore refused here with
+  `AasError::UnusableAssetIdentity` rather than percent-encoded, since encoding
+  would make the shell's identifier a different string from the one the caller
+  supplied — its own kind of false statement. A `Product` value needs no such
+  check: all three arms of `ProductIdentifier` already refuse whitespace.
+
+- **The shell's `serialId` carried the passport UUID; it now carries the
+  serial.** `passport.serial_number` — a real envelope field — was never read by
+  this crate at all, while the internal passport id, documented as an opaque
+  link and explicitly *not* a legal identifier, was published under a name an
+  integrator reads as the unit's serial. The UUID is still emitted, as
+  `passportId`. `serialId` appears only when there is a serial, and because
+  `serial_number` is a non-public field it reaches only an audience entitled to
+  it — which the old slot bypassed entirely by not being the field it claimed.
+
+- **`assetKind` follows the registration level.** It was hardcoded `"Instance"`
+  under a doc comment asserting a passport "describes one manufactured item or
+  batch, never a product type definition". `Granularity::Model` is exactly a
+  product type definition — one passport covering every unit sharing a model's
+  specifications — so the claim was false for one of the three levels the model
+  admits. `Model` now yields `"Type"`; `Batch`, `Item` and "not stated" keep
+  `"Instance"`.
+
 - **`RegistrationRequest` carries the passport's EN 18219 identifier, and
   refuses to be built without one.** 🚨 Until now the request carried nothing
   identifying the product — `passport_id`, operator, facility, carrier URI,
@@ -320,6 +381,37 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a field.
 
 ### Fixed
+
+- **Every passport carries its product identifier into the AAS, not just the
+  ones with a typed mapper.** Two of the four product-group mappers emitted
+  `productIdentifier` into their own submodel and two did not, and the **eight**
+  catalogued groups with no typed mapper emitted it nowhere at all — so whether
+  a passport's identity travelled with it depended on which product group it
+  was. It is now emitted once from `ProductIdentification`, the submodel every
+  passport gets, and removed from the two mappers that duplicated it.
+
+  `productIdentifierKind` travels beside it: `as_str()` alone flattens a GTIN
+  and a DID into one slot with nothing saying which scheme issued either.
+
+  🚨 The clearest case was `unsold-goods`, whose committed AAS Environment
+  asserted `gtin=09506000134352` for a disclosure that covers a financial year
+  and **identifies no product at all**. That fabricated GTIN is gone.
+
+  Absent for two different reasons the emitter must tell apart: an unsold-goods
+  report has no identifier by law, and an unmodelled product group is reduced to
+  its discriminant before any mapper runs. Neither is unwrapped.
+
+- **`ProductIdentifier::value_kind` and `is_uri`** name what an identifier's
+  value *is* and whether it is already a URI. Both were previously derivable
+  only by matching the enum, which `#[non_exhaustive]` makes impossible to do
+  exhaustively from another crate — so every consumer needed a wildcard arm, and
+  a wildcard that produced a label would name an unmapped scheme as though it
+  had been mapped. A test holds `value_kind` against `dpp-registry`'s published
+  `SCHEME_*` constants.
+
+- **`Granularity::describes_a_type`**, for the same reason: the enum is
+  `#[non_exhaustive]`, and the question "is this a specification or a
+  manufactured thing" should not be answered by a wildcard in a projection.
 
 - **🚨 Three plugins declared themselves satisfied with input their own schema
   would refuse.** A plugin's `validate_input` is what produces the compliance

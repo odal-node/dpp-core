@@ -36,6 +36,44 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
         string_property("passportId", &passport.id.to_string(), None),
         string_property("schemaVersion", &passport.schema_version, None),
     ];
+    // 🚨 The identifier belongs here, once, for every product group.
+    //
+    // Two of the four product-group mappers emitted it into their own submodel
+    // and two did not, so whether a passport's identity travelled with it
+    // depended on which product group it was — and the eight groups with no
+    // mapper at all never carried it anywhere but the shell. Emitting it from
+    // the submodel that is literally called ProductIdentification, which every
+    // passport gets, removes the choice rather than making it consistently.
+    //
+    // The kind travels with the value. `as_str()` alone flattens a GTIN and a
+    // DID into one slot with nothing saying which clause 5 scheme issued
+    // either: self-evident to a human reading it, not to a consumer keying on
+    // it.
+    //
+    // 🚨 Absent for two different reasons, and the emitter must tolerate both:
+    // an unsold-goods report identifies a reporting period rather than a trade
+    // item and has no identifier by law, while an unmodelled product group is
+    // reduced to its discriminant before any mapper runs and so has no typed
+    // payload to read one from. Neither may be unwrapped.
+    if let Some(identifier) = passport
+        .product_group_data
+        .as_ref()
+        .and_then(dpp_domain::ProductGroupData::product_identifier)
+    {
+        elements.push(string_property(
+            "productIdentifier",
+            identifier.as_str(),
+            None,
+        ));
+        elements.push(string_property(
+            "productIdentifierKind",
+            identifier.value_kind(),
+            None,
+        ));
+    }
+    if let Some(serial) = &passport.serial_number {
+        elements.push(string_property("serialNumber", serial, None));
+    }
     if let Some(batch) = &passport.batch_id {
         elements.push(string_property("batchId", batch, None));
     }

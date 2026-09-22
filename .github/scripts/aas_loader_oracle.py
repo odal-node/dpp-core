@@ -47,10 +47,18 @@ ENVIRONMENTS = (
     / "environments"
 )
 
-# Every product group must be covered. A glob that silently matched nothing, or
-# a fixture directory that moved, would otherwise make this pass having checked
-# nothing at all.
-MINIMUM_EXPECTED = 11
+# Every product group must be covered, plus the scenario fixtures. A glob that
+# silently matched nothing, or a fixture directory that moved, would otherwise
+# make this pass having checked nothing at all.
+#
+# Twelve product groups and one scenario Environment. The scenario exists
+# because two branches the projection can take are reachable by no product
+# group on its own -- assetKind "Type" (granularity is optional and every
+# per-group fixture leaves it unset) and a globalAssetId that is a bare DID
+# rather than a urn:odal-node: string. Without it those two values would reach
+# an integrator having been checked only against our own vendored schema copy,
+# never against the reference implementation.
+MINIMUM_EXPECTED = 13
 
 
 def check(path: pathlib.Path) -> list[str]:

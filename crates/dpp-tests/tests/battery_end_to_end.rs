@@ -14,6 +14,7 @@
 //! 7. Filter product group data by audience through the one access filter (dpp-domain)
 
 use chrono::Utc;
+use dpp_aas::AssetIdentity;
 use dpp_aas::build_aas_from_passport;
 use dpp_digital_link::DigitalLink;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience_in_scope};
@@ -29,6 +30,21 @@ use dpp_vc::credential::{
     Audience, CredentialBuilder, CredentialRole, DppCredentialSubject, VerificationResult,
     verify_credential_claims,
 };
+
+/// The identity a projection is asked for: the passport's own where it has
+/// one, a caller-chosen key where it does not.
+///
+/// 🚨 The `None` arm is not a fixture defect. An unsold-goods report covers a
+/// financial year across many products and identifies no single one, and an
+/// unmodelled product group is reduced to its discriminant before any mapper
+/// runs. Both reach here with no identifier, and both need the caller to say
+/// what the asset is instead.
+fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
+    AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
+        name: "assetKey",
+        value: "urn:odal-node:test-asset:1",
+    })
+}
 
 /// The canonical valid GTIN-14 used throughout the test suite.
 const VALID_GTIN: &str = "09506000134352";
@@ -195,7 +211,8 @@ fn battery_passport_serialisation_round_trip() {
 fn battery_passport_maps_to_aas_shell() {
     let passport = make_battery_passport();
     let (shell, submodels) =
-        build_aas_from_passport(&passport, VALID_GTIN, Audience::Public).expect("masking");
+        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+            .expect("masking");
 
     // Shell wiring: GTIN becomes the global asset id, and the passport id is a
     // specific asset id.

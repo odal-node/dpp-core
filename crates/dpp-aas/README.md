@@ -28,18 +28,30 @@ specification, and nothing here should be described as IDTA-conformant.
 ## Example
 
 ```rust
-use dpp_aas::build_aas_from_passport;
+use dpp_aas::{AssetIdentity, build_aas_from_passport};
 use dpp_domain::{Audience, Passport};
 
 // The projection is always built for an audience: the passport is filtered
 // through the disclosure seam before any mapper sees it, so a public shell
 // cannot carry a restricted field. There is no unmasked entry point.
-fn render_aas(passport: &Passport, gtin: &str) {
+fn render_aas(passport: &Passport) {
+    // What the shell says the asset *is*. `from_passport` uses the passport's
+    // own EN 18219 identifier and names the `specificAssetId` after the scheme
+    // that issued it, so the label cannot disagree with the value.
+    //
+    // `None` is a real answer, not a failure: an unsold-goods report identifies
+    // a reporting period rather than a trade item. Such a caller supplies
+    // `AssetIdentity::Named { name, value }` instead — and may not reuse a
+    // scheme's name for it.
+    let identity = AssetIdentity::from_passport(passport).unwrap_or(AssetIdentity::Named {
+        name: "assetKey",
+        value: "urn:example:asset:1",
+    });
+
     let (shell, submodels) =
-        build_aas_from_passport(passport, gtin, Audience::Public).expect("masking");
+        build_aas_from_passport(passport, identity, Audience::Public).expect("masking");
 
     assert_eq!(shell.id_short, "DigitalProductPassport");
-    assert!(shell.asset_information.global_asset_id.contains(gtin));
 
     // Five core submodels, plus one per-product group submodel when product_group_data is set
     for submodel in &submodels {
@@ -49,6 +61,36 @@ fn render_aas(passport: &Passport, gtin: &str) {
             submodel.submodel_elements.len()
         );
     }
+}
+
+// 🚨 The rule the shell follows, asserted against literals rather than against
+// the builder's own helper. `global_asset_id.contains(identity.value())` would
+// have passed just as happily under the double-wrapping this replaced, because
+// the wrapped form contains the value too — an assertion that recomputes the
+// expected value the way the code does cannot catch the code being wrong.
+//
+// A scheme 2 link and a scheme 3 DID are identifiers already; only a bare GTIN
+// is not, so only a bare GTIN is wrapped.
+fn global_asset_ids_are_not_double_wrapped(passport: &Passport) {
+    use dpp_domain::identifier::ProductIdentifier;
+
+    let did = ProductIdentifier::did("did:web:example.com:item:1").expect("a valid DID");
+    let (shell, _) =
+        build_aas_from_passport(passport, AssetIdentity::Product(&did), Audience::Public)
+            .expect("masking");
+    assert_eq!(
+        shell.asset_information.global_asset_id,
+        "did:web:example.com:item:1"
+    );
+
+    let gtin = ProductIdentifier::gs1(dpp_domain::Gtin::parse("09506000134352").expect("a GTIN"));
+    let (shell, _) =
+        build_aas_from_passport(passport, AssetIdentity::Product(&gtin), Audience::Public)
+            .expect("masking");
+    assert_eq!(
+        shell.asset_information.global_asset_id,
+        "urn:odal-node:product:09506000134352"
+    );
 }
 ```
 
