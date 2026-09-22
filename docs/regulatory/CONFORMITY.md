@@ -190,7 +190,7 @@ production order and rate. Fixed; regression tests cover both properties.
 time*. The serial is deterministic from the passport UUID and unique per
 passport, but nothing currently prevents two passports being issued for one
 physical item, or a reissued passport receiving a different serial for the same
-battery. That is an operational guarantee the engine must make, not one this
+battery. That is an operational guarantee the platform must make, not one this
 crate can enforce.
 
 ## Processor Limits — Art. 78(d)
@@ -221,9 +221,9 @@ per-variant counts — no IP address, user agent or session identifier, because 
 schema has no column for one. That design predates this section; Art. 78(d) is
 the article it answers to.
 
-**Residual, engine-side.** `dpp-core` is stateless and holds no data, so it can
+**Residual, platform-side.** `dpp-core` is stateless and holds no data, so it can
 only state the constraint and place it at the seam. Enforcement — retention of
-logs, backup handling, what a hosted control plane may read — is a `dpp-engine`
+logs, backup handling, what a hosted control plane may read — is a platform
 and infrastructure concern and is not evidenced here.
 
 ## Cryptographic Foundations

@@ -142,7 +142,7 @@ Adding a new schema version is a single file addition. The registry discovers al
 
 The core library is single-issuer and stateless — it has no concept of tenants, authentication, or API keys. Each issuer is identified by a `key_id` that maps to an Ed25519 key pair in the `KeyStore`, and by a `did:web` DID derived from the issuer's domain.
 
-Multi-tenancy, authentication, and access control are platform concerns — they live in the `dpp-engine` repository, not in the core.
+Multi-tenancy, authentication, and access control are platform concerns — they live in the platform that consumes this crate, not in the core.
 
 ---
 

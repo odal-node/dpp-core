@@ -129,7 +129,7 @@ Elements of `Passport.materials` — bill of materials entries.
 
 ### 3.4 Product group vs. product-group sub-classification
 
-`ProductGroup` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-product group sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers in either this repo or the engine, and every product group that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
+`ProductGroup` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-product group sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers here or in the platform that consumes this crate, and every product group that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
 
 | Product group | Field | Source |
 |---|---|---|

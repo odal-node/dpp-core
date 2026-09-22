@@ -189,9 +189,17 @@ reviews:
           particular deployment, and the pointer is the only part of such a
           sentence that does not survive vendoring. This binds every surface a
           consumer receives — `crates/*/src`, doc comments, each crate's
-          README, the CHANGELOG — and the public-facing policy documents at the
-          repository root. A sibling being public answers DISCLOSURE. It is
-          never an answer to DIRECTION.
+          README, the CHANGELOG — the public-facing policy documents at the
+          repository root, and everything under `docs/`, which is the reasoning
+          those surfaces are built on and is read the same way. It is permitted
+          only where the reader is already standing in this repository and
+          nothing is vendored: the issue tracker, pull request bodies,
+          `CLAUDE.md` and `.github/`. A sibling being public answers DISCLOSURE.
+          It is never an answer to DIRECTION. Note that a bare definite noun is
+          the same violation as the repository name — "the engine", "the engine
+          repo", "the engine's calculators" all name a consumer a vendoring
+          reader cannot identify. A common noun ("a compliance engine", "a
+          policy engine") is fine.
 
           PASS otherwise. When it fails, say which line and give the fix:
           inline the substance, drop the pointer, and cite the primary source

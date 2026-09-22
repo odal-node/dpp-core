@@ -99,8 +99,8 @@ as a leak, and history gets treated as contaminated when nothing was disclosed.
 - **Independence** — this crate must stand alone. Someone who vendors it from
   crates.io must never need a sibling repository to make sense of it. This binds
   the **published artifact** (`crates/*/src`, doc comments, each crate's README,
-  the CHANGELOG) and the public-facing policy documents at the repository root,
-  and applies *even when the target is public*, because the fault is the
+  the CHANGELOG), the public-facing policy documents at the repository root, and
+  everything under `docs/`, and applies *even when the target is public*, because the fault is the
   dependency on outside context, not disclosure. It runs **one way**: a consumer
   may name this workspace freely, and this workspace names no consumer. A reader
   who vendored `dpp-domain` has no interest in one particular deployment, and
@@ -112,7 +112,7 @@ as a leak, and history gets treated as contaminated when nothing was disclosed.
 **Never reference private material from a public surface.** Never write any of the following into this repo (or into a PR/issue on it):
 
 - **ADR numbers, titles, or section references** (`ADR-0NN §N`, "see the ADR for X"). Their existence, numbering and structure are themselves private.
-- **Any path into a repository that is not this one** — its internal directory or module structure — even inside a code comment or a doc link. This binds whatever the target's visibility: secrecy if it is non-public, independence if it is public, since a layout this repo does not control is one it cannot keep correct. Naming a *public* sibling is permitted on the issue tracker and in contributor-facing files, where the reader is already standing in this repo. It is **not** permitted anywhere the published artifact reaches — `crates/*/src`, doc comments, each crate's README, the CHANGELOG, or the policy documents at the repository root. Naming a non-public one is never permitted anywhere.
+- **Any path into a repository that is not this one** — its internal directory or module structure — even inside a code comment or a doc link. This binds whatever the target's visibility: secrecy if it is non-public, independence if it is public, since a layout this repo does not control is one it cannot keep correct. Naming a *public* sibling is permitted only where the reader is already standing in this repo and nothing is vendored: the issue tracker, pull request bodies, this file, and `.github/`. It is **not** permitted anywhere the published artifact reaches — `crates/*/src`, doc comments, each crate's README, the CHANGELOG, the policy documents at the repository root, or anything under `docs/`. 🚨 A bare definite noun is the same violation as the repository name: "the engine", "the engine repo", "the engine's calculators" all name a consumer that a vendoring reader cannot identify. A common noun — "a compliance engine", "a policy engine" — is fine. Naming a non-public sibling is never permitted anywhere.
 - **Commercial state**: pricing, quotes, contract terms, minimums, per-unit rates, negotiation status, vendor lead times.
 - **Named third parties in a non-public arrangement**: prospective pilot partners, which sub-providers sit behind a vendor for *us*, individual contact names. This includes test fixtures — a real company name in a fixture implies a relationship that may not exist.
 - **Anything a private document marks as private**, including material merely quoted or summarised from it.
