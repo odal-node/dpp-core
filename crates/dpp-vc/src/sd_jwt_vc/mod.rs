@@ -59,6 +59,21 @@
 //! - **Replacing the per-audience signatures.** Those stay. Cutting them over is
 //!   a wire change to every passport, and nothing outside this repository
 //!   consumes an SD-JWT VC yet.
+//!
+//! # Not built, and not a decision
+//!
+//! 🚨 **An issued credential cannot be withdrawn.** The profile's clause 2.2.2.3
+//! registers an OPTIONAL `status` claim — *"the information on how to read the
+//! status of the Verifiable Credential"*, by reference to the IETF Token Status
+//! List draft — and clause 2.4 says a verifier SHOULD check it when present.
+//! [`issue`] sets no `status`, and no `exp` either, so a credential verifies
+//! until its key is revoked: suspending, retiring or superseding the passport
+//! it was issued from changes nothing about it. [`verify`] does not check a
+//! `status` claim if one is present.
+//!
+//! This is recorded as a gap rather than listed above, because nobody chose it.
+//! The W3C credential path in this crate has a status list; the Token Status
+//! List the profile names is a different format, and it is not built.
 
 pub mod error;
 mod issue;
