@@ -6,11 +6,30 @@ use super::*;
 
 #[test]
 fn frame_and_strip_round_trip() {
-    let passport = json!({ "passportId": "abc", "productGroup": "battery" });
+    // `id`, not `passportId`. This fixture carried the key the dead term named
+    // rather than the one a passport emits, so it round-tripped a shape no
+    // passport has — which is how a stale key survives a rename twice over.
+    let passport = json!({ "id": "abc", "productGroup": "battery" });
     let framed = frame_passport(passport.clone());
     let stripped = strip_context(framed);
-    assert_eq!(stripped["passportId"], "abc");
+    assert_eq!(stripped["id"], "abc");
     assert!(stripped.get("@context").is_none());
+}
+
+/// 🚨 `id` aliases the `@id` keyword, and that target is the whole point.
+///
+/// Pointed anywhere else — `dpp:id`, say — the passport stops being a node
+/// with an identifier and becomes a node carrying a property that happens to
+/// be called `id`, which is a different statement about the same document.
+/// Presence checks cannot see that: the term is still there, still inline,
+/// still spelled `id`. Only its target says whether the passport names itself.
+#[test]
+fn the_passport_names_itself_with_the_id_keyword() {
+    assert_eq!(
+        term_map()["id"],
+        json!("@id"),
+        "`id` must alias the @id keyword, or the passport stops identifying itself"
+    );
 }
 
 #[test]
@@ -176,5 +195,65 @@ fn the_gs1_prefix_matches_its_record() {
         term_map()["gs1"].as_str().expect("gs1 prefix is a string"),
         recorded,
         "the context must declare the prefix the record records, not a copy of it"
+    );
+}
+
+/// Every envelope key a passport serialises has a term in this context.
+///
+/// This is the property the change is named for, and it was held by hand.
+/// `PASSPORT_TERMS` here and `PASSPORT_WIRE_KEYS` in the domain are two lists in
+/// two crates with nothing between them: adding an envelope field and
+/// forgetting the term costs nothing at compile time, and produces a passport
+/// whose new key expands to no IRI at all — dropped by a lenient processor,
+/// silently, in the one document whose whole job is to say what the keys mean.
+///
+/// 🚨 Not hypothetical. `carrierSerial` was added to the envelope while this
+/// work was open, and nothing noticed until it was rebased — by which point
+/// the context was a key short and every gate was still green.
+#[test]
+fn every_passport_wire_key_has_a_term() {
+    let map = term_map();
+    let missing: Vec<&str> = dpp_domain::PASSPORT_WIRE_KEYS
+        .iter()
+        .copied()
+        .filter(|key| !map.contains_key(*key))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "envelope keys carrying no JSON-LD term: {missing:?}"
+    );
+}
+
+/// Every term minted under our own namespace is named after its own key.
+///
+/// [`every_compact_term_expands_to_a_permitted_iri`] deliberately skips these —
+/// the register has nothing to say about a namespace we mint ourselves — so
+/// nothing checked that `productGroup` expands to `dpp:productGroup` rather
+/// than to `dpp:product_group`. One term did not, and it was caught by reading
+/// the table rather than by running anything.
+///
+/// A processor does not care: an IRI is opaque to it. A reader does, and so
+/// does anyone mapping this vocabulary onto another. An IRI *is* the term's
+/// identity, so the disagreement is not a typo that can be fixed later once
+/// passports exist to mean something by it.
+///
+/// Only our own namespace is held to this. A `gs1:` local name belongs to GS1
+/// and may legitimately differ from the key chosen for it here.
+#[test]
+fn every_term_in_our_namespace_is_named_after_its_key() {
+    let mut checked = 0usize;
+    for (term, target) in term_map() {
+        let Some(local) = target.as_str().and_then(|t| t.strip_prefix("dpp:")) else {
+            continue;
+        };
+        checked += 1;
+        assert_eq!(
+            local, term,
+            "term '{term}' mints '{local}' under our own namespace"
+        );
+    }
+    assert!(
+        checked > 0,
+        "no terms were checked — this would pass vacuously"
     );
 }

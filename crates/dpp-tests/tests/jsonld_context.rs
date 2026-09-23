@@ -117,7 +117,10 @@ fn the_passport_vocabulary_is_inlined() {
         .find(|e| e.is_object())
         .expect("the context carries an inline term map");
 
-    for term in ["dpp", "productIdentifier", "productGroup", "passportId"] {
+    // `id`, not `passportId`. The term used to be `passportId`, and this loop
+    // asserted it was present for as long as it existed — while the key the
+    // passport actually emits is `id`, which had no term of its own at all.
+    for term in ["dpp", "productIdentifier", "productGroup", "id"] {
         assert!(
             inline.get(term).is_some(),
             "term '{term}' is not defined inline — a consumer would have to \
@@ -328,4 +331,147 @@ fn every_product_identifier_key_has_a_scoped_term() {
     // Scoped contexts are a JSON-LD 1.1 feature; without the version marker a
     // processor treats the inner `@context` as an error rather than a scope.
     assert_eq!(terms["@version"], json!(1.1));
+}
+
+/// 🚨 Every key a `Passport` emits has a term, and every term names a key it
+/// emits.
+///
+/// A JSON-LD term is reachable only at the position its key occupies. A key
+/// with no term is dropped on expansion, taking everything inside it; a term
+/// whose key does not exist is inert and silently claims to define something.
+/// Both had happened, in the same object, and nothing compared the two sides:
+/// six of thirty-seven keys carried a term, `passportId` pointed at a key
+/// called `id`, and `jws` pointed at keys called `jwsSignature` and
+/// `publicJwsSignature`. The expanded form of a passport dropped its product
+/// name, its manufacturer, its materials and both of its signatures.
+///
+/// The field list is read from `Passport`'s own source rather than from a
+/// fixture, following `gtin_enforcement.rs`. A fixture only shows the keys it
+/// happens to populate — and fifteen of these fields are
+/// `skip_serializing_if`, so a fixture that left one `None` would prove
+/// nothing about it. The source cannot omit a field that exists.
+#[test]
+fn every_passport_key_has_a_term_and_every_term_has_a_key() {
+    let emitted = passport_wire_keys();
+    assert!(
+        emitted.len() > 30,
+        "only {} fields parsed out of Passport — the reader broke, not the context",
+        emitted.len()
+    );
+
+    let ctx = context_value();
+    let terms = ctx
+        .as_array()
+        .expect("@context is an array")
+        .iter()
+        .find(|e| e.is_object())
+        .and_then(Value::as_object)
+        .expect("the context carries an inline term map");
+
+    // `@version` is a keyword, `dpp` and `gs1` declare prefixes, and
+    // `productIdentifier` is a key *inside* `productGroupData` rather than on
+    // the envelope. Everything else in this map must name an envelope key.
+    let structural = ["@version", "dpp", "gs1", "productIdentifier"];
+
+    for (term, _) in terms
+        .iter()
+        .filter(|(t, _)| !structural.contains(&t.as_str()))
+    {
+        assert!(
+            emitted.contains(term),
+            "term `{term}` defines a key no passport emits, so it expands nothing: the \n             field was renamed and the term left behind, or the term was a guess"
+        );
+    }
+
+    for key in &emitted {
+        assert!(
+            terms.contains_key(key),
+            "`{key}` is emitted by Passport and has no term, so it and everything \n             inside it is dropped on expansion"
+        );
+    }
+    // 🚨 And each envelope term points into our own namespace. The context's
+    // rule is that `dpp:` is the only prefix it mints into — the single foreign
+    // term, `gs1:gtin`, is foreign because `dpp-vocab` holds a provenance
+    // record for it, and it is scoped under `productIdentifier` rather than
+    // sitting out here. A term that quietly acquired someone else's prefix
+    // would be an unsupported claim about their vocabulary, which is what the
+    // register exists to prevent.
+    for key in &emitted {
+        if key == "id" {
+            continue; // aliases the `@id` keyword; its target is pinned in dpp-vc
+        }
+        let iri = terms[key].as_str().unwrap_or_default();
+        assert!(
+            iri.starts_with("dpp:"),
+            "`{key}` maps to `{iri}`, which is outside our namespace: a foreign prefix needs a dpp-vocab record and a scoped definition"
+        );
+    }
+}
+
+/// The wire key of every field on `Passport`, read from its declaration.
+///
+/// `Passport` is `#[serde(rename_all = "camelCase")]` with no per-field
+/// `rename` and no `skip`, so the wire key of each field is its name in
+/// camelCase and nothing else. Both halves of that are asserted here rather
+/// than assumed: a `rename` or a `skip` appearing later would make this
+/// conversion quietly wrong, which is the same class of defect the test exists
+/// to catch.
+fn passport_wire_keys() -> Vec<String> {
+    let source = std::fs::read_to_string(
+        // CARGO_MANIFEST_DIR is crates/dpp-tests.
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("crates/dpp-tests sits two levels below the workspace root")
+            .join("crates/dpp-domain/src/passport/record.rs"),
+    )
+    .expect("Passport's source is readable");
+
+    let start = source
+        .find("pub struct Passport {")
+        .expect("the Passport declaration");
+    let body = &source[start
+        ..source[start..]
+            .find(
+                "
+}",
+            )
+            .expect("the end of the declaration")
+            + start];
+
+    assert!(
+        source[..start].contains(r#"#[serde(rename_all = "camelCase")]"#),
+        "Passport is no longer camelCase — this conversion is now wrong"
+    );
+    assert!(
+        !body.contains("rename ="),
+        "a field carries an explicit serde rename; read it rather than deriving it"
+    );
+    assert!(
+        !body.contains("skip)") && !body.contains("skip,"),
+        "a field is serde(skip) and must not get a term"
+    );
+
+    body.lines()
+        .filter_map(|line| line.strip_prefix("    pub "))
+        .filter_map(|rest| rest.split(':').next())
+        .filter(|name| {
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
+        })
+        .map(|name| {
+            let mut parts = name.split('_');
+            let head = parts.next().unwrap_or_default().to_owned();
+            parts.fold(head, |mut acc, part| {
+                let mut chars = part.chars();
+                if let Some(first) = chars.next() {
+                    acc.push(first.to_ascii_uppercase());
+                    acc.push_str(chars.as_str());
+                }
+                acc
+            })
+        })
+        .collect()
 }
