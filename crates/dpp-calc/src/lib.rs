@@ -6,7 +6,7 @@
 //! **Placement:** these compute *EU methodology* (cradle-to-gate CO₂e, battery
 //! CFB stub) plus a non-regulatory repairability heuristic, so they change when a
 //! regulation changes and therefore live in `dpp-core` under Apache-2.0 — not in
-//! the platform.
+//! a host application.
 //! The licensing split: the methodology is open; licensed LCI datasets are
 //! never bundled here and are injected at runtime via [`factor::FactorProvider`].
 //!

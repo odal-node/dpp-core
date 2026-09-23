@@ -2,7 +2,8 @@
 //!
 //! The primary entry point is [`calculate`], which computes the production-stage
 //! footprint from a bill of materials and manufacturing energy using a
-//! caller-supplied [`Co2eRuleset`]. [`cfb`] is a stub gated on Phase 2 data licensing.
+//! caller-supplied [`Co2eRuleset`]. [`cfb`] is a stub: the delegated act that
+//! defines its methodology has not been adopted.
 //!
 //! ## Module layout (five-file methodology convention)
 //!

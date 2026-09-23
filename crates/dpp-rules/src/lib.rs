@@ -60,7 +60,7 @@ pub mod canonical;
 
 // Ruleset-bundle format + verification seam (signed, versioned Compliance
 // Current bundles). Optional: signing and hot-swap runtime state stay
-// engine-side; this crate only carries the open format + fail-closed verify.
+// host-side; this crate only carries the open format + fail-closed verify.
 #[cfg(feature = "bundle")]
 pub mod bundle;
 

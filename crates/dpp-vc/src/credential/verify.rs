@@ -94,7 +94,7 @@ pub fn verify_credential_claims(
 }
 
 /// Full credential verification **including revocation**, with a fail-closed
-/// policy (crypto Gap 5).
+/// policy.
 ///
 /// `status_list` is the result of fetching the credential's status list:
 /// `Some(list)` when fetched and verified, `None` when there is nothing to

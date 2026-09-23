@@ -85,7 +85,7 @@ impl PassportStatus {
     /// must, in order to list the values its endpoints can return. Without this
     /// the list is hand-written downstream, keeps compiling when a variant is
     /// added here, and the new status ships undocumented: exactly how
-    /// `superseded` and `deactivated` came to be missing from the engine's
+    /// `superseded` and `deactivated` came to be missing from a consumer's
     /// OpenAPI description while both were reachable.
     ///
     /// A status added later is deliberately not covered until it is added here

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// constituents.
 ///
 /// This is pure data. Computing and verifying `public_jws_hash` (a network
-/// fetch plus a JWS check) is the responsibility of the stateful engine, not of
+/// fetch plus a JWS check) is the responsibility of a stateful host, not of
 /// this crate — the referenced passport is fetched, its `public_jws_signature`
 /// re-hashed, and the result compared against the value stored here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

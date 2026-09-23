@@ -128,7 +128,7 @@ the PR title:
 2. Add it to the re-exports in `dpp-domain::lib.rs`.
 3. Document the trait's contract, error semantics, and concurrency
    expectations.
-4. Do NOT provide an implementation — implementations live in the platform
+4. Do NOT provide an implementation — implementations live in a host
    repo.
 5. Update the architecture docs if the new port changes the core/platform
    boundary.

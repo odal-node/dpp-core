@@ -125,7 +125,7 @@ fn credential_with_status() {
     assert_eq!(json["credentialStatus"]["type"], "BitstringStatusListEntry");
 }
 
-/// VC-DM 2.0 conformance (crypto Gap 2).
+/// VC-DM 2.0 conformance.
 #[test]
 fn vc2_uses_valid_from_until_not_issuance_expiration() {
     let cred = CredentialBuilder::new("did:web:a.example.com".into(), sample_subject()).build();
@@ -139,7 +139,7 @@ fn vc2_uses_valid_from_until_not_issuance_expiration() {
     );
 }
 
-// ── Revocation (crypto Gap 5) ─────────────────────────────────────────────
+// ── Revocation ─────────────────────────────────────────────
 
 fn credential_with_status_index(index: &str) -> DppAccessCredential {
     CredentialBuilder::new("did:web:authority.example.com".into(), sample_subject())
@@ -235,7 +235,7 @@ fn credential_role_disclosure() {
     assert_eq!(CredentialRole::NotifiedBody.audience(), Audience::Authority);
 }
 
-// ── Gap 9: issuer trust anchor ────────────────────────────────────────────
+// ── Issuer trust anchor ────────────────────────────────────────────
 
 #[test]
 fn trusted_issuer_passes() {

@@ -31,7 +31,7 @@
 //! origin.
 //!
 //! Two operating models exist:
-//! - **Provider seal (delegated):** the platform holds its own qualified seal;
+//! - **Provider seal (delegated):** a host holds its own qualified seal;
 //!   operators register via delegated access without their own eIDAS credentials.
 //! - **Operator seal:** the operator obtains and manages their own qualified seal.
 //!

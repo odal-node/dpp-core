@@ -97,13 +97,14 @@ pub struct Passport {
     pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
-    /// CO₂ equivalent per unit — manufacturer-supplied or engine-calculated.
+    /// CO₂ equivalent per unit — manufacturer-supplied or calculated.
     pub co2e_per_unit: Option<CarbonFootprint>,
     /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
     pub repairability_score: Option<RepairabilityScore>,
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
-    /// receipt. Attached by the engine's `apply_compliance` at create/update.
+    /// receipt. Attached by the host at create/update, after it runs the
+    /// product group's compliance strategy.
     /// Part of the signed payload and immutable after retention lock. `None`
     /// until a determination is computed (e.g. a product group with no plugin loaded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -111,9 +112,8 @@ pub struct Passport {
     /// Non-binding plausibility findings from the `dpp-rules` lint pack —
     /// arithmetic and physical-plausibility checks distinct from binding
     /// compliance rules. Never gates publish and may be recomputed at any
-    /// time after publish (a lint re-check), unlike `compliance_result` —
-    /// see the vault's `POST /dpp/{id}/lint` endpoint. `None` until a lint
-    /// pass has run.
+    /// time after publish (a lint re-check), unlike `compliance_result`.
+    /// `None` until a lint pass has run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lint_result: Option<LintResult>,
     /// Typed, product group-specific DPP data (EU Battery Regulation, Textile DPP, etc.).
@@ -340,7 +340,7 @@ pub struct Passport {
     /// similar tasks pursuant to other Union law applicable to the product**";
     /// the identifier-issuance mechanics are **Art. 12**. (**Art. 13** governs
     /// uploading identifiers to the EU registry — a related but distinct
-    /// obligation, not the field's basis.) Populated by the engine from
+    /// obligation, not the field's basis.) Populated by the host from
     /// `operator_config`.
     ///
     /// The emphasised limbs were previously elided behind a `[...]`, and they
@@ -949,7 +949,7 @@ impl Passport {
     /// A passport missing content the law requires is not a passport with a
     /// quality problem — it is one that should not exist. Putting the check in
     /// `dpp-domain` rather than in a consumer means no caller can opt out of
-    /// it: an engine-side check would be bypassed by the next engine.
+    /// it: a check in one consumer would be bypassed by the next.
     ///
     /// # Why only on the *first* publish
     ///

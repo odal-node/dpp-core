@@ -35,7 +35,7 @@
 //! consumer must not miss is stated directly.
 //!
 //! The crate is safe to compile for `wasm32-unknown-unknown` — it contains no
-//! I/O, no HTTP clients, no async runtime. The platform repo provides the
+//! I/O, no HTTP clients, no async runtime. A host provides the
 //! actual HTTP adapter that implements network calls.
 //!
 //! # Key concepts

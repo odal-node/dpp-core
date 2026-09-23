@@ -66,7 +66,7 @@ fn calculating_with_a_pending_ruleset_is_rejected_as_undetermined() {
 
 /// The signature check is exercised by `dpp-rules`' own tests against both
 /// outcomes. What is under test here is what happens *after* a bundle
-/// verifies, so this stands in for the engine-side EdDSA adapter.
+/// verifies, so this stands in for a host-side EdDSA adapter.
 struct SignatureAccepted;
 impl JwsVerify for SignatureAccepted {
     fn verify_eddsa(&self, _jws: &str, _key: &str) -> Result<bool, RulesetError> {

@@ -1,6 +1,6 @@
 //! Bundle format + verification tests, driven with a fake [`JwsVerify`] so
 //! this crate's own tests never need a real signing key. The real EdDSA path
-//! is covered end-to-end where the adapter lives (engine-side).
+//! is covered end-to-end where the adapter lives (host-side).
 
 use std::collections::BTreeMap;
 

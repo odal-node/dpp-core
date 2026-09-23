@@ -190,7 +190,7 @@ production order and rate. Fixed; regression tests cover both properties.
 time*. The serial is deterministic from the passport UUID and unique per
 passport, but nothing currently prevents two passports being issued for one
 physical item, or a reissued passport receiving a different serial for the same
-battery. That is an operational guarantee the platform must make, not one this
+battery. That is an operational guarantee a host must make, not one this
 crate can enforce.
 
 ## Processor Limits — Art. 78(d)
@@ -238,7 +238,7 @@ and infrastructure concern and is not evidenced here.
 ## Wasm Plugin Architecture
 
 Product group-specific compliance logic runs as sandboxed Wasm modules
-(`wasm32-wasip1`) loaded by the platform. The plugin ABI includes:
+(`wasm32-wasip1`) loaded by a host. The plugin ABI includes:
 
 - Capability negotiation (plugins declare supported operations).
 - Semantic versioning with compatibility checking.
@@ -267,13 +267,13 @@ The `just check` recipe and GitHub Actions CI run:
 
 1. **JWS signature verification** in `jws_verifier` performs structural checks
    but does not yet resolve DIDs from the network to fetch public keys. This
-   requires the platform's HTTP client (not available in the pure core).
+   requires a host's HTTP client (not available in the pure core).
 
 2. **StatusList2021** revocation checking is modelled but not implemented
    (requires HTTP fetching of the status list credential).
 
 3. **Schema hot-reload** is implemented but the file-watching trigger lives
-   in the platform crate.
+   in a host crate.
 
 4. **Wasm plugins** are excluded from workspace CI. The `wasm-build.yml`
    workflow handles them separately.

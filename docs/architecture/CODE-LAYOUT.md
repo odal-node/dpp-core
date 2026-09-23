@@ -52,7 +52,7 @@ data conforms, when it imports exactly one module and sits second from the botto
 of the graph. The measurement is the authority; the name follows it.
 
 **Nothing may import tier 7.** The one tier-8 module is the open-source default
-adapter; every other `impl …Port for` in the workspace lives in the platform
+adapter; every other `impl …Port for` in the workspace lives in a host
 repository, already outside this crate.
 
 ### Direction is not enough — the graph must also be acyclic

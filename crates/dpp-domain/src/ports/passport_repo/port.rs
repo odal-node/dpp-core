@@ -207,8 +207,8 @@ pub trait PassportRepository: Send + Sync {
     /// passports with no batch set.
     ///
     /// Default implementation is an unindexed `list()` scan — correctness
-    /// only, suitable for tests and small in-memory stores. `PgPassportRepo`
-    /// overrides this with a real indexed query.
+    /// only, suitable for tests and small in-memory stores. A database-backed
+    /// implementor should override it with an indexed query.
     async fn find_by_identity(
         &self,
         identity: &ProductIdentity,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// A recognised derogation from the ESPR Art. 25 destruction ban. The exact
 /// category list is fixed by the Feb-2026 delegated act; the category string is
-/// validated against that list at the engine boundary, not here.
+/// validated against that list by the host, not here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerogationRef {

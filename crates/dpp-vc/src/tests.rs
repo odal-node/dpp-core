@@ -86,7 +86,7 @@ fn archived_keys_appear_as_secondary_methods_after_rotation() {
     assert!(vms[2]["id"].as_str().unwrap().ends_with("#key-3"));
 }
 
-/// Gap 7: a revoked key must not appear in the DID document at all.
+/// A revoked key must not appear in the DID document at all.
 #[test]
 fn revoked_key_is_excluded_from_did_document() {
     let store = temp_store("did-revoke", "t-rev");
@@ -300,7 +300,7 @@ async fn sign_and_verify_round_trip() {
     assert!(valid);
 }
 
-/// Content-binding (crypto Gap 8): a valid JWS signed over payload A must
+/// Content-binding: a valid JWS signed over payload A must
 /// NOT verify when presented alongside a different payload B.
 #[tokio::test]
 async fn signature_is_bound_to_its_payload() {
@@ -366,7 +366,7 @@ async fn tampered_jws_fails_verification() {
     assert!(matches!(valid, Ok(false) | Err(_)));
 }
 
-/// Gap 10: `SignedCredential.credential` must be a proper W3C VC 2.0 envelope.
+/// `SignedCredential.credential` must be a proper W3C VC 2.0 envelope.
 #[tokio::test]
 async fn sign_passport_credential_is_typed_vc() {
     let svc = test_service();
@@ -456,7 +456,7 @@ fn rotation_does_not_break_old_jws_verification() {
     assert!(ok_b, "new JWS must verify against current key");
 }
 
-/// Gap 7 end-to-end: after a key is **revoked**, a JWS it produced must no
+/// End-to-end: after a key is **revoked**, a JWS it produced must no
 /// longer be verifiable — the revoked key is absent from the DID document.
 #[test]
 fn revoked_key_signature_no_longer_verifies() {

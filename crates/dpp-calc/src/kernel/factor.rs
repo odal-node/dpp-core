@@ -14,10 +14,10 @@ pub use super::synthetic_factor::SyntheticFactorProvider;
 /// bundling the underlying data in this Apache-2.0 crate — the methodology is
 /// open, the factor data is licensed and supplied at runtime.
 ///
-/// A `FactorProvider` is intentionally *not* used by the Phase-0 calculators
-/// (repairability and the basic CO₂e cradle-to-gate), which take emission
-/// factors as caller-supplied inputs. It will be wired in Phase 2 when the
-/// battery CFB engine requires real LCI data.
+/// A `FactorProvider` is intentionally *not* used by the calculators that ship
+/// today (repairability and the basic CO₂e cradle-to-gate), which take emission
+/// factors as caller-supplied inputs. It is for the battery CFB calculation,
+/// which needs real life-cycle inventory data rather than a caller's numbers.
 pub trait FactorProvider: Send + Sync {
     /// Machine-readable identifier of the loaded dataset (e.g. `"ecoinvent-3.10"`).
     fn dataset_id(&self) -> &str;
