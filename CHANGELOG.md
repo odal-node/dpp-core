@@ -1112,6 +1112,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **🚨 Nothing tested that a revoked key leaves the SD-JWT VC issuer metadata.**
+  With both of `build_issuer_metadata`'s revocation filters deleted, every test
+  in `dpp-vc` and the cross-crate tier still passed. Three tests now hold it: a
+  compromise rotation drops the revoked key and serves its replacement alone,
+  an ordinary rotation keeps the old key so earlier credentials still verify,
+  and a revoked **current** key is withheld. No store call can produce that
+  last state, so the filtering moved into a private function over the key
+  records rather than into a test hook on a published crypto crate.
+
+- **The SD-JWT mechanism is now checked against RFC 9901 rather than only
+  against itself.** Every earlier test issued and verified with the same code,
+  so hashing the decoded bytes instead of the encoded string, or using the wrong
+  base64 alphabet, would have passed all of them. The clause 4.2.1 example
+  disclosure now hashes to the digest clause 4.2.3 publishes. All four of the
+  RFC's encodings of that one claim read the same and hash apart, and this
+  encoder produces the RFC's compact form byte for byte. Nothing had to change:
+  the implementation was right, and now there is evidence of it.
+
+- **An issued SD-JWT VC cannot be withdrawn, and the module now says so.**
+  draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2.3 registers an optional `status`
+  claim and clause 2.4 has a verifier check it when present. Issuance sets no
+  `status` and no `exp`, so a credential verifies until its key is revoked,
+  whatever becomes of the passport. This was undocumented, beside a list headed
+  *deliberately absent* that it did not belong in, because nobody decided it.
+
 - **🚨 A credential's expanded form carried no product identity at all.** The
   JSON-LD context defined `gtin` at the top level, which is where the key sat
   before the identifier migration. When the identifier moved under

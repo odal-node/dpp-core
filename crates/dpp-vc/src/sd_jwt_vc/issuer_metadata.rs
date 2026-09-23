@@ -44,7 +44,21 @@ pub const WELL_KNOWN_PATH: &str = "/.well-known/jwt-vc-issuer";
 /// set, which would assert that this issuer signs nothing.
 pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Option<Value> {
     let current = store.public_key(key_id)?;
+    metadata_for_keys(issuer, &current, &store.archived_public_keys(key_id))
+}
 
+/// The metadata document for a current key and its archived predecessors.
+///
+/// Separate from [`build_issuer_metadata`] so both revocation branches can be
+/// tested. A store's public API never leaves its *current* key revoked —
+/// `revoke_and_rotate` archives the revoked key and issues a fresh one — so the
+/// branch below that guards against it is unreachable through the store, and a
+/// guard nothing can reach is a guard nothing checks.
+pub(super) fn metadata_for_keys(
+    issuer: &str,
+    current: &PublicKeyInfo,
+    archived: &[PublicKeyInfo],
+) -> Option<Value> {
     // 🚨 The current key is filtered on `revoked` too, and it was not.
     //
     // The doc above says revoked keys are excluded; the code excluded them only
@@ -56,15 +70,9 @@ pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Op
     // prevent, reached by the metadata document meant to convey it.
     let mut keys: Vec<Value> = Vec::new();
     if !current.revoked {
-        keys.push(jwk(&current)?);
+        keys.push(jwk(current)?);
     }
-    keys.extend(
-        store
-            .archived_public_keys(key_id)
-            .iter()
-            .filter(|k| !k.revoked)
-            .filter_map(jwk),
-    );
+    keys.extend(archived.iter().filter(|k| !k.revoked).filter_map(jwk));
 
     // No usable key is not the same as an empty key set. A JWKS with `keys: []`
     // reads as "this issuer signs nothing", which a verifier may cache; absent
