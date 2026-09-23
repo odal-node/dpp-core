@@ -272,6 +272,7 @@ fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
         field_disclosure,
         envelope_disclosure: HashMap::new(),
         default_disclosure: Disclosure::Public,
+        public_envelope_fields: Default::default(),
     };
 
     let payload = json!({

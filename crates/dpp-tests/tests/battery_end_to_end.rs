@@ -217,14 +217,15 @@ fn battery_passport_maps_to_aas_shell() {
     // Shell wiring: GTIN becomes the global asset id, and the passport id is a
     // specific asset id.
     //
-    // The batch is **not**, at this audience. `batchId` is `Restricted`, and the
-    // projection now applies the same passport-level classes the JSON view does
-    // — it previously resolved a policy that carried only the universal
-    // conformity names, so every envelope field fell to the public default here
-    // while being stripped elsewhere.
+    // So is the batch, at this audience — **because this is a battery**. The
+    // projection applies the same passport-level classes the JSON view does,
+    // and `batchId`, `Restricted` by default, is opened by the battery schema:
+    // Art. 38(6) of Regulation (EU) 2023/1542 makes the batch or serial number
+    // identifying information, and Annex XIII point 1(a) makes it public. A
+    // product group without that opening keeps it off the public shell.
     assert!(shell.asset_information.global_asset_id.contains(VALID_GTIN));
     assert!(
-        !shell
+        shell
             .asset_information
             .specific_asset_ids
             .iter()

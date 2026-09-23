@@ -1017,8 +1017,14 @@ mod tests {
             .unwrap()
             .message;
         assert!(
-            msg.contains("batteryPassportNumber") && msg.contains("manufacturingDate"),
+            msg.contains("batteryModelId") && msg.contains("manufacturingDate"),
             "the finding must name what is missing: {msg}"
+        );
+        // The Art. 77(3) identifier is the passport's carrier identifier, not a
+        // payload field, so the superseded one is not owed.
+        assert!(
+            !msg.contains("batteryPassportNumber"),
+            "a superseded field is not mandatory content: {msg}"
         );
     }
 

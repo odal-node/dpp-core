@@ -814,6 +814,7 @@ name = "dpp-digital-link"
 version = "0.20.0"
 dependencies = [
  "dpp-domain",
+ "dpp-rules",
  "proptest",
  "serde",
  "serde_json",
@@ -892,6 +893,7 @@ dependencies = [
 name = "dpp-tests"
 version = "0.20.0"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "chrono",
  "dpp-aas",
@@ -905,6 +907,7 @@ dependencies = [
  "jsonschema",
  "semver",
  "serde_json",
+ "tokio",
  "uuid",
 ]
 

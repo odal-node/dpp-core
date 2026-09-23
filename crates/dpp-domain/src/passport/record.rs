@@ -32,29 +32,24 @@ pub struct Passport {
     ///
     /// # Why the carrier's serial is not this
     ///
-    /// A GS1 Digital Link carrier is `/01/{gtin}/21/{serial}`, and AI 21 *is*
-    /// the serial number — but the value put there is derived from the
-    /// passport's own UUID by `dpp_digital_link::short_serial`, which
-    /// hex-encodes the random tail of the UUIDv7 to fit GS1's 20-character cap.
+    /// The serial a GS1 data carrier prints in AI 21 is
+    /// [`carrier_serial`](Self::carrier_serial), a different field with a
+    /// different owner. That one is whatever the operator **attributes** as the
+    /// passport's unique identifier — the act Art. 77(3) of Regulation (EU)
+    /// 2023/1542 names — and by default it is derived from this record's id.
+    /// This one is a fact about the object. An operator may attribute its
+    /// manufacturer serial as the carrier serial, and then the two hold the same
+    /// value; nothing copies one into the other, because choosing what goes on a
+    /// label is the operator's decision rather than a side effect of recording
+    /// the unit.
     ///
-    /// That derivation is deliberate and stays. It was moved off the *leading*
-    /// bytes in 0.11.0 because a UUIDv7 opens with a millisecond timestamp, so
-    /// the old serial sorted in creation order and its first twelve hex
-    /// characters decoded to the passport's creation instant — a disclosure
-    /// through the printed label.
+    /// An item-level passport that cannot state the manufacturer's serial cannot
+    /// be matched back to the object by anyone holding it, whatever the label
+    /// says — which is why this field exists beside the carrier serial rather
+    /// than instead of it.
     ///
-    /// Opaque-by-design is exactly the point, and exactly why it cannot serve
-    /// here: it identifies the **record**, not the product. It is not the serial
-    /// stamped on the unit and not the serial in the manufacturer's ERP, and
-    /// nothing can reconcile the two. An item-level passport that cannot state
-    /// the manufacturer's serial cannot be matched back to the object by anyone
-    /// holding it — which is most of the people a passport exists for.
-    ///
-    /// **The carrier does not switch to this value when it is present**, and
-    /// `an_item_serial_does_not_change_the_carrier` pins that. The resolver is
-    /// GTIN-keyed and ignores AI 21 entirely, so putting a real serial in a
-    /// public URL would buy nothing and would reintroduce the printed-label
-    /// disclosure the 0.11.0 change removed.
+    /// Who may see it depends on the product group; see
+    /// `PASSPORT_FIELD_DISCLOSURE` for the default and the battery exception.
     ///
     /// # Why it is not required at item level
     ///
@@ -129,6 +124,42 @@ pub struct Passport {
     pub status: PassportStatus,
     /// The publicly accessible QR code URL for this passport.
     pub qr_code_url: Option<String>,
+    /// The serial this passport's GS1 data carrier prints in AI 21, when the
+    /// operator has attributed one. Read it through
+    /// [`effective_carrier_serial`](Self::effective_carrier_serial), which
+    /// supplies the default when this is `None`.
+    ///
+    /// # Why the operator attributes it
+    ///
+    /// Art. 77(3) of Regulation (EU) 2023/1542: the battery passport *"shall be
+    /// accessible through the QR code … which links to a unique identifier that
+    /// the economic operator placing the battery on the market shall attribute
+    /// to it"*. With a GS1 Digital Link, that identifier is the GTIN together
+    /// with this serial, so the serial is the part the operator chooses. An
+    /// operator that already serialises its units can attribute that serial; one
+    /// that does not accepts the default, [`PassportId::default_carrier_serial`],
+    /// which carries no creation time and cannot be guessed from a neighbour's.
+    ///
+    /// # What it must be
+    ///
+    /// One to twenty CSET 82 characters, which is AI 21 in GS1's syntax
+    /// dictionary; [`Self::validate`] refuses anything else, because the carrier
+    /// is built from it and must never print a value GS1 would reject. It is on
+    /// the printed label, so it is public by nature.
+    ///
+    /// # Why it is stored at all
+    ///
+    /// The label outlives every change to the record. An amendment creates a
+    /// new passport with a new id, and a default derived from that id would put
+    /// a different serial on the successor than the one printed on the object.
+    /// A successor therefore carries its predecessor's effective carrier serial
+    /// here, explicitly, so the label resolves to every record in the chain.
+    ///
+    /// `Option`, because the envelope is additive-only: a document written
+    /// before this field existed reads back as `None` and keeps the default it
+    /// always had.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carrier_serial: Option<String>,
     /// Compact JWS signature over the **full** canonical passport payload
     /// (`Disclosure::Conformity` — for authenticated, full-passport verification).
     pub jws_signature: Option<String>,
@@ -423,6 +454,7 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "productGroupData",
     "status",
     "qrCodeUrl",
+    "carrierSerial",
     "jwsSignature",
     "publicJwsSignature",
     "disclosureSignatures",
@@ -638,9 +670,25 @@ impl Passport {
         serde_json::from_value(doc).map_err(|e| DppError::Serialisation(e.to_string()))
     }
 
+    /// The serial this passport's data carrier prints in AI 21: the one the
+    /// operator attributed, or [`PassportId::default_carrier_serial`] when it
+    /// attributed none.
+    ///
+    /// This is the value a carrier is built from and the value a printed label
+    /// is resolved by, and both read it here so that they cannot disagree.
+    #[must_use]
+    pub fn effective_carrier_serial(&self) -> std::borrow::Cow<'_, str> {
+        match &self.carrier_serial {
+            Some(attributed) => std::borrow::Cow::Borrowed(attributed),
+            None => std::borrow::Cow::Owned(self.id.default_carrier_serial()),
+        }
+    }
+
     /// Validate the passport's own field invariants.
     ///
     /// Checks:
+    /// - `carrier_serial`, if attributed, is one to twenty CSET 82 characters
+    ///   (GS1 AI 21)
     /// - `product_name` is non-empty
     /// - `manufacturer.name` is non-empty
     /// - `manufacturer.address` is non-empty
@@ -666,6 +714,26 @@ impl Passport {
         use crate::field_error::{FieldError, ValidationErrors};
 
         let mut errors: Vec<FieldError> = Vec::new();
+
+        if let Some(serial) = &self.carrier_serial
+            && let Err(rejection) = dpp_rules::common::identifier::check_gs1_serial(serial)
+        {
+            use dpp_rules::common::identifier::Gs1SerialRejection;
+            let why = match rejection {
+                Gs1SerialRejection::Empty => "must not be empty".to_owned(),
+                Gs1SerialRejection::TooLong { chars } => format!(
+                    "has {chars} characters; GS1 AI 21 allows at most {}",
+                    dpp_rules::common::identifier::MAX_GS1_SERIAL_CHARS
+                ),
+                Gs1SerialRejection::OutsideCset82(c) => {
+                    format!("contains {c:?}, which is outside GS1 CSET 82")
+                }
+            };
+            errors.push(FieldError {
+                field: "/carrierSerial".to_owned(),
+                message: format!("carrier_serial {why}"),
+            });
+        }
 
         if self.product_name.trim().is_empty() {
             errors.push(FieldError {

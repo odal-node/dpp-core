@@ -32,9 +32,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   production run and one per unit — measured, two published passports sharing
   `09506000134352` across two batches. The old methods were documented as
   returning *"the first"*, with no ordering defined: one arbitrary row of N.
-  Hence `Vec`, and hence the two narrowing arguments, which follow the shape of
-  the Digital Link being answered — `/01/{gtin}`, `/01/{gtin}/10/{lot}`,
-  `/01/{gtin}/21/{serial}`.
+  Hence `Vec`, and hence the two narrowing arguments: no batch and no serial is
+  the model record, a batch alone is that run's record, and a manufacturer's
+  serial names one unit **whatever batch is asked for**, since GTIN and serial
+  already identify it. This method does not resolve a printed carrier — see
+  `find_by_carrier_serial` below.
 
   🚨 **Typed, not `&str`.** A bare string invites taking a value from one
   namespace and looking it up in another because both are strings, which is how
@@ -50,7 +52,100 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   two is the defect being removed rather than a smaller version of it.
 
   Migration: construct a `ProductIdentifier` at the route boundary, pass the
-  batch and serial the route carries, and filter the result on `status`.
+  batch and manufacturer's serial the caller holds, and filter the result on
+  `status`.
+
+- **🚨 A printed data carrier now resolves to the passport it was printed for,
+  and the operator attributes what the label carries.** *(Breaking:
+  `dpp_digital_link::build_qr_url` takes the passport and returns
+  `Result<Option<String>, _>`; `dpp_digital_link::short_serial` is removed;
+  `Passport` gains `carrier_serial`; `AiSpec` gains `cset_82`;
+  `ProductGroupAccessPolicy` gains `public_envelope_fields`. Each new field
+  breaks an exhaustive struct literal and nothing else. On the wire
+  `carrierSerial` is additive — optional in both directions, omitted when
+  `None`.)*
+
+  **The defect.** The carrier printed `/01/{gtin}[/10/{lot}]/21/{serial}` with
+  the serial derived from the passport's own id, while the lookup a resolver
+  was documented to use — `find_by_identifier` — compared the manufacturer's
+  `serial_number`. The two never met. Measured: a model, a lot and a unit
+  passport under one GTIN each resolved to **nothing** through their own
+  printed carrier, and a GTIN-only lookup returned the model record alone, so
+  lot and unit passports were unreachable from any label.
+
+  **Why the fix is not "print the manufacturer's serial".** That was the first
+  answer, and the law does not support it. Art. 77(3) of Regulation (EU)
+  2023/1542 has the battery passport reached through a QR code *"which links to
+  a unique identifier that the economic operator placing the battery on the
+  market shall attribute to it"* — the operator's choice, and not necessarily
+  the serial stamped on the unit. With a GS1 Digital Link that identifier is the
+  GTIN together with the AI 21 serial, so the serial is the part the operator
+  attributes.
+
+  - **`Passport::carrier_serial`** is that attribution. When it is `None` the
+    carrier uses **`PassportId::default_carrier_serial`** — the same derivation
+    `short_serial` made, moved into the domain, carrying no creation time and
+    unguessable from a neighbour's. `Passport::effective_carrier_serial` answers
+    either way, and the carrier and the lookup both read it. `validate` refuses
+    an attributed serial that is not one to twenty GS1 CSET 82 characters, and
+    the field is in `PROTECTED_PATCH_FIELDS`: a label already on an object must
+    keep resolving.
+  - **`PassportRepository::find_by_carrier_serial(&ProductIdentifier, &str)`**
+    resolves a label. `Vec`, because an amendment carries its predecessor's
+    serial forward and one label then names the chain. Defaulted, so no
+    implementation stops compiling; a real store indexes the effective serial,
+    which for the default is the last twenty hex digits of the id's canonical
+    text.
+  - **`build_qr_url(resolver_base, &Passport)`** builds from that same value,
+    `Ok(None)` for a passport without a GTIN, and refuses an attributed serial
+    GS1 would reject rather than printing it. **AI 10 is no longer emitted**: the
+    serial alone resolves the label, and a lot is operator free text this crate
+    cannot vouch for on a physical product.
+
+  **The Art. 77(3) identifier has one home.** The carrier identifier is it, so
+  the battery content gate no longer requires `batteryPassportNumber`. The field
+  still reads, and battery schema v2.7.0 documents it as superseded — two
+  fields for one identifier could only disagree.
+
+  **A battery's identifying batch and serial are public.** Art. 38(6) of that
+  Regulation has a battery bear *"a model identification and batch or serial
+  number, or product number or another element allowing their identification"*,
+  Annex VI Part A point 2 puts that on the label, and Annex XIII point 1(a)
+  makes Annex VI Part A publicly accessible. The envelope classed `batchId` and
+  `serialNumber` `Restricted` for every product group, which withheld exactly
+  that. A schema may now open fields from **`GROUP_OPENABLE_ENVELOPE_FIELDS`** —
+  those two, and nothing carrying a proof — with `x-public-envelope-fields`, and
+  battery v2.7.0 does. Regulation (EU) 2024/1781 Art. 10(1)(g) is what makes
+  access a per-product-group question. The opening applies to the top-level
+  envelope key only, travels with the schema version that declared it, and
+  reaches the public view, the AAS projection and SD-JWT issuance through one
+  composition, `ProductGroupAccessPolicy::for_passport`, which `redact_passport`
+  now uses instead of composing its own. Every other product group, and a
+  battery on an earlier version, is unchanged.
+
+  **CSET 82 is checked, and checked by GS1.** `dpp_rules::common::identifier`
+  gains `check_gs1_serial`, `is_cset_82` and `MAX_GS1_SERIAL_CHARS`, shared by
+  the domain's check and the parser. `DigitalLink::parse` now refuses a value
+  outside CSET 82 in an AI that is `X` throughout — AI 10 and AI 21 among them —
+  with `DigitalLinkError::OutsideCset82`, where it accepted it before. The GS1
+  syntax dictionary names CSET 82 without enumerating it, and the text that
+  does is not held here, so the table is ours; the oracle corpus now carries
+  every printable ASCII character in a serial, and GS1's Barcode Syntax Engine
+  agrees with every verdict.
+
+  🚨 `an_item_serial_does_not_change_the_carrier` used to compare a stored
+  `qrCodeUrl` string with itself after setting an unrelated field, so it could
+  not fail. It now builds the carrier.
+
+  **Migration.** Call `build_qr_url(base, &passport)` where you passed a GTIN,
+  a derived serial and a batch, and handle `Ok(None)` for scheme 2 and 3
+  passports. Replace `short_serial(id.0.as_bytes())` with
+  `id.default_carrier_serial()`. Resolve a label with `find_by_carrier_serial`,
+  not `find_by_identifier`. When amending a passport, set the successor's
+  `carrier_serial` to the predecessor's `effective_carrier_serial()`. Labels
+  already printed keep resolving: their AI 21 is the default derivation, and a
+  lot they carry is not read — unless that lot holds a character outside CSET
+  82, in which case the parser now refuses the link, as GS1's engine always did.
 
 - **`ProductIdentity` carries `serial_number`.** 🚨 Without it the type's claim
   to be an *exact* compound identity was false at item level: two published

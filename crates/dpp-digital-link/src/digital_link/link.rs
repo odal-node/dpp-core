@@ -5,7 +5,7 @@ use dpp_domain::Gtin;
 use super::codec::{normalize_gtin_to_14, percent_decode, percent_encode};
 use super::error::DigitalLinkError;
 use super::primary_key::PrimaryKey;
-use super::syntax_dictionary::{ai_spec, qualifier_position};
+use super::syntax_dictionary::{AiSpec, ai_spec, qualifier_position};
 
 /// A parsed GS1 Digital Link URI.
 ///
@@ -92,17 +92,7 @@ impl DigitalLink {
 
             let raw_value = ai_segments[i + 1];
             let value = percent_decode(raw_value);
-
-            // GS1 mandates a maximum length per AI; enforce it so an untrusted
-            // URI cannot smuggle an unbounded value downstream.
-            let value_len = value.chars().count();
-            if value_len > spec.max_len {
-                return Err(DigitalLinkError::ValueTooLong {
-                    code: code.to_owned(),
-                    max_len: spec.max_len,
-                    actual: value_len,
-                });
-            }
+            check_value(code, spec, &value)?;
 
             if spec.dl_primary_key {
                 // A second primary key must not silently overwrite the first —
@@ -229,4 +219,36 @@ impl DigitalLink {
     pub fn tpcsn(&self) -> Option<&str> {
         self.qualifier("235")
     }
+}
+
+/// Hold one decoded AI value to what the dictionary says about that AI.
+///
+/// The length first: GS1 mandates a maximum per AI, and enforcing it keeps an
+/// untrusted URI from smuggling an unbounded value downstream. Then, for an AI
+/// that is `X` throughout, the character set — a value GS1 would refuse is one
+/// no conformant reader can take from us, and one we should not take from
+/// anyone else either.
+///
+/// One function for reading and for building, so the carrier this crate prints
+/// is held to exactly the rule its own parser applies.
+pub(super) fn check_value(code: &str, spec: &AiSpec, value: &str) -> Result<(), DigitalLinkError> {
+    let value_len = value.chars().count();
+    if value_len > spec.max_len {
+        return Err(DigitalLinkError::ValueTooLong {
+            code: code.to_owned(),
+            max_len: spec.max_len,
+            actual: value_len,
+        });
+    }
+    if spec.cset_82
+        && let Some(character) = value
+            .chars()
+            .find(|c| !dpp_rules::common::identifier::is_cset_82(*c))
+    {
+        return Err(DigitalLinkError::OutsideCset82 {
+            code: code.to_owned(),
+            character,
+        });
+    }
+    Ok(())
 }

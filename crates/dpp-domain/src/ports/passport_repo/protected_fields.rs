@@ -36,6 +36,12 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     // correction, and identity changes go through supersession here — the
     // same reasoning that protects `batchId` one level up.
     "serialNumber",
+    // What the printed label says. Once a carrier has been built from it, a
+    // changed value leaves every label already on an object pointing at a
+    // serial this record no longer carries — the label stops resolving, with
+    // nothing to say why. An identifier that needs to change is a new
+    // identifier, and that goes through supersession.
+    "carrierSerial",
     "status",
     "retentionLocked",
     "retentionUntil",

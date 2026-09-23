@@ -46,6 +46,10 @@ pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     // lets one physical object be tracked across readers, and keeping the
     // printed label from leaking per-unit facts is the same concern that moved
     // the carrier serial off the UUIDv7 timestamp bytes in 0.11.0.
+    //
+    // That is the default and not a rule of law: where a product group's own
+    // legislation makes the identifying batch or serial public, its schema
+    // opens it — see `GROUP_OPENABLE_ENVELOPE_FIELDS`.
     ("serialNumber", Disclosure::Restricted),
     // Annex XIII point 4(c) of Reg. (EU) 2023/1542, and point 4's heading is
     // "INFORMATION AND DATA RELATING TO AN INDIVIDUAL BATTERY ACCESSIBLE ONLY TO
@@ -69,6 +73,34 @@ pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     ("seal", Disclosure::Conformity),
     ("retentionLocked", Disclosure::Conformity),
 ];
+
+/// The envelope fields a product group's schema may open to the public, and
+/// no others.
+///
+/// # Why a product group can open these at all
+///
+/// Access to passport data is decided per product group. Regulation (EU)
+/// 2024/1781 Art. 10(1)(g) regulates it *"with the specific access rights at
+/// product group level as specified in the applicable delegated act"*, and a
+/// group's own legislation can put an identifier on the public side. Batteries
+/// do: Art. 38(6) of Regulation (EU) 2023/1542 has a battery bear *"a model
+/// identification and batch or serial number, or product number or another
+/// element allowing their identification"*, Annex VI Part A point 2 puts that
+/// on the label, and Annex XIII point 1(a) makes Annex VI Part A publicly
+/// accessible in the passport. A universal `Restricted` on the envelope would
+/// withhold what that act requires to be shown.
+///
+/// # Why only these two
+///
+/// An opening is declared by a schema, and a schema is the product group's to
+/// write — so the list is the whole of what one can reach. It holds the two
+/// identity fields a product group's law can require to be public, and nothing
+/// that carries a proof or another audience's data. A schema naming anything
+/// else is refused when its policy is built, rather than opening it.
+///
+/// The opening applies to the envelope key itself, at the top of the document,
+/// never to a field of the same name nested anywhere else.
+pub const GROUP_OPENABLE_ENVELOPE_FIELDS: &[&str] = &["batchId", "serialNumber"];
 
 impl Disclosure {
     /// How many of the three audiences may see this class.

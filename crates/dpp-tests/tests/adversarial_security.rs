@@ -301,6 +301,7 @@ fn fail_closed_default_disclosure_blocks_unlisted_fields() {
             m
         },
         default_disclosure: Disclosure::Conformity, // fail-closed: unlisted = Confidential
+        public_envelope_fields: Default::default(),
     };
 
     let data = json!({

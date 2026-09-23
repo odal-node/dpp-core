@@ -99,6 +99,7 @@ fn minimal_passport(product_group: ProductGroup) -> Passport {
         product_group_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
+        carrier_serial: None,
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),

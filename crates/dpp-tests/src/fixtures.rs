@@ -72,6 +72,7 @@ pub fn base_passport(
         product_group_data: Some(product_group_data),
         status: PassportStatus::Draft,
         qr_code_url: None,
+        carrier_serial: None,
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),

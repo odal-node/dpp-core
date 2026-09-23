@@ -1,7 +1,11 @@
 //! The `Passport` aggregate root and its unique identifier type.
 
 pub mod id;
+#[cfg(test)]
+mod id_tests;
 
+#[cfg(test)]
+mod carrier_serial_tests;
 pub mod component;
 #[cfg(test)]
 mod component_tests;

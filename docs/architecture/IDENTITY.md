@@ -128,13 +128,13 @@ The verifier:
 The carrier (QR or Data Matrix) on a physical product encodes a **GS1 Digital Link** URI, not a proprietary path:
 
 ```
-{resolver_base}/01/{gtin}/10/{batchId}/21/{dpp_id}
+{resolver_base}/01/{gtin}/21/{carrier serial}
 ```
 
 - `resolver_base` is per-deployment configuration (`RESOLVER_BASE_URL`). A self-hoster sets it to their **own domain**, so the printed label carries the same trust root as their `did:web` identity; Odal's managed default is `https://id.odal-node.io`.
-- The `/10/{batchId}` (batch/lot) segment is omitted when the passport carries no batch.
 - The GTIN and identifier come from the **verified** passport fields — the resolver checks the JWS before building the URI and never trusts a stored `qrCodeUrl` value.
-- The `/21/` serial segment carries a GS1-conformant 20-character serial derived from the passport id — a raw 36-character UUID exceeds the GS1 AI 21 limit.
+- The `/21/` segment is the passport's **carrier serial**, `Passport::effective_carrier_serial`: the serial the operator attributes — the act Art. 77(3) of Regulation (EU) 2023/1542 names — or, when it attributes none, twenty hex characters from the random tail of the passport id. It is one to twenty GS1 CSET 82 characters either way, and a label resolves back to its passport through `PassportRepository::find_by_carrier_serial`, which compares the same value.
+- No batch/lot segment is printed. The carrier serial alone resolves the label, and a lot is operator free text.
 
 The carrier **fails closed**: if the passport does not verify, no URI is produced; if the product group data has no GTIN (for example an unsold-goods report), resolution returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital Link, any conformant resolver serving the same path answers the same scan — re-homing a passport is a DNS or registry change, not a reprint.
 

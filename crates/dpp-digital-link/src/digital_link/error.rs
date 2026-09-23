@@ -53,6 +53,12 @@ pub enum DigitalLinkError {
         max_len: usize,
         actual: usize,
     },
+    #[error(
+        "Application Identifier '{code}' value contains {character:?}, which is outside GS1 CSET 82"
+    )]
+    OutsideCset82 { code: String, character: char },
+    #[error("Application Identifier '{0}' has an empty value")]
+    EmptyValue(String),
 }
 
 impl From<GtinError> for DigitalLinkError {

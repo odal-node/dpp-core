@@ -129,12 +129,13 @@ use Requirement::{Conditional as C, Mandatory as M, NotApplicable as X};
 /// check" must not look the same in this table.
 const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     // ── Art. 77(3) — the identifier the passport is reached by ─────────────
-    // Guidance data point 1, "unique identifier", mandatory for all three.
-    // The envelope has no home for it: `product_id` is documented as an
-    // opaque internal link and explicitly not a legal identifier, and the
-    // serial inside `qr_code_url` is derived here rather than attributed by
-    // the operator, which is what Art. 77(3) asks for.
-    ("batteryPassportNumber", M, M, M),
+    // Guidance data point 1, "unique identifier", mandatory for all three —
+    // and deliberately **not a row**. This table checks product-group data,
+    // and the identifier is not there: it is the passport's data carrier
+    // identifier, the product identifier together with the carrier serial the
+    // operator attributes on the envelope, which is what the QR code links to.
+    // A `batteryPassportNumber` field required here would be a second home for
+    // one identifier, free to disagree with the one the label actually carries.
     // ── Annex VI Part A, reached by Annex XIII point 1(a) ──────────────────
     ("batteryType", M, M, M),
     // Guidance data point 7 — "model identification and batch or serial
@@ -380,8 +381,9 @@ mod tests {
         //
         // It used to be `"gtin"`, which was doubly misleading: the assertion
         // claimed the table answered `Mandatory` for it (the table has no such
-        // row — the identifier row is `batteryPassportNumber`), and product
-        // group data stopped carrying a bare `gtin` at all.
+        // row — the identifier is the envelope's carrier identifier, which this
+        // table does not check), and product group data stopped carrying a bare
+        // `gtin` at all.
         let present = [
             "productIdentifier",
             "dueDiligenceUrl",

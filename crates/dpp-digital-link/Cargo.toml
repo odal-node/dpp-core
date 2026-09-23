@@ -17,6 +17,10 @@ path = "src/lib.rs"
 
 [dependencies]
 dpp-domain = { workspace = true }
+# GS1 CSET 82, which an `X`-typed AI value must stay inside. It lives there
+# rather than here because the domain checks an attributed carrier serial
+# against the same table, and the domain cannot depend on this crate.
+dpp-rules  = { workspace = true }
 thiserror  = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }

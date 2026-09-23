@@ -49,8 +49,9 @@ pub trait PassportRepository: Send + Sync {
     /// Returns `None` if not found or not in Published state.
     async fn find_published_by_id(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
 
-    /// Every passport whose product identifier is `identifier`, narrowed by
-    /// `batch_id` and `serial_number` when the caller has them.
+    /// Every passport whose product identifier is `identifier`, at the level the
+    /// caller names: the model record, one production run, or one unit by its
+    /// manufacturer's serial.
     ///
     /// Replaces the two by-GTIN lookups this port used to carry. Three things
     /// changed and each was a defect:
@@ -61,10 +62,25 @@ pub trait PassportRepository: Send + Sync {
     /// passports sharing `09506000134352` across two batches. The old methods
     /// were documented as returning *"the first"*, with no ordering defined —
     /// one arbitrary row of N. Hence `Vec`, and hence the two narrowing
-    /// arguments: `(None, None)` is the model-level record, a batch narrows to
-    /// one run, a serial to one unit. That is the shape of the GS1 Digital Link
-    /// the caller is usually answering — `/01/{gtin}`, `/01/{gtin}/10/{lot}`,
-    /// `/01/{gtin}/21/{serial}`.
+    /// arguments:
+    ///
+    /// | `batch_id` | `serial_number` | Matches |
+    /// |---|---|---|
+    /// | `None` | `None` | the model-level record: no batch, no serial |
+    /// | `Some(lot)` | `None` | the record for that run, and not its units |
+    /// | either | `Some(sn)` | the unit with that manufacturer's serial, **whatever its batch** |
+    ///
+    /// The batch is ignored once a serial is given because the GTIN and the
+    /// serial already identify one unit; requiring the batch as well would miss
+    /// a unit recorded with a lot whenever the caller was not told the lot.
+    ///
+    /// 🚨 **This does not resolve a printed carrier.** The serial on a label is
+    /// the passport's [carrier serial](Passport::effective_carrier_serial),
+    /// which the operator attributes and which is not `serial_number` unless the
+    /// operator chose to make it so. A label resolves through
+    /// [`find_by_carrier_serial`](PassportRepository::find_by_carrier_serial).
+    /// This method answers someone holding the manufacturer's serial — read off
+    /// the unit, or out of an ERP.
     ///
     /// 🚨 **Typed, not `&str`.** A bare string invites taking a value out of
     /// one namespace and looking it up in another because both are strings,
@@ -113,12 +129,68 @@ pub trait PassportRepository: Send + Sync {
             .await?
             .into_iter()
             .filter(|p| {
-                p.product_group_data
-                    .as_ref()
-                    .and_then(crate::ProductGroupData::product_identifier)
-                    .is_some_and(|id| id == identifier)
-                    && p.batch_id.as_deref() == batch_id
-                    && p.serial_number.as_deref() == serial_number
+                carries_identifier(p, identifier)
+                    && match serial_number {
+                        Some(serial) => p.serial_number.as_deref() == Some(serial),
+                        None => p.batch_id.as_deref() == batch_id && p.serial_number.is_none(),
+                    }
+            })
+            .collect())
+    }
+
+    /// Every passport a printed data carrier names: the one carrying
+    /// `identifier` whose [effective carrier
+    /// serial](Passport::effective_carrier_serial) is `carrier_serial`.
+    ///
+    /// This is how a label is resolved. The carrier is built from the same
+    /// effective serial this compares against, so a label printed for a passport
+    /// always finds it — which the GTIN alone cannot do once a GTIN has a record
+    /// per batch or per unit.
+    ///
+    /// # Why the identifier is part of the key
+    ///
+    /// The serial alone is not enough, and not only because two operators can
+    /// attribute the same one. A label whose GTIN does not match the record it
+    /// names is not that record's label: resolving by serial alone would send a
+    /// reader holding one product to the passport of another.
+    ///
+    /// # Why `Vec`
+    ///
+    /// An amendment creates a new passport, and the label on the object does not
+    /// change — so a successor carries its predecessor's carrier serial
+    /// explicitly, and one label then names every record in the chain. The
+    /// caller picks by `status`, or walks
+    /// [`find_superseding_head`](PassportRepository::find_superseding_head) from
+    /// what it found. A successor that did *not* carry the serial forward leaves
+    /// the label naming the predecessor alone, and that walk still reaches the
+    /// head.
+    ///
+    /// Two records that are not a chain but share an identifier and a serial
+    /// are a data error this tier cannot prevent; they come back as two, rather
+    /// than one being chosen for the caller.
+    ///
+    /// No status filter, for the reason
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier) gives:
+    /// a withdrawn passport must still be found, so the route can say so.
+    ///
+    /// # Default implementation
+    ///
+    /// An unindexed `list()` scan — correctness only. A real store should index
+    /// the effective serial: the attributed `carrierSerial` where one is stored,
+    /// and otherwise [`PassportId::default_carrier_serial`], which is the last
+    /// twenty hex digits of the id's canonical text form and so indexable as an
+    /// expression over the id.
+    async fn find_by_carrier_serial(
+        &self,
+        identifier: &ProductIdentifier,
+        carrier_serial: &str,
+    ) -> Result<Vec<Passport>, DppError> {
+        Ok(self
+            .list(None, None, None, u32::MAX, 0)
+            .await?
+            .into_iter()
+            .filter(|p| {
+                carries_identifier(p, identifier) && p.effective_carrier_serial() == carrier_serial
             })
             .collect())
     }
@@ -402,4 +474,13 @@ pub trait PassportRepository: Send + Sync {
         }
         results
     }
+}
+
+/// Whether `passport`'s product group data carries `identifier`.
+fn carries_identifier(passport: &Passport, identifier: &ProductIdentifier) -> bool {
+    passport
+        .product_group_data
+        .as_ref()
+        .and_then(crate::ProductGroupData::product_identifier)
+        .is_some_and(|id| id == identifier)
 }

@@ -32,9 +32,9 @@
 //!
 //! The dictionary names a *linter* per component (`csum`, `gcppos2`, …) whose
 //! reference implementations are a separate GS1 resource that is not vendored.
-//! This module reads lengths and flags. Content validation beyond the check
-//! digit this crate already implements is not performed, and nothing here
-//! supports a claim of full GS1 validation.
+//! This module reads lengths, flags, and whether a value is CSET 82 throughout.
+//! Content validation beyond the check digit this crate already implements is
+//! not performed, and nothing here supports a claim of full GS1 validation.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -73,6 +73,13 @@ pub struct AiSpec {
     pub min_len: usize,
     /// Longest legal value, summing every component including optional ones.
     pub max_len: usize,
+    /// Every component is type `X`, so the whole value must stay inside GS1
+    /// CSET 82 — true of AI 10 and AI 21.
+    ///
+    /// Whole-value only. An AI mixing types (`N14` followed by `X..16`) needs
+    /// its value split by component before any one character set applies, and
+    /// that split is not performed here.
+    pub cset_82: bool,
     /// Human-readable title from the trailing comment, e.g. `"GTIN"`.
     pub title: String,
 }
@@ -185,12 +192,14 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
         // letter or an opening bracket.
         let mut min_len = 0usize;
         let mut max_len = 0usize;
+        let mut cset_82 = true;
         let mut dl_primary_key = false;
         let mut dl_qualifiers: Vec<Vec<String>> = Vec::new();
         for field in &rest[spec_start..] {
             if field.starts_with(COMPONENT_START) {
                 let optional = field.starts_with('[');
                 let component = field.trim_start_matches('[').trim_end_matches(']');
+                cset_82 &= component.starts_with('X');
                 if let Some((lo, hi)) = component_len(component) {
                     if !optional {
                         min_len += lo;
@@ -225,6 +234,7 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
                     dl_qualifiers: dl_qualifiers.clone(),
                     min_len,
                     max_len,
+                    cset_82,
                     title: title.clone(),
                 },
             );
@@ -312,6 +322,14 @@ mod tests {
         assert!(!batch.predefined_length, "10 is variable length");
         assert_eq!((batch.min_len, batch.max_len), (1, 20));
         assert!(!batch.dl_primary_key);
+        assert!(batch.cset_82, "10 is `X..20`");
+
+        let serial = ai_spec("21").expect("21 present");
+        assert_eq!((serial.min_len, serial.max_len), (1, 20));
+        assert!(serial.cset_82, "21 is `X..20`");
+        // Numeric, and mixed numeric-then-`X`: neither is a whole-value CSET 82.
+        assert!(!gtin.cset_82);
+        assert!(!ai_spec("253").expect("253 present").cset_82);
 
         // Optional trailing component widens the maximum but not the minimum.
         let gdti = ai_spec("253").expect("253 present");

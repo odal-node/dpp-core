@@ -393,7 +393,6 @@ const INLINE_TESTS_BASELINE: &[&str] = &[
     "crates/dpp-crypto/src/jws/canonical.rs",
     "crates/dpp-digital-link/src/digital_link/codec.rs",
     "crates/dpp-digital-link/src/digital_link/element_string.rs",
-    "crates/dpp-digital-link/src/digital_link/qr.rs",
     "crates/dpp-digital-link/src/digital_link/syntax_dictionary.rs",
     "crates/dpp-digital-link/src/linktype/media_type.rs",
     "crates/dpp-digital-link/src/linktype/vocabulary.rs",

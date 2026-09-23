@@ -50,7 +50,7 @@ pub mod linktype;
 
 pub use digital_link::{
     AiSpec, DigitalLink, DigitalLinkError, ElementString, PrimaryKey, ai_len_for_prefix, ai_spec,
-    build_qr_url, dictionary, qualifier_position, short_serial, validate_gtin,
+    build_qr_url, dictionary, qualifier_position, validate_gtin,
 };
 pub use linktype::{
     Audience, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,

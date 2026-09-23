@@ -23,6 +23,7 @@ fn policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPolicy {
         field_disclosure,
         envelope_disclosure: HashMap::new(),
         default_disclosure: Disclosure::Public,
+        public_envelope_fields: Default::default(),
     }
 }
 
@@ -37,6 +38,7 @@ fn envelope_policy_with(name: &str, class: Disclosure) -> ProductGroupAccessPoli
         field_disclosure: HashMap::new(),
         envelope_disclosure,
         default_disclosure: Disclosure::Public,
+        public_envelope_fields: Default::default(),
     }
 }
 
