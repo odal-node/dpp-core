@@ -1,4 +1,5 @@
-//! EN 18219:2026 clause 5 identifier syntax, for the two tiers that check it.
+//! EN 18219:2026 clause 5 identifier syntax, for the two tiers that check it,
+//! and the GS1 AI 21 serial a passport's data carrier prints.
 //!
 //! 🚨 **One home on purpose.** These predicates lived only in
 //! `dpp_domain::identifier::ProductIdentifier`, and the plugin SDK grew its own
@@ -84,6 +85,87 @@ pub fn check_did(did: &str) -> Result<(), DidRejection<'_>> {
         return Err(DidRejection::Malformed);
     }
     Ok(())
+}
+
+/// The most characters a GS1 AI 21 serial number may carry.
+///
+/// GS1's Barcode Syntax Dictionary specifies AI 21 as `X..20`: one to twenty
+/// characters of CSET 82. That dictionary is vendored by `dpp-digital-link`,
+/// which this crate cannot depend on, so the number is restated here and a
+/// cross-crate test holds it against the dictionary's own entry.
+pub const MAX_GS1_SERIAL_CHARS: usize = 20;
+
+/// Why a candidate AI 21 value cannot be printed as a serial number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gs1SerialRejection {
+    /// No characters at all. `X..20` has a minimum of one.
+    Empty,
+    /// More than [`MAX_GS1_SERIAL_CHARS`], counted in characters.
+    TooLong {
+        /// How many characters the value has.
+        chars: usize,
+    },
+    /// A character outside CSET 82 — the first one met.
+    OutsideCset82(char),
+}
+
+/// Whether `c` belongs to GS1 CSET 82, the character set of every `X`-typed
+/// Application Identifier component — AI 10 and AI 21 among them.
+///
+/// 🚨 **The table below is ours, and it is not checked against a text.** The
+/// syntax dictionary names the set (`"X": CSET 82`) without enumerating it; the
+/// enumeration is in the GS1 General Specifications, which this repository does
+/// not hold. What checks it instead is GS1's own Barcode Syntax Engine: the
+/// Digital Link oracle corpus carries every printable ASCII character in an
+/// AI 21 value together with this function's verdict, and the engine has to
+/// agree in both directions.
+#[must_use]
+pub const fn is_cset_82(c: char) -> bool {
+    matches!(
+        c,
+        '!' | '"'
+            | '%'
+            | '&'
+            | '\''
+            | '('
+            | ')'
+            | '*'
+            | '+'
+            | ','
+            | '-'
+            | '.'
+            | '/'
+            | '0'..='9'
+            | ':'
+            | ';'
+            | '<'
+            | '='
+            | '>'
+            | '?'
+            | 'A'..='Z'
+            | '_'
+            | 'a'..='z'
+    )
+}
+
+/// A value GS1 admits in AI 21: one to [`MAX_GS1_SERIAL_CHARS`] characters, all
+/// in CSET 82.
+///
+/// # Errors
+///
+/// [`Gs1SerialRejection`], naming the first rule the value breaks.
+pub fn check_gs1_serial(value: &str) -> Result<(), Gs1SerialRejection> {
+    if value.is_empty() {
+        return Err(Gs1SerialRejection::Empty);
+    }
+    let chars = value.chars().count();
+    if chars > MAX_GS1_SERIAL_CHARS {
+        return Err(Gs1SerialRejection::TooLong { chars });
+    }
+    match value.chars().find(|c| !is_cset_82(*c)) {
+        Some(c) => Err(Gs1SerialRejection::OutsideCset82(c)),
+        None => Ok(()),
+    }
 }
 
 /// W3C DID v1.0 clause 3.1: `method-specific-id = *( *idchar ":" ) 1*idchar`.

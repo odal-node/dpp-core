@@ -232,6 +232,30 @@ fn corpus() -> Vec<Entry> {
             format!("{base}/00/106141411234567897/22/VAR-1"),
             "qualifier from another primary key's sequence",
         ));
+
+        // ── CSET 82, one character at a time ────────────────────────────
+        //
+        // AI 21 is `X..20`, and `X` is CSET 82 — which the dictionary names and
+        // does not enumerate. The table we check against is therefore our own
+        // reading, and a serial is where an operator's own characters reach a
+        // printed carrier. Every printable ASCII character, and one that is not
+        // ASCII, goes in an otherwise valid serial, so the engine judges each
+        // membership decision rather than a sample of them.
+        let parsed = Gtin::parse(gtin).expect("corpus GTIN must be valid");
+        for c in (0x20u8..=0x7e).map(char::from).chain(['é']) {
+            let uri = DigitalLink {
+                resolver_base: (*base).to_owned(),
+                primary_key: PrimaryKey::Gtin(parsed.clone()),
+                qualifiers: vec![("21".to_owned(), format!("SN{c}1"))],
+            }
+            .build();
+            let note = if dpp_rules::common::identifier::is_cset_82(c) {
+                "serial carrying one CSET 82 character"
+            } else {
+                "serial carrying one character outside CSET 82"
+            };
+            out.push(entry(uri, note));
+        }
     }
 
     out
@@ -255,6 +279,7 @@ fn every_built_link_round_trips_through_our_own_parser() {
         "unassigned application identifier",
         "data attribute in the path rather than the query string",
         "qualifier from another primary key's sequence",
+        "serial carrying one character outside CSET 82",
     ];
 
     for e in corpus() {

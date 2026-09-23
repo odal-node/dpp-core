@@ -66,6 +66,7 @@ fn individual_item_data_is_withheld_from_authorities() {
         field_disclosure,
         envelope_disclosure: HashMap::new(),
         default_disclosure: Disclosure::Public,
+        public_envelope_fields: Default::default(),
     };
     let data = json!({
         "productName": "Cell",

@@ -62,8 +62,7 @@ async fn one_identifier_can_name_several_passports() {
     assert_eq!(at_model.len(), 1);
     assert_eq!(at_model[0].id, model.id);
 
-    // Narrowed to the run, and then to the unit — the shape of
-    // `/01/{gtin}` -> `/10/{lot}` -> `/21/{serial}`.
+    // Narrowed to the run, and then to the unit by its manufacturer's serial.
     let at_batch = repo
         .find_by_identifier(&id, Some("LOT-A"), None)
         .await
@@ -82,6 +81,36 @@ async fn one_identifier_can_name_several_passports() {
     assert!(
         model.id != lot_a.id && lot_a.id != unit.id && model.id != unit.id,
         "three distinct published passports for one identifier"
+    );
+}
+
+/// A manufacturer's serial finds its unit whether or not the caller knows the
+/// lot. GTIN and serial already identify one unit; requiring the batch too would
+/// miss every unit recorded with a lot whenever the lot was not to hand.
+#[tokio::test]
+async fn a_serial_finds_its_unit_whatever_batch_is_asked_for() {
+    let repo = InMemoryRepo::default();
+    let mut unit = identified_passport("Unit 1");
+    unit.batch_id = Some("LOT-A".into());
+    unit.serial_number = Some("SN-0001".into());
+    let unit = repo.create(unit).await.unwrap();
+
+    let id = fixture_identifier();
+    for batch in [None, Some("LOT-A"), Some("LOT-B")] {
+        let found = repo
+            .find_by_identifier(&id, batch, Some("SN-0001"))
+            .await
+            .unwrap();
+        assert_eq!(found.len(), 1, "batch {batch:?}");
+        assert_eq!(found[0].id, unit.id);
+    }
+
+    // And without a serial, a lot names the run's own record, not its units.
+    assert!(
+        repo.find_by_identifier(&id, Some("LOT-A"), None)
+            .await
+            .unwrap()
+            .is_empty()
     );
 }
 

@@ -236,28 +236,3 @@ fn an_item_serial_round_trips_and_is_omitted_when_unstated() {
         "an unstated serial is omitted, not nulled: {bare}"
     );
 }
-
-/// 🚨 The carrier does **not** adopt the manufacturer's serial.
-///
-/// A GS1 Digital Link carrier is `/01/{gtin}/21/{serial}`, and AI 21 *is* the
-/// serial number — so the obvious move is to put the real one there once it
-/// exists. That would be wrong twice over: the resolver is GTIN-keyed and
-/// ignores AI 21 entirely, so it buys nothing; and a per-unit serial in a public
-/// URL is exactly the printed-label disclosure the 0.11.0 change to
-/// `short_serial` removed.
-///
-/// Asserted by construction rather than argued in prose, because the change
-/// would be a one-line "improvement" to whoever builds the carrier next.
-#[test]
-fn an_item_serial_does_not_change_the_carrier() {
-    let mut passport = make_passport();
-    let before = serde_json::to_value(&passport).expect("serialises")["qrCodeUrl"].clone();
-
-    passport.serial_number = Some("SN-2026-00042".into());
-    let after = serde_json::to_value(&passport).expect("serialises")["qrCodeUrl"].clone();
-
-    assert_eq!(
-        before, after,
-        "setting a manufacturer serial must not move the carrier"
-    );
-}

@@ -76,6 +76,10 @@ fn passport_every_wire_key_is_classified() {
             "whether the passport is live, suspended or retired",
         ),
         ("qrCodeUrl", "the public address of this passport"),
+        (
+            "carrierSerial",
+            "printed on the label, so every holder of the object already has it",
+        ),
         ("createdAt", "record lifecycle timestamp"),
         ("updatedAt", "record lifecycle timestamp"),
         ("publishedAt", "record lifecycle timestamp"),

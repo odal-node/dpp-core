@@ -27,6 +27,8 @@
 //! [`count`]: PassportRepository::count
 
 #[cfg(test)]
+mod carrier_lookup_tests;
+#[cfg(test)]
 mod identifier_lookup_tests;
 mod port;
 mod protected_fields;

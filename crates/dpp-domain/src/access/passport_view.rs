@@ -31,7 +31,9 @@ use super::{ProductGroupAccessPolicy, filter_by_audience};
 /// 2. **Envelope fields follow [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`]**, applied
 ///    through the shared scope-aware filter so a product group's schema can
 ///    never reclassify an envelope field by declaring a property of the same
-///    name.
+///    name. The one exception is explicit: a schema may open a field named in
+///    [`crate::disclosure::GROUP_OPENABLE_ENVELOPE_FIELDS`] to the public, and
+///    only at the top-level envelope key.
 /// 3. **Product-group data follows the policy for *this passport's* schema
 ///    version**, not the catalog's current one.
 ///
@@ -64,18 +66,20 @@ pub fn redact_passport(passport: &Passport, audience: Audience) -> PassportView 
         Err(_) => return PassportView(serde_json::Value::Null),
     };
 
-    // The product group's own per-field tiers, pinned to the version this
-    // record was validated against. `None` is the fail-closed signal below.
+    // The whole-passport policy at the version this record was validated
+    // against: the product group's own per-field tiers and envelope openings,
+    // over the envelope defaults. `None` is the fail-closed signal below.
+    //
+    // Composed by `for_passport` rather than here. The two were composed
+    // separately, and a composition done twice is one that can disagree with
+    // itself — this view and a credential issued from the same passport would
+    // then disclose different fields.
     let product_group_key = passport.product_group.catalog_key();
     let resolved =
-        ProductGroupAccessPolicy::for_schema_version(product_group_key, &passport.schema_version);
-
-    let mut policy = ProductGroupAccessPolicy::passport_default();
-    if let Some(ref product_group_policy) = resolved {
-        policy
-            .field_disclosure
-            .extend(product_group_policy.field_disclosure.clone());
-    }
+        ProductGroupAccessPolicy::for_passport(product_group_key, &passport.schema_version);
+    let policy = resolved
+        .clone()
+        .unwrap_or_else(ProductGroupAccessPolicy::passport_default);
 
     let mut view = filter_by_audience(&value, &policy, audience).filtered_data;
 

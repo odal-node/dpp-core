@@ -39,6 +39,7 @@ pub(crate) fn sample_passport() -> Passport {
         product_group_data: None,
         status: PassportStatus::Draft,
         qr_code_url: None,
+        carrier_serial: None,
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),
@@ -211,6 +212,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
         assessed_at: now,
     });
     passport.qr_code_url = Some("https://id.example/01/09506000134352/21/A".to_owned());
+    passport.carrier_serial = Some("A".to_owned());
     passport.jws_signature = Some("eyJ..a".to_owned());
     passport.public_jws_signature = Some("eyJ..b".to_owned());
     passport

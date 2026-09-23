@@ -90,18 +90,39 @@ The dependency graph is strictly acyclic:
 ```
 dpp-rules         -> (standalone, no internal deps; no_std, zero-dep)
 dpp-plugin-traits -> (standalone, no internal deps)
-dpp-domain        -> dpp-rules
+dpp-vocab         -> (standalone, no internal deps)
 dpp-crypto        -> (none)
-dpp-vc            -> dpp-domain, dpp-crypto
-dpp-digital-link  -> dpp-domain
-dpp-aas           -> dpp-domain
-dpp-registry      -> dpp-domain
-dpp-calc          -> dpp-domain
-dpp-plugin-sdk    -> dpp-plugin-traits + dpp-rules
-dpp-tests         -> dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas (dev only)
+dpp-domain        -> dpp-rules
+dpp-vc            -> dpp-domain, dpp-crypto, dpp-vocab
+dpp-digital-link  -> dpp-domain, dpp-rules
+dpp-aas           -> dpp-domain, dpp-vocab
+dpp-registry      -> dpp-domain, dpp-rules
+dpp-calc          -> dpp-rules
+dpp-plugin-sdk    -> dpp-plugin-traits, dpp-rules
+dpp-tests         -> dpp-domain, dpp-crypto, dpp-vc
+                     + dev: dpp-digital-link, dpp-aas, dpp-registry, dpp-vocab, dpp-rules
+dpp-benches       -> dev only: dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas, dpp-calc, dpp-tests
 ```
 
-**No crate in this workspace may depend on**: axum, tokio, tower, sqlx, redis, reqwest, or any other HTTP/database/infrastructure crate. If a dependency pulls in async runtime or network I/O, it does not belong here.
+`dpp-rules` is the one home for identifier syntax — GTIN check digits, GS1
+CSET 82 — so anything that has to agree with the domain about whether an
+identifier is well formed depends on it directly rather than restating the
+table. It is `no_std` and zero-dependency, which is what makes that edge free
+to add.
+
+`dpp-tests` keeps three of its edges as real dependencies rather than dev ones
+because `src/fixtures.rs` is a library consumed by the integration tests. The
+crate is `publish = false`, so none of its edges reach a vendored graph.
+
+**No crate's `[dependencies]` may name**: axum, tokio, tower, sqlx, redis,
+reqwest, or any other HTTP/database/infrastructure crate. If a runtime
+dependency pulls in an async runtime or network I/O, it does not belong here.
+
+`[dev-dependencies]` are the exception, and only for a test runtime: `tokio`
+with `rt` and `macros` appears in `dpp-crypto`, `dpp-domain`, `dpp-vc` and
+`dpp-tests` so that `#[tokio::test]` can drive the async port traits. A test
+runtime is never compiled into the published library and never reaches anyone
+who vendors it. Nothing else on that list is permitted in either table.
 
 ---
 

@@ -1,6 +1,7 @@
 //! GS1 Digital Link parser, builder, and GTIN utilities.
 //!
-//! Canonical Odal form: `https://id.odal-node.io/01/{gtin}/21/{serial}`
+//! A passport's carrier: `{resolver}/01/{gtin}/21/{carrier serial}` — see
+//! [`build_qr_url`].
 //!
 //! Supports the GS1 Digital Link standard (GS1 DL URI Syntax, v1.2).
 //! Application Identifiers (AIs) recognised in the path:
@@ -32,7 +33,7 @@
 //! - `link`   — [`DigitalLink`] (parse/build).
 //! - `primary_key` — [`PrimaryKey`], the AI a path opens on.
 //! - `gtin`   — [`validate_gtin`].
-//! - `qr`     — [`build_qr_url`].
+//! - `qr`     — [`build_qr_url`], a passport's data carrier.
 
 mod codec;
 mod element_string;
@@ -50,5 +51,5 @@ pub use error::DigitalLinkError;
 pub use gtin::validate_gtin;
 pub use link::DigitalLink;
 pub use primary_key::PrimaryKey;
-pub use qr::{build_qr_url, short_serial};
+pub use qr::build_qr_url;
 pub use syntax_dictionary::{AiSpec, ai_len_for_prefix, ai_spec, dictionary, qualifier_position};

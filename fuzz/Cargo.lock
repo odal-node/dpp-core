@@ -294,6 +294,7 @@ name = "dpp-digital-link"
 version = "0.20.0"
 dependencies = [
  "dpp-domain",
+ "dpp-rules",
  "serde",
  "serde_json",
  "thiserror",

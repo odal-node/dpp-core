@@ -160,26 +160,28 @@ fn the_preview_passes_for_a_passport_that_publishes() {
         .expect("and must then actually publish");
 }
 
-/// The four identity data points the guidance marks mandatory for every
-/// covered category each block a publish on their own.
+/// The identity data points the guidance marks mandatory for every covered
+/// category, and which live in product group data, each block a publish on
+/// their own.
 ///
 /// These were absent from the requirements table *and* from every battery
 /// schema property, so a passport could be published carrying none of
-/// them: no unique identifier, no model identification, and no record of where
-/// or when the battery was made. The schema could not even store them —
-/// `additionalProperties: false` rejected all four — so this test is the guard
-/// on both halves of that defect at once. It fails if either the requirements
-/// row or the schema property is removed.
+/// them: no model identification, and no record of where or when the battery
+/// was made. The schema could not even store them — `additionalProperties:
+/// false` rejected them — so this test is the guard on both halves of that
+/// defect at once. It fails if either the requirements row or the schema
+/// property is removed.
+///
+/// The fourth, the Art. 77(3) unique identifier, is not among them: it is the
+/// passport's data carrier identifier, carried on the envelope, and
+/// `the_art_77_3_identifier_is_the_carrier_not_a_payload_field` covers it.
 #[test]
 fn each_identity_data_point_blocks_publish_on_its_own() {
     for (name, clear) in [
         (
-            "batteryPassportNumber",
-            (|b: &mut BatteryData| b.battery_passport_number = None) as fn(&mut BatteryData),
+            "batteryModelId",
+            (|b: &mut BatteryData| b.battery_model_id = None) as fn(&mut BatteryData),
         ),
-        ("batteryModelId", |b: &mut BatteryData| {
-            b.battery_model_id = None;
-        }),
         ("manufacturingPlace", |b: &mut BatteryData| {
             b.manufacturing_place = None;
         }),
@@ -201,6 +203,20 @@ fn each_identity_data_point_blocks_publish_on_its_own() {
         assert!(!p.retention_locked, "a refused publish must not lock");
         assert_eq!(p.status, PassportStatus::Draft);
     }
+}
+
+/// Art. 77(3): the QR code links to the identifier the operator attributes,
+/// which is the carrier identifier on the envelope. A superseded
+/// `batteryPassportNumber` left empty therefore blocks nothing, because the
+/// identifier it used to hold is always present — either attributed, or the
+/// default derived from the passport id.
+#[test]
+fn the_art_77_3_identifier_is_the_carrier_not_a_payload_field() {
+    let mut p = publishable_battery(crate::product_group::BatteryType::Ev);
+    battery_field(&mut p, |b| b.battery_passport_number = None);
+    assert!(!p.effective_carrier_serial().is_empty());
+    p.transition_to(PassportStatus::Published)
+        .expect("the carrier identifier is the Art. 77(3) identifier");
 }
 
 #[test]

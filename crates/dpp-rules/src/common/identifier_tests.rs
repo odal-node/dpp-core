@@ -47,3 +47,40 @@ fn a_did_needs_a_named_method_and_a_well_formed_id() {
     assert_eq!(check_did("did:web"), Err(DidRejection::Malformed));
     assert_eq!(check_did("web:example.com"), Err(DidRejection::Malformed));
 }
+
+#[test]
+fn an_ai_21_serial_is_one_to_twenty_cset_82_characters() {
+    assert_eq!(check_gs1_serial("SN-2026/00042"), Ok(()));
+    assert_eq!(check_gs1_serial("cdef1032547698badcfe"), Ok(()));
+    assert_eq!(check_gs1_serial("!\"%&'()*+,-./:;<=>?_"), Ok(()));
+
+    assert_eq!(check_gs1_serial(""), Err(Gs1SerialRejection::Empty));
+    assert_eq!(
+        check_gs1_serial("123456789012345678901"),
+        Err(Gs1SerialRejection::TooLong { chars: 21 })
+    );
+    // Counted in characters, not bytes: a two-byte character is one too many
+    // for the character set, not two too many for the length.
+    assert_eq!(
+        check_gs1_serial("é"),
+        Err(Gs1SerialRejection::OutsideCset82('é'))
+    );
+    for outside in [
+        ' ', '#', '$', '@', '[', '\\', ']', '^', '`', '{', '|', '}', '~',
+    ] {
+        assert_eq!(
+            check_gs1_serial(&alloc::format!("SN{outside}1")),
+            Err(Gs1SerialRejection::OutsideCset82(outside)),
+            "{outside:?} is not in CSET 82"
+        );
+    }
+}
+
+/// The table has eighty-two members, as its name says. A count is weak
+/// evidence of the *right* members — the GS1 oracle is what checks those —
+/// but it catches a character dropped or duplicated in editing.
+#[test]
+fn cset_82_has_eighty_two_members() {
+    let members = (0u8..=127).filter(|b| is_cset_82(char::from(*b))).count();
+    assert_eq!(members, 82);
+}

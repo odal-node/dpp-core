@@ -16,4 +16,6 @@ mod class;
 mod tests;
 
 pub use audience::Audience;
-pub use class::{Disclosure, PASSPORT_FIELD_DISCLOSURE, disclosure_key};
+pub use class::{
+    Disclosure, GROUP_OPENABLE_ENVELOPE_FIELDS, PASSPORT_FIELD_DISCLOSURE, disclosure_key,
+};

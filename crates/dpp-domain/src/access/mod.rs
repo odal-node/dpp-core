@@ -10,6 +10,8 @@
 
 #[cfg(test)]
 mod classification_tests;
+#[cfg(test)]
+mod envelope_opening_tests;
 pub mod filter;
 #[cfg(test)]
 mod lattice_tests;

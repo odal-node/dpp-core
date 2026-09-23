@@ -15,6 +15,10 @@
           {
             "name": "passportId",
             "value": "01234567-89ab-7cde-8f01-23456789abcd"
+          },
+          {
+            "name": "batchId",
+            "value": "LOT-X-0001"
           }
         ]
       },
@@ -136,6 +140,12 @@
           "idShort": "productIdentifierKind",
           "valueType": "xs:string",
           "value": "gtin"
+        },
+        {
+          "modelType": "Property",
+          "idShort": "batchId",
+          "valueType": "xs:string",
+          "value": "LOT-X-0001"
         }
       ]
     },

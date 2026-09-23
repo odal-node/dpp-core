@@ -36,6 +36,9 @@ dpp-registry        = { workspace = true }
 # anyone vendors.
 dpp-rules           = { workspace = true }
 serde_json = { workspace = true }
+# `carrier_resolution` drives the repository port, whose lookups are async.
+async-trait = { workspace = true }
+tokio      = { version = "1", features = ["macros", "rt"] }
 uuid       = { workspace = true }
 semver     = { workspace = true }
 base64     = { workspace = true }

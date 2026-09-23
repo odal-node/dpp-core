@@ -81,6 +81,14 @@ pub struct ProductGroupAccessPolicy {
     /// where every public field must be explicitly listed as `Public`.
     #[serde(default = "disclosure_public")]
     pub default_disclosure: Disclosure,
+    /// Envelope fields this product group's schema opens to the public,
+    /// declared by its `x-public-envelope-fields` and drawn only from
+    /// [`crate::disclosure::GROUP_OPENABLE_ENVELOPE_FIELDS`].
+    ///
+    /// Applied to the envelope key itself — a top-level key in envelope scope —
+    /// and nowhere else, so a nested field sharing the name keeps its own class.
+    #[serde(default)]
+    pub public_envelope_fields: std::collections::BTreeSet<String>,
 }
 
 fn disclosure_public() -> Disclosure {
@@ -415,6 +423,7 @@ impl ProductGroupAccessPolicy {
         policy.name = product_group.name.clone();
         policy.product_group = product_group.product_group.clone();
         policy.field_disclosure = product_group.field_disclosure;
+        policy.public_envelope_fields = product_group.public_envelope_fields;
         Some(policy)
     }
 
@@ -444,6 +453,8 @@ impl ProductGroupAccessPolicy {
             field_disclosure,
             envelope_disclosure: common_conformity(),
             default_disclosure: Disclosure::Public,
+            // The catalog map carries no openings; only a versioned schema can.
+            public_envelope_fields: std::collections::BTreeSet::new(),
         })
     }
 
@@ -514,12 +525,28 @@ impl ProductGroupAccessPolicy {
             &mut field_disclosure,
         );
 
+        // An opening outside the allow-list refuses the whole policy rather
+        // than being skipped: skipping would leave the schema reading as though
+        // it opened something, and failing closed is what every other
+        // unreadable schema here already does.
+        let mut public_envelope_fields = std::collections::BTreeSet::new();
+        if let Some(opened) = schema.get("x-public-envelope-fields") {
+            for field in opened.as_array()? {
+                let field = field.as_str()?;
+                if !crate::disclosure::GROUP_OPENABLE_ENVELOPE_FIELDS.contains(&field) {
+                    return None;
+                }
+                public_envelope_fields.insert(field.to_owned());
+            }
+        }
+
         Some(Self {
             name: format!("{product_group_key}-{version}"),
             product_group: product_group_key.to_owned(),
             field_disclosure,
             envelope_disclosure: common_conformity(),
             default_disclosure: Disclosure::Public,
+            public_envelope_fields,
         })
     }
 
@@ -553,6 +580,8 @@ impl ProductGroupAccessPolicy {
             field_disclosure: HashMap::new(),
             envelope_disclosure,
             default_disclosure: Disclosure::Public,
+            // Openings belong to a product group; this policy has none in play.
+            public_envelope_fields: std::collections::BTreeSet::new(),
         }
     }
 
@@ -614,8 +643,22 @@ impl ProductGroupAccessPolicy {
     /// made a disclosure verdict vary between calls in one process, which is
     /// fatal for content-binding. Ambiguity resolves the safe way, and the same
     /// way every time.
+    ///
+    /// # Opened envelope fields
+    ///
+    /// A top-level envelope key the product group has opened — see
+    /// [`Self::public_envelope_fields`] — is `Public`, ahead of everything
+    /// above. Anchored to that one position: the same name one level down, or
+    /// inside `productGroupData`, is classified as it always was.
     #[must_use]
     pub fn disclosure_for_path(&self, path: &[&str], scope: DocumentScope) -> Disclosure {
+        if scope == DocumentScope::Envelope
+            && let [key] = path
+            && self.public_envelope_fields.contains(*key)
+        {
+            return Disclosure::Public;
+        }
+
         let scoped = match scope {
             DocumentScope::ProductGroupData => Some(&self.field_disclosure),
             DocumentScope::Envelope => None,
