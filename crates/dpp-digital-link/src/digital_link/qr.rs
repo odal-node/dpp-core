@@ -34,6 +34,12 @@ use super::syntax_dictionary::ai_spec;
 /// holds for a passport that never went through it. A carrier is
 /// printed on physical products, so it is refused here rather than emitted and
 /// found wanting by a scanner.
+///
+/// [`DigitalLinkError::UnknownApplicationIdentifier`] if the vendored GS1
+/// syntax dictionary has no AI 21. That is an invariant of a file compiled in
+/// with `include_str!`, not a condition a caller can reach — but library code
+/// here does not panic on its own invariants, so it is returned rather than
+/// asserted.
 pub fn build_qr_url(
     resolver_base: &str,
     passport: &Passport,
@@ -51,7 +57,8 @@ pub fn build_qr_url(
     if serial.is_empty() {
         return Err(DigitalLinkError::EmptyValue("21".to_owned()));
     }
-    let spec = ai_spec("21").expect("the vendored GS1 dictionary defines AI 21");
+    let spec = ai_spec("21")
+        .ok_or_else(|| DigitalLinkError::UnknownApplicationIdentifier("21".to_owned()))?;
     check_value("21", spec, &serial)?;
 
     Ok(Some(format!(
