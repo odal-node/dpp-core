@@ -1137,6 +1137,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   whatever becomes of the passport. This was undocumented, beside a list headed
   *deliberately absent* that it did not belong in, because nobody decided it.
 
+- **🚨 Thirty of a passport's thirty-seven keys were dropped on JSON-LD
+  expansion, and two terms named keys that do not exist.** A JSON-LD
+  term is reachable only at the position its key occupies: a key with no term
+  is dropped, taking everything inside it, and a term whose key does not exist
+  defines nothing. The context had both faults at once, in the same object.
+
+  Six keys carried a term, and a seventh — `id` — survived only because the
+  remote DID context happens to alias it to `@id`. Measured against a JSON-LD
+  processor, a passport of thirty-seven keys expanded to **seven** entries: it
+  dropped its product name, its manufacturer, its materials, its compliance
+  instruments, its seal and **both of its signatures**. A semantic view that
+  conveyed almost nothing about the product. It now expands to every one of
+  them, and `every_passport_wire_key_has_a_term` holds that as the envelope
+  grows — the term table and the envelope's key list are two lists in two
+  crates, and nothing compared them until now. 🚨 That gap was live while this
+  was open: `carrierSerial` joined the envelope, no term followed it, and every
+  gate stayed green.
+
+  The two inert terms were `passportId`, where the emitted key is `id`, and
+  `jws`, where the emitted keys are `jwsSignature` and `publicJwsSignature`.
+  The second is the sharper one: the only term in the map aimed at the proof
+  itself matched nothing, while both real signature keys expanded to nothing.
+
+  Every emitted key now has a term. `id` aliases the `@id` keyword rather than
+  a `dpp:` IRI, so the passport names itself without depending on someone
+  else's document keeping its shape.
+
+  🚨 `productGroup` expanded to `dpp:product_group`, the one IRI here that
+  disagreed with its own key. It is **corrected, not preserved**. An IRI is a
+  term's identity, so this changes what that term means — which is affordable
+  exactly once, because there are no passports in the field to mean anything
+  different to. Preserving it would have bought compatibility with nobody at
+  the cost of a permanent inconsistency in a published vocabulary.
+
+  **The expanded form of every passport changes**, which is the point — keys
+  that silently vanished now carry IRIs. No Rust signature changes.
+
+  🚨 The term map is now a table (`PASSPORT_TERMS`) rather than a literal,
+  because its *completeness* is the property that matters and a literal is not
+  something a test can compare against a struct. A new test reads `Passport`'s
+  own source — not a fixture, since fifteen fields are `skip_serializing_if`
+  and a fixture that left one `None` would prove nothing about it — and
+  asserts both directions: every emitted key has a term, and every term names
+  an emitted key. Watched to fail both ways.
+
+
 - **🚨 A credential's expanded form carried no product identity at all.** The
   JSON-LD context defined `gtin` at the top level, which is where the key sat
   before the identifier migration. When the identifier moved under
