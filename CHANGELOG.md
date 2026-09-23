@@ -1112,6 +1112,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **🚨 The passport's `@context` referenced a remote document it no longer
+  needed, and a remote reference is a whole-document failure mode.** A string
+  entry in an `@context` array is fetched by the consumer at expansion time. One
+  that cannot be fetched does not degrade gracefully: a conforming processor
+  raises a remote-context load error and fails the **entire** document, and a
+  lenient one drops every term it cannot define. Since the payload uses bare
+  keys, either outcome means the `ld+json` door conveys no linked data at all —
+  worse than serving plain JSON, because an `@context` is itself a claim that
+  the document is semantically resolvable.
+
+  The one entry left was `https://www.w3.org/ns/did/v1`, and it did exactly one
+  job here: aliasing `id` to `@id`. That alias is now defined inline, so the
+  entry defined nothing a passport uses while keeping the failure mode. Measured
+  rather than reasoned about — a full passport expands to the same entry count
+  with the context and without it, `@id` intact, and no term here collides with
+  anything that document protects. `REMOTE_CONTEXTS` is now empty, and the
+  passport context fetches nothing.
+
+  🚨 **Emptying it would have panicked.** The array was built as
+  `[REMOTE_CONTEXTS[0], terms]`, so the constant could describe any list except
+  the one that removing its last entry produces. It is built from the list now.
+
+  The constant stays rather than disappearing: an empty list is a statement —
+  *this document fetches nothing* — and it is what the test pins. A new test
+  holds that property directly, because the existing
+  `every_remote_context_is_verified_resolvable` now passes over an empty set and
+  a check over nothing says nothing.
+
 - **🚨 Nothing tested that a revoked key leaves the SD-JWT VC issuer metadata.**
   With both of `build_issuer_metadata`'s revocation filters deleted, every test
   in `dpp-vc` and the cross-crate tier still passed. Three tests now hold it: a

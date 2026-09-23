@@ -64,10 +64,23 @@ fn gs1_namespace() -> &'static str {
 /// this crate referenced, and `https://odal-node.io/schemas/dpp/v1`, which the
 /// resolver hand-rolled.
 ///
+/// **It is now empty, and a passport expands the same either way.** The last
+/// entry was `https://www.w3.org/ns/did/v1`, which did exactly one job here:
+/// aliasing `id` to `@id`. That alias is now defined inline, so the entry
+/// defined nothing a passport uses — while still carrying the whole-document
+/// failure mode above. Measured with a JSON-LD processor rather than reasoned
+/// about: a full passport expands to the same entry count with the context and
+/// without it, `@id` intact, and no term of ours collides with anything that
+/// document protects.
+///
+/// The constant stays rather than disappearing, because an empty list is a
+/// statement — *this document fetches nothing* — and it is the thing the test
+/// pins. Adding an entry remains a deliberate act with a check attached.
+///
 /// Term-to-IRI mappings are a different matter and are inlined below: a prefix
 /// IRI names a vocabulary and is never dereferenced during expansion, so it
 /// carries no such obligation.
-pub const REMOTE_CONTEXTS: &[&str] = &["https://www.w3.org/ns/did/v1"];
+pub const REMOTE_CONTEXTS: &[&str] = &[];
 
 /// Build the JSON-LD context for an Odal Node passport.
 ///
@@ -244,9 +257,14 @@ pub fn passport_context() -> Value {
                 terms.insert((*term).to_owned(), json!(iri));
             }
 
-            json!({
-                "@context": [REMOTE_CONTEXTS[0], Value::Object(terms)]
-            })
+            // Built from the list rather than indexing it: `REMOTE_CONTEXTS[0]`
+            // made the constant a lie, since emptying it — which is what
+            // removing the last remote context means — would panic here rather
+            // than emit a context that fetches nothing.
+            let mut context: Vec<Value> = REMOTE_CONTEXTS.iter().map(|url| json!(url)).collect();
+            context.push(Value::Object(terms));
+
+            json!({ "@context": context })
         })
         .clone()
 }
