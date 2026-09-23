@@ -18,7 +18,7 @@ pub use super::hashing::{input_hash, jcs_hash};
 /// Carries enough information to reproduce or audit the result: both inputs
 /// and numeric outputs are JCS-hashed (RFC 8785) so an auditor can verify the
 /// same inputs produce the same outputs, and the exact ruleset + factor dataset
-/// versions are recorded. The receipt may be signed by the vault via
+/// versions are recorded. The receipt may be signed by its caller via
 /// [`seal_with_jws`](CalculationReceipt::seal_with_jws) after calling
 /// [`canonical_bytes_for_signing`](CalculationReceipt::canonical_bytes_for_signing).
 ///
@@ -79,7 +79,7 @@ pub struct CalculationReceipt {
     pub assessed_as_of: NaiveDate,
     /// UTC timestamp when the calculation ran.
     pub computed_at: DateTime<Utc>,
-    /// JWS signature produced by the vault/engine after calculation.
+    /// JWS signature produced by the caller after calculation.
     /// `None` until the caller calls [`seal_with_jws`](CalculationReceipt::seal_with_jws).
     pub jws: Option<String>,
 }
@@ -180,7 +180,7 @@ impl CalculationReceipt {
 
     /// JCS-canonical bytes of this receipt without the `jws` field.
     ///
-    /// Pass these bytes to the vault's signing infrastructure, then call
+    /// Pass these bytes to whatever holds the signing key, then call
     /// [`seal_with_jws`](CalculationReceipt::seal_with_jws) with the resulting
     /// JWS to produce the final sealed receipt.
     ///

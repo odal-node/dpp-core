@@ -194,7 +194,7 @@ fn load_archived_keys_empty_before_rotation() {
     );
 }
 
-// ── Gap 7: atomic rotation + revocation ───────────────────────────────────
+// ── Atomic rotation + revocation ───────────────────────────────────
 
 #[test]
 fn rotate_key_archives_old_and_installs_new() {

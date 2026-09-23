@@ -1,4 +1,4 @@
-//! Battery Carbon Footprint (CFB) calculator — Phase 2 placeholder.
+//! Battery Carbon Footprint (CFB) calculator — not yet implemented.
 //!
 //! Will implement Article 7 of EU Battery Regulation 2023/1542 once the carbon
 //! footprint delegated act under that article is adopted. **It has not been.**
@@ -11,10 +11,16 @@
 //! subject, and is not a basis for carbon footprint calculation.
 //!
 //! **Status: stub.** This module compiles but all entry points return
-//! `CalcError::NotImplemented`. Implementation is gated on Phase 1 completion:
-//!   1. Signed ecoinvent / EF dataset reseller sublicense.
-//!   2. Legal warranty scope agreed with counsel.
-//!   3. Reference CFB vectors extracted from the notified-body test report.
+//! `CalcError::NotImplemented`. Two things are missing and neither is code:
+//!   1. The delegated act's number and its Annex, without which there is no
+//!      methodology to implement — only a guess at one.
+//!   2. Life-cycle inventory data for the process routes. This crate never
+//!      bundles LCI data; it is supplied at runtime through [`FactorProvider`],
+//!      and the datasets that carry it are licensed separately by whoever
+//!      operates the calculation.
+//!
+//! Implementing against a draft would produce a number that looks official and
+//! is not, which is worse than an honest `NotImplemented`.
 //!
 //! ⚠️ COMPLIANCE-PIN PENDING: CFB Delegated Act number ("EU 2025/…") must be
 //! confirmed against EUR-Lex before implementation begins. Cite the final OJ number.
@@ -29,11 +35,12 @@ use serde::{Deserialize, Serialize};
 ///
 /// Extends [`Ruleset`] — concrete impls will carry the CFB-specific parameters
 /// (allocation rules, system boundary, performance class thresholds per EU 2023/1542
-/// Delegated Act). No concrete impls exist yet — gated on Phase 1 (signed factor-data
-/// license + confirmed delegated act number).
+/// Delegated Act). No concrete impls exist yet: the act that defines those
+/// parameters has not been adopted.
 pub trait CfbRuleset: Ruleset {
     // Battery Regulation 2023/1542, Art. 7, CFB Delegated Act (March 2025 draft).
-    // Parameters TBD from the delegated act's Annex; to be added in Phase 2.
+    // Parameters come from the act's Annex, and are deliberately not guessed at
+    // from the draft.
 }
 
 /// Inputs for the battery CFB calculation per EU 2023/1542 Art. 7.
@@ -50,8 +57,8 @@ pub struct CfbInputs {
     pub battery_chemistry: String,
     /// Declared nominal capacity in kWh.
     pub nominal_capacity_kwh: f64,
-    // Additional life-cycle-stage inputs will be added when the Phase 1 data
-    // license is in place and the exact CFB methodology steps are confirmed.
+    // Additional life-cycle-stage inputs follow from the methodology steps the
+    // delegated act sets out, so they are added when it is adopted.
 }
 
 /// Output of the CFB calculation.
@@ -68,16 +75,16 @@ pub struct CfbResult {
 
 /// Calculate the CFB for one battery per EU 2023/1542 Art. 7.
 ///
-/// Currently returns `Err(CalcError::NotImplemented)` — implementation is
-/// gated on a signed ecoinvent/EF data sublicense. See module-level docs.
+/// Currently returns `Err(CalcError::NotImplemented)`: the methodology it would
+/// implement has not been adopted. See module-level docs.
 pub fn calculate_cfb(
     _inputs: &CfbInputs,
     _provider: &dyn FactorProvider,
 ) -> Result<CfbResult, CalcError> {
     Err(CalcError::NotImplemented {
         methodology: "battery-cfb".into(),
-        reason: "gate: signed ecoinvent/EF sublicense + legal warranty + confirmed \
-                 CFB Delegated Act number (EU 2025/…)"
+        reason: "the Art. 7 carbon footprint delegated act is not adopted, so \
+                 there is no methodology to apply"
             .into(),
     })
 }

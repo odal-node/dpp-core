@@ -35,7 +35,7 @@ Draft  -->  Active (Published)  -->  Suspended  -->  Retired
 | Active -> Suspended | Reason required (recall, investigation, etc.) | Signature retained; resolver returns 410 |
 | Draft \| Active \| Suspended -> Retired | Irreversible; the three terminal states accept no transition at all | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
 
-Every transition is recorded by the platform layer (audit logging is a platform concern, not a domain concern).
+Every transition is recorded by a host layer (audit logging is a platform concern, not a domain concern).
 
 **On retention.** The period is not a constant in this document or anywhere else
 in prose. It is the **maximum** across every recorded `InstrumentBinding` that
@@ -115,9 +115,9 @@ ComplianceRegistry
   +-- maintained-ruleset registry (Compliance Current) -> warranted, methodology-current rulesets
 ```
 
-`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every product group. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm product group plugins via a plugin-backed registry in the platform. A computed determination is passed through `gate_determination(catalog.is_in_force(product group), …)` so a provisional product group can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
+`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every product group. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm product group plugins via a plugin-backed registry in a host. A computed determination is passed through `gate_determination(catalog.is_in_force(product group), …)` so a provisional product group can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
 
-This trait is the extension seam. Any implementation — open Wasm plugins, the platform's calculators, or third-party modules — can replace or extend it without touching any other code. It is a technical boundary, not a commercial one.
+This trait is the extension seam. Any implementation — open Wasm plugins, a host's calculators, or third-party modules — can replace or extend it without touching any other code. It is a technical boundary, not a commercial one.
 
 ---
 
@@ -142,7 +142,7 @@ Adding a new schema version is a single file addition. The registry discovers al
 
 The core library is single-issuer and stateless — it has no concept of tenants, authentication, or API keys. Each issuer is identified by a `key_id` that maps to an Ed25519 key pair in the `KeyStore`, and by a `did:web` DID derived from the issuer's domain.
 
-Multi-tenancy, authentication, and access control are platform concerns — they live in the platform that consumes this crate, not in the core.
+Multi-tenancy, authentication, and access control are platform concerns — they live in a host that consumes this crate, not in the core.
 
 ---
 

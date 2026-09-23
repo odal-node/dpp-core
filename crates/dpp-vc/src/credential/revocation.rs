@@ -16,7 +16,7 @@ pub enum RevocationOutcome {
 
 /// Resolve a credential's revocation status against an **already-fetched** status
 /// list. Fetching the status-list credential over the network is an
-/// infrastructure concern handled by the platform (crypto Gap 5) — this is the
+/// infrastructure concern handled by the host — this is the
 /// pure decision given the list.
 ///
 /// A credential that declares no `credentialStatus` is `NotRevoked` (there is

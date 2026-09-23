@@ -179,7 +179,7 @@ fn extract_key_from_did_document() {
     );
 }
 
-/// crypto Gap 3: only `kty:"OKP", crv:"Ed25519"` JWKs are accepted.
+/// Only `kty:"OKP", crv:"Ed25519"` JWKs are accepted.
 #[test]
 fn non_ed25519_jwk_is_rejected() {
     let doc = |jwk| {
@@ -196,7 +196,7 @@ fn non_ed25519_jwk_is_rejected() {
     assert!(super::verifier::extract_primary_public_key(&untyped).is_none());
 }
 
-/// crypto Gap 3 (verification relationship): key not in assertionMethod is rejected.
+/// The verification relationship is checked: a key not in assertionMethod is rejected.
 #[test]
 fn key_not_in_assertion_method_is_rejected() {
     let doc = json!({

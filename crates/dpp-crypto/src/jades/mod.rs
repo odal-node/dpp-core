@@ -17,7 +17,7 @@
 //! providers that sell JAdES; one that asks for a raw signature over a
 //! caller-supplied digest works with essentially all of them, because
 //! signing a hash is the one operation every provider offers. So the format
-//! stays here, the network stays in the platform, and which provider signs is a
+//! stays here, the network stays with the caller, and which provider signs is a
 //! deployment question.
 //!
 //! # What this module does not claim

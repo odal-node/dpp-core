@@ -82,7 +82,7 @@ src/
     │                         operator-supplied emission factors)
     ├── parameters.rs         Co2eInputs, MaterialFootprint
     ├── thresholds.rs         Co2eRuleset trait + CradleToGateRuleset
-    ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB (Phase 2)
+    ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB
     ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6 — free)
     └── golden_vectors.rs     #[cfg(test)]
 ```
@@ -95,7 +95,7 @@ src/
 | `repairability_index` | ✅ Enacted — Reg. (EU) 2023/1669 Annex IV point 5, smartphones and slate tablets |
 | `repairability` | ✅ Available — non-regulatory six-parameter heuristic; **not** the enacted index |
 | `co2e::calculate` | ✅ Baseline — operator-supplied emission factors |
-| `co2e::cfb` | 🔒 Stub — gated on signed ecoinvent/EF sublicense (Phase 1 gate) |
+| `co2e::cfb` | 🔒 Stub — the Art. 7 delegated act defining the methodology is not adopted |
 | `pef/` (future) | 📋 Not yet — awaits per-product group PEFCR finalisation (2026–2030) |
 
 ### Which repairability module do I want?
@@ -262,7 +262,7 @@ pub struct CalculationReceipt {
 }
 ```
 
-The platform stores this alongside the passport record. A notified body can re-run
+A host stores this alongside the passport record. A notified body can re-run
 any calculation from the receipt: same inputs (verify via `input_hash`) + same
 parameters (verify via `ruleset_content_sha256`) + same factor dataset version →
 must produce the same output.
@@ -306,7 +306,7 @@ A CI test (`expired_rulesets_have_superseded_by`) asserts that any ruleset with
 | Flag | Default | Purpose |
 |---|---|---|
 | `synthetic-factors` | off | Exposes `SyntheticFactorProvider` outside `#[cfg(test)]`. Enable in integration test harnesses only. Values are **not** real LCI data. |
-| `real-factors` | off | Gates licensed LCI factor-data implementations. Enable **only** in managed-service builds where a valid ecoinvent/EF reseller sublicense is in place. Never enable in open-source or self-hosted builds. |
+| `real-factors` | off | Gates implementations backed by licensed LCI datasets. Enable only where the dataset licence you hold permits redistribution in the form your build ships. This crate bundles no such data and takes no position on whose licence applies. |
 
 ---
 

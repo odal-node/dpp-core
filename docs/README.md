@@ -1,6 +1,6 @@
 # dpp-core Documentation — start here
 
-This folder documents **the standard, not the product**: what a Digital Product Passport *is* in code, how it's signed, validated, and verified. If you're looking for how to *run* a node, that belongs to the platform that runs it and is documented there, not here.
+This folder documents **the standard, not the product**: what a Digital Product Passport *is* in code, how it's signed, validated, and verified. If you're looking for how to *run* a node, that belongs to a platform that runs it and is documented there, not here.
 
 ## If you're new, read these three, in this order
 
@@ -27,6 +27,6 @@ This folder documents **the standard, not the product**: what a Digital Product 
 
 **Proof-bound.** The manufacturer validates and signs locally with their own key; the world receives a verifiable proof, not a promise. Every design decision — the port seam, the evidence dossier, the fail-closed verifiers — follows from this.
 
-**The compiler enforces the boundary.** Core builds with zero infrastructure (`cargo build --workspace`, no DB, no env). Anything that needs a database or an HTTP client lives across the seam, in the platform that consumes this crate. The port traits in `dpp-domain/src/ports/` *are* the boundary — the module is authoritative, prose never quotes a hardcoded count.
+**The compiler enforces the boundary.** Core builds with zero infrastructure (`cargo build --workspace`, no DB, no env). Anything that needs a database or an HTTP client lives across the seam, in a host that consumes this crate. The port traits in `dpp-domain/src/ports/` *are* the boundary — the module is authoritative, prose never quotes a hardcoded count.
 
 **Honesty is a feature.** Placeholder implementations (the Ghost family) are clearly marked, and regulatory citations that can't be pinned to the Official Journal are flagged rather than asserted. A binding compliance verdict requires an act that is actually in force *and* actually imposes a passport — two separate questions, asked separately. An act can bind today and require no passport (ESPR Arts. 24–25), or have its passport duty discharged by another system entirely (Art. 9(4)(b), EPREL). Conflating those is how a node comes to assert compliance against an obligation that does not exist.

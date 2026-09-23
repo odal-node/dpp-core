@@ -19,7 +19,7 @@ Passports mandated by:
 > **Timeline note:** the textile DPP delegated act has no adopted date yet; published estimates range from ~2026 to 2028. Treat any specific year here as provisional and verify against EUR-Lex before relying on it.
 
 dpp-core does **not** implement infrastructure concerns (HTTP APIs, databases,
-registry connectivity). Those belong in the platform layer.
+registry connectivity). Those belong in a host layer.
 
 ## Standards Alignment
 
@@ -191,7 +191,7 @@ interface types that **predate the published specification**:
   `OperatorIdentifier`), error types, and `RegistryEndpoint` — anticipated data
   shapes based on published ESPR articles and JTC 24 draft discussions.
 - `RegistrySyncPort` — the port trait (defined in `dpp-domain::ports`, with a
-  `GhostRegistrySync` placeholder) that the platform implements once the
+  `GhostRegistrySync` placeholder) that a host implements once the
   official API specification is released.
 
 These types remain explicitly unstable. What the OJ text *fixes* has now been

@@ -69,7 +69,7 @@ constant is right.
 | `granularity` | `Option<Granularity>` | `"granularity"` | Model / batch / item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one — the position of every ESPR product group today |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill of materials entries |
-| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit — may be set by the compliance engine |
+| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit — may be set by a compliance engine |
 | `repairability_score` | `Option<RepairabilityScore>` | `"repairabilityScore"` | Structured `{overall, criteria}`, not a bare number |
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
@@ -129,7 +129,7 @@ Elements of `Passport.materials` — bill of materials entries.
 
 ### 3.4 Product group vs. product-group sub-classification
 
-`ProductGroup` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-product group sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers here or in the platform that consumes this crate, and every product group that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
+`ProductGroup` is the **only** dispatch key: it selects the schema version and the Wasm plugin. `Passport` carries no cross-product group sub-classification field — an earlier `product_category: Option<ProductCategory>` envelope field was removed after measurement found it had zero readers here or in a host that consumes this crate, and every product group that classifies sub-types does so with its own field, under its own name, sourced from its own regulation:
 
 | Product group | Field | Source |
 |---|---|---|
@@ -376,7 +376,7 @@ removed rather than migrated. Safe only because nothing was ever stored under it
 
 ## 5. Audit Log (Platform Concern)
 
-Audit logging (who changed what, when, and why) is a platform concern — it is not part of the core domain. The platform layer is responsible for recording state transitions in an append-only audit log (`AuditEntry` records). The core domain enforces lifecycle rules and retention locks but does not define audit storage.
+Audit logging (who changed what, when, and why) is a platform concern — it is not part of the core domain. A host layer is responsible for recording state transitions in an append-only audit log (`AuditEntry` records). The core domain enforces lifecycle rules and retention locks but does not define audit storage.
 
 ---
 

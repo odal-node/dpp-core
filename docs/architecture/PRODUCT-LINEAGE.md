@@ -28,7 +28,7 @@ for, where the current model falls short of it, and the model proposed instead.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `PassportRef` | `dpp-domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is the platform layer's job. |
+| `PassportRef` | `dpp-domain::passport::reference` | `uri` + `public_jws_hash` — where to fetch a passport, and a SHA-256 pinning its exact signed public view. Pure data; fetching and checking is a host layer's job. |
 | `derived_from: Vec<DerivationRef>` | `dpp-domain::passport::record` | Upward second-life links, each typed with its Art. 77(7) operation. Plural since Phase 2; was `parent_passport_ref: Option<PassportRef>`, at most one. |
 | `component_refs: Vec<ComponentRef>` | `dpp-domain::passport::record` | Downward BOM links, each with an optional quantity and role. Object-ified in Phase 3; was `Vec<PassportRef>`. |
 | `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Responsibility handover on **one** passport, with a typed `TransferReason`. Carries the **outgoing** operator's authorisation plus the hosting node's attestation that acceptance ran — *not* a signature by the incoming operator. See §5.1. |
@@ -574,7 +574,7 @@ unblocked by Phase 1's pin and independent of 2–4.
 Phases 2 and 3 changed published field names and types (`parentPassportRef` →
 `derivedFrom`; `componentRefs` element type object-ified). Both are done, and
 under the lockstep versioning policy they are one coordinated minor version bump
-across all core crates, with the platform layer following — **they must ship in
+across all core crates, with a host layer following — **they must ship in
 the same release**, which is the whole reason they were sequenced together.
 
 🚨 **An earlier version of this section named a mechanism that does not exist.**

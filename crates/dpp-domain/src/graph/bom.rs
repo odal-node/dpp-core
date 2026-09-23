@@ -1,6 +1,6 @@
 //! Bill-of-materials graph checks over local passport component edges.
 //!
-//! Pure and greenfield. The engine builds the *local* adjacency — each passport
+//! Pure and greenfield. A host builds the *local* adjacency — each passport
 //! id mapped to the ids of the component passports it holds in the same repo —
 //! and this module decides whether a new `parent → child` edge is safe to add.
 //!

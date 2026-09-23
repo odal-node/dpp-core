@@ -50,7 +50,7 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
     })];
 
     // Revoked keys are excluded entirely — neither a verification method nor an
-    // assertionMethod — so signatures they produced no longer verify (Gap 7).
+    // assertionMethod — so signatures they produced no longer verify.
     let archived: Vec<_> = store
         .archived_public_keys(key_id)
         .into_iter()

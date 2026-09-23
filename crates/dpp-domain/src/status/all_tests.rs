@@ -8,7 +8,7 @@ use super::lifecycle::PassportStatus;
 /// compiling; the length assertion then fails until `ALL` is updated. Both
 /// stages matter — downstream consumers cannot enumerate this enum at all
 /// (it is `#[non_exhaustive]`) and inherit any gap in `ALL` silently. The
-/// engine's API description omitted `superseded` and `deactivated` for
+/// API description of a consumer omitted `superseded` and `deactivated` for
 /// exactly that reason.
 #[test]
 fn all_lists_every_variant() {

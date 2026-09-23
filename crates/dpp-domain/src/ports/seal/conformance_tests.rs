@@ -23,7 +23,7 @@ async fn the_ghost_is_conformant() {
 
 /// An adapter that substitutes a format is caught.
 ///
-/// This is the engine's current shape, reproduced here so the kit is known
+/// This is a shape seen in practice, reproduced here so the kit is known
 /// to detect it rather than assumed to.
 struct SubstitutesFormat;
 

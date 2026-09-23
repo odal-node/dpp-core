@@ -17,11 +17,11 @@
 //! - `content` — the ruleset payload the manifest commits to (thresholds,
 //!   tables, schema references).
 //!
-//! ## What lives here vs. engine-side
+//! ## What lives here vs. host-side
 //!
 //! This module carries the **format types and fail-closed verification**
 //! ([`verify_bundle`]) only. Signing (needs a private key store), hot-swap
-//! runtime state, and reading bundle files from disk are engine concerns and
+//! runtime state, and reading bundle files from disk are host concerns and
 //! stay there. Verification itself doesn't depend on a JWS/crypto crate
 //! directly — see [`JwsVerify`] — because `dpp-crypto` depends on
 //! `dpp-domain`, which depends on this crate; a direct dependency the other
