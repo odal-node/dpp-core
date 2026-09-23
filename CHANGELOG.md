@@ -147,13 +147,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   lot they carry is not read — unless that lot holds a character outside CSET
   82, in which case the parser now refuses the link, as GS1's engine always did.
 
-- **`ProductIdentity` carries `serial_number`.** 🚨 Without it the type's claim
+- **`ProductIdentity.gtin` is now `identifier`, and the struct also carries
+  `serial_number`.** *(Breaking: the field name, its wire key, and exhaustive
+  struct literals.)*
+
+  **The rename is not cosmetic — the old field could not answer.** It held
+  `ProductGroupData::gtin`, which returns `None` for an identifier issued under
+  EN 18219 scheme 2 or 3. So `from_passport` returned `None` for a perfectly
+  well-identified passport, the import delta-matcher found no existing record,
+  and the import wrote a **duplicate** rather than updating the passport it was
+  looking at. The field now holds `ProductIdentifier::as_str`, so a scheme 1
+  identity is the same 14-digit GTIN as before and existing keys are unchanged.
+
+  🚨 **The wire key changes with it, and there is no alias.** The struct
+  serialises its fields under their own names, so a document written as
+  `{"gtin": …}` no longer deserialises: `identifier` has no `#[serde(default)]`
+  and its absence is a missing-field error, not an empty value. Anything that
+  persisted or transmitted a `ProductIdentity` has to migrate the key. This is a
+  lookup key built from a passport on demand, not a stored passport, so no
+  `Passport` document is affected.
+
+  🚨 **`serial_number` closes the other half.** Without it the type's claim
   to be an *exact* compound identity was false at item level: two published
   passports differing only in serial produced the **identical** identity. That
   is the key the import delta-matcher uses to classify a row as create /
   update_draft / conflict_published **before any write**, so a second unit
-  matched the first and would have been written as a change to it. Additive on
-  the wire (`#[serde(default)]`), breaking for exhaustive struct literals.
+  matched the first and would have been written as a change to it. That field is
+  additive on the wire (`#[serde(default)]`).
 
 - **The AAS shell says what the asset *is*, and `build_aas_from_passport` takes
   an `AssetIdentity` instead of `gtin: &str`.** The shell wrote that string into
@@ -307,23 +327,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   makes a total refusal actionable — the registry assigns no per-passport record
   to point at, because there are no records.
 
-- **`SubmissionReceipt` gains `registration_identifiers`.** ✅ COMPLIANCE-PIN: IR
-  (EU) 2026/1778 **Art. 8(8)** — *"the registry shall generate and store a unique
-  and persistent registration identifier as part of the registration data"* — and
-  **Art. 8(10)**, which communicates it *"for that specific product … through the
-  user interface or the API response"*. Per product, so a hundred passports yield
-  a hundred identifiers and a receipt carrying one could not express them.
-
-  🚨 Correlation is **by submission order, and that is ours**: nothing published
-  says how the response ties an identifier to a passport, and position is the only
-  correspondence the article's text supports without inventing a key. Art. 8(10)
-  also sits awkwardly with 8(8) — it communicates the identifier *"upon
-  successful submission"* while 8(8) generates it *following successful
-  verification*, different moments in an asynchronous flow, and 8(10) cites
-  paragraph 9 for what paragraph 8 generates. The field models the later moment,
-  because an identifier verification has not yet produced is one the registry
-  cannot have sent.
-
 - **`RegistrationRequest::from_published_passport` returns a `Result`.** It
   defaulted three fields to `""` when the passport did not carry them — the
   operator identifier, the facility identifier and the data carrier URI — so an
@@ -385,7 +388,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   three: **archiving** is the retention of a live passport's historical versions,
   **retired** is the terminal publication state, and the ESPR **Art. 10(4)
   back-up copy** — the independent third-party replica behind
-  `ports::archive::ArchivePort` — is the third, a copy of a record rather than a
+  `ports::backup::BackupCopyPort` — is the third, a copy of a record rather than a
   history of one. Two uses elsewhere are compound and stay as they are: the
   keystore's *archived keys* and a seal's *archival timestamp*.
 
@@ -444,8 +447,20 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   identifier becomes `ProductIdentifier`, a union of the three EN 18219 clause 5
   ID schemes.** *(Breaking: `pub gtin: Gtin` becomes
   `pub product_identifier: ProductIdentifier` on all eleven typed payloads, the
-  wire key `gtin` becomes `productIdentifier`, and every product group gets a new
-  schema version. Stored documents are **not** broken — see the lens below.)*
+  wire key `gtin` becomes `productIdentifier`, the `ProductGroupPayload` trait
+  swaps which of the two methods an implementor must write, and every product
+  group gets a new schema version. Stored documents are **not** broken — see the
+  lens below.)*
+
+  🚨 **An outside implementor of `ProductGroupPayload` stops compiling.**
+  `fn gtin(&self) -> Option<&str>` was required and is now provided, derived from
+  the new **required** `fn product_identifier(&self) -> Option<&ProductIdentifier>`.
+  An existing impl therefore still satisfies `gtin` — it simply overrides the
+  default — while failing to satisfy the trait at all, so the error names the
+  missing method rather than the one that moved. Implement
+  `product_identifier` and delete the `gtin` override: overriding it is asking a
+  payload a question only one of the three schemes can answer, and nothing in
+  this workspace does.
 
   ✅ COMPLIANCE-PIN: **EN 18219:2026 clause 5.1** — an identifier satisfies
   clause 4's general principles **and** complies with **one of** clause 5's ID
@@ -520,112 +535,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   level further in, so losing the type would lose the validation without losing
   a field.
 
-### Fixed
+- **Four fields added to types a caller constructs, which breaks exhaustive
+  struct literals and nothing else.** Each is optional, additive on the wire, and
+  described in full under Added — they are listed here only because a literal
+  naming every field stops compiling.
 
-- **🚨 A credential's expanded form carried no product identity at all.** The
-  JSON-LD context defined `gtin` at the top level, which is where the key sat
-  before the identifier migration. When the identifier moved under
-  `productIdentifier`, that node had no term of its own — and an undefined term
-  is dropped on expansion, taking everything inside it. Measured against a
-  JSON-LD processor:
+  | Crate | Type | New field |
+  |---|---|---|
+  | `dpp-domain` | `ElectronicsData` | `repairability_index_inputs` |
+  | `dpp-domain` | `ElectronicsData` | `index_scope_exclusion` |
+  | `dpp-domain` | `ports::registry_sync::RegistrationRequest` | `service_provider` |
+  | `dpp-registry` | `RegistrationPayload` | `service_provider` |
 
-  ```
-  old shape      productGroupData -> {"https://ref.gs1.org/voc/gtin": [{"@value": "09506000134352"}]}
-  current shape  productGroupData -> {}
-  ```
-
-  So the one deliberately evidence-backed term in the whole context — GS1's
-  `gtin`, whose provenance record `dpp-vocab` carries — had become unreachable,
-  and a consumer doing semantic processing received a passport that identified
-  nothing.
-
-  `productIdentifier` now carries a **scoped** context defining `scheme`,
-  `gtin`, `url` and `did`, so all three EN 18219 schemes survive expansion.
-  Scoped rather than global on purpose: `scheme` is also a facility-snapshot
-  field, and one global term would give a GLN scheme the product identifier's
-  meaning. Requires `"@version": 1.1`, without which a processor treats an
-  inner `@context` as an error rather than a scope.
-
-  🚨 The existing `the_passport_vocabulary_is_inlined` test asserted `gtin` at
-  the **top level** and passed throughout — an assertion at the position a key
-  used to occupy cannot notice the key moving. It now checks the term where the
-  key is.
-
-- **Every passport carries its product identifier into the AAS, not just the
-  ones with a typed mapper.** Two of the four product-group mappers emitted
-  `productIdentifier` into their own submodel and two did not, and the **eight**
-  catalogued groups with no typed mapper emitted it nowhere at all — so whether
-  a passport's identity travelled with it depended on which product group it
-  was. It is now emitted once from `ProductIdentification`, the submodel every
-  passport gets, and removed from the two mappers that duplicated it.
-
-  `productIdentifierKind` travels beside it: `as_str()` alone flattens a GTIN
-  and a DID into one slot with nothing saying which scheme issued either.
-
-  🚨 The clearest case was `unsold-goods`, whose committed AAS Environment
-  asserted `gtin=09506000134352` for a disclosure that covers a financial year
-  and **identifies no product at all**. That fabricated GTIN is gone.
-
-  Absent for two different reasons the emitter must tell apart: an unsold-goods
-  report has no identifier by law, and an unmodelled product group is reduced to
-  its discriminant before any mapper runs. Neither is unwrapped.
-
-- **`ProductIdentifier::value_kind` and `is_uri`** name what an identifier's
-  value *is* and whether it is already a URI. Both were previously derivable
-  only by matching the enum, which `#[non_exhaustive]` makes impossible to do
-  exhaustively from another crate — so every consumer needed a wildcard arm, and
-  a wildcard that produced a label would name an unmapped scheme as though it
-  had been mapped. A test holds `value_kind` against `dpp-registry`'s published
-  `SCHEME_*` constants.
-
-- **`Granularity::describes_a_type`**, for the same reason: the enum is
-  `#[non_exhaustive]`, and the question "is this a specification or a
-  manufactured thing" should not be answered by a wildcard in a projection.
-
-- **🚨 Three plugins declared themselves satisfied with input their own schema
-  would refuse.** A plugin's `validate_input` is what produces the compliance
-  determination, and three of them checked fewer fields than the schema makes
-  top-level `required`:
-
-  - **battery** never checked `batteryType`, and that field is not one among
-    several — it selects which obligations apply. Art. 8(2) does not reach LMT
-    batteries and the Art. 8(4) second-life carve-out turns on status, so the
-    determination was being computed against the wrong instrument. The plugin
-    read the field back as `unwrap_or("")`, which made an absent category look
-    like a category no rule matches, so the Annex XIII mandatory-content check
-    emitted nothing rather than failing.
-  - **textile** never checked `productIdentifier`. It is the one plugin that
-    never called `require_gtin`, so when every other plugin's call had to be
-    replaced it had nothing to replace — it came through the identifier
-    migration clean by accident, and the same accident left it the only plugin
-    checking no identifier at all.
-  - **unsold-goods** (served by the textile crate, dispatched on the in-payload
-    discriminant) checked neither `entity` nor `financialYear`, so a disclosure
-    naming no discloser and no reporting period passed. Found only by writing
-    the gate below.
-
-  Schema validation runs separately at publish, so none of these was an open
-  door. They were the two checks disagreeing, with the plugin being the one that
-  decides.
-
-  🚨 **The fixtures were invalid too, which is most of why this was invisible.**
-  `valid_battery()` and nine other battery test records carried no
-  `batteryType`, and the textile fixture carried no `productIdentifier` — every
-  test in both crates ran against records their own schemas would refuse. Two
-  battery tests asserted `warnings.is_empty()` and passed *because* the absent
-  category made the Annex XIII content check inert; both are now narrowed to the
-  rule they are actually about.
-
-- **The Art. 1(3) battery categories have one home, `dpp-rules`.** The closed
-  five-value enumeration is stated in the battery JSON schema's `enum`, in
-  `dpp_domain`'s `BatteryType` serde tags, and — to validate it at the plugin
-  tier — would have been written a third time. Two of those three cannot see
-  each other: the plugins are excluded from the workspace and reach `dpp-rules`,
-  never `dpp-domain`. `dpp_rules::batteries::category::BATTERY_TYPES` states it
-  once, and a test holds all three against each other. `"sli"` is deliberately
-  **not** a member: `passport_content` accepts it as an alias when answering
-  questions about a category, which is tolerance on the read path and not a
-  value a passport may carry.
+  This list is `cargo-semver-checks`' `constructible_struct_adds_field` run
+  against the published 0.20.0, not a hand search. Every other addition it
+  reports belongs to the identifier migration and is recorded above, with the
+  field each one replaces.
 
 ### Added
 
@@ -635,40 +560,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so nothing at this tier can assert a field *inside* the object. An empty
   object is refused, because it satisfies "present" while carrying none of what
   made the field required.
-
-### Fixed
-
-- **🚨 The Wasm product group plugins still required a `gtin` the schemas had
-  stopped carrying, and the compliance determination silently stopped being
-  made.** The EN 18219 identifier work moved every product group's schema from a
-  bare top-level `gtin` to a `productIdentifier` object, and migrated the Rust
-  types, the catalog and the stored-data lens with it. **No file under
-  `plugins/` was touched.** Nine of the ten plugins went on calling
-  `require_gtin("gtin")`, which reads a flat top-level key, so fed a current
-  record they answered *"gtin is required"* — against data whose GTIN was
-  present the whole time, one level down inside `productIdentifier`.
-
-  The failure was silent rather than loud, which is the part worth keeping. Both
-  consumers of a determination discard the error: the publish-time compliance
-  gate reads `&& let Ok(determination) = …compute(…)`, so an `Err` makes the
-  whole condition false and **the gate that blocks a passport carrying binding
-  violations simply does not fire**. Passports published; nothing was evaluated.
-
-  Five gates were in a position to catch it and none did. `plugins/*` are
-  excluded from the workspace, so `cargo check --workspace` never compiled them
-  against the new shape. Their own tests passed because their fixtures still
-  carried `"gtin": "12345678901231"` — a test pinned to a shape that no longer
-  ships, the same defect class as the stale schema literal fixed earlier in this
-  release. The catalog↔schema parity test compares those two records to each
-  other and never asks what a plugin requires. Every plugin's declared
-  `schema_version_range` was stale, but that is dead metadata: the host calls
-  `check_compatibility(…, None, …)`, and `None` skips the schema check entirely.
-
-  Each plugin now calls `require_product_identifier("productIdentifier")`, and
-  the ten stale version ranges are bumped to the versions their product groups
-  actually serve.
-
-### Added
 
 - **`Validator::require_product_identifier` — the EN 18219 clause 5 check that
   replaces `require_gtin` for product group data.** Validates the object against
@@ -1072,6 +963,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     two named fields being ones the web client reads. Everything else about the
     body is unknown, so nothing else is modelled.
 
+- **`SubmissionReceipt::registration_identifiers`.** ✅ COMPLIANCE-PIN: IR
+  (EU) 2026/1778 **Art. 8(8)** — *"the registry shall generate and store a unique
+  and persistent registration identifier as part of the registration data"* — and
+  **Art. 8(10)**, which communicates it *"for that specific product … through the
+  user interface or the API response"*. Per product, so a hundred passports yield
+  a hundred identifiers and a receipt carrying one could not express them.
+
+  🚨 Correlation is **by submission order, and that is ours**: nothing published
+  says how the response ties an identifier to a passport, and position is the only
+  correspondence the article's text supports without inventing a key. Art. 8(10)
+  also sits awkwardly with 8(8) — it communicates the identifier *"upon
+  successful submission"* while 8(8) generates it *following successful
+  verification*, different moments in an asynchronous flow, and 8(10) cites
+  paragraph 9 for what paragraph 8 generates. The field models the later moment,
+  because an identifier verification has not yet produced is one the registry
+  cannot have sent.
+
 - **`MAX_PRODUCT_IDENTIFIER_CHARS`, and the risk it retires.** The User Guide
   caps the unique product identifier, and `RegistrationPayload::validate` now
   enforces it. The number matters more than the check: **v1.01 (2026-07-28) said
@@ -1095,12 +1003,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   is explicit — *"if a single DPP has an error, all the DPPs in the same
   submission will be rejected"* — so there is no partial success to reconcile.
 
-  **The batch payload itself is deliberately not modelled.** Its shape is exactly
-  the part no published material describes, and inventing it is what this crate's
-  open questions exist to prevent. A single-passport submission is a batch of
-  one, so the current shape stays correct under either answer, and the limits are
-  recorded here so an implementation inherits them rather than rediscovering
-  them at the registry.
+  **The batch payload is modelled, by `RegistrationSubmission`** — see the
+  Breaking entry on `EuRegistryEnvelope::payload`. These limits were written
+  first, and the note here used to say the shape was deliberately left alone
+  because no published material describes it. Nothing published describes it
+  still: what changed is that a rule applying across a submission, and a cap
+  counted in passports, are both unenforceable without a type that can hold
+  more than one. The wrapper adds no field of its own and serialises as a bare
+  array, so the shape on the wire is the one that was already there.
 
   Nothing here is breaking: `RegistryValidationError` is `#[non_exhaustive]` and
   gains `ProductIdentifierTooLong`, `RegistryStatusCode` is untouched, and the
@@ -1201,6 +1111,141 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   in lexicographic order, which is the order the literal already used.
 
 ### Fixed
+
+- **🚨 A credential's expanded form carried no product identity at all.** The
+  JSON-LD context defined `gtin` at the top level, which is where the key sat
+  before the identifier migration. When the identifier moved under
+  `productIdentifier`, that node had no term of its own — and an undefined term
+  is dropped on expansion, taking everything inside it. Measured against a
+  JSON-LD processor:
+
+  ```
+  old shape      productGroupData -> {"https://ref.gs1.org/voc/gtin": [{"@value": "09506000134352"}]}
+  current shape  productGroupData -> {}
+  ```
+
+  So the one deliberately evidence-backed term in the whole context — GS1's
+  `gtin`, whose provenance record `dpp-vocab` carries — had become unreachable,
+  and a consumer doing semantic processing received a passport that identified
+  nothing.
+
+  `productIdentifier` now carries a **scoped** context defining `scheme`,
+  `gtin`, `url` and `did`, so all three EN 18219 schemes survive expansion.
+  Scoped rather than global on purpose: `scheme` is also a facility-snapshot
+  field, and one global term would give a GLN scheme the product identifier's
+  meaning. Requires `"@version": 1.1`, without which a processor treats an
+  inner `@context` as an error rather than a scope.
+
+  🚨 The existing `the_passport_vocabulary_is_inlined` test asserted `gtin` at
+  the **top level** and passed throughout — an assertion at the position a key
+  used to occupy cannot notice the key moving. It now checks the term where the
+  key is.
+
+- **Every passport carries its product identifier into the AAS, not just the
+  ones with a typed mapper.** Two of the four product-group mappers emitted
+  `productIdentifier` into their own submodel and two did not, and the **eight**
+  catalogued groups with no typed mapper emitted it nowhere at all — so whether
+  a passport's identity travelled with it depended on which product group it
+  was. It is now emitted once from `ProductIdentification`, the submodel every
+  passport gets, and removed from the two mappers that duplicated it.
+
+  `productIdentifierKind` travels beside it: `as_str()` alone flattens a GTIN
+  and a DID into one slot with nothing saying which scheme issued either.
+
+  🚨 The clearest case was `unsold-goods`, whose committed AAS Environment
+  asserted `gtin=09506000134352` for a disclosure that covers a financial year
+  and **identifies no product at all**. That fabricated GTIN is gone.
+
+  Absent for two different reasons the emitter must tell apart: an unsold-goods
+  report has no identifier by law, and an unmodelled product group is reduced to
+  its discriminant before any mapper runs. Neither is unwrapped.
+
+- **`ProductIdentifier::value_kind` and `is_uri`** name what an identifier's
+  value *is* and whether it is already a URI. Both were previously derivable
+  only by matching the enum, which `#[non_exhaustive]` makes impossible to do
+  exhaustively from another crate — so every consumer needed a wildcard arm, and
+  a wildcard that produced a label would name an unmapped scheme as though it
+  had been mapped. A test holds `value_kind` against `dpp-registry`'s published
+  `SCHEME_*` constants.
+
+- **`Granularity::describes_a_type`**, for the same reason: the enum is
+  `#[non_exhaustive]`, and the question "is this a specification or a
+  manufactured thing" should not be answered by a wildcard in a projection.
+
+- **🚨 Three plugins declared themselves satisfied with input their own schema
+  would refuse.** A plugin's `validate_input` is what produces the compliance
+  determination, and three of them checked fewer fields than the schema makes
+  top-level `required`:
+
+  - **battery** never checked `batteryType`, and that field is not one among
+    several — it selects which obligations apply. Art. 8(2) does not reach LMT
+    batteries and the Art. 8(4) second-life carve-out turns on status, so the
+    determination was being computed against the wrong instrument. The plugin
+    read the field back as `unwrap_or("")`, which made an absent category look
+    like a category no rule matches, so the Annex XIII mandatory-content check
+    emitted nothing rather than failing.
+  - **textile** never checked `productIdentifier`. It is the one plugin that
+    never called `require_gtin`, so when every other plugin's call had to be
+    replaced it had nothing to replace — it came through the identifier
+    migration clean by accident, and the same accident left it the only plugin
+    checking no identifier at all.
+  - **unsold-goods** (served by the textile crate, dispatched on the in-payload
+    discriminant) checked neither `entity` nor `financialYear`, so a disclosure
+    naming no discloser and no reporting period passed. Found only by writing
+    the gate below.
+
+  Schema validation runs separately at publish, so none of these was an open
+  door. They were the two checks disagreeing, with the plugin being the one that
+  decides.
+
+  🚨 **The fixtures were invalid too, which is most of why this was invisible.**
+  `valid_battery()` and nine other battery test records carried no
+  `batteryType`, and the textile fixture carried no `productIdentifier` — every
+  test in both crates ran against records their own schemas would refuse. Two
+  battery tests asserted `warnings.is_empty()` and passed *because* the absent
+  category made the Annex XIII content check inert; both are now narrowed to the
+  rule they are actually about.
+
+- **The Art. 1(3) battery categories have one home, `dpp-rules`.** The closed
+  five-value enumeration is stated in the battery JSON schema's `enum`, in
+  `dpp_domain`'s `BatteryType` serde tags, and — to validate it at the plugin
+  tier — would have been written a third time. Two of those three cannot see
+  each other: the plugins are excluded from the workspace and reach `dpp-rules`,
+  never `dpp-domain`. `dpp_rules::batteries::category::BATTERY_TYPES` states it
+  once, and a test holds all three against each other. `"sli"` is deliberately
+  **not** a member: `passport_content` accepts it as an alias when answering
+  questions about a category, which is tolerance on the read path and not a
+  value a passport may carry.
+
+- **🚨 The Wasm product group plugins still required a `gtin` the schemas had
+  stopped carrying, and the compliance determination silently stopped being
+  made.** The EN 18219 identifier work moved every product group's schema from a
+  bare top-level `gtin` to a `productIdentifier` object, and migrated the Rust
+  types, the catalog and the stored-data lens with it. **No file under
+  `plugins/` was touched.** Nine of the ten plugins went on calling
+  `require_gtin("gtin")`, which reads a flat top-level key, so fed a current
+  record they answered *"gtin is required"* — against data whose GTIN was
+  present the whole time, one level down inside `productIdentifier`.
+
+  The failure was silent rather than loud, which is the part worth keeping. Both
+  consumers of a determination discard the error: the publish-time compliance
+  gate reads `&& let Ok(determination) = …compute(…)`, so an `Err` makes the
+  whole condition false and **the gate that blocks a passport carrying binding
+  violations simply does not fire**. Passports published; nothing was evaluated.
+
+  Five gates were in a position to catch it and none did. `plugins/*` are
+  excluded from the workspace, so `cargo check --workspace` never compiled them
+  against the new shape. Their own tests passed because their fixtures still
+  carried `"gtin": "12345678901231"` — a test pinned to a shape that no longer
+  ships, the same defect class as the stale schema literal fixed earlier in this
+  release. The catalog↔schema parity test compares those two records to each
+  other and never asks what a plugin requires. Every plugin's declared
+  `schema_version_range` was stale, but that is dead metadata: the host calls
+  `check_compatibility(…, None, …)`, and `None` skips the schema check entirely.
+
+  Each plugin now calls `require_product_identifier("productIdentifier")`, and
+  the ten stale version ranges are bumped to the versions their product groups
+  actually serve.
 
 - **Two `CITED_NOT_MODELLED` reasons asserted things the Official Journal does
   not say.** The inventory's reasons are what make it reviewable rather than a
@@ -1472,17 +1517,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     1222/2009 is repealed with effect from 1 May 2021."* The date the inventory
     asserted is right, and the article also directs that references to the
     repealed act be read against the correlation table in Annex VIII.
-  - **`32004R0648`** — Regulation (EU) 2026/405 **Art. 36**, repealing it with
-    effect from 23 September 2029. The reason now also carries the grandfathering
-    window to 23 September 2030, which the bare word "repealed" overstated.
+  - **`32004R0648`** — Regulation (EU) 2026/405 **Art. 35**, repealing it with
+    effect from 23 September 2029, with the transition in the *next* article,
+    Art. 36. The reason now also carries the grandfathering window to 23
+    September 2030, which the bare word "repealed" overstated. 🚨 This entry
+    named Art. 36 for both when it was written, and was marked as read against
+    the Official Journal while doing so; the entry above is what caught it.
   - **`32009R0661`** — 2020/740's own **Annex I Part C** names it as the source
     of the tyre noise limit values, confirming both the annex part and the act.
 
-  **`32024R1252` (the Critical Raw Materials Act) stays `Assumed`**, and its
-  reason now says so plainly instead of stating the conclusion. It is a negative
-  claim across a whole regulation — the hardest kind to hold — and the text is
-  not held. It is also the one that **ships**, in every battery and electronics
-  schema description naming the act.
+  **`32024R1252` (the Critical Raw Materials Act) was left `Assumed` here**, its
+  reason saying so plainly instead of stating the conclusion: a negative claim
+  across a whole regulation is the hardest kind to hold, and the text had not
+  been read. It has been read since, within this same release — see the entry
+  above — and the claim did not survive: Art. 28 and Art. 29 do govern
+  disclosure, and the entry is now `Sourced`. It is also the one that **ships**,
+  in every battery and electronics schema description naming the act.
 
 ## [0.20.0] - 2026-09-13
 
