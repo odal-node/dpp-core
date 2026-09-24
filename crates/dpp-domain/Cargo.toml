@@ -25,7 +25,13 @@ async-trait = { workspace = true }
 
 semver      = "1"
 
-# jsonschema not compatible with wasm32-unknown-unknown (uses reqwest blocking)
+# Excluded from `wasm32-unknown-unknown`. The reason recorded here was that
+# jsonschema pulls blocking reqwest — which was true, and is no longer: the
+# workspace dependency now disables `resolve-http` (see the root manifest).
+# The exclusion stays because nothing has *built* it for wasm32 since, and a gate
+# kept for a reason that has expired is worth either testing or removing rather
+# than inheriting. Lifting it would let the wasm32 consumers validate against the
+# embedded schemas, which today they cannot.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 jsonschema  = { workspace = true }
 

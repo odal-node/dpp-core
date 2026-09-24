@@ -76,7 +76,25 @@ wildcards = "deny"
 # to whatever exists at vendor time, so two consumers of the same released
 # version can get different graphs.
 allow-wildcard-paths = false
-deny = []
+
+# 🚨 The network stack, banned by name so it cannot return by transitive accident.
+#
+# It did exactly that: `jsonschema`'s default features (`resolve-http`,
+# `tls-aws-lc-rs`) put all four of these into `dpp-domain` — the crate whose
+# stated claim is no HTTP client and no async runtime — and nothing noticed,
+# because no direct dependency named any of them. `CONTRIBUTING.md` already said
+# a runtime dependency that pulls in network I/O does not belong here; this is
+# what makes that sentence something a build can check.
+#
+# `tokio` is deliberately absent from this list. It is present as a
+# `[dev-dependencies]` test runtime in four crates, which is permitted: it is
+# never compiled into a published library and never reaches a vendored graph.
+deny = [
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "rustls" },
+    { name = "aws-lc-sys" },
+]
 skip = []
 skip-tree = []
 
