@@ -1,5 +1,7 @@
 # Regulatory Implementation Status
 
+<!-- BOUNDARY-EXCEPTION(taxonomy): "Phase 1" and "Phase 2" are the stages of Regulation (EU) 2023/1542 Art. 8(2) and 8(3), not a roadmap. -->
+
 This document is the single reference for why a rule module contains real logic vs. a placeholder. Each entry states the legal basis, what is and isn't finalized, and the concrete condition that unlocks implementation.
 
 ---

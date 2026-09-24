@@ -226,10 +226,10 @@ per-variant counts — no IP address, user agent or session identifier, because 
 schema has no column for one. That design predates this section; Art. 78(d) is
 the article it answers to.
 
-**Residual, platform-side.** `dpp-core` is stateless and holds no data, so it can
+**Residual, host-side.** `dpp-core` is stateless and holds no data, so it can
 only state the constraint and place it at the seam. Enforcement — retention of
-logs, backup handling, what a hosted control plane may read — is a platform
-and infrastructure concern and is not evidenced here.
+logs, backup handling, what a hosted control plane may read — is a concern of
+whatever hosts it and of that host's infrastructure, and is not evidenced here.
 
 ## Cryptographic Foundations
 

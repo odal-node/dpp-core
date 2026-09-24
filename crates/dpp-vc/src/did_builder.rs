@@ -1,6 +1,6 @@
 //! `did:web` DID document builder.
 //!
-//! Constructs a W3C DID document from the node's `KeyStore`: primary key first,
+//! Constructs a W3C DID document from an issuer's `KeyStore`: primary key first,
 //! hygiene-archived keys as secondary verification methods, revoked keys excluded
 //! so their signatures stop verifying.
 

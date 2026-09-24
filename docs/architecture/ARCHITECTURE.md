@@ -322,6 +322,6 @@ Two wasm32 targets are supported:
 | Target | Crates | Purpose |
 |---|---|---|
 | `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas | Browser/Cloudflare Workers (JS-hosted). Not `dpp-crypto`/`dpp-vc` — the RNG needs a platform entropy source |
-| `wasm32-wasip1` | product group plugins | wasmtime sandbox (WASI P1 syscall interface) |
+| `wasm32-wasip1` | product group plugins | wasmtime sandbox (WASI Preview 1 syscall interface) |
 
 `getrandom` uses the JS backend for `wasm32-unknown-unknown` (configured in `.cargo/config.toml`).

@@ -69,6 +69,9 @@ use alloc::vec::Vec;
 
 use crate::common::date::CalendarDate;
 
+// BOUNDARY-EXCEPTION(taxonomy): "Phase 1" and "Phase 2" are the two stages of
+// Regulation (EU) 2023/1542 Art. 8(2) and 8(3), with statutory dates — the
+// Regulation's own staging, not a roadmap.
 // ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 8(2) and 8(3) (OJ L 191, 28.7.2023, p. 33)
 // Verified verbatim against the Official Journal text on 2026-07-25. Percentages,
 // dates and category scope were read directly from Art. 8(2) and 8(3); the prior

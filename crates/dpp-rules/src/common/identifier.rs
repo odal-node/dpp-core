@@ -125,7 +125,7 @@ pub enum Gs1ValueRejection {
 /// enumeration is in the GS1 General Specifications, which this repository does
 /// not hold. What checks it instead is GS1's own Barcode Syntax Engine: the
 /// Digital Link oracle corpus carries every printable ASCII character in an
-/// AI 21 value together with this function's verdict, and the engine has to
+/// AI 21 value together with this function's verdict, and GS1's engine has to
 /// agree in both directions.
 #[must_use]
 pub const fn is_cset_82(c: char) -> bool {

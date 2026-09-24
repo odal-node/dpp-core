@@ -96,7 +96,7 @@ fn the_element_shape_this_replaced_still_parses() {
     });
 
     let edge: ComponentRef =
-        serde_json::from_value(bare).expect("the pre-Phase-3 element shape must still parse");
+        serde_json::from_value(bare).expect("the bare-reference element shape must still parse");
 
     assert_eq!(edge.reference, reference());
     assert_eq!(
@@ -123,7 +123,7 @@ fn a_passport_carrying_the_old_element_shape_still_reads() {
     );
 
     let back: Passport =
-        serde_json::from_value(doc).expect("a passport with pre-Phase-3 edges must still read");
+        serde_json::from_value(doc).expect("a passport with bare-reference edges must still read");
 
     assert_eq!(back.component_refs.len(), 1);
     assert_eq!(back.component_refs[0].reference, reference());
