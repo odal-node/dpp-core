@@ -18,7 +18,17 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+# The version of the ten Wasm artifacts, shared by all of them.
+#
+# 🚨 This is **artifact identity, not compatibility**. A host negotiates on
+# `AbiVersion` and `SchemaVersionRange` from `describe()`, and neither reads this
+# number — so a stale value breaks nothing at dispatch and is invisible to every
+# gate. It sat at 0.2.0 from core 0.11.0 to 0.20.0 for exactly that reason, while
+# the plugins changed underneath it, most recently to refuse `gtin`-shaped input.
+#
+# 0.3.0 rather than 0.2.1: a plugin that rejects input its predecessor accepted is
+# a breaking change to anything feeding it, whatever the negotiation says.
+version = "0.3.0"
 edition = "2024"
 license = "Apache-2.0"
 
