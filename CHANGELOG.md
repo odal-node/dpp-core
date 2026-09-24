@@ -310,10 +310,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   than a release"*. Its untyped payload is read for a `productIdentifier`
   through the same EN 18219 clause 5 parser the typed variants use, so such a
   passport registers without a release. One that carries none, or one that does
-  not parse, is refused: **before this change it was not rejected, it was
-  registered under the internal UUID** — the fallback above, reached exactly
-  because an untyped group rarely carries a GS1 carrier. Registering a
-  meaningless identifier with a public authority was a defect; refusing is not.
+  not parse, is refused: **in 0.20.0 it was not rejected, it was registered under
+  the internal UUID** — the fallback above, reached exactly because an untyped
+  group rarely carries a GS1 carrier. Registering a meaningless identifier with a
+  public authority was a defect; refusing is not.
   See the `UnmodelledPayload` entry below for the shape that carries it.
 
   The field is `Option` on the struct for the **wire**, not the rule: this type is
@@ -604,8 +604,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and slips past the fail-closed reduction a view applies to a group with no
   policy. Neither door is open now.
 
-  **Migration.** Replace `ProductGroupData::Other { product_group, data }` with
-  `ProductGroupData::other(data)` (the tag is read from `data`), and patterns
+  **Migration.** For a `ProductGroupData::Other { product_group, data }` literal,
+  set `data["productGroup"]` to `product_group` first and then call
+  `ProductGroupData::other(data)`, handling its `Option`: the tag is now read
+  from `data` alone, and an object that lacks one becomes `"other"` rather than
+  keeping the tag the old field carried beside it. Replace patterns
   `Other { product_group, .. }` with `Other(p)` and `p.product_group()`.
 
 ### Added
