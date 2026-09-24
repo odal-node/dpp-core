@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-digital-link"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "dpp-domain",
  "dpp-rules",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-domain"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-plugin-traits"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "semver",
  "serde",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-rules"
-version = "0.20.0"
+version = "0.21.0"
 
 [[package]]
 name = "dyn-clone"
