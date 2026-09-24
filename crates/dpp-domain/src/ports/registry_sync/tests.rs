@@ -273,6 +273,62 @@ fn a_product_group_that_identifies_nothing_is_refused() {
     );
 }
 
+/// A passport for a product group this build has no typed variant for, with
+/// `product_identifier` as its payload's `productIdentifier`.
+fn untyped_passport(product_identifier: serde_json::Value) -> Passport {
+    use crate::product_group::{ProductGroup, ProductGroupData};
+
+    let mut passport = make_published_passport();
+    passport.product_group = ProductGroup::Other("photovoltaic".into());
+    passport.product_group_data = ProductGroupData::other(serde_json::json!({
+        "productGroup": "photovoltaic",
+        "productIdentifier": product_identifier,
+    }));
+    passport
+}
+
+/// The defect: an untyped product group carrying a valid identifier on the
+/// wire was refused, because nothing read one out of untyped data — so a group
+/// added to the catalog after this crate shipped needed a release to register.
+#[test]
+fn an_untyped_product_group_registers_on_the_identifier_it_carries() {
+    let passport = untyped_passport(serde_json::json!({
+        "scheme": "gs1",
+        "gtin": "09506000134352",
+    }));
+
+    let req = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect("a valid identifier registers whether or not the group is typed");
+
+    let identifier = req.product_identifier.expect("carried");
+    assert_eq!(identifier.as_str(), "09506000134352");
+}
+
+/// Reading the untyped payload does not make it lenient: an identifier that
+/// fails EN 18219 clause 5 is refused exactly as an absent one is.
+#[test]
+fn an_untyped_product_group_with_a_malformed_identifier_is_refused() {
+    let passport = untyped_passport(serde_json::json!({
+        "scheme": "gs1",
+        "gtin": "09506000134351",
+    }));
+
+    let refused = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect_err("a bad check digit is no identifier");
+    assert_eq!(
+        refused.errors[0].field,
+        "/productGroupData/productIdentifier"
+    );
+}
+
 /// 🚨 `Some("")` is the same absence wearing an `Option::Some`.
 ///
 /// `Passport`'s fields are public and it deserialises from stored documents, so

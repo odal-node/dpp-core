@@ -121,6 +121,7 @@ pub use crate::{
         TextileData,
         ToyData,
         TyreData,
+        UnmodelledPayload,
         UnsoldGoodsReport,
         UsageHistory,
         WasteTreatmentSplit,

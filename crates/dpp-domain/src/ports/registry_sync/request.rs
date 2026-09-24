@@ -250,14 +250,12 @@ impl RegistrationRequest {
         // disclosure is not a product registration, and refusing it here says
         // so — rather than an `Option` that lets it through unnamed.
         //
-        // 🚨 `Other` is refused too, and that case is *not* settled.
-        // `product_identifier()` answers `None` for it because the payload is
-        // untyped, not because it identifies nothing — an `Other` object can
-        // carry a usable `productIdentifier` and is still refused, because
-        // nothing reads one out of untyped data. That makes registering a
-        // product group added to the catalog after this crate shipped need a
-        // release, which is exactly the property `Other` exists to avoid.
-        // Fail-closed, so nothing is invented. Tracked in #321.
+        // A product group this build has no typed variant for registers like
+        // any other: its untyped payload is read for a `productIdentifier`
+        // through the same EN 18219 clause 5 parser the typed variants use, so
+        // a group added to the catalog after this crate shipped does not need a
+        // release to be registered. One that carries none, or one that does not
+        // parse, is refused here — fail-closed, so nothing is invented.
         let product_identifier = passport
             .product_group_data
             .as_ref()
@@ -268,7 +266,8 @@ impl RegistrationRequest {
             "/productGroupData/productIdentifier",
             "Art. 9(2)(a) requires the unique product identifier in a proof of \
              registration; a product group that identifies no single product — \
-             an unsold-goods disclosure — is not a product registration",
+             an unsold-goods disclosure — is not a product registration, and an \
+             untyped product group must carry a valid EN 18219 `productIdentifier`",
         );
         if !missing.is_empty() {
             return Err(crate::field_error::ValidationErrors { errors: missing });

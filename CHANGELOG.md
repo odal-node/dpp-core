@@ -303,22 +303,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   identifies no single one. A disclosure is not a product registration, and
   saying so is better than an `Option` that lets it through unnamed.
 
-  🚨 **`ProductGroupData::Other` is refused too, and that one is a real
-  narrowing.** `Other` is the forward-compatibility escape hatch — a passport
-  for a product group added to the catalog after this crate shipped round-trips
-  through it verbatim, which is what makes adding a product group *"a data
-  change rather than a release"*. `product_identifier()` answers `None` for it
-  because the payload is untyped, **not** because it identifies nothing: the
-  wire object can carry a perfectly good `productIdentifier` and is refused
-  anyway, since nothing reads it out. Until that is addressed, registering an
-  unmodelled product group needs a release.
-
-  This is still the better of the two available answers, and worth stating
-  plainly: **before this change such a passport was not rejected, it was
+  **`ProductGroupData::Other` registers on the identifier it carries.** `Other`
+  is the forward-compatibility escape hatch — a passport for a product group
+  added to the catalog after this crate shipped round-trips through it
+  verbatim, which is what makes adding a product group *"a data change rather
+  than a release"*. Its untyped payload is read for a `productIdentifier`
+  through the same EN 18219 clause 5 parser the typed variants use, so such a
+  passport registers without a release. One that carries none, or one that does
+  not parse, is refused: **before this change it was not rejected, it was
   registered under the internal UUID** — the fallback above, reached exactly
-  because an untyped group rarely carries a GS1 carrier. Refusing is a
-  narrowing; registering a meaningless identifier with a public authority was a
-  defect. Tracked in #321.
+  because an untyped group rarely carries a GS1 carrier. Registering a
+  meaningless identifier with a public authority was a defect; refusing is not.
+  See the `UnmodelledPayload` entry below for the shape that carries it.
 
   The field is `Option` on the struct for the **wire**, not the rule: this type is
   queued in a consumer's outbox across restarts, and a newly required field makes
@@ -583,6 +579,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   against the published 0.20.0, not a hand search. Every other addition it
   reports belongs to the identifier migration and is recorded above, with the
   field each one replaces.
+
+- **`ProductGroupData::Other` holds an `UnmodelledPayload`, whose fields are
+  private.** *(Breaking: `Other { product_group, data }` is now
+  `Other(UnmodelledPayload)` — match it as `Other(p)` and read
+  `p.product_group()` and `p.data()`. It can no longer be built with a struct
+  literal; use `ProductGroupData::other`. The wire is unchanged.)*
+
+  An untyped payload now answers `product_identifier()` — and through it
+  `gtin()` — with the `productIdentifier` it carries, parsed through the same
+  EN 18219 clause 5 deserialiser the typed variants use. So a product group added
+  to the catalog after this crate shipped registers, prints a carrier and
+  resolves like any other, instead of needing a release first. A value that
+  does not parse leaves the payload with no identifier rather than failing to
+  deserialise: an untyped group has to keep round-tripping whatever it carries,
+  and a fetched passport cannot be rewritten to fix it.
+
+  **Why the fields went private.** The identifier is read once, when the
+  payload is built, so a caller able to replace `data` afterwards would leave a
+  carrier or a registration naming an identifier the signed passport does not
+  contain. And the struct literal was already a way round `ProductGroupData::other`,
+  which refuses a typed tag — a second representation of battery that compares
+  unequal to the first — and a non-object payload, which serialises untagged
+  and slips past the fail-closed reduction a view applies to a group with no
+  policy. Neither door is open now.
+
+  **Migration.** Replace `ProductGroupData::Other { product_group, data }` with
+  `ProductGroupData::other(data)` (the tag is read from `data`), and patterns
+  `Other { product_group, .. }` with `Other(p)` and `p.product_group()`.
 
 ### Added
 

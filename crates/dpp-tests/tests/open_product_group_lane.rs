@@ -28,7 +28,7 @@ fn an_unknown_product_group_tag_deserializes_instead_of_failing() {
         .expect("an unknown product_group must not be a deserialization error");
 
     match &data {
-        ProductGroupData::Other { product_group, .. } => assert_eq!(product_group, UNKNOWN),
+        ProductGroupData::Other(unmodelled) => assert_eq!(unmodelled.product_group(), UNKNOWN),
         other => panic!("expected an untyped payload, got {other:?}"),
     }
 }
