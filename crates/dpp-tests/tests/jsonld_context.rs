@@ -475,3 +475,34 @@ fn passport_wire_keys() -> Vec<String> {
         })
         .collect()
 }
+
+/// 🚨 The passport's `@context` fetches nothing, and that is now the property.
+///
+/// A string entry is a fetch the consumer performs at expansion time, and one
+/// that fails takes the whole document with it: a conforming processor raises a
+/// remote-context load error, a lenient one silently drops every term it cannot
+/// define. Either way the `ld+json` door conveys no linked data — worse than
+/// serving plain JSON, because an `@context` is itself a claim that the document
+/// is semantically resolvable.
+///
+/// With every term inline there is nothing left to fetch, so that failure mode
+/// is gone rather than merely unlikely. It is pinned here because
+/// `every_remote_context_is_verified_resolvable` now passes *vacuously* — a
+/// check over an empty set says nothing, and this is the sentence it used to be
+/// saying.
+#[test]
+fn the_passport_context_fetches_nothing() {
+    let ctx = context_value();
+    let entries = ctx.as_array().expect("@context is an array");
+
+    let fetched: Vec<&str> = entries.iter().filter_map(Value::as_str).collect();
+    assert!(
+        fetched.is_empty(),
+        "the passport context would fetch {fetched:?} at expansion time"
+    );
+    assert_eq!(
+        entries.len(),
+        1,
+        "expected exactly one entry, the inline term map"
+    );
+}
