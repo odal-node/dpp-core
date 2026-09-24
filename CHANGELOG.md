@@ -984,8 +984,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so far was in a runtime error string.
 
   The terms are shapes of sentence — definite nouns and their compounds,
-  numbered planning labels, commercial phrases — never a list of private names,
-  so the list can be public without publishing what it protects. A legitimate
+  numbered planning labels, commercial phrases — and no repository is named: a
+  `dpp-` name that is not one of this workspace's own packages is flagged, so
+  every sibling is caught without the list publishing one. A legitimate
   use is exempted in its own file by `BOUNDARY-EXCEPTION(<class>): <reason>`,
   which must state why; the Batteries Regulation's own two-stage recycled-content
   timetable is the standing example. An exception that no longer exempts

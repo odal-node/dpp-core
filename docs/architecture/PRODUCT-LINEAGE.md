@@ -488,8 +488,10 @@ edge identifies its target by URI, a transfer identifies its subject by passport
 id, and resolving one to the other is a network fetch. So the **caller
 correlates and the rule checks**. An edge whose caller found no corresponding
 transfer is reported as unconsented — the correct reading of "no evidence was
-found", rather than an assumption that none exists. That also means the rule is
-enforced host-side, because core cannot resolve a URI.
+found", rather than an assumption that none exists. The split follows from what
+core cannot do: a host resolves the URI and correlates the transfer, because core
+cannot resolve a URI, and `dpp_rules::lineage::consent` judges the evidence the
+host found.
 
 BOM edges deliberately get **no** consent requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. The
@@ -559,7 +561,7 @@ two were design calls and are recorded as decided, not as recommendations.
 | **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
 | **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | **landed** |
 | **3** | `ComponentRef` with quantity/role (G4-down). The verification walk and the evidence component graph follow the new shape host-side. | **yes** | **landed** |
-| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). Enforced host-side, since correlating an edge to a transfer needs a URI resolved. | no | **landed** |
+| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). A host correlates an edge to a transfer, since that needs a URI resolved; the rule in `dpp-rules` judges the result. | no | **landed** |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
 
 Phase 0 was independently landable and did not wait for the rest. Phase 1 carried

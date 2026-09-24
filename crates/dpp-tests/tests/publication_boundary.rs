@@ -29,8 +29,10 @@
 //! An earlier private-reference scanner was parked because its denylist was
 //! itself the leak: a list of forbidden private names, committed to a public
 //! repository, publishes what it protects. Nothing here is like that. Every term
-//! is a generic English phrase or a numbering scheme; the one real name, the
-//! consumer repository's, is public.
+//! is a generic English phrase or a numbering scheme, and no repository is
+//! named at all: a `dpp-` name that is not one of this workspace's own packages
+//! is flagged as a sibling, which catches every sibling — public or not —
+//! without the list having to name one.
 //!
 //! # Exceptions
 //!
@@ -109,7 +111,6 @@ const CONSUMER: &[Phrase] = &[
     word("the node's"),
     word("platform repo"),
     word("engine repo"),
-    word("dpp-engine"),
     word("engine-side"),
     word("engine side"),
     word("engine-layer"),
@@ -124,15 +125,26 @@ const CONSUMER: &[Phrase] = &[
     word("vault-only"),
 ];
 
+/// Stems where the plural is as likely as the singular — "lead times",
+/// "per-unit rates", "price quotes".
 const COMMERCIAL: &[Phrase] = &[
     stem("sublicen"),
     stem("reseller"),
     word("agreed with counsel"),
-    word("per-unit rate"),
-    word("lead time"),
-    word("price quote"),
+    stem("per-unit rate"),
+    stem("lead time"),
+    stem("price quote"),
     word("contract terms"),
     word("under contract"),
+];
+
+/// `dpp-` names that are neither a package of this workspace nor a sibling
+/// repository — each an external identifier this workspace has to quote.
+const EXTERNAL_DPP_NAMES: &[&str] = &[
+    // The EU registry's registration endpoint path.
+    "dpp-registration-requests",
+    // An upstream vocabulary's own key in the vocabulary register.
+    "dpp-keystone",
 ];
 
 /// Numbered planning terms: the word, then a space or hyphen, then a digit.
@@ -207,10 +219,84 @@ fn taxonomy_hits(line: &str) -> Vec<&'static str> {
     hits
 }
 
+/// This repository's own `dpp-` names: every package in the workspace, and the
+/// repository itself. Read from the manifests, so a crate added later is known
+/// without editing this file.
+fn own_dpp_names() -> &'static [String] {
+    static NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        let root = workspace_root();
+        let mut manifests: Vec<PathBuf> = read_dir(&root.join("crates"))
+            .into_iter()
+            .map(|dir| dir.join("Cargo.toml"))
+            .filter(|m| m.is_file())
+            .collect();
+        manifests.push(root.join("benches").join("Cargo.toml"));
+        let mut names: Vec<String> = manifests
+            .iter()
+            .map(|m| {
+                let text = fs::read_to_string(m)
+                    .unwrap_or_else(|e| panic!("cannot read {}: {e}", m.display()));
+                text.lines()
+                    .find_map(|l| {
+                        let value = l.trim().strip_prefix("name")?.trim().strip_prefix('=')?;
+                        Some(value.trim().trim_matches('"').to_owned())
+                    })
+                    .unwrap_or_else(|| panic!("{} has no package name", m.display()))
+            })
+            .collect();
+        names.push("dpp-core".to_owned());
+        assert!(
+            names.len() > 5,
+            "found {} package names — has the layout moved?",
+            names.len()
+        );
+        names
+    })
+}
+
+/// A `dpp-` name that is not this workspace's names a sibling repository or
+/// one of its crates. Segments are joined by single hyphens, so a Markdown
+/// anchor such as `dpp-vc--trust` reads as `dpp-vc`.
+///
+/// Case-sensitive: package and repository names are lower case, and prose such
+/// as "DPP-specific" or an identifier such as "EU-DPP-0001" is neither.
+fn sibling_hits(line: &str) -> Vec<&'static str> {
+    let name_char = |b: &u8| b.is_ascii_lowercase() || b.is_ascii_digit();
+    let sibling = line.match_indices("dpp-").any(|(at, _)| {
+        if !starts_a_word(line, at) {
+            return false;
+        }
+        // Lower-case alphanumeric runs joined by single hyphens.
+        let rest = &line.as_bytes()[at + 4..];
+        let (mut i, mut end) = (0, 0);
+        while rest.get(i).is_some_and(name_char) {
+            while rest.get(i).is_some_and(name_char) {
+                i += 1;
+            }
+            end = i;
+            if rest.get(i) == Some(&b'-') && rest.get(i + 1).is_some_and(name_char) {
+                i += 1;
+            }
+        }
+        let name = &line[at..at + 4 + end];
+        end > 0 && !own_dpp_names().iter().any(|n| n == name) && !EXTERNAL_DPP_NAMES.contains(&name)
+    });
+    if sibling {
+        vec!["dpp-<a name outside this workspace>"]
+    } else {
+        Vec::new()
+    }
+}
+
 /// Every term of `class` that occurs in `line`.
 fn hits(class: Class, line: &str) -> Vec<&'static str> {
     match class {
-        Class::Consumer => phrase_hits(line, CONSUMER),
+        Class::Consumer => {
+            let mut hits = phrase_hits(line, CONSUMER);
+            hits.extend(sibling_hits(line));
+            hits
+        }
         Class::Taxonomy => taxonomy_hits(line),
         Class::Commercial => phrase_hits(line, COMMERCIAL),
     }
@@ -249,12 +335,21 @@ fn read(root: &Path, file: &Path) -> Surface {
     Surface { path, lines, text }
 }
 
+/// Every entry of `dir`. A directory or entry that cannot be read fails the
+/// gate: skipping it would pass while checking less than it claims to.
+fn read_dir(dir: &Path) -> Vec<PathBuf> {
+    fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("cannot scan {}: {e}", dir.display()))
+        .map(|entry| {
+            entry
+                .unwrap_or_else(|e| panic!("cannot scan {}: {e}", dir.display()))
+                .path()
+        })
+        .collect()
+}
+
 fn walk(dir: &Path, extension: &str, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
+    for path in read_dir(dir) {
         if path.is_dir() {
             walk(&path, extension, out);
         } else if path.extension().is_some_and(|e| e == extension) {
@@ -270,11 +365,7 @@ fn published_surface() -> Vec<Surface> {
     let mut files = Vec::new();
 
     let mut crates = 0;
-    for entry in fs::read_dir(root.join("crates"))
-        .expect("crates/")
-        .flatten()
-    {
-        let dir = entry.path();
+    for dir in read_dir(&root.join("crates")) {
         if dir.join("Cargo.toml").is_file() {
             crates += 1;
             walk(&dir.join("src"), "rs", &mut files);
@@ -302,6 +393,9 @@ fn published_surface() -> Vec<Surface> {
 }
 
 /// The CHANGELOG up to the first released version's heading.
+///
+/// The text is cut at the same line as the lines, so a marker in a released
+/// entry can neither exempt the unreleased section nor be judged stale by it.
 fn unreleased_changelog(root: &Path) -> Surface {
     let mut changelog = read(root, &root.join("CHANGELOG.md"));
     let released = changelog
@@ -310,6 +404,12 @@ fn unreleased_changelog(root: &Path) -> Surface {
         .position(|(_, l)| l.starts_with("## [") && !l.starts_with("## [Unreleased]"))
         .expect("the CHANGELOG has a released version");
     changelog.lines.truncate(released);
+    changelog.text = changelog
+        .lines
+        .iter()
+        .map(|(_, l)| l.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
     changelog
 }
 
@@ -423,7 +523,12 @@ fn each_class_catches_what_it_is_for() {
             Class::Consumer,
             "enforced platform-side, because core cannot",
         ),
-        (Class::Consumer, "see `dpp-engine` for the adapter"),
+        (Class::Consumer, "see `dpp-elsewhere` for the adapter"),
+        (
+            Class::Consumer,
+            "https://github.com/example/dpp-elsewhere/blob/main/src",
+        ),
+        (Class::Consumer, "the `dpp-elsewhere-types` crate"),
         (Class::Consumer, "the node's `KeyStore`"),
         (Class::Taxonomy, "// closes crypto Gap 5"),
         (Class::Taxonomy, "deferred to Phase 2 of the roadmap"),
@@ -440,6 +545,8 @@ fn each_class_catches_what_it_is_for() {
             "Legal warranty scope agreed with counsel",
         ),
         (Class::Commercial, "the vendor's lead time is six weeks"),
+        (Class::Commercial, "the vendor's lead times are six weeks"),
+        (Class::Commercial, "per-unit rates apply above 10k units"),
     ] {
         assert!(!hits(class, line).is_empty(), "{:?} missed: {line}", class);
     }
@@ -462,6 +569,10 @@ fn the_uses_worth_keeping_pass() {
         "a `typ` containing a quote",
         "### G7 — A lineage edge was asserted",
         "an EN 18219 identifier, not a UUID",
+        "[`dpp-vc`](#dpp-vc--trust), `dpp-domain` and `dpp_domain::Passport`",
+        "https://github.com/odal-node/dpp-core",
+        "pub const REGISTRATION_PATH: &str = \"/dpp-registration-requests\";",
+        "key: \"dpp-keystone\",",
     ] {
         for class in Class::ALL {
             assert!(
