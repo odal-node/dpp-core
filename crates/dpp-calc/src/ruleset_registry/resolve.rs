@@ -1,5 +1,8 @@
 //! `all_rulesets()` plus the per-methodology date-based `resolve_*` lookups.
 
+// BOUNDARY-EXCEPTION(taxonomy): "Phase 1" and "Phase 2" are the stages of
+// Regulation (EU) 2023/1542 Art. 8(2) and 8(3), not a roadmap.
+
 use chrono::NaiveDate;
 
 use crate::assessability::Assessability;

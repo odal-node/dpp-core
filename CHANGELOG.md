@@ -974,6 +974,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   written, and a listed file that has since gained a pin fails a staleness check
   until it is removed, so the list cannot become a permanent exemption.
 
+- **A tripwire now holds the publication boundary.** The published prose — every
+  crate's `src` and README, the root policy documents, `docs/` and this file's
+  unreleased section — may not name a particular consumer, cite an internal
+  planning scheme, or state commercial or vendor terms. Three manual sweeps each
+  missed the shape the next one found, because each grepped for what the last had
+  matched; a test over the whole surface, on every change, does not depend on
+  that. It reads whole lines rather than comments alone, since the worst finding
+  so far was in a runtime error string.
+
+  The terms are shapes of sentence — definite nouns and their compounds,
+  numbered planning labels, commercial phrases — and no repository is named: a
+  `dpp-` name that is not one of this workspace's own packages is flagged, so
+  every sibling is caught without the list publishing one. A legitimate
+  use is exempted in its own file by `BOUNDARY-EXCEPTION(<class>): <reason>`,
+  which must state why; the Batteries Regulation's own two-stage recycled-content
+  timetable is the standing example. An exception that no longer exempts
+  anything fails, and there is no baseline: the nine violations it found on
+  landing were reworded, and anything that fails now is new.
+
 - **`dpp_domain::schemas::citation`** — `act_refs` and `cites_article_or_annex`,
   the detectors the schema-prose gate was already built on, moved out of a
   `#[cfg(test)]` module and made public. The doc-comment gate must see

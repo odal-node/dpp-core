@@ -1,11 +1,13 @@
 # Product Lineage — Bill of Materials and Second Life
 
+<!-- BOUNDARY-EXCEPTION(taxonomy): the phases are this document's own plan, defined in §7, not a roadmap outside it. -->
+
 **Status:** Phases 0–5 landed. Phase 5 was non-breaking, and §4.2 records where
 it corrected this document.
 Supersedes the open questions raised against the initial BOM/second-life cut.
 **Affects:** `dpp-domain` passport model, `dpp-domain::transfer`,
-`dpp-rules::lineage`, platform-layer verification (`verify_tree`, evidence
-`componentGraph`).
+`dpp-rules::lineage`, and host-layer verification (a recursive BOM walk and an
+evidence component graph).
 **Version impact:** breaking — Phase 2 renamed a published envelope field and
 Phase 3 changed another's element type. Both belong to one coordinated minor
 bump; see §8, which also corrects a migration mechanism this document previously
@@ -32,10 +34,10 @@ for, where the current model falls short of it, and the model proposed instead.
 | `derived_from: Vec<DerivationRef>` | `dpp-domain::passport::record` | Upward second-life links, each typed with its Art. 77(7) operation. Plural since Phase 2; was `parent_passport_ref: Option<PassportRef>`, at most one. |
 | `component_refs: Vec<ComponentRef>` | `dpp-domain::passport::record` | Downward BOM links, each with an optional quantity and role. Object-ified in Phase 3; was `Vec<PassportRef>`. |
 | `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Responsibility handover on **one** passport, with a typed `TransferReason`. Carries the **outgoing** operator's authorisation plus the hosting node's attestation that acceptance ran — *not* a signature by the incoming operator. See §5.1. |
-| `verify_tree` | platform layer | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
+| BOM walk | a host layer | Recursive BOM walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
 
-The primitives are sound. `PassportRef`'s hash-pin is the right idea, and
-`verify_tree`'s bounding and cycle handling are careful work. The gaps below are
+The primitives are sound. `PassportRef`'s hash-pin is the right idea, and bounding
+the walk and handling cycles in it are a host's concerns. The gaps below are
 about *what the edges mean*, not about how they are fetched or checked.
 
 ---
@@ -486,18 +488,21 @@ edge identifies its target by URI, a transfer identifies its subject by passport
 id, and resolving one to the other is a network fetch. So the **caller
 correlates and the rule checks**. An edge whose caller found no corresponding
 transfer is reported as unconsented — the correct reading of "no evidence was
-found", rather than an assumption that none exists. That also means the rule is
-enforced platform-side, because core cannot resolve a URI.
+found", rather than an assumption that none exists. The split follows from what
+core cannot do: a host resolves the URI and correlates the transfer, because core
+cannot resolve a URI, and `dpp_rules::lineage::consent` judges the evidence the
+host found.
 
 BOM edges deliberately get **no** consent requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. The
 honest position is that a `componentRef` is a *claim by the assembler*, pinned so
-it cannot be tampered with, and `verify_tree` already reports exactly that.
+it cannot be tampered with, and a walk that checks the pin already reports exactly
+that.
 
 ### 5.2 What stays out of core
 
 - Any product group's definition of "component" or its granularity (G8).
-- Fetching, resolving, and walking edges — platform-side, already correct.
+- Fetching, resolving, and walking edges — a host's job.
 - Any status value beyond the five Annex XIII point 4(c) enumerates. The list is
   now pinned (§2.2) and is closed: a sixth value would be an invention, which is
   what the unpinned draft of this document produced.
@@ -555,8 +560,8 @@ two were design calls and are recorded as decided, not as recommendations.
 | **0** | Add `parentPassportRef` + `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line, closes the live bypass, forecloses nothing. | no | **landed** |
 | **1** | Pin Art. 77(7), Art. 3(29)–(32) and the Annex XIII point 4(c) status list against the OJ text; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
 | **2** | `DerivationRef` + `SecondLifeOperation` + plural `derived_from` (G1, G4-up). | **yes** | **landed** |
-| **3** | `ComponentRef` with quantity/role (G4-down). The verification walk and the evidence component graph follow the new shape platform-side. | **yes** | **landed** |
-| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). Enforced platform-side, since correlating an edge to a transfer needs a URI resolved. | no | **landed** |
+| **3** | `ComponentRef` with quantity/role (G4-down). The verification walk and the evidence component graph follow the new shape host-side. | **yes** | **landed** |
+| **4** | The lineage↔transfer binding rule in `dpp-rules` (G2, G7). A host correlates an edge to a transfer, since that needs a URI resolved; the rule in `dpp-rules` judges the result. | no | **landed** |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its mutation path per §4.2; the waste `TransferReason` variant (§6 question 4). | no | proposal |
 
 Phase 0 was independently landable and did not wait for the rest. Phase 1 carried

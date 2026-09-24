@@ -60,7 +60,7 @@ re-exports as `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each
 
 `product-group-battery` is the reference: it scopes EU 2023/1542 Art. 8(2) recycled-content
 checks to the declared chemistry and emits them as **advisory** warnings (the
-Phase-1 minima are not binding until 18 Aug 2031), while data-integrity
+Art. 8(2) minima are not binding until 18 Aug 2031), while data-integrity
 contradictions (cobalt declared on an LFP cell; inverted operating-temperature
 range) are hard **validation** errors raised in core `cross_field_errors`.
 

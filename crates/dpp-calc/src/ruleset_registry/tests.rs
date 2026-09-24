@@ -1,5 +1,8 @@
 //! Tests for ruleset resolution and the calculator status map.
 
+// BOUNDARY-EXCEPTION(taxonomy): "Phase 1" and "Phase 2" are the stages of
+// Regulation (EU) 2023/1542 Art. 8(2) and 8(3), not a roadmap.
+
 use super::*;
 use crate::assessability::Assessability;
 use crate::ruleset::Effectivity;
