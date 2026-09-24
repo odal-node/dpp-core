@@ -105,10 +105,7 @@ fn a_self_issued_identifier_still_yields_a_matching_identity() {
 fn a_group_with_no_identifier_still_yields_no_identity() {
     let p = base_passport(
         ProductGroup::Other("hypothetical".to_owned()),
-        Some(ProductGroupData::Other {
-            product_group: "hypothetical".to_owned(),
-            data: serde_json::json!({ "productGroup": "hypothetical" }),
-        }),
+        ProductGroupData::other(serde_json::json!({ "productGroup": "hypothetical" })),
     );
     assert!(ProductIdentity::from_passport(&p).is_none());
 }

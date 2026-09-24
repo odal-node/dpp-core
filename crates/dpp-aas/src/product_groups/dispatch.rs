@@ -41,7 +41,9 @@ pub(crate) fn build_product_group_submodel(
         ProductGroupData::UnsoldGoods(r) => {
             super::unsold_goods::build_unsold_goods_submodel(r, passport_id)
         }
-        ProductGroupData::Other { data: v, .. } => generic_product_group_submodel(passport_id, v),
+        ProductGroupData::Other(unmodelled) => {
+            generic_product_group_submodel(passport_id, unmodelled.data())
+        }
         // Every product group without a typed mapper — which is every product group whose
         // act is not in force — renders as a generic submodel from its
         // serialised fields, the same shape as `Other`. A generic projection is

@@ -51,7 +51,7 @@ pub use data::{
     HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, MattressData,
     ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth, SteelData,
     SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
-    UnsoldGoodsReport, UsageHistory,
+    UnmodelledPayload, UnsoldGoodsReport, UsageHistory,
 };
 pub use group::ProductGroup;
 pub use payload::ProductGroupPayload;

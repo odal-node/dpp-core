@@ -72,7 +72,7 @@ pub fn validate_product_group_data_with_registry(
     registry: &ProductGroupValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
-    if let ProductGroupData::Other { product_group, .. } = product_group_data {
+    if let ProductGroupData::Other(unmodelled) = product_group_data {
         // Dispatch by the product group's own key, not by a literal "other": the key
         // survives deserialization precisely so a product group with no typed variant
         // in this build can still be handled by name.
@@ -86,7 +86,7 @@ pub fn validate_product_group_data_with_registry(
         // product group lane is for, and would have turned removing a typed lane into
         // a hard regression for any product group whose schema we already ship.
         if let Err(ve) = validate_raw_product_group_data(
-            product_group,
+            unmodelled.product_group(),
             &product_group_data_instance(product_group_data),
             registry,
         ) {

@@ -75,10 +75,10 @@ impl<'a> AssetIdentity<'a> {
     /// The common case in one call — and `None` is the whole point of the
     /// signature. A passport without an identifier is not an error and not a
     /// reason to invent one: an unsold-goods report identifies a reporting
-    /// period rather than a trade item, and an unmodelled product group is
-    /// reduced to its discriminant before any projection runs. Both give
-    /// `None`, and the caller has to say what the asset is instead — which is
-    /// exactly the decision that used to be made silently by whatever string
+    /// period rather than a trade item, and an unmodelled product group whose
+    /// payload carries no valid `productIdentifier` has nothing to give. Both
+    /// give `None`, and the caller has to say what the asset is instead — which
+    /// is exactly the decision that used to be made silently by whatever string
     /// happened to be passed.
     #[must_use]
     pub fn from_passport(passport: &'a dpp_domain::Passport) -> Option<Self> {
