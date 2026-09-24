@@ -152,16 +152,21 @@ unique identifier shall comply with ISO/IEC standards 15459-1:2014,
 15459-2:2015, 15459-3:2014, 15459-4:2014, 15459-5:2014 and 15459-6:2014"*.
 
 **Position.** The carrier is a GS1 Digital Link URI over a GS1 identification
-key: GTIN (AI 01) plus an item serial (AI 21), optionally a batch/lot (AI 10) —
-i.e. a serialised GTIN. 🔶 GS1 is a registered Issuing Agency under ISO/IEC
-15459, so identifiers issued under GS1 keys carry a registered Issuing Agency
-Code and inherit the scheme's global-uniqueness guarantees. Conformance is
-therefore claimed **through GS1**, not by independent implementation of the
-ISO parts.
+key: the GTIN (AI 01), qualified at the level the passport describes — nothing
+for a model, a batch/lot (AI 10) for a batch, and a serial (AI 21) for an item
+or where no level is stated, which makes it a serialised GTIN. 🔶 GS1 is a
+registered Issuing Agency under ISO/IEC 15459, so identifiers issued under GS1
+keys carry a registered Issuing Agency Code and inherit the scheme's
+global-uniqueness guarantees. Conformance is therefore claimed **through GS1**,
+not by independent implementation of the ISO parts.
 
-**What is verified.** The AI 21 serial is exactly 20 characters from `[0-9a-f]`,
-within the GS1 General Specifications limit that the `DigitalLink` parser
-enforces, and that is covered by tests.
+**What is verified.** A printed serial or lot is one to twenty GS1 CSET 82
+characters — the default serial is twenty characters from `[0-9a-f]` — which
+`Passport::validate` and the builder both enforce against the vendored GS1
+syntax dictionary's `X..20` for AI 10 and AI 21, and which the `DigitalLink`
+parser enforces on the way back in. That is covered by tests, and every CSET 82
+membership decision in a serial and in a lot is judged by GS1's Barcode Syntax
+Engine through the oracle corpus.
 
 🔶 **The URI syntax revision is not.** This document previously asserted
 "GS1 Digital Link v1.2" here and in two other places, with no source recorded for

@@ -15,10 +15,10 @@ use async_trait::async_trait;
 use dpp_digital_link::{DigitalLink, DigitalLinkError, ai_spec, build_qr_url};
 use dpp_domain::ports::passport_repo::PassportRepository;
 use dpp_domain::{
-    BatteryData, DppError, Passport, PassportId, PassportStatus, ProductGroup, ProductGroupData,
-    ProductIdentifier,
+    BatteryData, DppError, Granularity, Passport, PassportId, PassportStatus, ProductGroup,
+    ProductGroupData, ProductIdentifier,
 };
-use dpp_rules::common::identifier::MAX_GS1_SERIAL_CHARS;
+use dpp_rules::common::identifier::{MAX_GS1_LOT_CHARS, MAX_GS1_SERIAL_CHARS};
 use dpp_tests::fixtures::base_passport;
 
 const RESOLVER: &str = "https://id.example.com";
@@ -102,42 +102,109 @@ fn carrier(passport: &Passport) -> String {
         .expect("a GS1-identified passport has a GS1 carrier")
 }
 
-/// Model, lot and unit passports under one GTIN, plus one whose operator
-/// attributed its own serial: each carrier resolves to its passport and no
-/// other.
+fn at(level: Option<Granularity>) -> Passport {
+    let mut passport = gs1_battery();
+    passport.granularity = level;
+    passport
+}
+
+/// Resolve a label the way a resolver does: parse it, read the qualifier the
+/// carrier printed, and look that up under the label's GTIN.
+async fn resolve(store: &Store, label: &str) -> Vec<PassportId> {
+    let link = DigitalLink::parse(label).expect("our own carrier parses");
+    let identifier = ProductIdentifier::gs1(link.gtin().expect("keyed on a GTIN").clone());
+    let qualifier = link
+        .carrier_qualifier()
+        .expect("our own carrier names a qualifier");
+    store
+        .find_by_carrier(&identifier, &qualifier)
+        .await
+        .expect("lookup")
+        .iter()
+        .map(|p| p.id)
+        .collect()
+}
+
+/// Passports at every level under one GTIN — model, two lots, units with and
+/// without a stated level, and one whose operator attributed its own serial:
+/// each carrier resolves to its passport and no other.
 #[tokio::test]
 async fn a_printed_carrier_resolves_to_the_passport_it_was_printed_for() {
     let store = Store::default();
 
-    let model = gs1_battery();
+    let model = at(Some(Granularity::Model));
 
-    let mut lot = gs1_battery();
-    lot.batch_id = Some("LOT-A".into());
+    let mut lot_a = at(Some(Granularity::Batch));
+    lot_a.batch_id = Some("LOT-A".into());
 
-    let mut unit = gs1_battery();
+    let mut lot_b = at(Some(Granularity::Batch));
+    lot_b.batch_id = Some("LOT-B".into());
+
+    let mut unit = at(Some(Granularity::Item));
     unit.batch_id = Some("LOT-A".into());
     unit.serial_number = Some("SN-0001".into());
 
-    let mut attributed = gs1_battery();
+    let mut unstated = at(None);
+    unstated.batch_id = Some("LOT-A".into());
+
+    let mut attributed = at(None);
     attributed.serial_number = Some("SN-0002".into());
     attributed.carrier_serial = Some("SN-0002".into());
 
-    for passport in [&model, &lot, &unit, &attributed] {
+    let all = [&model, &lot_a, &lot_b, &unit, &unstated, &attributed];
+    for passport in all {
+        passport.validate().expect("a coherent record");
         store.create(passport.clone()).await.expect("stored");
     }
 
-    for passport in [&model, &lot, &unit, &attributed] {
+    for passport in all {
         let label = carrier(passport);
-        let link = DigitalLink::parse(&label).expect("our own carrier parses");
-        let identifier = ProductIdentifier::gs1(link.gtin().expect("keyed on a GTIN").clone());
-        let serial = link.serial().expect("the carrier prints AI 21");
+        assert_eq!(resolve(&store, &label).await, [passport.id], "{label}");
+    }
+}
 
-        let found = store
-            .find_by_carrier_serial(&identifier, serial)
-            .await
-            .expect("lookup");
-        let ids: Vec<_> = found.iter().map(|p| p.id).collect();
-        assert_eq!(ids, [passport.id], "{label}");
+/// What each level prints: the GTIN alone for a model, the lot for a batch,
+/// and the carrier serial for a unit or a passport that states no level.
+#[test]
+fn the_carrier_asserts_the_level_the_passport_describes() {
+    let model = at(Some(Granularity::Model));
+    assert_eq!(carrier(&model), format!("{RESOLVER}/01/{GTIN}"));
+
+    let mut lot = at(Some(Granularity::Batch));
+    lot.batch_id = Some("LOT-2026/A".into());
+    assert_eq!(
+        carrier(&lot),
+        format!("{RESOLVER}/01/{GTIN}/10/LOT-2026%2FA")
+    );
+
+    for level in [Some(Granularity::Item), None] {
+        let passport = at(level);
+        assert_eq!(
+            carrier(&passport),
+            format!(
+                "{RESOLVER}/01/{GTIN}/21/{}",
+                passport.id.default_carrier_serial()
+            ),
+            "{level:?}"
+        );
+    }
+}
+
+/// A label printed when every carrier carried a serial, and a label printed
+/// by an earlier version with a lot before the serial, both still resolve —
+/// here to a passport that now states model level.
+#[tokio::test]
+async fn a_serial_label_printed_before_the_level_was_read_still_resolves() {
+    let store = Store::default();
+    let model = at(Some(Granularity::Model));
+    store.create(model.clone()).await.expect("stored");
+
+    let serial = model.effective_carrier_serial();
+    for label in [
+        format!("{RESOLVER}/01/{GTIN}/21/{serial}"),
+        format!("{RESOLVER}/01/{GTIN}/10/LOT-X-0001/21/{serial}"),
+    ] {
+        assert_eq!(resolve(&store, &label).await, [model.id], "{label}");
     }
 }
 
@@ -159,16 +226,41 @@ fn an_item_serial_does_not_change_the_carrier() {
     );
 }
 
-/// The lot is operator free text and adds nothing to resolution, so it is not
-/// printed however the record is batched.
+/// Below batch level the serial alone resolves the label, so a lot the record
+/// holds is not printed — only a batch-level carrier, which identifies the
+/// lot, carries one.
 #[test]
-fn the_carrier_prints_no_lot() {
-    let mut passport = gs1_battery();
-    passport.batch_id = Some("LOT-A".into());
-    let label = carrier(&passport);
-    let link = DigitalLink::parse(&label).expect("parses");
-    assert_eq!(link.batch(), None, "{label}");
-    assert!(!label.contains("LOT-A"), "{label}");
+fn only_a_batch_level_carrier_prints_the_lot() {
+    for level in [Some(Granularity::Item), None] {
+        let mut passport = at(level);
+        passport.batch_id = Some("LOT-A".into());
+        let label = carrier(&passport);
+        let link = DigitalLink::parse(&label).expect("parses");
+        assert_eq!(link.batch(), None, "{label}");
+        assert!(!label.contains("LOT-A"), "{label}");
+    }
+}
+
+/// A batch-level passport's lot is printed, so a lot GS1 would refuse is
+/// refused before it is printed — and a batch-level passport with no lot has
+/// no carrier, rather than one that falls back to a serial.
+#[test]
+fn a_lot_gs1_would_reject_is_not_printed() {
+    let with = |batch: Option<&str>| {
+        let mut passport = at(Some(Granularity::Batch));
+        passport.batch_id = batch.map(str::to_owned);
+        build_qr_url(RESOLVER, &passport)
+    };
+    assert!(matches!(with(None), Err(DigitalLinkError::EmptyValue(code)) if code == "10"));
+    assert!(matches!(with(Some("")), Err(DigitalLinkError::EmptyValue(code)) if code == "10"));
+    assert!(matches!(
+        with(Some("LOT A")),
+        Err(DigitalLinkError::OutsideCset82 { code, character: ' ' }) if code == "10"
+    ));
+    assert!(matches!(
+        with(Some("123456789012345678901")),
+        Err(DigitalLinkError::ValueTooLong { code, max_len: 20, actual: 21 }) if code == "10"
+    ));
 }
 
 /// A Digital Link keyed on AI 01 needs a GTIN; a passport identified under
@@ -200,16 +292,18 @@ fn an_attributed_serial_gs1_would_reject_is_not_printed() {
     ));
 }
 
-/// The domain restates GS1's AI 21 rule because it cannot read the dictionary
-/// this crate vendors. Held against that dictionary here, where both are in
-/// reach, so the restatement cannot drift from its source.
+/// The domain restates GS1's AI 10 and AI 21 rules because it cannot read the
+/// dictionary this crate vendors. Held against that dictionary here, where
+/// both are in reach, so the restatements cannot drift from their source.
 #[test]
-fn the_restated_ai_21_rule_matches_the_dictionary() {
-    let serial = ai_spec("21").expect("AI 21 in the dictionary");
-    assert_eq!(serial.max_len, MAX_GS1_SERIAL_CHARS);
-    assert_eq!(
-        serial.min_len, 1,
-        "`check_gs1_serial` refuses an empty value"
-    );
-    assert!(serial.cset_82, "`check_gs1_serial` applies CSET 82");
+fn the_restated_ai_10_and_ai_21_rules_match_the_dictionary() {
+    for (ai, max, check) in [
+        ("10", MAX_GS1_LOT_CHARS, "check_gs1_lot"),
+        ("21", MAX_GS1_SERIAL_CHARS, "check_gs1_serial"),
+    ] {
+        let spec = ai_spec(ai).expect("in the dictionary");
+        assert_eq!(spec.max_len, max, "AI {ai}");
+        assert_eq!(spec.min_len, 1, "`{check}` refuses an empty value");
+        assert!(spec.cset_82, "`{check}` applies CSET 82");
+    }
 }

@@ -255,6 +255,22 @@ fn corpus() -> Vec<Entry> {
                 "serial carrying one character outside CSET 82"
             };
             out.push(entry(uri, note));
+
+            // AI 10 is `X..20` too, and a batch-level carrier prints the
+            // operator's lot — so each verdict is asked of GS1 for the lot as
+            // well, rather than assumed to carry over from the serial.
+            let uri = DigitalLink {
+                resolver_base: (*base).to_owned(),
+                primary_key: PrimaryKey::Gtin(parsed.clone()),
+                qualifiers: vec![("10".to_owned(), format!("LOT{c}1"))],
+            }
+            .build();
+            let note = if dpp_rules::common::identifier::is_cset_82(c) {
+                "lot carrying one CSET 82 character"
+            } else {
+                "lot carrying one character outside CSET 82"
+            };
+            out.push(entry(uri, note));
         }
     }
 
@@ -280,6 +296,7 @@ fn every_built_link_round_trips_through_our_own_parser() {
         "data attribute in the path rather than the query string",
         "qualifier from another primary key's sequence",
         "serial carrying one character outside CSET 82",
+        "lot carrying one character outside CSET 82",
     ];
 
     for e in corpus() {

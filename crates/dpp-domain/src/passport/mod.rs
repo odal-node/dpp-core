@@ -4,6 +4,9 @@ pub mod id;
 #[cfg(test)]
 mod id_tests;
 
+pub mod carrier;
+#[cfg(test)]
+mod carrier_qualifier_tests;
 #[cfg(test)]
 mod carrier_serial_tests;
 pub mod component;
@@ -39,6 +42,7 @@ mod wire_keys_tests;
 pub use crate::facility::FacilitySnapshot;
 pub use crate::manufacturer::ManufacturerInfo;
 pub use crate::material::MaterialEntry;
+pub use carrier::CarrierQualifier;
 pub use component::{ComponentRef, Quantity};
 pub use derivation::{DerivationRef, SecondLifeOperation};
 pub use id::PassportId;

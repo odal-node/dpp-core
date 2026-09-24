@@ -54,26 +54,44 @@ fn an_ai_21_serial_is_one_to_twenty_cset_82_characters() {
     assert_eq!(check_gs1_serial("cdef1032547698badcfe"), Ok(()));
     assert_eq!(check_gs1_serial("!\"%&'()*+,-./:;<=>?_"), Ok(()));
 
-    assert_eq!(check_gs1_serial(""), Err(Gs1SerialRejection::Empty));
+    assert_eq!(check_gs1_serial(""), Err(Gs1ValueRejection::Empty));
     assert_eq!(
         check_gs1_serial("123456789012345678901"),
-        Err(Gs1SerialRejection::TooLong { chars: 21 })
+        Err(Gs1ValueRejection::TooLong { chars: 21 })
     );
     // Counted in characters, not bytes: a two-byte character is one too many
     // for the character set, not two too many for the length.
     assert_eq!(
         check_gs1_serial("é"),
-        Err(Gs1SerialRejection::OutsideCset82('é'))
+        Err(Gs1ValueRejection::OutsideCset82('é'))
     );
     for outside in [
         ' ', '#', '$', '@', '[', '\\', ']', '^', '`', '{', '|', '}', '~',
     ] {
         assert_eq!(
             check_gs1_serial(&alloc::format!("SN{outside}1")),
-            Err(Gs1SerialRejection::OutsideCset82(outside)),
+            Err(Gs1ValueRejection::OutsideCset82(outside)),
             "{outside:?} is not in CSET 82"
         );
     }
+}
+
+/// AI 10 is `X..20` like AI 21, so a lot is held to the same bounds and the
+/// same character set — which is what a batch-level carrier prints.
+#[test]
+fn an_ai_10_lot_is_one_to_twenty_cset_82_characters() {
+    assert_eq!(check_gs1_lot("LOT-2026/A"), Ok(()));
+    assert_eq!(check_gs1_lot("12345678901234567890"), Ok(()));
+
+    assert_eq!(check_gs1_lot(""), Err(Gs1ValueRejection::Empty));
+    assert_eq!(
+        check_gs1_lot("123456789012345678901"),
+        Err(Gs1ValueRejection::TooLong { chars: 21 })
+    );
+    assert_eq!(
+        check_gs1_lot("LOT A"),
+        Err(Gs1ValueRejection::OutsideCset82(' '))
+    );
 }
 
 /// The table has eighty-two members, as its name says. A count is weak

@@ -61,12 +61,12 @@ constant is right.
 | Field | Rust Type | JSON name | Description |
 |---|---|---|---|
 | `id` | `PassportId` | `"id"` | Unique passport identifier |
-| `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9) |
+| `batch_id` | `Option<String>` | `"batchId"` | Optional batch or lot identifier (ESPR Art. 9). Free text, except on a batch-level passport, whose carrier prints it in GS1 AI 10 — there one to twenty CSET 82 characters, and required |
 | `serial_number` | `Option<String>` | `"serialNumber"` | The **manufacturer's** serial for this physical unit, where the passport is item-level. Distinct from the carrier's AI 21, which is derived from the passport id and identifies the record. `Restricted`, and protected from patching |
 | `product_name` | `String` | `"productName"` | Human-readable product name (ESPR Art. 9) |
 | `product_group` | `ProductGroup` | `"productGroup"` | EU ESPR product group — the **dispatch key** (`battery`, `textile`, …). Selects schema + plugin. |
 | `applicable_instruments` | `Vec<InstrumentRef>` | `"applicableInstruments"` | The acts that applied at issuance, **recorded not computed**, and immutable thereafter (see §3.5) |
-| `granularity` | `Option<Granularity>` | `"granularity"` | Model / batch / item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one — the position of every ESPR product group today |
+| `granularity` | `Option<Granularity>` | `"granularity"` | Model / batch / item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one — the position of every ESPR product group today. Also decides what the carrier prints after the GTIN: nothing at model level, the batch at batch level, the carrier serial at item level or when `None`. A stated level must agree with `batch_id` and `serial_number` |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill of materials entries |
 | `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit — may be set by a compliance engine |

@@ -26,6 +26,10 @@ use crate::{
 pub struct Passport {
     pub id: PassportId,
     /// Optional batch or lot identifier.
+    ///
+    /// Free text, except on a batch-level passport: its carrier prints this in
+    /// GS1 AI 10, so [`Self::validate`] holds it to one to twenty CSET 82
+    /// characters there. See [`Self::carrier_qualifier`].
     pub batch_id: Option<String>,
     /// The manufacturer's own serial number for this physical unit, where the
     /// passport is item-level.
@@ -93,6 +97,9 @@ pub struct Passport {
     /// which is every product group today. Do not default it: the EU registry
     /// registers batteries at item level, but that is the registry's operational
     /// position and not a level any act has set.
+    ///
+    /// It also decides what the data carrier prints after the GTIN — nothing,
+    /// a batch, or a serial. See [`Self::carrier_qualifier`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
@@ -128,6 +135,11 @@ pub struct Passport {
     /// operator has attributed one. Read it through
     /// [`effective_carrier_serial`](Self::effective_carrier_serial), which
     /// supplies the default when this is `None`.
+    ///
+    /// Printed only when the passport is item-level or states no level; a
+    /// model- or batch-level carrier prints no serial, because a serial with a
+    /// GTIN names one individual item. See [`Self::carrier_qualifier`]. A
+    /// label printed with this serial still resolves at any level.
     ///
     /// # Why the operator attributes it
     ///
@@ -579,6 +591,24 @@ fn stored_product_group_version(doc: &serde_json::Value) -> Option<(String, Stri
     Some((product_group_key, recorded))
 }
 
+/// Why a value a carrier prints fails GS1 `ai`, for a validation message.
+fn gs1_rejection_reason(
+    rejection: dpp_rules::common::identifier::Gs1ValueRejection,
+    ai: &str,
+    max: usize,
+) -> String {
+    use dpp_rules::common::identifier::Gs1ValueRejection;
+    match rejection {
+        Gs1ValueRejection::Empty => "must not be empty".to_owned(),
+        Gs1ValueRejection::TooLong { chars } => {
+            format!("has {chars} characters; GS1 AI {ai} allows at most {max}")
+        }
+        Gs1ValueRejection::OutsideCset82(c) => {
+            format!("contains {c:?}, which is outside GS1 CSET 82")
+        }
+    }
+}
+
 impl Passport {
     /// Deserialize a passport as it was actually stored. Tries the direct,
     /// current-shape deserialize first — most schema evolution is additive
@@ -684,11 +714,54 @@ impl Passport {
         }
     }
 
+    /// What this passport's data carrier prints after its GTIN, chosen by its
+    /// [`granularity`](Self::granularity).
+    ///
+    /// | `granularity` | Carrier |
+    /// |---|---|
+    /// | `Model` | `/01/{gtin}` |
+    /// | `Batch` | `/01/{gtin}/10/{batch_id}` |
+    /// | `Item` | `/01/{gtin}/21/{carrier serial}` |
+    /// | `None` | `/01/{gtin}/21/{carrier serial}` |
+    ///
+    /// **`None` prints a serial**, as every carrier did before the level was
+    /// consulted. `None` means the level is not stated, not that it is model or
+    /// batch, so this does not claim a level the record denies. It also keeps
+    /// every such carrier naming exactly one passport, which the GTIN alone
+    /// would not once two passports share it. The AAS projection treats an
+    /// unstated level the same way.
+    ///
+    /// `None` when the passport states batch level and has no `batch_id`: it
+    /// has no lot to print. [`Self::validate`] refuses that record, so this
+    /// is only reachable for one that never went through it.
+    ///
+    /// This is the value a carrier is built from and the value a printed label
+    /// is resolved by — see
+    /// [`find_by_carrier`](crate::ports::passport_repo::PassportRepository::find_by_carrier).
+    #[must_use]
+    pub fn carrier_qualifier(&self) -> Option<super::CarrierQualifier<'_>> {
+        use super::CarrierQualifier;
+        match self.granularity {
+            Some(Granularity::Model) => Some(CarrierQualifier::Model),
+            Some(Granularity::Batch) => self
+                .batch_id
+                .as_deref()
+                .map(|batch| CarrierQualifier::Batch(std::borrow::Cow::Borrowed(batch))),
+            Some(Granularity::Item) | None => {
+                Some(CarrierQualifier::Serial(self.effective_carrier_serial()))
+            }
+        }
+    }
+
     /// Validate the passport's own field invariants.
     ///
     /// Checks:
     /// - `carrier_serial`, if attributed, is one to twenty CSET 82 characters
     ///   (GS1 AI 21)
+    /// - a stated `granularity` agrees with the identifiers the record carries:
+    ///   a model-level passport has no `batch_id` or `serial_number`, and a
+    ///   batch-level one has a `batch_id` its carrier can print in GS1 AI 10
+    ///   and no `serial_number`
     /// - `product_name` is non-empty
     /// - `manufacturer.name` is non-empty
     /// - `manufacturer.address` is non-empty
@@ -718,22 +791,20 @@ impl Passport {
         if let Some(serial) = &self.carrier_serial
             && let Err(rejection) = dpp_rules::common::identifier::check_gs1_serial(serial)
         {
-            use dpp_rules::common::identifier::Gs1SerialRejection;
-            let why = match rejection {
-                Gs1SerialRejection::Empty => "must not be empty".to_owned(),
-                Gs1SerialRejection::TooLong { chars } => format!(
-                    "has {chars} characters; GS1 AI 21 allows at most {}",
-                    dpp_rules::common::identifier::MAX_GS1_SERIAL_CHARS
-                ),
-                Gs1SerialRejection::OutsideCset82(c) => {
-                    format!("contains {c:?}, which is outside GS1 CSET 82")
-                }
-            };
             errors.push(FieldError {
                 field: "/carrierSerial".to_owned(),
-                message: format!("carrier_serial {why}"),
+                message: format!(
+                    "carrier_serial {}",
+                    gs1_rejection_reason(
+                        rejection,
+                        "21",
+                        dpp_rules::common::identifier::MAX_GS1_SERIAL_CHARS
+                    )
+                ),
             });
         }
+
+        self.check_granularity_carries_its_identifiers(&mut errors);
 
         if self.product_name.trim().is_empty() {
             errors.push(FieldError {
@@ -864,6 +935,78 @@ impl Passport {
             Err(crate::error::dpp::DppError::Validation(ValidationErrors {
                 errors,
             }))
+        }
+    }
+
+    /// The level-dependent half of [`Self::validate`]: a stated
+    /// [`granularity`](Self::granularity) and the identifiers the record
+    /// carries must agree, because the carrier is built from the two together.
+    ///
+    /// - **Model** covers every batch and every unit of the model, so it carries
+    ///   neither a `batch_id` nor a `serial_number`. A model-level record naming
+    ///   one batch describes that batch, not the model — and the EU registry
+    ///   confirms a passport's conformity with its granularity level on
+    ///   submission (Implementing Regulation (EU) 2026/1778 Art. 8(7)(c)).
+    /// - **Batch** carries the `batch_id` its carrier prints in AI 10 — one to
+    ///   twenty CSET 82 characters — and no `serial_number`, which would name
+    ///   one unit of the run.
+    /// - **Item**, and a level not stated, add nothing here. An item may carry
+    ///   its batch: Art. 8(4) of that Regulation links an item-level passport
+    ///   to its batch and model. And `batch_id` stays free text at those
+    ///   levels, because no carrier prints it.
+    fn check_granularity_carries_its_identifiers(
+        &self,
+        errors: &mut Vec<crate::field_error::FieldError>,
+    ) {
+        use crate::field_error::FieldError;
+
+        let finer_than_the_level = |field: &str, level: &str| FieldError {
+            field: format!("/{field}"),
+            message: format!(
+                "{field} names something finer than a {level}-level passport covers; \
+                 it belongs on a finer-grained passport"
+            ),
+        };
+
+        match self.granularity {
+            Some(Granularity::Model) => {
+                if self.batch_id.is_some() {
+                    errors.push(finer_than_the_level("batchId", "model"));
+                }
+                if self.serial_number.is_some() {
+                    errors.push(finer_than_the_level("serialNumber", "model"));
+                }
+            }
+            Some(Granularity::Batch) => {
+                match self.batch_id.as_deref() {
+                    None => errors.push(FieldError {
+                        field: "/batchId".to_owned(),
+                        message: "a batch-level passport must carry the batch_id its \
+                                  carrier prints in GS1 AI 10"
+                            .to_owned(),
+                    }),
+                    Some(batch) => {
+                        if let Err(rejection) = dpp_rules::common::identifier::check_gs1_lot(batch)
+                        {
+                            errors.push(FieldError {
+                                field: "/batchId".to_owned(),
+                                message: format!(
+                                    "batch_id {}",
+                                    gs1_rejection_reason(
+                                        rejection,
+                                        "10",
+                                        dpp_rules::common::identifier::MAX_GS1_LOT_CHARS
+                                    )
+                                ),
+                            });
+                        }
+                    }
+                }
+                if self.serial_number.is_some() {
+                    errors.push(finer_than_the_level("serialNumber", "batch"));
+                }
+            }
+            Some(Granularity::Item) | None => {}
         }
     }
 
