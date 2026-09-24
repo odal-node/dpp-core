@@ -83,8 +83,30 @@ zeroize      = { version = "1", features = ["derive"] }
 aes-gcm      = "0.11"
 rand         = "0.10"
 
-# Schema validation
-jsonschema   = "0.56"
+# Schema validation.
+#
+# 🚨 `default-features = false` is load-bearing, not tidying. The default set is
+# `resolve-http`, `resolve-file`, `tls-aws-lc-rs` and `idna`, and the first three
+# put reqwest, hyper, tokio, rustls and aws-lc-sys into `dpp-domain` — the crate
+# whose whole claim is that it has no network and no async runtime. It is not
+# only a dependency-graph problem: with `resolve-http` on, a schema carrying a
+# remote `$ref` makes `VersionedSchemaRegistry::register` **open a TCP
+# connection**, and again on every lazy compile after it.
+#
+# Every `$ref` in the schemas this crate embeds is a local fragment, so nothing
+# here needs either resolver. Without them a remote `$ref` fails closed instead
+# of reaching the network, which is the behaviour a pure validation crate should
+# have.
+#
+# `idna` is kept, and it is the one default worth keeping. It gates the
+# `idn-hostname` and `idn-email` format validators (every `#[cfg(feature =
+# "idna")]` in the crate is in `keywords/format.rs`); it is pure, and it touches
+# no resolution path. The schemas embedded here use neither format — but
+# `VersionedSchemaRegistry::register` compiles schemas supplied at runtime, and
+# dropping the feature would silently downgrade both formats to "unknown" for
+# those rather than fail, which is a validator quietly accepting what it was
+# asked to reject.
+jsonschema   = { version = "0.56", default-features = false, features = ["idna"] }
 semver       = "1"
 
 # Property-based testing (dev-only)
