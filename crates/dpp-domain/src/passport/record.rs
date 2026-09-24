@@ -774,6 +774,14 @@ impl Passport {
     ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
     ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     ///
+    /// **A write-time check, not a verdict on a fetched passport.** These are
+    /// the invariants a record must meet to be created or published. A passport
+    /// fetched from another operator is signed and cannot be rewritten by
+    /// anyone, so a rule added here later — the granularity check is one —
+    /// would turn a record that was valid when it was signed into a false
+    /// failure. Judge a fetched passport by verifying its signature, not with
+    /// this.
+    ///
     /// **This does not validate `product_group_data` against its JSON Schema**,
     /// and does not run the cross-field regulatory rules. That pass needs the
     /// versioned schema registry — and through it `jsonschema` and a blocking
