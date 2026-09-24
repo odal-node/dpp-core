@@ -263,6 +263,31 @@ fn a_lot_gs1_would_reject_is_not_printed() {
     ));
 }
 
+/// A product group this build has no typed variant for still names the product
+/// it identifies, so its passport prints a carrier and resolves through it like
+/// any other — adding a product group stays a data change, not a release.
+#[tokio::test]
+async fn an_untyped_product_group_prints_a_carrier_that_resolves() {
+    let store = Store::default();
+    let mut passport = gs1_battery();
+    passport.product_group = ProductGroup::Other("photovoltaic".into());
+    passport.product_group_data = ProductGroupData::other(serde_json::json!({
+        "productGroup": "photovoltaic",
+        "productIdentifier": { "scheme": "gs1", "gtin": GTIN },
+    }));
+    store.create(passport.clone()).await.expect("stored");
+
+    let label = carrier(&passport);
+    assert_eq!(
+        label,
+        format!(
+            "{RESOLVER}/01/{GTIN}/21/{}",
+            passport.id.default_carrier_serial()
+        )
+    );
+    assert_eq!(resolve(&store, &label).await, [passport.id]);
+}
+
 /// A Digital Link keyed on AI 01 needs a GTIN; a passport identified under
 /// EN 18219 scheme 2 or 3 has none and carries its own URL or DID instead.
 #[test]

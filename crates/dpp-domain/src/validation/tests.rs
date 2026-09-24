@@ -307,9 +307,9 @@ fn batch_validation_mixed_results() {
 /// A valid aluminium payload, as it would arrive from a build with no
 /// `ProductGroupData::Aluminium` variant.
 fn untyped_aluminium(recycled: serde_json::Value) -> ProductGroupData {
-    ProductGroupData::Other {
-        product_group: "aluminium".to_owned(),
-        data: serde_json::json!({
+    ProductGroupData::as_if_untyped(
+        "aluminium",
+        serde_json::json!({
             "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
             "alloyGrade": "6061",
             "productionRoute": "secondary-recycled",
@@ -317,7 +317,7 @@ fn untyped_aluminium(recycled: serde_json::Value) -> ProductGroupData {
             "recycledContentPct": recycled,
             "countryOfOrigin": "DE",
         }),
-    }
+    )
 }
 
 /// A product group carried as `Other` is validated against the schema this crate
@@ -361,10 +361,11 @@ fn untyped_product_group_schema_still_rejects_bad_data() {
 /// silent pass-through is still not safe.
 #[test]
 fn product_group_unknown_to_catalog_and_registry_is_still_refused() {
-    let data = ProductGroupData::Other {
-        product_group: "spacecraft".to_owned(),
-        data: serde_json::json!({ "thrustKn": 12.0 }),
-    };
+    let data = ProductGroupData::other(serde_json::json!({
+        "productGroup": "spacecraft",
+        "thrustKn": 12.0,
+    }))
+    .expect("an untyped product group");
     assert!(
         validate_product_group_data_with_registry(&data, &ProductGroupValidatorRegistry::default())
             .is_err(),

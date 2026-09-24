@@ -71,14 +71,15 @@ fn deserializing_the_valid_form_of_the_same_number_succeeds() {
 
 #[test]
 fn an_untyped_payload_reports_no_gtin() {
-    // `Other` carries an arbitrary object and identifies no trade item, so it
-    // must not answer with one — even when the object happens to hold a `gtin`
-    // key. Asserted rather than left implied, because a future `Other` that
-    // guessed here would report an unvalidated string as a GTIN.
-    let data = ProductGroupData::Other {
-        product_group: "hypothetical".to_owned(),
-        data: serde_json::json!({ "productGroup": "hypothetical", "gtin": BAD_CHECK_DIGIT }),
-    };
+    // `Other` answers only with a `productIdentifier` that parses as an
+    // EN 18219 clause 5 identifier, so a bare `gtin` key — here with a bad
+    // check digit — must not make it answer. Asserted rather than left implied,
+    // because an `Other` that guessed here would report an unvalidated string
+    // as a GTIN.
+    let data = ProductGroupData::other(
+        serde_json::json!({ "productGroup": "hypothetical", "gtin": BAD_CHECK_DIGIT }),
+    )
+    .expect("an untyped product group");
     assert_eq!(data.gtin(), None);
     // 🚨 And the question that actually distinguishes them. `gtin()` answers
     // `None` for a scheme 2 or 3 payload too, so it can no longer tell "no

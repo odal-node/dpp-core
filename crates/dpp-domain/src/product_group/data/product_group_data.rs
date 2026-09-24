@@ -13,6 +13,7 @@ use super::steel::SteelData;
 use super::textile::TextileData;
 use super::toy::ToyData;
 use super::tyre::TyreData;
+use super::unmodelled::UnmodelledPayload;
 use super::unsold_goods::UnsoldGoodsReport;
 use crate::product_group::ProductGroup;
 use crate::product_group::payload::ProductGroupPayload;
@@ -59,16 +60,13 @@ pub enum ProductGroupData {
     Detergent(DetergentData),
     /// A product group this build has no typed variant for.
     ///
-    /// `product_group` is the wire tag verbatim and `data` is the whole object. A
-    /// passport for a product group added to the catalog after this crate was
-    /// released survives a round trip unchanged — which is the property that
-    /// makes adding a product group a data change rather than a release.
-    Other {
-        /// The wire tag exactly as received.
-        product_group: String,
-        /// The full object, including its `product_group` key.
-        data: serde_json::Value,
-    },
+    /// The payload keeps the wire tag and the whole object verbatim. A passport
+    /// for a product group added to the catalog after this crate was released
+    /// survives a round trip unchanged, and still names the product it
+    /// identifies — which is the property that makes adding a product group a
+    /// data change rather than a release. See [`UnmodelledPayload`] for why it
+    /// can only be built by deserialising or through [`Self::other`].
+    Other(UnmodelledPayload),
 }
 
 // ─── Wire format ─────────────────────────────────────────────────────────────
@@ -102,7 +100,7 @@ impl Serialize for ProductGroupData {
             Self::Furniture(d) => serde_json::to_value(d),
             Self::Mattress(d) => serde_json::to_value(d),
             Self::Detergent(d) => serde_json::to_value(d),
-            Self::Other { data, .. } => Ok(data.clone()),
+            Self::Other(unmodelled) => Ok(unmodelled.data().clone()),
         }
         .map_err(serde::ser::Error::custom)?;
 
@@ -151,10 +149,9 @@ impl<'de> Deserialize<'de> for ProductGroupData {
             ProductGroup::Furniture => typed!(Furniture),
             ProductGroup::Mattress => typed!(Mattress),
             ProductGroup::Detergent => typed!(Detergent),
-            ProductGroup::Other(product_group) => Ok(Self::Other {
-                product_group,
-                data: value,
-            }),
+            ProductGroup::Other(product_group) => {
+                Ok(Self::Other(UnmodelledPayload::new(product_group, value)))
+            }
         }
     }
 }
@@ -190,7 +187,8 @@ impl ProductGroupData {
     ///
     /// Only a Rust caller could construct one: deserialization cannot, since it
     /// needs the object to find the tag in the first place. Refusing here closes
-    /// it at the only door it has.
+    /// it at the only door it has — [`UnmodelledPayload`]'s fields are private,
+    /// so there is no struct literal to go round it.
     #[must_use]
     pub fn other(mut data: serde_json::Value) -> Option<Self> {
         let map = data.as_object_mut()?;
@@ -207,12 +205,23 @@ impl ProductGroupData {
         map.entry("productGroup")
             .or_insert_with(|| serde_json::Value::String(product_group.clone()));
         match ProductGroup::from_wire_tag(&product_group) {
-            ProductGroup::Other(_) => Some(Self::Other {
-                product_group,
-                data,
-            }),
+            ProductGroup::Other(_) => {
+                Some(Self::Other(UnmodelledPayload::new(product_group, data)))
+            }
             _ => None,
         }
+    }
+
+    /// The payload a build **without** `product_group`'s typed variant would
+    /// deserialise, for testing the untyped lane against a group whose schema
+    /// ships.
+    ///
+    /// Test-only, and it goes round [`Self::other`]'s refusal of a typed tag on
+    /// purpose: every shipped schema has a typed variant in this build, so the
+    /// case cannot otherwise be built.
+    #[cfg(test)]
+    pub(crate) fn as_if_untyped(product_group: &str, data: serde_json::Value) -> Self {
+        Self::Other(UnmodelledPayload::new(product_group.to_owned(), data))
     }
 
     /// Returns the `ProductGroup` discriminant for this data.
@@ -230,8 +239,8 @@ impl ProductGroupData {
             ProductGroupData::Furniture(_) => ProductGroup::Furniture,
             ProductGroupData::Mattress(_) => ProductGroup::Mattress,
             ProductGroupData::Detergent(_) => ProductGroup::Detergent,
-            ProductGroupData::Other { product_group, .. } => {
-                ProductGroup::Other(product_group.clone())
+            ProductGroupData::Other(unmodelled) => {
+                ProductGroup::Other(unmodelled.product_group().to_owned())
             }
         }
     }
@@ -260,42 +269,50 @@ impl ProductGroupData {
     /// answer down. That was the exhaustive match's whole purpose; it is now
     /// enforced next to the data instead of three matches away from it.
     pub fn model_identifier(&self) -> Option<&str> {
-        self.payload()?.model_identifier()
+        self.payload().model_identifier()
     }
 
     /// The payload behind this variant, as the questions it can answer.
     ///
-    /// One `match` where there were three. [`ProductGroupData::Other`] has no
-    /// typed payload — it is an untyped object for a group this build has no
-    /// variant for — so it answers nothing by having nothing to ask.
-    fn payload(&self) -> Option<&dyn ProductGroupPayload> {
+    /// One `match` where there were three. [`ProductGroupData::Other`] answers
+    /// too: its identifier is readable without a typed variant, and the
+    /// questions only an act can define it answers with `None` — see
+    /// [`UnmodelledPayload`].
+    fn payload(&self) -> &dyn ProductGroupPayload {
         match self {
-            Self::Battery(d) => Some(&**d),
-            Self::Textile(d) => Some(&**d),
-            Self::UnsoldGoods(d) => Some(d),
-            Self::Steel(d) => Some(d),
-            Self::Electronics(d) => Some(d),
-            Self::Construction(d) => Some(d),
-            Self::Tyre(d) => Some(d),
-            Self::Toy(d) => Some(d),
-            Self::Aluminium(d) => Some(d),
-            Self::Furniture(d) => Some(d),
-            Self::Mattress(d) => Some(d),
-            Self::Detergent(d) => Some(d),
-            Self::Other { .. } => None,
+            Self::Battery(d) => &**d,
+            Self::Textile(d) => &**d,
+            Self::UnsoldGoods(d) => d,
+            Self::Steel(d) => d,
+            Self::Electronics(d) => d,
+            Self::Construction(d) => d,
+            Self::Tyre(d) => d,
+            Self::Toy(d) => d,
+            Self::Aluminium(d) => d,
+            Self::Furniture(d) => d,
+            Self::Mattress(d) => d,
+            Self::Detergent(d) => d,
+            Self::Other(unmodelled) => unmodelled,
         }
     }
 
-    /// The unique product identifier carried by this product group's typed
-    /// data, if any — in whichever EN 18219 clause 5 scheme issued it.
+    /// The unique product identifier this product group's data carries, if
+    /// any — in whichever EN 18219 clause 5 scheme issued it.
     ///
-    /// `UnsoldGoods` and `Other` answer `None`: a discard-event report and an
-    /// untyped catch-all respectively, neither of which identifies a single
-    /// product the way every other product group does. That is the **only**
-    /// reason this answers `None`, which is what makes it usable as a presence
-    /// check where [`Self::gtin`] no longer is.
+    /// `UnsoldGoods` answers `None`: a discard-event report identifies no
+    /// single product the way every other product group does. That is the
+    /// **only** reason this answers `None` for a well-formed record, which is
+    /// what makes it usable as a presence check where [`Self::gtin`] no longer
+    /// is.
+    ///
+    /// `Other` answers with the `productIdentifier` its untyped payload
+    /// carries. An identifier is keyed and shaped by EN 18219 clause 5 rather
+    /// than by any one act, so it can be read without a typed variant — and a
+    /// product group added to the catalog after this crate shipped then still
+    /// registers and prints a carrier. A payload carrying none, or one that is
+    /// not a valid clause 5 identifier, answers `None`.
     pub fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
-        self.payload()?.product_identifier()
+        self.payload().product_identifier()
     }
 
     /// The GTIN carried by this product group's typed data, if any.
@@ -306,7 +323,7 @@ impl ProductGroupData {
     /// "does this identify a product?" check is asking the wrong question —
     /// [`Self::product_identifier`] is the one that always answers.
     pub fn gtin(&self) -> Option<&str> {
-        self.payload()?.gtin()
+        self.payload().gtin()
     }
 
     /// Substances of very high concern declared by this product group's typed
@@ -316,7 +333,7 @@ impl ProductGroupData {
     /// "asked and none present" — the SVHC lints run on the second and stay
     /// silent on the first, so an unasked group is never rendered as cleared.
     pub fn svhc_substances(&self) -> Option<&[super::common::SvhcSubstance]> {
-        self.payload()?.svhc_substances()
+        self.payload().svhc_substances()
     }
 
     /// The product category this passport's data declares, if its group has
@@ -337,6 +354,6 @@ impl ProductGroupData {
     /// answers with and why.
     #[must_use]
     pub fn product_category(&self) -> Option<&str> {
-        self.payload()?.product_category()
+        self.payload().product_category()
     }
 }
