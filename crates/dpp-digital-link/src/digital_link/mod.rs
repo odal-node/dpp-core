@@ -1,7 +1,8 @@
 //! GS1 Digital Link parser, builder, and GTIN utilities.
 //!
-//! A passport's carrier: `{resolver}/01/{gtin}/21/{carrier serial}` — see
-//! [`build_qr_url`].
+//! A passport's carrier: `{resolver}/01/{gtin}`, followed by a batch or a
+//! carrier serial according to the level the passport describes — see
+//! [`build_qr_url`], and [`DigitalLink::carrier_qualifier`] for reading one back.
 //!
 //! Supports the GS1 Digital Link standard (GS1 DL URI Syntax, v1.2).
 //! Application Identifiers (AIs) recognised in the path:

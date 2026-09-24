@@ -128,13 +128,16 @@ The verifier:
 The carrier (QR or Data Matrix) on a physical product encodes a **GS1 Digital Link** URI, not a proprietary path:
 
 ```
-{resolver_base}/01/{gtin}/21/{carrier serial}
+{resolver_base}/01/{gtin}                        model level
+{resolver_base}/01/{gtin}/10/{batch}             batch level
+{resolver_base}/01/{gtin}/21/{carrier serial}    item level, or no level stated
 ```
 
 - `resolver_base` is per-deployment configuration (`RESOLVER_BASE_URL`). A self-hoster sets it to their **own domain**, so the printed label carries the same trust root as their `did:web` identity; Odal's managed default is `https://id.odal-node.io`.
 - The GTIN and identifier come from the **verified** passport fields — the resolver checks the JWS before building the URI and never trusts a stored `qrCodeUrl` value.
-- The `/21/` segment is the passport's **carrier serial**, `Passport::effective_carrier_serial`: the serial the operator attributes — the act Art. 77(3) of Regulation (EU) 2023/1542 names — or, when it attributes none, twenty hex characters from the random tail of the passport id. It is one to twenty GS1 CSET 82 characters either way, and a label resolves back to its passport through `PassportRepository::find_by_carrier_serial`, which compares the same value.
-- No batch/lot segment is printed. The carrier serial alone resolves the label, and a lot is operator free text.
+- What follows the GTIN is `Passport::carrier_qualifier`, chosen by the passport's `granularity`. A GTIN with AI 21 is a serialised GTIN, which GS1 defines as identifying **one individual** item, so a model- or batch-level carrier — printed on every unit it covers — carries no serial. Regulation (EU) 2024/1781 Art. 10(1)(f) draws the same line: the data *"shall refer to the product model, batch or item"*. A passport that states no level prints a serial, as every carrier did before the level was read. A label resolves back to its passport through `PassportRepository::find_by_carrier`, which compares the same value; a serial label resolves at any level, so labels printed before a passport stated its level keep working.
+- The `/21/` segment is the passport's **carrier serial**, `Passport::effective_carrier_serial`: the serial the operator attributes — the act Art. 77(3) of Regulation (EU) 2023/1542 names — or, when it attributes none, twenty hex characters from the random tail of the passport id. It is one to twenty GS1 CSET 82 characters either way.
+- The `/10/` segment is printed only at batch level, where the lot is what the carrier identifies; `Passport::validate` then holds `batch_id` to GS1 AI 10's one to twenty CSET 82 characters. Below batch level the serial alone resolves the label, and the lot stays operator free text that no carrier prints.
 
 The carrier **fails closed**: if the passport does not verify, no URI is produced; if the product group data has no GTIN (for example an unsold-goods report), resolution returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital Link, any conformant resolver serving the same path answers the same scan — re-homing a passport is a DNS or registry change, not a reprint.
 

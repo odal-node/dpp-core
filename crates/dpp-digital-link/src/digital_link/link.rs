@@ -1,6 +1,8 @@
 //! [`DigitalLink`] — a parsed GS1 Digital Link URI.
 
-use dpp_domain::Gtin;
+use std::borrow::Cow;
+
+use dpp_domain::{CarrierQualifier, Gtin};
 
 use super::codec::{normalize_gtin_to_14, percent_decode, percent_encode};
 use super::error::DigitalLinkError;
@@ -218,6 +220,39 @@ impl DigitalLink {
     #[must_use]
     pub fn tpcsn(&self) -> Option<&str> {
         self.qualifier("235")
+    }
+
+    /// The passport-carrier qualifier this link names, to resolve it by with
+    /// `PassportRepository::find_by_carrier` — the reading of
+    /// [`Passport::carrier_qualifier`](dpp_domain::Passport::carrier_qualifier)
+    /// that [`build_qr_url`](crate::build_qr_url) printed.
+    ///
+    /// | Path after the GTIN | Qualifier |
+    /// |---|---|
+    /// | nothing | `Model` |
+    /// | `/10/{lot}` | `Batch(lot)` |
+    /// | `/21/{sn}` | `Serial(sn)` |
+    /// | `/10/{lot}/21/{sn}` | `Serial(sn)` |
+    ///
+    /// A serial wins over a lot because the GTIN and the serial already name
+    /// one unit, and because carriers printed by earlier versions of this crate
+    /// carried both — the lot there qualifies nothing the serial does not.
+    ///
+    /// `None` for a link no passport carrier is: one keyed on anything but a
+    /// GTIN, or one carrying AI 22 or AI 235, which no carrier here prints.
+    /// Dropping an unknown qualifier to find *something* would answer for a
+    /// different thing than the label names.
+    #[must_use]
+    pub fn carrier_qualifier(&self) -> Option<CarrierQualifier<'_>> {
+        self.gtin()?;
+        if self.variant().is_some() || self.tpcsn().is_some() {
+            return None;
+        }
+        Some(match (self.batch(), self.serial()) {
+            (_, Some(serial)) => CarrierQualifier::Serial(Cow::Borrowed(serial)),
+            (Some(batch), None) => CarrierQualifier::Batch(Cow::Borrowed(batch)),
+            (None, None) => CarrierQualifier::Model,
+        })
     }
 }
 

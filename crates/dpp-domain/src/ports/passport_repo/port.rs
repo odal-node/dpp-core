@@ -6,7 +6,7 @@ use super::protected_fields::PROTECTED_PATCH_FIELDS;
 use crate::error::DppError;
 use crate::{
     identifier::ProductIdentifier,
-    passport::{Passport, PassportId},
+    passport::{CarrierQualifier, Passport, PassportId},
     product::ProductIdentity,
     status::PassportStatus,
 };
@@ -74,13 +74,18 @@ pub trait PassportRepository: Send + Sync {
     /// serial already identify one unit; requiring the batch as well would miss
     /// a unit recorded with a lot whenever the caller was not told the lot.
     ///
-    /// 🚨 **This does not resolve a printed carrier.** The serial on a label is
-    /// the passport's [carrier serial](Passport::effective_carrier_serial),
-    /// which the operator attributes and which is not `serial_number` unless the
-    /// operator chose to make it so. A label resolves through
-    /// [`find_by_carrier_serial`](PassportRepository::find_by_carrier_serial).
-    /// This method answers someone holding the manufacturer's serial — read off
-    /// the unit, or out of an ERP.
+    /// 🚨 **This does not resolve a printed carrier**, at any level. The serial
+    /// on a label is the passport's [carrier
+    /// serial](Passport::effective_carrier_serial), which the operator
+    /// attributes and which is not `serial_number` unless the operator chose to
+    /// make it so. And this method reads the level from which of `batch_id` and
+    /// `serial_number` a record carries, where a carrier is chosen by the
+    /// record's stated [`granularity`](Passport::granularity) — so a GTIN-only
+    /// or batch label read through here can miss the passport it was printed
+    /// for. A label resolves through
+    /// [`find_by_carrier`](PassportRepository::find_by_carrier). This method
+    /// answers someone holding the manufacturer's serial — read off the unit,
+    /// or out of an ERP — or a bare GTIN.
     ///
     /// 🚨 **Typed, not `&str`.** A bare string invites taking a value out of
     /// one namespace and looking it up in another because both are strings,
@@ -138,34 +143,55 @@ pub trait PassportRepository: Send + Sync {
             .collect())
     }
 
-    /// Every passport a printed data carrier names: the one carrying
-    /// `identifier` whose [effective carrier
-    /// serial](Passport::effective_carrier_serial) is `carrier_serial`.
+    /// Every passport a printed data carrier names: the ones carrying
+    /// `identifier` whose [carrier qualifier](Passport::carrier_qualifier) is
+    /// `qualifier`.
     ///
     /// This is how a label is resolved. The carrier is built from the same
-    /// effective serial this compares against, so a label printed for a passport
-    /// always finds it — which the GTIN alone cannot do once a GTIN has a record
-    /// per batch or per unit.
+    /// qualifier this compares against, so a label printed for a passport always
+    /// finds it — which the GTIN alone cannot do once a GTIN has a record per
+    /// batch or per unit.
+    ///
+    /// | `qualifier` | Matches |
+    /// |---|---|
+    /// | `Model` | the passports that state model level |
+    /// | `Batch(lot)` | the passports that state batch level, for that lot |
+    /// | `Serial(sn)` | the passport whose [carrier serial](Passport::effective_carrier_serial) is `sn`, **whatever its level** |
+    ///
+    /// # Why a serial matches at any level
+    ///
+    /// A label outlives the rules it was printed under. Carriers built before a
+    /// passport's level was consulted printed a serial at every level, and a
+    /// successor may state a level its predecessor did not while carrying the
+    /// predecessor's serial forward — either way an object holds a serial label
+    /// for a passport whose carrier would now print something else. A carrier
+    /// serial names one passport whatever its level, so honouring it cannot
+    /// land on the wrong one.
+    ///
+    /// Model and batch labels match the **stated** level only. A passport whose
+    /// level is not stated prints a serial, so no carrier built here names it
+    /// by the GTIN alone; someone holding just a GTIN wants
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier).
     ///
     /// # Why the identifier is part of the key
     ///
-    /// The serial alone is not enough, and not only because two operators can
-    /// attribute the same one. A label whose GTIN does not match the record it
-    /// names is not that record's label: resolving by serial alone would send a
-    /// reader holding one product to the passport of another.
+    /// The qualifier alone is not enough, and not only because two operators
+    /// can attribute the same serial. A label whose GTIN does not match the
+    /// record it names is not that record's label: resolving by the qualifier
+    /// alone would send a reader holding one product to the passport of another.
     ///
     /// # Why `Vec`
     ///
     /// An amendment creates a new passport, and the label on the object does not
     /// change — so a successor carries its predecessor's carrier serial
-    /// explicitly, and one label then names every record in the chain. The
-    /// caller picks by `status`, or walks
+    /// explicitly, or keeps its level and lot, and one label then names every
+    /// record in the chain. The caller picks by `status`, or walks
     /// [`find_superseding_head`](PassportRepository::find_superseding_head) from
     /// what it found. A successor that did *not* carry the serial forward leaves
     /// the label naming the predecessor alone, and that walk still reaches the
     /// head.
     ///
-    /// Two records that are not a chain but share an identifier and a serial
+    /// Two records that are not a chain but share an identifier and a qualifier
     /// are a data error this tier cannot prevent; they come back as two, rather
     /// than one being chosen for the caller.
     ///
@@ -176,21 +202,26 @@ pub trait PassportRepository: Send + Sync {
     /// # Default implementation
     ///
     /// An unindexed `list()` scan — correctness only. A real store should index
-    /// the effective serial: the attributed `carrierSerial` where one is stored,
-    /// and otherwise [`PassportId::default_carrier_serial`], which is the last
-    /// twenty hex digits of the id's canonical text form and so indexable as an
-    /// expression over the id.
-    async fn find_by_carrier_serial(
+    /// the effective serial — the attributed `carrierSerial` where one is
+    /// stored, and otherwise [`PassportId::default_carrier_serial`], which is
+    /// the last twenty hex digits of the id's canonical text form and so
+    /// indexable as an expression over the id — and the identifier together
+    /// with `granularity` and `batchId`.
+    async fn find_by_carrier(
         &self,
         identifier: &ProductIdentifier,
-        carrier_serial: &str,
+        qualifier: &CarrierQualifier<'_>,
     ) -> Result<Vec<Passport>, DppError> {
         Ok(self
             .list(None, None, None, u32::MAX, 0)
             .await?
             .into_iter()
             .filter(|p| {
-                carries_identifier(p, identifier) && p.effective_carrier_serial() == carrier_serial
+                carries_identifier(p, identifier)
+                    && match qualifier {
+                        CarrierQualifier::Serial(serial) => p.effective_carrier_serial() == *serial,
+                        level => p.carrier_qualifier().as_ref() == Some(level),
+                    }
             })
             .collect())
     }

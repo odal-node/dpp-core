@@ -1,5 +1,5 @@
 //! EN 18219:2026 clause 5 identifier syntax, for the two tiers that check it,
-//! and the GS1 AI 21 serial a passport's data carrier prints.
+//! and the GS1 AI 10 batch and AI 21 serial a passport's data carrier prints.
 //!
 //! 🚨 **One home on purpose.** These predicates lived only in
 //! `dpp_domain::identifier::ProductIdentifier`, and the plugin SDK grew its own
@@ -95,12 +95,20 @@ pub fn check_did(did: &str) -> Result<(), DidRejection<'_>> {
 /// cross-crate test holds it against the dictionary's own entry.
 pub const MAX_GS1_SERIAL_CHARS: usize = 20;
 
-/// Why a candidate AI 21 value cannot be printed as a serial number.
+/// The most characters a GS1 AI 10 batch or lot number may carry.
+///
+/// AI 10 is `X..20` in the same dictionary — the same rule as AI 21, restated
+/// under its own name because the two are separate entries that GS1 could
+/// change apart. The same cross-crate test holds it against the dictionary.
+pub const MAX_GS1_LOT_CHARS: usize = 20;
+
+/// Why a candidate AI 10 or AI 21 value cannot be printed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Gs1SerialRejection {
+pub enum Gs1ValueRejection {
     /// No characters at all. `X..20` has a minimum of one.
     Empty,
-    /// More than [`MAX_GS1_SERIAL_CHARS`], counted in characters.
+    /// More than the AI allows — [`MAX_GS1_LOT_CHARS`] or
+    /// [`MAX_GS1_SERIAL_CHARS`] — counted in characters.
     TooLong {
         /// How many characters the value has.
         chars: usize,
@@ -153,17 +161,32 @@ pub const fn is_cset_82(c: char) -> bool {
 ///
 /// # Errors
 ///
-/// [`Gs1SerialRejection`], naming the first rule the value breaks.
-pub fn check_gs1_serial(value: &str) -> Result<(), Gs1SerialRejection> {
+/// [`Gs1ValueRejection`], naming the first rule the value breaks.
+pub fn check_gs1_serial(value: &str) -> Result<(), Gs1ValueRejection> {
+    check_cset_82_up_to(value, MAX_GS1_SERIAL_CHARS)
+}
+
+/// A value GS1 admits in AI 10: one to [`MAX_GS1_LOT_CHARS`] characters, all in
+/// CSET 82.
+///
+/// # Errors
+///
+/// [`Gs1ValueRejection`], naming the first rule the value breaks.
+pub fn check_gs1_lot(value: &str) -> Result<(), Gs1ValueRejection> {
+    check_cset_82_up_to(value, MAX_GS1_LOT_CHARS)
+}
+
+/// `X..max`: one to `max` characters, all in CSET 82.
+fn check_cset_82_up_to(value: &str, max: usize) -> Result<(), Gs1ValueRejection> {
     if value.is_empty() {
-        return Err(Gs1SerialRejection::Empty);
+        return Err(Gs1ValueRejection::Empty);
     }
     let chars = value.chars().count();
-    if chars > MAX_GS1_SERIAL_CHARS {
-        return Err(Gs1SerialRejection::TooLong { chars });
+    if chars > max {
+        return Err(Gs1ValueRejection::TooLong { chars });
     }
     match value.chars().find(|c| !is_cset_82(*c)) {
-        Some(c) => Err(Gs1SerialRejection::OutsideCset82(c)),
+        Some(c) => Err(Gs1ValueRejection::OutsideCset82(c)),
         None => Ok(()),
     }
 }
