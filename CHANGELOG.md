@@ -1190,6 +1190,29 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **`cpr-2024-3110` no longer carries a passport date, because the Regulation
+  does not give one.** 0.19.0 recorded **8 January 2026** as a `sourced`
+  passport date, read from Art. 96, the Regulation's general application date.
+  Art. 96 does apply Arts. 75 and 76 from that day, but the provision that says
+  when a manufacturer owes a passport is **Art. 22(7)**: *"By 18 months after
+  the entry into force of the delegated act referred to in Article 75(1) the
+  manufacturer shall make available a digital product passport referred to in
+  Article 76"*. Art. 75(1) leaves that delegated act to the Commission and none
+  has been adopted, so the date is relative to an act that does not exist yet.
+  The record is now `required` with no date, the state `ObligationDate`
+  reserves for an act that mandates a passport and has not fixed when; once the
+  delegated act is adopted, its entry into force plus 18 months is the sourced
+  date. Nothing in the crate gated on the old date, but a consumer reading it
+  would have shown a construction passport as owed since January 2026.
+
+  `detergents-2026-405`'s `notes` still called its date assumed and unread,
+  although 0.19.0 had flipped it to `sourced`. The notes now cite what the date
+  rests on (Art. 21(1), applying from 23 September 2029 under Art. 37) and the
+  two limits it does not show: Art. 36(2)'s one-year transition for products
+  that meet Regulation (EC) No 648/2004, and Art. 21(10)'s rule that the
+  passport's technical implementing act cannot apply earlier than 18 months
+  after it enters into force.
+
 - **🚨 The passport's `@context` referenced a remote document it no longer
   needed, and a remote reference is a whole-document failure mode.** A string
   entry in an `@context` array is fetched by the consumer at expansion time. One
