@@ -1211,7 +1211,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   two limits it does not show: Art. 36(2)'s one-year transition for products
   that meet Regulation (EC) No 648/2004, and Art. 21(10)'s rule that the
   passport's technical implementing act cannot apply earlier than 18 months
-  after it enters into force.
+  after it enters into force, unless that act sets an earlier date in duly
+  justified cases relating to the whole act or certain provisions of it, or on
+  its partial repeal or amendment.
 
 - **🚨 The passport's `@context` referenced a remote document it no longer
   needed, and a remote reference is a whole-document failure mode.** A string
