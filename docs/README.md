@@ -19,6 +19,7 @@ This folder documents **the standard, not the product**: what a Digital Product 
 | "How do product group plugins run safely?" | [architecture/PLUGIN-HOST.md](architecture/PLUGIN-HOST.md) |
 | "How do passports link to their components and predecessors?" | [architecture/PRODUCT-LINEAGE.md](architecture/PRODUCT-LINEAGE.md) — design proposal, not yet implemented |
 | "Where does code meet regulation, formally?" | [regulatory/CONFORMITY.md](regulatory/CONFORMITY.md) — written for assessment bodies |
+| "Which RFC, W3C or ETSI text does this cite, at which revision, and is it still current?" | [architecture/STANDARDS.md](architecture/STANDARDS.md) — one row per specification, status dated, IETF rows held by a test |
 | "Which acts reach a product group, and from when?" | [architecture/DATA-MODEL.md](architecture/DATA-MODEL.md) §3.5 — the instrument catalog and why applicable law is a *set* |
 | "Why is a date pending rather than computed?" | [architecture/EFFECTIVE-DATES.md](architecture/EFFECTIVE-DATES.md) |
 | "How are releases, versions, and contributions governed?" | [governance/](governance/) — VERSIONING, RELEASE, DEVELOPMENT, GIT-STRATEGY (CONTRIBUTING and CHANGELOG are at the repo root) |
