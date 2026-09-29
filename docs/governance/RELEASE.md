@@ -45,6 +45,19 @@ Before running `cargo release`:
    reflect the current API and feature set.
 7. **Dependency review** — check that no new dependencies introduce
    problematic licenses. All dependencies must be compatible with Apache-2.0.
+8. **Standards re-read.** Re-read every row of
+   [`docs/architecture/STANDARDS.md`](../architecture/STANDARDS.md) at its
+   source and update its date:
+   - RFCs at `https://www.rfc-editor.org/info/rfcNNNN`;
+   - Internet-Drafts on the datatracker;
+   - W3C specifications at `https://www.w3.org/TR/…`;
+   - ETSI specifications in the `etsi.org/deliver` version listing;
+   - IDTA and GS1 on their specification pages.
+
+   A status that changed is the finding. `standard_citations.rs` holds the IETF
+   rows to the code, but it reads the register, not the IETF, so it cannot see
+   an RFC become obsoleted. For the W3C, GS1, IDTA and ETSI rows this re-read is
+   the only check.
 
 ## Publishing Order
 

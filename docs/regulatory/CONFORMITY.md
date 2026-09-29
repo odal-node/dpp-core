@@ -16,9 +16,13 @@ those texts.
 | CEN/CLC JTC 24 system standards | Six cited in the OJ on 15 Jul 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it requires an assessment we have not published — not merely a citation, which now exists |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Pending — an ESPR working-plan priority | `TextileData` struct held provisional; validated structurally until the act finalises |
-| GS1 Digital Link URI Syntax | Published | `DigitalLink` parser covers AI 01, 21, 10. 🔶 **The revision implemented is not established** — see the note below |
-| IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `dpp-aas` maps a passport to AAS shells and submodels carrying this library's own semantics — every emitted `semanticId` is `urn:odal-node:*`. No IDTA conformance is claimed |
-| W3C VC Data Model v2.0 | W3C Recommendation, 15 May 2025 | `DppAccessCredential` follows VC envelope structure |
+
+Technical specifications are recorded in
+[`architecture/STANDARDS.md`](../architecture/STANDARDS.md): IETF, W3C, the GS1
+Digital Link URI Syntax (whose implemented revision is not established; see
+[GS1 Interoperability](#gs1-interoperability)), the IDTA AAS metamodel and ETSI.
+Each row gives the revision cited, its status as last read, the evidence behind
+the implementation, and whether conformance is claimed.
 
 ## Access Model — an Art. 77(2) lattice, not a ranking
 

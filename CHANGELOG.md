@@ -13,7 +13,51 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **A standards register, and a tripwire that holds the code to it.**
+  `docs/architecture/STANDARDS.md` records every external technical
+  specification the repository cites. For each one it gives:
+  - the revision cited;
+  - its status as last read, and the date of that read;
+  - where the code uses it;
+  - the evidence behind that use: the RFC's own test vectors, an external
+    validator, a delegated crate, or unit tests;
+  - whether conformance is claimed.
+
+  Law stays in the instrument manifests.
+
+  `standard_citations.rs` holds the IETF rows to the code, with four rules:
+  - every `RFC NNNN` and `draft-ietf-…` cited anywhere in the repository must
+    have a row;
+  - an obsoleted specification may be cited only with a `kept:` reason;
+  - a draft must be cited with its revision and must claim no conformance;
+  - a row nothing cites fails, so the register cannot go stale.
+
+  The test reads a file, not the IETF, so it cannot see a status change. For
+  that, the Pre-Release Checklist gains a step that re-reads every row at its
+  source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only
+  check.
+
+  The first read found three things:
+  - **RFC 9864** (October 2025) updates RFC 8037. It deprecates the JOSE `alg`
+    value `EdDSA`, which every JWS here carries, in favour of `Ed25519`.
+    Nothing changes in this release; the decision is #370.
+  - **ETSI TS 119 612** V2.4.1 has been published, while `trusted_list` cites
+    V2.3.1.
+  - **IDTA-01001** is at revision 3-2, while `dpp-aas` cites 3-0.
+
+  It also establishes one status that had never been stated: the `did:web`
+  method specification is a W3C Community Group document marked `unofficial`,
+  not a W3C standard.
+
 ### Documentation
+
+- **Technical specifications have one home.** README's coverage table and the
+  conformity statement each gave their own status for GS1 Digital Link, the
+  IDTA AAS metamodel and VC Data Model 2.0, and the two had disagreed. Those
+  rows now point at the register. So does the standards list in
+  `docs/project/BLUEPRINT.md`, which no longer restates revisions.
 
 - **The conformity statement carried an unsourced regulatory attribution and
   claims that had gone stale.** This was an accuracy pass over
