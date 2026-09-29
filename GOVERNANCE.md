@@ -20,7 +20,7 @@ specification) is still evolving.
 ## Decision Records
 
 Significant technical decisions are recorded in the architecture and design
-docs under `docs/architecture/` and `docs/design/`, and summarised in
+docs under `docs/architecture/`, and summarised in
 `CHANGELOG.md`. Each decision captures the context, what was chosen, the
 alternatives considered, and the consequences. Superseded decisions are marked
 as such with a link to the replacement.
