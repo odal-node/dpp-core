@@ -114,7 +114,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     `NotApplicable` for EV, LMT and industrial batteries. v2.0 has them not
     filled or displayed as of February 2027, to be applied in line with
     Article 8 and its delegated act. The publish gate stops requiring them, and
-    the battery plugin refuses a passport that carries them.
+    `passport_content::fields_not_applicable` now reports them when a passport
+    of those categories carries them.
   - **The due diligence report** (row 19) stays `NotApplicable`. v2.0 now
     gives a date rather than a missing format: Art. 48(1) applies from 18
     August 2027, when the row becomes `Mandatory`. The rules carry no dates, so
