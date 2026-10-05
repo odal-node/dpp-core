@@ -5,6 +5,8 @@ pub mod canonical;
 #[cfg(test)]
 mod proptests;
 #[cfg(test)]
+mod resolve_tests;
+#[cfg(test)]
 mod rfc8032_vector_tests;
 #[cfg(test)]
 mod rfc8037_vector_tests;
@@ -13,11 +15,13 @@ mod rfc8785_vector_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod thumbprint_tests;
 pub mod verifier;
 
-pub use algorithm::{ED25519_CRV, EDDSA_ALG, is_allowed_alg};
+pub use algorithm::{
+    ED25519_ALG, ED25519_CRV, EDDSA_ALG, JWK_THUMBPRINT_URI_PREFIX, is_allowed_alg,
+};
 pub use canonical::canonicalize;
 pub use signer::{sign, sign_typed, verify};
-pub use verifier::{
-    extract_key_by_fingerprint, extract_kid_from_jws, extract_primary_public_key, verify_jws,
-};
+pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};

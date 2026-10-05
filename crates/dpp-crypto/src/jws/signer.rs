@@ -14,16 +14,24 @@ use crate::keystore::KeyStore;
 /// the payload it holds and compares — see [`super::canonical`] and
 /// `dpp_vc::local_service`.
 ///
-/// The protected header includes a `kid` field set to the SHA-256 fingerprint
-/// (hex) of the signing key's public bytes.  The verifier uses this `kid` to
-/// select the correct verification method from the DID document, so that JWS
-/// signatures remain verifiable after the operator rotates their key.
+/// The protected header carries the `alg` the key is recorded as using and the
+/// `kid` the caller passes. The verifier uses the `kid` to select the
+/// verification method in the issuer's DID document, so that a signature stays
+/// verifiable after the operator rotates their key.
+///
+/// **The `kid` is a parameter, with no default, because what it must be depends
+/// on how the token is verified, and a wrong one fails closed only at the
+/// verifier.** A token verified through a DID document carries the absolute DID
+/// URL of the verification method: `did:web:<host>#<thumbprint URI>`. An SD-JWT
+/// VC carries the key's thumbprint URI alone, which is what the issuer metadata's
+/// key set names. [`crate::keystore::PublicKeyInfo::thumbprint_uri`] gives the
+/// part both have in common.
 ///
 /// The curve is *not* emitted as a JOSE header parameter: RFC 8037 defines
 /// `crv` as a JWK member, not a registered header parameter. It lives on the
 /// DID document's `publicKeyJwk` instead, where it is the spec-correct place.
-pub fn sign(store: &KeyStore, key_id: &str, payload: &Value) -> anyhow::Result<String> {
-    sign_typed(store, key_id, payload, None)
+pub fn sign(store: &KeyStore, key_id: &str, payload: &Value, kid: &str) -> anyhow::Result<String> {
+    sign_typed(store, key_id, payload, kid, None)
 }
 
 /// [`sign`], with an optional `typ` protected-header parameter.
@@ -33,32 +41,28 @@ pub fn sign(store: &KeyStore, key_id: &str, payload: &Value) -> anyhow::Result<S
 /// rather than bolted on afterwards because the header is *protected*: adding a
 /// parameter after signing would invalidate the signature, so the only place it
 /// can be set is before the signing input is built.
-///
-/// `None` produces exactly the header [`sign`] has always produced, so existing
-/// signatures and their verifiers are unaffected.
 pub fn sign_typed(
     store: &KeyStore,
     key_id: &str,
     payload: &Value,
+    kid: &str,
     typ: Option<&str>,
 ) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
-    // Serialised rather than interpolated. `typ` is caller-supplied, and a value
-    // containing a quote or a backslash would otherwise escape the string it
-    // sits in — producing malformed JSON at best, and at worst letting a caller
-    // write additional members into a header that is about to be *signed*.
+    // Serialised rather than interpolated. `kid` and `typ` are caller-supplied,
+    // and a value containing a quote or a backslash would otherwise escape the
+    // string it sits in — producing malformed JSON at best, and at worst letting
+    // a caller write additional members into a header that is about to be
+    // *signed*.
     //
-    // The byte output is unchanged for `typ: None`: `serde_json::Map` is a
-    // `BTreeMap` here (no `preserve_order` feature in this workspace), so
-    // members serialise in lexicographic order, and `alg` < `kid` < `typ` is
-    // the order the hand-written literal already used. Existing signatures and
-    // the verifiers that check them are unaffected.
+    // `serde_json::Map` is a `BTreeMap` here (no `preserve_order` feature in
+    // this workspace), so members serialise in lexicographic order.
     let mut header = serde_json::Map::new();
     header.insert(
         "alg".to_owned(),
         Value::String(key.algorithm.jose_alg().to_owned()),
     );
-    header.insert("kid".to_owned(), Value::String(key.fingerprint.clone()));
+    header.insert("kid".to_owned(), Value::String(kid.to_owned()));
     if let Some(typ) = typ {
         header.insert("typ".to_owned(), Value::String(typ.to_owned()));
     }

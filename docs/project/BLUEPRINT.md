@@ -20,11 +20,16 @@ This is an architectural constraint, not a feature.
 
 Every technical decision starts from an open standard. No proprietary formats, no invented protocols. The standards the library implements:
 
-- GS1 Digital Link — product identification and QR resolution (the URI Syntax revision implemented is not established; see `docs/regulatory/CONFORMITY.md`)
-- W3C Verifiable Credentials v2.0 — access control and manufacturer identity
-- IDTA Asset Administration Shell v3.0 — AAS-shaped output for Industry 4.0 tooling, carrying this library's own semantics; no IDTA or Catena-X conformance is claimed
+- GS1 Digital Link — product identification and QR resolution
+- W3C Verifiable Credentials — access control and manufacturer identity
+- IDTA Asset Administration Shell — AAS-shaped output for Industry 4.0 tooling
 - CEN/CENELEC JTC 24 — EU DPP data model (tracked as it evolves)
 - did:web — decentralised manufacturer identity over DNS + HTTPS
+
+This list does not record which revision of each is cited, what status each has,
+or what evidence backs the implementation. Those are recorded once, in
+[`docs/architecture/STANDARDS.md`](../architecture/STANDARDS.md), along with
+whether conformance is claimed.
 
 ### 3. The Compilation Test
 

@@ -43,12 +43,15 @@ use serde_json::json;
 
 fn sign_a_payload(store: &KeyStore) {
     let payload = json!({ "product": "battery", "status": "published" });
-    let jws = signer::sign(store, "issuer", &payload).expect("sign");
-
     // The kid travels in the JWS header, so a verifier can select the right key
-    // from a DID document that may list several, including rotated ones.
-    let kid = verifier::extract_kid_from_jws(&jws).expect("kid present");
-    assert!(!kid.is_empty());
+    // from a DID document that may list several, including rotated ones. It is
+    // the key's thumbprint URI here; a token verified through a DID document
+    // carries the DID URL of the verification method that ends in it.
+    let public = store.public_key("issuer").expect("the key exists");
+    let kid = public.thumbprint_uri().expect("a valid public key");
+    let jws = signer::sign(store, "issuer", &payload, &kid).expect("sign");
+
+    assert_eq!(verifier::extract_kid_from_jws(&jws), Some(kid));
 }
 ```
 

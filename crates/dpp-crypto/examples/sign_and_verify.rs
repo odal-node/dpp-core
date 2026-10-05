@@ -30,10 +30,12 @@ fn main() {
     println!("\n=== Signing ===\n");
 
     let payload = json!({ "product": "battery", "status": "published" });
-    let jws = signer::sign(&store, "issuer", &payload).expect("sign");
-
     // The kid travels in the JWS header so a verifier can pick the right key
-    // out of a DID document that may list several — including rotated ones.
+    // out of a DID document that may list several, rotated ones included. It is
+    // the key's thumbprint URI here; a token verified through a DID document
+    // would carry the DID URL of the verification method that ends in it.
+    let kid = public.thumbprint_uri().expect("a valid public key");
+    let jws = signer::sign(&store, "issuer", &payload, &kid).expect("sign");
     let kid = verifier::extract_kid_from_jws(&jws).expect("kid present");
     println!("  payload:  {payload}");
     println!("  kid:      {kid}");

@@ -1,17 +1,17 @@
 //! Property tests for the JWS verifier's hostile-input surface.
 //!
 //! `verify_jws` parses an attacker-controlled compact JWS (which can originate
-//! from a scanned QR code or URL), and `extract_primary_public_key`/
-//! `extract_key_by_fingerprint` parse a DID document fetched over the network —
+//! from a scanned QR code or URL), and `resolve_verification_key` parses one
+//! against a DID document fetched over the network —
 //! neither input is trusted. The sibling `dpp-digital-link` crate already
 //! covers this class of risk for `DigitalLink::parse` with a proptest harness;
 //! this file gives the JWS verifier the same treatment.
 
 use proptest::prelude::*;
 
-use super::verifier::{
-    extract_key_by_fingerprint, extract_kid_from_jws, extract_primary_public_key, verify_jws,
-};
+use base64::Engine;
+
+use super::verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
 
 /// A bounded-depth, arbitrary JSON value — stands in for a malformed or
 /// adversarial DID document.
@@ -57,16 +57,25 @@ proptest! {
         let _ = extract_kid_from_jws(&jws);
     }
 
-    /// `extract_primary_public_key`/`extract_key_by_fingerprint` must never
-    /// panic on an arbitrary (malformed, wrong-shaped, or adversarial) JSON
-    /// value standing in for a fetched DID document.
+    /// `resolve_verification_key` must never panic on an arbitrary (malformed,
+    /// wrong-shaped, or adversarial) JSON value standing in for a fetched DID
+    /// document, whatever the JWS is.
     #[test]
-    fn extract_primary_public_key_never_panics(doc in arb_json()) {
-        let _ = extract_primary_public_key(&doc);
+    fn resolve_verification_key_never_panics(doc in arb_json(), jws in ".{0,128}") {
+        let _ = resolve_verification_key(&doc, &jws);
     }
 
+    /// The same, with a JWS whose header decodes, so the pressure lands on the
+    /// search through the document and not on the first parse.
     #[test]
-    fn extract_key_by_fingerprint_never_panics(doc in arb_json(), kid in ".{0,64}") {
-        let _ = extract_key_by_fingerprint(&doc, &kid);
+    fn resolve_verification_key_never_panics_with_a_readable_header(
+        doc in arb_json(), kid in ".{0,64}", alg in ".{0,16}"
+    ) {
+        let header = serde_json::json!({"kid": kid, "alg": alg}).to_string();
+        let jws = format!(
+            "{}.e30.c2ln",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(header)
+        );
+        let _ = resolve_verification_key(&doc, &jws);
     }
 }

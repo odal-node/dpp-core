@@ -11,10 +11,9 @@
 //! JWS signing example and its validation). A.4 and A.5 carry `alg: EdDSA`, which
 //! is what this crate emits and verifies.
 //!
-//! A.3, the JWK thumbprint, is not here: nothing in this workspace computes one.
-//! The `kid` this crate writes is a SHA-256 of the raw key bytes, which is a
-//! different value, so a test for A.3 would exercise a hash and a canonicaliser
-//! and none of this crate's code.
+//! A.3, the JWK thumbprint, is checked against the thumbprint code in
+//! `thumbprint_tests.rs`. Here it is the identifier the RFC's key is filed under
+//! in a DID document, which the key reader holds the key to.
 //!
 //! The compact JWS is assembled from its three published parts instead of being
 //! written as one string: a token-shaped literal in source is what secret
@@ -25,7 +24,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use serde_json::{Value, json};
 
 use super::algorithm::KeyAlgorithm;
-use super::verifier::{extract_primary_public_key, verify_jws};
+use super::verifier::{resolve_verification_key, verify_jws};
 
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
@@ -81,16 +80,32 @@ fn the_rfc_key_pair_yields_the_rfc_public_jwk() {
 
 /// The other direction: the RFC's public JWK, placed in a DID document the way
 /// `did_builder` places this crate's own, is read back as the RFC's `x`.
+///
+/// The method is filed under the thumbprint A.3 publishes for this key, so the
+/// key reader's check that a thumbprint identifier is the key's own is met by
+/// a value the RFC computed, not one this crate did.
 #[test]
 fn the_rfc_public_jwk_is_read_as_a_did_document_key() {
+    const DID: &str = "did:web:example";
     let rfc_jwk: Value = serde_json::from_str(PUBLIC_JWK).expect("the RFC's JWK parses");
+    let id = format!(
+        "{DID}#urn:ietf:params:oauth:jwk-thumbprint:sha-256:kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+    );
     let document = json!({
-        "verificationMethod": [{"id": "did:web:example#key-1", "publicKeyJwk": rfc_jwk}],
-        "assertionMethod": ["did:web:example#key-1"],
+        "id": DID,
+        "verificationMethod": [
+            {"id": id, "type": "JsonWebKey", "controller": DID, "publicKeyJwk": rfc_jwk},
+        ],
+        "assertionMethod": [id],
     });
 
+    // Only the header is read, so the payload and signature are placeholders.
+    let header = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(json!({"alg": "EdDSA", "kid": id}).to_string());
+    let token = format!("{header}.e30.c2ln");
+
     assert_eq!(
-        extract_primary_public_key(&document).as_deref(),
+        resolve_verification_key(&document, &token).as_deref(),
         Some(PUBLIC_X)
     );
 }

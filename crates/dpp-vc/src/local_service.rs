@@ -10,12 +10,10 @@ use dpp_domain::ports::identity::IdentityPort;
 use dpp_domain::{DppError, PassportId, SignedCredential};
 
 use dpp_crypto::jws::signer;
-use dpp_crypto::jws::verifier::{
-    extract_key_by_fingerprint, extract_kid_from_jws, extract_primary_public_key, verify_jws,
-};
+use dpp_crypto::jws::verifier::{resolve_verification_key, verify_jws};
 use dpp_crypto::keystore::KeyStore;
 
-use crate::did_builder::build_did_document;
+use crate::did_builder::{build_did_document, did_for};
 use crate::passport_credential::build_passport_credential;
 
 /// Concrete `IdentityPort` backed by a local `KeyStore`.
@@ -52,13 +50,19 @@ impl IdentityPort for LocalIdentityService {
             .map_err(|e| DppError::Signing(e.to_string()))?;
         let payload_hash = hex::encode(Sha256::digest(&canonical));
 
-        let jws = signer::sign(&self.store, &self.key_id, payload)
+        // The `kid` is the absolute DID URL of the signing key's verification
+        // method, which is the identifier `build_did_document` gives that key.
+        let issuer_did = did_for(&self.base_url);
+        let thumbprint = self
+            .store
+            .public_key(&self.key_id)
+            .ok_or_else(|| DppError::Signing(format!("no key found for {}", self.key_id)))?
+            .thumbprint_uri()
             .map_err(|e| DppError::Signing(e.to_string()))?;
+        let kid = format!("{issuer_did}#{thumbprint}");
 
-        let did_doc = build_did_document(&self.store, &self.base_url, &self.key_id)
+        let jws = signer::sign(&self.store, &self.key_id, payload, &kid)
             .map_err(|e| DppError::Signing(e.to_string()))?;
-
-        let issuer_did = did_doc["id"].as_str().unwrap_or_default().to_string();
 
         let passport_vc = build_passport_credential(issuer_did.clone(), passport_id, payload_hash);
 
@@ -77,9 +81,7 @@ impl IdentityPort for LocalIdentityService {
         let did_doc = build_did_document(&self.store, &self.base_url, &self.key_id)
             .map_err(|e| DppError::Signing(e.to_string()))?;
 
-        let pub_key_b64 = extract_kid_from_jws(jws)
-            .and_then(|kid| extract_key_by_fingerprint(&did_doc, &kid))
-            .or_else(|| extract_primary_public_key(&did_doc))
+        let pub_key_b64 = resolve_verification_key(&did_doc, jws)
             .ok_or_else(|| DppError::Signing("no matching public key in DID document".into()))?;
 
         if !verify_jws(jws, &pub_key_b64).map_err(|e| DppError::Signing(e.to_string()))? {
