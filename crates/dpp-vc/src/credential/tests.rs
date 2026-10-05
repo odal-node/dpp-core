@@ -115,6 +115,7 @@ fn credential_with_status() {
         .with_status(CredentialStatus {
             id: "https://authority.example.com/status/1#42".into(),
             status_type: "BitstringStatusListEntry".into(),
+            status_purpose: "revocation".into(),
             status_list_index: Some("42".into()),
             status_list_credential: Some("https://authority.example.com/status/1".into()),
         })
@@ -146,6 +147,7 @@ fn credential_with_status_index(index: &str) -> DppAccessCredential {
         .with_status(CredentialStatus {
             id: format!("https://authority.example.com/status/1#{index}"),
             status_type: "BitstringStatusListEntry".into(),
+            status_purpose: "revocation".into(),
             status_list_index: Some(index.to_owned()),
             status_list_credential: Some("https://authority.example.com/status/1".into()),
         })

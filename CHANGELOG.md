@@ -77,6 +77,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     fingerprint and no longer verifies. Sign it again. No keystore migration is
     needed.
 
+- **An access credential is typed as a VC-JWT, and a verifier requires the
+  type.** VC-JOSE-COSE asks for `typ: vc+jwt` and, when present, `cty: vc`, and
+  `sign_access_credential` set neither. It now sets both.
+  `authenticate_access_credential` refuses a token whose `typ` is absent or
+  names anything else, or whose `cty` names anything but `vc`. A signature by
+  the issuer's key is authentic whatever it signs, so without the type a
+  passport proof or an SD-JWT VC from the same key could be offered as a
+  credential: the explicit typing RFC 8725 §3.11 recommends. Both headers are
+  read as RFC 7515 §4.1.9 says, case-insensitively and with or without
+  `application/`. (#374)
+
+  `jws::sign_typed` gains a `cty` parameter, after `typ`. **Migration:** pass
+  `None` where no `cty` is wanted; re-sign access credentials issued before this
+  release.
+
+- **A credential's status entry carries `statusPurpose`.** Bitstring Status
+  List v1.0 requires it as a string, and its test suite checks every entry for
+  one, but `CredentialStatus` had no such field, so a verifier could not tell a
+  revocation list from a suspension list. `CredentialStatus::status_purpose` is
+  now required, and an entry without it does not deserialise.
+  `check_revocation` answers only an entry whose purpose is `revocation`, which
+  is exported as `REVOCATION_PURPOSE`, and returns `Indeterminate` for any other
+  purpose, whatever the bit says. (#375)
+
+  **Migration:** set `status_purpose` on every `CredentialStatus`, `"revocation"`
+  for a revocation list.
+
 - **The battery rules follow the Commission's guidance v2.0, and
   `co2ePerUnitKg` is optional.** The battery passport guidance *Digital
   Batteries Passport — data points by category* was reissued as v2.0 on 15
