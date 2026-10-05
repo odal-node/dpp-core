@@ -50,13 +50,15 @@
 //!
 //! That a recorded status is **current**. The gate reads a file, not the IETF.
 //! What it proves is that each IETF citation has a row, and that every row has a
-//! status somebody read and dated. Likewise it holds a claim to the form that
-//! makes it checkable, a named and existing path, and not to its truth: whether
-//! that path is evidence that is not circular is a reviewer's judgement. That turns the release-time re-read
+//! status somebody read and dated. That turns the release-time re-read
 //! (`docs/governance/RELEASE.md`) into a walk down one table instead of a
 //! search. W3C, GS1, IDTA and ETSI identifiers take too many shapes to match
 //! reliably, so nothing checks that their rows are still cited: the re-read is
 //! the only check on those.
+//!
+//! Likewise it holds a claim to the form that makes it checkable, a named and
+//! existing path, and not to its truth: whether that path is evidence that is
+//! not circular is a reviewer's judgement.
 //!
 //! # What it reads
 //!
