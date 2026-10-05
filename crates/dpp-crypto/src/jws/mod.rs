@@ -3,6 +3,8 @@
 pub mod algorithm;
 pub mod canonical;
 #[cfg(test)]
+mod crit_tests;
+#[cfg(test)]
 mod proptests;
 #[cfg(test)]
 mod resolve_tests;
