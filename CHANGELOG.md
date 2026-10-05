@@ -77,6 +77,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     fingerprint and no longer verifies. Sign it again. No keystore migration is
     needed.
 
+- **The battery rules follow the Commission's guidance v2.0, and
+  `co2ePerUnitKg` is optional.** The battery passport guidance *Digital
+  Batteries Passport — data points by category* was reissued as v2.0 on 15
+  August 2026. Compared line by line with v1.0, which the rules were written
+  against, its obligations differ in rows 19 to 23 only. (#389)
+  - **The four recycled-content shares** of Annex XIII point 1(e) (cobalt,
+    lithium, nickel and lead recovered from waste) move from `Mandatory` to
+    `NotApplicable` for EV, LMT and industrial batteries. v2.0 has them not
+    filled or displayed as of February 2027, to be applied in line with
+    Article 8 and its delegated act. The publish gate stops requiring them, and
+    the battery plugin refuses a passport that carries them.
+  - **The due diligence report** (row 19) stays `NotApplicable`. v2.0 now
+    gives a date rather than a missing format: Art. 48(1) applies from 18
+    August 2027, when the row becomes `Mandatory`. The rules carry no dates, so
+    that switch is still to be made.
+  - **`co2ePerUnitKg` is no longer required**, in a new battery schema v2.8.0,
+    and is `NotApplicable` for the same three categories.
+    `BatteryData::co2e_per_unit_kg` is `Option<f64>`. The guidance defers the
+    carbon footprint declaration of Annex XIII point 1(c), and a per-unit
+    figure is not that declaration anyway: Art. 7(1)(d) expresses it per kWh of
+    the total energy over the battery's expected service life.
+  - A v2.7.0 record reads forward unchanged through a pass-through lens, and
+    keeps any `co2ePerUnitKg` it carries. A reader built before this release
+    cannot read a v2.8.0 passport that omits the field. That break is taken now
+    because no passport has been issued.
+
+  **Migration:** wrap `co2e_per_unit_kg` values in `Some`. Stop sending the four
+  recycled-content shares and `co2ePerUnitKg` for EV, LMT and industrial
+  batteries.
+
 ### Added
 
 - **A standards register, and a tripwire that holds the code to it.**
@@ -163,6 +193,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   access credential, the local identity service, SD-JWT VC verification, and a
   ruleset bundle checked through an adapter over `verify_jws`. Nothing this
   workspace signs carries `crit`, so no existing token is affected.
+
+- **Three measured values of one battery were labelled public.** In battery
+  schemas v2.6.0 and v2.7.0, `dynamicPerformance` is `individual` (Annex XIII
+  point 4(a)), but its members `internalResistanceMohm`,
+  `roundTripEfficiencyPct` and `expectedLifetimeCycles` were `public`,
+  probably because they share names with the model-level figures at the top
+  level, which are public. Battery schema v2.8.0 labels them `individual`. No
+  audience's view changes, because the serving filter drops the whole object
+  for an audience that may not see it. (#388)
+
+  A new test holds every product group's current schema to the rule that no
+  member is visible to an audience its enclosing object is hidden from. It
+  found eight more members, which it lists as known faults with the reason
+  for each:
+  - **Six battery fields:** the `name` and `casNumber` of the anode, cathode
+    and electrolyte material arrays. They come from a shared definition whose
+    members collide with `criticalRawMaterial`'s public ones, so relabelling
+    them needs a change to how shared definitions are read.
+  - **Two electronics fields:** `criticalRawMaterials[].name` and
+    `countryOfOrigin`, which wait on the CRM Act reading in #314.
 
 ### Documentation
 

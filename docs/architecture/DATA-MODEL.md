@@ -237,13 +237,15 @@ property to validate against. The authoritative pair is:
 
 - `crates/dpp-domain/src/domain/product group/data/battery.rs` — the type, with a
   per-field regulatory citation on each doc comment.
-- `crates/dpp-domain/schemas/battery/v2.6.0.json` — the wire contract, with an
+- `crates/dpp-domain/schemas/battery/v2.8.0.json` — the wire contract, with an
   `x-disclosure` class on every property. `additionalProperties` is `false`, and
   a test asserts the two agree field-for-field.
 
-**Required** (6, and the only ones a passport cannot omit at any category):
-`gtin`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
-`co2ePerUnitKg`, `batteryType`. Everything else is `Option` — not laxity, but
+**Required** (5, and the only ones a passport cannot omit at any category):
+`productIdentifier`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
+`batteryType`. `co2ePerUnitKg` was required until v2.8.0; it is optional now,
+and barred for EV, LMT and industrial batteries, because the carbon footprint
+it would be read as is deferred. Everything else is `Option` — not laxity, but
 because the obligations are **per category**: a field mandatory for an
 electric-vehicle battery may be "not to be filled/displayed" for an LMT one.
 That constraint lives in `dpp_rules::batteries::passport_content`, which the

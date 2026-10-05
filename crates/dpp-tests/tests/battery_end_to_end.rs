@@ -91,7 +91,7 @@ fn make_battery_passport() -> Passport {
                 nominal_voltage_v: 3.2,
                 nominal_capacity_ah: 100.0,
                 expected_lifetime_cycles: Some(6000),
-                co2e_per_unit_kg: 73.2,
+                co2e_per_unit_kg: Some(73.2),
                 recycled_content_cobalt_pct: Some(12.0),
                 recycled_content_lithium_pct: Some(6.0),
                 recycled_content_nickel_pct: Some(9.0),

@@ -11,13 +11,21 @@ pub(super) fn build_battery_submodel(b: &BatteryData, passport_id: &str) -> AasS
         string_property("batteryChemistry", b.battery_chemistry.wire_str(), None),
         double_property("nominalVoltageV", b.nominal_voltage_v, None),
         double_property("nominalCapacityAh", b.nominal_capacity_ah, None),
-        double_property(
-            "co2ePerUnitKg",
-            b.co2e_per_unit_kg,
-            Some(semantic_ids::CO2E_PER_UNIT),
-        ),
-        string_property("batteryType", &enum_wire_str(&b.battery_type), None),
     ];
+    // Optional from schema v2.8.0. Emitted in the position it always had, so a
+    // record carrying one projects exactly as before.
+    if let Some(co2e) = b.co2e_per_unit_kg {
+        elements.push(double_property(
+            "co2ePerUnitKg",
+            co2e,
+            Some(semantic_ids::CO2E_PER_UNIT),
+        ));
+    }
+    elements.push(string_property(
+        "batteryType",
+        &enum_wire_str(&b.battery_type),
+        None,
+    ));
 
     macro_rules! push_opt_double {
         ($opt:expr, $id:literal) => {

@@ -83,7 +83,23 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_lifetime_cycles: Option<u32>,
     /// Carbon footprint in kg CO₂e per battery unit (manufacturer-supplied or calculated).
-    pub co2e_per_unit_kg: f64,
+    ///
+    /// Optional from schema v2.8.0. It is **not** the carbon footprint
+    /// declaration of Annex XIII point 1(c): Art. 7(1)(d) of Regulation (EU)
+    /// 2023/1542 expresses that per kWh of the total energy the battery provides
+    /// over its expected service life, and the Commission's battery passport
+    /// guidance (v2.0, 15 August 2026) has it not filled or displayed as of
+    /// February 2027 until an implementing act sets its format. A record written
+    /// before v2.8.0 keeps the value it carries; `#[serde(default)]` reads one
+    /// without it as `None`.
+    ///
+    /// ✅ COMPLIANCE-PIN: EU 2023/1542, Art. 7(1)(d), read in the consolidated
+    /// text of 31.7.2025 on 2026-10-05; the one later amendment, Reg. (EU)
+    /// 2026/1738, replaces Annex I only. The deferral is rows 17 and 18 of the
+    /// Commission's *Digital Batteries Passport — data points by category*,
+    /// v2.0 (15.8.2026).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub co2e_per_unit_kg: Option<f64>,
 
     // ── v1.0.0 optional fields ───────────────────────────────────────────
     /// Recycled cobalt content as a percentage of total cobalt (0.0–100.0).

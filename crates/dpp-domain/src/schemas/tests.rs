@@ -28,7 +28,7 @@ fn get_battery_v1() {
 fn latest_battery_returns_v2_7() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("battery").expect("battery schema exists");
-    assert_eq!(*version, "2.7.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "2.8.0".parse::<Version>().unwrap());
 }
 
 #[test]

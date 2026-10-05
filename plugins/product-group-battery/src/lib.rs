@@ -46,11 +46,11 @@ impl DppProductGroupPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.7.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.8.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.7.0".into(),
+            max_version: "2.8.0".into(),
         }
     }
 
@@ -485,7 +485,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.7.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.8.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 
