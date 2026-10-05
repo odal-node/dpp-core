@@ -5,20 +5,20 @@
 This document records the regulatory alignment of `dpp-core` with the EU
 Ecodesign for Sustainable Products Regulation (ESPR, Regulation (EU)
 2024/1781) and the anticipated product group delegated acts. It is intended for
-conformity assessment bodies, GS1 Solution Partner reviewers, and pilot
-programme evaluators.
+conformity assessment bodies and for anyone evaluating the library against
+those texts.
 
 ## Regulatory References
 
 | Reference | Status | dpp-core Alignment |
 |---|---|---|
 | ESPR (EU) 2024/1781 | In force | Core data model follows Art. 8–13 requirements |
-| CEN/CLC JTC 24 system standards | Six published May 2026 (EN 18216/18219/18220/18221/18222/18223); EN 18239 + 18246 at FprEN, expected ~Sep 2026; OJEU harmonisation citation pending | **No conformance assessed or claimed.** The standard texts have not been purchased, so no clause-by-clause mapping exists. Absent an OJEU citation there is also no presumption of conformity available to claim |
+| CEN/CLC JTC 24 system standards | Six cited in the OJ on 15 Jul 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it requires an assessment we have not published — not merely a citation, which now exists |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` struct implements Annex XIII fields (Art. 77 battery passport) |
 | Textile DPP Delegated Act | Pending — an ESPR working-plan priority | `TextileData` struct held provisional; validated structurally until the act finalises |
 | GS1 Digital Link URI Syntax | Published | `DigitalLink` parser covers AI 01, 21, 10. 🔶 **The revision implemented is not established** — see the note below |
-| IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `aas` module maps DPP to AAS Submodel |
-| W3C VC Data Model v2.0 | CR | `DppAccessCredential` follows VC envelope structure |
+| IDTA AAS Metamodel (IDTA-01001-3-0) | Published | `dpp-aas` maps a passport to AAS shells and submodels carrying this library's own semantics — every emitted `semanticId` is `urn:odal-node:*`. No IDTA conformance is claimed |
+| W3C VC Data Model v2.0 | W3C Recommendation, 15 May 2025 | `DppAccessCredential` follows VC envelope structure |
 
 ## Access Model — an Art. 77(2) lattice, not a ranking
 
@@ -101,37 +101,22 @@ reuse, the new economic operator assumes full DPP responsibility. The
 
 ### Versioned Schemas
 
-All product group schemas reside in `schemas/{product-group}/v{version}.json` and follow
-JSON Schema Draft-07. The `VersionedSchemaRegistry` embeds them at compile
-time via `include_str!()`.
+All product group schemas reside in
+`crates/dpp-domain/schemas/{product-group}/v{version}.json` and follow JSON
+Schema Draft-07. The `VersionedSchemaRegistry` embeds them at compile time via
+`include_str!()`. That directory is the list of product groups and versions; it
+is not restated here, because the copy this section used to carry had stopped
+at four product groups and their first versions.
 
-| Product group | Versions | Fields Covered |
-|---|---|---|
-| textile | v1.0.0, v1.1.0 | Fibre composition, SVHC, durability, microplastics |
-| battery | v1.0.0 | Chemistry, capacity, recycled content, SoH |
-| steel | v1.0.0 | CO₂ intensity, scrap content, production method |
-| unsold-goods | v1.0.0 | Unsold goods destruction reporting |
+### Textile Field Set
 
-### JTC 24 Field Coverage
+The textile schema's field set is this library's own. It is not derived from,
+and is not claimed to cover, any CEN/CLC JTC 24 standard — no clause-by-clause
+assessment of those standards is published here (see the table above).
 
-The textile v1.2.0 schema covers the fields carried by the
-CEN/CLC JTC 24 system standards (the six ENs published May 2026 —
-EN 18216/18219/18220/18221/18222/18223) and their data-model
-semantics:
-
-- `fibreComposition` (with per-fibre `countryOfOrigin`)
-- `countryOfOrigin` (ISO 3166-1 alpha-2 enforced)
-- `careInstructions`
-- `chemicalComplianceStandard`
-
-And all anticipated environmental and professional fields:
-
-- `carbonFootprintKgCo2e`, `waterUseLitres`, `microplasticSheddingMgPerWash`
-- `durabilityScore`, `repairScore`, `expectedWashCycles`
-- `svhcSubstances` (CAS number, concentration, SCIP notification)
-- `disassemblyInstructions`, `sparePartsAvailable`
-
-Integration test: `crates/dpp-tests/tests/schema_conformity.rs` asserts field coverage.
+Integration test: `crates/dpp-tests/tests/schema_conformity.rs` holds the field
+set against regression. Its own header says why that is not a conformity
+check.
 
 ## GS1 Interoperability
 
@@ -142,8 +127,9 @@ Integration test: `crates/dpp-tests/tests/schema_conformity.rs` asserts field co
   been diffed against neither. See the module-level note in `dpp-digital-link`.
 - **Link-type Negotiation** — Content negotiation returning different DPP
   representations (JSON-LD, HTML, AAS) based on the `linkType` query parameter.
-- **AAS Submodel Mapping** — Automatic conversion of DPP JSON to IDTA AAS
-  SubmodelElement structures for Industry 4.0 / Catena-X interoperability.
+- **AAS Submodel Mapping** — Conversion of passport JSON to AAS
+  SubmodelElement structures, carrying this library's own semantics. No IDTA or
+  Catena-X conformance is claimed.
 
 ## Unique Identifier — ISO/IEC 15459 (Battery Reg. Art. 77(3))
 
@@ -233,8 +219,9 @@ whatever hosts it and of that host's infrastructure, and is not evidenced here.
 
 ## Cryptographic Foundations
 
-- **Ed25519** — All signing operations use Ed25519 (EdDSA) as specified by
-  the ESPR implementing guidance.
+- **Ed25519** — All signing operations use Ed25519 (EdDSA). The curve is a
+  design choice of this library: no provision of ESPR or of its implementing
+  acts is recorded as requiring it.
 - **AES-256-GCM** — Key encryption at rest.
 - **did:web** — DID method for operator identification, with DID Document
   builder following W3C DID Core v1.0.
@@ -247,7 +234,9 @@ Product group-specific compliance logic runs as sandboxed Wasm modules
 
 - Capability negotiation (plugins declare supported operations).
 - Semantic versioning with compatibility checking.
-- Stateless invocation (no shared memory across plugin calls).
+- A stateless contract: each call carries its whole input, and a plugin is a
+  unit struct with no state of its own. Whether a host reuses a Wasm instance
+  between calls is that host's decision and is not evidenced here.
 
 ## Test Coverage
 
@@ -256,32 +245,39 @@ Product group-specific compliance logic runs as sandboxed Wasm modules
 | Textile end-to-end | `crates/dpp-tests/tests/textile_end_to_end.rs` | Passport lifecycle, AAS, GS1, credentials |
 | Transfer of responsibility | `crates/dpp-tests/tests/transfer_of_responsibility.rs` | Transfer chain, provenance, error cases |
 | Audience gatekeeping | `crates/dpp-tests/tests/access_gatekeeping.rs` | All three audiences, edge cases, custom policies |
-| Schema conformity | `crates/dpp-tests/tests/schema_conformity.rs` | JTC 24 field coverage, structure validation |
+| Schema conformity | `crates/dpp-tests/tests/schema_conformity.rs` | Schema validity, textile field-set regression — not a conformity check |
 | Unit tests | Per-module `#[cfg(test)]` | All crates have inline unit tests |
 
 ## CI/CD Gate
 
-The `just check` recipe and GitHub Actions CI run:
-
-1. `cargo fmt --all --check` — Formatting consistency.
-2. `cargo clippy --workspace --all-targets -- -D warnings` — Zero warnings.
-3. `cargo nextest run --workspace` — All unit and integration tests.
-4. `cargo audit` — RustSec advisory database check.
+The `check` recipe in `justfile` is the local gate, and its dependency list is
+the list of what it runs — formatting, lints and tests for the workspace and
+for the sector plugins, doc-tests, the doc build, the lockfile check and
+`cargo audit`. It is not restated step by step here, because the four-step copy
+this section used to carry had fallen behind it. GitHub Actions
+(`.github/workflows/`) covers the same ground in separate jobs and adds what
+`check` cannot: the Wasm cross-compiles, the orphaned-tests guard, and the GS1,
+AAS and JAdES oracle suites in their own workflows.
 
 ## Known Gaps
 
-1. **JWS signature verification** in `jws_verifier` performs structural checks
-   but does not yet resolve DIDs from the network to fetch public keys. This
-   requires a host's HTTP client (not available in the pure core).
+1. **DID resolution.** `dpp_crypto::jws` verifies an EdDSA signature
+   cryptographically against a public key the caller supplies. Fetching a
+   `did:web` document over the network to obtain that key needs an HTTP
+   client, which the pure core does not have, so a host does it.
 
-2. **StatusList2021** revocation checking is modelled but not implemented
-   (requires HTTP fetching of the status list credential).
+2. **Status list fetching.** Revocation is decided against a W3C Bitstring
+   Status List v1.0: `dpp_vc::status_list` decodes the list and
+   `check_revocation` reads the credential's bit, failing closed on an index
+   the list cannot answer. Fetching the status list credential needs an HTTP
+   client, so a host supplies the list.
 
 3. **Schema hot-reload** is implemented but the file-watching trigger lives
    in a host crate.
 
-4. **Wasm plugins** are excluded from workspace CI. The `wasm-build.yml`
-   workflow handles them separately.
+4. **Wasm plugins** are excluded from the Cargo workspace. `just check` still
+   formats, lints and tests them through their own recipes, and the
+   `wasm-build.yml` workflow cross-compiles every plugin to `wasm32-wasip1`.
 
 ## Contact
 

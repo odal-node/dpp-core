@@ -13,6 +13,62 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Documentation
+
+- **The conformity statement carried an unsourced regulatory attribution and
+  claims that had gone stale.** This was an accuracy pass over
+  `docs/regulatory/CONFORMITY.md`, the document addressed to conformity
+  assessment bodies. Every claim was re-checked against the tree or a primary
+  source, not simply re-read.
+
+  **Unsourced.** The document said Ed25519 was used *"as specified by the ESPR
+  implementing guidance"*. No provision of ESPR or of its implementing acts is
+  recorded as requiring any signature algorithm. The curve is this library's
+  design choice, and the text now says so.
+
+  **Stale against its own sources.**
+  - W3C VC Data Model 2.0 was listed as a Candidate Recommendation. It has been
+    a W3C Recommendation since 15 May 2025. The README said only "Published";
+    it now gives the same status and date.
+  - The CEN/CLC JTC 24 row still said the OJ citation was pending. It now
+    matches the README's earlier correction: cited by CID (EU) 2026/1736 on
+    15 July 2026, with no conformance claimed.
+  - The same row gave the absence of the standard texts as the reason no
+    clause-by-clause mapping existed, while the same document cites
+    EN 18219:2026 clause 6.3.2. That reason is gone.
+  - The row's forward-looking line about EN 18239 and EN 18246 had no source
+    and is removed.
+
+  **Overclaims.**
+  - The textile schema was said to cover the fields of the JTC 24 system
+    standards. That contradicted the table above it, and also the header of the
+    test cited as evidence (`schema_conformity.rs`), which says it is not a
+    conformity check. The field set is now described as this library's own.
+  - The AAS mapping claimed Catena-X interoperability. It carries
+    `urn:odal-node:*` semantics and claims no IDTA or Catena-X conformance, as
+    the README already said.
+  - `docs/project/BLUEPRINT.md` repeated this Catena-X claim along with
+    *"GS1 Digital Link v1.2"*, a revision with no recorded source. Both are
+    removed there too.
+
+  **Copies that had fallen behind.**
+  - The schema table listed four product groups at their first versions; there
+    are twelve. The CI section listed four of the gate's steps. Both sections
+    now point at their source (the schemas directory and the `check` recipe)
+    instead of restating it.
+  - The known gaps described a `jws_verifier` doing "structural checks".
+    Verification is cryptographic, and only fetching the DID document is left
+    to a host.
+  - The known gaps also named StatusList2021. The implementation is W3C
+    Bitstring Status List v1.0, and only fetching the list is left to a host.
+  - The plugin section promised "no shared memory across plugin calls". That
+    is a host property this crate cannot evidence, and it is now described as
+    one.
+
+  **Elsewhere.** The document named two audiences it had no basis to address,
+  and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
+  exist. Both are fixed.
+
 ## [0.21.0] - 2026-09-28
 
 ### Breaking
