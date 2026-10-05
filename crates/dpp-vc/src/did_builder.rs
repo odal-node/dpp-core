@@ -25,14 +25,17 @@ use dpp_crypto::keystore::{KeyStore, PublicKeyInfo};
 
 /// The DID of the issuer whose documents are served from `base_url`.
 ///
-/// `did:web:{hostname}`, pathless, so it resolves to `/.well-known/did.json`. A
-/// port's colon is percent-encoded, because it would otherwise read as a path
-/// separator.
+/// `did:web:{hostname}`, pathless, so it resolves to `/.well-known/did.json`. Only
+/// the URL's authority is used: a trailing slash, path, query or fragment would
+/// otherwise land inside the DID, where `/`, `?` and `#` begin a DID URL's own
+/// components rather than belonging to the identifier. A port's colon is
+/// percent-encoded, because it would otherwise read as a path separator.
 pub fn did_for(base_url: &str) -> String {
-    let hostname = base_url
+    let rest = base_url
         .trim_start_matches("https://")
         .trim_start_matches("http://");
-    format!("did:web:{}", hostname.replace(':', "%3A"))
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    format!("did:web:{}", authority.replace(':', "%3A"))
 }
 
 /// Build a `did:web` DID document for an issuer.

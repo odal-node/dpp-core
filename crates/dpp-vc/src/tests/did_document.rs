@@ -3,7 +3,7 @@
 
 use base64::Engine;
 
-use crate::did_builder::build_did_document;
+use crate::did_builder::{build_did_document, did_for};
 use crate::test_support::temp_store;
 
 #[test]
@@ -34,6 +34,33 @@ fn did_id_is_pathless_did_web() {
         build_did_document(&store, "https://identity.odal-node.io", "widgets-inc").expect("build");
     let id = doc["id"].as_str().expect("id is string");
     assert_eq!(id, "did:web:identity.odal-node.io");
+}
+
+/// Only the authority becomes the DID. A slash, path, query or fragment after it
+/// would otherwise sit inside the identifier, where `/`, `?` and `#` begin a DID
+/// URL's components and an outside verifier would resolve something else.
+#[test]
+fn the_did_is_the_base_urls_authority_alone() {
+    for base_url in [
+        "https://id.example.com",
+        "https://id.example.com/",
+        "https://id.example.com/issuers/42",
+        "https://id.example.com?tenant=a",
+        "https://id.example.com#top",
+        "http://id.example.com/",
+    ] {
+        assert_eq!(
+            did_for(base_url),
+            "did:web:id.example.com",
+            "base URL {base_url:?}"
+        );
+    }
+
+    // A port stays, its colon encoded, and its own suffix goes.
+    assert_eq!(
+        did_for("http://localhost:8080/"),
+        "did:web:localhost%3A8080"
+    );
 }
 
 #[test]
