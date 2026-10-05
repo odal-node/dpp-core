@@ -13,6 +13,70 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **A key is named by its own thumbprint, and every signature names the key
+  that made it.** Until now, verification methods were named by position. The
+  current key was always `#key-1`, and archived keys were renumbered whenever a
+  revoked one dropped out, so after a rotation `#key-1` named a different key. A
+  token's `kid` sits in its protected header and can never be rewritten, so the
+  name it carries has to be fixed too. (#376, #370)
+
+  **DID documents** (`build_did_document`):
+  - each verification method is a `JsonWebKey` (W3C Controlled Identifiers
+    v1.0) instead of `JsonWebKey2020`, which was a Community Group type;
+  - `@context` is `https://www.w3.org/ns/did/v1` plus
+    `https://www.w3.org/ns/cid/v1`, instead of the `jws-2020` suite context;
+  - each method's `id` is the DID, `#`, and the key's RFC 7638 SHA-256
+    thumbprint in RFC 9278 URI form:
+    `did:web:…#urn:ietf:params:oauth:jwk-thumbprint:sha-256:…`;
+  - the JWK gains `kid`, the same thumbprint URI, and `alg`, the identifier the
+    key signs under.
+
+  **Signing.** `jws::sign` and `jws::sign_typed` take the `kid` as a parameter,
+  because what it must be depends on how the token is verified:
+  - a passport JWS or a VC-JWT carries the absolute DID URL of the verification
+    method. VC-JOSE-COSE requires `kid` to be an absolute URL to a verification
+    method when `iss` is absent, and the old hex fingerprint was not one;
+  - an SD-JWT VC carries the thumbprint URI alone, which is the `kid` of its
+    entry in the issuer metadata's `jwks` (`draft-ietf-oauth-sd-jwt-vc-19`
+    clause 4.2).
+
+  **Verification.** `resolve_verification_key(did_document, jws)` replaces
+  `extract_key_by_fingerprint` and `extract_primary_public_key`, which are
+  removed. It returns a key only when all of these hold:
+  - the `kid` without its fragment is the document's `id`, and the method's
+    `controller` is that same DID (Controlled Identifiers v1.0 §3.3);
+  - `assertionMethod` references the method;
+  - the JWK is Ed25519;
+  - a fragment that is a thumbprint URI is the key's own;
+  - a JWK that declares an `alg` matches the header.
+
+  A token without a `kid` is refused rather than checked against a default key.
+
+  **`alg` stays `EdDSA`, and verification now also accepts `Ed25519`.** RFC 9864
+  deprecates `EdDSA` in favour of `Ed25519`, but lets a documented operational
+  requirement keep it. Two apply: the European Commission's DSS validator maps
+  only `EdDSA` for JOSE, and the W3C VC-JOSE-COSE test suite signs its fixtures
+  with it. The keystore is unchanged.
+
+  **New public items:** `did_for`, `PublicKeyInfo::thumbprint_uri`,
+  `KeyAlgorithm::{jwk_thumbprint, thumbprint_uri, published_jwk}`,
+  `ED25519_ALG` and `JWK_THUMBPRINT_URI_PREFIX`.
+
+  **Migration:**
+  - Pass a `kid` to `sign` / `sign_typed`:
+    - for a token verified through a DID document,
+      `format!("{}#{}", did_for(base_url), store.public_key(key_id)?.thumbprint_uri()?)`;
+    - for an SD-JWT VC, the `thumbprint_uri()` alone.
+  - Replace `extract_kid_from_jws` followed by `extract_key_by_fingerprint` or
+    `extract_primary_public_key` with `resolve_verification_key`.
+  - Code that read `#key-1` as the current key should read
+    `authentication[0]`.
+  - A token signed before this release names its key by the old hex
+    fingerprint and no longer verifies. Sign it again. No keystore migration is
+    needed.
+
 ### Added
 
 - **A standards register, and a tripwire that holds the code to it.**
@@ -52,7 +116,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   The first read found three things:
   - **RFC 9864** (October 2025) updates RFC 8037. It deprecates the JOSE `alg`
     value `EdDSA`, which every JWS here carries, in favour of `Ed25519`.
-    Nothing changes in this release; the decision is #370.
+    What this release does about it is under Breaking above.
   - **ETSI TS 119 612** V2.4.1 has been published, while `trusted_list` cites
     V2.3.1.
   - **IDTA-01001** is at revision 3-2, while `dpp-aas` cites 3-0.
@@ -60,6 +124,45 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   It also establishes one status that had never been stated: the `did:web`
   method specification is a W3C Community Group document marked `unofficial`,
   not a W3C standard.
+
+- **The RFCs' own test vectors now run in `just check`.** The signature library,
+  the canonicaliser and the key-derivation function had been checked only
+  against this repository's own expectations, which cannot catch a misreading
+  shared by the code and its tests. Five RFCs publish vectors for things this
+  workspace relies on, and all five now run:
+  - RFC 8785: Appendix B's 24 number serialisations, the worked example of
+    clauses 3.2.2 to 3.2.4 compared byte for byte, and the data for the UTF-16
+    property sort. Every signature and content hash in the workspace is over
+    this canonical form.
+  - RFC 8032: the five Ed25519 vectors of clause 7.1, including the 1023-byte
+    message, through `ed25519-dalek`.
+  - RFC 8037: appendix A's Ed25519 key pair and public JWK, through the
+    `publicKeyJwk` this crate emits and the DID-document key reader, and the JWS
+    of A.4 and A.5, which this crate's verifier accepts.
+  - RFC 9106: clause 5.3's Argon2id vector, through the `argon2` crate the
+    keystore uses. The keystore's cost parameters are not the RFC's, so the
+    vector runs through the crate with the RFC's parameters.
+  - RFC 9562: appendix A.6's UUIDv7 example, through the carrier-serial
+    derivation, which relies on the layout the RFC defines.
+
+  All of them passed, so nothing else in the workspace changed. RFC 8037's A.3,
+  the JWK thumbprint, runs with the thumbprint code under Breaking above. Not
+  run: the NaN and Infinity rows of RFC 8785, which a `serde_json::Value`
+  cannot hold; and the larger number file and the input and output files that
+  the RFC's author publishes separately.
+
+### Fixed
+
+- **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
+  4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
+  does not understand, and `dpp_crypto::jws` never read the member. A token its
+  producer had marked "do not process this unless you understand the extension"
+  therefore verified whenever its signature did. `verify_jws` and
+  `jws::signer::verify` now refuse any `crit`, since this crate understands no
+  extension, and so does every verifier built on them: the snapshot bound, the
+  access credential, the local identity service, SD-JWT VC verification, and a
+  ruleset bundle checked through an adapter over `verify_jws`. Nothing this
+  workspace signs carries `crit`, so no existing token is affected.
 
 ### Documentation
 

@@ -2,7 +2,6 @@
 //! credential type.
 
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 
 use dpp_crypto::keystore::{KeyStore, PublicKeyInfo};
 
@@ -91,24 +90,17 @@ pub(super) fn metadata_for_keys(
 ///
 /// Clause 4.2: *"It is RECOMMENDED that the Issuer-signed JWT contains a `kid`
 /// JWT header parameter that can be used to look up the public key in the JWK
-/// Set."* The signer emits the key's fingerprint as `kid`, so the same value has
-/// to appear here or the recommendation is met in name only — a verifier holding
-/// two keys would have no way to pick.
+/// Set."* [`super::issue`] writes the key's thumbprint URI as `kid`, and
+/// [`KeyAlgorithm::published_jwk`] puts the same value in the JWK, or the
+/// recommendation is met in name only — a verifier holding two keys would have no
+/// way to pick.
+///
+/// [`KeyAlgorithm::published_jwk`]: dpp_crypto::jws::algorithm::KeyAlgorithm::published_jwk
 fn jwk(key: &PublicKeyInfo) -> Option<Value> {
     let bytes = hex::decode(&key.verifying_key_hex).ok()?;
-    let mut jwk = key.algorithm.public_key_jwk(&bytes);
-    let object = jwk.as_object_mut()?;
-    // The same derivation the key store uses for `KeyEntry::fingerprint`, which
-    // is what `jws::sign_typed` writes into the header.
-    object.insert(
-        "kid".to_owned(),
-        Value::String(hex::encode(Sha256::digest(&bytes))),
-    );
-    // RFC 7517 clause 4.2/4.4: these keys verify signatures and nothing else.
-    object.insert("use".to_owned(), Value::String("sig".to_owned()));
-    object.insert(
-        "alg".to_owned(),
-        Value::String(key.algorithm.jose_alg().to_owned()),
-    );
+    let mut jwk = key.algorithm.published_jwk(&bytes);
+    // RFC 7517 clause 4.2: these keys verify signatures and nothing else.
+    jwk.as_object_mut()?
+        .insert("use".to_owned(), Value::String("sig".to_owned()));
     Some(jwk)
 }

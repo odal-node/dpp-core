@@ -44,24 +44,31 @@ Every issuer has one DID Document. `dpp_vc::did_builder` constructs it from the 
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1"],
+  "@context": ["https://www.w3.org/ns/did/v1", "https://www.w3.org/ns/cid/v1"],
   "id": "did:web:manufacturer.example.com",
   "verificationMethod": [
     {
-      "id": "did:web:manufacturer.example.com#key-1",
-      "type": "JsonWebKey2020",
+      "id": "did:web:manufacturer.example.com#urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}",
+      "type": "JsonWebKey",
       "controller": "did:web:manufacturer.example.com",
-      "publicKeyJwk": { "kty": "OKP", "crv": "Ed25519", "x": "{base64url-public-key}" }
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "{base64url-public-key}",
+        "kid": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}",
+        "alg": "EdDSA"
+      }
     }
   ],
-  "assertionMethod": ["did:web:manufacturer.example.com#key-1"],
-  "authentication": ["did:web:manufacturer.example.com#key-1"]
+  "assertionMethod": ["did:web:manufacturer.example.com#urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}"],
+  "authentication": ["did:web:manufacturer.example.com#urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}"]
 }
 ```
 
-- `verificationMethod`: All public keys, including archived ones from rotation. Old keys are **never removed** — they are retained so previously signed VCs remain verifiable.
-- `assertionMethod`: Only the current active key (permitted to sign new VCs).
-- `authentication`: Keys permitted for authentication flows.
+- `verificationMethod`: the current key first, then every archived key that has not been revoked, so previously signed VCs remain verifiable. A **revoked** key is removed, so its signatures stop verifying.
+- `assertionMethod`: every listed key. This is the relationship a signature is checked against.
+- `authentication`: the current key only.
+- Each method is a `JsonWebKey` (W3C Controlled Identifiers v1.0) whose JWK carries its own `kid` and the `alg` the key signs under.
 
 ---
 
@@ -79,19 +86,17 @@ let key = store.load_key(&key_id)?;       // load existing key
 
 ### Key IDs
 
-Key IDs follow the pattern `{did}#key-{n}` where `n` increments on each rotation:
-- `#key-1` — initial key (primary, in `authentication` + `assertionMethod`)
-- `#key-2` — after first rotation (`key-1` retained in `verificationMethod` only)
+A key is identified by its RFC 7638 SHA-256 thumbprint, written as an RFC 9278 URI: `urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}`. The verification method's id is the DID, `#`, and that URI. The identifier is derived from the key alone, so it never changes: not when a newer key is generated, and not when another key is revoked and drops out of the document. A position in a list could not promise that, and a signed token's `kid` is fixed for as long as the token exists.
 
 ### Key Rotation
 
 Key rotation does not invalidate existing signatures:
 
 1. Current key is archived with a timestamp
-2. New Ed25519 keypair generated, becomes `#key-1` (primary)
-3. Archived keys retained as `#key-2`, `#key-3`, etc. under `assertionMethod`
+2. New Ed25519 keypair generated, and listed first as the current key
+3. Archived keys keep their identifiers and stay under `assertionMethod`
 4. All future VCs are signed with the new key
-5. All existing VCs reference the old key in their `proof.verificationMethod` — verifiers use the specific key referenced in the proof, not the "current" key
+5. A token names the key that signed it in its `kid`, so verifiers use that key, not the "current" one
 
 ---
 
@@ -101,24 +106,26 @@ Key rotation does not invalidate existing signatures:
 
 `dpp_crypto::jws::signer::sign()` produces a JWS compact serialisation (EdDSA with Ed25519):
 
-1. Serialize the VC payload deterministically (sorted keys, no extra whitespace)
-2. Build the JWS Protected Header: `{"alg": "EdDSA", "b64": false, "crit": ["b64"], "kid": "{did}#key-1"}`
-3. Signing input: `base64url(header) || "." || payload_bytes`
+1. Serialize the payload as RFC 8785 (JCS) canonical JSON
+2. Build the JWS Protected Header: `{"alg": "EdDSA", "kid": "{kid}"}`, plus `typ` where the token type has one. For anything verified through the DID document, the `kid` is the absolute DID URL of the signing key's verification method, `{did}#urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}`. An SD-JWT VC carries the thumbprint URI alone, which is what its issuer metadata's key set names
+3. Signing input: `base64url(header) || "." || base64url(payload)`
 4. Sign with Ed25519
-5. Compact serialisation: `{header_b64}..{signature_b64}` (double dot — payload carried separately in the VC)
+5. Compact serialisation: `{header_b64}.{payload_b64}.{signature_b64}`
+
+`EdDSA` is the identifier RFC 9864 deprecates in favour of `Ed25519`. It is still the one written, because the European Commission's DSS validator maps only `EdDSA` for JOSE and the W3C VC-JOSE-COSE test suite signs with it. Verification accepts both.
 
 ### Verification
 
 `dpp_crypto::jws::verifier` provides the single source of truth for JWS verification:
 
 ```rust
-verify_jws(jws_compact, public_key_b64)?;
-extract_primary_public_key(did_document)?;
+let key = resolve_verification_key(&did_document, jws_compact)?;
+verify_jws(jws_compact, &key)?;
 ```
 
 The verifier:
 1. Fetches the issuer's DID Document (via the `did:web` resolution rule)
-2. Extracts the Ed25519 public key for the `kid` referenced in the JWS header
+2. Resolves the verification method the JWS `kid` names, with the binding checks of Controlled Identifiers v1.0 §3.3: the document is the one the `kid` names, the method is that document's, and `assertionMethod` references it. A `kid` that is a thumbprint URI must be the key's own, and a JWK that declares an `alg` must match the header. A token without a `kid` is refused
 3. Reconstructs the signing input and verifies the Ed25519 signature
 
 ---
