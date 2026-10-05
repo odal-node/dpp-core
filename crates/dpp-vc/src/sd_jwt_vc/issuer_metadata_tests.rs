@@ -64,6 +64,15 @@ fn kids(metadata: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The `kid` the current key is published under: its thumbprint URI.
+fn current_kid(store: &dpp_crypto::keystore::KeyStore) -> String {
+    store
+        .public_key(KEY_ID)
+        .expect("current key")
+        .thumbprint_uri()
+        .expect("thumbprint")
+}
+
 /// A compromise rotation takes the revoked key out of the published set, and
 /// serves its replacement alone.
 ///
@@ -73,16 +82,9 @@ fn kids(metadata: &Value) -> Vec<String> {
 #[test]
 fn a_revoked_key_is_not_published_after_a_compromise_rotation() {
     let store = temp_store("sdjwtvc-revoke", KEY_ID);
-    let revoked = store
-        .load_key(KEY_ID)
-        .expect("current key")
-        .fingerprint
-        .clone();
-    let replacement = store
-        .revoke_and_rotate(KEY_ID)
-        .expect("revoke and rotate")
-        .fingerprint
-        .clone();
+    let revoked = current_kid(&store);
+    store.revoke_and_rotate(KEY_ID).expect("revoke and rotate");
+    let replacement = current_kid(&store);
 
     let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
     assert_eq!(kids(&metadata), [replacement]);
@@ -94,16 +96,9 @@ fn a_revoked_key_is_not_published_after_a_compromise_rotation() {
 #[test]
 fn a_rotated_key_stays_published() {
     let store = temp_store("sdjwtvc-rotate", KEY_ID);
-    let old = store
-        .load_key(KEY_ID)
-        .expect("current key")
-        .fingerprint
-        .clone();
-    let new = store
-        .rotate_key(KEY_ID)
-        .expect("rotate")
-        .fingerprint
-        .clone();
+    let old = current_kid(&store);
+    store.rotate_key(KEY_ID).expect("rotate");
+    let new = current_kid(&store);
 
     let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
     let published = kids(&metadata);

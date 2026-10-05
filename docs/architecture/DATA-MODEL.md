@@ -402,7 +402,7 @@ When a DPP transitions to `Published`, it is wrapped in a W3C Verifiable Credent
   },
   "proof": {
     "type": "JsonWebSignature2020",
-    "verificationMethod": "did:web:manufacturer.example.com#key-1",
+    "verificationMethod": "did:web:manufacturer.example.com#urn:ietf:params:oauth:jwk-thumbprint:sha-256:{thumbprint}",
     "proofPurpose": "assertionMethod",
     "jws": "eyJhbGciOiJFZERTQSJ9..{signature}"
   }
