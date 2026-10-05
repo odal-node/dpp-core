@@ -16,8 +16,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 ### Added
 
 - **A standards register, and a tripwire that holds the code to it.**
-  `docs/architecture/STANDARDS.md` records every external technical
-  specification the repository cites. For each one it gives:
+  `docs/architecture/STANDARDS.md` records the IETF, W3C, GS1, IDTA and ETSI
+  specifications the repository cites. ISO/IEC and IEC standards are not yet
+  covered. For each specification it gives:
   - the revision cited;
   - its status as last read, and the date of that read;
   - where the code uses it;
@@ -34,10 +35,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - a draft must be cited with its revision and must claim no conformance;
   - a row nothing cites fails, so the register cannot go stale.
 
+  A fifth rule covers every row of both tables: each must have a status and a
+  `YYYY-MM-DD` date for the read that gave it.
+
   The test reads a file, not the IETF, so it cannot see a status change. For
   that, the Pre-Release Checklist gains a step that re-reads every row at its
-  source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only
-  check.
+  source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only check
+  on whether they are still cited.
 
   The first read found three things:
   - **RFC 9864** (October 2025) updates RFC 8037. It deprecates the JOSE `alg`
@@ -73,7 +77,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   **Stale against its own sources.**
   - W3C VC Data Model 2.0 was listed as a Candidate Recommendation. It has been
     a W3C Recommendation since 15 May 2025. The README said only "Published";
-    it now gives the same status and date.
+    its coverage table now points at the standards register, which gives the
+    status and date.
   - The CEN/CLC JTC 24 row still said the OJ citation was pending. It now
     matches the README's earlier correction: cited by CID (EU) 2026/1736 on
     15 July 2026, with no conformance claimed.

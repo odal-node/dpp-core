@@ -1,6 +1,7 @@
 # Standards Register
 
-One row per external technical specification this repository cites. Each row
+One row per IETF, W3C, GS1, IDTA and ETSI specification this repository cites.
+ISO/IEC and IEC standards are not yet covered; that is tracked in #392. Each row
 records:
 
 - which revision is cited;
@@ -24,9 +25,12 @@ status is a fact about the Official Journal, are covered in
   - a draft is cited without its revision number, or its row claims
     conformance;
   - a row is cited nowhere.
-- **Other rows are not machine-checked.** W3C, GS1, IDTA and ETSI identifiers
-  take too many shapes to match reliably, so the re-read below is their only
-  check.
+- **Every row, in both tables, carries a status and the date it was read.** The
+  same test fails on an empty `Status as read`, or a `Read` that is not a
+  `YYYY-MM-DD` date.
+- **The other rows are not checked against the code.** W3C, GS1, IDTA and ETSI
+  identifiers take too many shapes to match reliably, so nothing checks that
+  they are still cited. The re-read below is the only check on that.
 - **Every status is re-read at release.** The Pre-Release Checklist in
   [`governance/RELEASE.md`](../governance/RELEASE.md) re-reads each row at its
   source and updates the date. The gate proves that every citation has a status

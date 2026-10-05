@@ -32,14 +32,23 @@
 //!    text this repository no longer relies on, and every release would re-read
 //!    it for nothing.
 //!
+//! A fifth rule applies to every row of the register, in both tables, and not
+//! only to the IETF rows:
+//!
+//! 5. **A row carries a status and the date it was read.** An empty `Status as
+//!    read`, or a `Read` that is not a `YYYY-MM-DD` date, fails. Without this the
+//!    promise below, that each citation has a status somebody read and dated,
+//!    would hold only until a cell was cleared.
+//!
 //! # What this cannot prove
 //!
 //! That a recorded status is **current**. The gate reads a file, not the IETF.
-//! What it proves is that each citation has a status somebody read and dated.
-//! That turns the release-time re-read (`docs/governance/RELEASE.md`) into a
-//! walk down one table instead of a search. W3C, GS1, IDTA and ETSI identifiers
-//! take too many shapes to match reliably, so the re-read is the only check on
-//! their rows.
+//! What it proves is that each IETF citation has a row, and that every row has a
+//! status somebody read and dated. That turns the release-time re-read
+//! (`docs/governance/RELEASE.md`) into a walk down one table instead of a
+//! search. W3C, GS1, IDTA and ETSI identifiers take too many shapes to match
+//! reliably, so nothing checks that their rows are still cited: the re-read is
+//! the only check on those.
 //!
 //! # What it reads
 //!
@@ -182,6 +191,55 @@ fn register() -> Vec<Row> {
         !rows.is_empty(),
         "{REGISTER} yielded no IETF rows — the gate would pass by reading nothing"
     );
+    rows
+}
+
+/// A register row's first cell, its `Status as read`, and its `Read` date, for
+/// every row of every table that has both columns.
+///
+/// Reads both tables, and fails if either goes unread: a gate that quietly
+/// stopped seeing one of them would keep passing.
+fn dated_rows() -> Vec<(String, String, String)> {
+    let path = workspace_root().join(REGISTER);
+    let text =
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+
+    let mut header: Option<Vec<String>> = None;
+    let mut tables = Vec::new();
+    let mut rows = Vec::new();
+    for line in text.lines() {
+        let Some(row) = cells(line) else {
+            header = None;
+            continue;
+        };
+        let Some(columns) = header.as_ref() else {
+            tables.push(row[0].clone());
+            header = Some(row);
+            continue;
+        };
+        if row
+            .iter()
+            .all(|c| c.chars().all(|ch| ch == '-' || ch == ':'))
+        {
+            continue;
+        }
+        let at = |name: &str| columns.iter().position(|c| c == name);
+        let (Some(status), Some(read)) = (at("Status as read"), at("Read")) else {
+            continue;
+        };
+        rows.push((
+            row[0].clone(),
+            row.get(status).cloned().unwrap_or_default(),
+            row.get(read).cloned().unwrap_or_default(),
+        ));
+    }
+
+    for table in ["Spec", "Specification"] {
+        assert!(
+            tables.iter().any(|t| t == table),
+            "{REGISTER} has no table whose first column is `{table}` — the gate would pass by not reading it"
+        );
+    }
     rows
 }
 
@@ -334,6 +392,32 @@ fn every_register_row_is_still_cited() {
         "{REGISTER} has rows nothing cites any more. Remove them, or they will be \
          re-read at every release for a text this repository no longer relies on: \
          {stale:?}"
+    );
+}
+
+/// Rule 5: every row carries a status and the date it was read.
+#[test]
+fn every_register_row_carries_a_status_and_a_read_date() {
+    let faulty: Vec<String> = dated_rows()
+        .into_iter()
+        .filter_map(|(spec, status, read)| {
+            let mut faults = Vec::new();
+            if status.is_empty() {
+                faults.push("no `Status as read`");
+            }
+            let a_date =
+                read.len() == 10 && chrono::NaiveDate::parse_from_str(&read, "%Y-%m-%d").is_ok();
+            if !a_date {
+                faults.push("`Read` is not a YYYY-MM-DD date");
+            }
+            (!faults.is_empty()).then(|| format!("  {spec}: {}", faults.join(", ")))
+        })
+        .collect();
+    assert!(
+        faulty.is_empty(),
+        "{REGISTER} has rows without a dated status. Read the specification's \
+         current status at its source and record it with the date:\n{}",
+        faulty.join("\n")
     );
 }
 
