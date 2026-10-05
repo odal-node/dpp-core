@@ -28,6 +28,9 @@ status is a fact about the Official Journal, are covered in
 - **Every row, in both tables, carries a status and the date it was read.** The
   same test fails on an empty `Status as read`, or a `Read` that is not a
   `YYYY-MM-DD` date.
+- **A conformance claim is held to its evidence.** The same test fails on a
+  `Yes` that names no repository path, that names one which does not exist, or
+  whose row offers nothing but unit tests as evidence.
 - **The other rows are not checked against the code.** W3C, GS1, IDTA and ETSI
   identifiers take too many shapes to match reliably, so nothing checks that
   they are still cited. The re-read below is the only check on that.
@@ -36,9 +39,34 @@ status is a fact about the Official Journal, are covered in
   source and updates the date. The gate proves that every citation has a status
   somebody read and dated. It cannot prove that status is still current.
 
-**"Conformance claimed" is `No` throughout.** Code here *implements* the parts of
-a specification it uses. Claiming conformance would mean stating a profile and
-the options chosen, and nothing here does that yet.
+## Claiming conformance
+
+A conformance claim lives in one place: the `Conformance claimed` cell of the
+specification's row. No other document restates it;
+[`README.md`](../../README.md), [`regulatory/CONFORMITY.md`](../regulatory/CONFORMITY.md)
+and [`project/BLUEPRINT.md`](../project/BLUEPRINT.md) point here instead. Code
+here *implements* the parts of a specification it uses, and that is not a claim.
+
+A cell may start with `Yes` only if it says, in the cell itself:
+
+1. the **conformance class** the specification defines, such as a conforming
+   issuer implementation;
+2. the **scope**: the features and options covered, for example "compact
+   serialisation, no key binding";
+3. the **known deviations**. A claim with a deviation it does not list is not
+   made;
+4. that the claim is **self-declared**, since no body certifies these;
+5. **evidence that is not circular**, each piece named as a repository path: the
+   specification's own test vectors, an official or independent test suite, or an
+   independent implementation used as an oracle.
+
+Unit tests written against this repository's own reading of a specification can
+never carry a claim alone, because the code and its tests would share any
+misreading.
+
+`standard_citations.rs` checks the form of a claim, not its truth. Whether the
+named evidence is not circular, and whether the class, scope and deviations are
+right, is a reviewer's call. A cell that reads `No` makes no claim.
 
 ## IETF
 
