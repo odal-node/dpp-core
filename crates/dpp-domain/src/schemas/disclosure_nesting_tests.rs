@@ -53,11 +53,15 @@ fn walk(
         if active_refs.iter().any(|r| r == pointer) {
             return;
         }
-        if let Some(target) = pointer.strip_prefix('#').and_then(|p| root.pointer(p)) {
-            active_refs.push(pointer.to_owned());
-            walk(target, path, enclosing, root, active_refs, out);
-            active_refs.pop();
-        }
+        // A reference this walk cannot follow would hide its whole subtree from
+        // the check and still pass, so it fails instead.
+        let target = pointer
+            .strip_prefix('#')
+            .and_then(|p| root.pointer(p))
+            .unwrap_or_else(|| panic!("{path}: cannot resolve $ref {pointer:?}"));
+        active_refs.push(pointer.to_owned());
+        walk(target, path, enclosing, root, active_refs, out);
+        active_refs.pop();
     }
 
     let own = node.get("x-disclosure").and_then(Value::as_str).map(class);
@@ -154,13 +158,14 @@ const KNOWN_FAULTS: &[(&str, &str, &str, &str)] = &[
         "1.4.0",
         "criticalRawMaterials[].name",
         "which critical raw materials a product contains is a disclosure question \
-         for the CRM Act, #314; relabel it once that reading is done",
+         under Regulation (EU) 2024/1252, read in #314; relabel it once that \
+         reading is done",
     ),
     (
         "electronics",
         "1.4.0",
         "criticalRawMaterials[].countryOfOrigin",
-        "as above, #314",
+        "as above: Regulation (EU) 2024/1252, read in #314",
     ),
 ];
 

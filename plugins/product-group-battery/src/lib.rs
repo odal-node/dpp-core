@@ -68,7 +68,9 @@ impl DppProductGroupPlugin for BatteryPlugin {
             .require_str("batteryChemistry")
             .require_positive("nominalVoltageV")
             .require_positive("nominalCapacityAh")
-            .require_non_negative("co2ePerUnitKg")
+            // Optional from schema v2.8.0, where the guidance defers the carbon
+            // footprint the figure would be read as.
+            .optional_non_negative("co2ePerUnitKg")
             .optional_positive_int("expectedLifetimeCycles")
             .optional_pct("recycledContentCobaltPct")
             .optional_pct("recycledContentLithiumPct")
@@ -585,6 +587,21 @@ mod tests {
     fn non_positive_voltage_fails() {
         let mut data = valid_battery();
         data["nominalVoltageV"] = json!(0.0);
+        assert!(BatteryPlugin.validate_input(&data).is_err());
+    }
+
+    /// Schema v2.8.0 no longer requires `co2ePerUnitKg`, so a record without
+    /// it is valid, and no CO2e metric is invented for it. A value that is
+    /// present is still held to being non-negative.
+    #[test]
+    fn a_record_without_co2e_is_valid_and_reports_no_co2e() {
+        let mut data = valid_battery();
+        data.as_object_mut().unwrap().remove("co2ePerUnitKg");
+        assert!(BatteryPlugin.validate_input(&data).is_ok());
+        let result = BatteryPlugin.calculate_metrics(&data).expect("metrics");
+        assert_eq!(result.co2e_score(), None);
+
+        data["co2ePerUnitKg"] = json!(-1.0);
         assert!(BatteryPlugin.validate_input(&data).is_err());
     }
 

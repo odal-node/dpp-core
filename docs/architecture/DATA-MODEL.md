@@ -225,7 +225,7 @@ Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each
 
 **Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Product group (`BatteryData`) — v2.6.0
+### 4.1 Battery Product group (`BatteryData`) — v2.8.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
@@ -278,7 +278,7 @@ field is itself the defect.
 - `HazardousSubstance { name, cas_number, concentration_pct }`
 - `TemperatureRange { min_c, max_c }`
 
-Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.6.0}.json`. Older versions stay
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.8.0}.json`. Older versions stay
 registered so a passport validated against one remains verifiable, and each
 carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.
