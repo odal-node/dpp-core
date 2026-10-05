@@ -13,9 +13,11 @@
 //! untouched: the envelope is external, and there is no `proof` member.
 //!
 //! - `alg` is `EdDSA`. `none` is rejected, and the algorithm is bound to the key
-//!   record rather than read from the attacker-supplied header.
-//! - `kid` is the signing key fingerprint, resolved against the issuer's
-//!   `did:web` document.
+//!   record rather than read from the attacker-supplied header. A verifier also
+//!   accepts `Ed25519`, the RFC 9864 name for the same operation.
+//! - `kid` is the absolute DID URL of the signing key's verification method in the
+//!   issuer's `did:web` document: the issuer's DID, then `#`, then the key's
+//!   thumbprint URI. It is required, and it is stable across rotation.
 //! - The payload is JCS-canonical, so one document has one byte sequence and a
 //!   verifier never has to re-serialise anything to check a signature.
 //!
@@ -26,8 +28,7 @@
 //! wire format binds every issuer that ever produces one:
 //!
 //! 1. It reuses the verification path this workspace already has:
-//!    `extract_kid_from_jws` → issuer DID document → `extract_key_by_fingerprint`
-//!    → `verify_jws`.
+//!    issuer DID document → `resolve_verification_key` → `verify_jws`.
 //! 2. One canonicalisation scheme. A second would be a permanent review burden
 //!    on the most security-sensitive code here, for no gain a verifier can use.
 //! 3. Header-safe by construction: base64url, so it survives an HTTP header
@@ -48,9 +49,7 @@
 //! URL inside an unauthenticated document, above all.
 
 use dpp_crypto::jws::signer;
-use dpp_crypto::jws::verifier::{
-    extract_key_by_fingerprint, extract_kid_from_jws, extract_primary_public_key, verify_jws,
-};
+use dpp_crypto::jws::verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
 use dpp_crypto::keystore::KeyStore;
 
 use super::types::DppAccessCredential;
@@ -70,16 +69,31 @@ use super::verify::VerificationResult;
 /// helper exists so that an issuer building on this crate produces the bytes a
 /// verifier expects — not to suggest that issuing is a node's job.
 ///
+/// # The `kid`
+///
+/// The credential has no `iss` claim, so the token's `kid` has to be the absolute
+/// URL of the verification method (VC-JOSE-COSE, key discovery by `kid`). It is
+/// the credential's `issuer`, which is the issuer's DID, followed by the signing
+/// key's thumbprint URI. That is the identifier [`build_did_document`] gives the
+/// key, so it resolves in the issuer's document for as long as the key is in it.
+///
 /// # Errors
-/// Propagates key-store and signing failures from [`signer::sign`], and fails if
-/// the credential cannot be serialised to JSON.
+/// Propagates key-store and signing failures from [`signer::sign`], fails if
+/// `key_id` names no key, and fails if the credential cannot be serialised to
+/// JSON.
+///
+/// [`build_did_document`]: crate::did_builder::build_did_document
 pub fn sign_access_credential(
     credential: &DppAccessCredential,
     store: &KeyStore,
     key_id: &str,
 ) -> anyhow::Result<String> {
     let payload = serde_json::to_value(credential)?;
-    signer::sign(store, key_id, &payload)
+    let key = store
+        .public_key(key_id)
+        .ok_or_else(|| anyhow::anyhow!("no key found for {key_id}"))?;
+    let kid = format!("{}#{}", credential.issuer, key.thumbprint_uri()?);
+    signer::sign(store, key_id, &payload, &kid)
 }
 
 /// Authenticate a VC-JWT and return the credential it carries.
@@ -107,16 +121,18 @@ pub fn authenticate_access_credential(
 ) -> Result<DppAccessCredential, VerificationResult> {
     use base64::Engine as _;
 
-    // The key the JWS names, falling back to the document's primary key for an
-    // issuer that publishes one verification method and no `kid`.
-    let key = match extract_kid_from_jws(jws) {
-        Some(kid) => extract_key_by_fingerprint(issuer_did_document, &kid),
-        None => extract_primary_public_key(issuer_did_document),
-    }
-    .ok_or_else(|| {
-        VerificationResult::InvalidSignature(
-            "issuer DID document publishes no key matching this credential".into(),
-        )
+    // The key the JWS names. A token that names none is refused, not verified
+    // against a key chosen for it. The refusal says which document was checked
+    // and what was looked for, since a document for another DID fails here.
+    let key = resolve_verification_key(issuer_did_document, jws).ok_or_else(|| {
+        let document_subject = issuer_did_document
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("(no id)");
+        let kid = extract_kid_from_jws(jws).unwrap_or_else(|| "(none)".to_owned());
+        VerificationResult::InvalidSignature(format!(
+            "the DID document for {document_subject} publishes no key matching kid {kid}"
+        ))
     })?;
 
     match verify_jws(jws, &key) {

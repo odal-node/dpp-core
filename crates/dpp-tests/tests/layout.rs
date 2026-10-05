@@ -341,7 +341,6 @@ const ROOT_FILES_BASELINE: &[&str] = &[
     "crates/dpp-vc/src/local_service.rs",
     "crates/dpp-vc/src/passport_credential.rs",
     "crates/dpp-vc/src/status_list.rs",
-    "crates/dpp-vc/src/tests.rs",
     "plugins/product-group-textile/src/fibre_composition.rs",
     "plugins/product-group-textile/src/unsold_goods.rs",
 ];
@@ -501,7 +500,6 @@ const MODULE_DOCS_BASELINE: &[&str] = &[
     "crates/dpp-vc/src/credential/trust.rs",
     "crates/dpp-vc/src/credential/types.rs",
     "crates/dpp-vc/src/credential/verify.rs",
-    "crates/dpp-vc/src/tests.rs",
     "crates/dpp-vocab/src/register/tests.rs",
 ];
 

@@ -135,10 +135,9 @@ fn a_credential_checked_against_another_issuers_document_is_refused() {
 /// The binding check: a credential naming issuer A, signed by A, but verified
 /// against a document that *does* contain the signing key yet belongs to B.
 ///
-/// This is the case a signature check alone cannot catch. Without the explicit
-/// `issuer` comparison the credential would authenticate, and the trust registry
-/// would then be asked about the issuer the credential *claims* rather than the
-/// one whose document was actually checked.
+/// This is the case a signature check alone cannot catch. The `kid` names A's
+/// document, so key resolution refuses B's: a document vouches only for its own
+/// keys. The refusal names the document that was checked.
 #[test]
 fn a_document_for_a_different_did_is_refused_even_with_the_right_key() {
     let store = temp_store("jwt-relabel", KEY_ID);
@@ -155,6 +154,36 @@ fn a_document_for_a_different_did_is_refused_even_with_the_right_key() {
             assert!(
                 reason.contains("impostor.example"),
                 "the refusal should name the mismatched document: {reason}"
+            );
+        }
+        other => panic!("expected InvalidSignature, got {other:?}"),
+    }
+}
+
+/// The other half of the binding check, which key resolution cannot see: the
+/// token names a key in B's document correctly, and B's key signed it, but the
+/// credential claims A as its issuer.
+///
+/// Without the explicit `issuer` comparison it would authenticate, and the trust
+/// registry would then be asked about the issuer the credential *claims* rather
+/// than the one whose document was actually checked.
+#[test]
+fn a_credential_claiming_another_issuer_than_its_signers_document_is_refused() {
+    let store = temp_store("jwt-claims-another", KEY_ID);
+    let signers_doc =
+        build_did_document(&store, "https://impostor.example", KEY_ID).expect("did document");
+    let kid = signers_doc["verificationMethod"][0]["id"]
+        .as_str()
+        .expect("the document publishes a key");
+    let claims_a = serde_json::to_value(credential_from(ISSUER_DID)).expect("serialise");
+    let jws = dpp_crypto::jws::signer::sign(&store, KEY_ID, &claims_a, kid).expect("sign");
+
+    let err = authenticate_access_credential(&jws, &signers_doc).expect_err("must refuse");
+    match err {
+        VerificationResult::InvalidSignature(reason) => {
+            assert!(
+                reason.contains(ISSUER_DID) && reason.contains("impostor.example"),
+                "the refusal should name both issuers: {reason}"
             );
         }
         other => panic!("expected InvalidSignature, got {other:?}"),
@@ -199,9 +228,13 @@ fn a_payload_that_is_not_a_credential_is_refused() {
     let store = temp_store("jwt-garbage", KEY_ID);
     let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
 
-    // Correctly signed, but the payload is not a credential.
-    let jws =
-        dpp_crypto::jws::signer::sign(&store, KEY_ID, &json!({ "hello": "world" })).expect("sign");
+    // Correctly signed, and naming a key the document publishes, but the payload
+    // is not a credential.
+    let kid = doc["verificationMethod"][0]["id"]
+        .as_str()
+        .expect("the document publishes a key");
+    let jws = dpp_crypto::jws::signer::sign(&store, KEY_ID, &json!({ "hello": "world" }), kid)
+        .expect("sign");
 
     let err = authenticate_access_credential(&jws, &doc).expect_err("must refuse");
     assert!(
