@@ -832,6 +832,7 @@ dependencies = [
  "dpp-rules",
  "dpp-vc",
  "dpp-vocab",
+ "ed25519-dalek",
  "jsonschema",
  "semver",
  "serde_json",

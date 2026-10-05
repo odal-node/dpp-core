@@ -145,6 +145,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot hold; and the larger number file and the input and output files that
   the RFC's author publishes separately.
 
+### Fixed
+
+- **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
+  4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
+  does not understand, and `dpp_crypto::jws` never read the member. A token its
+  producer had marked "do not process this unless you understand the extension"
+  therefore verified whenever its signature did. `verify_jws` and
+  `jws::signer::verify` now refuse any `crit`, since this crate understands no
+  extension, and so does every verifier built on them: the snapshot bound, the
+  access credential, the local identity service, SD-JWT VC verification, and a
+  ruleset bundle checked through an adapter over `verify_jws`. Nothing this
+  workspace signs carries `crit`, so no existing token is affected.
+
 ### Documentation
 
 - **Technical specifications have one home.** README's coverage table and the
