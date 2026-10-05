@@ -4,6 +4,12 @@ pub mod algorithm;
 pub mod canonical;
 #[cfg(test)]
 mod proptests;
+#[cfg(test)]
+mod rfc8032_vector_tests;
+#[cfg(test)]
+mod rfc8037_vector_tests;
+#[cfg(test)]
+mod rfc8785_vector_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;

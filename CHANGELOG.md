@@ -13,6 +13,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **The RFCs' own test vectors now run in `just check`.** The signature library,
+  the canonicaliser and the key-derivation function had been checked only
+  against this repository's own expectations, which cannot catch a misreading
+  shared by the code and its tests. Five RFCs publish vectors for things this
+  workspace relies on, and all five now run:
+  - RFC 8785: Appendix B's 24 number serialisations, the worked example of
+    clauses 3.2.2 to 3.2.4 compared byte for byte, and the data for the UTF-16
+    property sort. Every signature and content hash in the workspace is over
+    this canonical form.
+  - RFC 8032: the five Ed25519 vectors of clause 7.1, including the 1023-byte
+    message, through `ed25519-dalek`.
+  - RFC 8037: appendix A's Ed25519 key pair and public JWK, through the
+    `publicKeyJwk` this crate emits and the DID-document key reader, and the JWS
+    of A.4 and A.5, which this crate's verifier accepts.
+  - RFC 9106: clause 5.3's Argon2id vector, through the `argon2` crate the
+    keystore uses. The keystore's cost parameters are not the RFC's, so the
+    vector runs through the crate with the RFC's parameters.
+  - RFC 9562: appendix A.6's UUIDv7 example, through the carrier-serial
+    derivation, which relies on the layout the RFC defines.
+
+  All of them passed, so nothing else in the workspace changed. Not run: RFC
+  8037's A.3 (a JWK thumbprint), because nothing here computes one; the NaN and
+  Infinity rows of RFC 8785, which a `serde_json::Value` cannot hold; and the
+  larger number file and the input and output files that the RFC's author
+  publishes separately.
+
 ### Documentation
 
 - **The conformity statement carried an unsourced regulatory attribution and
