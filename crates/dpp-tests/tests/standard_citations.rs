@@ -32,19 +32,27 @@
 //!    text this repository no longer relies on, and every release would re-read
 //!    it for nothing.
 //!
-//! A fifth rule applies to every row of the register, in both tables, and not
+//! Two more rules apply to every row of the register, in both tables, and not
 //! only to the IETF rows:
 //!
 //! 5. **A row carries a status and the date it was read.** An empty `Status as
 //!    read`, or a `Read` that is not a `YYYY-MM-DD` date, fails. Without this the
 //!    promise below, that each citation has a status somebody read and dated,
 //!    would hold only until a cell was cleared.
+//! 6. **A conformance claim names its evidence.** A `Conformance claimed` cell
+//!    that starts with `Yes` must name at least one repository path, every path
+//!    it names must exist, and the row's `Evidence` cell must offer more than
+//!    unit tests. Unit tests check this code against its own reading of a
+//!    specification, so they can never carry a claim alone. What a claim must
+//!    say is in the register.
 //!
 //! # What this cannot prove
 //!
 //! That a recorded status is **current**. The gate reads a file, not the IETF.
 //! What it proves is that each IETF citation has a row, and that every row has a
-//! status somebody read and dated. That turns the release-time re-read
+//! status somebody read and dated. Likewise it holds a claim to the form that
+//! makes it checkable, a named and existing path, and not to its truth: whether
+//! that path is evidence that is not circular is a reviewer's judgement. That turns the release-time re-read
 //! (`docs/governance/RELEASE.md`) into a walk down one table instead of a
 //! search. W3C, GS1, IDTA and ETSI identifiers take too many shapes to match
 //! reliably, so nothing checks that their rows are still cited: the re-read is
@@ -194,12 +202,25 @@ fn register() -> Vec<Row> {
     rows
 }
 
-/// A register row's first cell, its `Status as read`, and its `Read` date, for
-/// every row of every table that has both columns.
+/// One data row of one register table: its first cell, and every cell by the
+/// name of its column.
+struct RegisterRow {
+    name: String,
+    cells: BTreeMap<String, String>,
+}
+
+impl RegisterRow {
+    /// A cell's text, or `None` if the row's table has no such column.
+    fn cell(&self, column: &str) -> Option<&str> {
+        self.cells.get(column).map(String::as_str)
+    }
+}
+
+/// Every data row of every table in the register.
 ///
 /// Reads both tables, and fails if either goes unread: a gate that quietly
 /// stopped seeing one of them would keep passing.
-fn dated_rows() -> Vec<(String, String, String)> {
+fn register_rows() -> Vec<RegisterRow> {
     let path = workspace_root().join(REGISTER);
     let text =
         fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
@@ -223,15 +244,10 @@ fn dated_rows() -> Vec<(String, String, String)> {
         {
             continue;
         }
-        let at = |name: &str| columns.iter().position(|c| c == name);
-        let (Some(status), Some(read)) = (at("Status as read"), at("Read")) else {
-            continue;
-        };
-        rows.push((
-            row[0].clone(),
-            row.get(status).cloned().unwrap_or_default(),
-            row.get(read).cloned().unwrap_or_default(),
-        ));
+        rows.push(RegisterRow {
+            name: row[0].clone(),
+            cells: columns.iter().cloned().zip(row).collect(),
+        });
     }
 
     for table in ["Spec", "Specification"] {
@@ -241,6 +257,50 @@ fn dated_rows() -> Vec<(String, String, String)> {
         );
     }
     rows
+}
+
+/// The repository paths a conformance cell names: every backticked token that
+/// contains a `/` and is not a URL.
+fn repository_paths(cell: &str) -> Vec<&str> {
+    cell.split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| token.contains('/') && !token.contains("://") && !token.contains(' '))
+        .collect()
+}
+
+/// Whether an Evidence cell offers nothing but unit tests.
+fn only_unit_tests(evidence: &str) -> bool {
+    evidence
+        .to_ascii_lowercase()
+        .replace("unit tests", "")
+        .chars()
+        .all(|c| !c.is_alphanumeric())
+}
+
+/// What is wrong with a row's conformance claim. A cell that does not start with
+/// `Yes` makes no claim and has nothing to check.
+///
+/// This holds a claim to the form that makes it checkable, not to the truth of
+/// it. That the named evidence is not circular stays a reviewer's call.
+fn claim_faults(conformance: &str, evidence: &str, root: &Path) -> Vec<String> {
+    if !conformance.starts_with("Yes") {
+        return Vec::new();
+    }
+    let mut faults = Vec::new();
+    let paths = repository_paths(conformance);
+    if paths.is_empty() {
+        faults.push("names no repository path as evidence".to_owned());
+    }
+    for path in paths {
+        if !root.join(path).exists() {
+            faults.push(format!("names `{path}`, which does not exist"));
+        }
+    }
+    if only_unit_tests(evidence) {
+        faults.push("its only evidence is unit tests".to_owned());
+    }
+    faults
 }
 
 /// Every file this gate reads.
@@ -398,19 +458,22 @@ fn every_register_row_is_still_cited() {
 /// Rule 5: every row carries a status and the date it was read.
 #[test]
 fn every_register_row_carries_a_status_and_a_read_date() {
-    let faulty: Vec<String> = dated_rows()
+    let faulty: Vec<String> = register_rows()
         .into_iter()
-        .filter_map(|(spec, status, read)| {
+        .filter_map(|row| {
+            let (Some(status), Some(read)) = (row.cell("Status as read"), row.cell("Read")) else {
+                return None;
+            };
             let mut faults = Vec::new();
             if status.is_empty() {
                 faults.push("no `Status as read`");
             }
             let a_date =
-                read.len() == 10 && chrono::NaiveDate::parse_from_str(&read, "%Y-%m-%d").is_ok();
+                read.len() == 10 && chrono::NaiveDate::parse_from_str(read, "%Y-%m-%d").is_ok();
             if !a_date {
                 faults.push("`Read` is not a YYYY-MM-DD date");
             }
-            (!faults.is_empty()).then(|| format!("  {spec}: {}", faults.join(", ")))
+            (!faults.is_empty()).then(|| format!("  {}: {}", row.name, faults.join(", ")))
         })
         .collect();
     assert!(
@@ -418,6 +481,73 @@ fn every_register_row_carries_a_status_and_a_read_date() {
         "{REGISTER} has rows without a dated status. Read the specification's \
          current status at its source and record it with the date:\n{}",
         faulty.join("\n")
+    );
+}
+
+/// Rule 6: a conformance claim names evidence that exists, and is not backed by
+/// unit tests alone.
+#[test]
+fn a_conformance_claim_names_its_evidence() {
+    let root = workspace_root();
+    let faulty: Vec<String> = register_rows()
+        .into_iter()
+        .filter_map(|row| {
+            let faults = claim_faults(
+                row.cell("Conformance claimed")?,
+                row.cell("Evidence").unwrap_or_default(),
+                &root,
+            );
+            (!faults.is_empty()).then(|| format!("  {}: {}", row.name, faults.join("; ")))
+        })
+        .collect();
+    assert!(
+        faulty.is_empty(),
+        "{REGISTER} has a `Yes` that is not held to evidence. A claim names, as \
+         repository paths in its own cell, the specification's test vectors, an \
+         external suite or an independent implementation it was run against, and \
+         unit tests alone cannot carry it:\n{}",
+        faulty.join("\n")
+    );
+}
+
+/// The claim check is only worth having if it fails on each way a claim can lack
+/// evidence, and passes on one that has it.
+#[test]
+fn the_claim_check_catches_what_it_is_for() {
+    let root = workspace_root();
+    let real = "crates/dpp-tests/tests/standard_citations.rs";
+    let backed = format!("Yes. Self-declared; run against `{real}`.");
+
+    assert!(claim_faults(&backed, "The RFC's own test vectors", &root).is_empty());
+    assert!(
+        claim_faults("No", "Unit tests", &root).is_empty(),
+        "a `No` makes no claim, so there is nothing to hold to evidence"
+    );
+
+    assert_eq!(
+        claim_faults("Yes", "The RFC's own test vectors", &root),
+        ["names no repository path as evidence"]
+    );
+    assert_eq!(
+        claim_faults(
+            "Yes. Run against `crates/nowhere/missing.rs`.",
+            "Vectors",
+            &root
+        ),
+        ["names `crates/nowhere/missing.rs`, which does not exist"]
+    );
+    for evidence in ["Unit tests", "unit tests.", "Unit tests; unit tests", ""] {
+        assert_eq!(
+            claim_faults(&backed, evidence, &root),
+            ["its only evidence is unit tests"],
+            "evidence: {evidence:?}"
+        );
+    }
+
+    // A URL and a bare file name are not repository paths.
+    assert_eq!(
+        repository_paths("Yes, per `https://example.test/a/b` and `jades-oracle.yml`"),
+        Vec::<&str>::new()
     );
 }
 

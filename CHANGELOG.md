@@ -38,6 +38,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A fifth rule covers every row of both tables: each must have a status and a
   `YYYY-MM-DD` date for the read that gave it.
 
+  A sixth holds a conformance claim to its evidence. A `Yes` must name
+  repository paths that exist, and cannot rest on unit tests alone. The register
+  now says what a claim must state: its class, its scope, its known deviations,
+  that it is self-declared, and evidence that is not circular. A claim lives only
+  in its row's `Conformance claimed` cell.
+
   The test reads a file, not the IETF, so it cannot see a status change. For
   that, the Pre-Release Checklist gains a step that re-reads every row at its
   source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only check
