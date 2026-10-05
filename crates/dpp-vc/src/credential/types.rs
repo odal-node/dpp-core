@@ -116,6 +116,11 @@ pub struct CredentialStatus {
     /// `"BitstringStatusListEntry"` (the older `"StatusList2021Entry"` is dated).
     #[serde(rename = "type")]
     pub status_type: String,
+    /// What the list this entry points into records: `revocation`,
+    /// `suspension`, or another purpose. Bitstring Status List v1.0 requires it
+    /// as a string, and so does its test suite, so an entry without one does not
+    /// deserialise. A revocation check answers only for `revocation`.
+    pub status_purpose: String,
     /// Index in the status list.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status_list_index: Option<String>,

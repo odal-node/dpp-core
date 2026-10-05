@@ -126,7 +126,12 @@ fn a_snapshot_proof_with_crit_proves_nothing() {
 
 // ── Access credential ────────────────────────────────────────────────────────
 
+/// An access credential signed under `header`, typed as the VC-JWT a verifier
+/// requires, so `crit` is the only thing the cases differ by.
 fn access_credential(store: &KeyStore, header: &Value) -> String {
+    let mut header = header.clone();
+    header["typ"] = json!("vc+jwt");
+    header["cty"] = json!("vc");
     let credential = CredentialBuilder::new(
         ISSUER_DID.into(),
         make_subject(
@@ -140,7 +145,7 @@ fn access_credential(store: &KeyStore, header: &Value) -> String {
     .build();
     forge(
         store,
-        header,
+        &header,
         &serde_json::to_vec(&credential).expect("credential serialises"),
     )
 }
