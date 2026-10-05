@@ -8,16 +8,13 @@ use serde_json::json;
 use sha2::Digest;
 
 use crate::local_service::LocalIdentityService;
-use dpp_crypto::keystore::KeyStore;
+use crate::test_support::temp_store;
 
 use dpp_domain::{PassportId, ports::identity::IdentityPort};
 
 fn test_service() -> LocalIdentityService {
-    let path = std::env::temp_dir().join(format!("test-identity-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "test-passphrase").expect("open store");
-    store.generate_key("test-issuer").expect("generate key");
     LocalIdentityService::new(
-        Arc::new(store),
+        Arc::new(temp_store("identity", "test-issuer")),
         "test-issuer".into(),
         "https://id.example.com".into(),
     )

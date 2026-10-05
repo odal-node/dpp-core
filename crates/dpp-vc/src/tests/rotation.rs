@@ -12,12 +12,7 @@ use dpp_crypto::keystore::KeyStore;
 const ROTATION_BASE_URL: &str = "https://id.example.com";
 
 fn rotation_store(label: &str) -> KeyStore {
-    let path = std::env::temp_dir().join(format!("test-{label}-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "rotation-test").expect("open store");
-    store
-        .generate_key("issuer")
-        .expect("generate the first key");
-    store
+    crate::test_support::temp_store(label, "issuer")
 }
 
 /// Sign as a passport is signed: the `kid` is the DID URL of the verification
