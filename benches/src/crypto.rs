@@ -9,7 +9,7 @@ fn setup() -> (KeyStore, String, serde_json::Value, String, String) {
     store.generate_key("bench").expect("generate key");
 
     let payload = json!({"passport_id": "bench-001", "status": "draft"});
-    let jws = signer::sign(&store, "bench", &payload).expect("sign");
+    let jws = signer::sign(&store, "bench", &payload, "bench-kid").expect("sign");
 
     let entry = store.load_key("bench").expect("load key");
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -22,7 +22,7 @@ fn crypto_benchmarks(c: &mut Criterion) {
     let (store, key_id, payload, jws, pub_key_b64) = setup();
 
     c.bench_function("jws_sign", |b| {
-        b.iter(|| signer::sign(&store, &key_id, &payload).unwrap());
+        b.iter(|| signer::sign(&store, &key_id, &payload, "bench-kid").unwrap());
     });
 
     c.bench_function("jws_verify_via_store", |b| {

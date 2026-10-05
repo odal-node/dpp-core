@@ -66,13 +66,18 @@ fn public_key_b64(store: &KeyStore) -> String {
 }
 
 /// A compact JWS carrying a genuine signature over `header` and `payload`, with
-/// the key's `kid` added so a verifier selects the key the way it does for a
-/// token this workspace issued.
+/// the `kid` this workspace issues added so a verifier selects the key the way
+/// it does for its own tokens: the DID URL of the key's verification method.
 fn forge(store: &KeyStore, header: &Value, payload: &[u8]) -> String {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let key = store.load_key(KEY_ID).expect("load key");
+    let thumbprint = store
+        .public_key(KEY_ID)
+        .expect("public key")
+        .thumbprint_uri()
+        .expect("thumbprint");
     let mut header = header.clone();
-    header["kid"] = json!(key.fingerprint);
+    header["kid"] = json!(format!("{ISSUER_DID}#{thumbprint}"));
     let signing_input = format!(
         "{}.{}",
         b64.encode(serde_json::to_vec(&header).expect("header serialises")),

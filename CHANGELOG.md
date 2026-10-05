@@ -13,6 +13,112 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **A key is named by its own thumbprint, and every signature names the key
+  that made it.** Until now, verification methods were named by position. The
+  current key was always `#key-1`, and archived keys were renumbered whenever a
+  revoked one dropped out, so after a rotation `#key-1` named a different key. A
+  token's `kid` sits in its protected header and can never be rewritten, so the
+  name it carries has to be fixed too. (#376, #370)
+
+  **DID documents** (`build_did_document`):
+  - each verification method is a `JsonWebKey` (W3C Controlled Identifiers
+    v1.0) instead of `JsonWebKey2020`, which was a Community Group type;
+  - `@context` is `https://www.w3.org/ns/did/v1` plus
+    `https://www.w3.org/ns/cid/v1`, instead of the `jws-2020` suite context;
+  - each method's `id` is the DID, `#`, and the key's RFC 7638 SHA-256
+    thumbprint in RFC 9278 URI form:
+    `did:web:…#urn:ietf:params:oauth:jwk-thumbprint:sha-256:…`;
+  - the JWK gains `kid`, the same thumbprint URI, and `alg`, the identifier the
+    key signs under.
+
+  **Signing.** `jws::sign` and `jws::sign_typed` take the `kid` as a parameter,
+  because what it must be depends on how the token is verified:
+  - a passport JWS or a VC-JWT carries the absolute DID URL of the verification
+    method. VC-JOSE-COSE requires `kid` to be an absolute URL to a verification
+    method when `iss` is absent, and the old hex fingerprint was not one;
+  - an SD-JWT VC carries the thumbprint URI alone, which is the `kid` of its
+    entry in the issuer metadata's `jwks` (`draft-ietf-oauth-sd-jwt-vc-19`
+    clause 4.2).
+
+  **Verification.** `resolve_verification_key(did_document, jws)` replaces
+  `extract_key_by_fingerprint` and `extract_primary_public_key`, which are
+  removed. It returns a key only when all of these hold:
+  - the `kid` without its fragment is the document's `id`, and the method's
+    `controller` is that same DID (Controlled Identifiers v1.0 §3.3);
+  - `assertionMethod` references the method;
+  - the JWK is Ed25519;
+  - a fragment that is a thumbprint URI is the key's own;
+  - a JWK that declares an `alg` matches the header.
+
+  A token without a `kid` is refused rather than checked against a default key.
+
+  **`alg` stays `EdDSA`, and verification now also accepts `Ed25519`.** RFC 9864
+  deprecates `EdDSA` in favour of `Ed25519`, but lets a documented operational
+  requirement keep it. Two apply: the European Commission's DSS validator maps
+  only `EdDSA` for JOSE, and the W3C VC-JOSE-COSE test suite signs its fixtures
+  with it. The keystore is unchanged.
+
+  **New public items:** `did_for`, `PublicKeyInfo::thumbprint_uri`,
+  `KeyAlgorithm::{jwk_thumbprint, thumbprint_uri, published_jwk}`,
+  `ED25519_ALG` and `JWK_THUMBPRINT_URI_PREFIX`.
+
+  **Migration:**
+  - Pass a `kid` to `sign` / `sign_typed`:
+    - for a token verified through a DID document,
+      `format!("{}#{}", did_for(base_url), store.public_key(key_id)?.thumbprint_uri()?)`;
+    - for an SD-JWT VC, the `thumbprint_uri()` alone.
+  - Replace `extract_kid_from_jws` followed by `extract_key_by_fingerprint` or
+    `extract_primary_public_key` with `resolve_verification_key`.
+  - Code that read `#key-1` as the current key should read
+    `authentication[0]`.
+  - A token signed before this release names its key by the old hex
+    fingerprint and no longer verifies. Sign it again. No keystore migration is
+    needed.
+
+### Added
+
+- **A standards register, and a tripwire that holds the code to it.**
+  `docs/architecture/STANDARDS.md` records the IETF, W3C, GS1, IDTA and ETSI
+  specifications the repository cites. ISO/IEC and IEC standards are not yet
+  covered. For each specification it gives:
+  - the revision cited;
+  - its status as last read, and the date of that read;
+  - where the code uses it;
+  - the evidence behind that use: the RFC's own test vectors, an external
+    validator, a delegated crate, or unit tests;
+  - whether conformance is claimed.
+
+  Law stays in the instrument manifests.
+
+  `standard_citations.rs` holds the IETF rows to the code, with four rules:
+  - every `RFC NNNN` and `draft-ietf-…` cited anywhere in the repository must
+    have a row;
+  - an obsoleted specification may be cited only with a `kept:` reason;
+  - a draft must be cited with its revision and must claim no conformance;
+  - a row nothing cites fails, so the register cannot go stale.
+
+  A fifth rule covers every row of both tables: each must have a status and a
+  `YYYY-MM-DD` date for the read that gave it.
+
+  The test reads a file, not the IETF, so it cannot see a status change. For
+  that, the Pre-Release Checklist gains a step that re-reads every row at its
+  source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only check
+  on whether they are still cited.
+
+  The first read found three things:
+  - **RFC 9864** (October 2025) updates RFC 8037. It deprecates the JOSE `alg`
+    value `EdDSA`, which every JWS here carries, in favour of `Ed25519`.
+    What this release does about it is under Breaking above.
+  - **ETSI TS 119 612** V2.4.1 has been published, while `trusted_list` cites
+    V2.3.1.
+  - **IDTA-01001** is at revision 3-2, while `dpp-aas` cites 3-0.
+
+  It also establishes one status that had never been stated: the `did:web`
+  method specification is a W3C Community Group document marked `unofficial`,
+  not a W3C standard.
+
 ### Fixed
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
@@ -28,6 +134,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Documentation
 
+- **Technical specifications have one home.** README's coverage table and the
+  conformity statement each gave their own status for GS1 Digital Link, the
+  IDTA AAS metamodel and VC Data Model 2.0, and the two had disagreed. Those
+  rows now point at the register. So does the standards list in
+  `docs/project/BLUEPRINT.md`, which no longer restates revisions.
+
 - **The conformity statement carried an unsourced regulatory attribution and
   claims that had gone stale.** This was an accuracy pass over
   `docs/regulatory/CONFORMITY.md`, the document addressed to conformity
@@ -42,7 +154,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   **Stale against its own sources.**
   - W3C VC Data Model 2.0 was listed as a Candidate Recommendation. It has been
     a W3C Recommendation since 15 May 2025. The README said only "Published";
-    it now gives the same status and date.
+    its coverage table now points at the standards register, which gives the
+    status and date.
   - The CEN/CLC JTC 24 row still said the OJ citation was pending. It now
     matches the README's earlier correction: cited by CID (EU) 2026/1736 on
     15 July 2026, with no conformance claimed.
