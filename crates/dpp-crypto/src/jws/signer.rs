@@ -89,8 +89,8 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     // Bind `alg` to the key record, never the other way round. The header is
     // attacker-supplied, so it may only *confirm* what the key already says —
     // it must never select the verification path. Rejects `alg:none` and every
-    // substitution by the same check.
-    if !super::verifier::header_alg_matches(&b64, parts[0], key.algorithm) {
+    // substitution by the same check, and any `crit`.
+    if !super::verifier::header_admissible(&b64, parts[0], key.algorithm) {
         return Ok(false);
     }
 

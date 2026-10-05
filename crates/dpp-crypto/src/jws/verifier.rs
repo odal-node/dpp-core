@@ -9,6 +9,8 @@ use super::algorithm::KeyAlgorithm;
 /// Verify an EdDSA compact JWS given a base64url-encoded public key.
 ///
 /// Returns `Ok(true)` when the signature is valid, `Ok(false)` when it is not.
+/// A protected header that names a critical extension (`crit`, RFC 7515 clause
+/// 4.1.11) or any algorithm but `EdDSA` is refused the same way: `Ok(false)`.
 /// Returns `Err` only on malformed input (bad base64, wrong key/sig length).
 pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -21,7 +23,7 @@ pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
     // No key record here — the caller supplies raw Ed25519 key bytes — so the
     // algorithm is pinned rather than bound. Rejects `alg:none` and every
     // substitution downgrade.
-    if !header_alg_matches(&b64, parts[0], KeyAlgorithm::Ed25519) {
+    if !header_admissible(&b64, parts[0], KeyAlgorithm::Ed25519) {
         return Ok(false);
     }
 
@@ -88,31 +90,47 @@ fn vm_is_assertion_authorized(vm: &serde_json::Value, authorized: &[String]) -> 
         .is_some_and(|id| authorized.iter().any(|a| a == id))
 }
 
-/// Decode the JWS protected header and read its `alg`, if it names an
-/// algorithm this crate allows at all. `None` for a malformed header, a
-/// missing `alg`, `alg:none`, or anything outside the allowlist.
-fn header_alg(
-    b64: &base64::engine::general_purpose::GeneralPurpose,
-    header_b64: &str,
-) -> Option<KeyAlgorithm> {
-    let bytes = b64.decode(header_b64).ok()?;
-    let header: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    KeyAlgorithm::from_jose_alg(header.get("alg")?.as_str()?)
-}
-
-/// Whether the JWS protected header's `alg` is exactly the algorithm the
-/// signing key is recorded as using.
+/// Whether a JWS protected header may be acted on at all: it names no critical
+/// extension, and its `alg` is exactly the algorithm the signing key is
+/// recorded as using.
 ///
-/// The header does not get a vote in which algorithm is used — it is checked
-/// *against* the key. With one algorithm in the allowlist this is equivalent to
-/// pinning; with two it is the difference between a verifier and an algorithm-
-/// confusion oracle, which is why it is written this way now rather than later.
-pub(crate) fn header_alg_matches(
+/// **`crit`.** RFC 7515 clause 4.1.11 says a JWS whose `crit` lists an
+/// extension the recipient does not understand is invalid, and the recipient
+/// must reject it. This crate understands none, so a `crit` of any shape is
+/// refused rather than inspected. That also covers the shapes the clause forbids
+/// a producer to emit (an empty list, a registered parameter, a repeated name),
+/// which a recipient may treat as invalid. Ignoring `crit` instead would accept
+/// a token its producer marked "do not process this unless you understand the
+/// extension", for example one whose signing input is built differently.
+///
+/// **`alg`.** The header does not get a vote in which algorithm is used — it is
+/// checked *against* the key. With one algorithm in the allowlist this is
+/// equivalent to pinning; with two it is the difference between a verifier and
+/// an algorithm-confusion oracle, which is why it is written this way now rather
+/// than later. `false` for a malformed header, a missing `alg`, `alg:none`, or
+/// anything outside the allowlist.
+///
+/// Every verification path in this crate calls this one function, so a check
+/// added here cannot be skipped by a path that was written later.
+pub(crate) fn header_admissible(
     b64: &base64::engine::general_purpose::GeneralPurpose,
     header_b64: &str,
     expected: KeyAlgorithm,
 ) -> bool {
-    header_alg(b64, header_b64) == Some(expected)
+    let Ok(bytes) = b64.decode(header_b64) else {
+        return false;
+    };
+    let Ok(header) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return false;
+    };
+    if header.get("crit").is_some() {
+        return false;
+    }
+    header
+        .get("alg")
+        .and_then(serde_json::Value::as_str)
+        .and_then(KeyAlgorithm::from_jose_alg)
+        == Some(expected)
 }
 
 /// Extract the base64url-encoded primary Ed25519 public key (`x`) from a DID document.
