@@ -8,6 +8,12 @@ mod crit_tests;
 mod proptests;
 #[cfg(test)]
 mod resolve_tests;
+#[cfg(test)]
+mod rfc8032_vector_tests;
+#[cfg(test)]
+mod rfc8037_vector_tests;
+#[cfg(test)]
+mod rfc8785_vector_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;
