@@ -10,9 +10,10 @@
     "2.4.0",
     "2.5.0",
     "2.6.0",
-    "2.7.0"
+    "2.7.0",
+    "2.8.0"
   ],
-  "currentSchemaVersion": "2.7.0",
+  "currentSchemaVersion": "2.8.0",
   "productCategories": [
     "portable",
     "industrial",

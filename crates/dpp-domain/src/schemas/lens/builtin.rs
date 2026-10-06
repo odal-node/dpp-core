@@ -215,6 +215,21 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             gtin_to_product_identifier,
         ),
         Lens::new(
+            "battery",
+            Version::new(2, 7, 0),
+            Version::new(2, 8, 0),
+            false,
+            "EU Battery Regulation 2023/1542 and the Commission's battery passport \
+             guidance v2.0 (15 August 2026) v2.8.0: co2ePerUnitKg leaves required, \
+             since the guidance defers the Annex XIII point 1(c) carbon footprint \
+             declaration and a per-unit figure is not that declaration; and three \
+             dynamicPerformance members take their parent's individual class. A \
+             v2.7.0 record keeps any co2ePerUnitKg it carries, and a relabelled \
+             class changes no audience's view, because the parent already withheld \
+             the object whole.",
+            pass_through,
+        ),
+        Lens::new(
             "construction",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),

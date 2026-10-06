@@ -215,6 +215,7 @@ fn confidential_tier_via_market_surveillance_authority() {
         .with_status(CredentialStatus {
             id: "https://ec.europa.eu/status/1#42".into(),
             status_type: "BitstringStatusListEntry".into(),
+            status_purpose: "revocation".into(),
             status_list_index: Some("42".into()),
             status_list_credential: Some("https://ec.europa.eu/status/1".into()),
         })

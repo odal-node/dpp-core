@@ -31,29 +31,31 @@ use crate::keystore::KeyStore;
 /// `crv` as a JWK member, not a registered header parameter. It lives on the
 /// DID document's `publicKeyJwk` instead, where it is the spec-correct place.
 pub fn sign(store: &KeyStore, key_id: &str, payload: &Value, kid: &str) -> anyhow::Result<String> {
-    sign_typed(store, key_id, payload, kid, None)
+    sign_typed(store, key_id, payload, kid, None, None)
 }
 
-/// [`sign`], with an optional `typ` protected-header parameter.
+/// [`sign`], with optional `typ` and `cty` protected-header parameters.
 ///
-/// `typ` exists because some JWS profiles require the token to declare what it
-/// is — SD-JWT VC is one, and mandates `dc+sd-jwt`. It is threaded through here
-/// rather than bolted on afterwards because the header is *protected*: adding a
-/// parameter after signing would invalidate the signature, so the only place it
-/// can be set is before the signing input is built.
+/// They exist because some JWS profiles require the token to declare what it
+/// is and what it carries: SD-JWT VC mandates `typ: dc+sd-jwt`, and VC-JOSE-COSE
+/// asks for `typ: vc+jwt` with `cty: vc`. They are threaded through here rather
+/// than bolted on afterwards because the header is *protected*: adding a
+/// parameter after signing would invalidate the signature, so the only place
+/// one can be set is before the signing input is built.
 pub fn sign_typed(
     store: &KeyStore,
     key_id: &str,
     payload: &Value,
     kid: &str,
     typ: Option<&str>,
+    cty: Option<&str>,
 ) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
-    // Serialised rather than interpolated. `kid` and `typ` are caller-supplied,
-    // and a value containing a quote or a backslash would otherwise escape the
-    // string it sits in — producing malformed JSON at best, and at worst letting
-    // a caller write additional members into a header that is about to be
-    // *signed*.
+    // Serialised rather than interpolated. `kid`, `typ` and `cty` are
+    // caller-supplied, and a value containing a quote or a backslash would
+    // otherwise escape the string it sits in — producing malformed JSON at best,
+    // and at worst letting a caller write additional members into a header that
+    // is about to be *signed*.
     //
     // `serde_json::Map` is a `BTreeMap` here (no `preserve_order` feature in
     // this workspace), so members serialise in lexicographic order.
@@ -65,6 +67,9 @@ pub fn sign_typed(
     header.insert("kid".to_owned(), Value::String(kid.to_owned()));
     if let Some(typ) = typ {
         header.insert("typ".to_owned(), Value::String(typ.to_owned()));
+    }
+    if let Some(cty) = cty {
+        header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
     let header_json = serde_json::to_string(&header)?;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;

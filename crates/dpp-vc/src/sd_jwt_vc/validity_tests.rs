@@ -222,8 +222,9 @@ fn foreign_credential_with_iss(
         .expect("fixture key exists")
         .thumbprint_uri()
         .expect("a valid public key");
-    let jwt = dpp_crypto::jws::sign_typed(store, KEY_ID, &jwt_payload, &kid, Some(super::TYP))
-        .expect("fixture key signs");
+    let jwt =
+        dpp_crypto::jws::sign_typed(store, KEY_ID, &jwt_payload, &kid, Some(super::TYP), None)
+            .expect("fixture key signs");
     dpp_crypto::sd_jwt::SdJwt::new(jwt, Vec::new()).serialise()
 }
 

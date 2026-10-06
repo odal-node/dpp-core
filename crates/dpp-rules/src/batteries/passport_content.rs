@@ -10,10 +10,18 @@
 //! # Source
 //!
 //! The Commission's *Guidance Document: Digital Batteries Passport — data
-//! points by category* (v1.0, 28 July 2026), read in full against the model.
-//! Its table has one row per data point and one column per category, which is
-//! the shape of the `REQUIREMENTS` table below — so a reviewer can diff the two
-//! directly rather than reconstructing the mapping.
+//! points by category* (v2.0, 15 August 2026). The table was first read in full
+//! against v1.0 (28 July 2026); v2.0 was then compared with v1.0 line by line.
+//! Its obligations differ in rows 19 to 23 only, which are taken up below, and
+//! the rest of its changes are wording: rows 6 and 25 now give the reason they
+//! are not filled, row 35 drops an "only", and a footnote defines "if
+//! applicable". Its table has one row per data point and one column per
+//! category, which is the shape of the `REQUIREMENTS` table below — so a
+//! reviewer can diff the two directly rather than reconstructing the mapping.
+//!
+//! v2.0 also states its industrial scope as batteries with a capacity greater
+//! than 2 kWh. This module does not see capacity, so it answers for the
+//! `industrial` category as a whole.
 //!
 //! **The guidance covers EV, LMT and industrial batteries only.** It says
 //! nothing about portable or SLI batteries, so this module answers
@@ -52,12 +60,15 @@
 //!   parameter sets, and rows 68–71 the four members of `UsageHistory`. Each
 //!   block is one row here because the block is what a passport carries or
 //!   omits; the per-member conditions live in the types.
-//! - **Deferred by the guidance** — rows 17, 18, 19 and 44 are *"not to be
-//!   filled/displayed as of February 2027"*. The two with a modelled field
-//!   (`carbonFootprintClass`, `dueDiligenceUrl`) are listed below as
-//!   `NotApplicable`; rows 17 and 44 (carbon footprint *declaration*, and
-//!   instructions for use) have no field at all, which is the correct state for
-//!   a data point whose format has not been specified.
+//! - **Deferred by the guidance** — rows 17 to 23 and 44 are *"not to be
+//!   filled/displayed as of February 2027"*. The six with a modelled field
+//!   (`carbonFootprintClass`, `dueDiligenceUrl`, and the four recycled-content
+//!   shares of rows 20 to 23) are listed below as `NotApplicable`; rows 17 and
+//!   44 (carbon footprint *declaration*, and instructions for use) have no field
+//!   at all, which is the correct state for a data point whose format has not
+//!   been specified. `co2ePerUnitKg` is barred beside row 17: it is not the
+//!   declaration, but a figure labelled carbon footprint in a passport states one
+//!   the guidance says not to display.
 //! - **Restated elsewhere in the annex** — row 16 is Annex XIII point 1(c)
 //!   material composition, deferred, but its constituents are separately
 //!   mandatory as Annex VI Part A points 7, 8 and 10 (rows 12, 13, 15) and are
@@ -153,26 +164,44 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     ("usableExtinguishingAgent", M, M, M),
     ("criticalRawMaterials", M, M, M),
     // ── Annex XIII point 1 ─────────────────────────────────────────────────
-    // Guidance rows 18 and 19 are both *"not to be filled/displayed as of
-    // February 2027 — format still to be specified in the upcoming
-    // implementing act"*, for all three categories.
+    // Guidance rows 17 to 23 are *"not to be filled/displayed as of February
+    // 2027"* for all three categories, each with its own reason:
     //
-    // `NotApplicable` is the honest class for that, and it is the same one
-    // `ratedCapacityAh` already carries for the same words below. It is not a
-    // statement that the field is wrong — it is the guidance saying the format
-    // does not exist yet, so a value filed today cannot be the one the act will
-    // ask for. Both entries come out when that act lands.
+    // - Rows 17 and 18, the carbon footprint: the format is still to be
+    //   specified in the upcoming implementing act.
+    // - Row 19, the due diligence report: as provided in Article 48(1),
+    //   required from August 2027. Art. 48(1), as replaced by Reg. (EU)
+    //   2025/1561, applies from 18 August 2027. v1.0 gave the implementing-act
+    //   reason here too; v2.0 names the date instead. This table records the
+    //   obligation as of February 2027 and carries no dates, so the row stays
+    //   `NotApplicable` and becomes `Mandatory` on 18 August 2027.
+    // - Rows 20 to 23, the shares of cobalt, lithium, nickel and lead recovered
+    //   from waste: to be applied in line with Article 8 and the relevant
+    //   delegated act. v1.0 had them `Mandatory` for all three.
+    //
+    // `NotApplicable` is the honest class for each, and it is the same one
+    // `ratedCapacityAh` carries below. It is not a statement that the field is
+    // wrong; it is the guidance saying a value filed today cannot be the one
+    // that will be asked for.
+    //
+    // `co2ePerUnitKg` is not a guidance row. It is barred beside row 17
+    // because a per-unit figure labelled carbon footprint states a footprint
+    // the guidance says not to display, in a unit that is not the one
+    // Article 7(1)(d) sets for the declaration (per kWh of total energy over the
+    // expected service life).
     //
     // Distinct from disclosure: `dueDiligenceUrl` is Annex XIII point 1(d) and
     // therefore *public* when it is eventually filled. What may be seen and
     // whether it may be filled are different axes, and this table only answers
     // the second.
+    ("co2ePerUnitKg", X, X, X),
     ("carbonFootprintClass", X, X, X),
     ("dueDiligenceUrl", X, X, X),
-    ("recycledContentCobaltPct", M, M, M),
-    ("recycledContentLithiumPct", M, M, M),
-    ("recycledContentNickelPct", M, M, M),
-    ("recycledContentLeadPct", M, M, M),
+    ("recycledContentCobaltPct", X, X, X),
+    ("recycledContentLithiumPct", X, X, X),
+    ("recycledContentNickelPct", X, X, X),
+    ("recycledContentLeadPct", X, X, X),
+    // Row 24, point 1(f), is mandatory in both versions.
     ("renewableContentPct", M, M, M),
     // Point 1(g) is "not to be filled/displayed" for every category. The Ah
     // figure a passport does carry is Annex VI Part A point 6, above.
@@ -344,19 +373,28 @@ mod tests {
         );
     }
 
-    /// The two fields the guidance defers are barred for every category, and
-    /// the deferral is not the same thing as a disclosure class.
+    /// The fields the guidance defers are barred for every category, and the
+    /// deferral is not the same thing as a disclosure class.
     ///
-    /// Guidance rows 18 and 19 read *"not to be filled/displayed as of February
-    /// 2027 — format still to be specified in the upcoming implementing act"*.
-    /// `dueDiligenceUrl` is simultaneously an Annex XIII point 1(d) field and
-    /// therefore **public** once it is filled; the two facts sit on different
-    /// axes and neither cancels the other. A reader who conflates them will
-    /// either publish a value the act has not defined, or withhold one the annex
-    /// puts in the public tier.
+    /// Guidance rows 18 to 23 read *"not to be filled/displayed as of February
+    /// 2027"*: the carbon footprint label, the due diligence report, and the four
+    /// recycled-content shares, which v1.0 had mandatory. `co2ePerUnitKg` is
+    /// barred beside row 17, the declaration. `dueDiligenceUrl` is
+    /// simultaneously an Annex XIII point 1(d) field and therefore **public**
+    /// once it is filled; the two facts sit on different axes and neither cancels
+    /// the other. A reader who conflates them will either publish a value the act
+    /// has not defined, or withhold one the annex puts in the public tier.
     #[test]
     fn the_deferred_data_points_are_barred_for_every_category() {
-        for field in ["carbonFootprintClass", "dueDiligenceUrl"] {
+        for field in [
+            "co2ePerUnitKg",
+            "carbonFootprintClass",
+            "dueDiligenceUrl",
+            "recycledContentCobaltPct",
+            "recycledContentLithiumPct",
+            "recycledContentNickelPct",
+            "recycledContentLeadPct",
+        ] {
             for category in ["ev", "lmt", "industrial"] {
                 assert_eq!(
                     annex_xiii_requirement(field, category),
