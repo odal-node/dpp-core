@@ -104,7 +104,7 @@ pub fn issue(
         .ok_or_else(|| SdJwtVcError::Signing(format!("no key found for {key_id}")))?
         .thumbprint_uri()
         .map_err(|e| SdJwtVcError::Signing(e.to_string()))?;
-    let jwt = dpp_crypto::jws::sign_typed(store, key_id, &jwt_payload, &kid, Some(TYP))
+    let jwt = dpp_crypto::jws::sign_typed(store, key_id, &jwt_payload, &kid, Some(TYP), None)
         .map_err(|e| SdJwtVcError::Signing(e.to_string()))?;
 
     Ok(SdJwt::new(jwt, disclosures))

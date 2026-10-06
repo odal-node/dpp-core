@@ -28,6 +28,9 @@ status is a fact about the Official Journal, are covered in
 - **Every row, in both tables, carries a status and the date it was read.** The
   same test fails on an empty `Status as read`, or a `Read` that is not a
   `YYYY-MM-DD` date.
+- **A conformance claim is held to its evidence.** The same test fails on a
+  `Yes` that names no repository path, that names one which does not exist, or
+  whose row offers nothing but unit tests as evidence.
 - **The other rows are not checked against the code.** W3C, GS1, IDTA and ETSI
   identifiers take too many shapes to match reliably, so nothing checks that
   they are still cited. The re-read below is the only check on that.
@@ -36,9 +39,34 @@ status is a fact about the Official Journal, are covered in
   source and updates the date. The gate proves that every citation has a status
   somebody read and dated. It cannot prove that status is still current.
 
-**"Conformance claimed" is `No` throughout.** Code here *implements* the parts of
-a specification it uses. Claiming conformance would mean stating a profile and
-the options chosen, and nothing here does that yet.
+## Claiming conformance
+
+A conformance claim lives in one place: the `Conformance claimed` cell of the
+specification's row. No other document restates it;
+[`README.md`](../../README.md), [`regulatory/CONFORMITY.md`](../regulatory/CONFORMITY.md)
+and [`project/BLUEPRINT.md`](../project/BLUEPRINT.md) point here instead. Code
+here *implements* the parts of a specification it uses, and that is not a claim.
+
+A cell may start with `Yes` only if it says, in the cell itself:
+
+1. the **conformance class** the specification defines, such as a conforming
+   issuer implementation;
+2. the **scope**: the features and options covered, for example "compact
+   serialisation, no key binding";
+3. the **known deviations**. A claim with a deviation it does not list is not
+   made;
+4. that the claim is **self-declared**, since no body certifies these;
+5. **evidence that is not circular**, each piece named as a repository path: the
+   specification's own test vectors, an official or independent test suite, or an
+   independent implementation used as an oracle.
+
+Unit tests written against this repository's own reading of a specification can
+never carry a claim alone, because the code and its tests would share any
+misreading.
+
+`standard_citations.rs` checks the form of a claim, not its truth. Whether the
+named evidence is not circular, and whether the class, scope and deviations are
+right, is a reviewer's call. A cell that reads `No` makes no claim.
 
 ## IETF
 
@@ -54,10 +82,11 @@ the options chosen, and nothing here does that yet.
 | RFC 8032 | Edwards-Curve Digital Signature Algorithm (EdDSA) | Informational | 2026-09-29 | `dpp-crypto` JWS signing and strict verification | Delegated to `ed25519-dalek`; cross-library test | No |
 | RFC 8037 | CFRG ECDH and Signatures in JOSE | Proposed Standard; **updated by RFC 9864**, which deprecates the JOSE `alg` value `EdDSA`. `dpp-crypto` still writes it, for the reason in the RFC 9864 row | 2026-10-05 | `dpp-crypto` `alg`/`crv` names; `dpp-vc` JWK `kty` | Unit tests | No |
 | RFC 8410 | Algorithm Identifiers for Ed25519, Ed448, X25519, and X448 for Use in the Internet X.509 PKI | Proposed Standard; updated by RFC 9295 | 2026-09-29 | `dpp-crypto` JAdES oracle artefact (PKCS#8 key) | Artefact validated in `jades-oracle.yml` | No |
+| RFC 8725 | JSON Web Token Best Current Practices | Best Current Practice; updates RFC 7519 | 2026-10-05 | `dpp-vc` VC-JWT verification requires `typ: vc+jwt`, the explicit typing of §3.11 | Unit tests | No |
 | RFC 8785 | JSON Canonicalization Scheme (JCS) | Informational | 2026-09-29 | Signing and content-binding canonical form across `dpp-crypto`, `dpp-domain`, `dpp-rules`, `dpp-calc`, `dpp-vc` | Delegated to `serde_jcs`; unit tests | No |
-| RFC 9278 | JWK Thumbprint URI | Proposed Standard | 2026-10-05 | `dpp-crypto` thumbprint URI; `dpp-vc` verification-method fragments, JWK `kid`, and the SD-JWT VC `kid` | Unit tests | No |
 | RFC 9106 | Argon2 Memory-Hard Function for Password Hashing and Proof-of-Work Applications | Informational | 2026-09-29 | `dpp-crypto` keystore key derivation | Delegated to `argon2`; frozen vectors produced by `argon2` 0.5.3, **not** the RFC's own vectors | No |
 | RFC 9110 | HTTP Semantics | Internet Standard | 2026-09-29 | `dpp-digital-link` `Accept` q-value parsing | Unit tests | No |
+| RFC 9278 | JWK Thumbprint URI | Proposed Standard | 2026-10-05 | `dpp-crypto` thumbprint URI; `dpp-vc` verification-method fragments, JWK `kid`, and the SD-JWT VC `kid` | Unit tests | No |
 | RFC 9562 | Universally Unique IDentifiers (UUIDs) | Proposed Standard | 2026-09-29 | `dpp-domain` passport id, UUIDv7 layout | Delegated to `uuid`; serial-derivation regression tests | No |
 | RFC 9864 | Fully-Specified Algorithms for JSON Object Signing and Encryption (JOSE) and CBOR Object Signing and Encryption (COSE) | Proposed Standard; updates RFC 7518, RFC 8037, RFC 9053 | 2026-10-05 | `dpp-crypto` accepts `alg: Ed25519` when verifying and still writes the deprecated `EdDSA`, under the exception in §4.4 for documented operational requirements: the European Commission's DSS 6.5 maps only `EdDSA` for JOSE, and the W3C VC-JOSE-COSE test suite signs its fixtures with it. Re-read both at each release; the emitted name changes when both have moved | Unit tests | No |
 | RFC 9901 | Selective Disclosure for JSON Web Tokens | Proposed Standard | 2026-09-29 | `dpp-crypto::sd_jwt`; `dpp-vc::sd_jwt_vc` | **The RFC's own test vectors** (`rfc9901_vector_tests.rs`) | No |
@@ -70,9 +99,9 @@ the options chosen, and nothing here does that yet.
 | W3C Verifiable Credentials Data Model | v2.0 | W3C Recommendation, 15 May 2025 | 2026-09-29 | `dpp-vc::credential` (`DppAccessCredential`) | Unit tests; `access_gatekeeping.rs` | No |
 | W3C Decentralized Identifiers (DIDs) | v1.0 | W3C Recommendation, 19 July 2022. v1.1 is a Candidate Recommendation Snapshot (5 March 2026) that defines its key properties by reference to Controlled Identifiers v1.0 | 2026-10-05 | `dpp-vc` DID document builder; DID syntax in `dpp-rules::common::identifier` | Unit tests | No |
 | W3C Controlled Identifiers | v1.0 | W3C Recommendation, 15 May 2025 | 2026-10-05 | `dpp-vc` DID document: `JsonWebKey` verification methods, `cid/v1` context; `dpp-crypto` key resolution (the binding checks of §3.3) | Unit tests | No |
-| W3C Securing Verifiable Credentials using JOSE and COSE | v1.0 | W3C Recommendation, 15 May 2025 | 2026-10-05 | `dpp-vc` VC-JWT `kid` (key discovery) | Unit tests | No |
+| W3C Securing Verifiable Credentials using JOSE and COSE | v1.0 | W3C Recommendation, 15 May 2025 | 2026-10-05 | `dpp-vc` VC-JWT `kid` (key discovery), `typ: vc+jwt` and `cty: vc` | Unit tests | No |
 | `did:web` Method Specification | Unversioned | A W3C Credentials Community Group document whose own `specStatus` is `unofficial`. **Not a W3C standard** | 2026-09-29 | `dpp-vc` DID document builder | Unit tests | No |
-| W3C Bitstring Status List | v1.0 | W3C Recommendation, 15 May 2025 | 2026-09-29 | `dpp-vc::status_list`; `credential::check_revocation` | Unit tests | No |
+| W3C Bitstring Status List | v1.0 | W3C Recommendation, 15 May 2025 | 2026-10-05 | `dpp-vc::status_list`; `credential::check_revocation`, which answers only an entry whose `statusPurpose` is `revocation` | Unit tests | No |
 | W3C JSON-LD | 1.1 | W3C Recommendation, 16 July 2020 | 2026-09-29 | `dpp-vc::jsonld` context | Unit tests; `jsonld_context.rs` | No |
 | JSON Schema | Draft-07 | Later drafts published (2019-09, 2020-12). The product group schemas pin Draft-07 | 2026-09-29 | `crates/dpp-domain/schemas/` | Every schema compiled and exercised by the schema tests | No |
 | GS1 Digital Link URI Syntax | **Not established** | EN 18219:2026 clause 6.3.2 names 1.6.0:2022. The parser has been diffed against no revision. See [`regulatory/CONFORMITY.md`](../regulatory/CONFORMITY.md) | 2026-09-29 | `dpp-digital-link` | Unit tests; CSET 82 membership judged by GS1's Barcode Syntax Engine in `gs1-oracle.yml` | No |

@@ -14,6 +14,7 @@ use crate::credential::{
 };
 use crate::did_builder::build_did_document;
 use crate::test_support::temp_store;
+use dpp_crypto::keystore::KeyStore;
 
 const KEY_ID: &str = "issuer-key";
 const BASE_URL: &str = "https://authority.example";
@@ -176,7 +177,7 @@ fn a_credential_claiming_another_issuer_than_its_signers_document_is_refused() {
         .as_str()
         .expect("the document publishes a key");
     let claims_a = serde_json::to_value(credential_from(ISSUER_DID)).expect("serialise");
-    let jws = dpp_crypto::jws::signer::sign(&store, KEY_ID, &claims_a, kid).expect("sign");
+    let jws = signed(&store, &claims_a, kid, Some("vc+jwt"), Some("vc"));
 
     let err = authenticate_access_credential(&jws, &signers_doc).expect_err("must refuse");
     match err {
@@ -228,19 +229,109 @@ fn a_payload_that_is_not_a_credential_is_refused() {
     let store = temp_store("jwt-garbage", KEY_ID);
     let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
 
-    // Correctly signed, and naming a key the document publishes, but the payload
-    // is not a credential.
+    // Correctly signed, typed as a credential, and naming a key the document
+    // publishes, but the payload is not a credential.
     let kid = doc["verificationMethod"][0]["id"]
         .as_str()
         .expect("the document publishes a key");
-    let jws = dpp_crypto::jws::signer::sign(&store, KEY_ID, &json!({ "hello": "world" }), kid)
-        .expect("sign");
+    let jws = signed(
+        &store,
+        &json!({ "hello": "world" }),
+        kid,
+        Some("vc+jwt"),
+        Some("vc"),
+    );
 
     let err = authenticate_access_credential(&jws, &doc).expect_err("must refuse");
     assert!(
         matches!(err, VerificationResult::MalformedCredential(_)),
         "expected MalformedCredential, got {err:?}"
     );
+}
+
+/// Sign `payload` under `kid` with the given `typ` and `cty`.
+fn signed(
+    store: &KeyStore,
+    payload: &serde_json::Value,
+    kid: &str,
+    typ: Option<&str>,
+    cty: Option<&str>,
+) -> String {
+    dpp_crypto::jws::signer::sign_typed(store, KEY_ID, payload, kid, typ, cty).expect("sign")
+}
+
+/// VC-JOSE-COSE: a credential secured as a JWT is typed `vc+jwt`, and its `cty`
+/// says it carries a `vc`.
+#[test]
+fn an_issued_credential_is_typed_as_a_vc_jwt() {
+    let (jws, _doc) = issued(ISSUER_DID);
+    let header: serde_json::Value = serde_json::from_slice(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(jws.split('.').next().expect("a header"))
+            .expect("base64url"),
+    )
+    .expect("JSON");
+
+    assert_eq!(header["typ"], "vc+jwt");
+    assert_eq!(header["cty"], "vc");
+}
+
+/// A signature by the issuer's key is authentic whatever it signs, so the type is
+/// what keeps a token of another kind from being taken for a credential. Each
+/// case carries a genuine credential and a valid signature; only the header
+/// differs from the control.
+#[test]
+fn a_token_not_typed_as_a_vc_jwt_is_refused() {
+    let store = temp_store("jwt-typ", KEY_ID);
+    let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
+    let kid = doc["verificationMethod"][0]["id"]
+        .as_str()
+        .expect("the document publishes a key");
+    let credential = serde_json::to_value(credential_from(ISSUER_DID)).expect("serialise");
+
+    let control = signed(&store, &credential, kid, Some("vc+jwt"), Some("vc"));
+    assert!(authenticate_access_credential(&control, &doc).is_ok());
+
+    for (typ, cty) in [
+        (None, Some("vc")),
+        (Some("dc+sd-jwt"), None),
+        (Some("JWT"), None),
+        (Some("vc+jwt"), Some("vp")),
+    ] {
+        let jws = signed(&store, &credential, kid, typ, cty);
+        match authenticate_access_credential(&jws, &doc) {
+            Err(VerificationResult::InvalidSignature(reason)) => assert!(
+                reason.contains("typ") || reason.contains("cty"),
+                "typ {typ:?}, cty {cty:?}: the refusal should name the header: {reason}"
+            ),
+            other => panic!("typ {typ:?}, cty {cty:?}: expected a refusal, got {other:?}"),
+        }
+    }
+}
+
+/// RFC 7515 §4.1.9: a recipient reads a `typ` or `cty` without a `/` as if
+/// `application/` were prepended, and media types compare case-insensitively.
+/// A `cty` is optional.
+#[test]
+fn the_type_is_read_as_a_media_type() {
+    let store = temp_store("jwt-typ-media", KEY_ID);
+    let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
+    let kid = doc["verificationMethod"][0]["id"]
+        .as_str()
+        .expect("the document publishes a key");
+    let credential = serde_json::to_value(credential_from(ISSUER_DID)).expect("serialise");
+
+    for (typ, cty) in [
+        ("application/vc+jwt", Some("application/vc")),
+        ("VC+JWT", Some("VC")),
+        ("vc+jwt", None),
+    ] {
+        let jws = signed(&store, &credential, kid, Some(typ), cty);
+        assert!(
+            authenticate_access_credential(&jws, &doc).is_ok(),
+            "typ {typ:?}, cty {cty:?} must authenticate"
+        );
+    }
 }
 
 /// Structurally broken input is refused without panicking.
