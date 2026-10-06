@@ -64,12 +64,17 @@
 //!
 //! Every `.rs`, `.md`, `.toml`, `.json`, `.yml` and `.yaml` file in the
 //! repository, plus `.gitattributes` and `justfile`. It skips build output and
-//! hidden directories other than `.github`. Three files are skipped:
+//! hidden directories other than `.github`. Three files and one directory are
+//! skipped:
 //!
 //! - the register itself, which is what citations are checked against;
 //! - `CHANGELOG.md`, a record of what was said at each release, since
 //!   rewriting a released entry changes no claim made today;
-//! - this file, whose fixtures cite on purpose.
+//! - this file, whose fixtures cite on purpose;
+//! - the vendored JSON Schema test suite, which is someone else's verbatim text.
+//!   A suite case that mentions RFC 8141 is not this repository citing it, and a
+//!   register row for it would claim the code implements URN syntax. The files'
+//!   bytes are held by their recorded hashes instead.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -84,6 +89,9 @@ const SKIPPED: &[&str] = &[
     "CHANGELOG.md",
     "crates/dpp-tests/tests/standard_citations.rs",
 ];
+
+/// Directories this gate does not read, each for the reason in the module docs.
+const SKIPPED_TREES: &[&str] = &["crates/dpp-tests/fixtures/json-schema/test-suite/"];
 
 const EXTENSIONS: &[&str] = &["rs", "md", "toml", "json", "yml", "yaml"];
 
@@ -352,7 +360,9 @@ fn cited() -> BTreeMap<String, Vec<String>> {
             .display()
             .to_string()
             .replace('\\', "/");
-        if SKIPPED.contains(&relative.as_str()) {
+        if SKIPPED.contains(&relative.as_str())
+            || SKIPPED_TREES.iter().any(|tree| relative.starts_with(tree))
+        {
             continue;
         }
         let text = fs::read_to_string(&file)
