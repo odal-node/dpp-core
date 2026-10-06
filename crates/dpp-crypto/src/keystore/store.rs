@@ -107,6 +107,24 @@ impl From<&KeyRecord> for PublicKeyInfo {
     }
 }
 
+impl PublicKeyInfo {
+    /// The key's RFC 9278 thumbprint URI.
+    ///
+    /// This is the key's identity on the wire: it is the fragment of the
+    /// verification method's identifier in the DID document, the `kid` of the
+    /// published JWK, and the `kid` of an SD-JWT VC. It is derived from the
+    /// public key alone, so it does not change when the key is rotated out or
+    /// revoked.
+    ///
+    /// # Errors
+    /// If the recorded public key is not valid hexadecimal.
+    pub fn thumbprint_uri(&self) -> Result<String> {
+        let bytes = hex::decode(&self.verifying_key_hex)
+            .context("the recorded public key is not valid hexadecimal")?;
+        Ok(self.algorithm.thumbprint_uri(&bytes))
+    }
+}
+
 /// On-disk envelope for the key store file.
 ///
 /// V2 adds `kdf` and `salt` fields. If `kdf` is missing (V1 format), the

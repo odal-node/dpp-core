@@ -39,12 +39,12 @@ mod tests;
 
 pub use credential::{
     AllowAllIssuers, Audience, CredentialBuilder, CredentialRole, CredentialStatus,
-    DppAccessCredential, DppCredentialSubject, RevocationOutcome, StaticTrustedIssuers,
-    TrustedIssuerRegistry, VerificationResult, check_revocation, verify_credential_claims,
-    verify_credential_claims_with_trust, verify_credential_with_revocation,
-    verify_credential_with_revocation_and_trust,
+    DppAccessCredential, DppCredentialSubject, REVOCATION_PURPOSE, RevocationOutcome,
+    StaticTrustedIssuers, TrustedIssuerRegistry, VerificationResult, check_revocation,
+    verify_credential_claims, verify_credential_claims_with_trust,
+    verify_credential_with_revocation, verify_credential_with_revocation_and_trust,
 };
-pub use did_builder::build_did_document;
+pub use did_builder::{build_did_document, did_for};
 pub use jsonld::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 pub use local_service::LocalIdentityService;
 pub use passport_credential::{PassportCredential, PassportCredentialSubject};

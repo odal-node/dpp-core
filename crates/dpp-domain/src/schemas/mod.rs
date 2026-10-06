@@ -16,6 +16,8 @@ mod conformance_tests;
 pub mod diff;
 #[cfg(test)]
 mod diff_tests;
+#[cfg(test)]
+mod disclosure_nesting_tests;
 mod embedded;
 mod entry;
 pub mod lens;

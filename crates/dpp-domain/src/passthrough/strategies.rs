@@ -81,9 +81,10 @@ impl ComplianceStrategy for PassthroughBatteryStrategy {
             return Err(wrong_product_group("battery", data));
         };
         Ok(ComplianceResult {
-            // Manufacturer-declared, not computed. `co2e_per_unit_kg` is
-            // non-optional on `BatteryData`, so there is always a value here.
-            co2e_score: Some(battery.co2e_per_unit_kg),
+            // Manufacturer-declared, not computed, and absent when the record
+            // carries none: optional from schema v2.8.0, since the figure is not
+            // the Annex XIII point 1(c) declaration the guidance defers.
+            co2e_score: battery.co2e_per_unit_kg,
             // See the type doc: four per-metal figures do not become one.
             recycled_content_pct: None,
             // Battery repairability has no EU index. `dpp-calc`'s EU 2023/1669

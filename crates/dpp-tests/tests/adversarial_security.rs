@@ -55,6 +55,7 @@ fn credential_with_status_at_index(index: &str) -> dpp_vc::DppAccessCredential {
         .with_status(CredentialStatus {
             id: format!("https://status.example.com/list#{index}"),
             status_type: "BitstringStatusListEntry".into(),
+            status_purpose: "revocation".into(),
             status_list_index: Some(index.into()),
             status_list_credential: Some("https://status.example.com/list".into()),
         })
@@ -238,10 +239,10 @@ fn content_binding_tamper_rejected() {
 
     // Sign original payload
     let jws_original =
-        dpp_crypto::jws::signer::sign(&store, "key", &original).expect("sign original");
+        dpp_crypto::jws::signer::sign(&store, "key", &original, "test-kid").expect("sign original");
     // Sign tampered payload (used only to get the canonical tampered payload_b64)
     let jws_tampered_payload =
-        dpp_crypto::jws::signer::sign(&store, "key", &tampered).expect("sign tampered");
+        dpp_crypto::jws::signer::sign(&store, "key", &tampered, "test-kid").expect("sign tampered");
 
     // Build forged JWS: original header + sig, but tampered payload segment.
     let parts_orig: Vec<&str> = jws_original.splitn(3, '.').collect();
@@ -269,7 +270,7 @@ fn content_binding_tamper_rejected() {
 fn signature_tamper_rejected() {
     let store = temp_key_store();
     let payload = json!({"passportId": "xyz-456", "status": "active"});
-    let mut jws = dpp_crypto::jws::signer::sign(&store, "key", &payload).expect("sign");
+    let mut jws = dpp_crypto::jws::signer::sign(&store, "key", &payload, "test-kid").expect("sign");
 
     // Flip the last character of the signature.
     let last = jws.pop().unwrap();

@@ -66,9 +66,13 @@ dpp-core/
 | **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, product group schema |
 | **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
 | **CEN/CLC JTC 24 system standards** | Six cited in the OJ on 15 Jul 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it requires an assessment we have not published — not merely a citation, which now exists |
-| **GS1 Digital Link** | Published | AI 01/21/10 parsing, link-type negotiation. **No URI Syntax revision is claimed** — see `dpp-digital-link`'s module docs: an earlier *v1.2* claim had no recorded basis, the parser has not been diffed against 1.6.0:2022, and naming either would assert something unverified |
-| **IDTA AAS Metamodel** | Published | Passport-to-AAS shell and submodel mapping. AAS-shaped output carrying **our own** semantics — every emitted `semanticId` is `urn:odal-node:*`; no IDTA conformance is claimed |
-| **W3C VC Data Model v2.0** | Published | `DppAccessCredential` mapping operator roles to an `Audience` |
+
+**Technical specifications** are not listed here: IETF, W3C, GS1 Digital Link,
+IDTA AAS and ETSI. Each one is recorded once, in
+[`docs/architecture/STANDARDS.md`](docs/architecture/STANDARDS.md), with the
+revision cited, its status as last read, where the code uses it, and the
+evidence behind that use. A test fails when the code cites an IETF document the
+register does not list.
 
 ---
 

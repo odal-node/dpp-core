@@ -239,7 +239,7 @@ fn product_group_discriminant_matches_variant() {
         nominal_voltage_v: 4.0,
         nominal_capacity_ah: 50.0,
         expected_lifetime_cycles: Some(1000),
-        co2e_per_unit_kg: 40.0,
+        co2e_per_unit_kg: Some(40.0),
         ..crate::test_support::sample_battery_data()
     }));
     assert_eq!(battery.product_group(), ProductGroup::Battery);

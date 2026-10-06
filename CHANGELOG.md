@@ -15,6 +15,300 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A key is named by its own thumbprint, and every signature names the key
+  that made it.** Until now, verification methods were named by position. The
+  current key was always `#key-1`, and archived keys were renumbered whenever a
+  revoked one dropped out, so after a rotation `#key-1` named a different key. A
+  token's `kid` sits in its protected header and can never be rewritten, so the
+  name it carries has to be fixed too. (#376, #370)
+
+  **DID documents** (`build_did_document`):
+  - each verification method is a `JsonWebKey` (W3C Controlled Identifiers
+    v1.0) instead of `JsonWebKey2020`, which was a Community Group type;
+  - `@context` is `https://www.w3.org/ns/did/v1` plus
+    `https://www.w3.org/ns/cid/v1`, instead of the `jws-2020` suite context;
+  - each method's `id` is the DID, `#`, and the key's RFC 7638 SHA-256
+    thumbprint in RFC 9278 URI form:
+    `did:web:…#urn:ietf:params:oauth:jwk-thumbprint:sha-256:…`;
+  - the JWK gains `kid`, the same thumbprint URI, and `alg`, the identifier the
+    key signs under.
+
+  **Signing.** `jws::sign` and `jws::sign_typed` take the `kid` as a parameter,
+  because what it must be depends on how the token is verified:
+  - a passport JWS or a VC-JWT carries the absolute DID URL of the verification
+    method. VC-JOSE-COSE requires `kid` to be an absolute URL to a verification
+    method when `iss` is absent, and the old hex fingerprint was not one;
+  - an SD-JWT VC carries the thumbprint URI alone, which is the `kid` of its
+    entry in the issuer metadata's `jwks` (`draft-ietf-oauth-sd-jwt-vc-19`
+    clause 4.2).
+
+  **Verification.** `resolve_verification_key(did_document, jws)` replaces
+  `extract_key_by_fingerprint` and `extract_primary_public_key`, which are
+  removed. It returns a key only when all of these hold:
+  - the `kid` without its fragment is the document's `id`, and the method's
+    `controller` is that same DID (Controlled Identifiers v1.0 §3.3);
+  - `assertionMethod` references the method;
+  - the JWK is Ed25519;
+  - a fragment that is a thumbprint URI is the key's own;
+  - a JWK that declares an `alg` matches the header.
+
+  A token without a `kid` is refused rather than checked against a default key.
+
+  **`alg` stays `EdDSA`, and verification now also accepts `Ed25519`.** RFC 9864
+  deprecates `EdDSA` in favour of `Ed25519`, but lets a documented operational
+  requirement keep it. Two apply: the European Commission's DSS validator maps
+  only `EdDSA` for JOSE, and the W3C VC-JOSE-COSE test suite signs its fixtures
+  with it. The keystore is unchanged.
+
+  **New public items:** `did_for`, `PublicKeyInfo::thumbprint_uri`,
+  `KeyAlgorithm::{jwk_thumbprint, thumbprint_uri, published_jwk}`,
+  `ED25519_ALG` and `JWK_THUMBPRINT_URI_PREFIX`.
+
+  **Migration:**
+  - Pass a `kid` to `sign` / `sign_typed`:
+    - for a token verified through a DID document,
+      `format!("{}#{}", did_for(base_url), store.public_key(key_id)?.thumbprint_uri()?)`;
+    - for an SD-JWT VC, the `thumbprint_uri()` alone.
+  - Replace `extract_kid_from_jws` followed by `extract_key_by_fingerprint` or
+    `extract_primary_public_key` with `resolve_verification_key`.
+  - Code that read `#key-1` as the current key should read
+    `authentication[0]`.
+  - A token signed before this release names its key by the old hex
+    fingerprint and no longer verifies. Sign it again. No keystore migration is
+    needed.
+
+- **An access credential is typed as a VC-JWT, and a verifier requires the
+  type.** VC-JOSE-COSE asks for `typ: vc+jwt` and, when present, `cty: vc`, and
+  `sign_access_credential` set neither. It now sets both.
+  `authenticate_access_credential` refuses a token whose `typ` is absent or
+  names anything else, or whose `cty` names anything but `vc`. A signature by
+  the issuer's key is authentic whatever it signs, so without the type a
+  passport proof or an SD-JWT VC from the same key could be offered as a
+  credential: the explicit typing RFC 8725 §3.11 recommends. Both headers are
+  read as RFC 7515 §4.1.9 says, case-insensitively and with or without
+  `application/`. (#374)
+
+  `jws::sign_typed` gains a `cty` parameter, after `typ`. **Migration:** pass
+  `None` where no `cty` is wanted; re-sign access credentials issued before this
+  release.
+
+- **A credential's status entry carries `statusPurpose`.** Bitstring Status
+  List v1.0 requires it as a string, and its test suite checks every entry for
+  one, but `CredentialStatus` had no such field, so a verifier could not tell a
+  revocation list from a suspension list. `CredentialStatus::status_purpose` is
+  now required, and an entry without it does not deserialise.
+  `check_revocation` answers only an entry whose purpose is `revocation`, which
+  is exported as `REVOCATION_PURPOSE`, and returns `Indeterminate` for any other
+  purpose, whatever the bit says. (#375)
+
+  **Migration:** set `status_purpose` on every `CredentialStatus`, `"revocation"`
+  for a revocation list.
+
+- **The battery rules follow the Commission's guidance v2.0, and
+  `co2ePerUnitKg` is optional.** The battery passport guidance *Digital
+  Batteries Passport — data points by category* was reissued as v2.0 on 15
+  August 2026. Compared line by line with v1.0, which the rules were written
+  against, its obligations differ in rows 19 to 23 only. (#389)
+  - **The four recycled-content shares** of Annex XIII point 1(e) (cobalt,
+    lithium, nickel and lead recovered from waste) move from `Mandatory` to
+    `NotApplicable` for EV, LMT and industrial batteries. v2.0 has them not
+    filled or displayed as of February 2027, to be applied in line with
+    Article 8 and its delegated act. The publish gate stops requiring them, and
+    `passport_content::fields_not_applicable` now reports them when a passport
+    of those categories carries them.
+  - **The due diligence report** (row 19) stays `NotApplicable`. v2.0 now
+    gives a date rather than a missing format: Art. 48(1) applies from 18
+    August 2027, when the row becomes `Mandatory`. The rules carry no dates, so
+    that switch is still to be made.
+  - **`co2ePerUnitKg` is no longer required**, in a new battery schema v2.8.0,
+    and is `NotApplicable` for the same three categories.
+    `BatteryData::co2e_per_unit_kg` is `Option<f64>`. The guidance defers the
+    carbon footprint declaration of Annex XIII point 1(c), and a per-unit
+    figure is not that declaration anyway: Art. 7(1)(d) expresses it per kWh of
+    the total energy over the battery's expected service life.
+  - A v2.7.0 record reads forward unchanged through a pass-through lens, and
+    keeps any `co2ePerUnitKg` it carries. A reader built before this release
+    cannot read a v2.8.0 passport that omits the field. That break is taken now
+    because no passport has been issued.
+
+  **Migration:** wrap `co2e_per_unit_kg` values in `Some`. Stop sending the four
+  recycled-content shares and `co2ePerUnitKg` for EV, LMT and industrial
+  batteries.
+
+### Added
+
+- **A standards register, and a tripwire that holds the code to it.**
+  `docs/architecture/STANDARDS.md` records the IETF, W3C, GS1, IDTA and ETSI
+  specifications the repository cites. ISO/IEC and IEC standards are not yet
+  covered. For each specification it gives:
+  - the revision cited;
+  - its status as last read, and the date of that read;
+  - where the code uses it;
+  - the evidence behind that use: the RFC's own test vectors, an external
+    validator, a delegated crate, or unit tests;
+  - whether conformance is claimed.
+
+  Law stays in the instrument manifests.
+
+  `standard_citations.rs` holds the IETF rows to the code, with four rules:
+  - every `RFC NNNN` and `draft-ietf-…` cited anywhere in the repository must
+    have a row;
+  - an obsoleted specification may be cited only with a `kept:` reason;
+  - a draft must be cited with its revision and must claim no conformance;
+  - a row nothing cites fails, so the register cannot go stale.
+
+  A fifth rule covers every row of both tables: each must have a status and a
+  `YYYY-MM-DD` date for the read that gave it.
+
+  A sixth holds a conformance claim to its evidence. A `Yes` must name
+  repository paths that exist, and cannot rest on unit tests alone. The register
+  now says what a claim must state: its class, its scope, its known deviations,
+  that it is self-declared, and evidence that is not circular. A claim lives only
+  in its row's `Conformance claimed` cell.
+
+  The test reads a file, not the IETF, so it cannot see a status change. For
+  that, the Pre-Release Checklist gains a step that re-reads every row at its
+  source. For the W3C, GS1, IDTA and ETSI rows, that re-read is the only check
+  on whether they are still cited.
+
+  The first read found three things:
+  - **RFC 9864** (October 2025) updates RFC 8037. It deprecates the JOSE `alg`
+    value `EdDSA`, which every JWS here carries, in favour of `Ed25519`.
+    What this release does about it is under Breaking above.
+  - **ETSI TS 119 612** V2.4.1 has been published, while `trusted_list` cites
+    V2.3.1.
+  - **IDTA-01001** is at revision 3-2, while `dpp-aas` cites 3-0.
+
+  It also establishes one status that had never been stated: the `did:web`
+  method specification is a W3C Community Group document marked `unofficial`,
+  not a W3C standard.
+
+- **The RFCs' own test vectors now run in `just check`.** The signature library,
+  the canonicaliser and the key-derivation function had been checked only
+  against this repository's own expectations, which cannot catch a misreading
+  shared by the code and its tests. Five RFCs publish vectors for things this
+  workspace relies on, and all five now run:
+  - RFC 8785: Appendix B's 24 number serialisations, the worked example of
+    clauses 3.2.2 to 3.2.4 compared byte for byte, and the data for the UTF-16
+    property sort. Every signature and content hash in the workspace is over
+    this canonical form.
+  - RFC 8032: the five Ed25519 vectors of clause 7.1, including the 1023-byte
+    message, through `ed25519-dalek`.
+  - RFC 8037: appendix A's Ed25519 key pair and public JWK, through the
+    `publicKeyJwk` this crate emits and the DID-document key reader, and the JWS
+    of A.4 and A.5, which this crate's verifier accepts.
+  - RFC 9106: clause 5.3's Argon2id vector, through the `argon2` crate the
+    keystore uses. The keystore's cost parameters are not the RFC's, so the
+    vector runs through the crate with the RFC's parameters.
+  - RFC 9562: appendix A.6's UUIDv7 example, through the carrier-serial
+    derivation, which relies on the layout the RFC defines.
+
+  All of them passed, so nothing else in the workspace changed. RFC 8037's A.3,
+  the JWK thumbprint, runs with the thumbprint code under Breaking above. Not
+  run: the NaN and Infinity rows of RFC 8785, which a `serde_json::Value`
+  cannot hold; and the larger number file and the input and output files that
+  the RFC's author publishes separately.
+
+### Fixed
+
+- **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
+  4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
+  does not understand, and `dpp_crypto::jws` never read the member. A token its
+  producer had marked "do not process this unless you understand the extension"
+  therefore verified whenever its signature did. `verify_jws` and
+  `jws::signer::verify` now refuse any `crit`, since this crate understands no
+  extension, and so does every verifier built on them: the snapshot bound, the
+  access credential, the local identity service, SD-JWT VC verification, and a
+  ruleset bundle checked through an adapter over `verify_jws`. Nothing this
+  workspace signs carries `crit`, so no existing token is affected.
+
+- **Three measured values of one battery were labelled public.** In battery
+  schemas v2.6.0 and v2.7.0, `dynamicPerformance` is `individual` (Annex XIII
+  point 4(a)), but its members `internalResistanceMohm`,
+  `roundTripEfficiencyPct` and `expectedLifetimeCycles` were `public`,
+  probably because they share names with the model-level figures at the top
+  level, which are public. Battery schema v2.8.0 labels them `individual`. No
+  audience's view changes, because the serving filter drops the whole object
+  for an audience that may not see it. (#388)
+
+  A new test holds every product group's current schema to the rule that no
+  member is visible to an audience its enclosing object is hidden from. It
+  found eight more members, which it lists as known faults with the reason
+  for each:
+  - **Six battery fields:** the `name` and `casNumber` of the anode, cathode
+    and electrolyte material arrays. They come from a shared definition whose
+    members collide with `criticalRawMaterial`'s public ones, so relabelling
+    them needs a change to how shared definitions are read.
+  - **Two electronics fields:** `criticalRawMaterials[].name` and
+    `countryOfOrigin`, which wait on the CRM Act reading in #314.
+
+### Documentation
+
+- **Technical specifications have one home.** README's coverage table and the
+  conformity statement each gave their own status for GS1 Digital Link, the
+  IDTA AAS metamodel and VC Data Model 2.0, and the two had disagreed. Those
+  rows now point at the register. So does the standards list in
+  `docs/project/BLUEPRINT.md`, which no longer restates revisions.
+
+- **The conformity statement carried an unsourced regulatory attribution and
+  claims that had gone stale.** This was an accuracy pass over
+  `docs/regulatory/CONFORMITY.md`, the document addressed to conformity
+  assessment bodies. Every claim was re-checked against the tree or a primary
+  source, not simply re-read.
+
+  **Unsourced.** The document said Ed25519 was used *"as specified by the ESPR
+  implementing guidance"*. No provision of ESPR or of its implementing acts is
+  recorded as requiring any signature algorithm. The curve is this library's
+  design choice, and the text now says so.
+
+  **Stale against its own sources.**
+  - W3C VC Data Model 2.0 was listed as a Candidate Recommendation. It has been
+    a W3C Recommendation since 15 May 2025. The README said only "Published";
+    its coverage table now points at the standards register, which gives the
+    status and date.
+  - The CEN/CLC JTC 24 row still said the OJ citation was pending. It now
+    matches the README's earlier correction: cited by CID (EU) 2026/1736 on
+    15 July 2026, with no conformance claimed.
+  - The same row gave the absence of the standard texts as the reason no
+    clause-by-clause mapping existed, while the same document cites
+    EN 18219:2026 clause 6.3.2. That reason is gone.
+  - The row's forward-looking line about EN 18239 and EN 18246 had no source
+    and is removed.
+
+  **Overclaims.**
+  - The textile schema was said to cover the fields of the JTC 24 system
+    standards. That contradicted the table above it, and also the header of the
+    test cited as evidence (`schema_conformity.rs`), which says it is not a
+    conformity check. The field set is now described as this library's own.
+  - The AAS mapping claimed Catena-X interoperability. It carries
+    `urn:odal-node:*` semantics and claims no IDTA or Catena-X conformance, as
+    the README already said.
+  - `docs/project/BLUEPRINT.md` repeated this Catena-X claim along with
+    *"GS1 Digital Link v1.2"*, a revision with no recorded source. Both are
+    removed there too.
+
+  **Copies that had fallen behind.**
+  - The schema table listed four product groups at their first versions; there
+    are twelve. The CI section listed four of the gate's steps. Both sections
+    now point at their source (the schemas directory and the `check` recipe)
+    instead of restating it.
+  - The known gaps described a `jws_verifier` doing "structural checks".
+    Verification is cryptographic, and only fetching the DID document is left
+    to a host.
+  - The known gaps also named StatusList2021. The implementation is W3C
+    Bitstring Status List v1.0, and only fetching the list is left to a host.
+  - The plugin section promised "no shared memory across plugin calls". That
+    is a host property this crate cannot evidence, and it is now described as
+    one.
+
+  **Elsewhere.** The document named two audiences it had no basis to address,
+  and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
+  exist. Both are fixed.
+
+## [0.21.0] - 2026-09-28
+
+### Breaking
+
 - **`PassportRepository` resolves a passport by its identifier, and the two
   by-GTIN lookups are removed.** `find_published_by_gtin` and
   `find_by_gtin_any_status` were the port's only single-identifier lookups and
@@ -1189,6 +1483,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   in lexicographic order, which is the order the literal already used.
 
 ### Fixed
+
+- **`cpr-2024-3110` no longer carries a passport date, because the Regulation
+  does not give one.** 0.19.0 recorded **8 January 2026** as a `sourced`
+  passport date, read from Art. 96, the Regulation's general application date.
+  Art. 96 does apply Arts. 75 and 76 from that day, but the provision that says
+  when a manufacturer owes a passport is **Art. 22(7)**: *"By 18 months after
+  the entry into force of the delegated act referred to in Article 75(1) the
+  manufacturer shall make available a digital product passport referred to in
+  Article 76"*. Art. 75(1) leaves that delegated act to the Commission and none
+  has been adopted, so the date is relative to an act that does not exist yet.
+  The record is now `required` with no date, the state `ObligationDate`
+  reserves for an act that mandates a passport and has not fixed when; once the
+  delegated act is adopted, its entry into force plus 18 months is the sourced
+  date. Nothing in the crate gated on the old date, but a consumer reading it
+  would have shown a construction passport as owed since January 2026.
+
+  `detergents-2026-405`'s `notes` still called its date assumed and unread,
+  although 0.19.0 had flipped it to `sourced`. The notes now cite what the date
+  rests on (Art. 21(1), applying from 23 September 2029 under Art. 37) and the
+  two limits it does not show: Art. 36(2)'s one-year transition for products
+  that meet Regulation (EC) No 648/2004, and Art. 21(10)'s rule that the
+  passport's technical implementing act cannot apply earlier than 18 months
+  after it enters into force, unless that act sets an earlier date in duly
+  justified cases relating to the whole act or certain provisions of it, or on
+  its partial repeal or amendment.
 
 - **🚨 The passport's `@context` referenced a remote document it no longer
   needed, and a remote reference is a whole-document failure mode.** A string
