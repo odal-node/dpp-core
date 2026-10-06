@@ -2,13 +2,15 @@
 
 use base64::Engine;
 use ed25519_dalek::{Signature, VerifyingKey};
-use sha2::{Digest, Sha256};
 
-use super::algorithm::KeyAlgorithm;
+use super::algorithm::{JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
 
 /// Verify an EdDSA compact JWS given a base64url-encoded public key.
 ///
 /// Returns `Ok(true)` when the signature is valid, `Ok(false)` when it is not.
+/// A protected header that names a critical extension (`crit`, RFC 7515 clause
+/// 4.1.11), or any algorithm but `EdDSA` and its RFC 9864 name `Ed25519`, is
+/// refused the same way: `Ok(false)`.
 /// Returns `Err` only on malformed input (bad base64, wrong key/sig length).
 pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -21,7 +23,7 @@ pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
     // No key record here — the caller supplies raw Ed25519 key bytes — so the
     // algorithm is pinned rather than bound. Rejects `alg:none` and every
     // substitution downgrade.
-    if !header_alg_matches(&b64, parts[0], KeyAlgorithm::Ed25519) {
+    if !header_admissible(&b64, parts[0], KeyAlgorithm::Ed25519) {
         return Ok(false);
     }
 
@@ -67,76 +69,78 @@ fn jwk_ed25519_x(jwk: &serde_json::Value) -> Option<String> {
     jwk.get("x")?.as_str().map(String::from)
 }
 
-/// IDs the DID document authorizes via `assertionMethod` — the verification
-/// relationship that permits signing credentials/passports.
-fn assertion_method_ids(did_document: &serde_json::Value) -> Vec<String> {
+/// The absolute form of an identifier inside the document `document_id`: a
+/// fragment-only reference (`#…`) is resolved against the document, and anything
+/// else is already absolute. Controlled Identifiers compares verification
+/// methods by their absolute URL, and documents written by others do use the
+/// relative form.
+fn absolute(document_id: &str, id: &str) -> String {
+    if id.starts_with('#') {
+        format!("{document_id}{id}")
+    } else {
+        id.to_owned()
+    }
+}
+
+/// Whether `assertionMethod` — the verification relationship that permits
+/// signing credentials and passports — references the method `vm_id`.
+fn is_assertion_method(did_document: &serde_json::Value, document_id: &str, vm_id: &str) -> bool {
     did_document
         .get("assertionMethod")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|e| e.as_str().map(String::from))
-                .collect()
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|refs| {
+            refs.iter()
+                .filter_map(serde_json::Value::as_str)
+                .any(|r| absolute(document_id, r) == vm_id)
         })
-        .unwrap_or_default()
 }
 
-/// Whether a verification-method entry is referenced by `assertionMethod`.
-fn vm_is_assertion_authorized(vm: &serde_json::Value, authorized: &[String]) -> bool {
-    vm.get("id")
-        .and_then(|v| v.as_str())
-        .is_some_and(|id| authorized.iter().any(|a| a == id))
-}
-
-/// Decode the JWS protected header and read its `alg`, if it names an
-/// algorithm this crate allows at all. `None` for a malformed header, a
-/// missing `alg`, `alg:none`, or anything outside the allowlist.
-fn header_alg(
-    b64: &base64::engine::general_purpose::GeneralPurpose,
-    header_b64: &str,
-) -> Option<KeyAlgorithm> {
-    let bytes = b64.decode(header_b64).ok()?;
-    let header: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    KeyAlgorithm::from_jose_alg(header.get("alg")?.as_str()?)
-}
-
-/// Whether the JWS protected header's `alg` is exactly the algorithm the
-/// signing key is recorded as using.
+/// Whether a JWS protected header may be acted on at all: it names no critical
+/// extension, and its `alg` is exactly the algorithm the signing key is
+/// recorded as using.
 ///
-/// The header does not get a vote in which algorithm is used — it is checked
-/// *against* the key. With one algorithm in the allowlist this is equivalent to
-/// pinning; with two it is the difference between a verifier and an algorithm-
-/// confusion oracle, which is why it is written this way now rather than later.
-pub(crate) fn header_alg_matches(
+/// **`crit`.** RFC 7515 clause 4.1.11 says a JWS whose `crit` lists an
+/// extension the recipient does not understand is invalid, and the recipient
+/// must reject it. This crate understands none, so a `crit` of any shape is
+/// refused rather than inspected. That also covers the shapes the clause forbids
+/// a producer to emit (an empty list, a registered parameter, a repeated name),
+/// which a recipient may treat as invalid. Ignoring `crit` instead would accept
+/// a token its producer marked "do not process this unless you understand the
+/// extension", for example one whose signing input is built differently.
+///
+/// **`alg`.** The header does not get a vote in which algorithm is used — it is
+/// checked *against* the key. With one algorithm in the allowlist this is
+/// equivalent to pinning; with two it is the difference between a verifier and
+/// an algorithm-confusion oracle, which is why it is written this way now rather
+/// than later. `false` for a malformed header, a missing `alg`, `alg:none`, or
+/// anything outside the allowlist.
+///
+/// Every verification path in this crate calls this one function, so a check
+/// added here cannot be skipped by a path that was written later.
+pub(crate) fn header_admissible(
     b64: &base64::engine::general_purpose::GeneralPurpose,
     header_b64: &str,
     expected: KeyAlgorithm,
 ) -> bool {
-    header_alg(b64, header_b64) == Some(expected)
-}
-
-/// Extract the base64url-encoded primary Ed25519 public key (`x`) from a DID document.
-///
-/// Looks at `verificationMethod[0].publicKeyJwk.x`.
-pub fn extract_primary_public_key(did_document: &serde_json::Value) -> Option<String> {
-    let authorized = assertion_method_ids(did_document);
-    did_document["verificationMethod"]
-        .as_array()?
-        .iter()
-        .find_map(|vm| {
-            if vm_is_assertion_authorized(vm, &authorized) {
-                jwk_ed25519_x(vm.get("publicKeyJwk")?)
-            } else {
-                None
-            }
-        })
+    let Ok(bytes) = b64.decode(header_b64) else {
+        return false;
+    };
+    let Ok(header) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return false;
+    };
+    if header.get("crit").is_some() {
+        return false;
+    }
+    header
+        .get("alg")
+        .and_then(serde_json::Value::as_str)
+        .and_then(KeyAlgorithm::from_jose_alg)
+        == Some(expected)
 }
 
 /// Extract the `kid` field from the JWS protected header.
 ///
 /// Returns `None` if the JWS is malformed or the header contains no `kid`.
-/// Old JWS tokens produced before the kid-header change will return `None`
-/// and callers should fall back to `extract_primary_public_key`.
 pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header_b64 = jws.split('.').next()?;
@@ -145,30 +149,72 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
     header.get("kid")?.as_str().map(String::from)
 }
 
-/// Find the base64url-encoded Ed25519 public key (`x`) in a DID document
-/// whose SHA-256 fingerprint (hex) matches `kid`.
+/// Resolve the public key a JWS names, from its issuer's DID document: the
+/// base64url Ed25519 `x` of the verification method the `kid` identifies.
 ///
-/// The `kid` embedded in the JWS protected header by `signer::sign` is
-/// `hex::encode(Sha256::digest(verifying_key_bytes))`.  This function
-/// iterates all `verificationMethod` entries and returns the `x` value of
-/// the first one whose decoded public key produces the same fingerprint —
-/// allowing verification against any rotation-archived key.
-pub fn extract_key_by_fingerprint(did_document: &serde_json::Value, kid: &str) -> Option<String> {
+/// The `kid` must be the absolute URL of a verification method: the document's
+/// DID, `#`, and a fragment. The ones this crate issues end in the key's
+/// thumbprint URI, `did:web:…#urn:ietf:params:oauth:jwk-thumbprint:sha-256:…`.
+/// There is no fallback to a default key: a token that does not say which key
+/// signed it is not verified against one chosen for it. `None` unless **all** of
+/// these hold:
+///
+/// - the `kid` without its fragment is the document's own `id`, and a
+///   verification method whose absolute `id` is the `kid` has that same
+///   `controller`. These are the binding checks of the Controlled Identifiers
+///   v1.0 retrieval algorithm (§3.3): a document vouches only for its own keys;
+/// - `assertionMethod` references that method;
+/// - its `publicKeyJwk` is an Ed25519 key (`kty: OKP`, `crv: Ed25519`);
+/// - if the fragment is a thumbprint URI, it is that key's own. An identifier
+///   that claims to be derived from the key is held to it, or a document could
+///   file any key under another key's name. Other fragments, such as `#key-1`
+///   in a document someone else wrote, are taken as the names they are;
+/// - if the JWK declares an `alg`, the JWS `alg` is the same string. A key that
+///   says what it is for is held to it.
+///
+/// The ids this crate issues are stable across rotation and revocation, so a
+/// signature made before a rotation resolves to the key that made it. A revoked
+/// key is absent from the document, and so resolves to nothing.
+pub fn resolve_verification_key(did_document: &serde_json::Value, jws: &str) -> Option<String> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let authorized = assertion_method_ids(did_document);
-    did_document["verificationMethod"]
+    let header_bytes = b64.decode(jws.split('.').next()?).ok()?;
+    let header: serde_json::Value = serde_json::from_slice(&header_bytes).ok()?;
+    let kid = header.get("kid")?.as_str()?;
+    let jws_alg = header.get("alg")?.as_str()?;
+
+    let (document_url, fragment) = kid.split_once('#')?;
+    let document_id = did_document.get("id")?.as_str()?;
+    if fragment.is_empty() || document_url != document_id {
+        return None;
+    }
+
+    let vm = did_document["verificationMethod"]
         .as_array()?
         .iter()
-        .find_map(|vm| {
-            if !vm_is_assertion_authorized(vm, &authorized) {
-                return None;
-            }
-            let x = jwk_ed25519_x(vm.get("publicKeyJwk")?)?;
-            let raw = b64.decode(&x).ok()?;
-            if hex::encode(Sha256::digest(&raw)) == kid {
-                Some(x)
-            } else {
-                None
-            }
-        })
+        .find(|vm| {
+            vm.get("id")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|id| absolute(document_id, id) == kid)
+        })?;
+    if vm.get("controller").and_then(serde_json::Value::as_str) != Some(document_id)
+        || !is_assertion_method(did_document, document_id, kid)
+    {
+        return None;
+    }
+
+    let jwk = vm.get("publicKeyJwk")?;
+    let x = jwk_ed25519_x(jwk)?;
+    let raw = b64.decode(&x).ok()?;
+
+    if fragment.starts_with(JWK_THUMBPRINT_URI_PREFIX)
+        && fragment != KeyAlgorithm::Ed25519.thumbprint_uri(&raw)
+    {
+        return None;
+    }
+    if let Some(declared) = jwk.get("alg")
+        && declared.as_str() != Some(jws_alg)
+    {
+        return None;
+    }
+    Some(x)
 }

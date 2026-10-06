@@ -95,8 +95,8 @@ Verification:
 Key rotation is a first-class operation:
 
 1. The current Ed25519 key is archived with a timestamp
-2. A new key pair is generated and becomes `#key-1` (primary, authentication)
-3. Archived keys are retained as `#key-2`, `#key-3`, etc. under `assertionMethod` in the DID document
+2. A new key pair is generated and listed first in the DID document (primary, authentication)
+3. Archived keys are retained under `assertionMethod`, each keeping its identifier: the DID and the key's own thumbprint, which no rotation changes
 4. All past JWS signatures remain verifiable against their corresponding archived key
 
 This means a manufacturer can rotate keys without invalidating any previously published passports.

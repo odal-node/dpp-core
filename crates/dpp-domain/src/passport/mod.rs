@@ -3,6 +3,8 @@
 pub mod id;
 #[cfg(test)]
 mod id_tests;
+#[cfg(test)]
+mod rfc9562_vector_tests;
 
 pub mod carrier;
 #[cfg(test)]

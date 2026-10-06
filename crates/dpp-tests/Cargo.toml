@@ -33,9 +33,14 @@ dpp-registry        = { workspace = true }
 # Read so a test can hold the shared battery-category vocabulary against the
 # domain enum and the JSON schema. Dev-only: nothing in `src/` uses it, and
 # this crate is `publish = false`, so the edge does not reach the crate graph
-# anyone vendors.
-dpp-rules           = { workspace = true }
+# anyone vendors. `bundle` is on so `jws_crit_rejection` can drive the real
+# `verify_bundle`; `dpp-calc` already enables it across the workspace, but a
+# `-p dpp-tests` build must not depend on that.
+dpp-rules           = { workspace = true, features = ["bundle"] }
 serde_json = { workspace = true }
+# `jws_crit_rejection` signs a header `dpp-crypto` will not write, which needs
+# the signing primitive itself. Already in the workspace graph.
+ed25519-dalek = { workspace = true }
 # `carrier_resolution` drives the repository port, whose lookups are async.
 async-trait = { workspace = true }
 tokio      = { version = "1", features = ["macros", "rt"] }

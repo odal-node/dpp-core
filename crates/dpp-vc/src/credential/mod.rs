@@ -33,6 +33,8 @@ pub mod jwt;
 mod jwt_tests;
 mod revocation;
 #[cfg(test)]
+mod revocation_tests;
+#[cfg(test)]
 mod tests;
 mod trust;
 mod types;
@@ -40,7 +42,7 @@ mod verify;
 
 pub use builder::CredentialBuilder;
 pub use jwt::{authenticate_access_credential, sign_access_credential};
-pub use revocation::{RevocationOutcome, check_revocation};
+pub use revocation::{REVOCATION_PURPOSE, RevocationOutcome, check_revocation};
 pub use trust::{AllowAllIssuers, StaticTrustedIssuers, TrustedIssuerRegistry};
 pub use types::{
     Audience, CredentialRole, CredentialStatus, DppAccessCredential, DppCredentialSubject,

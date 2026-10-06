@@ -154,6 +154,11 @@ documents still read is answered by the frozen fixtures in
 
 **No longer required:** `gtin`
 
+### v2.7.0 → v2.8.0
+
+
+**No longer required:** `co2ePerUnitKg`
+
 ## construction
 
 

@@ -207,7 +207,7 @@ AES-256-GCM encrypted Ed25519 key storage. Keys are persisted as JSON files on t
 
 JWS compact signing (EdDSA with Ed25519):
 
-- `sign(store, key_id, payload)` — produce a JWS compact serialisation
+- `sign(store, key_id, payload, kid)` — produce a JWS compact serialisation whose header names the signing key by `kid`
 - `verify(jws, public_key)` — verify a JWS signature
 
 ### JWS Verifier
@@ -215,7 +215,7 @@ JWS compact signing (EdDSA with Ed25519):
 Single source of truth for JWS verification:
 
 - `verify_jws(jws, public_key_b64)` — verify a JWS against a base64-encoded public key
-- `extract_primary_public_key(did_document)` — extract the primary Ed25519 public key from a DID document
+- `resolve_verification_key(did_document, jws)` — the Ed25519 public key of the verification method the JWS `kid` names, after the Controlled Identifiers v1.0 binding checks. No `kid`, no key
 
 ## dpp-registry — EU Registry Interface
 
@@ -243,7 +243,7 @@ platform entropy source.
 
 Constructs `did:web` DID documents from the KeyStore state:
 
-- `build_did_document(store, base_url, key_id)` — builds the full DID document with the current primary key as `#key-1` (authentication) and archived keys as `#key-2`, `#key-3`, etc. (assertionMethod)
+- `build_did_document(store, base_url, key_id)` — builds the full DID document: one `JsonWebKey` verification method per key, identified by the DID and the key's RFC 9278 thumbprint URI. The current key comes first and alone in `authentication`; it and every non-revoked archived key are in `assertionMethod`
 
 ### LocalIdentityService
 

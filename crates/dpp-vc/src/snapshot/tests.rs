@@ -54,7 +54,8 @@ fn snapshot(store: &KeyStore, as_of: chrono::DateTime<Utc>, valid_for: Duration)
     object.insert("asOf".to_owned(), json!(rfc3339(as_of)));
     object.insert("validUntil".to_owned(), json!(rfc3339(as_of + valid_for)));
 
-    let proof = dpp_crypto::jws::sign(store, KEY, &document).expect("sign snapshot");
+    let proof =
+        dpp_crypto::jws::sign(store, KEY, &document, "snapshot-kid").expect("sign snapshot");
     document
         .as_object_mut()
         .expect("object")
@@ -285,7 +286,8 @@ fn a_snapshot_survives_the_round_trip_through_bytes() {
         "asOf": rfc3339,
         "validUntil": (as_of + Duration::days(7)).to_rfc3339_opts(SecondsFormat::Secs, true),
     });
-    let proof = dpp_crypto::jws::sign(&store, KEY, &document).expect("sign snapshot");
+    let proof =
+        dpp_crypto::jws::sign(&store, KEY, &document, "snapshot-kid").expect("sign snapshot");
     document
         .as_object_mut()
         .expect("object")
