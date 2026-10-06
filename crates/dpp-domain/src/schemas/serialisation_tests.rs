@@ -50,7 +50,7 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
         expected_lifetime_cycles: Some(3_000),
-        co2e_per_unit_kg: 85.4,
+        co2e_per_unit_kg: Some(85.4),
         recycled_content_cobalt_pct: Some(16.0),
         recycled_content_lithium_pct: Some(6.0),
         recycled_content_nickel_pct: Some(6.0),

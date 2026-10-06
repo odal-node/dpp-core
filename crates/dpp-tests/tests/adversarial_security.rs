@@ -55,6 +55,7 @@ fn credential_with_status_at_index(index: &str) -> dpp_vc::DppAccessCredential {
         .with_status(CredentialStatus {
             id: format!("https://status.example.com/list#{index}"),
             status_type: "BitstringStatusListEntry".into(),
+            status_purpose: "revocation".into(),
             status_list_index: Some(index.into()),
             status_list_credential: Some("https://status.example.com/list".into()),
         })
