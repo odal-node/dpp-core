@@ -106,7 +106,7 @@ rand         = "0.10"
 # dropping the feature would silently downgrade both formats to "unknown" for
 # those rather than fail, which is a validator quietly accepting what it was
 # asked to reject.
-jsonschema   = { version = "0.56", default-features = false, features = ["idna"] }
+jsonschema   = { version = "0.58", default-features = false, features = ["idna"] }
 semver       = "1"
 
 # Property-based testing (dev-only)
