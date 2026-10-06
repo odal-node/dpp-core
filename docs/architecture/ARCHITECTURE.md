@@ -164,6 +164,7 @@ Trait definitions that downstream projects implement against their own infrastru
 | `IdentityPort` | yes | Sign and verify passport JWS |
 | `PluginHost` | no | Dispatch to Wasm product group plugins |
 | `BackupCopyPort` | yes | The ESPR Art. 10(4) third-party back-up copy |
+| `ArchivedVersionPort` | yes | The EN 18221 clause 4.2 archive of a passport's historical versions |
 | `RegistrySyncPort` | yes | EU Central Registry registration and status sync |
 | `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 

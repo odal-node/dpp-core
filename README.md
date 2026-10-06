@@ -211,7 +211,7 @@ has mapped is exactly where an invented identifier otherwise passes unexamined.
 
 ## Port Traits
 
-The eight port traits define the core/platform boundary. Any downstream project implements these against its own infrastructure:
+The port traits define the core/platform boundary. Any downstream project implements these against its own infrastructure:
 
 | Trait | Kind | Purpose |
 |---|---|---|
@@ -220,6 +220,7 @@ The eight port traits define the core/platform boundary. Any downstream project 
 | `IdentityPort` | async | Sign and verify passport JWS |
 | `PluginHost` | sync | Wasm plugin dispatch |
 | `BackupCopyPort` | async | The ESPR Art. 10(4) third-party back-up copy |
+| `ArchivedVersionPort` | async | The EN 18221 clause 4.2 archive of a passport's historical versions |
 | `RegistrySyncPort` | async | EU Central Registry registration and status sync |
 | `SealPort` | async | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 

@@ -10,7 +10,8 @@ drifts the moment another port lands). CI enforces agreement: the test
 
 | Module | Trait(s) | Concern |
 |---|---|---|
-| `backup` | `BackupCopyPort` | The third-party **back-up copy** of ESPR **Art. 10(4)**, lodged with the **Art. 2(32)** independent provider for the **Annex III(i)** availability period — *not* ESPR Art. 13, which is the registry. Separate from EN 18221 clause 4.2 archiving by **shape, not by actor**: clause 4.2 expects the back-up provider to hold archived versions too, so a provider may owe a history — but nothing on this port takes or returns a series, so none is expressible here. |
+| `archive` | `ArchivedVersionPort` | The **archive** of a live passport's historical versions, EN 18221 clause 4.2: the version a change replaces, kept append-only for the passport's lifetime, each with a content hash. Separate from `backup` by **shape, not by actor**: this port holds a *series of versions of one record*, and a back-up provider implements it alongside `BackupCopyPort`, as the main store does. It returns whole documents and applies no disclosure policy, which the caller does. |
+| `backup` | `BackupCopyPort` | The third-party **back-up copy** of ESPR **Art. 10(4)**, lodged with the **Art. 2(32)** independent provider for the **Art. 9(2)(i)** availability period — *not* ESPR Art. 13, which is the registry. Separate from EN 18221 clause 4.2 archiving by **shape, not by actor**: this port holds *one copy of one record*, so a history is not expressible here, and is held through `archive` instead. Clause 4.2 expects the back-up provider to hold archived versions too, so a provider implements both. |
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
@@ -18,7 +19,7 @@ drifts the moment another port lands). CI enforces agreement: the test
 | `registry_sync` | `RegistrySyncPort` | EU Central Registry registration/status sync (ESPR Art. 13). |
 | `seal` | `SealPort` | eIDAS qualified electronic seal (eIDAS 910/2014). |
 
-**Count today: 7 port modules, 8 `pub trait`s** (compliance carries two). Prefer
+**Count today: 8 port modules, 9 `pub trait`s** (compliance carries two). Prefer
 naming the modules over asserting a count.
 
 ### Adjacent seams (deliberately *not* in `ports/`)
@@ -31,6 +32,7 @@ so the inventory is complete, and are excluded from the machine block below.
 
 <!-- PORTS-INVENTORY:BEGIN (one module name per line; parsed by ports_inventory.rs) -->
 ```
+archive
 backup
 compliance
 identity
