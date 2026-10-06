@@ -46,11 +46,11 @@ impl DppProductGroupPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.7.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.8.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.7.0".into(),
+            max_version: "2.8.0".into(),
         }
     }
 
@@ -68,7 +68,9 @@ impl DppProductGroupPlugin for BatteryPlugin {
             .require_str("batteryChemistry")
             .require_positive("nominalVoltageV")
             .require_positive("nominalCapacityAh")
-            .require_non_negative("co2ePerUnitKg")
+            // Optional from schema v2.8.0, where the guidance defers the carbon
+            // footprint the figure would be read as.
+            .optional_non_negative("co2ePerUnitKg")
             .optional_positive_int("expectedLifetimeCycles")
             .optional_pct("recycledContentCobaltPct")
             .optional_pct("recycledContentLithiumPct")
@@ -485,7 +487,7 @@ mod tests {
     fn capabilities_cover_battery_schema_range() {
         let caps = BatteryPlugin.capabilities();
         assert_eq!(caps.abi_version, AbiVersion::current());
-        assert_eq!(caps.supported_schemas[0].max_version, "2.7.0");
+        assert_eq!(caps.supported_schemas[0].max_version, "2.8.0");
         assert!(caps.capabilities.contains(&PluginCapability::Validate));
     }
 
@@ -585,6 +587,21 @@ mod tests {
     fn non_positive_voltage_fails() {
         let mut data = valid_battery();
         data["nominalVoltageV"] = json!(0.0);
+        assert!(BatteryPlugin.validate_input(&data).is_err());
+    }
+
+    /// Schema v2.8.0 no longer requires `co2ePerUnitKg`, so a record without
+    /// it is valid, and no CO2e metric is invented for it. A value that is
+    /// present is still held to being non-negative.
+    #[test]
+    fn a_record_without_co2e_is_valid_and_reports_no_co2e() {
+        let mut data = valid_battery();
+        data.as_object_mut().unwrap().remove("co2ePerUnitKg");
+        assert!(BatteryPlugin.validate_input(&data).is_ok());
+        let result = BatteryPlugin.calculate_metrics(&data).expect("metrics");
+        assert_eq!(result.co2e_score(), None);
+
+        data["co2ePerUnitKg"] = json!(-1.0);
         assert!(BatteryPlugin.validate_input(&data).is_err());
     }
 

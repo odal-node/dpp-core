@@ -75,7 +75,7 @@ pub(crate) fn sample_battery_data() -> BatteryData {
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
         expected_lifetime_cycles: Some(3000),
-        co2e_per_unit_kg: 85.4,
+        co2e_per_unit_kg: Some(85.4),
         recycled_content_cobalt_pct: None,
         recycled_content_lithium_pct: None,
         recycled_content_nickel_pct: None,
