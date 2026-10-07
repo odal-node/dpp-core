@@ -20,6 +20,8 @@
 //!   extensibility seam (a port-like abstraction, different change-cadence).
 //! - [`functions`] — the `validate_*` free functions (schema + cross-field).
 //! - [`batch`] — batch validation over multiple product group-data items.
+//! - [`personal_data`] — the write-time check that a field able to hold personal
+//!   data carries the operator's statement about it.
 
 // Only the schema pass needs gating. `rules` is a thin adapter onto `dpp-rules`
 // and is pure, so it stays available on every target — the module-level gate
@@ -28,10 +30,14 @@
 pub mod batch;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod functions;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod personal_data;
 pub mod rules;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validator;
 
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod personal_data_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
@@ -42,6 +48,8 @@ pub use functions::{
     validate_passport, validate_product_group_data, validate_product_group_data_with_registry,
     validate_raw_product_group_data,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use personal_data::{PERSONAL_DATA_MARK, check_personal_data, personal_data_marks};
 pub use rules::{
     battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
     unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,

@@ -11,6 +11,7 @@
   },
   "retentionYears": 10,
   "retentionYearsBasis": "sourced",
+  "customerPersonalData": { "storage": "explicitConsentOnly", "provision": "Regulation (EU) 2025/2509 Art. 20(10)" },
   "productGroups": [
     {
       "productGroup": "toy",

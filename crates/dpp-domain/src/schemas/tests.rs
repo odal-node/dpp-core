@@ -32,10 +32,10 @@ fn latest_battery_returns_v2_7() {
 }
 
 #[test]
-fn latest_textile_returns_v1_3() {
+fn latest_textile_returns_v1_4() {
     let reg = VersionedSchemaRegistry::new();
     let (version, _json) = reg.latest("textile").expect("textile schema exists");
-    assert_eq!(*version, "1.3.0".parse::<Version>().unwrap());
+    assert_eq!(*version, "1.4.0".parse::<Version>().unwrap());
 }
 
 #[test]
@@ -76,14 +76,15 @@ fn product_groups_returns_unique_sorted_list() {
 }
 
 #[test]
-fn versions_for_textile_returns_all_four() {
+fn versions_for_textile_returns_all_five() {
     let reg = VersionedSchemaRegistry::new();
     let versions = reg.versions_for("textile");
-    assert_eq!(versions.len(), 4);
+    assert_eq!(versions.len(), 5);
     assert_eq!(*versions[0], "1.0.0".parse::<Version>().unwrap());
     assert_eq!(*versions[1], "1.1.0".parse::<Version>().unwrap());
     assert_eq!(*versions[2], "1.2.0".parse::<Version>().unwrap());
     assert_eq!(*versions[3], "1.3.0".parse::<Version>().unwrap());
+    assert_eq!(*versions[4], "1.4.0".parse::<Version>().unwrap());
 }
 
 // ── Hot-reload / runtime registration tests ───────────────────────────

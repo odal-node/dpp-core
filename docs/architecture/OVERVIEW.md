@@ -164,12 +164,14 @@ trait IdentityPort          // Sign and verify JWS
 // Plugins
 trait PluginHost            // Dispatch to Wasm plugins
 
-// Back-up copy & registry & sealing
+// Back-up copy & archive & personal data & registry & sealing
 trait BackupCopyPort        // The ESPR Art. 10(4) third-party back-up copy
+trait ArchivedVersionPort   // The EN 18221 clause 4.2 archive of historical versions
+trait PersonalDataPort      // Erasable records of personal data held outside a passport
 trait RegistrySyncPort      // EU Central Registry registration / status sync
 trait SealPort              // eIDAS qualified electronic seal (ESPR Art. 13)
 ```
 
-`PassportRepository`, `IdentityPort`, `BackupCopyPort`, `RegistrySyncPort`, and `SealPort` are `async`. The compliance and plugin traits are sync — they must work in `no_std` and `wasm32` contexts.
+`PassportRepository`, `IdentityPort`, `BackupCopyPort`, `ArchivedVersionPort`, `PersonalDataPort`, `RegistrySyncPort`, and `SealPort` are `async`. The compliance and plugin traits are sync — they must work in `no_std` and `wasm32` contexts.
 
 `dpp-vc` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by `dpp-crypto`'s local `KeyStore`. Anyone who implements the remaining traits against their own infrastructure has a complete, standard-compliant DPP system.

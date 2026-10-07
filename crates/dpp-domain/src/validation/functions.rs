@@ -18,13 +18,13 @@ use crate::product_group::{ProductGroupData, SvhcSubstance};
 use crate::schemas::VersionedSchemaRegistry;
 
 /// The embedded schema registry, built once.
-fn default_registry() -> &'static VersionedSchemaRegistry {
+pub(super) fn default_registry() -> &'static VersionedSchemaRegistry {
     static REGISTRY: OnceLock<VersionedSchemaRegistry> = OnceLock::new();
     REGISTRY.get_or_init(VersionedSchemaRegistry::new)
 }
 
 /// The embedded product group catalog, built once.
-fn default_catalog() -> &'static ProductGroupCatalog {
+pub(super) fn default_catalog() -> &'static ProductGroupCatalog {
     static CATALOG: OnceLock<ProductGroupCatalog> = OnceLock::new();
     CATALOG.get_or_init(ProductGroupCatalog::new)
 }
@@ -198,7 +198,9 @@ fn schema_errors(product_group_data: &ProductGroupData, errors: &mut Vec<FieldEr
 
 /// The JSON the schema expects: the inner product group fields without the `"productGroup"`
 /// discriminant tag that `ProductGroupData` serialises (schemas forbid extra props).
-fn product_group_data_instance(product_group_data: &ProductGroupData) -> serde_json::Value {
+pub(super) fn product_group_data_instance(
+    product_group_data: &ProductGroupData,
+) -> serde_json::Value {
     let mut value =
         serde_json::to_value(product_group_data).expect("ProductGroupData serializes to Value");
     if let Some(obj) = value.as_object_mut() {
@@ -291,8 +293,12 @@ fn push_svhc(substances: Option<&[SvhcSubstance]>, errors: &mut Vec<FieldError>)
     }
 }
 
-/// Validate a passport completely: its own invariants, then schema conformance
-/// of its product-group data.
+/// Validate a passport completely: its own invariants, schema conformance of its
+/// product-group data, and the operator's statements about personal data.
+///
+/// The third half is [`super::check_personal_data`]: a field the schema marks as
+/// able to hold personal data is refused here, before anything is stored or
+/// signed, unless the passport states what is held about it.
 ///
 /// This is the pairing [`Passport::validate`] used to do alone, split because
 /// the two halves are not the same kind of check.
@@ -324,6 +330,8 @@ pub fn validate_passport(passport: &Passport) -> Result<(), DppError> {
     {
         errors.extend(ve.errors);
     }
+
+    errors.extend(super::check_personal_data(passport));
 
     if errors.is_empty() {
         Ok(())

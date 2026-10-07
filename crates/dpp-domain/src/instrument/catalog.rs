@@ -2,6 +2,7 @@
 
 use super::act::Instrument;
 use super::binding::InstrumentBinding;
+use super::customer_personal_data::CustomerPersonalData;
 use super::obligation::ObligationDate;
 use super::reference::InstrumentRef;
 use super::status::InstrumentStatus;
@@ -126,6 +127,32 @@ impl InstrumentCatalog {
     #[must_use]
     pub fn get(&self, id: &str) -> Option<&Instrument> {
         self.entries.iter().find(|i| i.id == id)
+    }
+
+    /// The condition on storing customer personal data that governs a passport
+    /// recording the act `id` as applicable: the act's own, or else the nearest
+    /// framework's above it through [`Instrument::parent`].
+    ///
+    /// `None` for an act this catalog does not hold, and for one that sets no
+    /// condition and has no framework that does. Neither means personal data may
+    /// be stored freely; see [`CustomerPersonalData`].
+    #[must_use]
+    pub fn customer_personal_data_for(&self, id: &str) -> Option<&CustomerPersonalData> {
+        let mut visited: Vec<&str> = Vec::new();
+        let mut current = self.get(id)?;
+        loop {
+            if let Some(condition) = &current.customer_personal_data {
+                return Some(condition);
+            }
+            // A parent chain that loops is an authoring error, and the answer it
+            // can give is the one already reached: no condition on the way.
+            visited.push(&current.id);
+            let parent = current.parent.as_deref()?;
+            if visited.contains(&parent) {
+                return None;
+            }
+            current = self.get(parent)?;
+        }
     }
 
     /// All instruments.

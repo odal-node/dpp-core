@@ -253,6 +253,16 @@ pub fn passport_context() -> Value {
                 }),
             );
 
+            // 🚨 `personalData` is a map keyed by field paths such as
+            // `usageHistory.negativeEvents`. Those keys are not terms and not
+            // IRIs, so expansion would drop every one of them and leave the
+            // operator's signed statements as an empty node. `@json` keeps the
+            // value whole, as the literal it is.
+            terms.insert(
+                "personalData".to_owned(),
+                json!({ "@id": "dpp:personalData", "@type": "@json" }),
+            );
+
             for (term, iri) in PASSPORT_TERMS {
                 terms.insert((*term).to_owned(), json!(iri));
             }

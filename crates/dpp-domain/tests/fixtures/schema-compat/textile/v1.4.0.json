@@ -1,0 +1,15 @@
+{
+  "careInstructions": "x",
+  "chemicalComplianceStandard": "x",
+  "countryOfOrigin": "DE",
+  "fibreComposition": [
+    {
+      "fibre": "x",
+      "pct": 0.0
+    }
+  ],
+  "productIdentifier": {
+    "gtin": "09506000134352",
+    "scheme": "gs1"
+  }
+}

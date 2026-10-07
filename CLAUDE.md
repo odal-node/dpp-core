@@ -218,10 +218,12 @@ Port traits define the core/platform boundary:
 - `IdentityPort` (async, sign/verify)
 - `PluginHost` (non-async, Wasm dispatch)
 - `BackupCopyPort` (async, the ESPR Art. 10(4) third-party back-up copy)
+- `ArchivedVersionPort` (async, the EN 18221 clause 4.2 archive of a passport's historical versions)
+- `PersonalDataPort` (async, erasable records of personal data held outside a passport)
 - `RegistrySyncPort` (async, EU Central Registry registration/status sync)
 - `SealPort` (async, eIDAS qualified electronic seal — ESPR Art. 13 / eIDAS 910/2014)
 
-All implementations live in the platform repo.
+Production implementations live in the hosts that consume this crate. The ones shipped here are defaults and test doubles: `PassthroughRegistry` (`ComplianceRegistry`), `LocalIdentityService` in `dpp-vc` (`IdentityPort`), the Ghost placeholders (`BackupCopyPort`, `RegistrySyncPort`, `SealPort`), and the in-memory implementations behind `test-utils`.
 
 ### Schemas
 

@@ -13,6 +13,7 @@ use super::{
 use crate::catalog::Granularity;
 use crate::compliance::ComplianceResult;
 use crate::instrument::InstrumentRef;
+use crate::personal_data::PersonalDataStatement;
 use crate::seal::SealedEnvelope;
 use crate::{
     lint::LintResult,
@@ -128,6 +129,22 @@ pub struct Passport {
     /// `None` for passports where product group-specific data has not yet been supplied.
     /// Set this field when publishing to ensure regulatory compliance validation.
     pub product_group_data: Option<ProductGroupData>,
+    /// What the operator states about personal data, for each field of
+    /// `productGroupData` its schema marks as able to hold it, keyed by the
+    /// field's dotted path, e.g. `usageHistory.negativeEvents`.
+    ///
+    /// A marked field with a value is refused at write time unless it has an
+    /// entry here. [`crate::personal_data`] states the rule, the law behind it,
+    /// and why the personal data itself is never part of the passport.
+    ///
+    /// Content like any other: frozen at publish and covered by the operator's
+    /// signature. Withdrawn consent erases the record a statement points to, not
+    /// the statement.
+    ///
+    /// A `BTreeMap` so a field has one answer and the signed bytes are
+    /// reproducible. Empty on a record written before this field existed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub personal_data: BTreeMap<String, PersonalDataStatement>,
     pub status: PassportStatus,
     /// The publicly accessible QR code URL for this passport.
     pub qr_code_url: Option<String>,
@@ -464,6 +481,7 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
     "complianceResult",
     "lintResult",
     "productGroupData",
+    "personalData",
     "status",
     "qrCodeUrl",
     "carrierSerial",
