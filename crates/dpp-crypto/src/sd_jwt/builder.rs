@@ -9,6 +9,9 @@ use super::error::SdJwtError;
 pub(crate) const SD_CLAIM: &str = "_sd";
 /// The claim naming the hash algorithm, RFC 9901 clause 4.1.1.
 pub(crate) const SD_ALG_CLAIM: &str = "_sd_alg";
+/// The one key of the object that stands in for a concealed array element, RFC
+/// 9901 clause 4.2.4.2.
+pub(crate) const ARRAY_ELEMENT_CLAIM: &str = "...";
 
 /// Replace the named members of `object` with digests, returning the rewritten
 /// object and the disclosures that reopen it.
@@ -58,6 +61,66 @@ pub fn conceal(
     }
 
     Ok((kept, disclosures))
+}
+
+/// Replace the chosen elements of `items` with placeholders, returning the
+/// rewritten array and the disclosures that reopen it.
+///
+/// `conceal_if` is given an element's position and value and decides whether it
+/// is hidden. Each hidden element becomes `{"...": "<digest>"}` **in the position
+/// it came from** (clause 4.2.4.2), and gets a Disclosure with a salt of its own.
+///
+/// Unlike [`conceal`], nothing is sorted. The digests of an object's members are
+/// an unordered set, so clause 4.2.4.1 asks the issuer to hide their order; an
+/// array's order is the data, and the placeholders have to keep it.
+///
+/// **Two things this does not do, both on purpose.** It does not pad the array
+/// with decoy digests (clause 4.2.5), so the array's length is the number of
+/// elements it had, and a verifier handed it learns that. And it does not descend:
+/// an element that is itself an array or an object is hidden whole or left whole,
+/// and a caller wanting something inside it concealed calls [`conceal`] or this
+/// on that value first.
+pub fn conceal_elements(
+    items: &[Value],
+    mut conceal_if: impl FnMut(usize, &Value) -> bool,
+) -> (Vec<Value>, Vec<Disclosure>) {
+    let mut kept = Vec::with_capacity(items.len());
+    let mut disclosures = Vec::new();
+
+    for (position, item) in items.iter().enumerate() {
+        if conceal_if(position, item) {
+            let disclosure = Disclosure::element(item.clone());
+            kept.push(placeholder(&disclosure.digest()));
+            disclosures.push(disclosure);
+        } else {
+            kept.push(item.clone());
+        }
+    }
+
+    (kept, disclosures)
+}
+
+/// `{"...": "<digest>"}`, the whole of what stands in an array for one element.
+fn placeholder(digest: &str) -> Value {
+    let mut object = Map::new();
+    object.insert(
+        ARRAY_ELEMENT_CLAIM.to_owned(),
+        Value::String(digest.to_owned()),
+    );
+    Value::Object(object)
+}
+
+/// The digest an array element stands for, if the element is a placeholder.
+///
+/// Clause 7.1 step 3.b.ii: an object with **one** key, that key being `...` and
+/// its value a string. Anything else, an object with a second key or a value that
+/// is not a string, is an ordinary object and is left to be read as one.
+fn placeholder_digest(item: &Value) -> Option<&str> {
+    let object = item.as_object()?;
+    if object.len() != 1 {
+        return None;
+    }
+    object.get(ARRAY_ELEMENT_CLAIM)?.as_str()
 }
 
 /// A parsed SD-JWT: the issuer-signed JWT, verbatim, plus the disclosures that
@@ -151,7 +214,8 @@ impl SdJwt {
         self.key_binding_jwt.is_some()
     }
 
-    /// The digests of every disclosure carrying `claim_name`.
+    /// The digests of every disclosure carrying `claim_name`. An array element has
+    /// no name, so none of them is among these.
     ///
     /// Plural on purpose. One claim name can occur at several places in a
     /// credential — RFC 9901 clause 9.3 says so explicitly, which is why each
@@ -161,7 +225,7 @@ impl SdJwt {
     pub fn digests_for_claim(&self, claim_name: &str) -> Vec<String> {
         self.disclosures
             .iter()
-            .filter(|d| d.claim_name() == claim_name)
+            .filter(|d| d.claim_name() == Some(claim_name))
             .map(Disclosure::digest)
             .collect()
     }
@@ -288,10 +352,15 @@ fn substitute(
                     return Err(SdJwtError::DuplicateDigest(digest.to_owned()));
                 }
                 if let Some(d) = by_digest.get(digest) {
-                    if map.contains_key(d.claim_name()) {
-                        return Err(SdJwtError::ClaimCollision(d.claim_name().to_owned()));
+                    // Step 3.c.ii.1: a two-element Disclosure has no name to
+                    // insert under, and is not what an `_sd` array refers to.
+                    let Some(name) = d.claim_name() else {
+                        return Err(SdJwtError::WrongDisclosureKind(digest.to_owned()));
+                    };
+                    if map.contains_key(name) {
+                        return Err(SdJwtError::ClaimCollision(name.to_owned()));
                     }
-                    map.insert(d.claim_name().to_owned(), d.claim_value().clone());
+                    map.insert(name.to_owned(), d.claim_value().clone());
                     *used += 1;
                 }
             }
@@ -304,9 +373,36 @@ fn substitute(
             Ok(())
         }
         Value::Array(items) => {
-            for item in items {
-                substitute(item, by_digest, used, seen_digests)?;
+            // Rebuilt, not edited in place, because a placeholder with no
+            // Disclosure is removed (clause 7.1 step 3.d) and one with a
+            // Disclosure is replaced by what it discloses, which is then read
+            // for placeholders and `_sd` arrays of its own (clause 4.2.6).
+            let mut kept = Vec::with_capacity(items.len());
+            for mut item in std::mem::take(items) {
+                let Some(digest) = placeholder_digest(&item) else {
+                    substitute(&mut item, by_digest, used, seen_digests)?;
+                    kept.push(item);
+                    continue;
+                };
+                // The same set as `_sd`: clause 4.1 forbids a digest twice in the
+                // whole SD-JWT, whichever way it is embedded.
+                if !seen_digests.insert(digest.to_owned()) {
+                    return Err(SdJwtError::DuplicateDigest(digest.to_owned()));
+                }
+                // No Disclosure: the issuer hid this element and the holder did
+                // not reveal it, or it is a decoy. Either way it is not there.
+                let Some(d) = by_digest.get(digest) else {
+                    continue;
+                };
+                if !d.is_array_element() {
+                    return Err(SdJwtError::WrongDisclosureKind(digest.to_owned()));
+                }
+                *used += 1;
+                let mut revealed = d.claim_value().clone();
+                substitute(&mut revealed, by_digest, used, seen_digests)?;
+                kept.push(revealed);
             }
+            *items = kept;
             Ok(())
         }
         _ => Ok(()),

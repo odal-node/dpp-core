@@ -14,7 +14,7 @@ use super::error::{DisclosureError, SdJwtError};
 /// check is [`crate::jws::verifier`]'s. A stub JWT with a real payload is all
 /// the mechanism needs, and using one keeps a key out of tests that do not
 /// depend on signing.
-fn stub_jwt(payload: &Value) -> String {
+pub(super) fn stub_jwt(payload: &Value) -> String {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     format!(
@@ -138,7 +138,9 @@ fn a_tampered_disclosure_is_refused_not_ignored() {
     let original = &issued.disclosures()[0];
     let forged = Disclosure::with_salt(
         original.salt().to_owned(),
-        original.claim_name(),
+        original
+            .claim_name()
+            .expect("a property disclosure has a name"),
         json!("forged"),
     )
     .unwrap();
@@ -219,14 +221,23 @@ fn reserved_claim_names_are_refused() {
 }
 
 #[test]
-fn a_two_element_array_disclosure_is_refused() {
+fn an_array_of_any_length_but_two_or_three_is_refused() {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let encoded = b64.encode(json!(["salt", "value"]).to_string());
-    assert_eq!(
-        Disclosure::parse(&encoded),
-        Err(DisclosureError::NotATriple)
-    );
+    for shape in [
+        json!(["salt"]),
+        json!(["salt", "name", "value", "extra"]),
+        json!([]),
+        json!({ "salt": "x" }),
+        json!(["salt", 5, "value"]),
+        json!([5, "value"]),
+    ] {
+        assert_eq!(
+            Disclosure::parse(&b64.encode(shape.to_string())),
+            Err(DisclosureError::NotATripleOrPair),
+            "{shape}"
+        );
+    }
 }
 
 #[test]

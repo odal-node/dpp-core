@@ -1,4 +1,6 @@
-//! Disclosures — the `[salt, claim_name, claim_value]` triples of RFC 9901.
+//! Disclosures — the `[salt, claim_name, claim_value]` triples of RFC 9901 clause
+//! 4.2.1 for an object property, and the `[salt, value]` pairs of clause 4.2.2 for
+//! an array element.
 
 use base64::Engine;
 use serde_json::Value;
@@ -30,8 +32,15 @@ fn b64() -> base64::engine::general_purpose::GeneralPurpose {
 /// One selectively disclosable claim, together with the exact string its digest
 /// was computed over.
 ///
+/// Two kinds, told apart by the array the RFC defines for each. An **object
+/// property** is `[salt, name, value]` (clause 4.2.1) and its digest goes in an
+/// `_sd` array. An **array element** is `[salt, value]` (clause 4.2.2): it has no
+/// name, because its place is the position of the placeholder its digest stands
+/// in for, and that digest goes in the array itself as `{"...": "<digest>"}`
+/// (clause 4.2.4.2).
+///
 /// The encoded form is stored rather than recomputed because **the digest is
-/// over the string, not over the triple**. Re-serialising `[salt, name, value]`
+/// over the string, not over the array**. Re-serialising `[salt, name, value]`
 /// is not guaranteed to reproduce the bytes an issuer hashed — a different
 /// number formatting or key order in a nested object value would change the
 /// digest and break verification for a credential that was never tampered with.
@@ -39,7 +48,8 @@ fn b64() -> base64::engine::general_purpose::GeneralPurpose {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Disclosure {
     salt: String,
-    claim_name: String,
+    /// `None` for an array element, which has no name.
+    claim_name: Option<String>,
     claim_value: Value,
     encoded: String,
 }
@@ -94,33 +104,73 @@ impl Disclosure {
         );
         Ok(Self {
             salt,
-            claim_name,
+            claim_name: Some(claim_name),
             claim_value,
             encoded,
         })
     }
 
+    /// Create a disclosure for an array element, with a fresh salt.
+    ///
+    /// Clause 4.2.2: the element can be any JSON value. The salt is drawn the same
+    /// way as for a property and for the same reason (clause 9.3), once per
+    /// element: two equal elements of one array get two salts, so their
+    /// Disclosures, and the digests that hide them, differ.
+    pub fn element(claim_value: Value) -> Self {
+        let mut salt_bytes = [0u8; SALT_BYTES];
+        crate::os_rng().fill_bytes(&mut salt_bytes);
+        Self::element_with_salt(b64().encode(salt_bytes), claim_value)
+    }
+
+    /// Create an array-element disclosure with a caller-supplied salt, on the same
+    /// terms as [`Disclosure::with_salt`].
+    pub fn element_with_salt(salt: String, claim_value: Value) -> Self {
+        let encoded = b64().encode(
+            Value::Array(vec![Value::String(salt.clone()), claim_value.clone()]).to_string(),
+        );
+        Self {
+            salt,
+            claim_name: None,
+            claim_value,
+            encoded,
+        }
+    }
+
     /// Read a disclosure produced elsewhere, keeping its original bytes.
+    ///
+    /// Three elements is an object property and two is an array element. Any other
+    /// length, or a salt or claim name that is not a string, is refused.
     pub fn parse(encoded: &str) -> Result<Self, DisclosureError> {
         let bytes = b64()
             .decode(encoded)
             .map_err(|_| DisclosureError::NotBase64)?;
         let parsed: Value = serde_json::from_slice(&bytes).map_err(|_| DisclosureError::NotJson)?;
         let Some(items) = parsed.as_array() else {
-            return Err(DisclosureError::NotATriple);
+            return Err(DisclosureError::NotATripleOrPair);
         };
-        let [salt, name, value] = items.as_slice() else {
-            return Err(DisclosureError::NotATriple);
+        let (salt, claim_name, value) = match items.as_slice() {
+            [salt, name, value] => (salt, Some(name), value),
+            [salt, value] => (salt, None, value),
+            _ => return Err(DisclosureError::NotATripleOrPair),
         };
-        let (Some(salt), Some(name)) = (salt.as_str(), name.as_str()) else {
-            return Err(DisclosureError::NotATriple);
+        let Some(salt) = salt.as_str() else {
+            return Err(DisclosureError::NotATripleOrPair);
         };
-        if RESERVED.contains(&name) {
-            return Err(DisclosureError::ReservedClaimName);
-        }
+        let claim_name = match claim_name {
+            None => None,
+            Some(name) => {
+                let Some(name) = name.as_str() else {
+                    return Err(DisclosureError::NotATripleOrPair);
+                };
+                if RESERVED.contains(&name) {
+                    return Err(DisclosureError::ReservedClaimName);
+                }
+                Some(name.to_owned())
+            }
+        };
         Ok(Self {
             salt: salt.to_owned(),
-            claim_name: name.to_owned(),
+            claim_name,
             claim_value: value.clone(),
             encoded: encoded.to_owned(),
         })
@@ -138,9 +188,16 @@ impl Disclosure {
         &self.salt
     }
 
-    /// The claim this discloses.
-    pub fn claim_name(&self) -> &str {
-        &self.claim_name
+    /// The claim this discloses, or `None` for an array element, which has no
+    /// name.
+    pub fn claim_name(&self) -> Option<&str> {
+        self.claim_name.as_deref()
+    }
+
+    /// Whether this discloses an array element (clause 4.2.2) and not an object
+    /// property (clause 4.2.1).
+    pub fn is_array_element(&self) -> bool {
+        self.claim_name.is_none()
     }
 
     /// The value this discloses.
@@ -148,8 +205,10 @@ impl Disclosure {
         &self.claim_value
     }
 
-    /// The digest that stands in for this claim in an `_sd` array:
-    /// base64url(SHA-256(ASCII(encoded))), per RFC 9901 clause 4.2.4.1.
+    /// The digest that stands in for this claim: base64url(SHA-256(ASCII(encoded))),
+    /// per RFC 9901 clause 4.2.3. It goes in an `_sd` array for a property (clause
+    /// 4.2.4.1) and in a `{"...": "<digest>"}` placeholder for an array element
+    /// (clause 4.2.4.2).
     pub fn digest(&self) -> String {
         digest_of(&self.encoded)
     }

@@ -15,12 +15,11 @@ pub enum DisclosureError {
     /// The decoded bytes are not JSON.
     #[error("disclosure does not decode to JSON")]
     NotJson,
-    /// The JSON is not the three-element array clause 4.2.1 requires.
-    ///
-    /// The two-element form (array-element disclosures, clause 4.2.2) is
-    /// deliberately not accepted — see the module documentation.
-    #[error("disclosure is not a [salt, name, value] triple")]
-    NotATriple,
+    /// The JSON is not one of the two arrays RFC 9901 defines: the three
+    /// elements `[salt, name, value]` of clause 4.2.1 for an object property, or
+    /// the two elements `[salt, value]` of clause 4.2.2 for an array element.
+    #[error("disclosure is not a [salt, name, value] triple or a [salt, value] pair")]
+    NotATripleOrPair,
     /// The claim name is one clause 4.2.1 forbids: `_sd` or `...`.
     #[error("disclosure names a reserved claim")]
     ReservedClaimName,
@@ -69,4 +68,13 @@ pub enum SdJwtError {
     /// have two values for one claim and the reader would pick one.
     #[error("disclosure for '{0}' collides with a cleartext claim")]
     ClaimCollision(String),
+    /// A digest in an `_sd` array matched a two-element Disclosure, or a digest
+    /// standing in for an array element matched a three-element one.
+    ///
+    /// Clause 7.1 steps 3.c.ii.1 and 3.c.iii.1 both say the SD-JWT MUST be
+    /// rejected. The shape of a Disclosure says where it belongs, and a token
+    /// that puts one somewhere else is not one the issuer made. The digest is
+    /// reported and not the Disclosure, which carries a claim value.
+    #[error("digest {0} refers to a disclosure of the other kind")]
+    WrongDisclosureKind(String),
 }
