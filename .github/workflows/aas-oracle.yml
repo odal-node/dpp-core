@@ -1,8 +1,8 @@
 # Runs the committed AAS Environments through two external AAS implementations:
 # `aas-core3.0` (aas-core-works) and `aas-test-engines`, IDTA's own test tooling.
 #
-# Deliberately its own workflow rather than a job in `ci.yml`. It is the only
-# check in this repository that needs Python, and `cargo build --workspace`
+# Deliberately its own workflow rather than a job in `ci.yml`. It is one of the
+# checks in this repository that needs Python, and `cargo build --workspace`
 # succeeding with zero infrastructure — no Python, no native toolchain, no
 # services — is a property this project states publicly. Keeping the dependency
 # here means the main gate never acquires it, and this job is free to be slow
