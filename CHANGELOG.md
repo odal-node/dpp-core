@@ -305,6 +305,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   method specification is a W3C Community Group document marked `unofficial`,
   not a W3C standard.
 
+- **An independent JSON-LD processor now expands everything this workspace
+  emits, and the register's JSON-LD row makes a claim.** The context tests held
+  the contexts to this repository's own reading of JSON-LD, and said that the
+  workspace ran no processor. `jsonld-oracle.yml` now builds a corpus with the
+  real builders (a DID document at a first key and after a rotation, the passport
+  credential, the access credential with and without a status entry, and a framed
+  passport of each of the twelve product groups, plus the five contexts they
+  carry) and expands all of it with PyLD 3.3.0, in JSON-LD 1.1 mode.
+  - It fails on a processor error, and on any property that expands to nothing.
+    The processor reports each dropped property, and the same set is recomputed
+    from an expand-and-compact round trip so each is named by path.
+  - The processor is given the three W3C contexts the documents reference
+    (`credentials/v2`, `did/v1`, `cid/v1`), vendored with their SHA-256, and no
+    other. A context added to a builder fails the oracle by name until somebody
+    vendors it.
+  - Planted defects were each caught: a key with no term, a term mapped to
+    nothing or to a relative IRI, the scoped `productIdentifier` context removed
+    (which drops `gtin` and `scheme`), and an edited vendored context.
+  - **One gap is listed, not hidden.** A framed passport's context defines a term
+    for each key of the envelope and for the product identifier, and for nothing
+    beneath them. A processor therefore drops the keys inside `manufacturer`,
+    `materials` and the other envelope objects, and every key of
+    `productGroupData` except the identifier: 191 key paths across the corpus.
+    The documents are still conforming JSON-LD, and they still carry the
+    envelope's meaning, but a consumer reading the `ld+json` form gets no linked
+    data below it. The oracle allows exactly that gap, fails on any other drop,
+    and fails when the gap closes so the allowance is deleted. Whether to give
+    those keys terms is a vocabulary decision this change does not make.
+
 - **The RFCs' own test vectors now run in `just check`.** The signature library,
   the canonicaliser and the key-derivation function had been checked only
   against this repository's own expectations, which cannot catch a misreading
@@ -332,6 +361,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the RFC's author publishes separately.
 
 ### Fixed
+
+- **A JSON-LD processor refused every access credential, and one of its
+  subject's keys had no term.** The credential's inline context redefined `name`,
+  which the base context (`credentials/v2`) protects as `https://schema.org/name`,
+  and a conforming processor fails the whole document when a protected term is
+  redefined. The subject also serialises `productGroups`, while the term was
+  spelled `product_groups`, so the key was dropped on expansion with no error.
+  The redefinition is gone, so `name` is schema.org's, and the term is now
+  `productGroups`, in the camelCase spelling the other terms use. Both were found
+  by running a processor over the credentials; nothing in this workspace had.
+  The credential's `@context` array is unchanged in shape, and `dpp:productGroups`
+  replaces `dpp:product_groups` as the IRI.
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it

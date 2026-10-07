@@ -27,6 +27,12 @@ crates/dpp-tests/fixtures/aas/aas-*.json -text
 # excluded from language stats: they are evidence, not code we maintain.
 crates/dpp-tests/fixtures/aas/aas-*.json linguist-vendored
 
+# W3C context documents, carried verbatim. The oracle script checks their
+# SHA-256 against the hashes in the NOTICE.md beside them, so the same `-text`
+# reasoning applies, and for the same reason they are evidence, not code.
+crates/dpp-tests/fixtures/jsonld/*.jsonld -text
+crates/dpp-tests/fixtures/jsonld/*.jsonld linguist-vendored
+
 # Generated, not authored — regenerate with
 # `UPDATE_AAS_FIXTURES=1 cargo test -p dpp-tests` rather than editing by hand.
 # Collapsed in review because a mapper change is meant to arrive as a readable
