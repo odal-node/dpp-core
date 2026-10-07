@@ -257,3 +257,15 @@ fn every_term_in_our_namespace_is_named_after_its_key() {
         "no terms were checked — this would pass vacuously"
     );
 }
+
+/// 🚨 `personalData` is keyed by field paths, which are neither terms nor IRIs,
+/// so as a plain term every key would be dropped on expansion and the
+/// operator's signed statements would expand to nothing. As `@json` the value
+/// is carried whole.
+#[test]
+fn personal_data_is_carried_as_a_json_literal() {
+    assert_eq!(
+        term_map()["personalData"],
+        json!({ "@id": "dpp:personalData", "@type": "@json" })
+    );
+}

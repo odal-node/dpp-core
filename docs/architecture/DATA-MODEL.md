@@ -74,6 +74,7 @@ constant is right.
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
 | `product_group_data` | `Option<ProductGroupData>` | `"productGroupData"` | Typed product-group-specific data (tagged enum) |
+| `personal_data` | `BTreeMap<String, PersonalDataStatement>` | `"personalData"` | The operator's statement about personal data for each field its schema marks `x-personal-data`, keyed by the field's dotted path. A marked field with a value is refused at write time without one. The personal data itself is never in the passport: a statement says nothing is held, or names an erasable record held outside it and its GDPR Art. 6(1) basis. Shown only to audiences that see the field, never to the public. Omitted when empty |
 | `status` | `PassportStatus` | `"status"` | Lifecycle state (see §2) |
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |

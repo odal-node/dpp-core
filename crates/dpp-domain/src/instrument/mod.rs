@@ -13,6 +13,9 @@ mod axis_tests;
 pub mod binding;
 pub mod catalog;
 pub mod currency;
+pub mod customer_personal_data;
+#[cfg(test)]
+mod customer_personal_data_tests;
 pub mod kind;
 #[cfg(test)]
 mod kind_tests;
@@ -28,6 +31,7 @@ pub use act::Instrument;
 pub use binding::InstrumentBinding;
 pub use catalog::InstrumentCatalog;
 pub use currency::{CurrencyCheck, CurrencyState};
+pub use customer_personal_data::{CustomerPersonalData, PersonalDataStorage};
 pub use kind::InstrumentKind;
 pub use obligation::{DateBasis, ObligationDate, PassportObligation};
 pub use reference::{InstrumentRef, RecordedBasis};

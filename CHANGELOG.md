@@ -151,6 +151,75 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `verify`. An adapter that fills `content_hash` hashes the canonical form.
   Remove `sha2` and `hex` from any `dpp-domain` feature list.
 
+- **A field that can hold personal data is refused unless the operator says
+  what is held, and the personal data itself is never in the passport.** ESPR
+  Art. 10(1)(e) forbids storing customer personal data in a passport without
+  explicit consent under GDPR Art. 6, and the Toy Safety Regulation (EU)
+  2025/2509 Art. 20(10) and the Detergents Regulation (EU) 2026/405 Art. 22(h)
+  say the same. GDPR was cited nowhere in this workspace, and nothing refused
+  anything. The Batteries Regulation has no such provision, so a battery
+  passport answers to GDPR alone, and to its Art. 78(h) requirement of a high
+  level of privacy. That matters most for batteries, because Annex XIII point 4
+  records each unit's use, accidents included. (#261)
+  - **Consent can be withdrawn, and a passport cannot be erased from.**
+    Withdrawal obliges erasure where no other legal ground remains (GDPR Art.
+    7(3), Art. 17(1)(b)). A published passport is signed, frozen, archived,
+    copied to a back-up provider and kept by every reader who fetched it. So
+    personal data a passport is not required to carry stays out of it,
+    whatever its basis. The new `personal_data` module documents the
+    reasoning, and `docs/architecture/PERSONAL-DATA.md` records what it was
+    chosen over: a stated position alone, a content lint, a consent-only
+    statement, the data inside the passport, and the archive port.
+  - **Schemas mark the fields.** `"x-personal-data": true` marks
+    operator-written free text describing one item's life after sale. Battery
+    v2.8.0 (unreleased, so edited in place) marks
+    `usageHistory.negativeEvents` and `usageHistory.operatingConditions[].note`,
+    the only free text in the individual-battery tier. A new **textile v1.4.0**
+    marks `repairHistoryUrl`, a log of repairs to one specific item, and is
+    otherwise identical to v1.3.0, which an identity lens carries forward.
+    Content an act requires is not marked, such as battery Annex XIII point
+    2(b)'s spare-part contacts. Neither are measurements: storing them is the
+    obligation, and GDPR Art. 17(3)(b) keeps them out of erasure's reach.
+  - **`Passport` gains `personal_data`** (`"personalData"`), a map from a marked
+    field's dotted path to a `PersonalDataStatement`. Every statement asserts
+    that the field's value carries no personal data beyond what the governing
+    act requires the passport to carry. It then says either that nothing
+    related is held (`{"held":"nothing"}`), or that it is held outside the
+    passport in an erasable record: `{"held":"outside","lawfulBasis":…,
+    "record":…}`, with a closed `LawfulBasis` of the six GDPR Art. 6(1) points.
+    The operator's passport signature covers the statement. On the wire the key
+    is additive: optional, and omitted when empty. Its JSON-LD term is typed
+    `@json`, because the field-path keys are neither terms nor IRIs and
+    expansion would otherwise drop every statement.
+  - **`validate_passport` refuses**, through the new `check_personal_data`, a
+    marked field with a value and no statement, a statement about an unmarked
+    field, and an `outside` statement with an empty record. Where a governing
+    act admits customer personal data only with explicit consent, it also
+    refuses any other basis. It never reads what a field says.
+  - **Instrument manifests say which acts set that condition.** `Instrument`
+    gains `customer_personal_data`, recorded on ESPR, toys and detergents.
+    `InstrumentCatalog::customer_personal_data_for` resolves it through
+    `parent`, so an ESPR delegated act carries ESPR's. A passport is governed by
+    the acts it records. When it records none, the acts bound to its product
+    group govern instead.
+  - **`redact_passport` shows a statement only to audiences that see its
+    field, and never to the public.** `personalData` is classed `Individual` in
+    `PASSPORT_FIELD_DISCLOSURE` as the fallback for a consumer using the raw
+    filter.
+  - **A new port, `PersonalDataPort`**, holds the records: `store`, `fetch`,
+    `records_for` and `erase`. Erasure removes the content and keeps a
+    tombstone, which can still relate to the item's owner and is protected
+    accordingly. A retried erasure returns the first receipt. `records_for` lists every
+    record held for a passport, so one whose identifier was lost on the way
+    back from `store` can still be found and erased. A record is never part of
+    the back-up copy, the archive or any passport view. `InMemoryPersonalData`
+    implements it under `test-utils`.
+
+  **Migration:** add `personal_data` to any exhaustive `Passport` literal and
+  `customer_personal_data` to any exhaustive `Instrument` literal. A passport
+  that writes a marked field must also write its statement. Write textile
+  passports at v1.4.0.
+
 ### Added
 
 - **A port for the archive of a passport's historical versions.** `ports::archive`

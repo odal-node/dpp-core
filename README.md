@@ -145,7 +145,7 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.
 |---|---|---|
 | battery | v1.0.0, v2.0.0 – v2.7.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
 | electronics | v1.0.0 – v1.4.0 | Repairability, spare parts, substances of concern |
-| textile | v1.0.0 – v1.3.0 | Fibre composition, SVHC, durability, microplastics |
+| textile | v1.0.0 – v1.4.0 | Fibre composition, SVHC, durability, microplastics |
 | furniture | v1.0.0 – v1.3.0 | Product group-specific delegated-act fields |
 | aluminium, construction, detergent, steel, toy | v1.0.0 – v1.2.0 each | Product group-specific delegated-act fields; steel adds CO2 intensity, scrap content, production method |
 | mattress, tyre | v1.0.0 – v1.1.0 each | Product group-specific delegated-act fields |
@@ -221,6 +221,7 @@ The port traits define the core/platform boundary. Any downstream project implem
 | `PluginHost` | sync | Wasm plugin dispatch |
 | `BackupCopyPort` | async | The ESPR Art. 10(4) third-party back-up copy |
 | `ArchivedVersionPort` | async | The EN 18221 clause 4.2 archive of a passport's historical versions |
+| `PersonalDataPort` | async | Erasable records of personal data held outside a passport |
 | `RegistrySyncPort` | async | EU Central Registry registration and status sync |
 | `SealPort` | async | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 

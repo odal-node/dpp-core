@@ -15,7 +15,7 @@ fn textile_passport() -> Passport {
         product_group_data: Some(ProductGroupData::Textile(Box::new(
             crate::test_support::sample_textile_data(),
         ))),
-        schema_version: "1.3.0".into(),
+        schema_version: "1.4.0".into(),
         ..make_passport()
     }
 }

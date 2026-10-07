@@ -314,6 +314,17 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             gtin_to_product_identifier,
         ),
         Lens::new(
+            "textile",
+            Version::new(1, 3, 0),
+            Version::new(1, 4, 0),
+            false,
+            "v1.4.0 marks repairHistoryUrl as able to hold personal data and changes no \
+             shape, so the document passes through untouched. The mark governs what may \
+             be written from now on; a v1.3.0 record was written before it and is \
+             carried forward as it stands.",
+            identity,
+        ),
+        Lens::new(
             "toy",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),

@@ -43,6 +43,7 @@ pub(crate) fn sample_passport() -> Passport {
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),
+        personal_data: Default::default(),
         created_at: now,
         updated_at: now,
         published_at: None,
@@ -218,6 +219,10 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport
         .disclosure_signatures
         .insert("public+restricted".to_owned(), "eyJ..c".to_owned());
+    passport.personal_data.insert(
+        "repairHistoryUrl".to_owned(),
+        crate::personal_data::PersonalDataStatement::NothingHeld,
+    );
     passport.published_at = Some(now);
     passport.placed_on_market_date = Some(now.date_naive());
     passport.supersedes_id = Some(PassportId::new());
