@@ -1,4 +1,5 @@
-# Runs the committed AAS Environments through an external AAS implementation.
+# Runs the committed AAS Environments through two external AAS implementations:
+# `aas-core3.0` (aas-core-works) and `aas-test-engines`, IDTA's own test tooling.
 #
 # Deliberately its own workflow rather than a job in `ci.yml`. It is the only
 # check in this repository that needs Python, and `cargo build --workspace`
@@ -34,16 +35,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Pinned exactly. This is somebody else's judgement about what the
-      # metamodel permits, and an unpinned upgrade would turn their tightening
-      # into our red build on code that did not change. Moving the pin is a
-      # deliberate edit with a visible diff, recorded alongside the vendored
+      # Pinned exactly, with hashes, for the tools and everything they pull in.
+      # This is somebody else's judgement about what the metamodel permits, and
+      # an unpinned upgrade would turn their tightening into our red build on
+      # code that did not change. Moving a pin is a deliberate edit with a
+      # visible diff: change `requirements.in`, regenerate `requirements.txt`
+      # with the command in its header, and record the move beside the vendored
       # schemas in crates/dpp-tests/fixtures/aas/NOTICE.md.
-      - name: Install the AAS reference implementation
-        run: pip install --no-input "aas-core3.0==1.1.4"
+      - name: Install the AAS reference implementation and IDTA's test tooling
+        run: pip install --no-input --require-hashes -r .github/oracle/aas/requirements.txt
 
       - name: Record what is actually being run
-        run: python -c "import importlib.metadata as m; print('aas-core3.0', m.version('aas-core3.0'))"
+        run: python -c "import importlib.metadata as m; print('aas-core3.0', m.version('aas-core3.0')); print('aas-test-engines', m.version('aas-test-engines'))"
 
       - name: Load every Environment
         run: python .github/scripts/aas_loader_oracle.py
+
+      # Same job as the step above, not a second one: the ruleset requires this
+      # job by name, so a second job would be a check nobody is required to pass.
+      # The tool prints SyntaxWarnings from its own dependencies on import.
+      - name: Check every Environment with IDTA's test tooling
+        run: python .github/scripts/aas_test_engines_oracle.py
+        env:
+          PYTHONWARNINGS: ignore::SyntaxWarning
