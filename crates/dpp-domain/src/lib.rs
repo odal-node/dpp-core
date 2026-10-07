@@ -147,6 +147,7 @@ pub use compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
     gate_determination,
 };
+pub use ports::archive::{ArchiveReceipt, ArchivedVersion, ArchivedVersionPort};
 pub use ports::backup::{
     BackupCopyPort, BackupReceipt, BackupStatus, BackupVerification, GhostBackup,
 };

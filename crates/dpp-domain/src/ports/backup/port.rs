@@ -55,7 +55,9 @@ pub trait BackupCopyPort: Send + Sync {
     /// merely because it is not ESPR Art. 10(4)'s. It is simply not expressible
     /// here: no method on this port takes or returns a series. A caller that
     /// reads this method as discharging clause 4.2 has read a promise this
-    /// trait cannot make.
+    /// trait cannot make. A history is held through
+    /// [`ArchivedVersionPort`](crate::ports::archive::ArchivedVersionPort), which a
+    /// provider implements alongside this port.
     async fn update(&self, passport: &Passport) -> Result<BackupReceipt, DppError>;
 
     /// Verify that the provider holds an intact copy of the passport.

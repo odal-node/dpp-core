@@ -22,7 +22,9 @@
 //! so a history is not expressible here whoever owes it. While the two shared
 //! a word, a reader could satisfy themselves that wiring this port had ticked
 //! clause 4.2. Wiring it cannot, and that is a statement about this interface
-//! rather than about anybody's duties.
+//! rather than about anybody's duties. A history is expressible through
+//! [`ArchivedVersionPort`](crate::ports::archive::ArchivedVersionPort), which a
+//! provider implements alongside this port.
 //!
 //! The Regulation supplies the name. ESPR Art. 10(4) says *back-up copy*, so that is
 //! what this is called, and "archiving" is left to mean only the thing the
@@ -32,10 +34,14 @@
 //! The obligation is **ESPR Art. 10(4)**: the economic operator "shall make available
 //! a back-up copy of the digital product passport through a digital product
 //! passport service provider", which **Art. 2(32)** defines as "an independent
-//! third-party authorised by the economic operator". The period is **Annex
-//! III(i)** — "at least the expected lifetime of a specific product" — delegated
-//! per product group. **Annex III(l)** makes the provider's reference a passport
-//! data element.
+//! third-party authorised by the economic operator". The period is **Art.
+//! 9(2)(i)** — "at least the expected lifetime of a specific product" — which each
+//! delegated act sets for its product group. Annex III point (i) lists unique
+//! facility identifiers, so it is not where the period comes from. **Annex
+//! III(l)** makes the provider's reference a passport data element.
+//!
+//! ✅ COMPLIANCE-PIN: Reg. (EU) 2024/1781, Art. 9(2)(i) and Annex III points (i)
+//! and (l), read in the consolidated text of 28.6.2024 on 2026-10-06.
 //!
 //! Two consequences worth stating, because both have been got wrong before.
 //! *Independent third party* means an operator's own storage does not discharge
