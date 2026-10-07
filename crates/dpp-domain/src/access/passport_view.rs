@@ -17,7 +17,7 @@
 use crate::disclosure::Audience;
 use crate::passport::{PASSPORT_PROOF_FIELDS, Passport, PassportView};
 
-use super::{ProductGroupAccessPolicy, filter_by_audience};
+use super::{DocumentScope, ProductGroupAccessPolicy, filter_by_audience};
 
 /// Return an audience-filtered JSON view of `passport`.
 ///
@@ -36,6 +36,13 @@ use super::{ProductGroupAccessPolicy, filter_by_audience};
 ///    only at the top-level envelope key.
 /// 3. **Product-group data follows the policy for *this passport's* schema
 ///    version**, not the catalog's current one.
+/// 4. **A statement about personal data goes where its field goes, and never
+///    to the public.** Each entry of `personalData` is about one field of
+///    `productGroupData`, and is kept only for an audience that may see that
+///    field. No single class could express that, since the fields differ in
+///    class. The public never receives one, because even a statement that
+///    nothing is held tells a reader whether personal data about one item
+///    exists. See [`crate::personal_data`].
 ///
 /// # Why there is no `catalog` parameter
 ///
@@ -119,9 +126,57 @@ pub fn redact_passport(passport: &Passport, audience: Audience) -> PassportView 
                 drop_unclassified_product_group_keys(obj, product_group_policy);
             }
         }
+
+        // Rule 4. Rebuilt from the passport rather than from what the filter
+        // kept, so the envelope class the filter applied can only ever have
+        // removed statements, never decided which ones survive.
+        obj.remove("personalData");
+        if audience != Audience::Public
+            && resolved.is_some()
+            && let Some(visible) = visible_statements(passport, &policy, audience)
+        {
+            obj.insert("personalData".to_owned(), visible);
+        }
     }
 
     PassportView(view)
+}
+
+/// The passport's personal-data statements that `audience` may see, as JSON, or
+/// `None` when it may see none.
+///
+/// A statement is kept when the audience may see every key on the way to its
+/// field: `productGroupData` itself, classified as an envelope field, and then
+/// each segment of the field's dotted path inside it. That is the walk
+/// [`filter_by_audience`] makes, so a statement survives exactly when the field
+/// it describes would.
+fn visible_statements(
+    passport: &Passport,
+    policy: &ProductGroupAccessPolicy,
+    audience: Audience,
+) -> Option<serde_json::Value> {
+    let visible: serde_json::Map<String, serde_json::Value> = passport
+        .personal_data
+        .iter()
+        .filter(|(field, _)| {
+            let mut path = vec!["productGroupData"];
+            path.extend(field.split('.'));
+            (1..=path.len()).all(|depth| {
+                let scope = if depth == 1 {
+                    DocumentScope::Envelope
+                } else {
+                    DocumentScope::ProductGroupData
+                };
+                audience.may_see(policy.disclosure_for_path(&path[..depth], scope))
+            })
+        })
+        .filter_map(|(field, statement)| {
+            serde_json::to_value(statement)
+                .ok()
+                .map(|value| (field.clone(), value))
+        })
+        .collect();
+    (!visible.is_empty()).then_some(serde_json::Value::Object(visible))
 }
 
 /// Drop any `productGroupData` key the passport's **declared schema version**

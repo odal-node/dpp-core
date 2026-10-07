@@ -93,6 +93,7 @@ what each module does.
 | `manufacturer` | 2 | `ManufacturerInfo` — the economic operator that placed the product on the market |
 | `material` | 2 | `MaterialEntry` — one declared constituent material |
 | `operator` | 2 | `ResponsibleOperator` and the `ResponsibilityBasis` that makes it answerable — Annex III(k). Shared by `passport` and `transfer`, so owned by neither |
+| `personal_data` | 2 | The operator's statement about personal data for a field its schema marks as able to hold it, and the GDPR Art. 6(1) basis a record held outside the passport rests on. Tier 2 because `Passport` carries the statement |
 | `passport` | 4 | The aggregate root, its id, reference and audience-filtered view |
 | `product` | 5 | `ProductIdentity` — what identifies a product, independent of its passport |
 | `product_group` | 4 | The typed per-group payloads and the `ProductGroupData` union |
@@ -136,6 +137,7 @@ material
 operator
 passport
 passthrough
+personal_data
 ports
 product
 product_group
@@ -164,6 +166,7 @@ Trait definitions that downstream projects implement against their own infrastru
 | `IdentityPort` | yes | Sign and verify passport JWS |
 | `PluginHost` | no | Dispatch to Wasm product group plugins |
 | `BackupCopyPort` | yes | The ESPR Art. 10(4) third-party back-up copy |
+| `PersonalDataPort` | yes | Erasable records of personal data held outside a passport |
 | `RegistrySyncPort` | yes | EU Central Registry registration and status sync |
 | `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
 
@@ -311,7 +314,7 @@ Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is U
 
 Odal never stores raw production data. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
 
-This satisfies GDPR data minimisation and the EU ESPR trust architecture.
+Personal data has a rule of its own. A field a schema marks as able to hold it is refused unless the operator states what is held, and personal data the passport is not required to carry is kept outside the signed record, where it can be erased when consent is withdrawn. The `personal_data` module in `dpp-domain` states the rule and the law behind it.
 
 ---
 

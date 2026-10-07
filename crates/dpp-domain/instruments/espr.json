@@ -8,6 +8,7 @@
   "passport": { "obligation": "required" },
   "retentionYears": 10,
   "retentionYearsBasis": "assumed",
+  "customerPersonalData": { "storage": "explicitConsentOnly", "provision": "Regulation (EU) 2024/1781 Art. 10(1)(e)" },
   "productGroups": [
     {
       "productGroup": "textile",

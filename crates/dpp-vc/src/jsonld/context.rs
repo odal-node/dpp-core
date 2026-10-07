@@ -181,6 +181,7 @@ const PASSPORT_TERMS: &[(&str, &str)] = &[
     ("manufacturer", "dpp:manufacturer"),
     ("materials", "dpp:materials"),
     ("operatorIdentifier", "dpp:operatorIdentifier"),
+    ("personalData", "dpp:personalData"),
     ("placedOnMarketDate", "dpp:placedOnMarketDate"),
     ("productGroup", "dpp:productGroup"),
     ("productGroupData", "dpp:productGroupData"),

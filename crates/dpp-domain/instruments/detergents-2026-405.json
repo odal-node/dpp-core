@@ -9,6 +9,7 @@
     "obligation": "required",
     "from": { "date": "2029-09-23", "basis": "sourced" }
   },
+  "customerPersonalData": { "storage": "explicitConsentOnly", "provision": "Regulation (EU) 2026/405 Art. 22(h)" },
   "productGroups": [
     {
       "productGroup": "detergent",

@@ -95,6 +95,7 @@ fn main() {
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),
+        personal_data: Default::default(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
         published_at: None,

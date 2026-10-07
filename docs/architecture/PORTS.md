@@ -14,11 +14,12 @@ drifts the moment another port lands). CI enforces agreement: the test
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
+| `personal_data` | `PersonalDataPort` | **Personal data held outside a passport**, in records that can be erased at any time without touching the passport — GDPR Art. 7(3) withdrawal and Art. 17(1)(b) erasure against a signed, frozen record. Erasure keeps a tombstone with no data in it. Not part of the back-up copy or the archive, and never served in a passport view. |
 | `plugin_host` | `PluginHost` | Wasm product group-plugin dispatch. |
 | `registry_sync` | `RegistrySyncPort` | EU Central Registry registration/status sync (ESPR Art. 13). |
 | `seal` | `SealPort` | eIDAS qualified electronic seal (eIDAS 910/2014). |
 
-**Count today: 7 port modules, 8 `pub trait`s** (compliance carries two). Prefer
+**Count today: 8 port modules, 9 `pub trait`s** (compliance carries two). Prefer
 naming the modules over asserting a count.
 
 ### Adjacent seams (deliberately *not* in `ports/`)
@@ -35,6 +36,7 @@ backup
 compliance
 identity
 passport_repo
+personal_data
 plugin_host
 registry_sync
 seal

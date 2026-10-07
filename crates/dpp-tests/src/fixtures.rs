@@ -76,6 +76,7 @@ pub fn base_passport(
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),
+        personal_data: Default::default(),
         created_at: now,
         updated_at: now,
         published_at: None,

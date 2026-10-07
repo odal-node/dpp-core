@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::binding::InstrumentBinding;
 use super::currency::CurrencyCheck;
+use super::customer_personal_data::CustomerPersonalData;
 use super::kind::InstrumentKind;
 use super::obligation::PassportObligation;
 use super::status::InstrumentStatus;
@@ -85,6 +86,11 @@ pub struct Instrument {
     /// implementing act. `None` for a framework or a direct instrument.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
+    /// The condition this act sets before customer personal data may be stored
+    /// in its passport, where it sets one. `None` means the act adds no
+    /// condition of its own, not that none applies: GDPR always does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customer_personal_data: Option<CustomerPersonalData>,
     /// Product groups this act reaches, and the terms of each reach.
     #[serde(default)]
     pub product_groups: Vec<InstrumentBinding>,

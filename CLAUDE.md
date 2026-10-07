@@ -218,6 +218,7 @@ Port traits define the core/platform boundary:
 - `IdentityPort` (async, sign/verify)
 - `PluginHost` (non-async, Wasm dispatch)
 - `BackupCopyPort` (async, the ESPR Art. 10(4) third-party back-up copy)
+- `PersonalDataPort` (async, erasable records of personal data held outside a passport)
 - `RegistrySyncPort` (async, EU Central Registry registration/status sync)
 - `SealPort` (async, eIDAS qualified electronic seal — ESPR Art. 13 / eIDAS 910/2014)
 

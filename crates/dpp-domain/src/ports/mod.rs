@@ -5,6 +5,7 @@ pub mod compliance;
 mod ghosts;
 pub mod identity;
 pub mod passport_repo;
+pub mod personal_data;
 pub mod plugin_host;
 pub mod registry_sync;
 pub mod seal;
