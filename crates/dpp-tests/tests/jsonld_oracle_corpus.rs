@@ -112,8 +112,10 @@ fn did_documents() -> Vec<(String, Value)> {
             "https://rotated.example.com",
         ),
     ] {
-        let path =
-            std::env::temp_dir().join(format!("test-jsonld-corpus-{}.json", uuid::Uuid::now_v7()));
+        // Cargo's scratch directory for integration tests, inside `target`, and not
+        // the system temporary directory, which other users share.
+        let path = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("test-jsonld-corpus-{}.json", uuid::Uuid::now_v7()));
         let store = KeyStore::open(&path, "test-pass").expect("open the keystore");
         store
             .generate_key("issuer")
