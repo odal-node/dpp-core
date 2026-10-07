@@ -32,3 +32,8 @@ crates/dpp-tests/fixtures/aas/aas-*.json linguist-vendored
 # Collapsed in review because a mapper change is meant to arrive as a readable
 # diff, and it cannot be read when buried in several thousand generated lines.
 crates/dpp-tests/fixtures/aas/environments/*.json linguist-generated
+
+# ETSI's JSON Schemas for JAdES, carried verbatim with their SHA-256 recorded in
+# the NOTICE.md beside them, for the same two reasons as the AAS schemas above.
+crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** -text
+crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** linguist-vendored

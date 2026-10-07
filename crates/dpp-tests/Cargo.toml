@@ -48,3 +48,7 @@ uuid       = { workspace = true }
 semver     = { workspace = true }
 base64     = { workspace = true }
 jsonschema = { workspace = true }
+# `jades_annex_b_schemas` checks the vendored ETSI schema files against the
+# SHA-256s recorded in their NOTICE.md. Both are already in the workspace graph.
+sha2       = { workspace = true }
+hex        = { workspace = true }
