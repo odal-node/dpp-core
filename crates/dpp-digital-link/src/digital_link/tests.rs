@@ -12,9 +12,9 @@ fn round_trip_gtin_serial() {
 }
 
 #[test]
-fn non_https_scheme_is_rejected() {
+fn a_scheme_other_than_http_or_https_is_rejected() {
     assert!(matches!(
-        DigitalLink::parse("http://id.odal-node.io/01/09506000134352"),
+        DigitalLink::parse("ftp://id.odal-node.io/01/09506000134352"),
         Err(DigitalLinkError::InvalidScheme(_))
     ));
 }

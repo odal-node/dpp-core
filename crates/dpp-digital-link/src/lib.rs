@@ -4,38 +4,58 @@
 //! Pure, stateless crate with no I/O or network dependencies. Compiles to both
 //! `std` and `wasm32`.
 //!
-//! # 🔶 Which version of the URI syntax this implements is not established
+//! # Which version of the URI syntax this implements
+//!
+//! **GS1 Digital Link URI Syntax 1.7.0**, section 4, the ABNF grammar that
+//! section 2 of that standard says defines conformance. The parser and builder
+//! were read against it rule by rule, and a corpus with one URI for each rule is
+//! judged by the GS1 Barcode Syntax Engine. That engine is a component of the GS1
+//! Barcode Syntax Resource, which section 2 names as a tool for confirming
+//! conformance.
 //!
 //! **EN 18219:2026** — *Digital product passport: Unique identifiers* — is one
 //! of the six harmonised standards cited by Commission Implementing Decision
-//! (EU) 2026/1736, and **Art. 41(2) of Regulation (EU) 2024/1781** makes
-//! conformity with it a presumption of conformity with that Regulation's
-//! Articles 10 and 11.
+//! (EU) 2026/1736, and Art. 41(2) of Regulation (EU) 2024/1781 makes conformity
+//! with it a presumption of conformity with that Regulation's Articles 10 and 11.
+//! Its identifier scheme 1, which the `/01/{gtin}/21/{serial}` form produced here
+//! sits in, requires the Digital Link URI Syntax at a named revision, and clause
+//! 6.3.2 names **1.6.0:2022**. A claim against 1.7.0 does not by itself show
+//! conformance with that clause. GS1's change log for 1.7.0 lists five changes
+//! since 1.6.0, and only the data attributes added for new Application
+//! Identifiers touch the grammar, in the query string, which this crate does not
+//! read. Whether that settles the question is a matter for the harmonised
+//! standard's assessment, not for this crate.
 //!
-//! Its clause 5.1 requires a unique product identifier to comply with one of the
-//! ID schemes in its Clause 5. The scheme the `/01/{gtin}/21/{serial}` form
-//! produced here sits in — scheme 1, web-enabled structured-path identification
-//! — requires conformance with the **GS1 Digital Link URI Syntax standard at a
-//! specifically named version**, and clause 6.3.2 names **1.6.0:2022**.
+//! # Where the reader departs from the grammar
 //!
-//! This crate has never named a version, and that is the defect: **a versioned
-//! normative requirement cannot be met by an unversioned implementation claim.**
-//! Not because the parser is wrong — as far as review has gone it is fine — but
-//! because nobody can check it, and it cannot go stale visibly. When GS1
-//! publishes the next revision, nothing here will indicate whether this still
-//! conforms.
+//! Each of these is recorded against the case that shows it in
+//! `tests/gs1_syntax_rules_corpus.rs`, and none affects what the builder writes.
 //!
-//! ⚠️ **Naming 1.6.0:2022 here would be asserting something unverified.** The
-//! parser and builder have not been diffed against that revision, and a separate
-//! conformity document in this repository has long claimed *v1.2* — an older
-//! revision — without recording where that claim came from. So there are two
-//! candidate versions, no evidence for either, and the honest state is that the
-//! question is open. It is recorded here rather than left invisible.
-//!
-//! **Resolving it means diffing the parser and builder against 1.6.0:2022 and
-//! naming the outcome in this comment.** If the crate turns out to implement an
-//! older revision than EN 18219 names, that is a larger finding than a missing
-//! version string — and it is not one this note can pre-empt.
+//! - **A GTIN of fewer than 14 digits is read and padded.** The grammar wants 14.
+//!   GS1 says only existing infrastructure should keep reading the legacy forms,
+//!   which is what labels already printed carry.
+//! - **A trailing slash is tolerated.** It is not in the grammar, and GS1's
+//!   resolver standard asks resolvers to accept it.
+//! - **A symbol the grammar spells as an escape may be written raw.** `!`, `&`,
+//!   `'`, `(`, `)`, `*`, `+`, `,`, `;`, `=` and `:` are legal in a path under
+//!   RFC 3986. They are always built escaped.
+//! - **The double quote is built as `%22`.** The grammar names a raw `"`, which
+//!   RFC 3986 does not allow in a URI and GS1's engine refuses.
+//! - **The query string is not read.** It is cut off at the first `?` so it can
+//!   never corrupt the last path value, and what it holds is not validated:
+//!   neither a data attribute's format nor the shape of an extension parameter.
+//! - **An empty host is refused.** The grammar's `reg-name` may be empty, which
+//!   names no resolver and cannot be built back into a link.
+//! - **GS1's deeper validation is not run.** Lengths, character sets and the
+//!   modulo-10 check digit are applied from the dictionary. That the digits begin
+//!   with a plausible GS1 Company Prefix, and the check character pair of a Global
+//!   Model Number, are not, and the other linters the dictionary names are not
+//!   either.
+//! - **A custom path is read by finding the primary key.** The first segment that
+//!   names one opens the path, so a resolver's own path prefix that contains a
+//!   primary-key AI as a whole segment is misread. GS1 says a custom path cannot
+//!   be tested by the grammar at all.
+//! - **Compressed Digital Link URIs are not read.**
 //!
 //! This crate previously also carried AAS mapping and a JSON-LD context behind
 //! its name. Both have moved out — the AAS projection to [`dpp-aas`], the
@@ -49,8 +69,9 @@ pub mod digital_link;
 pub mod linktype;
 
 pub use digital_link::{
-    AiSpec, DigitalLink, DigitalLinkError, ElementString, PrimaryKey, ai_len_for_prefix, ai_spec,
-    build_qr_url, dictionary, qualifier_position, validate_gtin,
+    AiSpec, CharKind, Component, DigitalLink, DigitalLinkError, ElementString, PrimaryKey,
+    ai_len_for_prefix, ai_spec, build_qr_url, dictionary, qualifier_position, required_qualifier,
+    validate_gtin,
 };
 pub use linktype::{
     Audience, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,

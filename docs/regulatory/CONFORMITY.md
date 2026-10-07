@@ -124,11 +124,12 @@ check.
 
 ## GS1 Interoperability
 
-- **Digital Link** — Full AI 01/21/10 parsing and building against the GS1
-  Digital Link URI Syntax. 🔶 **Which revision is not established** — this
-  document claimed *v1.2* with no recorded source, while EN 18219:2026 clause
-  6.3.2 names **1.6.0:2022** as the version its scheme 1 requires. The parser has
-  been diffed against neither. See the module-level note in `dpp-digital-link`.
+- **Digital Link** — Parsing and building the path of a GS1 Digital Link URI:
+  any of GS1's sixteen primary keys with its qualifiers, read against GS1 Digital
+  Link URI Syntax 1.7.0. The claim, its evidence and its deviations are in
+  [`STANDARDS.md`](../architecture/STANDARDS.md). EN 18219:2026 clause 6.3.2
+  names **1.6.0:2022** as the version its scheme 1 requires, which is a different
+  revision; see below.
 - **Link-type Negotiation** — Content negotiation returning different DPP
   representations (JSON-LD, HTML, AAS) based on the `linkType` query parameter.
 - **AAS Submodel Mapping** — Conversion of passport JSON to AAS
@@ -158,12 +159,16 @@ parser enforces on the way back in. That is covered by tests, and every CSET 82
 membership decision in a serial and in a lot is judged by GS1's Barcode Syntax
 Engine through the oracle corpus.
 
-🔶 **The URI syntax revision is not.** This document previously asserted
-"GS1 Digital Link v1.2" here and in two other places, with no source recorded for
-the figure. EN 18219:2026 clause 6.3.2 names **1.6.0:2022** as the revision its
-scheme 1 requires, so there are two candidate versions and evidence for neither.
-Do not restate either as verified until the parser and builder have been diffed
-against 1.6.0:2022.
+**The URI syntax revision is 1.7.0, and EN 18219 names 1.6.0.** The parser and
+builder were read against 1.7.0, which GS1 ratified in August 2026, and the
+register records what was run and where this crate departs from it.
+EN 18219:2026 clause 6.3.2 names **1.6.0:2022** as the revision its scheme 1
+requires. GS1's change log for 1.7.0 lists five changes since 1.6.0: data
+attributes added for new Application Identifiers, harmonised terminology,
+editorial changes, a new regular expression for compressed URIs, and the Barcode
+Syntax Resource named as a validation tool. Whether a claim made against 1.7.0
+carries over to that clause depends on those differences, and that is for the
+harmonised-standard assessment to settle. This document does not say it does.
 
 **What is not.** 🔶 The ISO/IEC 15459 parts are paywalled and have **not** been
 read against primary text. The claim above rests on GS1's registration as an

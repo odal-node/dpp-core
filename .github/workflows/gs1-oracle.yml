@@ -1,4 +1,5 @@
-# Judges the Digital Link URIs we build with GS1's own syntax tooling.
+# Judges the Digital Link URIs we build, and a URI for each rule of the path
+# grammar, with GS1's own syntax tooling.
 #
 # Its own workflow rather than a job in `ci.yml`, for the same reason the AAS
 # oracle is: this is the only check here that needs Node, and `cargo build
@@ -50,10 +51,15 @@ jobs:
       - name: Install the GS1 Barcode Syntax Engine
         run: npm install --no-audit --no-fund --prefix .github/scripts
 
-      - name: Build the corpus from our own builder
-        run: EMIT_GS1_CORPUS=1 cargo test -p dpp-digital-link --test gs1_oracle_corpus
+      # Both emitters in one invocation: the first is every link this crate
+      # builds, and the second is one URI for each rule of the path grammar, with
+      # the verdict the grammar gives it.
+      - name: Build the corpora from our own builder
+        run: >-
+          EMIT_GS1_CORPUS=1 cargo test -p dpp-digital-link
+          --test gs1_oracle_corpus --test gs1_syntax_rules_corpus
 
       - name: Judge every Digital Link
-        run: node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl
+        run: node .github/scripts/gs1_syntax_oracle.mjs target/gs1-oracle/corpus.jsonl target/gs1-oracle/rules.jsonl
         env:
           NODE_PATH: .github/scripts/node_modules
