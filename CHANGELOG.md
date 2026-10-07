@@ -135,6 +135,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   recycled-content shares and `co2ePerUnitKg` for EV, LMT and industrial
   batteries.
 
+- **`BackupReceipt::content_hash` has a definition, and the in-memory back-up
+  follows it.** The hash is SHA-256 of the RFC 8785 canonical form of the
+  passport, as lower-case hexadecimal, which is how the new archive port
+  defines its own. Until now the field said only "SHA-256 of the stored
+  payload", and `InMemoryBackup` hashed plain `serde_json` output. That differs
+  from the canonical bytes for most documents, so a hash computed the old way
+  no longer matches the receipt for the same, unchanged passport, and
+  `BackupCopyPort::verify` reports a mismatch. `sha2` and `hex` are no longer
+  optional dependencies of `dpp-domain`, so the `sha2` and `hex` features they
+  implied are gone. (#387)
+
+  **Migration:** recompute any expected hash taken from an earlier
+  `InMemoryBackup` receipt, or from a digest of raw JSON, before passing it to
+  `verify`. An adapter that fills `content_hash` hashes the canonical form.
+  Remove `sha2` and `hex` from any `dpp-domain` feature list.
+
 ### Added
 
 - **A port for the archive of a passport's historical versions.** `ports::archive`
@@ -163,15 +179,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     the most up-to-date version. Holding history there is what the presumption of
     conformity under the standard costs, and the docs say so rather than calling it
     a legal requirement.
-  - **The content hash is now defined, for both ports:** SHA-256 of the RFC 8785
-    canonical form, as lower-case hexadecimal. `BackupReceipt::content_hash` had
-    no definition, and the in-memory back-up hashed plain `serde_json` output. It
-    now follows the same definition, so one document carries one hash in either
-    port.
+  - **One document carries one hash in either port:** SHA-256 of the RFC 8785
+    canonical form, as lower-case hexadecimal, the definition
+    `BackupReceipt::content_hash` now has (see Breaking).
   - `InMemoryArchive` ships with the `test-utils` feature, which now enables
-    `dpp-rules/bundle` for the canonical hash. `sha2` and `hex` are no longer
-    optional dependencies of `dpp-domain`, so the `sha2` and `hex` features that
-    they implied are gone.
+    `dpp-rules/bundle` for the canonical hash.
 
   Not covered: a bound on how far behind a back-up may lag (clause 4.5), though the
   receipt's `archived_at` against `superseded_at` is the means to measure it; and
