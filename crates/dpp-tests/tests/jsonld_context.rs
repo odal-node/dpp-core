@@ -400,7 +400,13 @@ fn every_passport_key_has_a_term_and_every_term_has_a_key() {
         if key == "id" {
             continue; // aliases the `@id` keyword; its target is pinned in dpp-vc
         }
-        let iri = terms[key].as_str().unwrap_or_default();
+        // A term is either a compact IRI or an expanded definition, and the
+        // namespace rule is about the IRI either way: `personalData` is
+        // expanded only to type its value `@json`.
+        let iri = terms[key]
+            .as_str()
+            .or_else(|| terms[key].get("@id").and_then(Value::as_str))
+            .unwrap_or_default();
         assert!(
             iri.starts_with("dpp:"),
             "`{key}` maps to `{iri}`, which is outside our namespace: a foreign prefix needs a dpp-vocab record and a scoped definition"

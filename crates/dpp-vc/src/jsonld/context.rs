@@ -181,7 +181,6 @@ const PASSPORT_TERMS: &[(&str, &str)] = &[
     ("manufacturer", "dpp:manufacturer"),
     ("materials", "dpp:materials"),
     ("operatorIdentifier", "dpp:operatorIdentifier"),
-    ("personalData", "dpp:personalData"),
     ("placedOnMarketDate", "dpp:placedOnMarketDate"),
     ("productGroup", "dpp:productGroup"),
     ("productGroupData", "dpp:productGroupData"),
@@ -252,6 +251,16 @@ pub fn passport_context() -> Value {
                         "did": "dpp:decentralizedIdentifier"
                     }
                 }),
+            );
+
+            // 🚨 `personalData` is a map keyed by field paths such as
+            // `usageHistory.negativeEvents`. Those keys are not terms and not
+            // IRIs, so expansion would drop every one of them and leave the
+            // operator's signed statements as an empty node. `@json` keeps the
+            // value whole, as the literal it is.
+            terms.insert(
+                "personalData".to_owned(),
+                json!({ "@id": "dpp:personalData", "@type": "@json" }),
             );
 
             for (term, iri) in PASSPORT_TERMS {

@@ -169,7 +169,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     passport in an erasable record: `{"held":"outside","lawfulBasis":…,
     "record":…}`, with a closed `LawfulBasis` of the six GDPR Art. 6(1) points.
     The operator's passport signature covers the statement. On the wire the key
-    is additive: optional, and omitted when empty.
+    is additive: optional, and omitted when empty. Its JSON-LD term is typed
+    `@json`, because the field-path keys are neither terms nor IRIs and
+    expansion would otherwise drop every statement.
   - **`validate_passport` refuses**, through the new `check_personal_data`, a
     marked field with a value and no statement, a statement about an unmarked
     field, and an `outside` statement with an empty record. Where a governing
