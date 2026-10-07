@@ -21,7 +21,8 @@
 
 /// Appendix A.1: a presentation that discloses only the region and the country of the address.
 pub(super) const A1_PRESENTATION: &str = concat!(
-    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2Qi",
+    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.",
+    "eyJfc2Qi",
     "OiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1FyazFXSF84YmR3T0FfWVVyVW5HUVUi",
     "LCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZzZKMmtTZnFZUkJlb3d2RSIs",
     "ICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZkx2S2hoX2ZfOWFZIiwg",
@@ -40,7 +41,8 @@ pub(super) const A1_PRESENTATION: &str = concat!(
     "ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25VbGRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1",
     "ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0MG9pZEVlVnNBIiwgInVOSG9XWWhYc1po",
     "VkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R3JNWDQiXX0sICJfc2RfYWxnIjog",
-    "InNoYS0yNTYifQ.EOZa2YqK8j4i7cqBDkfPcTMaFsgPwcx3aYJkFoMfvV46LxL-P",
+    "InNoYS0yNTYifQ.",
+    "EOZa2YqK8j4i7cqBDkfPcTMaFsgPwcx3aYJkFoMfvV46LxL-P",
     "PqrWsIyNukB4x8Y2LT31eIHDc4Wg4XNzaqu4w~WyJHMDJOU3JRZmpGWFE3SW8wOX",
     "N5YWpBIiwgInJlZ2lvbiIsICJcdTZlMmZcdTUzM2EiXQ~WyJsa2x4RjVqTVlsR1R",
     "QVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~",
@@ -97,7 +99,8 @@ pub(super) const A3_INPUT: &str = r#"{
 
 /// Appendix A.3: the issued SD-JWT, every Disclosure included.
 pub(super) const A3_ISSUED: &str = concat!(
-    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImRjK3NkLWp3dCJ9.eyJfc2QiOiBbIjB",
+    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImRjK3NkLWp3dCJ9.",
+    "eyJfc2QiOiBbIjB",
     "IWm1uU0lQejMzN2tTV2U3QzM0bC0tODhnekppLWVCSjJWel9ISndBVGciLCAiMUN",
     "ybjAzV21VZVJXcDR6d1B2dkNLWGw5WmFRcC1jZFFWX2dIZGFHU1dvdyIsICIycjA",
     "wOWR6dkh1VnJXclJYVDVrSk1tSG5xRUhIbldlME1MVlp3OFBBVEI4IiwgIjZaTkl",
@@ -118,7 +121,8 @@ pub(super) const A3_ISSUED: &str = concat!(
     "fc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyI",
     "sICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9",
     "ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJ",
-    "TSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.ZOZQTqmq8X1mCyFXi0wbV8xjctX",
+    "TSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.",
+    "ZOZQTqmq8X1mCyFXi0wbV8xjctX",
     "1AlEa5TkdnkKOyWvLfW40XDb5oj9tzkgwff5s44IDnrfAdgLtmTcojs97_Q~WyIy",
     "R0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiRXJpa2EiXQ~W",
     "yJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIk11c3Rlc",
@@ -164,7 +168,8 @@ pub(super) const A3_ISSUED: &str = concat!(
 
 /// Appendix A.3: an SD-JWT+KB disclosing the nationality and that the holder is over 18. The last segment is the Key Binding JWT.
 pub(super) const A3_PRESENTATION: &str = concat!(
-    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImRjK3NkLWp3dCJ9.eyJfc2QiOiBbIjB",
+    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImRjK3NkLWp3dCJ9.",
+    "eyJfc2QiOiBbIjB",
     "IWm1uU0lQejMzN2tTV2U3QzM0bC0tODhnekppLWVCSjJWel9ISndBVGciLCAiMUN",
     "ybjAzV21VZVJXcDR6d1B2dkNLWGw5WmFRcC1jZFFWX2dIZGFHU1dvdyIsICIycjA",
     "wOWR6dkh1VnJXclJYVDVrSk1tSG5xRUhIbldlME1MVlp3OFBBVEI4IiwgIjZaTkl",
@@ -185,7 +190,8 @@ pub(super) const A3_PRESENTATION: &str = concat!(
     "fc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyI",
     "sICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9",
     "ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJ",
-    "TSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.ZOZQTqmq8X1mCyFXi0wbV8xjctX",
+    "TSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.",
+    "ZOZQTqmq8X1mCyFXi0wbV8xjctX",
     "1AlEa5TkdnkKOyWvLfW40XDb5oj9tzkgwff5s44IDnrfAdgLtmTcojs97_Q~WyJl",
     "SzVvNXBIZmd1cFBwbHRqMXFoQUp3IiwgImFnZV9lcXVhbF9vcl9vdmVyIiwgeyJf",
     "c2QiOiBbIjF0RWl5elBSWU9Lc2Y3U3NZR01nUFpLc09UMWxRWlJ4SFhBMHI1X0J3",
@@ -196,10 +202,12 @@ pub(super) const A3_PRESENTATION: &str = concat!(
     "ICJ5NlNGclZGUnlxNTBJYlJKdmlUWnFxalFXejB0TGl1Q21NZU8wS3FhekdJIl19",
     "XQ~WyJPQktsVFZsdkxnLUFkd3FZR2JQOFpBIiwgIjE4IiwgdHJ1ZV0~WyJsa2x4R",
     "jVqTVlsR1RQVW92TU5JdkNBIiwgIm5hdGlvbmFsaXRpZXMiLCBbIkRFIl1d~eyJh",
-    "bGciOiAiRVMyNTYiLCAidHlwIjogImtiK2p3dCJ9.eyJub25jZSI6ICIxMjM0NTY",
+    "bGciOiAiRVMyNTYiLCAidHlwIjogImtiK2p3dCJ9.",
+    "eyJub25jZSI6ICIxMjM0NTY",
     "3ODkwIiwgImF1ZCI6ICJodHRwczovL3ZlcmlmaWVyLmV4YW1wbGUub3JnIiwgIml",
     "hdCI6IDE3NDg1MzcyNDQsICJzZF9oYXNoIjogIlBqTVlmTTA3VmJKZE14TElsdXZ",
-    "STmI4OEpGbGpTWDRuLUc0M1VjX0JTUk0ifQ.f3TeS_1BWEG78EbIJRh5wgv8nYum",
+    "STmI4OEpGbGpTWDRuLUc0M1VjX0JTUk0ifQ.",
+    "f3TeS_1BWEG78EbIJRh5wgv8nYum",
     "k7euzu6xgbgpNB4pbQQqgRPWK-vQjlhhgU1EFGZ9LFakFX_0mgul1G_3mw",
 );
 
@@ -227,7 +235,8 @@ pub(super) const A3_PROCESSED: &str = r#"{
 
 /// Appendix A.4: an SD-JWT+KB over a W3C credential payload. The last segment is the Key Binding JWT.
 pub(super) const A4_PRESENTATION: &str = concat!(
-    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJAY29u",
+    "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.",
+    "eyJAY29u",
     "dGV4dCI6IFsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEi",
     "LCAiaHR0cHM6Ly93M2lkLm9yZy92YWNjaW5hdGlvbi92MSJdLCAidHlwZSI6IFsi",
     "VmVyaWZpYWJsZUNyZWRlbnRpYWwiLCAiVmFjY2luYXRpb25DZXJ0aWZpY2F0ZSJd",
@@ -263,7 +272,8 @@ pub(super) const A4_PRESENTATION: &str = concat!(
     "S1F2ZUNmR2ZyeU5STjl3IiwgImF0Y0NvZGUiLCAiSjA3QlgwMyJd~WyJlbHVWNU9",
     "nM2dTTklJOEVZbnN4QV9BIiwgIm1lZGljaW5hbFByb2R1Y3ROYW1lIiwgIkNPVkl",
     "ELTE5IFZhY2NpbmUgTW9kZXJuYSJd~eyJhbGciOiAiRVMyNTYiLCAidHlwIjogIm",
-    "tiK2p3dCJ9.eyJub25jZSI6ICIxMjM0NTY3ODkwIiwgImF1ZCI6ICJodHRwczovL",
+    "tiK2p3dCJ9.",
+    "eyJub25jZSI6ICIxMjM0NTY3ODkwIiwgImF1ZCI6ICJodHRwczovL",
     "3ZlcmlmaWVyLmV4YW1wbGUub3JnIiwgImlhdCI6IDE3NDg1MzcyNDQsICJzZF9oY",
     "XNoIjogIklvV1VIOTFsbGYzWEVybDQyYlEzc3hfNTNWMW8xdWpDejA4aERxSEs3R",
     "GsifQ.n0vzyIwCFMDVauEaeJIWEKZZchxXMpXTQewHgAkARbOSZxB09IbXXtHfpo",
