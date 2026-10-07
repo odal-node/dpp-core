@@ -221,6 +221,48 @@ only state the constraint and place it at the seam. Enforcement — retention of
 logs, backup handling, what a hosted control plane may read — is a concern of
 whatever hosts it and of that host's infrastructure, and is not evidenced here.
 
+## Personal Data — ESPR Art. 10(1)(e)
+
+ESPR Art. 10(1)(e) makes it an essential requirement that *"personal data
+relating to customers shall not be stored in the digital product passport
+without their explicit consent in compliance with Article 6 of Regulation (EU)
+2016/679"*. Regulation (EU) 2025/2509 (toys) Art. 20(10) and Regulation (EU)
+2026/405 (detergents) Art. 22(h) set the same condition for their passports.
+Regulation (EU) 2023/1542 has no equivalent, so a battery passport answers to
+Regulation (EU) 2016/679 (GDPR) and to its own Art. 78(h) requirement of a high
+level of privacy.
+
+**Personal data a passport is not required to carry is kept out of it.**
+Consent can be withdrawn at any time (GDPR Art. 7(3)), and withdrawal obliges
+erasure (Art. 17(1)(b)). A published passport is signed, frozen, archived and
+copied, so nothing inside it can be erased. Data the governing act requires,
+such as a battery's Annex XIII point 4 usage record, is a different case: it
+rests on a legal obligation (GDPR Art. 6(1)(c)), and erasure does not reach it
+(Art. 17(3)(b)).
+
+**Where it lives in code.** Product-group schemas mark operator-written free
+text that describes one item's life after sale with `x-personal-data`.
+`dpp_domain::check_personal_data`, run by `validate_passport`, refuses a marked
+field with a value unless the passport's `personalData` states what is held
+about it. That is either nothing, or an erasable record held outside the
+passport through `PersonalDataPort`, on a named GDPR Art. 6(1) basis. Where a
+governing act admits customer personal data only with explicit consent, any
+other basis is refused. That condition is recorded per act in the instrument
+manifests. `redact_passport` shows a statement only to the audiences that see
+its field, and never to the public.
+
+**What it does not do.** Read field content. Whether text is personal data
+cannot be decided by a pattern, and the statement is the controller's answer,
+signed with its own key. Nor can it check that a basis is valid or that consent
+was given. Those are the controller's to establish and to demonstrate (GDPR
+Art. 5(2), Art. 7(1)).
+
+**Residual, host-side.** The check is a function, and a host decides when it
+runs. Art. 10(1)(e) prohibits *storing*, and a stored draft is storage, so it
+has to run on every write and not only at publish. Holding the records, erasing
+them on withdrawal, and keeping them out of every served view are the host's,
+through the port.
+
 ## Cryptographic Foundations
 
 - **Ed25519** — All signing operations use Ed25519 (EdDSA). The curve is a
