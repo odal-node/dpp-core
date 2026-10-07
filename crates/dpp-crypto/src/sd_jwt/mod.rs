@@ -68,6 +68,10 @@ pub mod error;
 mod builder;
 
 #[cfg(test)]
+mod rfc9901_example_tests;
+#[cfg(test)]
+mod rfc9901_examples;
+#[cfg(test)]
 mod rfc9901_vector_tests;
 #[cfg(test)]
 mod salt_tests;
