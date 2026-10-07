@@ -2,7 +2,7 @@
 # grammar, with GS1's own syntax tooling.
 #
 # Its own workflow rather than a job in `ci.yml`, for the same reason the AAS
-# oracle is: this is the only check here that needs Node, and `cargo build
+# oracle is: this is one of the checks here that needs Node, and `cargo build
 # --workspace` succeeding with no native toolchain and no services is a property
 # this project states publicly. Keeping the dependency here means the main gate
 # never acquires it.
