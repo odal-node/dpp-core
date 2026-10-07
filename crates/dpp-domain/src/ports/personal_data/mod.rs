@@ -3,9 +3,10 @@
 //!
 //! [`crate::personal_data`] explains why such data is never inside a passport:
 //! consent can be withdrawn at any time (GDPR Art. 7(3)), withdrawal obliges the
-//! controller to erase (Art. 17(1)(b)), and a published passport cannot be
-//! erased from. A passport carries only a statement naming a record and the
-//! basis it is held on. This port holds the record.
+//! controller to erase where no other legal ground for the processing remains
+//! (Art. 17(1)(b)), and a published passport cannot be erased from. A passport
+//! carries only a statement naming a record and the basis it is held on. This
+//! port holds the record.
 //!
 //! # The contract
 //!
@@ -20,6 +21,9 @@
 //! - **An identifier is minted here and relates to no one.** It goes into a
 //!   signed passport that outlives the record, so it must carry nothing derived
 //!   from the data or the person, and it is never reused for another record.
+//! - **Nothing held is out of reach.** Every record a passport has can be
+//!   listed, erased ones included, so a record whose identifier was lost on the
+//!   way back from `store` can still be found and erased.
 //! - **Nothing here is part of the passport's other copies.** The back-up copy of
 //!   ESPR Art. 10(4) and the archive of past versions hold the passport, and so
 //!   only the statement. A record lodged with them could not be erased with

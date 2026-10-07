@@ -105,3 +105,73 @@ async fn an_identifier_never_minted_is_unknown() {
         Err(DppError::NotFound(_))
     ));
 }
+
+/// A `store` whose answer never arrived still left a record, and the caller
+/// must be able to find it to erase it.
+#[tokio::test]
+async fn a_record_whose_identifier_was_lost_is_found_by_its_passport() {
+    let port = InMemoryPersonalData::new();
+    let passport = PassportId::new();
+    let elsewhere = PassportId::new();
+    let lost = port.store(passport, FIELD, &json!("a")).await.unwrap();
+    let erased = port.store(passport, FIELD, &json!("b")).await.unwrap();
+    port.store(elsewhere, FIELD, &json!("c")).await.unwrap();
+    let receipt = port.erase(&erased).await.unwrap();
+
+    let held = port.records_for(passport).await.unwrap();
+    assert_eq!(
+        held.len(),
+        2,
+        "only this passport's records, erased ones too"
+    );
+    let Some(HeldRecord::Present(first)) = held.first() else {
+        panic!("the first record stored is listed first, with its data");
+    };
+    assert_eq!(first.id, lost);
+    assert_eq!(held[1], HeldRecord::Erased(receipt));
+
+    port.erase(&lost).await.unwrap();
+    assert!(
+        port.records_for(passport)
+            .await
+            .unwrap()
+            .iter()
+            .all(|h| matches!(h, HeldRecord::Erased(_)))
+    );
+}
+
+#[tokio::test]
+async fn a_passport_with_nothing_held_lists_nothing() {
+    let port = InMemoryPersonalData::new();
+    assert!(
+        port.records_for(PassportId::new())
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+/// A panic while the lock was held must not leave a record impossible to
+/// erase.
+#[tokio::test]
+async fn a_poisoned_lock_still_lets_a_record_be_erased() {
+    let port = std::sync::Arc::new(InMemoryPersonalData::new());
+    let id = port
+        .store(PassportId::new(), FIELD, &json!("x"))
+        .await
+        .unwrap();
+
+    let poisoner = std::sync::Arc::clone(&port);
+    let _ = std::thread::spawn(move || {
+        let _guard = poisoner.held.lock().unwrap();
+        panic!("poison the lock");
+    })
+    .join();
+    assert!(port.held.is_poisoned());
+
+    let receipt = port
+        .erase(&id)
+        .await
+        .expect("erasure survives a poisoned lock");
+    assert_eq!(receipt.record, id);
+}

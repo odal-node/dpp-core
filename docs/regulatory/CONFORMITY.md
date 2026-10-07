@@ -234,8 +234,9 @@ level of privacy.
 
 **Personal data a passport is not required to carry is kept out of it.**
 Consent can be withdrawn at any time (GDPR Art. 7(3)), and withdrawal obliges
-erasure (Art. 17(1)(b)). A published passport is signed, frozen, archived and
-copied, so nothing inside it can be erased. Data the governing act requires,
+erasure where no other legal ground for the processing remains (Art.
+17(1)(b)). A published passport is signed, frozen, archived and copied, so
+nothing inside it can be erased. Data the governing act requires,
 such as a battery's Annex XIII point 4 usage record, is a different case: it
 rests on a legal obligation (GDPR Art. 6(1)(c)), and erasure does not reach it
 (Art. 17(3)(b)).

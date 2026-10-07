@@ -146,11 +146,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   level of privacy. That matters most for batteries, because Annex XIII point 4
   records each unit's use, accidents included. (#261)
   - **Consent can be withdrawn, and a passport cannot be erased from.**
-    Withdrawal obliges erasure (GDPR Art. 7(3), Art. 17(1)(b)). A published
-    passport is signed, frozen, archived, copied to a back-up provider and kept
-    by every reader who fetched it. So personal data a passport is not required
-    to carry stays out of it, whatever its basis. The new `personal_data`
-    module documents the reasoning.
+    Withdrawal obliges erasure where no other legal ground remains (GDPR Art.
+    7(3), Art. 17(1)(b)). A published passport is signed, frozen, archived,
+    copied to a back-up provider and kept by every reader who fetched it. So
+    personal data a passport is not required to carry stays out of it,
+    whatever its basis. The new `personal_data` module documents the
+    reasoning.
   - **Schemas mark the fields.** `"x-personal-data": true` marks
     operator-written free text describing one item's life after sale. Battery
     v2.8.0 (unreleased, so edited in place) marks
@@ -187,10 +188,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     field, and never to the public.** `personalData` is classed `Individual` in
     `PASSPORT_FIELD_DISCLOSURE` as the fallback for a consumer using the raw
     filter.
-  - **A new port, `PersonalDataPort`**, holds the records: `store`, `fetch`
-    and `erase`. Erasure keeps a tombstone with no data in it, and a retry
-    returns the first receipt. A record is never part of the back-up copy, the
-    archive or any passport view. `InMemoryPersonalData` implements it under
+  - **A new port, `PersonalDataPort`**, holds the records: `store`, `fetch`,
+    `records_for` and `erase`. Erasure keeps a tombstone with no data in it,
+    and a retried erasure returns the first receipt. `records_for` lists every
+    record held for a passport, so one whose identifier was lost on the way
+    back from `store` can still be found and erased. A record is never part of
+    the back-up copy, the archive or any passport view. `InMemoryPersonalData` implements it under
     `test-utils`.
 
   **Migration:** add `personal_data` to any exhaustive `Passport` literal and
