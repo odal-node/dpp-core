@@ -135,6 +135,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   recycled-content shares and `co2ePerUnitKg` for EV, LMT and industrial
   batteries.
 
+- **`BackupReceipt::content_hash` has a definition, and the in-memory back-up
+  follows it.** The hash is SHA-256 of the RFC 8785 canonical form of the
+  passport, as lower-case hexadecimal, which is how the new archive port
+  defines its own. Until now the field said only "SHA-256 of the stored
+  payload", and `InMemoryBackup` hashed plain `serde_json` output. That differs
+  from the canonical bytes for most documents, so a hash computed the old way
+  no longer matches the receipt for the same, unchanged passport, and
+  `BackupCopyPort::verify` reports a mismatch. `sha2` and `hex` are no longer
+  optional dependencies of `dpp-domain`, so the `sha2` and `hex` features they
+  implied are gone. (#387)
+
+  **Migration:** recompute any expected hash taken from an earlier
+  `InMemoryBackup` receipt, or from a digest of raw JSON, before passing it to
+  `verify`. An adapter that fills `content_hash` hashes the canonical form.
+  Remove `sha2` and `hex` from any `dpp-domain` feature list.
+
 - **A field that can hold personal data is refused unless the operator says
   what is held, and the personal data itself is never in the passport.** ESPR
   Art. 10(1)(e) forbids storing customer personal data in a passport without
@@ -193,8 +209,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     and a retried erasure returns the first receipt. `records_for` lists every
     record held for a passport, so one whose identifier was lost on the way
     back from `store` can still be found and erased. A record is never part of
-    the back-up copy, the archive or any passport view. `InMemoryPersonalData` implements it under
-    `test-utils`.
+    the back-up copy, the archive or any passport view. `InMemoryPersonalData`
+    implements it under `test-utils`.
 
   **Migration:** add `personal_data` to any exhaustive `Passport` literal and
   `customer_personal_data` to any exhaustive `Instrument` literal. A passport
@@ -202,6 +218,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   passports at v1.4.0.
 
 ### Added
+
+- **A port for the archive of a passport's historical versions.** `ports::archive`
+  adds `ArchivedVersionPort`, the functionality EN 18221:2026 clause 4.2 calls
+  archiving: the version a change replaces is kept, append-only, for the
+  passport's lifetime, so the passport as it stood at any earlier moment can be
+  retrieved. Core could not express it. `BackupCopyPort` holds one copy and has no
+  method that takes or returns a series, so a back-up provider had nothing in core
+  to implement for the back-up half of clause 4.2, and a deployment that kept
+  versions had to use a trait of its own.
+  - `archive` takes the passport id, the document and the instant it was
+    superseded, and returns an `ArchiveReceipt` carrying the version's hash.
+    `versions` lists them oldest first. `version_at` answers which was current at
+    an instant, half-open on `superseded_at`.
+  - A retry is safe: archiving a version already held returns its original
+    receipt. A version that would precede the latest, or share an instant with a
+    different one, is refused.
+  - The document is a `serde_json::Value`, not a typed `Passport`. An archive is
+    evidence, and reading a document through a struct drops what the struct does
+    not know, which changes its hash and the signature over it.
+  - The port returns whole documents and applies no disclosure policy. The caller
+    does, since clause 4.2 gives an archived attribute the same access restriction
+    as the current one.
+  - It is separate from `BackupCopyPort` by shape, not by actor: a back-up
+    provider implements both. The Regulation's own text asks the back-up only for
+    the most up-to-date version. Holding history there is what the presumption of
+    conformity under the standard costs, and the docs say so rather than calling it
+    a legal requirement.
+  - **One document carries one hash in either port:** SHA-256 of the RFC 8785
+    canonical form, as lower-case hexadecimal, the definition
+    `BackupReceipt::content_hash` now has (see Breaking).
+  - `InMemoryArchive` ships with the `test-utils` feature, which now enables
+    `dpp-rules/bundle` for the canonical hash.
+
+  Not covered: a bound on how far behind a back-up may lag (clause 4.5), though the
+  receipt's `archived_at` against `superseded_at` is the means to measure it; and
+  any no-op implementation, deliberately, since one that kept nothing would make a
+  deployment look as if it archived.
 
 - **A standards register, and a tripwire that holds the code to it.**
   `docs/architecture/STANDARDS.md` records the IETF, W3C, GS1, IDTA and ETSI
@@ -309,6 +362,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     `countryOfOrigin`, which wait on the CRM Act reading in #314.
 
 ### Documentation
+
+- **The back-up copy's availability period was cited to the wrong place.**
+  `BackupCopyPort`'s docs and the port inventory gave the period as ESPR Annex
+  III(i), which lists unique facility identifiers. The period is Art. 9(2)(i),
+  which has the passport remain available for at least the expected lifetime of
+  the product, to be set per product group by each delegated act. Annex III(l),
+  the provider's reference, was cited correctly. The README also stops quoting a
+  port count: `PORTS.md` is the one place that does.
 
 - **Technical specifications have one home.** README's coverage table and the
   conformity statement each gave their own status for GS1 Digital Link, the
