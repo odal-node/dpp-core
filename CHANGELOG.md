@@ -167,7 +167,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     copied to a back-up provider and kept by every reader who fetched it. So
     personal data a passport is not required to carry stays out of it,
     whatever its basis. The new `personal_data` module documents the
-    reasoning.
+    reasoning, and `docs/architecture/PERSONAL-DATA.md` records what it was
+    chosen over: a stated position alone, a content lint, a consent-only
+    statement, the data inside the passport, and the archive port.
   - **Schemas mark the fields.** `"x-personal-data": true` marks
     operator-written free text describing one item's life after sale. Battery
     v2.8.0 (unreleased, so edited in place) marks
@@ -205,8 +207,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     `PASSPORT_FIELD_DISCLOSURE` as the fallback for a consumer using the raw
     filter.
   - **A new port, `PersonalDataPort`**, holds the records: `store`, `fetch`,
-    `records_for` and `erase`. Erasure keeps a tombstone with no data in it,
-    and a retried erasure returns the first receipt. `records_for` lists every
+    `records_for` and `erase`. Erasure removes the content and keeps a
+    tombstone, which can still relate to the item's owner and is protected
+    accordingly. A retried erasure returns the first receipt. `records_for` lists every
     record held for a passport, so one whose identifier was lost on the way
     back from `store` can still be found and erased. A record is never part of
     the back-up copy, the archive or any passport view. `InMemoryPersonalData`

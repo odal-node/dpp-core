@@ -15,7 +15,7 @@ drifts the moment another port lands). CI enforces agreement: the test
 | `compliance` | `ComplianceRegistry`, `ComplianceStrategy` | Product group dispatch + per-product group compliance strategy (**two traits**). |
 | `identity` | `IdentityPort` | Operator-key sign/verify (Ed25519/JWS). |
 | `passport_repo` | `PassportRepository` | Passport persistence. |
-| `personal_data` | `PersonalDataPort` | **Personal data held outside a passport**, in records that can be erased at any time without touching the passport — GDPR Art. 7(3) withdrawal and Art. 17(1)(b) erasure against a signed, frozen record. Erasure keeps a tombstone with no data in it, and every record a passport has can be listed, so one whose identifier was lost can still be erased. Not part of the back-up copy or the archive, and never served in a passport view. |
+| `personal_data` | `PersonalDataPort` | **Personal data held outside a passport**, in records that can be erased at any time without touching the passport — GDPR Art. 7(3) withdrawal and Art. 17(1)(b) erasure against a signed, frozen record. Erasure removes the content and keeps a tombstone, which can still relate to the item's owner and is protected accordingly. Every record a passport has can be listed, so one whose identifier was lost can still be erased. Not part of the back-up copy or the archive, and never served in a passport view. |
 | `plugin_host` | `PluginHost` | Wasm product group-plugin dispatch. |
 | `registry_sync` | `RegistrySyncPort` | EU Central Registry registration/status sync (ESPR Art. 13). |
 | `seal` | `SealPort` | eIDAS qualified electronic seal (eIDAS 910/2014). |

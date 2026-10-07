@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Opaque, and minted by whoever holds the record. It goes into a signed,
 /// retention-locked passport, where it outlives the record it names, so it must
 /// carry nothing derived from the data or from the person: once the record is
-/// erased, the identifier left in the passport must relate to no one.
+/// erased, the identifier left in the passport must say nothing about anyone.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PersonalDataRecordId(String);

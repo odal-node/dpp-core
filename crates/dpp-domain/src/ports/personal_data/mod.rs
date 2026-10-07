@@ -13,14 +13,19 @@
 //! - **A record can be erased at any time, and erasing it touches nothing
 //!   else.** Not the passport, which is signed and frozen. Not the statement in
 //!   it, which keeps naming the record. Not any other record.
-//! - **Erasure leaves a tombstone, and the tombstone holds no personal data.**
-//!   It keeps the identifier, the passport and field the record belonged to, and
-//!   when it was erased, so a controller can show that it erased (GDPR Art.
-//!   5(2)) and a reader following the passport's statement learns that the record
-//!   is gone rather than that it never existed.
-//! - **An identifier is minted here and relates to no one.** It goes into a
-//!   signed passport that outlives the record, so it must carry nothing derived
-//!   from the data or the person, and it is never reused for another record.
+//! - **Erasure removes the content and leaves a tombstone.** The tombstone keeps
+//!   the identifier, the passport and field the record belonged to, and when it
+//!   was erased, so a controller can show that it erased (GDPR Art. 5(2)) and a
+//!   reader following the passport's statement learns that the record is gone
+//!   rather than that it never existed. **It is not necessarily free of personal
+//!   data.** A passport identifier can relate to whoever owns the item, and GDPR
+//!   Recital 26 counts information that can be linked to a person as personal
+//!   data. So a tombstone is protected like the passport's individual-item data,
+//!   and kept only as long as the controller has a basis to keep it.
+//! - **An identifier is minted here and carries nothing about anyone.** It goes
+//!   into a signed passport that outlives the record, so it must hold nothing
+//!   derived from the data or the person, and it is never reused for another
+//!   record.
 //! - **Nothing held is out of reach.** Every record a passport has can be
 //!   listed, erased ones included, so a record whose identifier was lost on the
 //!   way back from `store` can still be found and erased.

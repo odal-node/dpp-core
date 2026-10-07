@@ -93,9 +93,10 @@
 //! In the record a [`PersonalDataRecordId`] names, kept through the
 //! `PersonalDataPort` in the ports module. That record can be erased at any
 //! time without touching the passport. Once it is erased, the identifier in the
-//! signed passport points at nothing that relates to anyone. No passport view
-//! ever includes the record: showing it to a reader is a disclosure that needs a
-//! basis of its own, and only the controller can establish one.
+//! signed passport points at a tombstone that holds none of the erased data. No
+//! passport view ever includes the record: showing it to a reader is a
+//! disclosure that needs a basis of its own, and only the controller can
+//! establish one.
 
 mod held_outside;
 mod lawful_basis;

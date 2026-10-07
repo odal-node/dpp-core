@@ -6,8 +6,9 @@ use crate::passport::PassportId;
 use crate::personal_data::PersonalDataRecordId;
 
 /// The tombstone of an erased record: which record it was, which passport field
-/// it related to, and when it was erased. No content, and nothing about the
-/// person.
+/// it related to, and when it was erased. None of the erased content. The
+/// passport identifier can still relate to whoever owns the item, so see the
+/// module docs on how long a tombstone is kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErasureReceipt {
     /// The erased record's identifier.

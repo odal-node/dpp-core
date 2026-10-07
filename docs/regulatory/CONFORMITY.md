@@ -258,11 +258,18 @@ signed with its own key. Nor can it check that a basis is valid or that consent
 was given. Those are the controller's to establish and to demonstrate (GDPR
 Art. 5(2), Art. 7(1)).
 
+**When it binds.** Art. 10(1)(e) binds a product group once a delegated act
+under ESPR requires its passport, and none does yet. The toys and detergents
+passports apply from 1 August 2030 and 23 September 2029. GDPR applies now, to
+any personal data a passport or a draft holds, whichever act governs it.
+
 **Residual, host-side.** The check is a function, and a host decides when it
-runs. Art. 10(1)(e) prohibits *storing*, and a stored draft is storage, so it
-has to run on every write and not only at publish. Holding the records, erasing
-them on withdrawal, and keeping them out of every served view are the host's,
-through the port.
+runs. Where one of those acts applies, the prohibition is on *storing*, and a
+stored draft is storage, so the check belongs on every write and not only at
+publish. Running it on every write today costs nothing and keeps the passport
+inside GDPR's minimisation principle before any of them applies. Holding the
+records, erasing them on withdrawal, and keeping them out of every served view
+are the host's, through the port.
 
 ## Cryptographic Foundations
 

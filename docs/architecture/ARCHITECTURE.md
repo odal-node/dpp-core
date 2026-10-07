@@ -315,7 +315,7 @@ Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is U
 
 Odal never stores raw production data. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
 
-Personal data has a rule of its own. A field a schema marks as able to hold it is refused unless the operator states what is held, and personal data the passport is not required to carry is kept outside the signed record, where it can be erased when consent is withdrawn. The `personal_data` module in `dpp-domain` states the rule and the law behind it.
+Personal data has a rule of its own. A field a schema marks as able to hold it is refused unless the operator states what is held, and personal data the passport is not required to carry is kept outside the signed record, where it can be erased when consent is withdrawn. The `personal_data` module in `dpp-domain` states the rule and the law behind it, and [PERSONAL-DATA.md](PERSONAL-DATA.md) records the alternatives it was chosen over.
 
 ---
 
