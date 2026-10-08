@@ -88,6 +88,8 @@ mod builder;
 #[cfg(test)]
 mod array_tests;
 #[cfg(test)]
+mod oracle_tests;
+#[cfg(test)]
 mod rfc9901_array_tests;
 #[cfg(test)]
 mod rfc9901_example_tests;
