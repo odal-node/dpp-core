@@ -1,8 +1,24 @@
 //! EU Trusted List vocabulary — who is qualified, for what, and since when.
 //!
-//! ETSI TS 119 612 V2.3.1, the standard Commission Implementing Regulations
-//! (EU) 2025/1945 and 2025/1946 both name normatively for validation and
-//! preservation of qualified signatures and seals.
+//! ETSI TS 119 612, the standard Commission Implementing Regulations (EU)
+//! 2025/1945 (validation) and 2025/1946 (preservation) both name normatively for
+//! qualified signatures and seals. They name **V2.3.1**. **V2.4.1**, the current
+//! publication, is the one that the trusted-list template of Implementing
+//! Decision (EU) 2015/1505 names, as amended by Implementing Decision (EU)
+//! 2025/2164.
+//!
+//! **For what this module reads, a citation of either is a citation of both.**
+//! The two versions are the same in the service type URIs of clause 5.5.1, the
+//! status values of clause 5.5.4 and Annex D.5, the status history of clauses
+//! 5.5.5 and 5.6, and the retention rule of clauses 5.3.12 and 5.4.6. Compared
+//! word for word, what changed between them is wording, cross-references and the
+//! schema attachment, none of it in a clause this module reads.
+//!
+//! ✅ COMPLIANCE-PIN: Reg. (EU) No 910/2014, Art. 51(3), read in the consolidated
+//! text of 18.10.2024 on 2026-10-06. Implementing Regulations (EU) 2025/1945 and
+//! 2025/1946, and Implementing Decision (EU) 2025/2164, read in the Official
+//! Journal text on 2026-10-06: the first two each list TS 119 612 V2.3.1 among
+//! their referenced standards, and the third moves the template to V2.4.1.
 //!
 //! # Why this is in the domain and not in an adapter
 //!

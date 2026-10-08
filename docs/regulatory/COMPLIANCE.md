@@ -25,7 +25,7 @@ registry connectivity). Those belong in a host layer.
 
 | Standard | Body | Version Tracked | Where Used |
 |---|---|---|---|
-| GS1 Digital Link | GS1 | v1.2 | `dpp-digital-link` — URL parsing and link-type negotiation |
+| GS1 Digital Link | GS1 | 1.7.0 (the register, [`STANDARDS.md`](../architecture/STANDARDS.md), has the status) | `dpp-digital-link` — URL parsing and link-type negotiation |
 | AAS (Asset Administration Shell) | IDTA | v3.0 | `dpp-aas` — submodel mapping |
 | W3C Verifiable Credentials | W3C | Data Model v2.0 | `dpp-crypto` — VC issuance and verification |
 | DID:web | W3C | did:web Method Spec | `dpp-crypto` — DID document builder |
