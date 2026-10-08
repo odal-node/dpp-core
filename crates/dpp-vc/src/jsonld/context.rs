@@ -135,8 +135,8 @@ pub const REMOTE_CONTEXTS: &[&str] = &[];
 /// 🚨 Two of the terms it did carry pointed at keys that do not exist.
 /// `passportId` was never emitted — the key is `id` — and `jws` was never
 /// emitted either, because the fields serialise as `jwsSignature` and
-/// `publicJwsSignature`. Both are gone; the signature keys are below under the
-/// names they actually have.
+/// `publicJwsSignature`. Both terms are gone; the signature keys are below under
+/// the names they actually have.
 ///
 /// 🚨 `productGroup` expanded to `dpp:product_group` — the only IRI here
 /// that disagreed with its own key, alone in snake_case among camelCase
@@ -224,7 +224,14 @@ pub fn passport_context() -> Value {
             // that depended on someone else's document keeping its shape. That
             // definition is `"id": "@id"` exactly, so restating it here is the
             // identical redefinition JSON-LD 1.1 permits for a protected term,
-            // and the passport now names itself either way.
+            // and the context still layers after `credentials/v2` and `did/v1`,
+            // which both protect `id`.
+            //
+            // Its value in the framed form is `urn:uuid:` and the id, which
+            // `frame_passport` writes. A bare UUID is a relative IRI reference:
+            // with no base a processor converting to RDF dropped every statement
+            // about the passport, and one that supplies a base of its own named
+            // the passport after wherever that was.
             terms.insert("id".to_owned(), json!("@id"));
 
             // 🚨 The identifier's terms are **scoped to it**, not global.
@@ -282,6 +289,13 @@ pub fn passport_context() -> Value {
 /// The `@context` value alone, for a caller that already has a passport object
 /// and needs to stamp the context onto it.
 ///
+/// Such a caller also writes the passport's `id` as [`passport_iri`] gives it.
+/// The context makes `id` the node identifier, and a bare UUID there is a
+/// relative IRI, which names nothing until a base is chosen. [`frame_passport`]
+/// does both.
+///
+/// [`passport_iri`]: crate::passport_iri
+///
 /// Exists so the resolver stops constructing its own: two definitions of one
 /// context is how the served one came to reference a URL that 404s while this
 /// one referenced a different URL that also 404s.
@@ -291,15 +305,28 @@ pub fn context_value() -> Value {
 
 /// Wrap a passport JSON value in a JSON-LD envelope.
 ///
+/// The passport's `id` is written as [`passport_iri`] gives it, `urn:uuid:` and
+/// the UUID, which is also the subject of its credential, so the framed passport
+/// is named by an absolute IRI. Only an `id` in the form a `PassportId` serialises
+/// to is rewritten; any other value is left as it is, so nothing is invented for
+/// an identifier this crate did not issue.
+///
 /// A non-object payload cannot be merged into the `@context` object; it is
 /// returned **unchanged** rather than silently discarded into a bare, empty
 /// envelope.
+///
+/// [`passport_iri`]: crate::passport_iri
 pub fn frame_passport(passport: Value) -> Value {
     match passport {
         Value::Object(passport_map) => {
             let mut framed = passport_context();
             if let Value::Object(ref mut ctx_map) = framed {
                 ctx_map.extend(passport_map);
+                if let Some(id) = ctx_map.get_mut("id")
+                    && let Some(uuid) = id.as_str().and_then(issued_uuid)
+                {
+                    *id = Value::String(crate::passport_iri(dpp_domain::PassportId(uuid)));
+                }
             }
             framed
         }
@@ -307,13 +334,32 @@ pub fn frame_passport(passport: Value) -> Value {
     }
 }
 
-/// Extract the plain data from a JSON-LD framed passport (strip `@context`).
+/// Extract the plain data from a JSON-LD framed passport: `@context` goes, and an
+/// `id` of the form [`frame_passport`] writes goes back to the bare UUID, so the
+/// two are inverses.
 pub fn strip_context(framed: Value) -> Value {
     match framed {
         Value::Object(mut map) => {
             map.remove("@context");
+            if let Some(id) = map.get_mut("id")
+                && let Some(uuid) = id
+                    .as_str()
+                    .and_then(|iri| iri.strip_prefix("urn:uuid:"))
+                    .and_then(issued_uuid)
+            {
+                *id = Value::String(dpp_domain::PassportId(uuid).to_string());
+            }
             Value::Object(map)
         }
         other => other,
     }
+}
+
+/// The UUID in `id`, if `id` is written exactly as a `PassportId` serialises:
+/// lower-case and hyphenated. Any other spelling `Uuid` would also accept (upper
+/// case, braces, no hyphens, a URN) is left alone, so framing and stripping change
+/// only what they produce and stay inverses.
+fn issued_uuid(id: &str) -> Option<uuid::Uuid> {
+    let uuid = uuid::Uuid::try_parse(id).ok()?;
+    (uuid.hyphenated().to_string() == id).then_some(uuid)
 }

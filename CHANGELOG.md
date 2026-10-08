@@ -15,6 +15,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
+  passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
+  `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
+  `strip_context` turns it back. Only an `id` spelled as a `PassportId`
+  serialises (lower-case, hyphenated) is rewritten. `id` still aliases `@id`, so
+  the context still layers after `credentials/v2` and `did/v1`. **Migration:** a
+  caller that stamps `context_value()` onto a passport itself, rather than calling
+  `frame_passport`, writes `id` as `passport_iri(id)` too; left as a bare UUID it
+  is a relative IRI, which names nothing. See Fixed for why.
+
 - **A key is named by its own thumbprint, and every signature names the key
   that made it.** Until now, verification methods were named by position. The
   current key was always `#key-1`, and archived keys were renumbered whenever a
@@ -320,6 +330,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     (`credentials/v2`, `did/v1`, `cid/v1`), vendored with their SHA-256, and no
     other. A context added to a builder fails the oracle by name until somebody
     vendors it.
+  - It fails on a node identifier that is a relative IRI. PyLD is passed an
+    explicit null base for that: when the option is left out, it resolves a
+    relative IRI against `http://example.org/base/` of its own accord, which is
+    how the passport's identifier, below, went unseen until a second processor
+    (jsonld.js) was run over the same corpus.
+  - It fails if one of our contexts can no longer be layered after
+    `credentials/v2` or `did/v1`, which both protect `id` as `@id`.
   - Planted defects were each caught: a key with no term, a term mapped to
     nothing or to a relative IRI, the scoped `productIdentifier` context removed
     (which drops `gtin` and `scheme`), and an edited vendored context.
@@ -361,6 +378,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the RFC's author publishes separately.
 
 ### Fixed
+
+- **A framed passport had no name in linked data.** The context aliases `id`
+  to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI
+  reference. Converting a framed passport to RDF with no base IRI dropped every
+  statement about the passport itself (jsonld.js reports a "relative @id
+  reference"), and a processor that supplies a base named the passport after
+  wherever that was. The passport's credential names it `urn:uuid:` and its id,
+  so even with a base the two were unrelated nodes. `frame_passport` now writes
+  `id` in that form, from the new `dpp_vc::passport_iri`, which the credential's
+  subject uses too, and `strip_context` turns it back. With it, PyLD and
+  jsonld.js give the same canonical RDF for every document in the oracle's
+  corpus.
 
 - **A JSON-LD processor refused every access credential, and one of its
   subject's keys had no term.** The credential's inline context redefined `name`,

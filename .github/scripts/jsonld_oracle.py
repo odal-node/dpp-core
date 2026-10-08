@@ -12,7 +12,7 @@ Digital Bazaar and sharing no code or author with this workspace. The corpus it
 is given comes from `crates/dpp-tests/tests/jsonld_oracle_corpus.rs`, which
 builds every document with the real builder.
 
-Four checks, each catching something the others do not:
+Six checks, each catching something the others do not:
 
   contexts   every `@context` an emitted document carries processes without
              error, and every term it defines expands to an IRI. A protected
@@ -25,6 +25,19 @@ Four checks, each catching something the others do not:
   loader     the processor is given the vendored W3C contexts and nothing else.
              A context the oracle cannot serve is a failure, not a fetch, so a
              new remote context has to be looked at before it is trusted.
+  named      every node identifier in the expanded form is an absolute IRI or a
+             blank node. A relative one names nothing until a base is chosen:
+             converting to RDF without a base drops every statement about the
+             node. PyLD is passed an explicit null base for this, because when
+             the option is left out it resolves a relative IRI against
+             `http://example.org/base/` of its own accord, which would hide
+             exactly this. The passport's own `id` was such a reference until it
+             was written as `urn:uuid:`, and a second processor (jsonld.js)
+             found it.
+  layered    our own contexts still expand after `credentials/v2` and `did/v1`.
+             Both protect `id` as `@id`, and a context of ours that redefined a
+             protected term could no longer be layered after them, nor a framed
+             passport embedded in a credential.
 
 **One gap is known and listed, not hidden.** The passport context defines a term
 for every key of the passport envelope and for the product identifier, and for
@@ -50,6 +63,7 @@ import copy
 import hashlib
 import json
 import pathlib
+import re
 import sys
 from importlib.metadata import version
 
@@ -96,6 +110,28 @@ def is_nested_undefined(label: str, path: str) -> bool:
     return not (parts[0] == "productGroupData" and parts[1] == "productIdentifier")
 
 
+ABSOLUTE_IRI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+
+
+def relative_ids(node, path=""):
+    """Every node identifier in an expanded document that is not an absolute IRI
+    or a blank node, with the path it sits at."""
+    found = []
+    if isinstance(node, dict):
+        identifier = node.get("@id")
+        if isinstance(identifier, str) and not (
+            identifier.startswith("_:") or ABSOLUTE_IRI.match(identifier)
+        ):
+            found.append((path or "/", identifier))
+        for key, value in node.items():
+            if key not in ("@id", "@value"):
+                found += relative_ids(value, f"{path}/{key}")
+    elif isinstance(node, list):
+        for item in node:
+            found += relative_ids(item, path)
+    return found
+
+
 def sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -132,7 +168,10 @@ def loader(url, options=None):
     }
 
 
-OPTIONS = {"processingMode": "json-ld-1.1", "documentLoader": loader}
+# `base: None` is load-bearing. Left out, or given as "", PyLD resolves a relative
+# IRI against `http://example.org/base/`, a base of its own, and the `named` check
+# below would never see one.
+OPTIONS = {"processingMode": "json-ld-1.1", "documentLoader": loader, "base": None}
 
 
 def expand(document):
@@ -235,6 +274,11 @@ def controls() -> list[str]:
     except jsonld.JsonLdError:
         pass
 
+    unnamed = {"@context": {"dpp": "https://example.org/dpp#"}, "@id": "a-bare-uuid", "dpp:x": "y"}
+    expanded, _ = expand(unnamed)
+    if relative_ids(expanded) != [("/", "a-bare-uuid")]:
+        escaped.append("did not report a relative node identifier, so an unnamed node would go unseen")
+
     return escaped
 
 
@@ -261,7 +305,10 @@ def main() -> int:
         for reason in escaped:
             print(f"error: control failed: the processor {reason}", file=sys.stderr)
         return 1
-    print("controls: a redefined protected term fails, an undefined key is reported, an unvendored context is refused\n")
+    print(
+        "controls: a redefined protected term fails, an undefined key is reported, "
+        "an unvendored context is refused, a relative node identifier is reported\n"
+    )
 
     failed = 0
 
@@ -275,6 +322,15 @@ def main() -> int:
                 problems.append(f"{dropped} defined term(s) expand to nothing")
         except jsonld.JsonLdError as error:
             problems.append(describe(error))
+        # Our contexts have to stay usable under the W3C ones, which protect `id`.
+        for base in ("https://www.w3.org/ns/credentials/v2", "https://www.w3.org/ns/did/v1"):
+            own = entry["context"] if isinstance(entry["context"], list) else [entry["context"]]
+            if base in own:
+                continue
+            try:
+                expand(probe(copy.deepcopy([base] + own)))
+            except jsonld.JsonLdError as error:
+                problems.append(f"cannot be layered after {base}: {describe(error)}")
         report("context ", label, problems)
         failed += bool(problems)
 
@@ -296,6 +352,10 @@ def main() -> int:
                     allowed_seen += 1
                 else:
                     problems.append(f"{path} expands to nothing")
+            for path, identifier in relative_ids(expanded):
+                problems.append(
+                    f"{path} is named {identifier!r}, a relative IRI: without a base it names nothing"
+                )
         except jsonld.JsonLdError as error:
             problems.append(describe(error))
         report("document", label, problems)
