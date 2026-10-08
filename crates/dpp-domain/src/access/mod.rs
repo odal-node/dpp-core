@@ -20,6 +20,8 @@ pub mod passport_view;
 mod passport_view_tests;
 #[cfg(test)]
 mod path_matching_tests;
+#[cfg(test)]
+mod personal_data_view_tests;
 pub mod policy;
 #[cfg(test)]
 mod policy_tests;

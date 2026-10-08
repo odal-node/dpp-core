@@ -74,6 +74,7 @@ constant is right.
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
 | `product_group_data` | `Option<ProductGroupData>` | `"productGroupData"` | Typed product-group-specific data (tagged enum) |
+| `personal_data` | `BTreeMap<String, PersonalDataStatement>` | `"personalData"` | The operator's statement about personal data for each field its schema marks `x-personal-data`, keyed by the field's dotted path. A marked field with a value is refused at write time without one. The personal data itself is never in the passport: a statement says nothing is held, or names an erasable record held outside it and its GDPR Art. 6(1) basis. Shown only to audiences that see the field, never to the public. Omitted when empty |
 | `status` | `PassportStatus` | `"status"` | Lifecycle state (see §2) |
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |
@@ -225,7 +226,7 @@ Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each
 
 **Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Product group (`BatteryData`) — v2.6.0
+### 4.1 Battery Product group (`BatteryData`) — v2.8.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
@@ -237,13 +238,15 @@ property to validate against. The authoritative pair is:
 
 - `crates/dpp-domain/src/domain/product group/data/battery.rs` — the type, with a
   per-field regulatory citation on each doc comment.
-- `crates/dpp-domain/schemas/battery/v2.6.0.json` — the wire contract, with an
+- `crates/dpp-domain/schemas/battery/v2.8.0.json` — the wire contract, with an
   `x-disclosure` class on every property. `additionalProperties` is `false`, and
   a test asserts the two agree field-for-field.
 
-**Required** (6, and the only ones a passport cannot omit at any category):
-`gtin`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
-`co2ePerUnitKg`, `batteryType`. Everything else is `Option` — not laxity, but
+**Required** (5, and the only ones a passport cannot omit at any category):
+`productIdentifier`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
+`batteryType`. `co2ePerUnitKg` was required until v2.8.0; it is optional now,
+and barred for EV, LMT and industrial batteries, because the carbon footprint
+it would be read as is deferred. Everything else is `Option` — not laxity, but
 because the obligations are **per category**: a field mandatory for an
 electric-vehicle battery may be "not to be filled/displayed" for an LMT one.
 That constraint lives in `dpp_rules::batteries::passport_content`, which the
@@ -276,7 +279,7 @@ field is itself the defect.
 - `HazardousSubstance { name, cas_number, concentration_pct }`
 - `TemperatureRange { min_c, max_c }`
 
-Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.6.0}.json`. Older versions stay
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.8.0}.json`. Older versions stay
 registered so a passport validated against one remains verifiable, and each
 carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.

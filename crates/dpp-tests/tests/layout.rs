@@ -553,6 +553,7 @@ const TIERS: &[(&str, u8)] = &[
     ("manufacturer", 2),
     ("material", 2),
     ("operator", 2),
+    ("personal_data", 2),
     ("seal", 2),
     ("status", 2),
     ("trusted_list", 2),

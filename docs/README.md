@@ -22,6 +22,7 @@ This folder documents **the standard, not the product**: what a Digital Product 
 | "Which RFC, W3C or ETSI text does this cite, at which revision, and what was its status when last read?" | [architecture/STANDARDS.md](architecture/STANDARDS.md) — one row per specification, status dated, IETF rows held by a test |
 | "Which acts reach a product group, and from when?" | [architecture/DATA-MODEL.md](architecture/DATA-MODEL.md) §3.5 — the instrument catalog and why applicable law is a *set* |
 | "Why is a date pending rather than computed?" | [architecture/EFFECTIVE-DATES.md](architecture/EFFECTIVE-DATES.md) |
+| "Why is personal data kept out of the passport, and what else was considered?" | [architecture/PERSONAL-DATA.md](architecture/PERSONAL-DATA.md) — the rule itself is in the `personal_data` module |
 | "How are releases, versions, and contributions governed?" | [governance/](governance/) — VERSIONING, RELEASE, DEVELOPMENT, GIT-STRATEGY (CONTRIBUTING and CHANGELOG are at the repo root) |
 
 ## The three ideas that explain everything else

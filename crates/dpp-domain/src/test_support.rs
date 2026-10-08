@@ -43,6 +43,7 @@ pub(crate) fn sample_passport() -> Passport {
         jws_signature: None,
         public_jws_signature: None,
         disclosure_signatures: Default::default(),
+        personal_data: Default::default(),
         created_at: now,
         updated_at: now,
         published_at: None,
@@ -75,7 +76,7 @@ pub(crate) fn sample_battery_data() -> BatteryData {
         nominal_voltage_v: 3.2,
         nominal_capacity_ah: 100.0,
         expected_lifetime_cycles: Some(3000),
-        co2e_per_unit_kg: 85.4,
+        co2e_per_unit_kg: Some(85.4),
         recycled_content_cobalt_pct: None,
         recycled_content_lithium_pct: None,
         recycled_content_nickel_pct: None,
@@ -218,6 +219,10 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport
         .disclosure_signatures
         .insert("public+restricted".to_owned(), "eyJ..c".to_owned());
+    passport.personal_data.insert(
+        "repairHistoryUrl".to_owned(),
+        crate::personal_data::PersonalDataStatement::NothingHeld,
+    );
     passport.published_at = Some(now);
     passport.placed_on_market_date = Some(now.date_naive());
     passport.supersedes_id = Some(PassportId::new());

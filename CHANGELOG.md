@@ -77,7 +77,187 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     fingerprint and no longer verifies. Sign it again. No keystore migration is
     needed.
 
+- **An access credential is typed as a VC-JWT, and a verifier requires the
+  type.** VC-JOSE-COSE asks for `typ: vc+jwt` and, when present, `cty: vc`, and
+  `sign_access_credential` set neither. It now sets both.
+  `authenticate_access_credential` refuses a token whose `typ` is absent or
+  names anything else, or whose `cty` names anything but `vc`. A signature by
+  the issuer's key is authentic whatever it signs, so without the type a
+  passport proof or an SD-JWT VC from the same key could be offered as a
+  credential: the explicit typing RFC 8725 §3.11 recommends. Both headers are
+  read as RFC 7515 §4.1.9 says, case-insensitively and with or without
+  `application/`. (#374)
+
+  `jws::sign_typed` gains a `cty` parameter, after `typ`. **Migration:** pass
+  `None` where no `cty` is wanted; re-sign access credentials issued before this
+  release.
+
+- **A credential's status entry carries `statusPurpose`.** Bitstring Status
+  List v1.0 requires it as a string, and its test suite checks every entry for
+  one, but `CredentialStatus` had no such field, so a verifier could not tell a
+  revocation list from a suspension list. `CredentialStatus::status_purpose` is
+  now required, and an entry without it does not deserialise.
+  `check_revocation` answers only an entry whose purpose is `revocation`, which
+  is exported as `REVOCATION_PURPOSE`, and returns `Indeterminate` for any other
+  purpose, whatever the bit says. (#375)
+
+  **Migration:** set `status_purpose` on every `CredentialStatus`, `"revocation"`
+  for a revocation list.
+
+- **The battery rules follow the Commission's guidance v2.0, and
+  `co2ePerUnitKg` is optional.** The battery passport guidance *Digital
+  Batteries Passport — data points by category* was reissued as v2.0 on 15
+  August 2026. Compared line by line with v1.0, which the rules were written
+  against, its obligations differ in rows 19 to 23 only. (#389)
+  - **The four recycled-content shares** of Annex XIII point 1(e) (cobalt,
+    lithium, nickel and lead recovered from waste) move from `Mandatory` to
+    `NotApplicable` for EV, LMT and industrial batteries. v2.0 has them not
+    filled or displayed as of February 2027, to be applied in line with
+    Article 8 and its delegated act. The publish gate stops requiring them, and
+    `passport_content::fields_not_applicable` now reports them when a passport
+    of those categories carries them.
+  - **The due diligence report** (row 19) stays `NotApplicable`. v2.0 now
+    gives a date rather than a missing format: Art. 48(1) applies from 18
+    August 2027, when the row becomes `Mandatory`. The rules carry no dates, so
+    that switch is still to be made.
+  - **`co2ePerUnitKg` is no longer required**, in a new battery schema v2.8.0,
+    and is `NotApplicable` for the same three categories.
+    `BatteryData::co2e_per_unit_kg` is `Option<f64>`. The guidance defers the
+    carbon footprint declaration of Annex XIII point 1(c), and a per-unit
+    figure is not that declaration anyway: Art. 7(1)(d) expresses it per kWh of
+    the total energy over the battery's expected service life.
+  - A v2.7.0 record reads forward unchanged through a pass-through lens, and
+    keeps any `co2ePerUnitKg` it carries. A reader built before this release
+    cannot read a v2.8.0 passport that omits the field. That break is taken now
+    because no passport has been issued.
+
+  **Migration:** wrap `co2e_per_unit_kg` values in `Some`. Stop sending the four
+  recycled-content shares and `co2ePerUnitKg` for EV, LMT and industrial
+  batteries.
+
+- **`BackupReceipt::content_hash` has a definition, and the in-memory back-up
+  follows it.** The hash is SHA-256 of the RFC 8785 canonical form of the
+  passport, as lower-case hexadecimal, which is how the new archive port
+  defines its own. Until now the field said only "SHA-256 of the stored
+  payload", and `InMemoryBackup` hashed plain `serde_json` output. That differs
+  from the canonical bytes for most documents, so a hash computed the old way
+  no longer matches the receipt for the same, unchanged passport, and
+  `BackupCopyPort::verify` reports a mismatch. `sha2` and `hex` are no longer
+  optional dependencies of `dpp-domain`, so the `sha2` and `hex` features they
+  implied are gone. (#387)
+
+  **Migration:** recompute any expected hash taken from an earlier
+  `InMemoryBackup` receipt, or from a digest of raw JSON, before passing it to
+  `verify`. An adapter that fills `content_hash` hashes the canonical form.
+  Remove `sha2` and `hex` from any `dpp-domain` feature list.
+
+- **A field that can hold personal data is refused unless the operator says
+  what is held, and the personal data itself is never in the passport.** ESPR
+  Art. 10(1)(e) forbids storing customer personal data in a passport without
+  explicit consent under GDPR Art. 6, and the Toy Safety Regulation (EU)
+  2025/2509 Art. 20(10) and the Detergents Regulation (EU) 2026/405 Art. 22(h)
+  say the same. GDPR was cited nowhere in this workspace, and nothing refused
+  anything. The Batteries Regulation has no such provision, so a battery
+  passport answers to GDPR alone, and to its Art. 78(h) requirement of a high
+  level of privacy. That matters most for batteries, because Annex XIII point 4
+  records each unit's use, accidents included. (#261)
+  - **Consent can be withdrawn, and a passport cannot be erased from.**
+    Withdrawal obliges erasure where no other legal ground remains (GDPR Art.
+    7(3), Art. 17(1)(b)). A published passport is signed, frozen, archived,
+    copied to a back-up provider and kept by every reader who fetched it. So
+    personal data a passport is not required to carry stays out of it,
+    whatever its basis. The new `personal_data` module documents the
+    reasoning, and `docs/architecture/PERSONAL-DATA.md` records what it was
+    chosen over: a stated position alone, a content lint, a consent-only
+    statement, the data inside the passport, and the archive port.
+  - **Schemas mark the fields.** `"x-personal-data": true` marks
+    operator-written free text describing one item's life after sale. Battery
+    v2.8.0 (unreleased, so edited in place) marks
+    `usageHistory.negativeEvents` and `usageHistory.operatingConditions[].note`,
+    the only free text in the individual-battery tier. A new **textile v1.4.0**
+    marks `repairHistoryUrl`, a log of repairs to one specific item, and is
+    otherwise identical to v1.3.0, which an identity lens carries forward.
+    Content an act requires is not marked, such as battery Annex XIII point
+    2(b)'s spare-part contacts. Neither are measurements: storing them is the
+    obligation, and GDPR Art. 17(3)(b) keeps them out of erasure's reach.
+  - **`Passport` gains `personal_data`** (`"personalData"`), a map from a marked
+    field's dotted path to a `PersonalDataStatement`. Every statement asserts
+    that the field's value carries no personal data beyond what the governing
+    act requires the passport to carry. It then says either that nothing
+    related is held (`{"held":"nothing"}`), or that it is held outside the
+    passport in an erasable record: `{"held":"outside","lawfulBasis":…,
+    "record":…}`, with a closed `LawfulBasis` of the six GDPR Art. 6(1) points.
+    The operator's passport signature covers the statement. On the wire the key
+    is additive: optional, and omitted when empty. Its JSON-LD term is typed
+    `@json`, because the field-path keys are neither terms nor IRIs and
+    expansion would otherwise drop every statement.
+  - **`validate_passport` refuses**, through the new `check_personal_data`, a
+    marked field with a value and no statement, a statement about an unmarked
+    field, and an `outside` statement with an empty record. Where a governing
+    act admits customer personal data only with explicit consent, it also
+    refuses any other basis. It never reads what a field says.
+  - **Instrument manifests say which acts set that condition.** `Instrument`
+    gains `customer_personal_data`, recorded on ESPR, toys and detergents.
+    `InstrumentCatalog::customer_personal_data_for` resolves it through
+    `parent`, so an ESPR delegated act carries ESPR's. A passport is governed by
+    the acts it records. When it records none, the acts bound to its product
+    group govern instead.
+  - **`redact_passport` shows a statement only to audiences that see its
+    field, and never to the public.** `personalData` is classed `Individual` in
+    `PASSPORT_FIELD_DISCLOSURE` as the fallback for a consumer using the raw
+    filter.
+  - **A new port, `PersonalDataPort`**, holds the records: `store`, `fetch`,
+    `records_for` and `erase`. Erasure removes the content and keeps a
+    tombstone, which can still relate to the item's owner and is protected
+    accordingly. A retried erasure returns the first receipt. `records_for` lists every
+    record held for a passport, so one whose identifier was lost on the way
+    back from `store` can still be found and erased. A record is never part of
+    the back-up copy, the archive or any passport view. `InMemoryPersonalData`
+    implements it under `test-utils`.
+
+  **Migration:** add `personal_data` to any exhaustive `Passport` literal and
+  `customer_personal_data` to any exhaustive `Instrument` literal. A passport
+  that writes a marked field must also write its statement. Write textile
+  passports at v1.4.0.
+
 ### Added
+
+- **A port for the archive of a passport's historical versions.** `ports::archive`
+  adds `ArchivedVersionPort`, the functionality EN 18221:2026 clause 4.2 calls
+  archiving: the version a change replaces is kept, append-only, for the
+  passport's lifetime, so the passport as it stood at any earlier moment can be
+  retrieved. Core could not express it. `BackupCopyPort` holds one copy and has no
+  method that takes or returns a series, so a back-up provider had nothing in core
+  to implement for the back-up half of clause 4.2, and a deployment that kept
+  versions had to use a trait of its own.
+  - `archive` takes the passport id, the document and the instant it was
+    superseded, and returns an `ArchiveReceipt` carrying the version's hash.
+    `versions` lists them oldest first. `version_at` answers which was current at
+    an instant, half-open on `superseded_at`.
+  - A retry is safe: archiving a version already held returns its original
+    receipt. A version that would precede the latest, or share an instant with a
+    different one, is refused.
+  - The document is a `serde_json::Value`, not a typed `Passport`. An archive is
+    evidence, and reading a document through a struct drops what the struct does
+    not know, which changes its hash and the signature over it.
+  - The port returns whole documents and applies no disclosure policy. The caller
+    does, since clause 4.2 gives an archived attribute the same access restriction
+    as the current one.
+  - It is separate from `BackupCopyPort` by shape, not by actor: a back-up
+    provider implements both. The Regulation's own text asks the back-up only for
+    the most up-to-date version. Holding history there is what the presumption of
+    conformity under the standard costs, and the docs say so rather than calling it
+    a legal requirement.
+  - **One document carries one hash in either port:** SHA-256 of the RFC 8785
+    canonical form, as lower-case hexadecimal, the definition
+    `BackupReceipt::content_hash` now has (see Breaking).
+  - `InMemoryArchive` ships with the `test-utils` feature, which now enables
+    `dpp-rules/bundle` for the canonical hash.
+
+  Not covered: a bound on how far behind a back-up may lag (clause 4.5), though the
+  receipt's `archived_at` against `superseded_at` is the means to measure it; and
+  any no-op implementation, deliberately, since one that kept nothing would make a
+  deployment look as if it archived.
 
 - **A standards register, and a tripwire that holds the code to it.**
   `docs/architecture/STANDARDS.md` records the IETF, W3C, GS1, IDTA and ETSI
@@ -164,7 +344,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   ruleset bundle checked through an adapter over `verify_jws`. Nothing this
   workspace signs carries `crit`, so no existing token is affected.
 
+- **Three measured values of one battery were labelled public.** In battery
+  schemas v2.6.0 and v2.7.0, `dynamicPerformance` is `individual` (Annex XIII
+  point 4(a)), but its members `internalResistanceMohm`,
+  `roundTripEfficiencyPct` and `expectedLifetimeCycles` were `public`,
+  probably because they share names with the model-level figures at the top
+  level, which are public. Battery schema v2.8.0 labels them `individual`. No
+  audience's view changes, because the serving filter drops the whole object
+  for an audience that may not see it. (#388)
+
+  A new test holds every product group's current schema to the rule that no
+  member is visible to an audience its enclosing object is hidden from. It
+  found eight more members, which it lists as known faults with the reason
+  for each:
+  - **Six battery fields:** the `name` and `casNumber` of the anode, cathode
+    and electrolyte material arrays. They come from a shared definition whose
+    members collide with `criticalRawMaterial`'s public ones, so relabelling
+    them needs a change to how shared definitions are read.
+  - **Two electronics fields:** `criticalRawMaterials[].name` and
+    `countryOfOrigin`, which wait on the CRM Act reading in #314.
+
 ### Documentation
+
+- **The back-up copy's availability period was cited to the wrong place.**
+  `BackupCopyPort`'s docs and the port inventory gave the period as ESPR Annex
+  III(i), which lists unique facility identifiers. The period is Art. 9(2)(i),
+  which has the passport remain available for at least the expected lifetime of
+  the product, to be set per product group by each delegated act. Annex III(l),
+  the provider's reference, was cited correctly. The README also stops quoting a
+  port count: `PORTS.md` is the one place that does.
 
 - **Technical specifications have one home.** README's coverage table and the
   conformity statement each gave their own status for GS1 Digital Link, the

@@ -57,6 +57,15 @@ pub const PASSPORT_FIELD_DISCLOSURE: &[(&str, Disclosure)] = &[
     // `default_disclosure`, which is `Public` — an individual unit's life status
     // is exactly what that tier exists to keep off the anonymous view.
     ("lifeStatus", Disclosure::Individual),
+    // The operator's statements about personal data, one per marked field.
+    // `redact_passport` does better than any one class can: it shows each
+    // statement to exactly the audiences that see the field it is about, and
+    // never to the public — see `crate::personal_data`. This entry is what a
+    // consumer driving the raw filter gets instead, so it has to fail safe.
+    // `Individual` is the tier the only marked fields in the individual-item
+    // data sit in, and it keeps a statement about one unit's accidents off the
+    // public view and away from authorities, who do not see those fields either.
+    ("personalData", Disclosure::Individual),
     // Advisory plausibility output, re-computable after publish and carrying
     // free-text findings about our own data quality — operator- and
     // auditor-facing, not consumer-facing.

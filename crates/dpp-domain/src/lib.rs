@@ -35,6 +35,7 @@ pub mod material;
 pub mod operator;
 pub mod passport;
 pub mod passthrough;
+pub mod personal_data;
 pub mod ports;
 pub mod product;
 pub mod product_group;
@@ -52,8 +53,9 @@ pub use catalog::{
     RetentionBasis,
 };
 pub use instrument::{
-    DateBasis, Instrument, InstrumentBinding, InstrumentCatalog, InstrumentKind, InstrumentRef,
-    InstrumentStatus, ObligationDate, PassportObligation, RecordedBasis,
+    CustomerPersonalData, DateBasis, Instrument, InstrumentBinding, InstrumentCatalog,
+    InstrumentKind, InstrumentRef, InstrumentStatus, ObligationDate, PassportObligation,
+    PersonalDataStorage, RecordedBasis,
 };
 
 pub use crate::{
@@ -71,6 +73,7 @@ pub use crate::{
         CarrierQualifier, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_PROOF_FIELDS,
         PASSPORT_WIRE_KEYS, Passport, PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
     },
+    personal_data::{HeldOutside, LawfulBasis, PersonalDataRecordId, PersonalDataStatement},
     product::ProductIdentity,
     product_group::{
         AluminiumData,
@@ -136,9 +139,10 @@ pub use field_error::{FieldError, ValidationErrors};
 #[cfg(not(target_arch = "wasm32"))]
 pub use validation::{
     BatchValidationItem, ProductGroupValidator, ProductGroupValidatorRegistry, batch_errors,
-    battery_recycled_chemistry_conflicts, unsold_goods_annex_vii_heading,
-    unsold_goods_cn_depth_is_correct, validate_battery_operating_temp, validate_fibre_composition,
-    validate_passport, validate_product_group_data, validate_product_group_data_batch,
+    battery_recycled_chemistry_conflicts, check_personal_data, personal_data_marks,
+    unsold_goods_annex_vii_heading, unsold_goods_cn_depth_is_correct,
+    validate_battery_operating_temp, validate_fibre_composition, validate_passport,
+    validate_product_group_data, validate_product_group_data_batch,
     validate_product_group_data_with_registry, validate_raw_product_group_data,
     validate_surfactants, validate_svhc_substances,
 };
@@ -147,11 +151,13 @@ pub use compliance::{
     ComplianceError, ComplianceErrorKind, ComplianceFinding, ComplianceResult, ComplianceStatus,
     gate_determination,
 };
+pub use ports::archive::{ArchiveReceipt, ArchivedVersion, ArchivedVersionPort};
 pub use ports::backup::{
     BackupCopyPort, BackupReceipt, BackupStatus, BackupVerification, GhostBackup,
 };
 pub use ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
+pub use ports::personal_data::{ErasureReceipt, HeldRecord, PersonalDataPort, PersonalDataRecord};
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus,
     RegistrySyncPort,

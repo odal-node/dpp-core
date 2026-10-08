@@ -132,6 +132,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/battery/v2.7.0.json"),
     },
     EmbeddedSchema {
+        product_group: "battery",
+        version: "2.8.0",
+        json: include_str!("../../schemas/battery/v2.8.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "textile",
         version: "1.0.0",
         json: include_str!("../../schemas/textile/v1.0.0.json"),
@@ -150,6 +155,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         product_group: "textile",
         version: "1.3.0",
         json: include_str!("../../schemas/textile/v1.3.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "textile",
+        version: "1.4.0",
+        json: include_str!("../../schemas/textile/v1.4.0.json"),
     },
     // No v1.0.0. It predated Impl. Reg. (EU) 2026/2 and nothing can carry a
     // document forward from it: a financial year is not derivable from a
