@@ -9,7 +9,9 @@
 //!
 //! The European Commission publishes the reference implementation of AdES
 //! creation and validation (DSS). Handing it an artefact and asking *"what is
-//! this?"* is the only check available here that is not circular. This test
+//! this?"* is one of two checks here that are not circular, and the one that
+//! judges a whole signature. The other holds the protected header to ETSI's own
+//! JSON Schema, in `crates/dpp-tests/tests/jades_annex_b_schemas.rs`. This test
 //! produces the artefact; `.github/oracle/jades/` runs the validator.
 //!
 //! # Why the certificate is self-signed, and why that is enough
