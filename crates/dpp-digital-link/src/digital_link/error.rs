@@ -16,8 +16,16 @@ pub enum DigitalLinkError {
         expected: u32,
         actual: u32,
     },
-    #[error("URI scheme must be 'https', got '{0}'")]
+    #[error("URI scheme must be 'http' or 'https', got '{0}'")]
     InvalidScheme(String),
+    #[error("'{0}' is not a host a GS1 Digital Link URI can have")]
+    InvalidHost(String),
+    #[error(
+        "'{0}' holds a percent escape that is not '%' and two hexadecimal digits, or does not decode to UTF-8"
+    )]
+    MalformedPercentEscape(String),
+    #[error("'{0}' is not a path segment a GS1 Digital Link URI can have")]
+    InvalidPathSegment(String),
     #[error("Unknown Application Identifier '{0}' in URI path")]
     UnknownApplicationIdentifier(String),
     #[error(
@@ -54,9 +62,56 @@ pub enum DigitalLinkError {
         actual: usize,
     },
     #[error(
+        "Application Identifier '{code}' value is shorter than its minimum length of {min_len} (got {actual})"
+    )]
+    ValueTooShort {
+        code: String,
+        min_len: usize,
+        actual: usize,
+    },
+    #[error(
         "Application Identifier '{code}' value contains {character:?}, which is outside GS1 CSET 82"
     )]
     OutsideCset82 { code: String, character: char },
+    #[error(
+        "Application Identifier '{code}' value contains {character:?}, which is outside {charset}"
+    )]
+    OutsideCharset {
+        code: String,
+        character: char,
+        charset: &'static str,
+    },
+    #[error(
+        "Application Identifier '{code}' check digit invalid: expected {expected}, got {actual}"
+    )]
+    InvalidCheckDigit {
+        code: String,
+        expected: u8,
+        actual: u8,
+    },
+    #[error(
+        "Application Identifier '{code}' value does not begin with the four digits of a GS1 Company Prefix"
+    )]
+    InvalidCompanyPrefix { code: String },
+    #[error(
+        "Application Identifier '{code}' check character pair invalid: expected '{expected}', got '{actual}'"
+    )]
+    InvalidCheckPair {
+        code: String,
+        expected: String,
+        actual: String,
+    },
+    #[error(
+        "Application Identifier '{code}' value must carry a filler digit of 0 where it has another"
+    )]
+    NonZeroFiller { code: String },
+    #[error(
+        "Primary key '{primary_key}' cannot stand without its qualifier '{qualifier}', which the path omits"
+    )]
+    MissingQualifier {
+        primary_key: String,
+        qualifier: String,
+    },
     #[error("Application Identifier '{0}' has an empty value")]
     EmptyValue(String),
 }

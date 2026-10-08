@@ -67,43 +67,55 @@ enforces the stricter no-hyphen name rule.
 Validating against these files establishes **metamodel validity** — the document
 is shaped the way the AAS metamodel says a document is shaped.
 
-It is **not** a conformance claim. IDTA conformance would need IDTA's own test
-engine run against a pinned version, and even that would say nothing about
-whether a submodel matches a published *submodel template*. Any public wording
-about this must say "schema-valid against IDTA-01001 metamodel 3.0, 3.1 and
-3.2", never "IDTA-conformant".
+It is **not** a conformance claim on its own, and it says nothing about whether a
+submodel matches a published *submodel template*. The standards register's IDTA
+row makes the metamodel-constraint claim, on the evidence of the two external
+tools below. Wording for what this section covers is "schema-valid against
+IDTA-01001 metamodel 3.0, 3.1 and 3.2", never "IDTA-conformant".
 
-## The external loader, and what it covers
+## The external tools, and what they cover
 
-A separate CI job (`.github/workflows/aas-oracle.yml`) runs every committed
-Environment through an external AAS implementation, because the blind spot below
-means no schema can do this job.
+A separate CI workflow (`.github/workflows/aas-oracle.yml`) runs every committed
+Environment through two external AAS implementations, because the blind spot
+below means no schema can do this job.
 
-| | |
-|---|---|
-| **Tool** | `aas-core3.0` (aas-core-works, Python) |
-| **Pinned at** | `1.1.4` |
-| **Metamodel it implements** | AAS **3.0** |
-| **Checks** | deserialisation, the specification's own constraint verification, and round-trip |
+| | `aas-core3.0` | `aas-test-engines` |
+|---|---|---|
+| **From** | aas-core-works (Python) | IDTA's `admin-shell-io` organisation, "official test tooling for the Asset Administration Shell" (Python) |
+| **Pinned at** | `1.1.4` | `1.0.3` |
+| **Metamodel it implements** | AAS **3.0** | AAS **3.0** (metamodel 3.0.1); its `supported_versions()` lists no other |
+| **Checks** | deserialisation, the specification's own constraint verification, and round-trip | the meta-model check (members, types, enums), then the constraints it implements |
+| **Script** | `.github/scripts/aas_loader_oracle.py` | `.github/scripts/aas_test_engines_oracle.py` |
 
-**It covers metamodel 3.0 only.** We validate documents against the 3.0/3.1/3.2
-schemas but load them through a 3.0 implementation, so the loader-level check —
+Both pins, and everything they install, are hash-locked in
+`.github/oracle/aas/requirements.txt`, generated from `requirements.in`.
+
+**They cover metamodel 3.0 only.** We validate documents against the 3.0/3.1/3.2
+schemas but load them through 3.0 implementations, so the loader-level check —
 the one that catches members no schema sees — is 3.0-scoped. Do not round that
-claim up. `aas-core3.0` is generated from `aas-core-meta`, so a 3.1/3.2 loader
-becomes available if and when upstream generates one.
+claim up. The test tooling's own file check ignores its version argument, and
+aas-core-works publishes Python packages for 3.0 (`aas-core3.0`) and 3.1
+(`aas-core3.1`) and none for 3.2 on PyPI, so a 3.2 constraint check becomes
+possible if and when an implementation of it exists. `aas_test_engines_oracle.py` fails the day the tool
+lists a second version, so the claim cannot move without a decision.
 
-The pin is exact and deliberate: this is somebody else's judgement about what the
-metamodel permits, and an unpinned upgrade would turn their tightening into a red
-build on code that did not change.
+**The two cover each other's gaps.** The test tooling's source marks `AASd-021`
+and `AASd-077` as not implemented; `aas-core3.0` verifies both. Neither says
+anything about the constraints 3.2 adds (`AASd-137`, `AASd-138`), or about the
+`Batch` value 3.2 adds to `AssetKind`.
+
+The pins are exact and deliberate: this is somebody else's judgement about what
+the metamodel permits, and an unpinned upgrade would turn their tightening into a
+red build on code that did not change.
 
 **A lenient implementation is worth nothing here.** Eclipse BaSyx accepts unknown
 members and reported success on the `unit` defect that made every Environment
 unloadable. An oracle has to be strict to be an oracle — which is also why
 "opens in a GUI tool" is not evidence.
 
-Public wording: "passes `aas-core3.0` 1.1.4 for metamodel 3.0". Never
-"IDTA-conformant" — that is a separate process against IDTA's own test tooling,
-and neither claim says anything about submodel-template conformance.
+Public wording: "passes `aas-core3.0` 1.1.4 and IDTA's `aas-test-engines` 1.0.3
+for metamodel 3.0". Never "IDTA-conformant" or "IDTA-certified": nobody certifies
+an AAS file, and neither tool says anything about submodel-template conformance.
 
 ### The blind spot, named because it caught us
 
