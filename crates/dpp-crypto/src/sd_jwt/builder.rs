@@ -12,6 +12,15 @@ pub(crate) const SD_ALG_CLAIM: &str = "_sd_alg";
 /// The one key of the object that stands in for a concealed array element, RFC
 /// 9901 clause 4.2.4.2.
 pub(crate) const ARRAY_ELEMENT_CLAIM: &str = "...";
+/// How deep a value may sit in the processed payload, the top-level object being
+/// at depth 0.
+///
+/// 127 is the deepest a value sits in a document `serde_json` parses: it reads
+/// 127 nested objects or arrays and refuses the 128th. The bound has to be set
+/// again here because each Disclosure is parsed on its own, so that limit holds
+/// for one Disclosure and not for Disclosures nested inside one another.
+/// Processing recurses on the depth, so it needs a bound of its own.
+const MAX_DEPTH: usize = 127;
 
 /// Replace the named members of `object` with digests, returning the rewritten
 /// object and the disclosures that reopen it.
@@ -305,7 +314,7 @@ impl SdJwt {
         let mut used = 0usize;
         let mut seen_digests = std::collections::HashSet::new();
         let mut object = Value::Object(payload);
-        substitute(&mut object, &by_digest, &mut used, &mut seen_digests)?;
+        substitute(&mut object, &by_digest, &mut used, &mut seen_digests, 0)?;
 
         if used != by_digest.len() {
             return Err(SdJwtError::UnusedDisclosures(by_digest.len() - used));
@@ -325,7 +334,11 @@ fn substitute(
     by_digest: &std::collections::HashMap<String, &Disclosure>,
     used: &mut usize,
     seen_digests: &mut std::collections::HashSet<String>,
+    depth: usize,
 ) -> Result<(), SdJwtError> {
+    if depth > MAX_DEPTH {
+        return Err(SdJwtError::TooDeep(MAX_DEPTH));
+    }
     match value {
         Value::Object(map) => {
             let digests = match map.remove(SD_CLAIM) {
@@ -368,7 +381,7 @@ fn substitute(
             // Descend after substituting, so a disclosure whose value is itself
             // an object carrying `_sd` is opened too.
             for (_, v) in map.iter_mut() {
-                substitute(v, by_digest, used, seen_digests)?;
+                substitute(v, by_digest, used, seen_digests, depth + 1)?;
             }
             Ok(())
         }
@@ -380,7 +393,7 @@ fn substitute(
             let mut kept = Vec::with_capacity(items.len());
             for mut item in std::mem::take(items) {
                 let Some(digest) = placeholder_digest(&item) else {
-                    substitute(&mut item, by_digest, used, seen_digests)?;
+                    substitute(&mut item, by_digest, used, seen_digests, depth + 1)?;
                     kept.push(item);
                     continue;
                 };
@@ -399,7 +412,7 @@ fn substitute(
                 }
                 *used += 1;
                 let mut revealed = d.claim_value().clone();
-                substitute(&mut revealed, by_digest, used, seen_digests)?;
+                substitute(&mut revealed, by_digest, used, seen_digests, depth + 1)?;
                 kept.push(revealed);
             }
             *items = kept;

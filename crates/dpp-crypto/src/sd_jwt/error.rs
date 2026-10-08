@@ -77,4 +77,13 @@ pub enum SdJwtError {
     /// reported and not the Disclosure, which carries a claim value.
     #[error("digest {0} refers to a disclosure of the other kind")]
     WrongDisclosureKind(String),
+    /// The processed payload would hold a value deeper than the depth given, which
+    /// is the deepest a value sits in a document `serde_json` parses.
+    ///
+    /// Each Disclosure is parsed on its own, so Disclosures nested inside one
+    /// another can go deeper than that limit, and processing recurses on the
+    /// depth. A token that deep is refused rather than read. No document
+    /// `serde_json` would parse on its own reaches it.
+    #[error("the processed payload holds a value more than {0} levels deep")]
+    TooDeep(usize),
 }

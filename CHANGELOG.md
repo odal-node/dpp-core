@@ -414,6 +414,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Processing an SD-JWT payload is now bounded in depth.** `disclosed_payload`
+  recursed once per level of the processed payload and nothing limited how deep
+  that went. `serde_json` limits each Disclosure it parses, but each Disclosure is
+  parsed on its own, so Disclosures nested inside one another could go deeper than
+  it allows in a single document. Processing now refuses a value deeper than 127
+  levels, the deepest a value sits in a document `serde_json` parses, with
+  `SdJwtError::TooDeep`, so no payload `serde_json` would parse on its own is
+  refused; a test pins both sides of that line. The recursion predates array
+  elements, which add a second path into it.
+
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
   does not understand, and `dpp_crypto::jws` never read the member. A token its
