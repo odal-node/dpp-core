@@ -11,5 +11,6 @@
     "svhcSubstances": "restricted",
     "disassemblyInstructionsUrl": "restricted"
   },
-  "notes": "Split out of furniture: the working plan selects mattresses separately, with their own ranking and adoption year. Schema is furniture v1.1.0 with productType removed and nothing added — no delegated act exists for either group, so neither field set is more than a best reading. No plugin is bound yet; furniture's would have to branch on a category that no longer exists."
+  "plugin": "product-group-mattress",
+  "notes": "Split out of furniture: the working plan selects mattresses separately, with their own ranking and adoption year. Schema is furniture v1.1.0 with productType removed and nothing added — no delegated act exists for either group, so neither field set is more than a best reading. The plugin is a group's own, not furniture's, because furniture's would have to branch on a category that no longer exists."
 }

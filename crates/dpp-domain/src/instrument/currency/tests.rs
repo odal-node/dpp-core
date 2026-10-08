@@ -272,13 +272,14 @@ fn an_adopted_act_with_no_recorded_check_is_not_current_law() {
 fn the_staleness_query_reports_stale_and_never_checked_alike() {
     let catalog = InstrumentCatalog::new();
 
-    // Every embedded check was made on 2026-09-11.
+    // Every embedded check was made on 2026-09-11, except the Critical Raw
+    // Materials Act's, which was added and checked on 2026-10-08.
     assert!(
         catalog.currency_checked_before("2026-09-11").is_empty(),
         "the cutoff is exclusive, so a check made on it is not yet stale"
     );
 
-    let stale = catalog.currency_checked_before("2026-09-12");
+    let stale = catalog.currency_checked_before("2026-10-09");
     let adopted = catalog
         .all()
         .iter()
@@ -288,6 +289,13 @@ fn the_staleness_query_reports_stale_and_never_checked_alike() {
         stale.len(),
         adopted,
         "every adopted act was checked before the cutoff"
+    );
+    assert!(
+        catalog
+            .currency_checked_before("2026-10-08")
+            .iter()
+            .all(|i| i.id != "crm-act-2024-1252"),
+        "exclusive at the other end too: the act checked on the cutoff is not stale"
     );
 
     // An act with no check at all is reported however early the cutoff.

@@ -222,6 +222,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **The Critical Raw Materials Act is recorded, as an act that owes content to
+  the passport another act requires.** `PassportObligation` gains
+  `IncludedIn { basis }`, and the new `crm-act-2024-1252` instrument uses it.
+  Art. 28(6) says that for a product in the Act's closed list that another Union
+  act requires a passport for, the Art. 28(4) magnet information *"shall be
+  included in that product passport"*. The Act creates no passport and displaces
+  none, so `NotRequired` was literally true of it and hid the duty; it had been
+  filed as a list of materials. The instrument records the duties of Arts. 28
+  and 29, the dates as corrected, and that Art. 31 is not product content. (#314)
+  - **It is unbound on purpose.** No product group this catalog models is on the
+    Art. 28(1) list. The nearest case is Regulation (EU) 2026/1738, whose vehicle
+    passport must carry the Art. 11 information that reaches the same magnets and
+    whose recital 37 calls it the sector-specific implementation. Whether that
+    displaces Art. 28(3) to (7) under Art. 28(8) is a legal reading, and the
+    record does not make it.
+  - **`IncludedIn` is for an operative duty only.** Regulation (EU) 2025/40
+    recital 70 says a passport *"should"* carry packaging information, which binds
+    nobody, so that act stays `NotRequired`.
+
+- **A plugin for mattresses.** `product-group-mattress` serves the `mattress`
+  group, which was split out of furniture with a schema and a typed payload and
+  no plugin, so nothing made its compliance determination. Furniture's plugin
+  cannot serve it: it requires a `productType` that a mattress payload does not
+  carry. The checks are furniture's without that field, plus the
+  `primaryMaterial` enum, which a test holds equal to the schema's. The group had
+  been listed as deliberately unplugged with the reason "no plugin yet", which
+  was a gap and not a decision, and `docs/architecture/PLUGIN-HOST.md` had
+  explained it away; both are corrected. (#354)
+
+- **Two tripwires for claims the repository made about itself.**
+  - `crate_graph.rs` holds the crate graph in `CONTRIBUTING.md` to the
+    manifests, edge by edge, with `[dependencies]` and `[dev-dependencies]` kept
+    apart. It also refuses `axum`, `tokio`, `tower`, `sqlx`, `redis` and
+    `reqwest` in any crate's `[dependencies]`, and all but `tokio` in
+    `[dev-dependencies]`. The same ban now covers every product group plugin,
+    directly and through `plugins/Cargo.lock`, where it had no home. The graph
+    had six wrong entries and a rule its own tree broke, and nothing noticed for
+    five releases. The manifest reader fails on any form it cannot parse rather
+    than skipping it. (#349)
+  - `plugin_version_lockstep.rs` holds the plugins' version equal to the
+    workspace's. See the entry under Fixed. (#354)
+
 - **A port for the archive of a passport's historical versions.** `ports::archive`
   adds `ArchivedVersionPort`, the functionality EN 18221:2026 clause 4.2 calls
   archiving: the version a change replaces is kept, append-only, for the
@@ -333,6 +375,69 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **The Critical Raw Materials Act's Art. 28(2) deadline was recorded a year
+  late.** The Official Journal text printed 24 November 2026 in Arts. 27(6),
+  27(7)(a), 28(2), 31(2), 44(1) and 47. Corrigendum 2024/90330 (3.6.2024) makes it
+  24 November 2025, and moves Arts. 48(1) and 49(2) from 24 May 2028 to 2029. The
+  0.21.0 entry for this Act, and the inventory reason it describes, carry the
+  uncorrected year. That is history and is left alone; this is the correction.
+  Corrigendum 2024/90589 corrects Art. 30(4) and the Art. 4(5) list in Art. 43,
+  and touches nothing recorded here. A corrigendum-only consolidation is
+  `Consolidated` in this catalog's own terms, which the instrument now says: the
+  Official Journal text of 3 May 2024 is not the one to cite. (#314)
+
+- **Battery schemas v2.6.0 and v2.7.0 say the CRM Act "does not govern
+  disclosure".** Both shipped in 0.21.0, and v2.8.0 repeated it. As a statement
+  about the Act it is false: Art. 28 governs disclosure of magnet information for
+  a closed list of products. Scoped to batteries it is true, since batteries are
+  not on that list, but the sentence did not say so. A published schema version is
+  never edited, so v2.6.0 and v2.7.0 keep the wording and this entry is the
+  erratum. v2.8.0, which has not shipped, now says that Annex II of the Act lists
+  the critical raw materials and that the field's disclosure rests on the
+  Batteries Regulation alone. (#314)
+
+- **Six `CITED_NOT_MODELLED` reasons had never been read; all now have been.**
+  Each is rewritten to claim only what the held text shows, and marked `Sourced`.
+  "Not a passport instrument" was checked by searching each text for the word,
+  which none of the six contains. What the reading changed: (#318)
+  - **RoHS**: Annex II lists ten substances, not the six of the 2011 text; the
+    four phthalates came in with Delegated Directive (EU) 2015/863.
+  - **Toy Safety Directive**: not "superseded". It is repealed with effect from 1
+    August 2030 (Regulation (EU) 2025/2509 Art. 56), and Art. 57 lets toys placed
+    before then stay on the market.
+  - **Company law directive**: Art. 16(1) requires the European unique
+    identifier and sets its minimum content. Its form is in Implementing
+    Regulation (EU) 2015/884, so "establishes" was loose.
+  - **Tyre labelling**: also carries a product-database duty (Art. 5, Annex VII,
+    with Art. 5(7) keeping the data five years). The reason also predicted where a
+    future tyre passport would come from, which the Regulation cannot show.
+  - **Energy labelling for smartphones and tablets**: also carries a
+    product-database duty (Art. 3(1)), and defines the repairability class and
+    index the electronics schema's repairability inputs feed (Annex II point C,
+    Annex IV point 5).
+  - **REACH**: Art. 33 and Annex XVII entry 72 hold in the 22 June 2026
+    consolidation. Appendix 12 is a long list that includes phthalates and
+    several solvents and dyes.
+  - Nothing in the inventory is `Assumed` now, so the rule that a `Sourced`
+    reason must name an article or annex is run against entries made for the
+    purpose, which the real ones can no longer show.
+
+- **The Wasm plugins carry the workspace version.** `plugins/Cargo.toml` is a
+  separate workspace, so cargo never moved its version: it sat at 0.2.0 from
+  0.11.0 to 0.20.0 while the artifacts changed, and was set to 0.3.0 by hand.
+  Anything that caches, pins or reports a plugin by version was describing
+  several releases' worth of different artifacts with one string. It is now
+  0.21.0, in lockstep, and a test fails when the two differ. (#354)
+  - **Why not "bump it when a plugin changes".** Every plugin compiles
+    `dpp-plugin-sdk`, `dpp-plugin-traits` and `dpp-rules`, none of which is under
+    `plugins/`. Across the eleven releases from 0.11.0 to 0.21.0, `plugins/`
+    changed in four and that closure in seven, so a tripwire on `plugins/` alone
+    would have missed three. The price of lockstep is a plugin version that moves
+    in a release where no plugin changed; nothing reads it to decide anything.
+  - `docs/governance/RELEASE.md` said plugin versions "track independently" and
+    that the artifacts are attached to GitHub Releases. Nothing did either, and
+    no workflow in this repository attaches them. It now says what is true.
+
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
   does not understand, and `dpp_crypto::jws` never read the member. A token its
@@ -362,7 +467,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     members collide with `criticalRawMaterial`'s public ones, so relabelling
     them needs a change to how shared definitions are read.
   - **Two electronics fields:** `criticalRawMaterials[].name` and
-    `countryOfOrigin`, which wait on the CRM Act reading in #314.
+    `countryOfOrigin`. The CRM Act does not decide them, since its Art. 28 and
+    29 do not reach a smartphone or tablet; they wait on the same
+    shared-definition problem as the battery arrays and on a new electronics
+    schema version.
 
 ### Documentation
 

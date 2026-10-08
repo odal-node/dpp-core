@@ -1,4 +1,4 @@
-# Shared workspace for the 10 product-group plugins. Deliberately separate from the
+# Shared workspace for the 11 product-group plugins. Deliberately separate from the
 # parent dpp-core workspace (excluded there via `exclude = ["plugins/*"]`)
 # because these compile to a different target (`wasm32-wasip1`) via
 # `just build-plugins` / `just build-plugin <name>`.
@@ -11,6 +11,7 @@ members = [
     "product-group-detergent",
     "product-group-electronics",
     "product-group-furniture",
+    "product-group-mattress",
     "product-group-steel",
     "product-group-textile",
     "product-group-toy",
@@ -18,17 +19,22 @@ members = [
 ]
 
 [workspace.package]
-# The version of the ten Wasm artifacts, shared by all of them.
+# The version of the Wasm artifacts, shared by all of them — and **the workspace
+# version, in lockstep**. This workspace is separate, so cargo will not move it;
+# `crates/dpp-tests/tests/plugin_version_lockstep.rs` fails when the two differ.
+# Moving the workspace version means moving this line, and `cargo update -w` here.
 #
 # 🚨 This is **artifact identity, not compatibility**. A host negotiates on
 # `AbiVersion` and `SchemaVersionRange` from `describe()`, and neither reads this
 # number — so a stale value breaks nothing at dispatch and is invisible to every
 # gate. It sat at 0.2.0 from core 0.11.0 to 0.20.0 for exactly that reason, while
-# the plugins changed underneath it, most recently to refuse `gtin`-shaped input.
+# the artifacts changed underneath it.
 #
-# 0.3.0 rather than 0.2.1: a plugin that rejects input its predecessor accepted is
-# a breaking change to anything feeding it, whatever the negotiation says.
-version = "0.3.0"
+# Lockstep rather than "bump it when a plugin changes", because a plugin changes
+# whenever `dpp-plugin-sdk`, `dpp-plugin-traits` or `dpp-rules` does, and none of
+# those is under this directory: over the eleven releases from 0.11.0 to 0.21.0
+# `plugins/` changed in four and that closure in seven.
+version = "0.21.0"
 edition = "2024"
 license = "Apache-2.0"
 

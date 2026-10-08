@@ -59,6 +59,10 @@ const EMBEDDED: &[EmbeddedInstrument] = &[
         json: include_str!("../../instruments/ppwr-2025-40.json"),
     },
     EmbeddedInstrument {
+        id: "crm-act-2024-1252",
+        json: include_str!("../../instruments/crm-act-2024-1252.json"),
+    },
+    EmbeddedInstrument {
         id: "unsold-goods-format-2026-2",
         json: include_str!("../../instruments/unsold-goods-format-2026-2.json"),
     },

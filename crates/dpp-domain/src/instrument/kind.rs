@@ -51,7 +51,9 @@ pub enum InstrumentKind {
     /// An act that imposes product data duties discharged through *another*
     /// system, so it shares or displaces a carrier rather than creating a
     /// passport. Regs (EU) 2023/1670 and 2023/1669 route through EPREL; PPWR
-    /// points at the packaged product's existing passport.
+    /// points at the packaged product's existing passport; the Critical Raw
+    /// Materials Act requires its magnet information to be included in a
+    /// passport another act requires.
     ///
     /// This is the kind the previous model could not express, and where the
     /// `electronics` defect lived: an adjacent act was recorded as though it
