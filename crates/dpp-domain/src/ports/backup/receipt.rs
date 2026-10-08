@@ -19,7 +19,10 @@ pub struct BackupReceipt {
     pub backup_id: String,
     /// The passport ID of the backed-up record.
     pub passport_id: PassportId,
-    /// Cryptographic hash (SHA-256) of the stored payload for integrity verification.
+    /// SHA-256 of the RFC 8785 (JCS) canonical form of the stored passport, as
+    /// lower-case hexadecimal, for integrity verification. The archive port
+    /// defines its hash the same way, so a version held in either carries one
+    /// hash: see [`ArchivedVersionPort`](crate::ports::archive::ArchivedVersionPort).
     pub content_hash: String,
     /// Timestamp when the provider accepted the record.
     pub stored_at: DateTime<Utc>,

@@ -193,3 +193,89 @@ fn an_empty_history_is_unknown() {
     assert_eq!(history.status_at(at(2027, 1, 1)), None);
     assert!(!history.was_granted_at(at(2027, 1, 1)));
 }
+
+/// `looks_qualified` reads a naming convention, so it is held to every service
+/// type the standard lists, not to the six this crate names.
+///
+/// The thirteen of clause 5.5.1.1 are the qualified ones. None of the
+/// non-qualified types of clause 5.5.1.2, or of the nationally defined types of
+/// clause 5.5.1.3, may read as qualified. `TSA/TSS-QC` and `NationalRootCA-QC` are
+/// the near misses: they end in `QC` without the slash, and they are not
+/// qualified service types.
+///
+/// The lists are those of the standard's two current versions, which are the same
+/// in these clauses. A type added later is not tested until it is added here.
+#[test]
+fn the_qualified_naming_convention_holds_for_every_listed_service_type() {
+    const BASE: &str = "http://uri.etsi.org/TrstSvc/Svctype/";
+    const QUALIFIED: &[&str] = &[
+        "CA/QC",
+        "Certstatus/CRL/QC",
+        "Certstatus/OCSP/QC",
+        "EAA/Q",
+        "EDS/Q",
+        "EDS/REM/Q",
+        "ElectronicArchiving/Q",
+        "Ledgers/Q",
+        "PSES/Q",
+        "QESValidation/Q",
+        "RemoteQSealCDManagement/Q",
+        "RemoteQSigCDManagement/Q",
+        "TSA/QTST",
+    ];
+    const NOT_QUALIFIED: &[&str] = &[
+        // Clause 5.5.1.2, the Regulation's non-qualified types.
+        "AdESGeneration",
+        "AdESValidation",
+        "CA/PKC",
+        "CA/PKC/CertsforOtherTypesOfTS",
+        "Certstatus/CRL",
+        "Certstatus/OCSP",
+        "EAA",
+        "EAA/Pub-EAA",
+        "EAAValidation",
+        "EDS",
+        "EDS/REM",
+        "EDSValidation",
+        "ElectronicArchiving",
+        "Ledgers",
+        "PKCPreservation",
+        "PKCValidation",
+        "PKCValidation/CertsforOtherTypesOfTS",
+        "PSES",
+        "RemoteSealCDManagement",
+        "RemoteSigCDManagement",
+        "TSA",
+        "TSA/TSS-AdESQCandQES",
+        "TSA/TSS-QC",
+        "TSTValidation",
+        // Clause 5.5.1.3, the nationally defined types.
+        "ACA",
+        "Archiv",
+        "Archiv/nothavingPKIid",
+        "IdV",
+        "IdV/nothavingPKIid",
+        "KEscrow",
+        "KEscrow/nothavingPKIid",
+        "NationalRootCA-QC",
+        "PPwd",
+        "PPwd/nothavingPKIid",
+        "RA",
+        "RA/nothavingPKIid",
+        "SignaturePolicyAuthority",
+        "TLIssuer",
+        "unspecified",
+    ];
+
+    for suffix in QUALIFIED {
+        let service = TrustServiceType::new(format!("{BASE}{suffix}"));
+        assert!(service.looks_qualified(), "{suffix} is a qualified type");
+    }
+    for suffix in NOT_QUALIFIED {
+        let service = TrustServiceType::new(format!("{BASE}{suffix}"));
+        assert!(
+            !service.looks_qualified(),
+            "{suffix} is not a qualified type"
+        );
+    }
+}

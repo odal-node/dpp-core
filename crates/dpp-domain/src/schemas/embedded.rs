@@ -156,6 +156,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         version: "1.3.0",
         json: include_str!("../../schemas/textile/v1.3.0.json"),
     },
+    EmbeddedSchema {
+        product_group: "textile",
+        version: "1.4.0",
+        json: include_str!("../../schemas/textile/v1.4.0.json"),
+    },
     // No v1.0.0. It predated Impl. Reg. (EU) 2026/2 and nothing can carry a
     // document forward from it: a financial year is not derivable from a
     // quarter, a CN code is not derivable from the word "apparel", a six-way
