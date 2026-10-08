@@ -311,7 +311,7 @@ Product group-specific compliance logic runs as sandboxed Wasm modules
 
 The `check` recipe in `justfile` is the local gate, and its dependency list is
 the list of what it runs — formatting, lints and tests for the workspace and
-for the sector plugins, doc-tests, the doc build, the lockfile check and
+for the product group plugins, doc-tests, the doc build, the lockfile check and
 `cargo audit`. It is not restated step by step here, because the four-step copy
 this section used to carry had fallen behind it. GitHub Actions
 (`.github/workflows/`) covers the same ground in separate jobs and adds what
