@@ -45,6 +45,11 @@ all crates together. The rationale:
 3. Once individual crates stabilise at different rates (post-1.0), lockstep
    may be relaxed. That decision will be recorded in this document and the changelog.
 
+The Wasm product group plugins are outside the workspace and inside the lockstep:
+`plugins/Cargo.toml` carries the same version, and a test fails when it does not.
+See [`RELEASE.md`](RELEASE.md#product-group-plugins) for why and for the step this
+adds to a version bump.
+
 ## Breaking Change Detection
 
 CI runs [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks)

@@ -53,7 +53,7 @@ dpp-core/
     dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
     dpp-vocab ........... External vocabulary authorities, one file per authority, with what we verified
     dpp-tests ........... Cross-crate integration tests and the structural tripwires
-  plugins/ .............. 10 Wasm product group plugins (wasm32-wasip1, excluded from workspace)
+  plugins/ .............. 11 Wasm product group plugins (wasm32-wasip1, excluded from workspace)
 ```
 
 ---
@@ -169,9 +169,9 @@ The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtim
 
 ### Wasm Product group Plugins
 
-Compliance logic ships as sandboxed Wasm modules (`wasm32-wasip1`). Ten product group
+Compliance logic ships as sandboxed Wasm modules (`wasm32-wasip1`). Eleven product group
 plugins live under `plugins/` — battery (the reference implementation), textile,
-electronics, steel, aluminium, construction, detergent, furniture, toy, and tyre.
+electronics, steel, aluminium, construction, detergent, furniture, mattress, toy, and tyre.
 Highlights:
 
 | Plugin | Product groups | Key Rule |

@@ -43,11 +43,14 @@ use std::path::{Path, PathBuf};
 /// reason. Asserted as an exact set so a thirteenth group cannot appear
 /// unplugged without someone deciding that it should.
 ///
+/// `mattress` was on this list with the reason "no plugin yet", and that was a
+/// gap, not a decision: it was split out of furniture and the plugin was simply
+/// not written. It has one now. A group can leave this list; it should not sit
+/// on it unexplained.
+///
 /// - `unsold-goods` is a disclosure over a reporting period rather than a
 ///   product, and has no compliance determination to make.
-/// - `mattress` has no plugin yet. Recorded rather than fixed here: writing one
-///   is not this test's business, but its absence should be a decision.
-const GROUPS_WITHOUT_A_PLUGIN: &[&str] = &["mattress", "unsold-goods"];
+const GROUPS_WITHOUT_A_PLUGIN: &[&str] = &["unsold-goods"];
 
 fn workspace_root() -> PathBuf {
     // CARGO_MANIFEST_DIR is crates/dpp-tests.
@@ -205,8 +208,8 @@ fn every_plugin_declares_the_schema_versions_its_group_ships() {
     // These crates were once `plugins/sector-*`, and the rename silently
     // emptied a glob that had no such guard.
     assert_eq!(
-        checked, 10,
-        "expected 10 product-group plugins, read {checked} — if one was added \
+        checked, 11,
+        "expected 11 product-group plugins, read {checked} — if one was added \
          or removed, update this count deliberately"
     );
 }

@@ -170,7 +170,7 @@
       "items": {
         "$ref": "#/definitions/criticalRawMaterial"
       },
-      "description": "Critical raw materials present in the battery. Public: Annex XIII point 1(b) lists \"critical raw materials present in the battery\" alongside chemistry and hazardous substances as part of the publicly accessible material composition, and Annex VI Part A point 10 reaches the same result via point 1(a). The EU CRM Act 2024/1252 defines the canonical list; it does not govern disclosure.",
+      "description": "Critical raw materials present in the battery. Public: Annex XIII point 1(b) lists \"critical raw materials present in the battery\" alongside chemistry and hazardous substances as part of the publicly accessible material composition, and Annex VI Part A point 10 reaches the same result via point 1(a). The EU CRM Act 2024/1252 lists the critical raw materials (Annex II). Its Art. 28 puts permanent-magnet information into the product passport only for a closed list of products that does not include batteries, so this field's disclosure rests on the Batteries Regulation alone.",
       "x-disclosure": "public"
     },
     "cycleLifeTestCRate": {

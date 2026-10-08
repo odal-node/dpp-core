@@ -17,6 +17,9 @@ fn each_variant_round_trips() {
             system: "EPREL".to_owned(),
             basis: "ESPR Art. 9(4)(b)".to_owned(),
         },
+        PassportObligation::IncludedIn {
+            basis: "Regulation (EU) 2024/1252 Art. 28(6)".to_owned(),
+        },
     ];
     for case in cases {
         let json = serde_json::to_string(&case).expect("serialise");
@@ -44,5 +47,24 @@ fn only_required_reports_a_passport_duty() {
             basis: "ESPR Art. 9(4)(b)".to_owned(),
         }
         .is_required()
+    );
+    assert!(
+        !PassportObligation::IncludedIn {
+            basis: "Regulation (EU) 2024/1252 Art. 28(6)".to_owned(),
+        }
+        .is_required(),
+        "content owed to another act's passport is not a passport of this act's own"
+    );
+}
+
+#[test]
+fn content_owed_to_another_passport_is_not_a_dated_duty_of_its_own() {
+    let included = PassportObligation::IncludedIn {
+        basis: "Regulation (EU) 2024/1252 Art. 28(6)".to_owned(),
+    };
+    assert!(included.applies_from().is_none());
+    assert_eq!(
+        serde_json::to_string(&included).unwrap(),
+        r#"{"obligation":"includedIn","basis":"Regulation (EU) 2024/1252 Art. 28(6)"}"#
     );
 }

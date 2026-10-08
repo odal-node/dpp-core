@@ -203,13 +203,18 @@ for every adopted act and for no other, which is a tested invariant. `None` mean
 while `InstrumentStatus::has_citable_text` deliberately stays true for a repealed
 act, since quoting one for history is the case it exists to permit.
 
-**`PassportObligation` is a three-way answer**, not an optional date:
-`Required { from }` · `NotRequired` · `DisplacedBy { system, basis }`. The third
-is ESPR **Art. 9(4)(b)** — an act whose information duty is discharged through
-another system, e.g. EPREL. Without it, an act that creates real, live obligations
-but *no passport* could only be recorded as "no date yet", which reads as "a
-passport is coming". Determinability and passport duty are **independent
-predicates**: ESPR Arts. 24–25 bind today and impose no passport at all.
+**`PassportObligation` is a four-way answer**, not an optional date:
+`Required { from }` · `NotRequired` · `DisplacedBy { system, basis }` ·
+`IncludedIn { basis }`. `DisplacedBy` is ESPR **Art. 9(4)(b)** — an act whose
+information duty is discharged through another system, e.g. EPREL. Without it, an
+act that creates real, live obligations but *no passport* could only be recorded
+as "no date yet", which reads as "a passport is coming". `IncludedIn` is an act
+that creates no passport but whose content another act's passport must carry —
+Regulation (EU) 2024/1252 **Art. 28(6)**, *"shall be included in that product
+passport"*. It is for an operative duty only: a recital saying a passport "should"
+carry something, as Regulation (EU) 2025/40 recital 70 does, stays `NotRequired`.
+Determinability and passport duty are **independent predicates**: ESPR Arts. 24–25
+bind today and impose no passport at all.
 
 **Recorded, not computed.** `applicable_instruments` is written at issuance and is
 immutable in both senses — it is in `PROTECTED_PATCH_FIELDS` and absent from
