@@ -424,6 +424,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the workspace builds the library without. A test checks that no schema has a
   `$ref` that leaves its document.
 
+- **The W3C's DID test suite now runs over the DID documents we produce.**
+  `build_did_document` had been checked only by tests written by the people who
+  wrote it. A new workflow, `did-oracle.yml`, builds five documents with it: a
+  first key, a hygiene rotation, a compromise, both of those in one history, and
+  a host with a port. It then runs the suite's `did-core-properties` and
+  `did-production` suites over them, 185 assertions, all passing. The suite is
+  Node, so it has its own workflow and the workspace build still needs none. It
+  is pinned to a commit of `w3c/did-test-suite`, which publishes no releases, and
+  installed from its own lockfile.
+
+  The same job runs those documents again with two rules broken on purpose, and
+  fails unless the suite goes red. A matcher that had stopped checking anything
+  would otherwise leave the job green.
+
+  The documents are given to the suite as the JSON-LD representation, which is
+  what they are: each carries `@context`. The register's DID row now claims a
+  conforming DID document, with the scope and the rules the suite does not reach.
+  Not claimed: the plain JSON representation, which this library does not
+  produce; DID syntax, resolution and consumption; and the `did:web` method,
+  whose specification is not a W3C standard.
+
 ### Fixed
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
