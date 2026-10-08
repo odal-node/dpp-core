@@ -26,10 +26,31 @@ use super::date::ObligationDate;
 /// with an inferred date, and a passport obligation that does not exist became
 /// assertable. Making that state unrepresentable is the point of this type.
 ///
+/// # A third state, found later: content owed to someone else's passport
+///
+/// Regulation (EU) 2024/1252 Art. 28(6) creates no passport and displaces none,
+/// and it is not "no passport" either: for a product that another act already
+/// requires a passport for, the magnet information Art. 28(4) lists *"shall be
+/// included in that product passport"*. [`NotRequired`](Self::NotRequired) is
+/// literally true of it, and it hides what a reader of the catalog most needs to
+/// know. The Act was first filed as a list of materials for that reason.
+/// [`IncludedIn`](Self::IncludedIn) says it.
+///
+/// It is for an **operative** duty only. Regulation (EU) 2025/40 recital 70 says
+/// a packaged product's passport "should also be used" for packaging
+/// information, and a recital binds nobody, so that act stays `NotRequired`.
+///
+/// ✅ COMPLIANCE-PIN: EU 2024/1252, Art. 28(6) (OJ L, 2024/1252, 3.5.2024, as
+/// corrected by Corrigendum 2024/90330): the sentence quoted above, and the only
+/// place the Regulation mentions a passport. EU 2025/40, recital (70) (OJ L,
+/// 2025/40, 22.1.2025): "that digital product passport should also be used for
+/// providing the relevant information under this Regulation".
+///
 /// Serialised internally tagged on `obligation`:
 /// `{"obligation":"required","from":{"date":"2027-02-18","basis":"sourced"}}`,
 /// `{"obligation":"notRequired"}`,
-/// `{"obligation":"displacedBy","system":"EPREL","basis":"ESPR Art. 9(4)(b)"}`.
+/// `{"obligation":"displacedBy","system":"EPREL","basis":"ESPR Art. 9(4)(b)"}`,
+/// `{"obligation":"includedIn","basis":"Regulation (EU) 2024/1252 Art. 28(6)"}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "obligation", rename_all = "camelCase")]
 #[non_exhaustive]
@@ -42,9 +63,23 @@ pub enum PassportObligation {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         from: Option<ObligationDate>,
     },
-    /// The act imposes obligations but no passport. Not "no passport yet" —
-    /// there is no passport article to wait for.
+    /// The act imposes obligations but no passport, and requires nothing to be
+    /// put into anyone else's. Not "no passport yet" — there is no passport
+    /// article to wait for.
     NotRequired,
+    /// The act creates no passport of its own, but requires information to be
+    /// included in the passport **another Union act** requires for the same
+    /// product. Where no other act requires one, the information is owed some
+    /// other way, which the instrument's notes record.
+    ///
+    /// Not a determination gate and not a passport duty:
+    /// [`is_required`](Self::is_required) is `false`, because no passport arises
+    /// from this act. What it adds is the statement that a passport built under
+    /// another act is incomplete without this act's content.
+    IncludedIn {
+        /// The provision that says so, e.g. `"Regulation (EU) 2024/1252 Art. 28(6)"`.
+        basis: String,
+    },
     /// The act's information duty is discharged through another system instead
     /// of a passport.
     DisplacedBy {

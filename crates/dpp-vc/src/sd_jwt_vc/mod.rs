@@ -5,10 +5,13 @@
 //! credential profile **draft-ietf-oauth-sd-jwt-vc-19** (31 August 2026), read
 //! on 2026-09-16.
 //!
-//! **No conformance is claimed.** The profile is an Internet-Draft — submitted
-//! to the IESG, but not published — and an Internet-Draft is explicitly not
-//! reference material. What can honestly be said is the sentence above: which
-//! documents were read, and when.
+//! **No conformance is claimed for the profile.** It is an Internet-Draft —
+//! submitted to the IESG, but not published — and an Internet-Draft is explicitly
+//! not reference material. What can honestly be said of it is the sentence above:
+//! which document was read, and when. RFC 9901 is a different matter. It is a
+//! published standard, and it is claimed separately, for [`dpp_crypto::sd_jwt`]
+//! only and on the RFC's own examples; nothing in this module is part of that
+//! claim.
 //!
 //! # What this is for
 //!

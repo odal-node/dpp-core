@@ -17,10 +17,13 @@ use serde::{Deserialize, Serialize};
 /// there.
 ///
 /// The remaining eleven belong to other axes entirely: `recognisedatnationallevel`
-/// and `deprecatedatnationallevel` are for nationally-defined services
-/// (clauses 5.5.1.2 and 5.5.1.3), `setbynationallaw` is for national root CAs,
-/// and `accredited` / `undersupervision` / `supervisionceased` and their
-/// relatives are pre-eIDAS survivals from the Directive 1999/93/EC regime.
+/// and `deprecatedatnationallevel` are for the non-qualified service types the
+/// Regulation lists (clause 5.5.1.2) and for nationally defined ones (clause
+/// 5.5.1.3), `setbynationallaw` and `deprecatedbynationallaw` are for national
+/// root CAs, and `accredited` / `undersupervision` / `supervisionceased` and their
+/// relatives are pre-eIDAS survivals from the Directive 1999/93/EC regime, which
+/// Annex J migrated to `granted` or `withdrawn` when the Regulation began to
+/// apply.
 ///
 /// Folding those into the same enum as `granted` invites the reading that
 /// `undersupervision` is a lesser kind of qualified, or that

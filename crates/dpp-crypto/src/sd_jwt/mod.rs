@@ -36,12 +36,24 @@
 //!   the presenter holds a key the credential names. That needs holders to have
 //!   keys. The parser tolerates a trailing KB-JWT segment so that a presentation
 //!   carrying one is not misread as malformed, and otherwise ignores it.
-//! - **It does not implement array-element disclosures** (clause 4.2.2's `...`
-//!   form) or decoy digests (clause 4.2.5). Both are optional. Array elements
-//!   are not how any disclosure class here is expressed — a class attaches to a
-//!   named field, and the whole array travels with it — and decoys buy
-//!   concealment of *how many* claims were withheld, which the digest count
-//!   already reveals only in aggregate.
+//! - **It does not issue decoy digests** (clause 4.2.5). They are optional, and
+//!   they buy concealment of *how many* claims or elements were withheld, which
+//!   the digest count already reveals only in aggregate. Reading them works: a
+//!   digest with no Disclosure is ignored, which is all a decoy is.
+//!
+//! # Array elements
+//!
+//! Clause 4.2.2 lets an issuer hide one element of an array and leave the rest.
+//! The element's Disclosure is the two-element `[salt, value]`, and the array
+//! carries `{"...": "<digest>"}` where the element was (clause 4.2.4.2).
+//! [`Disclosure::element`] and [`conceal_elements`] make them. A verifier replaces
+//! each placeholder it holds a Disclosure for with the value, **removes every
+//! placeholder it does not**, and opens what it revealed for placeholders and
+//! `_sd` arrays of its own (clause 7.1 step 3).
+//!
+//! Position is the one thing that is not hidden: the placeholders keep the order
+//! of the array, because the order is the data. That is why [`conceal_elements`]
+//! does not sort the way [`conceal`] does.
 //!
 //! # Two requirements that are easy to miss and are tested
 //!
@@ -49,6 +61,12 @@
 //!   MUST hide the original order of the claims in the array."* Pushing digests
 //!   in the order the fields were walked leaks the source structure, and a naive
 //!   implementation does exactly that. [`conceal`] sorts.
+//! - **A placeholder with no Disclosure is gone, not passed through.** Left in the
+//!   array it would reach the caller as an object where a string was expected,
+//!   which is a wrong answer and not a withheld one. Clause 7.1 step 3.d removes it.
+//! - **A Disclosure of the wrong kind is an error.** A two-element Disclosure
+//!   matched by an `_sd` digest, or a three-element one matched by a placeholder,
+//!   is a token the issuer did not make (steps 3.c.ii.1 and 3.c.iii.1).
 //! - **An unmatched disclosure is an error, not an omission.** Clause 7.1
 //!   requires every disclosure to be used; one whose digest is absent from the
 //!   token means the credential and the disclosures disagree, and the safe
@@ -68,12 +86,20 @@ pub mod error;
 mod builder;
 
 #[cfg(test)]
+mod array_tests;
+#[cfg(test)]
+mod rfc9901_array_tests;
+#[cfg(test)]
+mod rfc9901_example_tests;
+#[cfg(test)]
+mod rfc9901_examples;
+#[cfg(test)]
 mod rfc9901_vector_tests;
 #[cfg(test)]
 mod salt_tests;
 #[cfg(test)]
 mod tests;
 
-pub use builder::{SdJwt, build_payload, conceal};
+pub use builder::{SdJwt, build_payload, conceal, conceal_elements};
 pub use disclosure::{Disclosure, SD_HASH_ALG, digest_of};
 pub use error::{DisclosureError, SdJwtError};

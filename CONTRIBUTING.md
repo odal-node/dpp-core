@@ -76,10 +76,10 @@ dpp-core/
     dpp-vocab/            # External vocabulary authorities, one file per authority
     dpp-tests/            # Cross-crate integration tests and structural tripwires (publish = false)
   benches/                 # Criterion benchmarks (workspace member)
-  plugins/                 # 10 product group Wasm plugins (excluded from workspace)
+  plugins/                 # 11 product group Wasm plugins (excluded from workspace)
     product-group-battery/  product-group-textile/  product-group-steel/  product-group-electronics/
     product-group-aluminium/  product-group-construction/  product-group-detergent/
-    product-group-furniture/  product-group-toy/  product-group-tyre/
+    product-group-furniture/  product-group-mattress/  product-group-toy/  product-group-tyre/
   docs/                    # Architecture and design documentation
 ```
 
@@ -123,6 +123,14 @@ with `rt` and `macros` appears in `dpp-crypto`, `dpp-domain`, `dpp-vc` and
 `dpp-tests` so that `#[tokio::test]` can drive the async port traits. A test
 runtime is never compiled into the published library and never reaches anyone
 who vendors it. Nothing else on that list is permitted in either table.
+
+The product group plugins are held to the same list, and more strictly: a plugin
+is deterministic and free of I/O by contract, and is loaded into a host as Wasm,
+so none of those crates may appear anywhere in `plugins/Cargo.lock`, directly or
+transitively. Not even `tokio` as a test runtime.
+
+`crates/dpp-tests/tests/crate_graph.rs` checks the graph above and these rules
+against the manifests.
 
 ---
 

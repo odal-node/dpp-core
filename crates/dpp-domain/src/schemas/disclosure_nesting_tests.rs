@@ -157,15 +157,21 @@ const KNOWN_FAULTS: &[(&str, &str, &str, &str)] = &[
         "electronics",
         "1.4.0",
         "criticalRawMaterials[].name",
-        "which critical raw materials a product contains is a disclosure question \
-         under Regulation (EU) 2024/1252, read in #314; relabel it once that \
-         reading is done",
+        "the array is restricted and these members are public. Regulation (EU) \
+         2024/1252 does not decide it: its Art. 28 and 29 reach permanent \
+         magnets in a closed list of products, where an electric motor is one \
+         rated at 0,12 kW or more (Art. 2(47)), and a smartphone or tablet is \
+         neither on the list nor such a motor. The tier is this schema's own \
+         to set. Relabelling needs a new \
+         electronics schema version, and the members come from a definition \
+         shared with battery, where they are public (the shared-definition \
+         floor above)",
     ),
     (
         "electronics",
         "1.4.0",
         "criticalRawMaterials[].countryOfOrigin",
-        "as above: Regulation (EU) 2024/1252, read in #314",
+        "as above",
     ),
 ];
 

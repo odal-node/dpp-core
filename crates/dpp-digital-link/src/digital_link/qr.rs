@@ -4,8 +4,8 @@ use dpp_domain::{Passport, ProductGroupData, ProductIdentifier};
 
 use super::codec::percent_encode;
 use super::error::DigitalLinkError;
-use super::link::check_value;
 use super::syntax_dictionary::ai_spec;
+use super::value::check_value;
 
 /// Build the GS1 Digital Link a passport's data carrier encodes, at the level
 /// the passport describes:

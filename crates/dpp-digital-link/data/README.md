@@ -37,6 +37,8 @@ that pin specific AI shapes exist to make that visible.
 
 Content validation. The dictionary names a *linter* per component (`csum`,
 `gcppos1`, …); the reference implementations of those routines live in GS1's
-Syntax Tests, which are **not** vendored here. This crate applies the check
-digit it already implements and the lengths from this file — it does not claim
-to run GS1's full deep validation.
+Syntax Tests, which are **not** vendored here. This crate applies the lengths
+and character sets from this file and five linters it names (`csum`,
+`csumalpha`, `zero`, `gcppos1` and `gcppos2`, the last two only as far as the
+four leading digits of a GS1 Company Prefix) — it does not claim to run GS1's
+full deep validation.

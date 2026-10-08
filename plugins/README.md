@@ -82,4 +82,4 @@ Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is U
 
 ## SDK status
 
-All ten plugins run on the SDK: each depends on `dpp-plugin-sdk`, implements `DppProductGroupPlugin`, and calls `export_plugin!` once — `product-group-battery`, `textile`, `steel`, `electronics`, `construction`, `tyre`, `toy`, `aluminium`, `furniture`, and `detergent`. None hand-roll the legacy 3-symbol ABI. `product-group-battery` is the reference implementation.
+All eleven plugins run on the SDK: each depends on `dpp-plugin-sdk`, implements `DppProductGroupPlugin`, and calls `export_plugin!` once — `product-group-battery`, `textile`, `steel`, `electronics`, `construction`, `tyre`, `toy`, `aluminium`, `furniture`, `mattress`, and `detergent`. None hand-roll the legacy 3-symbol ABI. `product-group-battery` is the reference implementation.

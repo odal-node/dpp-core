@@ -46,7 +46,7 @@
 use std::collections::BTreeSet;
 
 use super::citation::{act_refs, cites_article_or_annex};
-use super::prose_act_reference_tests::{CITED_NOT_MODELLED, CitationBasis};
+use super::prose_act_reference_tests::{CITED_NOT_MODELLED, CitationBasis, CitedNotModelled};
 use crate::instrument::InstrumentCatalog;
 use crate::schemas::VersionedSchemaRegistry;
 
@@ -159,6 +159,21 @@ fn every_act_cited_in_prose_is_known() {
     );
 }
 
+/// The `Sourced` entries whose reason names no article or annex.
+///
+/// Its own function so the rule can be run against entries made for the purpose
+/// ([`the_anchor_rule_binds_sourced_entries_and_leaves_assumed_ones_alone`]):
+/// once every real entry has been read, nothing in the inventory is `Assumed`,
+/// and a rule that no live entry can trigger is a rule nobody notices break.
+fn unanchored_sourced(entries: &[CitedNotModelled]) -> Vec<&'static str> {
+    entries
+        .iter()
+        .filter(|e| e.basis == CitationBasis::Sourced)
+        .filter(|e| !cites_article_or_annex(e.reason))
+        .map(|e| e.celex)
+        .collect()
+}
+
 /// **Rule B2 — a `Sourced` reason names the article or annex it was read from.**
 ///
 /// Rule B checks that a cited act is one this crate knows. This checks the thing
@@ -177,12 +192,7 @@ fn every_act_cited_in_prose_is_known() {
 /// citation from it would only encourage inventing one.
 #[test]
 fn a_sourced_reason_cites_an_article_or_annex() {
-    let unanchored: Vec<&str> = CITED_NOT_MODELLED
-        .iter()
-        .filter(|e| e.basis == CitationBasis::Sourced)
-        .filter(|e| !cites_article_or_annex(e.reason))
-        .map(|e| e.celex)
-        .collect();
+    let unanchored = unanchored_sourced(CITED_NOT_MODELLED);
 
     assert!(
         unanchored.is_empty(),
@@ -191,6 +201,37 @@ fn a_sourced_reason_cites_an_article_or_annex() {
          — either add the anchor or mark them Assumed: {unanchored:?}",
         unanchored.len()
     );
+}
+
+/// Rule B2 flags a `Sourced` reason with no anchor, passes one with an anchor,
+/// and does not constrain an `Assumed` reason at all — the three behaviours its
+/// doc comment promises, none of which the real inventory can show once every
+/// entry has been read.
+#[test]
+fn the_anchor_rule_binds_sourced_entries_and_leaves_assumed_ones_alone() {
+    let entry = |celex, reason, basis| CitedNotModelled {
+        celex,
+        reason,
+        basis,
+    };
+    let entries = [
+        entry(
+            "32000L0001",
+            "Recalled, never read.",
+            CitationBasis::Assumed,
+        ),
+        entry(
+            "32000L0002",
+            "Read, and says where: Art. 4.",
+            CitationBasis::Sourced,
+        ),
+        entry(
+            "32000L0003",
+            "Read, and says nothing of where.",
+            CitationBasis::Sourced,
+        ),
+    ];
+    assert_eq!(unanchored_sourced(&entries), ["32000L0003"]);
 }
 
 /// **Rule C — schema prose does not state a passport applicability date.**

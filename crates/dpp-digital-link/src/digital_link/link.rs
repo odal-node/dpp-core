@@ -4,10 +4,13 @@ use std::borrow::Cow;
 
 use dpp_domain::{CarrierQualifier, Gtin};
 
-use super::codec::{normalize_gtin_to_14, percent_decode, percent_encode};
+use super::codec::{
+    is_segment, is_valid_authority, normalize_gtin_to_14, percent_decode, percent_encode,
+};
 use super::error::DigitalLinkError;
 use super::primary_key::PrimaryKey;
-use super::syntax_dictionary::{AiSpec, ai_spec, qualifier_position};
+use super::syntax_dictionary::{ai_spec, qualifier_position, required_qualifier};
+use super::value::check_value;
 
 /// A parsed GS1 Digital Link URI.
 ///
@@ -53,17 +56,29 @@ impl DigitalLink {
         let path_end = uri.find('?').unwrap_or(uri.len());
         let uri_no_query = &uri[..path_end];
 
-        if !uri_no_query.starts_with("https://") {
-            let scheme = uri_no_query.split("://").next().unwrap_or("").to_owned();
-            return Err(DigitalLinkError::InvalidScheme(scheme));
-        }
-
-        let without_scheme = &uri_no_query["https://".len()..];
+        // The grammar's `scheme` is one of four spellings: `http` and `https`, and
+        // the same two in capitals. It is kept as written, so a link read from a
+        // label builds back to the same base.
+        let (scheme, without_scheme) = uri_no_query
+            .split_once("://")
+            .filter(|(scheme, _)| matches!(*scheme, "http" | "https" | "HTTP" | "HTTPS"))
+            .ok_or_else(|| {
+                DigitalLinkError::InvalidScheme(
+                    uri_no_query.split("://").next().unwrap_or("").to_owned(),
+                )
+            })?;
         let slash_pos = without_scheme.find('/').unwrap_or(without_scheme.len());
         let host = &without_scheme[..slash_pos];
         let path = &without_scheme[slash_pos..];
+        if !is_valid_authority(host) {
+            return Err(DigitalLinkError::InvalidHost(host.to_owned()));
+        }
 
-        let all_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        // `path` is empty or starts with `/`. One trailing slash is tolerated, as
+        // resolvers are asked to; every other empty segment is kept, so the
+        // checks below see it.
+        let body = path.strip_suffix('/').unwrap_or(path);
+        let all_segments: Vec<&str> = body.split('/').skip(1).collect();
 
         // Locate the primary key — everything before it is the resolver path
         // prefix. Read from the dictionary's `dlpkey` flag, so the set tracks
@@ -73,13 +88,27 @@ impl DigitalLink {
             .position(|s| ai_spec(s).is_some_and(|spec| spec.dl_primary_key))
             .ok_or(DigitalLinkError::MissingGtin)?;
 
-        let path_prefix = if key_pos > 0 {
-            format!("/{}", all_segments[..key_pos].join("/"))
-        } else {
+        // The stem's segments are the grammar's `segment`, which may be empty.
+        // From the primary key on, each segment is an AI or a value: never empty,
+        // and in a value the double quote, which `XSYMBOL` names as itself, is the
+        // one character beyond `pchar` the grammar writes raw. A `%` is let through
+        // here so that `percent_decode` names a malformed escape as one.
+        let (stem, ai_segments) = all_segments.split_at(key_pos);
+        let bad_stem = stem.iter().find(|s| !is_segment(s, b""));
+        let bad_ai = ai_segments
+            .iter()
+            .find(|s| s.is_empty() || !is_segment(s, b"\"%"));
+        if let Some(bad) = bad_stem.or(bad_ai) {
+            return Err(DigitalLinkError::InvalidPathSegment((*bad).to_owned()));
+        }
+
+        let stem: Vec<&str> = stem.iter().copied().filter(|s| !s.is_empty()).collect();
+        let path_prefix = if stem.is_empty() {
             String::new()
+        } else {
+            format!("/{}", stem.join("/"))
         };
 
-        let ai_segments = &all_segments[key_pos..];
         let mut i = 0;
         let mut primary_key: Option<PrimaryKey> = None;
         let mut primary_ai = "";
@@ -93,8 +122,17 @@ impl DigitalLink {
                 .ok_or_else(|| DigitalLinkError::UnknownApplicationIdentifier(code.to_owned()))?;
 
             let raw_value = ai_segments[i + 1];
-            let value = percent_decode(raw_value);
-            check_value(code, spec, &value)?;
+            let value = percent_decode(raw_value)?;
+            // A GTIN of fewer than 14 digits is the legacy form, which the
+            // grammar no longer has and which this reader still pads. It is
+            // checked by `Gtin::parse` below, in its own words, rather than
+            // here; every other AI is held to its dictionary entry.
+            let value = if code == "01" {
+                normalize_gtin_to_14(&value)?
+            } else {
+                check_value(code, spec, &value)?;
+                value
+            };
 
             if spec.dl_primary_key {
                 // A second primary key must not silently overwrite the first —
@@ -105,7 +143,7 @@ impl DigitalLink {
                 primary_ai = code;
                 primary_key = Some(if code == "01" {
                     // The one key this workspace models as a validated type.
-                    PrimaryKey::Gtin(Gtin::parse(&normalize_gtin_to_14(&value)?)?)
+                    PrimaryKey::Gtin(Gtin::parse(&value)?)
                 } else {
                     PrimaryKey::Other {
                         ai: code.to_owned(),
@@ -160,22 +198,37 @@ impl DigitalLink {
 
         let primary_key = primary_key.ok_or(DigitalLinkError::MissingGtin)?;
 
+        // A key that GS1's dictionary makes dependent on one of its qualifiers
+        // is not a link without it: AI 415 is a payer, and is named only
+        // together with the payment reference it was invoiced under.
+        if let Some(required) = required_qualifier(primary_ai)
+            && !qualifiers.iter().any(|(ai, _)| ai == required)
+        {
+            return Err(DigitalLinkError::MissingQualifier {
+                primary_key: primary_ai.to_owned(),
+                qualifier: required.to_owned(),
+            });
+        }
+
         Ok(Self {
-            resolver_base: format!("https://{host}{path_prefix}"),
+            resolver_base: format!("{scheme}://{host}{path_prefix}"),
             primary_key,
             qualifiers,
         })
     }
 
-    /// Build a canonical GS1 Digital Link URI with qualifiers in path order.
+    /// Build a GS1 Digital Link URI with qualifiers in path order.
     ///
-    /// AI values containing reserved characters are percent-encoded.
+    /// Every AI value, the primary key's included, is written with each
+    /// character outside the unreserved set percent-encoded, which is how the
+    /// grammar spells them. A CPID such as `AB-C#/` therefore leaves as
+    /// `AB-C%23%2F` rather than as a fragment and a new path segment.
     pub fn build(&self) -> String {
         let mut uri = format!(
             "{}/{}/{}",
             self.resolver_base.trim_end_matches('/'),
             self.primary_key.ai(),
-            self.primary_key.wire_value()
+            percent_encode(self.primary_key.wire_value())
         );
         for (ai, value) in &self.qualifiers {
             uri.push_str(&format!("/{ai}/{}", percent_encode(value)));
@@ -254,36 +307,4 @@ impl DigitalLink {
             (None, None) => CarrierQualifier::Model,
         })
     }
-}
-
-/// Hold one decoded AI value to what the dictionary says about that AI.
-///
-/// The length first: GS1 mandates a maximum per AI, and enforcing it keeps an
-/// untrusted URI from smuggling an unbounded value downstream. Then, for an AI
-/// that is `X` throughout, the character set — a value GS1 would refuse is one
-/// no conformant reader can take from us, and one we should not take from
-/// anyone else either.
-///
-/// One function for reading and for building, so the carrier this crate prints
-/// is held to exactly the rule its own parser applies.
-pub(super) fn check_value(code: &str, spec: &AiSpec, value: &str) -> Result<(), DigitalLinkError> {
-    let value_len = value.chars().count();
-    if value_len > spec.max_len {
-        return Err(DigitalLinkError::ValueTooLong {
-            code: code.to_owned(),
-            max_len: spec.max_len,
-            actual: value_len,
-        });
-    }
-    if spec.cset_82
-        && let Some(character) = value
-            .chars()
-            .find(|c| !dpp_rules::common::identifier::is_cset_82(*c))
-    {
-        return Err(DigitalLinkError::OutsideCset82 {
-            code: code.to_owned(),
-            character,
-        });
-    }
-    Ok(())
 }

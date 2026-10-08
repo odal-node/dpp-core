@@ -5,6 +5,18 @@
 //! encoded string, or the wrong base64 alphabet — would pass all of them and
 //! produce credentials no other implementation accepts. These compare against
 //! values the RFC publishes, which this code did not produce.
+//!
+//! The RFC's data in this file is reused as Code Components under the IETF
+//! Trust's Legal Provisions Relating to IETF Documents:
+//!
+//! > Copyright (c) 2025 IETF Trust and the persons identified as authors of the
+//! > code. All rights reserved.
+//! >
+//! > Redistribution and use in source and binary forms, with or without
+//! > modification, is permitted pursuant to, and subject to the license terms
+//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
+//! > Trust's Legal Provisions Relating to IETF Documents
+//! > (<https://trustee.ietf.org/license-info>).
 
 use serde_json::json;
 
@@ -30,7 +42,7 @@ const RFC_VARIANTS: [&str; 3] = [
 fn the_rfc_example_disclosure_hashes_to_its_published_digest() {
     let d = Disclosure::parse(RFC_DISCLOSURE).expect("the RFC's disclosure parses");
     assert_eq!(d.salt(), "_26bc4LT-ac6q2KI6cBW5es");
-    assert_eq!(d.claim_name(), "family_name");
+    assert_eq!(d.claim_name(), Some("family_name"));
     assert_eq!(d.claim_value(), &json!("Möbius"));
     assert_eq!(d.digest(), RFC_DIGEST);
     assert_eq!(digest_of(RFC_DISCLOSURE), RFC_DIGEST);
@@ -45,7 +57,7 @@ fn every_rfc_encoding_of_one_claim_reads_the_same_and_hashes_apart() {
     let mut digests = vec![digest_of(RFC_DISCLOSURE)];
     for variant in RFC_VARIANTS {
         let d = Disclosure::parse(variant).expect("each RFC variant parses");
-        assert_eq!(d.claim_name(), "family_name", "{variant}");
+        assert_eq!(d.claim_name(), Some("family_name"), "{variant}");
         assert_eq!(d.claim_value(), &json!("Möbius"), "{variant}");
         assert_eq!(d.digest(), digest_of(variant), "{variant}");
         digests.push(d.digest());

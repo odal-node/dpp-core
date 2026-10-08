@@ -140,6 +140,41 @@ fn a_displaced_passport_is_never_reported_as_required() {
     );
 }
 
+/// The Critical Raw Materials Act was filed, until it was read, as an act that
+/// "does not govern disclosure". It owes magnet information to the passport
+/// another act requires (Art. 28(6)), creates none of its own, and reaches no
+/// product group this catalog models — so it must say the first, deny the second
+/// and stay out of every group's passport fold.
+#[test]
+fn the_crm_act_owes_content_to_other_passports_and_creates_none() {
+    let catalog = InstrumentCatalog::new();
+    let act = catalog.get("crm-act-2024-1252").expect("embedded");
+
+    let PassportObligation::IncludedIn { basis } = &act.passport else {
+        panic!("recorded as {:?}, which hides Art. 28(6)", act.passport);
+    };
+    assert!(
+        basis.contains("Art. 28(6)"),
+        "the basis names the provision: {basis}"
+    );
+    assert!(!act.passport.is_required());
+    assert!(act.passport.applies_from().is_none());
+    assert!(
+        act.product_groups.is_empty(),
+        "no modelled product group is on the Art. 28(1) list; binding one needs a reading of Art. 28(8) first"
+    );
+
+    for key in ["battery", "electronics", "textile", "toy"] {
+        assert!(
+            catalog
+                .bindings_for(key)
+                .iter()
+                .all(|(instrument, _)| instrument.id != "crm-act-2024-1252"),
+            "{key} is not on the Art. 28(1) list"
+        );
+    }
+}
+
 /// An unsourced figure anywhere makes the compound figure unsourced, whichever
 /// act supplied the maximum — the safe direction for a claim about someone
 /// else's legal obligation.

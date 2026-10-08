@@ -57,6 +57,7 @@ const PLUGIN_GROUPS: &[(&str, &[&str])] = &[
     ("product-group-detergent", &["detergent"]),
     ("product-group-electronics", &["electronics"]),
     ("product-group-furniture", &["furniture"]),
+    ("product-group-mattress", &["mattress"]),
     ("product-group-steel", &["steel"]),
     ("product-group-textile", &["textile", "unsold-goods"]),
     ("product-group-toy", &["toy"]),
@@ -174,11 +175,11 @@ fn every_plugin_checks_every_field_its_schema_requires() {
         problems.join("\n  ")
     );
 
-    // 🚨 A count, because a loop over an empty list passes. Ten crates, eleven
+    // 🚨 A count, because a loop over an empty list passes. Eleven crates, twelve
     // product groups: the textile crate answers for two.
     assert_eq!(
-        checked, 11,
-        "expected 11 (crate, product group) pairs, checked {checked}"
+        checked, 12,
+        "expected 12 (crate, product group) pairs, checked {checked}"
     );
 }
 

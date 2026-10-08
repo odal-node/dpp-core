@@ -201,18 +201,45 @@ pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
     },
     CitedNotModelled {
         celex: "32006R1907",
-        reason: "REACH. Cited for Art. 33 (SVHC communication duty above 0,1 % \
-                 w/w) and Annex XVII entry 72 (restricted substances in \
-                 textiles). A horizontal chemicals regime rather than a passport \
-                 instrument, so it binds no product group in the catalog sense.",
-        basis: CitationBasis::Assumed,
+        reason: "REACH. Cited for two provisions. Art. 33(1) makes the supplier of \
+                 an article containing a substance meeting the Art. 57 criteria \
+                 and identified under Art. 59(1) in a concentration above 0,1 % \
+                 weight by weight give the recipient 'sufficient information, \
+                 available to the supplier, to allow safe use of the article \
+                 including, as a minimum, the name of that substance'; Art. 33(2) \
+                 gives a consumer the same on request, within 45 days. Annex XVII \
+                 entry 72 bars clothing, related accessories, skin-contact \
+                 textiles and footwear for consumers from the market when a \
+                 substance listed in Appendix 12 is present at or above its \
+                 limit, measured in homogeneous material. Appendix 12 is a long \
+                 list with a limit per substance: cadmium, chromium VI, arsenic \
+                 and lead compounds, benzene, polycyclic aromatic hydrocarbons, \
+                 formaldehyde, several phthalates, N-methyl-2-pyrrolidone, \
+                 N,N-dimethylacetamide, N,N-dimethylformamide and a run of dyes \
+                 and amines, in the consolidation of 22 June 2026. A horizontal \
+                 chemicals regime rather than a passport instrument: the word \
+                 'passport' does not occur in that text, so it binds no product \
+                 group in the catalog sense.",
+        basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
         celex: "32009L0048",
-        reason: "Toy Safety Directive. Cited for CE marking. Superseded for \
-                 passport purposes by Regulation (EU) 2025/2509, which is \
-                 modelled.",
-        basis: CitationBasis::Assumed,
+        reason: "Toy Safety Directive. Cited by the toy schema as the regime under \
+                 which a toy bears CE marking: Art. 16(1) says toys made \
+                 available on the market shall bear it, and Art. 17 sets how and \
+                 where it is affixed. Art. 15 is the EC declaration of \
+                 conformity. It is not repealed yet: Regulation (EU) 2025/2509 \
+                 Art. 56 reads 'Directive 2009/48/EC is repealed with effect \
+                 from 1 August 2030'. Art. 57(1) lets toys placed on the market \
+                 in conformity with the Directive before that date stay on it, \
+                 and Art. 57(3) keeps EC type-examination certificates valid \
+                 until 1 February 2031 unless they expire sooner. The passport \
+                 comes from the Regulation, which is modelled, and its recital \
+                 54 says the passport 'should replace the EU declaration of \
+                 conformity pursuant to Directive 2009/48/EC'. The Directive is \
+                 not a passport instrument: the word 'passport' does not occur \
+                 in it as consolidated on 29 August 2026.",
+        basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
         celex: "32009R0661",
@@ -237,65 +264,69 @@ pub(super) const CITED_NOT_MODELLED: &[CitedNotModelled] = &[
     CitedNotModelled {
         celex: "32011L0065",
         reason: "RoHS. Cited for the substance restrictions an electronics \
-                 declaration references. Not a passport instrument.",
-        basis: CitationBasis::Assumed,
+                 declaration references. Art. 4(1) requires Member States to \
+                 ensure that electrical and electronic equipment placed on the \
+                 market 'does not contain the substances listed in Annex II', \
+                 and Annex II lists ten, each with a maximum concentration by \
+                 weight in homogeneous materials: lead, mercury, cadmium, \
+                 hexavalent chromium, PBB, PBDE and four phthalates (DEHP, BBP, \
+                 DBP, DIBP). 🚨 The 2011 text lists six; the phthalates came in \
+                 with Delegated Directive (EU) 2015/863, so a check built from \
+                 the original is four substances short. Not a passport \
+                 instrument: the word 'passport' does not occur in the \
+                 consolidated text.",
+        basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
         celex: "32017L1132",
-        reason: "Company law directive. Cited for Art. 16, which establishes the \
-                 unique company identifier the unsold-goods schema uses for the \
-                 EUID.",
-        basis: CitationBasis::Assumed,
+        reason: "Company law directive. Cited because Implementing Regulation (EU) \
+                 2026/2, Annex I note (b), names the European unique identifier \
+                 (EUID) 'established by' it, and the unsold-goods schema follows \
+                 that wording. What the Directive does, in Art. 16(1), is require \
+                 Member States to 'ensure that companies have a European unique \
+                 identifier', refer to it by point (8) of the Annex to \
+                 Implementing Regulation (EU) 2015/884, and set its minimum \
+                 content: elements identifying the Member State of the register, \
+                 the domestic register of origin and the company number in it, \
+                 and where appropriate features to avoid identification errors. \
+                 So the identifier's exact form is not in this Directive.",
+        basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
         celex: "32020R0740",
-        reason: "Tyre labelling. Cited for the Annex I grading scales. A \
-                 labelling regime, not a passport obligation — the tyre passport \
-                 duty, when one exists, will come from an ESPR delegated act.",
-        basis: CitationBasis::Assumed,
+        reason: "Tyre labelling. Cited for Annex I, 'Testing, grading and \
+                 measurement of tyre parameters': Parts A and B grade fuel \
+                 efficiency (from the rolling resistance coefficient) and wet \
+                 grip (from the wet grip index) on A to E scales, Part C sets \
+                 the external rolling noise class and measured value, and Parts \
+                 D and E add the snow and ice grip pictograms. A labelling \
+                 regime, not a passport: the word 'passport' does not occur in \
+                 it. It does carry a data duty, discharged through the product \
+                 database established under Art. 12 of Regulation (EU) 2017/1369 \
+                 rather than through a passport: Art. 5(1) and Annex VII have the \
+                 supplier enter the label, its class parameters and the product \
+                 information sheet before placing a tyre produced after 1 May \
+                 2021 on the market, and \
+                 Art. 5(7) keeps a tyre type's data in the compliance part for \
+                 five years after its last unit is placed.",
+        basis: CitationBasis::Sourced,
     },
     CitedNotModelled {
         celex: "32023R1669",
-        reason: "Energy labelling for smartphones and slate tablets. The sibling \
-                 of Regulation (EU) 2023/1670, which is modelled; this one sets \
-                 label classes rather than passport content.",
-        basis: CitationBasis::Assumed,
-    },
-    CitedNotModelled {
-        celex: "32024R1252",
-        reason: "Critical Raw Materials Act. Cited as the source of the canonical \
-                 CRM list, which Annexes I and II supply and which is why prose \
-                 names it. 🚨 It was also recorded here as an act that 'does not \
-                 govern disclosure'. That is false. Art. 28 requires a label \
-                 stating whether a product incorporates permanent magnets and of \
-                 which type, and a data carrier linked to a unique product \
-                 identifier giving access to each magnet's weight, location and \
-                 chemical composition; Art. 28(6) says that where a product \
-                 passport is required under another Union act, 'the information \
-                 referred to in paragraph 4 shall be included in that product \
-                 passport'. Art. 28(7) puts that information's accuracy and a \
-                 lifetime-plus-ten-years retention on the person placing the \
-                 product on the market. Art. 29 requires the recycled share of \
-                 eight named elements to be published on a free-access website. \
-                 The act is still not *modelled* — no binding describes it — but \
-                 it is a passport-content instrument, not a list of materials. \
-                 \
-                 Scope, because these duties are narrower than they read. Art. 28 \
-                 binds an exhaustive list of products — MRI devices, wind energy \
-                 generators, industrial robots, motor vehicles, light means of \
-                 transport, cooling generators, heat pumps, electric motors \
-                 including where integrated, washing machines, tumble driers, \
-                 microwaves, vacuum cleaners, dishwashers — and none of the \
-                 product groups this crate models is among them. It applies two \
-                 years after an implementing act due 24 November 2026, and from \
-                 24 May 2029 for MRI devices, motor vehicles and category-L \
-                 vehicles. Art. 29 is narrower again: only those products, only \
-                 magnet types (i) to (iii), and only where the magnets' total \
-                 weight exceeds 0,2 kg — a threshold that is Art. 29's and not \
-                 Art. 28's — from 24 May 2027 or two years after its delegated \
-                 act, whichever is later. Art. 28(8) lets Union harmonisation \
-                 legislation displace Art. 28 for a listed product, so the answer \
-                 is per product group rather than global.",
+        reason: "Energy labelling for smartphones and slate tablets, applying \
+                 from 20 June 2025 (Art. 8). The sibling of Regulation (EU) \
+                 2023/1670: the instrument modelled for that act lists this one \
+                 in its legal basis but is keyed on 2023/1670's CELEX number, so \
+                 this act needs its own entry here. It sets label content and a \
+                 product-database duty, not passport content: Art. 3(1) has the \
+                 supplier supply a printed label, enter the product information \
+                 sheet parameters (Annex V) and the technical documentation \
+                 (Annex VI) in the product database, and the word 'passport' \
+                 does not occur in it. Two of its parts matter beyond \
+                 labelling, because the electronics schema's repairability \
+                 inputs are the operands of the index it defines: Annex II \
+                 point C grades the repairability class from the repairability \
+                 index R (Table 4), and Annex IV point 5 gives the method for R.",
         basis: CitationBasis::Sourced,
     },
 ];

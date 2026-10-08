@@ -37,14 +37,15 @@ let link = DigitalLink::parse("https://id.gs1.org/01/09521234543213/21/ABC123").
 assert_eq!(link.gtin().unwrap().as_str(), "09521234543213");
 assert_eq!(link.serial(), Some("ABC123"));
 
-// A link keyed on an SSCC parses too. Its value is length-checked and not
-// check-digit verified, and the only accessor for it says so.
-let sscc = DigitalLink::parse("https://id.gs1.org/00/106141411234567890").unwrap();
+// A link keyed on an SSCC parses too. Its value is held to GS1's dictionary
+// for the AI (length, characters, check digit) but is not a typed identifier,
+// and the only accessor for it says so.
+let sscc = DigitalLink::parse("https://id.gs1.org/00/106141411234567897").unwrap();
 assert_eq!(sscc.primary_key.ai(), "00");
 assert!(sscc.gtin().is_none());
 assert_eq!(
     sscc.primary_key.unvalidated_value(),
-    Some("106141411234567890"),
+    Some("106141411234567897"),
 );
 
 // Negotiate the best link for a JSON consumer
@@ -68,6 +69,18 @@ assert!(best.is_some());
 ```
 
 A runnable version is in [`examples/parse_and_negotiate.rs`](examples/parse_and_negotiate.rs).
+
+## Which revision of the URI syntax
+
+The path grammar this crate is read against is **GS1 Digital Link URI Syntax
+1.7.0**, section 4. The register at
+[`docs/architecture/STANDARDS.md`](../../docs/architecture/STANDARDS.md) records
+the revision, what was run against it and every deviation, which are also listed
+in this crate's API documentation.
+
+EN 18219:2026 clause 6.3.2 names 1.6.0 for its identifier scheme 1. Whether a
+1.7.0 claim carries over to that clause depends on how the two revisions differ,
+and is not decided here.
 
 ## Scope boundary
 

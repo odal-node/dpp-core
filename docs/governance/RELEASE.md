@@ -58,6 +58,12 @@ Before running `cargo release`:
    rows to the code, but it reads the register, not the IETF, so it cannot see
    an RFC become obsoleted. For the W3C, GS1, IDTA and ETSI rows this re-read is
    the only check.
+9. **Plugin version.** `plugins/Cargo.toml`'s `[workspace.package] version` must
+   equal the workspace's, and `plugins/Cargo.lock` must agree (`just lock-check`).
+   `plugin_version_lockstep` fails if the first is wrong, but **nothing moves it
+   for you**: `cargo release` has never changed `plugins/Cargo.toml`'s version, so
+   after a bump, edit that line and run `cargo update -w` in `plugins/`. Do not cut
+   a release until `cargo release` does this itself, checked with a dry run.
 
 ## Publishing Order
 
@@ -146,8 +152,22 @@ since yanking breaks downstream `Cargo.lock` files.
 ## Product group Plugins
 
 Wasm product group plugins (`plugins/product-group-*`) are not part of the workspace and are
-not published to crates.io. They are released as `.wasm` artefacts attached to
-GitHub Releases. Their versions track independently from the workspace version.
+not published to crates.io. Nothing in this repository attaches them to a release.
+
+**Their version is the workspace version, in lockstep.** `plugins/Cargo.toml` is a
+separate workspace, so cargo does not move it: whoever moves the workspace version
+moves `[workspace.package] version` there to match, then runs `cargo update -w` in
+`plugins/` (`just lock-check` fails until the lockfile agrees).
+`crates/dpp-tests/tests/plugin_version_lockstep.rs` fails when the two differ.
+
+This is not "bump the plugins when a plugin changes". A plugin changes whenever
+`dpp-plugin-sdk`, `dpp-plugin-traits` or `dpp-rules` does, and none of those is
+under `plugins/`; over the eleven releases from 0.11.0 to 0.21.0 `plugins/` itself
+changed in four and that closure in seven. The version is an identity and not a
+compatibility signal (a host negotiates on `AbiVersion` and `SchemaVersionRange`),
+so a plugin version that moves in a release where no plugin changed costs nothing,
+while one that stays put through a change describes different artifacts with one
+string, which it did for nine releases.
 
 ## References
 
