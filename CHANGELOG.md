@@ -364,6 +364,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot hold; and the larger number file and the input and output files that
   the RFC's author publishes separately.
 
+- **The shipped schemas are checked against Draft-07 itself, and the register
+  makes its first conformance claim.** Every product group schema declares
+  Draft-07, but `schema_conformity.rs` showed only that each one compiles in the
+  library that enforces it. That is circular: a schema the library tolerates and
+  Draft-07 forbids would have passed. Two checks now run in `just check`:
+  - every embedded schema, of every version, is validated against the Draft-07
+    meta-schema, vendored verbatim from json-schema.org. The check is shown to
+    reject a bad `type`, `required`, `minimum`, `minLength`, `enum`, `pattern`
+    and `additionalProperties`, at any depth;
+  - the official JSON-Schema-Test-Suite files for the keywords and formats the
+    schemas use (22 files and 710 cases, with `date`, `date-time` and `uri`
+    asserted) run against the pinned `jsonschema` crate as a Draft-07 validator,
+    and the registry's `validator_for` is checked to resolve to Draft-07 for every
+    schema. Every case passes and none is excluded.
+
+  The meta-schema has one blind spot, which the tests assert rather than
+  describe: Draft-07 permits unknown keywords, so a misspelt `minLenght` is a
+  valid schema that constrains nothing. A census of the keywords the schemas use
+  closes it. It fails on any keyword that is not a Draft-07 one, and on any used
+  keyword or format whose suite file is not vendored, naming the file to take.
+
+  The vendored files carry their source, commit and SHA-256 in a `NOTICE.md`, are
+  pinned `-text`, and a test checks the bytes, so a suite file cannot be edited
+  until it passes. Everything passed on the first run, so no schema changed.
+
+  The JSON Schema row of the register now reads `Yes`, with its class, scope and
+  known deviations, and the statement that it is self-declared. It is the first
+  claim in the register. Not run: the keywords no schema uses, such as
+  `patternProperties` and `if`/`then`/`else`; and remote `$ref` retrieval, which
+  the workspace builds the library without. A test checks that no schema has a
+  `$ref` that leaves its document.
+
 ### Fixed
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
@@ -467,6 +499,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   **Elsewhere.** The document named two audiences it had no basis to address,
   and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
   exist. Both are fixed.
+
+- **The trusted-list vocabulary was re-read against ETSI TS 119 612 V2.4.1, and
+  two of its clause citations were wrong.** `trusted_list` cited V2.3.1, and
+  V2.4.1 had since been published. Compared word for word, the two versions
+  differ only in wording, cross-references and the schema attachment, so nothing
+  the module reads has changed: the service type URIs, the status values, the
+  status history and the retention rule.
+  - **The citation is not simply moved to V2.4.1.** Implementing Regulations (EU)
+    2025/1945 and 2025/1946, which the module's header cites, name V2.3.1
+    themselves. Only the template of Implementing Decision (EU) 2015/1505, as
+    amended by Implementing Decision (EU) 2025/2164, names V2.4.1. The module now
+    says so, and the register row records both revisions.
+  - `TrustServiceStatus` described clauses 5.5.1.2 and 5.5.1.3 as both nationally
+    defined. Clause 5.5.1.2 is the Regulation's non-qualified service types. It
+    also omitted `deprecatedbynationallaw` from the statuses it sets aside.
+  - `TrustServiceHistory` put the rule that history is kept even when a service's
+    present status would not require it in a note to clause 5.5.1. It is in
+    clause 5.4.6.
+  - The module header's date for the Art. 51(3) transitional, 21 May 2026, is
+    checked against the consolidated text and pinned, which takes the file off the
+    list of files that state a figure without a source.
+  - A test holds the `looks_qualified` naming convention to every service type
+    the standard lists.
+
+  The register row stays `No`: the standard defines the list a scheme operator
+  publishes, and this crate consumes lists, so there is no conformance class for
+  it to claim.
 
 ## [0.21.0] - 2026-09-28
 
