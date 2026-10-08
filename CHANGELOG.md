@@ -435,6 +435,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
   exist. Both are fixed.
 
+- **The trusted-list vocabulary was re-read against ETSI TS 119 612 V2.4.1, and
+  two of its clause citations were wrong.** `trusted_list` cited V2.3.1, and
+  V2.4.1 had since been published. Compared word for word, the two versions
+  differ only in wording, cross-references and the schema attachment, so nothing
+  the module reads has changed: the service type URIs, the status values, the
+  status history and the retention rule.
+  - **The citation is not simply moved to V2.4.1.** Implementing Regulations (EU)
+    2025/1945 and 2025/1946, which the module's header cites, name V2.3.1
+    themselves. Only the template of Implementing Decision (EU) 2015/1505, as
+    amended by Implementing Decision (EU) 2025/2164, names V2.4.1. The module now
+    says so, and the register row records both revisions.
+  - `TrustServiceStatus` described clauses 5.5.1.2 and 5.5.1.3 as both nationally
+    defined. Clause 5.5.1.2 is the Regulation's non-qualified service types. It
+    also omitted `deprecatedbynationallaw` from the statuses it sets aside.
+  - `TrustServiceHistory` put the rule that history is kept even when a service's
+    present status would not require it in a note to clause 5.5.1. It is in
+    clause 5.4.6.
+  - The module header's date for the Art. 51(3) transitional, 21 May 2026, is
+    checked against the consolidated text and pinned, which takes the file off the
+    list of files that state a figure without a source.
+  - A test holds the `looks_qualified` naming convention to every service type
+    the standard lists.
+
+  The register row stays `No`: the standard defines the list a scheme operator
+  publishes, and this crate consumes lists, so there is no conformance class for
+  it to claim.
+
 ## [0.21.0] - 2026-09-28
 
 ### Breaking
