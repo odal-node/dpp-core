@@ -30,14 +30,17 @@
 //!
 //! ## What this does not do
 //!
-//! The dictionary names a *linter* per component (`csum`, `gcppos2`, …) whose
-//! reference implementations are a separate GS1 resource that is not vendored.
-//! This module reads lengths, flags, and whether a value is CSET 82 throughout.
-//! Content validation beyond the check digit this crate already implements is
-//! not performed, and nothing here supports a claim of full GS1 validation.
+//! The dictionary names a *linter* per component (`csum`, `gcppos2`, …). This
+//! module reads the components, their lengths, character sets and linter names,
+//! and the flags. `value.rs` applies five linters from them (the check digit, the
+//! check character pair, the zero filler and the GS1 Company Prefix's leading
+//! digits); the rest are not run, and nothing here supports a claim of full GS1
+//! validation.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
+
+use super::component::{CharKind, Component};
 
 /// GS1's published dictionary, vendored at a tagged release.
 const DICTIONARY: &str = include_str!("../../data/gs1-syntax-dictionary.txt");
@@ -82,6 +85,17 @@ pub struct AiSpec {
     pub cset_82: bool,
     /// Human-readable title from the trailing comment, e.g. `"GTIN"`.
     pub title: String,
+    /// The specification's components, in order. `N14,csum` is one component;
+    /// `N13,csum [X..17]` is two, the second optional.
+    ///
+    /// What `min_len`, `max_len` and `cset_82` summarise, kept whole so a value
+    /// can be held to each component's own length and character set, which a
+    /// whole-value summary cannot do for an AI that mixes types.
+    pub components: Vec<Component>,
+    /// The tokens of the entry's `req=` attribute, as written. For a primary
+    /// key whose only requisite is one of its own qualifiers, that qualifier is
+    /// mandatory: AI 415 declares `req=8020 dlpkey=8020`.
+    pub requisites: Vec<String>,
 }
 
 /// The parsed dictionary, keyed by AI. Built once on first use.
@@ -118,6 +132,25 @@ pub fn qualifier_position(primary_key: &str, qualifier: &str) -> Option<(usize, 
                 .position(|a| a == qualifier)
                 .map(|pos| (seq, u8::try_from(pos + 1).unwrap_or(u8::MAX)))
         })
+}
+
+/// The qualifier a primary key cannot appear without, if it has one.
+///
+/// The dictionary says so in two places that agree: AI 415 declares `req=8020`
+/// and `dlpkey=8020`, so its only requisite is its own qualifier. Read from the
+/// data rather than written here, so a key GS1 makes dependent later is picked
+/// up with the dictionary.
+#[must_use]
+pub fn required_qualifier(primary_key: &str) -> Option<&'static str> {
+    let spec = ai_spec(primary_key)?;
+    let [only] = spec.requisites.as_slice() else {
+        return None;
+    };
+    spec.dl_qualifiers
+        .iter()
+        .flatten()
+        .find(|qualifier| *qualifier == only)
+        .map(String::as_str)
 }
 
 /// How long an AI beginning with `prefix` (its first two characters) is.
@@ -195,6 +228,8 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
         let mut cset_82 = true;
         let mut dl_primary_key = false;
         let mut dl_qualifiers: Vec<Vec<String>> = Vec::new();
+        let mut components: Vec<Component> = Vec::new();
+        let mut requisites: Vec<String> = Vec::new();
         for field in &rest[spec_start..] {
             if field.starts_with(COMPONENT_START) {
                 let optional = field.starts_with('[');
@@ -205,7 +240,18 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
                         min_len += lo;
                     }
                     max_len += hi;
+                    if let Some(kind) = char_kind(component) {
+                        components.push(Component {
+                            kind,
+                            min_len: lo,
+                            max_len: hi,
+                            optional,
+                            linters: component.split(',').skip(1).map(str::to_owned).collect(),
+                        });
+                    }
                 }
+            } else if let Some(value) = field.strip_prefix("req=") {
+                requisites = value.split(',').map(str::to_owned).collect();
             } else if *field == "dlpkey" {
                 dl_primary_key = true;
             } else if let Some(value) = field.strip_prefix("dlpkey=") {
@@ -236,6 +282,8 @@ fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
                     max_len,
                     cset_82,
                     title: title.clone(),
+                    components: components.clone(),
+                    requisites: requisites.clone(),
                 },
             );
         }
@@ -260,6 +308,17 @@ fn component_len(component: &str) -> Option<(usize, usize)> {
             let exact = digits.parse().ok()?;
             Some((exact, exact))
         }
+    }
+}
+
+/// The character set a component's type letter names.
+fn char_kind(component: &str) -> Option<CharKind> {
+    match component.chars().next()? {
+        'N' => Some(CharKind::Numeric),
+        'X' => Some(CharKind::Cset82),
+        'Y' => Some(CharKind::Cset39),
+        'Z' => Some(CharKind::Cset64),
+        _ => None,
     }
 }
 
@@ -400,6 +459,96 @@ mod tests {
                 "00", "01", "253", "255", "401", "402", "414", "415", "417", "8003", "8004",
                 "8006", "8010", "8013", "8017", "8018"
             ]
+        );
+    }
+
+    /// The components the value check reads are the entry's own, in order, with
+    /// the linters it names. Pinned against entries read out of the vendored file.
+    #[test]
+    fn reads_each_components_set_length_and_linters() {
+        let grai = ai_spec("8003").expect("8003 present");
+        assert_eq!(
+            grai.components,
+            vec![
+                Component {
+                    kind: CharKind::Numeric,
+                    min_len: 1,
+                    max_len: 1,
+                    optional: false,
+                    linters: vec!["zero".into()],
+                },
+                Component {
+                    kind: CharKind::Numeric,
+                    min_len: 13,
+                    max_len: 13,
+                    optional: false,
+                    linters: vec!["csum".into(), "gcppos1".into()],
+                },
+                Component {
+                    kind: CharKind::Cset82,
+                    min_len: 1,
+                    max_len: 16,
+                    optional: true,
+                    linters: vec![],
+                },
+            ]
+        );
+
+        let cpid = ai_spec("8010").expect("8010 present");
+        assert_eq!(cpid.components[0].kind, CharKind::Cset39);
+        assert_eq!((cpid.min_len, cpid.max_len), (1, 30));
+
+        let uic = ai_spec("7040").expect("7040 present");
+        let kinds: Vec<CharKind> = uic.components.iter().map(|c| c.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                CharKind::Numeric,
+                CharKind::Cset82,
+                CharKind::Cset82,
+                CharKind::Cset82
+            ]
+        );
+    }
+
+    /// Every AI the dictionary describes has components that add up to the
+    /// lengths it reports, so the two summaries can never disagree with the
+    /// whole they summarise.
+    #[test]
+    fn components_account_for_the_reported_lengths() {
+        for spec in dictionary().values() {
+            let min: usize = spec
+                .components
+                .iter()
+                .filter(|c| !c.optional)
+                .map(|c| c.min_len)
+                .sum();
+            let max: usize = spec.components.iter().map(|c| c.max_len).sum();
+            assert_eq!(
+                (spec.min_len, spec.max_len),
+                (min, max),
+                "AI {} components disagree with its lengths",
+                spec.ai
+            );
+        }
+    }
+
+    /// Only AI 415 depends on one of its own qualifiers: it declares
+    /// `req=8020 dlpkey=8020`. The rule is read from those attributes, so a key
+    /// whose requisites are something else, or are several, is not made
+    /// dependent by it.
+    #[test]
+    fn only_the_pay_to_gln_requires_a_qualifier() {
+        assert_eq!(required_qualifier("415"), Some("8020"));
+        for spec in dictionary().values().filter(|s| s.dl_primary_key) {
+            if spec.ai != "415" {
+                assert_eq!(required_qualifier(&spec.ai), None, "AI {}", spec.ai);
+            }
+        }
+        assert_eq!(
+            required_qualifier("10"),
+            None,
+            "a qualifier is no primary key"
         );
     }
 }

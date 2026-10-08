@@ -14,14 +14,22 @@ const VC_BASE_CONTEXT: &str = "https://www.w3.org/ns/credentials/v2";
 /// `dpp_domain::PassportCredential`: a string `@context` entry is fetched by
 /// the consumer at expansion time, and this crate does not host a context
 /// document. `dpp:` is a prefix IRI, never dereferenced during expansion.
+///
+/// 🚨 Two terms here were wrong, and an independent JSON-LD processor is what
+/// found both. `name` is **not** defined: the base context defines it as
+/// `https://schema.org/name` and protects it, so redefining it makes a
+/// conforming processor refuse the whole credential, which is what the earlier
+/// `"name": "dpp:name"` did. And the term for the product groups was spelled
+/// `product_groups` while the subject serialises `productGroups`, so the key had
+/// no term and was dropped on expansion with no error. The subject's key is the
+/// spelling that matters, so the term follows it.
 fn dpp_terms() -> Value {
     json!({
         "dpp": "https://schema.odal-node.io/dpp#",
         "DppAccessCredential": "dpp:DppAccessCredential",
-        "name": "dpp:name",
         "role": "dpp:role",
         "country": "dpp:country",
-        "product_groups": "dpp:product_groups",
+        "productGroups": "dpp:productGroups",
         "productCategories": "dpp:productCategories",
     })
 }

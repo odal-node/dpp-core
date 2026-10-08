@@ -15,6 +15,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
+  passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
+  `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
+  `strip_context` turns it back. Only an `id` spelled as a `PassportId`
+  serialises (lower-case, hyphenated) is rewritten. `id` still aliases `@id`, so
+  the context still layers after `credentials/v2` and `did/v1`. **Migration:** a
+  caller that stamps `context_value()` onto a passport itself, rather than calling
+  `frame_passport`, writes `id` as `passport_iri(id)` too; left as a bare UUID it
+  is a relative IRI, which names nothing. See Fixed for why.
+
 - **A key is named by its own thumbprint, and every signature names the key
   that made it.** Until now, verification methods were named by position. The
   current key was always `#key-1`, and archived keys were renumbered whenever a
@@ -220,6 +230,57 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that writes a marked field must also write its statement. Write textile
   passports at v1.4.0.
 
+- **`DigitalLink::parse` holds every AI value to GS1's dictionary, and reads the
+  scheme and the host as the grammar has them.** Until now a value was checked
+  for its maximum length and, if the AI was all `X`, for CSET 82, and nothing
+  else. A 17-digit SSCC, a GLN with letters in it, and a GLN or SSCC with a wrong
+  check digit all parsed, and the README's own SSCC example had a wrong check
+  digit. GS1's syntax engine refuses every one of them. Now each value is held
+  to its AI's components: the minimum and maximum length, the character set of
+  each component (digits, CSET 82, CSET 39, CSET 64), the modulo-10 check digit
+  where the dictionary names `csum`, the check character pair where it names
+  `csumalpha`, the four leading digits of a GS1 Company Prefix where it names
+  `gcppos1` or `gcppos2`, and the filler `0` of `zero`.
+  - **AI 415 is refused without AI 8020**, which the dictionary declares as its
+    only requisite and which the grammar's `payTo-path` requires.
+  - **A malformed percent escape is an error**, where it was read as literal
+    characters; so is a value whose bytes are not UTF-8.
+  - **A host is checked against the URI grammar**: a registered name, an IPv4
+    address or a bracketed IPv6 literal, with digits for a port. A user name and
+    an `@` are refused, and so is an empty host.
+  - **`http://` is accepted**, with the grammar's four spellings of the scheme,
+    where only `https://` was. The scheme is kept as written, so a link builds back
+    to its own base.
+  - **Each path segment is held to the grammar's characters.** A segment of the
+    custom path stem is RFC 3986's `pchar`, where a raw space, `"`, `<` or a
+    character beyond ASCII had been taken into the resolver base as written. From
+    the primary key on no segment may be empty, where `/01//…` had been read as
+    `/01/…`, and a value may not hold a character no URI holds raw, such as `<`
+    or `>`, which the grammar writes only as escapes and which CSET 82 had let
+    through. GS1's syntax engine refuses the empty segments and the characters no
+    URI holds; it does not hold a stem to `pchar`, so a stem with `[`, `]` or a
+    malformed escape is recorded as a case where GS1's syntax engine is not the
+    evidence.
+  - A GTIN of fewer than 14 digits is still read and padded, as before.
+
+  `DigitalLinkError` gains `ValueTooShort`, `OutsideCharset`, `InvalidCheckDigit`,
+  `InvalidCheckPair`, `InvalidCompanyPrefix`, `NonZeroFiller`, `MissingQualifier`,
+  `InvalidHost`, `MalformedPercentEscape` and `InvalidPathSegment`
+  (the enum is `#[non_exhaustive]`). `AiSpec` gains `components` and `requisites`,
+  and the crate exports `Component`, `CharKind` and `required_qualifier`.
+  `percent_encode` now escapes everything outside RFC 3986's unreserved set, where
+  it left `!&'()*+,;=:` raw: the grammar spells those as escapes, so a carrier
+  with such a character in a serial is built differently, and reads back the same.
+
+- **`Disclosure::claim_name` returns an `Option`, and an SD-JWT Disclosure is
+  either of two kinds.** RFC 9901 has a second Disclosure, the two-element
+  `[salt, value]` of clause 4.2.2 for an array element, and the type now holds
+  both. An array element has no name, so `claim_name()` is `None` for it, and
+  `is_array_element()` tells the kinds apart. `DisclosureError::NotATriple` is now
+  `NotATripleOrPair`, since a pair is no longer an error, and `SdJwtError` gains
+  `WrongDisclosureKind`. Nothing outside the module's own tests and `dpp-vc`'s
+  read a name.
+
 ### Added
 
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
@@ -347,6 +408,141 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   method specification is a W3C Community Group document marked `unofficial`,
   not a W3C standard.
 
+- **The JAdES module's headers are checked against ETSI's own JSON Schema, and the
+  register's JAdES row now makes a claim.** The module's tests check its output
+  against this repository's own reading of ETSI TS 119 182-1, and the DSS oracle
+  judges one signature. Annex B of V1.2.1 is normative and names ETSI's JSON
+  Schemas for the protected header. They are now vendored, under their
+  BSD-3-Clause licence, and every header shape the builder emits at B-B is
+  validated against `19182-protected-jsonSchema.json` in `just check`.
+  - `x5c` with `x5t#S256`, which is the form the EU profile of Implementing
+    Regulation (EU) 2026/248 asks for, and `x5t#S256` alone, pass, each with and
+    without a content type.
+  - Nine broken headers fail: no `alg`, no certificate reference, no signing time,
+    both `iat` and `sigT`, the SHA-1 `x5t`, and four wrong types. Dropping `iat`
+    from the builder, or adding `x5t`, fails the check with the schema's own
+    message.
+  - **ETSI's published schema cannot be applied as written.** It declares
+    `contentEncoding: base64` for `x5t#S256`, which RFC 7515 defines as base64url,
+    so a correct thumbprint containing `-` or `_` fails a validator that asserts
+    the keyword. The test reads `base64` as either alphabet, which still rejects a
+    string that is neither, and asserts the defect.
+  - **The schema is weaker than DSS.** It accepts a header with `x5c` alone, which
+    is clause 5.1.7's "at least one of", and DSS reports that as not baseline. The
+    test asserts the gap, and the claim does not cover that form.
+
+  The files carry their source, tag and SHA-256 in a `NOTICE.md`, are pinned
+  `-text`, and a test checks the bytes. Everything passed on the first run apart
+  from the encoding point, so the module did not change.
+
+  The register row reads `Yes`, with its class, scope and deviations and the
+  statement that it is self-declared. The comments that called the DSS oracle the
+  one check that is not circular now name both. Not run: ETSI's own Signature
+  Conformance Checker, which is an account-based web service with no API, so it
+  cannot run in CI. The oracle still pins DSS 6.2.
+
+- **IDTA's own AAS test tooling now checks every committed Environment, and the
+  register's IDTA row makes a claim.** `aas-test-engines`, which IDTA's
+  `admin-shell-io` organisation publishes as the official test tooling for the
+  Asset Administration Shell, runs in `aas-oracle.yml` beside `aas-core3.0`. The
+  two share no code and no author. Both pass all thirteen Environments (twelve
+  product groups and one scenario), and the new script fails unless an
+  Environment exists for every product group, read from the schema directories.
+  - **The claim is made against IDTA-01001-3-0, not 3-2**, and the register row
+    says why. The tool lists AAS 3.0 and no other revision, and its file check
+    ignores the version it is given. aas-core-works publishes Python packages for
+    3.0 and 3.1 and none for 3.2. A 3-2 claim would have no independent check of
+    its constraints, which include two new ones. The script fails the day the
+    tool lists a second revision, so the pin cannot move past that point unread.
+  - **3-2 adds a `Batch` value to `AssetKind`**, for digital product passports.
+    `dpp-aas` still emits `Instance` for a batch-level passport, which every
+    revision accepts. Whether to emit `Batch` is a mapping decision, and IDTA's
+    change log marks the addition as not backward compatible.
+  - The tool does not implement `AASd-021` and `AASd-077`; its source says so.
+    `aas-core3.0` verifies both, and the register row lists the gap.
+  - The script rejects a duplicated `idShort` and a member the class does not
+    define before it looks at a real Environment, so a tool upgrade that stopped
+    checking would not leave the job green.
+
+  The two tools and everything they install are hash-locked in
+  `.github/oracle/aas/requirements.txt`; the workflow had pinned only
+  `aas-core3.0`. The oracle job keeps its name, since the repository's ruleset
+  requires it by name.
+
+- **An independent JSON-LD processor now expands everything this workspace
+  emits, and the register's JSON-LD row makes a claim.** The context tests held
+  the contexts to this repository's own reading of JSON-LD, and said that the
+  workspace ran no processor. `jsonld-oracle.yml` now builds a corpus with the
+  real builders (a DID document at a first key and after a rotation, the passport
+  credential, the access credential with and without a status entry, and a framed
+  passport of each of the twelve product groups, plus the five contexts they
+  carry) and expands all of it with PyLD 3.3.0, in JSON-LD 1.1 mode.
+  - It fails on a processor error, and on any property that expands to nothing.
+    The processor reports each dropped property, and the same set is recomputed
+    from an expand-and-compact round trip so each is named by path.
+  - The processor is given the three W3C contexts the documents reference
+    (`credentials/v2`, `did/v1`, `cid/v1`), vendored with their SHA-256, and no
+    other. A context added to a builder fails the oracle by name until somebody
+    vendors it.
+  - It fails on a node identifier that is a relative IRI. PyLD is passed an
+    explicit null base for that: when the option is left out, it resolves a
+    relative IRI against `http://example.org/base/` of its own accord, which is
+    how the passport's identifier, below, went unseen until a second processor
+    (jsonld.js) was run over the same corpus.
+  - It fails if one of our contexts can no longer be layered after
+    `credentials/v2` or `did/v1`, which both protect `id` as `@id`.
+  - Planted defects were each caught: a key with no term, a term mapped to
+    nothing or to a relative IRI, the scoped `productIdentifier` context removed
+    (which drops `gtin` and `scheme`), and an edited vendored context.
+  - **One gap is listed, not hidden.** A framed passport's context defines a term
+    for each key of the envelope and for the product identifier, and for nothing
+    beneath them. A processor therefore drops the keys inside `manufacturer`,
+    `materials` and the other envelope objects, and every key of
+    `productGroupData` except the identifier: 191 key paths across the corpus.
+    The documents are still conforming JSON-LD, and they still carry the
+    envelope's meaning, but a consumer reading the `ld+json` form gets no linked
+    data below it. The oracle allows exactly that gap, fails on any other drop,
+    and fails when the gap closes so the allowance is deleted. Whether to give
+    those keys terms is a vocabulary decision this change does not make.
+
+- **GS1 Digital Link URI Syntax 1.7.0 is the revision this crate is read against,
+  and the register's GS1 row makes a claim.** The revision had never been
+  established: an earlier "v1.2" had no source, and the parser had been diffed
+  against nothing. Section 4's grammar was read in full and every rule compared,
+  and `gs1_syntax_rules_corpus.rs` now holds one URI for each: the value format of
+  each of the sixteen primary keys and of each qualifier, the qualifier sequences
+  and the four composite paths, the scheme and host, the percent escapes, and the
+  extension parameters of the query.
+  - **GS1's own engine judges the corpus, and does parse whole URIs.** The issue
+    left that open. The Barcode Syntax Engine, a component of the Barcode Syntax
+    Resource that section 2 of the standard names, takes any `http` or `https`
+    input as a Digital Link and validates it, so no second oracle was needed.
+  - Each case carries the grammar's verdict, and a reason wherever this reader or
+    GS1's engine departs from it. Both tools are pinned to the grammar except where a
+    reason says so, and a reason that stops being true fails the oracle, so
+    neither list of departures can go stale. Planted regressions were caught: a
+    check digit left unchecked, the 415 rule removed, a dropped or an invented
+    reason, and a flipped grammar verdict.
+  - **GS1's engine is not always the evidence.** It is lenient about a second
+    primary key in a path, a malformed percent escape, a raw sub-delimiter, a
+    port's digits, a fragment and the shape of the query, and it refuses an empty
+    host, a raw double quote, and the sub-delimiters and escapes the grammar's
+    `reg-name` allows in a host. For those the register says the verdict rests on
+    this repository's reading of the grammar.
+  - **A Global Model Number's check character pair is verified**, by the GS1
+    General Specifications' calculation for alphanumeric keys, wherever the
+    dictionary names `csumalpha`. GS1's engine runs the same calculation; its own
+    test vectors, which between them weigh every symbol of CSET 82, are unit
+    tests here, and the corpus holds the two implementations to each other.
+  - **A value that cannot begin with a GS1 Company Prefix is refused** where the
+    dictionary names `gcppos1` or `gcppos2`: it wants the four digits the shortest
+    prefix has, at the first or second character. That is the check GS1's linter
+    makes unless it is given GS1's allocation data.
+  - Not done: the query string is still not read, so a malformed data attribute is
+    accepted, and whether a GS1 Company Prefix is one GS1 has allocated is not
+    checked, which needs GS1's allocation data. Both are listed as deviations. EN 18219 clause 6.3.2 names 1.6.0, and whether a
+    1.7.0 claim carries over to it is left to the harmonised-standard assessment.
+
 - **The RFCs' own test vectors now run in `just check`.** The signature library,
   the canonicaliser and the key-derivation function had been checked only
   against this repository's own expectations, which cannot catch a misreading
@@ -373,7 +569,170 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot hold; and the larger number file and the input and output files that
   the RFC's author publishes separately.
 
+- **The shipped schemas are checked against Draft-07 itself, and the register
+  makes its first conformance claim.** Every product group schema declares
+  Draft-07, but `schema_conformity.rs` showed only that each one compiles in the
+  library that enforces it. That is circular: a schema the library tolerates and
+  Draft-07 forbids would have passed. Two checks now run in `just check`:
+  - every embedded schema, of every version, is validated against the Draft-07
+    meta-schema, vendored verbatim from json-schema.org. The check is shown to
+    reject a bad `type`, `required`, `minimum`, `minLength`, `enum`, `pattern`
+    and `additionalProperties`, at any depth;
+  - the official JSON-Schema-Test-Suite files for the keywords and formats the
+    schemas use (22 files and 710 cases, with `date`, `date-time` and `uri`
+    asserted) run against the pinned `jsonschema` crate as a Draft-07 validator,
+    and the registry's `validator_for` is checked to resolve to Draft-07 for every
+    schema. Every case passes and none is excluded.
+
+  The meta-schema has one blind spot, which the tests assert rather than
+  describe: Draft-07 permits unknown keywords, so a misspelt `minLenght` is a
+  valid schema that constrains nothing. A census of the keywords the schemas use
+  closes it. It fails on any keyword that is not a Draft-07 one, and on any used
+  keyword or format whose suite file is not vendored, naming the file to take.
+
+  The vendored files carry their source, commit and SHA-256 in a `NOTICE.md`, are
+  pinned `-text`, and a test checks the bytes, so a suite file cannot be edited
+  until it passes. Everything passed on the first run, so no schema changed.
+
+  The JSON Schema row of the register now reads `Yes`, with its class, scope and
+  known deviations, and the statement that it is self-declared. It is the first
+  claim in the register. Not run: the keywords no schema uses, such as
+  `patternProperties` and `if`/`then`/`else`; and remote `$ref` retrieval, which
+  the workspace builds the library without. A test checks that no schema has a
+  `$ref` that leaves its document.
+
+- **The W3C's DID test suite now runs over the DID documents we produce.**
+  `build_did_document` had been checked only by tests written by the people who
+  wrote it. A new workflow, `did-oracle.yml`, builds five documents with it: a
+  first key, a hygiene rotation, a compromise, both of those in one history, and
+  a host with a port. It then runs the suite's `did-core-properties` and
+  `did-production` suites over them, 185 assertions, all passing. The suite is
+  Node, so it has its own workflow and the workspace build still needs none. It
+  is pinned to a commit of `w3c/did-test-suite`, which publishes no releases, and
+  installed from its own lockfile.
+
+  The same job runs those documents again with two rules broken on purpose, and
+  fails unless the suite goes red. A matcher that had stopped checking anything
+  would otherwise leave the job green.
+
+  The documents are given to the suite as the JSON-LD representation, which is
+  what they are: each carries `@context`. The register's DID row now claims a
+  conforming DID document, with the scope and the rules the suite does not reach.
+  Not claimed: the plain JSON representation, which this library does not
+  produce; DID syntax, resolution and consumption; and the `did:web` method,
+  whose specification is not a W3C standard.
+
+- **SD-JWT array elements (RFC 9901 clause 4.2.2) are now read and written.**
+  An issuer can hide one element of an array and leave the rest, and the verifier
+  had no way to take that back. A placeholder `{"...": "<digest>"}` with a
+  Disclosure becomes the value it hid, in its position, and is read in turn for
+  placeholders and `_sd` arrays of its own. A placeholder with no Disclosure is
+  removed, as clause 7.1 step 3.d says; before, it reached the caller as an object
+  where a string was expected.
+  - **Verifier.** A digest may not appear twice in the token, whichever way it is
+    embedded. A Disclosure of the wrong kind for the digest that matched it is
+    refused (steps 3.c.ii.1 and 3.c.iii.1), an object of one key `...` holding a
+    string is a placeholder and any other object is left as an object, and an
+    element Disclosure no digest refers to refuses the token, as any other does.
+  - **Holder.** `present` selects by digest and needed no change.
+  - **Issuer.** `Disclosure::element` and `conceal_elements` hide chosen elements
+    in place, one salt each, and sort nothing, since the order of an array is its
+    data. They add no decoys and do not descend, and the register says the
+    payload around the digests is checked by this repository's tests alone.
+  - **Evidence.** The RFC's own cases now run: the worked example of clauses 4.2.2
+    and 4.2.4.2 with both outputs it states, section 5.1's issuance of two
+    nationalities, section 5.2's presentation of one with the Processed payload
+    the RFC prints, and Appendix A.2, where the disclosed element holds digests of
+    its own. They passed on the first run. Six planted breakages (a kept
+    placeholder, a revealed element not read in turn, no kind check, no repeat
+    check on placeholders, a revealed element not counted as used, a placeholder
+    with a second key) are each caught. A property test holds the whole round trip
+    to a model of which elements should remain.
+  - **Not done.** Nothing in `dpp-vc` issues array-element Disclosures: the access
+    policy classes fields, and says nothing of one element of an array. That is a
+    decision for whatever consumes this, not for this crate.
+
+- **The standards register makes its first three conformance claims: RFC 9901,
+  RFC 8785 and RFC 8032.** Each is a `Yes` with its class, scope, known
+  deviations, the statement that it is self-declared, and the paths of its
+  evidence, which the claim-form check in `standard_citations.rs` now holds them
+  to. The evidence in each case is the RFC's own test data, run on every build.
+  - **RFC 9901** was the thin one. Its vectors covered a Disclosure and its
+    digest and nothing else, which would have carried a claim for the Disclosure
+    only. The RFC's own complete examples now run through `SdJwt::parse` and
+    `disclosed_payload`: Appendix A.1, A.3 and A.4, with decoy digests, recursive
+    Disclosures and a Key Binding JWT, each processed to the payload the RFC
+    prints; sections 6.1 to 6.3, three structures of one claim, with every digest
+    the RFC prints; and a Holder's presentation rebuilt from A.3's issued token to
+    the RFC's. They passed without a change to the module. Two planted breakages
+    (nested Disclosures not opened, no Disclosure applied) each fail most of them.
+  - **The claim is narrower than the RFC.** It covers Disclosures for object
+    properties and for array elements with SHA-256, with no Key Binding and no
+    decoys issued, and it says so. The RFC's own signatures are ES256, which this
+    crate does not implement, so no signature is checked against them; the module
+    never verified the Issuer-signed JWT, and the row says that is the caller's.
+  - **RFC 8785**: the number table already ran from IEEE 754 bit patterns, and
+    now also from text, because a passport reaches the canonicaliser as JSON text
+    where an integer is not a double. An integer a double cannot hold is rounded
+    to the nearest one, which the table's rows for 2^53 pin. The row lists three
+    deviations: `-0` is written as `0` and not refused, which a verified erratum
+    (7920) says a parser should do; a repeated member name is resolved by
+    `serde_json` before the canonicaliser sees it; and an integer beyond ±2^53,
+    which clause 3.1 keeps out of the input by requiring every number to be a
+    double, is written as the nearest double without a warning and not refused.
+  - **RFC 8032**: the five vectors of clause 7.1 are the evidence, run on the
+    `ed25519-dalek` version locked in `Cargo.lock`, since nothing here
+    implements the curve. Verification is `verify_strict`, which refuses a small-
+    order key or nonce and compares the cofactorless equation, so it accepts a
+    subset of what the RFC permits. The row says so.
+
+  The RFC Editor's errata for 8785 and 8032 were read, and none changes a vector.
+  Three more rows have vectors that run (RFC 8037, RFC 9106, RFC 9562) and are not
+  claimed here. RFC 9106's vector runs through the argon2 library with the RFC's
+  parameters and not through the keystore's own, so it would not support a claim
+  about the keystore.
+
 ### Fixed
+
+- **A framed passport had no name in linked data.** The context aliases `id`
+  to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI
+  reference. Converting a framed passport to RDF with no base IRI dropped every
+  statement about the passport itself (jsonld.js reports a "relative @id
+  reference"), and a processor that supplies a base named the passport after
+  wherever that was. The passport's credential names it `urn:uuid:` and its id,
+  so even with a base the two were unrelated nodes. `frame_passport` now writes
+  `id` in that form, from the new `dpp_vc::passport_iri`, which the credential's
+  subject uses too, and `strip_context` turns it back. With it, PyLD and
+  jsonld.js give the same canonical RDF for every document in the oracle's
+  corpus.
+
+- **A JSON-LD processor refused every access credential, and one of its
+  subject's keys had no term.** The credential's inline context redefined `name`,
+  which the base context (`credentials/v2`) protects as `https://schema.org/name`,
+  and a conforming processor fails the whole document when a protected term is
+  redefined. The subject also serialises `productGroups`, while the term was
+  spelled `product_groups`, so the key was dropped on expansion with no error.
+  The redefinition is gone, so `name` is schema.org's, and the term is now
+  `productGroups`, in the camelCase spelling the other terms use. Both were found
+  by running a processor over the credentials; nothing in this workspace had.
+  The credential's `@context` array is unchanged in shape, and `dpp:productGroups`
+  replaces `dpp:product_groups` as the IRI.
+
+- **A primary key's value was written into a Digital Link unescaped.** A CPID may
+  hold `#` and `/`, so `AB-C#/` was built as a fragment and a new path segment, and
+  the link no longer meant the key it was built from. `DigitalLink::build` now
+  escapes the primary key as it does a qualifier. The round-trip check over the new
+  corpus found it.
+
+- **Processing an SD-JWT payload is now bounded in depth.** `disclosed_payload`
+  recursed once per level of the processed payload and nothing limited how deep
+  that went. `serde_json` limits each Disclosure it parses, but each Disclosure is
+  parsed on its own, so Disclosures nested inside one another could go deeper than
+  it allows in a single document. Processing now refuses a value deeper than 127
+  levels, the deepest a value sits in a document `serde_json` parses, with
+  `SdJwtError::TooDeep`, so no payload `serde_json` would parse on its own is
+  refused; a test pins both sides of that line. The recursion predates array
+  elements, which add a second path into it.
 
 - **The Critical Raw Materials Act's Art. 28(2) deadline was recorded a year
   late.** The Official Journal text printed 24 November 2026 in Arts. 27(6),
@@ -542,6 +901,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   **Elsewhere.** The document named two audiences it had no basis to address,
   and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
   exist. Both are fixed.
+
+- **The trusted-list vocabulary was re-read against ETSI TS 119 612 V2.4.1, and
+  two of its clause citations were wrong.** `trusted_list` cited V2.3.1, and
+  V2.4.1 had since been published. Compared word for word, the two versions
+  differ only in wording, cross-references and the schema attachment, so nothing
+  the module reads has changed: the service type URIs, the status values, the
+  status history and the retention rule.
+  - **The citation is not simply moved to V2.4.1.** Implementing Regulations (EU)
+    2025/1945 and 2025/1946, which the module's header cites, name V2.3.1
+    themselves. Only the template of Implementing Decision (EU) 2015/1505, as
+    amended by Implementing Decision (EU) 2025/2164, names V2.4.1. The module now
+    says so, and the register row records both revisions.
+  - `TrustServiceStatus` described clauses 5.5.1.2 and 5.5.1.3 as both nationally
+    defined. Clause 5.5.1.2 is the Regulation's non-qualified service types. It
+    also omitted `deprecatedbynationallaw` from the statuses it sets aside.
+  - `TrustServiceHistory` put the rule that history is kept even when a service's
+    present status would not require it in a note to clause 5.5.1. It is in
+    clause 5.4.6.
+  - The module header's date for the Art. 51(3) transitional, 21 May 2026, is
+    checked against the consolidated text and pinned, which takes the file off the
+    list of files that state a figure without a source.
+  - A test holds the `looks_qualified` naming convention to every service type
+    the standard lists.
+
+  The register row stays `No`: the standard defines the list a scheme operator
+  publishes, and this crate consumes lists, so there is no conformance class for
+  it to claim.
 
 ## [0.21.0] - 2026-09-28
 

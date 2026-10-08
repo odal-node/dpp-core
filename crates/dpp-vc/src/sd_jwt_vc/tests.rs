@@ -202,12 +202,14 @@ fn tampering_with_a_revealed_value_refuses_the_credential() {
     let original = credential
         .disclosures()
         .iter()
-        .find(|d| d.claim_name() == "stateOfHealthPct")
+        .find(|d| d.claim_name() == Some("stateOfHealthPct"))
         .expect("state of health is disclosable");
 
     let forged = Disclosure::with_salt(
         original.salt().to_owned(),
-        original.claim_name(),
+        original
+            .claim_name()
+            .expect("a property disclosure has a name"),
         json!(12.0),
     )
     .unwrap();

@@ -92,6 +92,11 @@ impl TrustServiceType {
     /// reading a list, never as the basis of a compliance decision — the status
     /// is what decides that, and a service of a qualified type can perfectly well
     /// be `withdrawn`.
+    ///
+    /// Held to every service type the standard lists: the thirteen of clause
+    /// 5.5.1.1 all end this way, and none of those of clause 5.5.1.2 or 5.5.1.3
+    /// does. The near misses are `TSA/TSS-QC` and `NationalRootCA-QC`, which end
+    /// in `QC` without the slash and are not qualified service types.
     #[must_use]
     pub fn looks_qualified(&self) -> bool {
         self.0.ends_with("/Q") || self.0.ends_with("/QC") || self.0.ends_with("/QTST")

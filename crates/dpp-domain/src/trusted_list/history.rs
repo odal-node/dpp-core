@@ -10,6 +10,11 @@ use super::status::TrustServiceStatus;
 /// TS 119 612 clause 5.5.5 ("Current status starting date and time") for the
 /// present status, and clause 5.6 ("Service history instance") for each previous
 /// one.
+///
+/// The standard has the instant as the UTC time the status became effective. Its
+/// note to clause 5.5.5 has a relying party compare it with the time a
+/// certificate or time-stamp was issued, which is what
+/// [`TrustServiceHistory::status_at`] does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrustServiceStatusPeriod {
@@ -43,11 +48,12 @@ pub struct TrustServiceStatusPeriod {
 /// 2027, and a present-tense check would certify a seal that never was.
 ///
 /// Trusted lists are built for this. TS 119 612 clause 5.3.12 requires the
-/// retention period for historical information to be `65535`, which the standard
-/// defines as retained indefinitely, and clause 5.5.1 note adds that historical
-/// information "shall be retained even if the service's present status would not
-/// normally" require it. The history is there precisely so that a past question
-/// can be answered.
+/// historical information period to be `65535`, which the standard says means
+/// that historical information is never removed. Clause 5.4.6 adds that the
+/// history is kept even where a service's present status would not otherwise
+/// require it to be listed, such as a withdrawn one, so a provider whose only
+/// service is withdrawn stays listed. The history is there precisely so that a
+/// past question can be answered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrustServiceHistory {

@@ -14,15 +14,21 @@ fn frame_and_strip_round_trip() {
     let stripped = strip_context(framed);
     assert_eq!(stripped["id"], "abc");
     assert!(stripped.get("@context").is_none());
+
+    // And with an issued id, which framing writes as `urn:uuid:` and stripping
+    // turns back.
+    let passport =
+        json!({ "id": dpp_domain::PassportId::new().to_string(), "productGroup": "battery" });
+    assert_eq!(strip_context(frame_passport(passport.clone())), passport);
 }
 
 /// 🚨 `id` aliases the `@id` keyword, and that target is the whole point.
 ///
 /// Pointed anywhere else — `dpp:id`, say — the passport stops being a node
 /// with an identifier and becomes a node carrying a property that happens to
-/// be called `id`, which is a different statement about the same document.
-/// Presence checks cannot see that: the term is still there, still inline,
-/// still spelled `id`. Only its target says whether the passport names itself.
+/// be called `id`, which is a different statement about the same document. It
+/// would also stop layering after `credentials/v2` and `did/v1`: both protect
+/// `id` as `@id`, and only an identical definition may restate a protected term.
 #[test]
 fn the_passport_names_itself_with_the_id_keyword() {
     assert_eq!(
@@ -30,6 +36,35 @@ fn the_passport_names_itself_with_the_id_keyword() {
         json!("@id"),
         "`id` must alias the @id keyword, or the passport stops identifying itself"
     );
+}
+
+/// 🚨 The name it gives itself is absolute, and is the subject of its credential.
+///
+/// A passport's `id` is a bare UUID, which as an `@id` is a relative IRI
+/// reference: converting to RDF with no base dropped every statement about the
+/// passport (jsonld.js reports a "relative @id reference"), and PyLD resolved it
+/// against a base of its own, so a graph holding a passport and its credential
+/// had two unrelated nodes.
+#[test]
+fn a_framed_passport_is_named_by_the_iri_its_credential_uses() {
+    let id = dpp_domain::PassportId::new();
+    let framed = frame_passport(json!({ "id": id.to_string(), "productGroup": "battery" }));
+
+    assert_eq!(framed["id"], json!(crate::passport_iri(id)));
+    assert_eq!(framed["id"], json!(format!("urn:uuid:{id}")));
+}
+
+/// Only the spelling a `PassportId` serialises to is rewritten. Anything else is
+/// not an identifier this crate issued, and a name invented for it would be a
+/// claim about something nobody issued.
+#[test]
+fn an_id_this_crate_did_not_issue_is_left_as_it_is() {
+    let upper = dpp_domain::PassportId::new().to_string().to_uppercase();
+    for id in ["abc", "urn:dpp:abc", upper.as_str()] {
+        let framed = frame_passport(json!({ "id": id }));
+        assert_eq!(framed["id"], json!(id), "{id}");
+        assert_eq!(strip_context(framed)["id"], json!(id), "{id}");
+    }
 }
 
 #[test]
