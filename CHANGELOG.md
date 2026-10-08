@@ -338,6 +338,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Conformance Checker, which is an account-based web service with no API, so it
   cannot run in CI. The oracle still pins DSS 6.2.
 
+- **IDTA's own AAS test tooling now checks every committed Environment, and the
+  register's IDTA row makes a claim.** `aas-test-engines`, which IDTA's
+  `admin-shell-io` organisation publishes as the official test tooling for the
+  Asset Administration Shell, runs in `aas-oracle.yml` beside `aas-core3.0`. The
+  two share no code and no author. Both pass all thirteen Environments (twelve
+  product groups and one scenario), and the new script fails unless an
+  Environment exists for every product group, read from the schema directories.
+  - **The claim is made against IDTA-01001-3-0, not 3-2**, and the register row
+    says why. The tool lists AAS 3.0 and no other revision, and its file check
+    ignores the version it is given. aas-core-works publishes Python packages for
+    3.0 and 3.1 and none for 3.2. A 3-2 claim would have no independent check of
+    its constraints, which include two new ones. The script fails the day the
+    tool lists a second revision, so the pin cannot move past that point unread.
+  - **3-2 adds a `Batch` value to `AssetKind`**, for digital product passports.
+    `dpp-aas` still emits `Instance` for a batch-level passport, which every
+    revision accepts. Whether to emit `Batch` is a mapping decision, and IDTA's
+    change log marks the addition as not backward compatible.
+  - The tool does not implement `AASd-021` and `AASd-077`; its source says so.
+    `aas-core3.0` verifies both, and the register row lists the gap.
+  - The script rejects a duplicated `idShort` and a member the class does not
+    define before it looks at a real Environment, so a tool upgrade that stopped
+    checking would not leave the job green.
+
+  The two tools and everything they install are hash-locked in
+  `.github/oracle/aas/requirements.txt`; the workflow had pinned only
+  `aas-core3.0`. The oracle job keeps its name, since the repository's ruleset
+  requires it by name.
+
 - **The RFCs' own test vectors now run in `just check`.** The signature library,
   the canonicaliser and the key-derivation function had been checked only
   against this repository's own expectations, which cannot catch a misreading
