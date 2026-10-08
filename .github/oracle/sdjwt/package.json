@@ -1,0 +1,11 @@
+{
+  "name": "sdjwt-oracle",
+  "private": true,
+  "description": "CI-only. Pins the independent SD-JWT implementation (RFC 9901) used to judge dpp-crypto::sd_jwt. Never a dependency of any published crate.",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@sd-jwt/core": "0.22.0"
+  }
+}
