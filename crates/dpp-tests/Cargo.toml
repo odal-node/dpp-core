@@ -48,3 +48,7 @@ uuid       = { workspace = true }
 semver     = { workspace = true }
 base64     = { workspace = true }
 jsonschema = { workspace = true }
+# `json_schema_draft07` checks the vendored suite files against the SHA-256s
+# recorded in their NOTICE.md. Both are already in the workspace graph.
+sha2       = { workspace = true }
+hex        = { workspace = true }

@@ -331,6 +331,38 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot hold; and the larger number file and the input and output files that
   the RFC's author publishes separately.
 
+- **The shipped schemas are checked against Draft-07 itself, and the register
+  makes its first conformance claim.** Every product group schema declares
+  Draft-07, but `schema_conformity.rs` showed only that each one compiles in the
+  library that enforces it. That is circular: a schema the library tolerates and
+  Draft-07 forbids would have passed. Two checks now run in `just check`:
+  - every embedded schema, of every version, is validated against the Draft-07
+    meta-schema, vendored verbatim from json-schema.org. The check is shown to
+    reject a bad `type`, `required`, `minimum`, `minLength`, `enum`, `pattern`
+    and `additionalProperties`, at any depth;
+  - the official JSON-Schema-Test-Suite files for the keywords and formats the
+    schemas use (22 files and 710 cases, with `date`, `date-time` and `uri`
+    asserted) run against the pinned `jsonschema` crate as a Draft-07 validator,
+    and the registry's `validator_for` is checked to resolve to Draft-07 for every
+    schema. Every case passes and none is excluded.
+
+  The meta-schema has one blind spot, which the tests assert rather than
+  describe: Draft-07 permits unknown keywords, so a misspelt `minLenght` is a
+  valid schema that constrains nothing. A census of the keywords the schemas use
+  closes it. It fails on any keyword that is not a Draft-07 one, and on any used
+  keyword or format whose suite file is not vendored, naming the file to take.
+
+  The vendored files carry their source, commit and SHA-256 in a `NOTICE.md`, are
+  pinned `-text`, and a test checks the bytes, so a suite file cannot be edited
+  until it passes. Everything passed on the first run, so no schema changed.
+
+  The JSON Schema row of the register now reads `Yes`, with its class, scope and
+  known deviations, and the statement that it is self-declared. It is the first
+  claim in the register. Not run: the keywords no schema uses, such as
+  `patternProperties` and `if`/`then`/`else`; and remote `$ref` retrieval, which
+  the workspace builds the library without. A test checks that no schema has a
+  `$ref` that leaves its document.
+
 ### Fixed
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
