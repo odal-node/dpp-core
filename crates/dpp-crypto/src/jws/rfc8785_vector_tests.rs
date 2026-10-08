@@ -112,6 +112,30 @@ fn every_appendix_b_number_serialises_as_the_rfc_prints_it() {
     }
 }
 
+/// The table above is run from IEEE 754 bit patterns. A passport reaches the
+/// canonicaliser from JSON text, where an integer is an integer to `serde_json`
+/// and not a double, so the same rows are run from their text. Clause 3.1 wants
+/// every input number to be expressible as a double, and 2^53 + 1 is not:
+/// `serde_json` holds it exactly, and canonicalising writes the nearest double,
+/// rounding to even, which is the table's row for `4340000000000000`. Nothing
+/// refuses it, and the register lists that as a deviation.
+#[test]
+fn integers_read_from_text_are_written_as_the_doubles_they_denote() {
+    for (text, expected) in [
+        ("9007199254740992", "9007199254740992"),
+        ("-9007199254740992", "-9007199254740992"),
+        ("9007199254740993", "9007199254740992"),
+        ("-9007199254740993", "-9007199254740992"),
+    ] {
+        let value: Value = serde_json::from_str(text).expect("a JSON number");
+        assert_eq!(
+            String::from_utf8(canonicalize(&value).expect("canonicalises")).expect("UTF-8"),
+            expected,
+            "{text}"
+        );
+    }
+}
+
 /// The RFC publishes the exact bytes. Comparing bytes and not text is the point:
 /// the escapes, the euro sign's three bytes, and the number forms are all in it.
 #[test]

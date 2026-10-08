@@ -572,6 +572,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   produce; DID syntax, resolution and consumption; and the `did:web` method,
   whose specification is not a W3C standard.
 
+- **The standards register makes its first three conformance claims: RFC 9901,
+  RFC 8785 and RFC 8032.** Each is a `Yes` with its class, scope, known
+  deviations, the statement that it is self-declared, and the paths of its
+  evidence, which the claim-form check in `standard_citations.rs` now holds them
+  to. The evidence in each case is the RFC's own test data, run on every build.
+  - **RFC 9901** was the thin one. Its vectors covered a Disclosure and its
+    digest and nothing else, which would have carried a claim for the Disclosure
+    only. The RFC's own complete examples now run through `SdJwt::parse` and
+    `disclosed_payload`: Appendix A.1, A.3 and A.4, with decoy digests, recursive
+    Disclosures and a Key Binding JWT, each processed to the payload the RFC
+    prints; sections 6.1 to 6.3, three structures of one claim, with every digest
+    the RFC prints; and a Holder's presentation rebuilt from A.3's issued token to
+    the RFC's. They passed without a change to the module. Two planted breakages
+    (nested Disclosures not opened, no Disclosure applied) each fail most of them.
+  - **The claim is narrower than the RFC.** It covers object-property Disclosures
+    with SHA-256, no Key Binding and no array elements, and it says so. Array
+    elements (clause 4.2.2) are not read, so a placeholder for one survives into
+    the processed payload where clause 7.1 step 3.d removes it. A test records
+    that, and fails the day array elements are implemented, which is when the
+    register row needs editing. The RFC's own signatures are ES256, which this
+    crate does not implement, so no signature is checked against them; the
+    module never verified the Issuer-signed JWT, and the row says that is the
+    caller's.
+  - **RFC 8785**: the number table already ran from IEEE 754 bit patterns, and
+    now also from text, because a passport reaches the canonicaliser as JSON text
+    where an integer is not a double. An integer a double cannot hold is rounded
+    to the nearest one, which the table's rows for 2^53 pin. The row lists three
+    deviations: `-0` is written as `0` and not refused, which a verified erratum
+    (7920) says a parser should do; a repeated member name is resolved by
+    `serde_json` before the canonicaliser sees it; and an integer beyond ±2^53,
+    which clause 3.1 keeps out of the input by requiring every number to be a
+    double, is written as the nearest double without a warning and not refused.
+  - **RFC 8032**: the five vectors of clause 7.1 are the evidence, run on the
+    `ed25519-dalek` version locked in `Cargo.lock`, since nothing here
+    implements the curve. Verification is `verify_strict`, which refuses a small-
+    order key or nonce and compares the cofactorless equation, so it accepts a
+    subset of what the RFC permits. The row says so.
+
+  The RFC Editor's errata for 8785 and 8032 were read, and none changes a vector.
+  Three more rows have vectors that run (RFC 8037, RFC 9106, RFC 9562) and are not
+  claimed here. RFC 9106's vector runs through the argon2 library with the RFC's
+  parameters and not through the keystore's own, so it would not support a claim
+  about the keystore.
+
 ### Fixed
 
 - **A framed passport had no name in linked data.** The context aliases `id`
