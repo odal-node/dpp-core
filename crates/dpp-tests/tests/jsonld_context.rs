@@ -9,6 +9,7 @@
 //! dead URL.
 
 use dpp_domain::{Gtin, PassportCredential, ProductIdentifier};
+use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::{CredentialBuilder, CredentialRole, DppCredentialSubject};
 use dpp_vc::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 use serde_json::{Value, json};
@@ -511,4 +512,65 @@ fn the_passport_context_fetches_nothing() {
         1,
         "expected exactly one entry, the inline term map"
     );
+}
+
+/// 🚨 The access credential's context redefines nothing the base context
+/// protects, and defines a term for every key its subject emits.
+///
+/// Neither was true, and neither failed anything. The base context
+/// (`credentials/v2`) protects `name` as `https://schema.org/name`, so the
+/// inline `"name": "dpp:name"` made a conforming processor refuse every access
+/// credential outright. And the subject serialises `productGroups` while the
+/// inline term was spelled `product_groups`, so the key had no term and was
+/// dropped on expansion without an error. An independent processor found both
+/// (see `.github/workflows/jsonld-oracle.yml`).
+///
+/// This is the cheap half of that check, for the gate that runs no Python: it
+/// reads the key set off the serialised subject, as
+/// `every_passport_wire_key_has_a_term` does for the passport, rather than
+/// listing it here.
+#[test]
+fn the_access_credential_context_defines_what_its_subject_emits_and_redefines_no_base_term() {
+    // Defined by the base context, which this one is layered on, and protected
+    // there: an inline term of the same name is a processing error.
+    const DEFINED_BY_THE_BASE: &[&str] = &["name"];
+    // `id` is an alias of `@id`, which the base context also defines.
+    const ALIASES: &[&str] = &["id"];
+
+    let mut subject = make_subject(
+        "did:web:holder.example.com",
+        "Test Holder",
+        CredentialRole::AuthorisedRepairer,
+        vec!["textile".into()],
+    );
+    // Both lists are skipped when empty, so a subject that leaves either empty
+    // would leave its key out of the set this test reads.
+    subject.product_categories = vec!["apparel".into()];
+
+    let credential = CredentialBuilder::new("did:web:issuer.example.com".into(), subject).build();
+    let terms = credential
+        .context
+        .iter()
+        .find_map(Value::as_object)
+        .expect("the context carries an inline term map");
+
+    for protected in DEFINED_BY_THE_BASE {
+        assert!(
+            !terms.contains_key(*protected),
+            "`{protected}` is defined and protected by the base context, so redefining it \
+             makes a conforming processor refuse the whole credential"
+        );
+    }
+
+    let emitted = serde_json::to_value(&credential.credential_subject).expect("serialises");
+    for key in emitted.as_object().expect("a subject is an object").keys() {
+        if DEFINED_BY_THE_BASE.contains(&key.as_str()) || ALIASES.contains(&key.as_str()) {
+            continue;
+        }
+        assert!(
+            terms.contains_key(key),
+            "`{key}` is emitted by the access credential's subject and has no term, so it is \
+             dropped on expansion"
+        );
+    }
 }
