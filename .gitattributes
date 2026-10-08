@@ -27,6 +27,15 @@ crates/dpp-tests/fixtures/aas/aas-*.json -text
 # excluded from language stats: they are evidence, not code we maintain.
 crates/dpp-tests/fixtures/aas/aas-*.json linguist-vendored
 
+# The JSON Schema meta-schema and the official test-suite files, carried
+# verbatim with their SHA-256 recorded in the NOTICE.md beside them, for the same
+# two reasons as the schemas above. A glob, so a suite file added later is
+# pinned without anybody having to remember to.
+crates/dpp-tests/fixtures/json-schema/draft-07-schema.json -text
+crates/dpp-tests/fixtures/json-schema/test-suite/** -text
+crates/dpp-tests/fixtures/json-schema/draft-07-schema.json linguist-vendored
+crates/dpp-tests/fixtures/json-schema/test-suite/** linguist-vendored
+
 # W3C context documents, carried verbatim. The oracle script checks their
 # SHA-256 against the hashes in the NOTICE.md beside them, so the same `-text`
 # reasoning applies, and for the same reason they are evidence, not code.
@@ -38,3 +47,8 @@ crates/dpp-tests/fixtures/jsonld/*.jsonld linguist-vendored
 # Collapsed in review because a mapper change is meant to arrive as a readable
 # diff, and it cannot be read when buried in several thousand generated lines.
 crates/dpp-tests/fixtures/aas/environments/*.json linguist-generated
+
+# ETSI's JSON Schemas for JAdES, carried verbatim with their SHA-256 recorded in
+# the NOTICE.md beside them, for the same two reasons as the AAS schemas above.
+crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** -text
+crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** linguist-vendored

@@ -833,9 +833,11 @@ dependencies = [
  "dpp-vc",
  "dpp-vocab",
  "ed25519-dalek",
+ "hex",
  "jsonschema",
  "semver",
  "serde_json",
+ "sha2",
  "tokio",
  "uuid",
 ]

@@ -1,0 +1,77 @@
+# Runs the DID documents we produce through the W3C's own DID test suite.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the AAS and
+# GS1 oracles are: the suite is Node, and `cargo build --workspace` succeeding
+# with no native toolchain and no services is a property this project states
+# publicly. Keeping the dependency here means the main gate never acquires it.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever. The job is a minute or two, so running it
+# always costs little and leaves it eligible to be required.
+name: W3C DID suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  documents:
+    name: DID documents pass the W3C DID test suite
+    runs-on: ubuntu-latest
+    steps:
+      # Neither checkout keeps the token. This job installs a few hundred npm
+      # packages that run lifecycle scripts, and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Pinned to a commit, and moved only by a deliberate edit with a visible
+      # diff. The suite publishes no tags or releases, so a commit is the only
+      # exact name it has, and its `main` moves whenever an implementer adds a
+      # test result. This is the W3C's judgement about what DID Core requires; an
+      # unpinned run would turn their next change into a red build here on code
+      # that did not change. Dependabot does not watch this line.
+      - name: Check out the W3C DID test suite
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: w3c/did-test-suite
+          ref: 939b31d07d5b1699340ac0702ec0fa46ffcdef0a
+          path: target/did-test-suite
+          persist-credentials: false
+
+      # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and
+      # rustup is already on the runner, so invoking cargo selects the pinned
+      # toolchain by itself.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      # `npm ci`, from the suite's own lockfile, so what runs is what was
+      # locked. Actions sets `CI`, which also makes the suite's lerna bootstrap
+      # install each of its packages with `npm ci` and build its matcher library.
+      - name: Install the suite
+        working-directory: target/did-test-suite
+        run: npm ci --no-audit --no-fund
+
+      - name: Record what is actually being run
+        run: |
+          echo "node $(node --version)"
+          git -C target/did-test-suite log -1 --format='w3c/did-test-suite %H (%cs)'
+
+      - name: Produce DID documents from our own builder
+        run: EMIT_DID_SUITE_INPUT=1 cargo test -p dpp-vc --test did_suite_input
+
+      - name: Run the suite over them
+        run: node .github/scripts/did_suite_oracle.mjs target/did-oracle/implementation.json target/did-test-suite
