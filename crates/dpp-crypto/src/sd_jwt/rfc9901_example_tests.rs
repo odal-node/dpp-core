@@ -21,18 +21,6 @@
 //! payload, so those tests give it a stub JWT around it. Key Binding is not
 //! checked either: the Key Binding JWT at the end of A.3 and A.4 is tolerated and
 //! carried, which is the most this module does with it.
-//!
-//! The RFC's data in this file is reused as Code Components under the IETF
-//! Trust's Legal Provisions Relating to IETF Documents:
-//!
-//! > Copyright (c) 2025 IETF Trust and the persons identified as authors of the
-//! > code. All rights reserved.
-//! >
-//! > Redistribution and use in source and binary forms, with or without
-//! > modification, is permitted pursuant to, and subject to the license terms
-//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
-//! > Trust's Legal Provisions Relating to IETF Documents
-//! > (<https://trustee.ietf.org/license-info>).
 
 use base64::Engine;
 use serde_json::{Map, Value, json};
@@ -136,7 +124,7 @@ fn every_digest_the_rfc_prints_is_the_digest_of_its_disclosure() {
     for (name, digest, encoded) in printed {
         assert_eq!(digest_of(encoded), digest, "{name}");
         let parsed = disclosure(encoded);
-        assert_eq!(parsed.claim_name(), name);
+        assert_eq!(parsed.claim_name(), Some(name));
         assert_eq!(parsed.digest(), digest, "{name}");
     }
 }
@@ -331,39 +319,4 @@ fn a_holder_presenting_the_rfcs_choice_from_the_issued_token_gives_the_rfcs_pres
         Value::Object(presented.disclosed_payload().expect("processes")),
         json_of(A3_PROCESSED)
     );
-}
-
-/// 🚨 A recorded deviation, not a behaviour to rely on. Clause 4.2.2 hides an array
-/// element behind a placeholder `{"...": "<digest>"}`, and clause 7.1 step 3.d has
-/// a Verifier remove every placeholder it has no Disclosure for. This module does
-/// not read array-element Disclosures, so such a placeholder survives into the
-/// processed payload as the object it is, where a consumer expecting an array of
-/// values will find an object. The register lists it as a deviation. When array
-/// elements are implemented this test fails, and the row is the next thing to edit.
-#[test]
-fn array_element_placeholders_survive_processing_unread() {
-    let payload = json!({
-        "iss": "https://issuer.example.com",
-        "nationalities": [{ "...": "w0I8EKcdCtUPkGCNUrfwVp2xEgNjtoIDlOxc9-PlOhs" }, "DE"],
-        "_sd_alg": "sha-256"
-    });
-    let shown = processed_with(&payload.to_string(), &[]).expect("processes");
-
-    assert_eq!(
-        shown["nationalities"],
-        json!([{ "...": "w0I8EKcdCtUPkGCNUrfwVp2xEgNjtoIDlOxc9-PlOhs" }, "DE"]),
-        "clause 7.1 step 3.d would leave only the elements that were in the clear"
-    );
-}
-
-/// The other half of the same deviation: a two-element Disclosure, which is how
-/// clause 4.2.2 spells an array element, is refused outright rather than applied.
-#[test]
-fn a_two_element_array_disclosure_is_refused_not_applied() {
-    // ["lklxF5jMYlGTPUovMNIvCA", "FR"], as clause 4.2.2 forms one.
-    let array_element = "WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIkZSIl0";
-    assert!(matches!(
-        Disclosure::parse(array_element),
-        Err(super::DisclosureError::NotATriple)
-    ));
 }

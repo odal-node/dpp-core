@@ -14,7 +14,7 @@ use super::error::{DisclosureError, SdJwtError};
 /// check is [`crate::jws::verifier`]'s. A stub JWT with a real payload is all
 /// the mechanism needs, and using one keeps a key out of tests that do not
 /// depend on signing.
-fn stub_jwt(payload: &Value) -> String {
+pub(super) fn stub_jwt(payload: &Value) -> String {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     format!(
@@ -138,7 +138,9 @@ fn a_tampered_disclosure_is_refused_not_ignored() {
     let original = &issued.disclosures()[0];
     let forged = Disclosure::with_salt(
         original.salt().to_owned(),
-        original.claim_name(),
+        original
+            .claim_name()
+            .expect("a property disclosure has a name"),
         json!("forged"),
     )
     .unwrap();
@@ -219,14 +221,23 @@ fn reserved_claim_names_are_refused() {
 }
 
 #[test]
-fn a_two_element_array_disclosure_is_refused() {
+fn an_array_of_any_length_but_two_or_three_is_refused() {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let encoded = b64.encode(json!(["salt", "value"]).to_string());
-    assert_eq!(
-        Disclosure::parse(&encoded),
-        Err(DisclosureError::NotATriple)
-    );
+    for shape in [
+        json!(["salt"]),
+        json!(["salt", "name", "value", "extra"]),
+        json!([]),
+        json!({ "salt": "x" }),
+        json!(["salt", 5, "value"]),
+        json!([5, "value"]),
+    ] {
+        assert_eq!(
+            Disclosure::parse(&b64.encode(shape.to_string())),
+            Err(DisclosureError::NotATripleOrPair),
+            "{shape}"
+        );
+    }
 }
 
 #[test]
@@ -355,4 +366,72 @@ fn every_constructed_disclosure_round_trips() {
         let d = Disclosure::new(name, value).unwrap();
         assert_eq!(Disclosure::parse(d.encoded()).unwrap(), d);
     }
+}
+
+/// Disclosures chained so that each is nested `depth` deep and ends in the
+/// digest of the next. Each one alone is well within `serde_json`'s limit.
+fn nested_chain(links: usize, depth: usize) -> (Value, Vec<Disclosure>) {
+    let mut next: Option<String> = None;
+    let mut disclosures = Vec::new();
+    for link in 0..links {
+        let mut value = next.map_or(json!(1), |digest| json!({ "_sd": [digest] }));
+        for _ in 0..depth {
+            value = json!({ "a": value });
+        }
+        let disclosure = Disclosure::new(format!("link{link}"), value).expect("a disclosure");
+        next = Some(disclosure.digest());
+        disclosures.push(disclosure);
+    }
+    (
+        json!({ "_sd": [next.expect("at least one link")] }),
+        disclosures,
+    )
+}
+
+/// Disclosures nested inside one another go past the bound and are refused.
+#[test]
+fn a_chain_of_deep_disclosures_is_refused() {
+    let (payload, disclosures) = nested_chain(100, 120);
+    let result = SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload();
+    assert_eq!(result, Err(SdJwtError::TooDeep(127)));
+}
+
+/// The bound is exactly the deepest `serde_json` goes: a single payload nested as
+/// deep as it will parse is read, and one level more, which only a Disclosure can
+/// add, is refused.
+#[test]
+fn the_nesting_bound_is_where_serde_json_stops() {
+    let text = format!("{{\"a\":{}1{}}}", "[".repeat(126), "]".repeat(126));
+    let payload: Value = serde_json::from_str(&text).expect("127 levels, which serde_json reads");
+    assert!(
+        SdJwt::new(stub_jwt(&payload), Vec::new())
+            .disclosed_payload()
+            .is_ok()
+    );
+
+    let deeper = format!("{{\"a\":{}1{}}}", "[".repeat(127), "]".repeat(127));
+    assert!(
+        serde_json::from_str::<Value>(&deeper).is_err(),
+        "serde_json refuses one more"
+    );
+
+    // One link holding a value nested `depth` times sits at depth `depth + 1`.
+    let (payload, disclosures) = nested_chain(1, 126);
+    assert!(
+        SdJwt::new(stub_jwt(&payload), disclosures)
+            .disclosed_payload()
+            .is_ok()
+    );
+    let (payload, disclosures) = nested_chain(1, 127);
+    assert_eq!(
+        SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload(),
+        Err(SdJwtError::TooDeep(127))
+    );
+}
+
+#[test]
+fn a_chain_within_the_nesting_bound_is_read() {
+    let (payload, disclosures) = nested_chain(2, 60);
+    let result = SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload();
+    assert!(result.is_ok(), "{result:?}");
 }

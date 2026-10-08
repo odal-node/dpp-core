@@ -230,7 +230,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that writes a marked field must also write its statement. Write textile
   passports at v1.4.0.
 
-
 - **`DigitalLink::parse` holds every AI value to GS1's dictionary, and reads the
   scheme and the host as the grammar has them.** Until now a value was checked
   for its maximum length and, if the AI was all `X`, for CSET 82, and nothing
@@ -272,6 +271,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `percent_encode` now escapes everything outside RFC 3986's unreserved set, where
   it left `!&'()*+,;=:` raw: the grammar spells those as escapes, so a carrier
   with such a character in a serial is built differently, and reads back the same.
+
+- **`Disclosure::claim_name` returns an `Option`, and an SD-JWT Disclosure is
+  either of two kinds.** RFC 9901 has a second Disclosure, the two-element
+  `[salt, value]` of clause 4.2.2 for an array element, and the type now holds
+  both. An array element has no name, so `claim_name()` is `None` for it, and
+  `is_array_element()` tells the kinds apart. `DisclosureError::NotATriple` is now
+  `NotATripleOrPair`, since a pair is no longer an error, and `SdJwtError` gains
+  `WrongDisclosureKind`. Nothing outside the module's own tests and `dpp-vc`'s
+  read a name.
 
 ### Added
 
@@ -572,6 +580,36 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   produce; DID syntax, resolution and consumption; and the `did:web` method,
   whose specification is not a W3C standard.
 
+- **SD-JWT array elements (RFC 9901 clause 4.2.2) are now read and written.**
+  An issuer can hide one element of an array and leave the rest, and the verifier
+  had no way to take that back. A placeholder `{"...": "<digest>"}` with a
+  Disclosure becomes the value it hid, in its position, and is read in turn for
+  placeholders and `_sd` arrays of its own. A placeholder with no Disclosure is
+  removed, as clause 7.1 step 3.d says; before, it reached the caller as an object
+  where a string was expected.
+  - **Verifier.** A digest may not appear twice in the token, whichever way it is
+    embedded. A Disclosure of the wrong kind for the digest that matched it is
+    refused (steps 3.c.ii.1 and 3.c.iii.1), an object of one key `...` holding a
+    string is a placeholder and any other object is left as an object, and an
+    element Disclosure no digest refers to refuses the token, as any other does.
+  - **Holder.** `present` selects by digest and needed no change.
+  - **Issuer.** `Disclosure::element` and `conceal_elements` hide chosen elements
+    in place, one salt each, and sort nothing, since the order of an array is its
+    data. They add no decoys and do not descend, and the register says the
+    payload around the digests is checked by this repository's tests alone.
+  - **Evidence.** The RFC's own cases now run: the worked example of clauses 4.2.2
+    and 4.2.4.2 with both outputs it states, section 5.1's issuance of two
+    nationalities, section 5.2's presentation of one with the Processed payload
+    the RFC prints, and Appendix A.2, where the disclosed element holds digests of
+    its own. They passed on the first run. Six planted breakages (a kept
+    placeholder, a revealed element not read in turn, no kind check, no repeat
+    check on placeholders, a revealed element not counted as used, a placeholder
+    with a second key) are each caught. A property test holds the whole round trip
+    to a model of which elements should remain.
+  - **Not done.** Nothing in `dpp-vc` issues array-element Disclosures: the access
+    policy classes fields, and says nothing of one element of an array. That is a
+    decision for whatever consumes this, not for this crate.
+
 - **The standards register makes its first three conformance claims: RFC 9901,
   RFC 8785 and RFC 8032.** Each is a `Yes` with its class, scope, known
   deviations, the statement that it is self-declared, and the paths of its
@@ -586,15 +624,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     the RFC prints; and a Holder's presentation rebuilt from A.3's issued token to
     the RFC's. They passed without a change to the module. Two planted breakages
     (nested Disclosures not opened, no Disclosure applied) each fail most of them.
-  - **The claim is narrower than the RFC.** It covers object-property Disclosures
-    with SHA-256, no Key Binding and no array elements, and it says so. Array
-    elements (clause 4.2.2) are not read, so a placeholder for one survives into
-    the processed payload where clause 7.1 step 3.d removes it. A test records
-    that, and fails the day array elements are implemented, which is when the
-    register row needs editing. The RFC's own signatures are ES256, which this
-    crate does not implement, so no signature is checked against them; the
-    module never verified the Issuer-signed JWT, and the row says that is the
-    caller's.
+  - **The claim is narrower than the RFC.** It covers Disclosures for object
+    properties and for array elements with SHA-256, with no Key Binding and no
+    decoys issued, and it says so. The RFC's own signatures are ES256, which this
+    crate does not implement, so no signature is checked against them; the module
+    never verified the Issuer-signed JWT, and the row says that is the caller's.
   - **RFC 8785**: the number table already ran from IEEE 754 bit patterns, and
     now also from text, because a passport reaches the canonicaliser as JSON text
     where an integer is not a double. An integer a double cannot hold is rounded
@@ -647,6 +681,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the link no longer meant the key it was built from. `DigitalLink::build` now
   escapes the primary key as it does a qualifier. The round-trip check over the new
   corpus found it.
+
+- **Processing an SD-JWT payload is now bounded in depth.** `disclosed_payload`
+  recursed once per level of the processed payload and nothing limited how deep
+  that went. `serde_json` limits each Disclosure it parses, but each Disclosure is
+  parsed on its own, so Disclosures nested inside one another could go deeper than
+  it allows in a single document. Processing now refuses a value deeper than 127
+  levels, the deepest a value sits in a document `serde_json` parses, with
+  `SdJwtError::TooDeep`, so no payload `serde_json` would parse on its own is
+  refused; a test pins both sides of that line. The recursion predates array
+  elements, which add a second path into it.
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it

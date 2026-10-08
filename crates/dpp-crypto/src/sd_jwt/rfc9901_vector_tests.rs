@@ -42,7 +42,7 @@ const RFC_VARIANTS: [&str; 3] = [
 fn the_rfc_example_disclosure_hashes_to_its_published_digest() {
     let d = Disclosure::parse(RFC_DISCLOSURE).expect("the RFC's disclosure parses");
     assert_eq!(d.salt(), "_26bc4LT-ac6q2KI6cBW5es");
-    assert_eq!(d.claim_name(), "family_name");
+    assert_eq!(d.claim_name(), Some("family_name"));
     assert_eq!(d.claim_value(), &json!("Möbius"));
     assert_eq!(d.digest(), RFC_DIGEST);
     assert_eq!(digest_of(RFC_DISCLOSURE), RFC_DIGEST);
@@ -57,7 +57,7 @@ fn every_rfc_encoding_of_one_claim_reads_the_same_and_hashes_apart() {
     let mut digests = vec![digest_of(RFC_DISCLOSURE)];
     for variant in RFC_VARIANTS {
         let d = Disclosure::parse(variant).expect("each RFC variant parses");
-        assert_eq!(d.claim_name(), "family_name", "{variant}");
+        assert_eq!(d.claim_name(), Some("family_name"), "{variant}");
         assert_eq!(d.claim_value(), &json!("Möbius"), "{variant}");
         assert_eq!(d.digest(), digest_of(variant), "{variant}");
         digests.push(d.digest());
