@@ -1,0 +1,69 @@
+# Expands the JSON-LD this workspace emits with an independent JSON-LD 1.1
+# processor.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the AAS and
+# GS1 oracles are: this needs Python, and `cargo build --workspace` succeeding
+# with no Python, no native toolchain and no services is a property this project
+# states publicly. Keeping the dependency here means the main gate never
+# acquires it.
+#
+# What it answers: *does an independent JSON-LD processor accept every context
+# and document we emit, and does it keep every property?* The Rust tests hold the
+# contexts to this repository's own reading of the specification, which a
+# transcription error passes, and which cannot see a key that no term reaches. A
+# processor drops such a key with everything inside it and says nothing.
+#
+# It does **not** answer whether any IRI is the right IRI. Conformance of the
+# documents is the claim; the meaning of the vocabulary is not.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever.
+name: JSON-LD oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  expand:
+    name: JSON-LD documents expand under an independent processor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      # Pinned exactly, with hashes, for the processor and everything it pulls
+      # in. This is somebody else's judgement about what JSON-LD permits, and an
+      # unpinned upgrade would turn their tightening into our red build on code
+      # that did not change. Moving the pin is a deliberate edit with a visible
+      # diff: change `requirements.in`, regenerate `requirements.txt` with the
+      # command in its header, and cite the new version in the register row.
+      - name: Install the JSON-LD processor
+        run: pip install --no-input --require-hashes -r .github/oracle/jsonld/requirements.txt
+
+      - name: Record what is actually being run
+        run: python -c "import importlib.metadata as m; print('PyLD', m.version('pyld'))"
+
+      # No Rust toolchain action, for the reason given in `gs1-oracle.yml`:
+      # `rust-toolchain.toml` pins the channel and rustup is already on the
+      # runner.
+      - name: Build the corpus from our own builders
+        run: EMIT_JSONLD_CORPUS=1 cargo test -p dpp-tests --test jsonld_oracle_corpus
+
+      - name: Expand every context and document
+        run: python .github/scripts/jsonld_oracle.py

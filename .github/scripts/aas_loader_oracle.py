@@ -20,9 +20,9 @@ Three checks, each catching something the others do not:
   round-trip    information dropped or invented on the way back out
 
 **Passing this is not IDTA conformance.** It says a reference implementation
-accepts the document. Conformance is a separate process against IDTA's own test
-tooling, and neither says anything about whether a submodel matches a published
-submodel template.
+accepts the document. IDTA's own test tooling judges the same files in
+`aas_test_engines_oracle.py`, and neither says anything about whether a submodel
+matches a published submodel template.
 
 Note that a lenient implementation is worth nothing here: Eclipse BaSyx accepts
 unknown members and would have reported success on the `unit` defect. An oracle

@@ -15,6 +15,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
+  passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
+  `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
+  `strip_context` turns it back. Only an `id` spelled as a `PassportId`
+  serialises (lower-case, hyphenated) is rewritten. `id` still aliases `@id`, so
+  the context still layers after `credentials/v2` and `did/v1`. **Migration:** a
+  caller that stamps `context_value()` onto a passport itself, rather than calling
+  `frame_passport`, writes `id` as `passport_iri(id)` too; left as a bare UUID it
+  is a relative IRI, which names nothing. See Fixed for why.
+
 - **A key is named by its own thumbprint, and every signature names the key
   that made it.** Until now, verification methods were named by position. The
   current key was always `#key-1`, and archived keys were renumbered whenever a
@@ -348,6 +358,103 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   method specification is a W3C Community Group document marked `unofficial`,
   not a W3C standard.
 
+- **The JAdES module's headers are checked against ETSI's own JSON Schema, and the
+  register's JAdES row now makes a claim.** The module's tests check its output
+  against this repository's own reading of ETSI TS 119 182-1, and the DSS oracle
+  judges one signature. Annex B of V1.2.1 is normative and names ETSI's JSON
+  Schemas for the protected header. They are now vendored, under their
+  BSD-3-Clause licence, and every header shape the builder emits at B-B is
+  validated against `19182-protected-jsonSchema.json` in `just check`.
+  - `x5c` with `x5t#S256`, which is the form the EU profile of Implementing
+    Regulation (EU) 2026/248 asks for, and `x5t#S256` alone, pass, each with and
+    without a content type.
+  - Nine broken headers fail: no `alg`, no certificate reference, no signing time,
+    both `iat` and `sigT`, the SHA-1 `x5t`, and four wrong types. Dropping `iat`
+    from the builder, or adding `x5t`, fails the check with the schema's own
+    message.
+  - **ETSI's published schema cannot be applied as written.** It declares
+    `contentEncoding: base64` for `x5t#S256`, which RFC 7515 defines as base64url,
+    so a correct thumbprint containing `-` or `_` fails a validator that asserts
+    the keyword. The test reads `base64` as either alphabet, which still rejects a
+    string that is neither, and asserts the defect.
+  - **The schema is weaker than DSS.** It accepts a header with `x5c` alone, which
+    is clause 5.1.7's "at least one of", and DSS reports that as not baseline. The
+    test asserts the gap, and the claim does not cover that form.
+
+  The files carry their source, tag and SHA-256 in a `NOTICE.md`, are pinned
+  `-text`, and a test checks the bytes. Everything passed on the first run apart
+  from the encoding point, so the module did not change.
+
+  The register row reads `Yes`, with its class, scope and deviations and the
+  statement that it is self-declared. The comments that called the DSS oracle the
+  one check that is not circular now name both. Not run: ETSI's own Signature
+  Conformance Checker, which is an account-based web service with no API, so it
+  cannot run in CI. The oracle still pins DSS 6.2.
+
+- **IDTA's own AAS test tooling now checks every committed Environment, and the
+  register's IDTA row makes a claim.** `aas-test-engines`, which IDTA's
+  `admin-shell-io` organisation publishes as the official test tooling for the
+  Asset Administration Shell, runs in `aas-oracle.yml` beside `aas-core3.0`. The
+  two share no code and no author. Both pass all thirteen Environments (twelve
+  product groups and one scenario), and the new script fails unless an
+  Environment exists for every product group, read from the schema directories.
+  - **The claim is made against IDTA-01001-3-0, not 3-2**, and the register row
+    says why. The tool lists AAS 3.0 and no other revision, and its file check
+    ignores the version it is given. aas-core-works publishes Python packages for
+    3.0 and 3.1 and none for 3.2. A 3-2 claim would have no independent check of
+    its constraints, which include two new ones. The script fails the day the
+    tool lists a second revision, so the pin cannot move past that point unread.
+  - **3-2 adds a `Batch` value to `AssetKind`**, for digital product passports.
+    `dpp-aas` still emits `Instance` for a batch-level passport, which every
+    revision accepts. Whether to emit `Batch` is a mapping decision, and IDTA's
+    change log marks the addition as not backward compatible.
+  - The tool does not implement `AASd-021` and `AASd-077`; its source says so.
+    `aas-core3.0` verifies both, and the register row lists the gap.
+  - The script rejects a duplicated `idShort` and a member the class does not
+    define before it looks at a real Environment, so a tool upgrade that stopped
+    checking would not leave the job green.
+
+  The two tools and everything they install are hash-locked in
+  `.github/oracle/aas/requirements.txt`; the workflow had pinned only
+  `aas-core3.0`. The oracle job keeps its name, since the repository's ruleset
+  requires it by name.
+
+- **An independent JSON-LD processor now expands everything this workspace
+  emits, and the register's JSON-LD row makes a claim.** The context tests held
+  the contexts to this repository's own reading of JSON-LD, and said that the
+  workspace ran no processor. `jsonld-oracle.yml` now builds a corpus with the
+  real builders (a DID document at a first key and after a rotation, the passport
+  credential, the access credential with and without a status entry, and a framed
+  passport of each of the twelve product groups, plus the five contexts they
+  carry) and expands all of it with PyLD 3.3.0, in JSON-LD 1.1 mode.
+  - It fails on a processor error, and on any property that expands to nothing.
+    The processor reports each dropped property, and the same set is recomputed
+    from an expand-and-compact round trip so each is named by path.
+  - The processor is given the three W3C contexts the documents reference
+    (`credentials/v2`, `did/v1`, `cid/v1`), vendored with their SHA-256, and no
+    other. A context added to a builder fails the oracle by name until somebody
+    vendors it.
+  - It fails on a node identifier that is a relative IRI. PyLD is passed an
+    explicit null base for that: when the option is left out, it resolves a
+    relative IRI against `http://example.org/base/` of its own accord, which is
+    how the passport's identifier, below, went unseen until a second processor
+    (jsonld.js) was run over the same corpus.
+  - It fails if one of our contexts can no longer be layered after
+    `credentials/v2` or `did/v1`, which both protect `id` as `@id`.
+  - Planted defects were each caught: a key with no term, a term mapped to
+    nothing or to a relative IRI, the scoped `productIdentifier` context removed
+    (which drops `gtin` and `scheme`), and an edited vendored context.
+  - **One gap is listed, not hidden.** A framed passport's context defines a term
+    for each key of the envelope and for the product identifier, and for nothing
+    beneath them. A processor therefore drops the keys inside `manufacturer`,
+    `materials` and the other envelope objects, and every key of
+    `productGroupData` except the identifier: 191 key paths across the corpus.
+    The documents are still conforming JSON-LD, and they still carry the
+    envelope's meaning, but a consumer reading the `ld+json` form gets no linked
+    data below it. The oracle allows exactly that gap, fails on any other drop,
+    and fails when the gap closes so the allowance is deleted. Whether to give
+    those keys terms is a vocabulary decision this change does not make.
+
 - **GS1 Digital Link URI Syntax 1.7.0 is the revision this crate is read against,
   and the register's GS1 row makes a claim.** The revision had never been
   established: an earlier "v1.2" had no source, and the parser had been diffed
@@ -412,7 +519,84 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot hold; and the larger number file and the input and output files that
   the RFC's author publishes separately.
 
+- **The shipped schemas are checked against Draft-07 itself, and the register
+  makes its first conformance claim.** Every product group schema declares
+  Draft-07, but `schema_conformity.rs` showed only that each one compiles in the
+  library that enforces it. That is circular: a schema the library tolerates and
+  Draft-07 forbids would have passed. Two checks now run in `just check`:
+  - every embedded schema, of every version, is validated against the Draft-07
+    meta-schema, vendored verbatim from json-schema.org. The check is shown to
+    reject a bad `type`, `required`, `minimum`, `minLength`, `enum`, `pattern`
+    and `additionalProperties`, at any depth;
+  - the official JSON-Schema-Test-Suite files for the keywords and formats the
+    schemas use (22 files and 710 cases, with `date`, `date-time` and `uri`
+    asserted) run against the pinned `jsonschema` crate as a Draft-07 validator,
+    and the registry's `validator_for` is checked to resolve to Draft-07 for every
+    schema. Every case passes and none is excluded.
+
+  The meta-schema has one blind spot, which the tests assert rather than
+  describe: Draft-07 permits unknown keywords, so a misspelt `minLenght` is a
+  valid schema that constrains nothing. A census of the keywords the schemas use
+  closes it. It fails on any keyword that is not a Draft-07 one, and on any used
+  keyword or format whose suite file is not vendored, naming the file to take.
+
+  The vendored files carry their source, commit and SHA-256 in a `NOTICE.md`, are
+  pinned `-text`, and a test checks the bytes, so a suite file cannot be edited
+  until it passes. Everything passed on the first run, so no schema changed.
+
+  The JSON Schema row of the register now reads `Yes`, with its class, scope and
+  known deviations, and the statement that it is self-declared. It is the first
+  claim in the register. Not run: the keywords no schema uses, such as
+  `patternProperties` and `if`/`then`/`else`; and remote `$ref` retrieval, which
+  the workspace builds the library without. A test checks that no schema has a
+  `$ref` that leaves its document.
+
+- **The W3C's DID test suite now runs over the DID documents we produce.**
+  `build_did_document` had been checked only by tests written by the people who
+  wrote it. A new workflow, `did-oracle.yml`, builds five documents with it: a
+  first key, a hygiene rotation, a compromise, both of those in one history, and
+  a host with a port. It then runs the suite's `did-core-properties` and
+  `did-production` suites over them, 185 assertions, all passing. The suite is
+  Node, so it has its own workflow and the workspace build still needs none. It
+  is pinned to a commit of `w3c/did-test-suite`, which publishes no releases, and
+  installed from its own lockfile.
+
+  The same job runs those documents again with two rules broken on purpose, and
+  fails unless the suite goes red. A matcher that had stopped checking anything
+  would otherwise leave the job green.
+
+  The documents are given to the suite as the JSON-LD representation, which is
+  what they are: each carries `@context`. The register's DID row now claims a
+  conforming DID document, with the scope and the rules the suite does not reach.
+  Not claimed: the plain JSON representation, which this library does not
+  produce; DID syntax, resolution and consumption; and the `did:web` method,
+  whose specification is not a W3C standard.
+
 ### Fixed
+
+- **A framed passport had no name in linked data.** The context aliases `id`
+  to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI
+  reference. Converting a framed passport to RDF with no base IRI dropped every
+  statement about the passport itself (jsonld.js reports a "relative @id
+  reference"), and a processor that supplies a base named the passport after
+  wherever that was. The passport's credential names it `urn:uuid:` and its id,
+  so even with a base the two were unrelated nodes. `frame_passport` now writes
+  `id` in that form, from the new `dpp_vc::passport_iri`, which the credential's
+  subject uses too, and `strip_context` turns it back. With it, PyLD and
+  jsonld.js give the same canonical RDF for every document in the oracle's
+  corpus.
+
+- **A JSON-LD processor refused every access credential, and one of its
+  subject's keys had no term.** The credential's inline context redefined `name`,
+  which the base context (`credentials/v2`) protects as `https://schema.org/name`,
+  and a conforming processor fails the whole document when a protected term is
+  redefined. The subject also serialises `productGroups`, while the term was
+  spelled `product_groups`, so the key was dropped on expansion with no error.
+  The redefinition is gone, so `name` is schema.org's, and the term is now
+  `productGroups`, in the camelCase spelling the other terms use. Both were found
+  by running a processor over the credentials; nothing in this workspace had.
+  The credential's `@context` array is unchanged in shape, and `dpp:productGroups`
+  replaces `dpp:product_groups` as the IRI.
 
 - **A primary key's value was written into a Digital Link unescaped.** A CPID may
   hold `#` and `/`, so `AB-C#/` was built as a fragment and a new path segment, and
@@ -521,6 +705,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   **Elsewhere.** The document named two audiences it had no basis to address,
   and `GOVERNANCE.md` pointed at a `docs/design/` directory that does not
   exist. Both are fixed.
+
+- **The trusted-list vocabulary was re-read against ETSI TS 119 612 V2.4.1, and
+  two of its clause citations were wrong.** `trusted_list` cited V2.3.1, and
+  V2.4.1 had since been published. Compared word for word, the two versions
+  differ only in wording, cross-references and the schema attachment, so nothing
+  the module reads has changed: the service type URIs, the status values, the
+  status history and the retention rule.
+  - **The citation is not simply moved to V2.4.1.** Implementing Regulations (EU)
+    2025/1945 and 2025/1946, which the module's header cites, name V2.3.1
+    themselves. Only the template of Implementing Decision (EU) 2015/1505, as
+    amended by Implementing Decision (EU) 2025/2164, names V2.4.1. The module now
+    says so, and the register row records both revisions.
+  - `TrustServiceStatus` described clauses 5.5.1.2 and 5.5.1.3 as both nationally
+    defined. Clause 5.5.1.2 is the Regulation's non-qualified service types. It
+    also omitted `deprecatedbynationallaw` from the statuses it sets aside.
+  - `TrustServiceHistory` put the rule that history is kept even when a service's
+    present status would not require it in a note to clause 5.5.1. It is in
+    clause 5.4.6.
+  - The module header's date for the Art. 51(3) transitional, 21 May 2026, is
+    checked against the consolidated text and pinned, which takes the file off the
+    list of files that state a figure without a source.
+  - A test holds the `looks_qualified` naming convention to every service type
+    the standard lists.
+
+  The register row stays `No`: the standard defines the list a scheme operator
+  publishes, and this crate consumes lists, so there is no conformance class for
+  it to claim.
 
 ## [0.21.0] - 2026-09-28
 

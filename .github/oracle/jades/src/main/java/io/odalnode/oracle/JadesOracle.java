@@ -20,8 +20,10 @@ import java.util.List;
  * The Rust tests for the JAdES module check its output against <em>our own
  * reading</em> of ETSI TS 119 182-1. That reading cites every clause it relies
  * on, but it is still ours — a test built from a transcription agrees with the
- * transcription, including wherever the transcription is wrong. This is the one
- * check available that is not circular.
+ * transcription, including wherever the transcription is wrong. This is one of
+ * two checks that are not circular, and the one that judges a whole signature.
+ * The other holds the protected header to ETSI's own JSON Schema, in
+ * {@code crates/dpp-tests/tests/jades_annex_b_schemas.rs}.
  *
  * <h2>What it asserts, and what it deliberately does not</h2>
  *

@@ -47,7 +47,7 @@ pub use credential::{
 pub use did_builder::{build_did_document, did_for};
 pub use jsonld::{REMOTE_CONTEXTS, context_value, frame_passport, passport_context, strip_context};
 pub use local_service::LocalIdentityService;
-pub use passport_credential::{PassportCredential, PassportCredentialSubject};
+pub use passport_credential::{PassportCredential, PassportCredentialSubject, passport_iri};
 pub use sd_jwt_vc::{SdJwtVcError, TYP as SD_JWT_VC_TYP, build_issuer_metadata, vct_for};
 pub use snapshot::{CLOCK_SKEW_TOLERANCE, SnapshotBound, verify_snapshot_bound};
 pub use status_list::StatusList;
