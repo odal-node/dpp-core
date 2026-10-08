@@ -30,11 +30,12 @@
 //!
 //! ## What this does not do
 //!
-//! The dictionary names a *linter* per component (`csum`, `gcppos2`, …) whose
-//! reference implementations are a separate GS1 resource that is not vendored.
-//! This module reads lengths, flags, and whether a value is CSET 82 throughout.
-//! Content validation beyond the check digit this crate already implements is
-//! not performed, and nothing here supports a claim of full GS1 validation.
+//! The dictionary names a *linter* per component (`csum`, `gcppos2`, …). This
+//! module reads the components, their lengths, character sets and linter names,
+//! and the flags. `value.rs` applies five linters from them (the check digit, the
+//! check character pair, the zero filler and the GS1 Company Prefix's leading
+//! digits); the rest are not run, and nothing here supports a claim of full GS1
+//! validation.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;

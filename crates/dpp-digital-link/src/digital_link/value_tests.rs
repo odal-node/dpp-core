@@ -2,7 +2,7 @@
 //!
 //! These are this crate's own checks, written by the people who wrote the parser,
 //! and they carry no conformance claim. They pin each rule so a change shows up
-//! here; whether the rules are GS1's is what `tests/gs1_uri_syntax_corpus.rs` and
+//! here; whether the rules are GS1's is what `tests/gs1_syntax_rules_corpus.rs` and
 //! GS1's own syntax engine judge.
 
 use dpp_domain::gs1_check_digit;
@@ -293,4 +293,86 @@ fn a_primary_key_value_is_escaped_when_built() {
         parse(&link.build()[BASE.len()..]).expect("it parses back"),
         link
     );
+}
+
+/// The pair is the GS1 General Specifications' calculation for alphanumeric keys;
+/// GS1's engine agrees on this value, and on every GMN in the oracle corpus.
+#[test]
+fn a_gmn_is_held_to_its_check_character_pair() {
+    assert!(parse("/8013/1987654Ad4X4bL5ttr2310c2K").is_ok());
+    assert!(matches!(
+        parse("/8013/1987654Ad4X4bL5ttr2310c2X"),
+        Err(DigitalLinkError::InvalidCheckPair { expected, actual, .. })
+            if expected == "2K" && actual == "2X"
+    ));
+}
+
+/// Every value is escaped as the builder escapes it, so a symbol reaches the
+/// check as itself.
+fn escaped(value: &str) -> String {
+    value
+        .bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                char::from(b).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// GS1's own test vectors for the check character pair, from its syntax engine,
+/// that also begin with the four digits AI 8013's `gcppos1` asks for. Between
+/// them they weigh every symbol of CSET 82, so a mis-ordered weight fails here.
+#[test]
+fn the_check_character_pair_agrees_with_gs1s_vectors() {
+    for good in [
+        "12345678901234567890123NT",
+        "12345_ABCDEFGHIJKLMCP",
+        "12345_NOPQRSTUVWXYZDN",
+        "12345_abcdefghijklmN3",
+        "12345_nopqrstuvwxyzP2",
+        "12345_!\"%&'()*+,-./LC",
+        "12345_0123456789:;<=>?62",
+        "7907665Bm8v2AB",
+        "97850l6KZm0yCD",
+        "225803106GSpEF",
+        "149512464PM+GH",
+        "62577B8fRG7HJK",
+        "515942070CYxLM",
+        "390800494sP6NP",
+        "386830132uO+QR",
+        "53395376X1:nST",
+        "957813138Sb6UV",
+        "530790no0qOgWX",
+        "62185314IvwmYZ",
+        "23956qk1&dB!23",
+        "794394895ic045",
+    ] {
+        let path = format!("/8013/{}", escaped(good));
+        assert!(parse(&path).is_ok(), "{good} is a GMN with a valid pair");
+    }
+    assert!(matches!(
+        parse("/8013/1987654Ad4X4bL5ttr2310cXK"),
+        Err(DigitalLinkError::InvalidCheckPair { .. })
+    ));
+    assert!(matches!(
+        parse("/8013/2"),
+        Err(DigitalLinkError::ValueTooShort { min_len: 2, .. })
+    ));
+}
+
+/// `gcppos1`: the value begins with the four digits of a GS1 Company Prefix.
+#[test]
+fn a_value_that_cannot_begin_with_a_company_prefix_is_refused() {
+    for bad in ["ABCD123", "123", "12A4567"] {
+        assert!(
+            matches!(
+                parse(&format!("/8004/{bad}")),
+                Err(DigitalLinkError::InvalidCompanyPrefix { .. })
+            ),
+            "{bad}"
+        );
+    }
+    assert!(parse("/8004/1234ABC").is_ok());
 }

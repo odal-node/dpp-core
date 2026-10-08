@@ -36,9 +36,10 @@
 //!   which is what labels already printed carry.
 //! - **A trailing slash is tolerated.** It is not in the grammar, and GS1's
 //!   resolver standard asks resolvers to accept it.
-//! - **A symbol the grammar spells as an escape may be written raw.** `!`, `&`,
-//!   `'`, `(`, `)`, `*`, `+`, `,`, `;`, `=` and `:` are legal in a path under
-//!   RFC 3986. They are always built escaped.
+//! - **A symbol the grammar spells as an escape may be written raw, if RFC 3986
+//!   allows it in a path.** That is `!`, `&`, `'`, `(`, `)`, `*`, `+`, `,`, `;`,
+//!   `=` and `:`. They are always built escaped. Any other character outside a
+//!   path segment's (`<`, `>`, a space) is refused raw.
 //! - **The double quote is built as `%22`.** The grammar names a raw `"`, which
 //!   RFC 3986 does not allow in a URI and GS1's engine refuses.
 //! - **The query string is not read.** It is cut off at the first `?` so it can
@@ -46,11 +47,11 @@
 //!   neither a data attribute's format nor the shape of an extension parameter.
 //! - **An empty host is refused.** The grammar's `reg-name` may be empty, which
 //!   names no resolver and cannot be built back into a link.
-//! - **GS1's deeper validation is not run.** Lengths, character sets and the
-//!   modulo-10 check digit are applied from the dictionary. That the digits begin
-//!   with a plausible GS1 Company Prefix, and the check character pair of a Global
-//!   Model Number, are not, and the other linters the dictionary names are not
-//!   either.
+//! - **GS1's deeper validation is not run.** Lengths, character sets, the
+//!   modulo-10 check digit, a Global Model Number's check character pair and the
+//!   four leading digits of a GS1 Company Prefix are applied from the dictionary.
+//!   Whether a prefix is one GS1 has allocated is not checked, and the other
+//!   linters the dictionary names are not run.
 //! - **A custom path is read by finding the primary key.** The first segment that
 //!   names one opens the path, so a resolver's own path prefix that contains a
 //!   primary-key AI as a whole segment is misread. GS1 says a custom path cannot

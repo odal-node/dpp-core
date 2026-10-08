@@ -16,13 +16,11 @@
 //! dictionary says about its AI: its length, the character set of each component,
 //! and the modulo-10 check digit where the entry names `csum` (AI `8003` is
 //! `N1,zero N13,csum [X..16]`, so the digit covers the thirteen digits after the
-//! filler, not the whole value). What is **not** checked is the rest of GS1's
-//! deep validation: that the digits begin with a plausible GS1 Company Prefix,
-//! and the alphanumeric check character pair of a Global Model Number (AI
-//! `8013`, `csumalpha`), which is a different algorithm altogether. Those
-//! linters' reference implementations are a resource this crate does not vendor,
-//! and writing one from the shape of a dictionary line, without the specification
-//! that defines it, is the invented detail this project refuses elsewhere.
+//! filler, not the whole value), and the alphanumeric check character pair where
+//! it names `csumalpha` (AI `8013`, a Global Model Number), and the four leading
+//! digits of a GS1 Company Prefix where it names `gcppos1` or `gcppos2`. What is
+//! **not** checked is whether that prefix is one GS1 has allocated, which needs
+//! GS1's allocation data, and the rest of GS1's deeper validation.
 //!
 //! That asymmetry is a property a caller has to know about, so it is spelled
 //! into the API rather than left in this paragraph. There is no method that

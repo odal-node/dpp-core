@@ -36,6 +36,7 @@ pub struct Component {
     /// In square brackets in the dictionary, so it may be absent.
     pub optional: bool,
     /// The linters the entry names for it, such as `csum`, `zero` and
-    /// `gcppos1`. Of those only `csum` and `zero` are applied by this crate.
+    /// `gcppos1`. This crate applies `csum`, `csumalpha`, `zero`, `gcppos1` and
+    /// `gcppos2`, and no others.
     pub linters: Vec<String>,
 }

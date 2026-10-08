@@ -19,8 +19,8 @@ those texts.
 
 Technical specifications are recorded in
 [`architecture/STANDARDS.md`](../architecture/STANDARDS.md): IETF, W3C, the GS1
-Digital Link URI Syntax (whose implemented revision is not established; see
-[GS1 Interoperability](#gs1-interoperability)), the IDTA AAS metamodel and ETSI.
+Digital Link URI Syntax (read against 1.7.0, while EN 18219:2026 names 1.6.0:2022;
+see [GS1 Interoperability](#gs1-interoperability)), the IDTA AAS metamodel and ETSI.
 Each row gives the revision cited, its status as last read, the evidence behind
 the implementation, and whether conformance is claimed.
 

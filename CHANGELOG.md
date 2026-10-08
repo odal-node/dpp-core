@@ -229,7 +229,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   digit. GS1's syntax engine refuses every one of them. Now each value is held
   to its AI's components: the minimum and maximum length, the character set of
   each component (digits, CSET 82, CSET 39, CSET 64), the modulo-10 check digit
-  where the dictionary names `csum`, and the filler `0` of `zero`.
+  where the dictionary names `csum`, the check character pair where it names
+  `csumalpha`, the four leading digits of a GS1 Company Prefix where it names
+  `gcppos1` or `gcppos2`, and the filler `0` of `zero`.
   - **AI 415 is refused without AI 8020**, which the dictionary declares as its
     only requisite and which the grammar's `payTo-path` requires.
   - **A malformed percent escape is an error**, where it was read as literal
@@ -240,10 +242,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **`http://` is accepted**, with the grammar's four spellings of the scheme,
     where only `https://` was. The scheme is kept as written, so a link builds back
     to its own base.
+  - **Each path segment is held to the grammar's characters.** A segment of the
+    custom path stem is RFC 3986's `pchar`, where a raw space, `"`, `<` or a
+    character beyond ASCII had been taken into the resolver base as written. From
+    the primary key on no segment may be empty, where `/01//…` had been read as
+    `/01/…`, and a value may not hold a character no URI holds raw, such as `<`
+    or `>`, which the grammar writes only as escapes and which CSET 82 had let
+    through. GS1's syntax engine refuses the empty segments and the characters no
+    URI holds; it does not hold a stem to `pchar`, so a stem with `[`, `]` or a
+    malformed escape is recorded as a case where GS1's syntax engine is not the
+    evidence.
   - A GTIN of fewer than 14 digits is still read and padded, as before.
 
   `DigitalLinkError` gains `ValueTooShort`, `OutsideCharset`, `InvalidCheckDigit`,
-  `NonZeroFiller`, `MissingQualifier`, `InvalidHost` and `MalformedPercentEscape`
+  `InvalidCheckPair`, `InvalidCompanyPrefix`, `NonZeroFiller`, `MissingQualifier`,
+  `InvalidHost`, `MalformedPercentEscape` and `InvalidPathSegment`
   (the enum is `#[non_exhaustive]`). `AiSpec` gains `components` and `requisites`,
   and the crate exports `Component`, `CharKind` and `required_qualifier`.
   `percent_encode` now escapes everything outside RFC 3986's unreserved set, where
@@ -356,12 +369,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **GS1's engine is not always the evidence.** It is lenient about a second
     primary key in a path, a malformed percent escape, a raw sub-delimiter, a
     port's digits, a fragment and the shape of the query, and it refuses an empty
-    host and a raw double quote. For those the register says the verdict rests on
+    host, a raw double quote, and the sub-delimiters and escapes the grammar's
+    `reg-name` allows in a host. For those the register says the verdict rests on
     this repository's reading of the grammar.
+  - **A Global Model Number's check character pair is verified**, by the GS1
+    General Specifications' calculation for alphanumeric keys, wherever the
+    dictionary names `csumalpha`. GS1's engine runs the same calculation; its own
+    test vectors, which between them weigh every symbol of CSET 82, are unit
+    tests here, and the corpus holds the two implementations to each other.
+  - **A value that cannot begin with a GS1 Company Prefix is refused** where the
+    dictionary names `gcppos1` or `gcppos2`: it wants the four digits the shortest
+    prefix has, at the first or second character. That is the check GS1's linter
+    makes unless it is given GS1's allocation data.
   - Not done: the query string is still not read, so a malformed data attribute is
-    accepted, and GS1's deeper linters are not run (that a value begins with a
-    plausible GS1 Company Prefix, a Global Model Number's check character pair).
-    Both are listed as deviations. EN 18219 clause 6.3.2 names 1.6.0, and whether a
+    accepted, and whether a GS1 Company Prefix is one GS1 has allocated is not
+    checked, which needs GS1's allocation data. Both are listed as deviations. EN 18219 clause 6.3.2 names 1.6.0, and whether a
     1.7.0 claim carries over to it is left to the harmonised-standard assessment.
 
 - **The RFCs' own test vectors now run in `just check`.** The signature library,

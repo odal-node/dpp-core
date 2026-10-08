@@ -110,6 +110,8 @@ const QUERY_UNREAD: &str = "the query string is not read, so a malformed one is 
 const ENGINE_ESCAPES: &str = "the engine reads a malformed percent escape as literal characters";
 const ENGINE_RAW: &str = "the engine reads the sub-delimiters raw as well as escaped";
 const RAW_SYMBOL: &str = "a symbol the grammar spells as an escape is read raw too, since RFC 3986 allows it in a path; it is always built escaped";
+const ENGINE_STEM: &str = "the engine holds the custom path stem only to the characters a URI may hold, not to a segment's";
+const ENGINE_DOMAIN: &str = "the engine reads a host as a domain name, and refuses the sub-delimiters and escapes reg-name allows";
 const NO_MATCHING_REQ: &str = "the engine's requisite-AI check wants AI 01 for a qualifier of AI 8006, which the grammar's path for an ITIP allows";
 
 #[allow(clippy::too_many_lines)]
@@ -143,6 +145,40 @@ fn corpus() -> Vec<Case> {
         "4.11 optionalPathSegment may be empty",
         true,
     ));
+    for stem in ["a%20b", "r:e@s!$&'()*+,;="] {
+        out.push(case(
+            format!("{BASE}/{stem}/01/{GTIN}"),
+            "4.11 a stem segment is pchar",
+            true,
+        ));
+    }
+    for bad in [" ", "\u{e9}", "\"", "<", "{", "\\"] {
+        out.push(case(
+            format!("{BASE}/re{bad}s/01/{GTIN}"),
+            "4.11 a stem segment is pchar",
+            false,
+        ));
+    }
+    for bad in ["[", "]", "%zz"] {
+        out.push(
+            case(
+                format!("{BASE}/re{bad}s/01/{GTIN}"),
+                "4.11 a stem segment is pchar",
+                false,
+            )
+            .engine(ENGINE_STEM),
+        );
+    }
+    for host in ["exa(mple.com", "exa%41mple.com"] {
+        out.push(
+            case(
+                format!("https://{host}/01/{GTIN}"),
+                "4.11 reg-name admits sub-delims and escapes",
+                true,
+            )
+            .engine(ENGINE_DOMAIN),
+        );
+    }
     out.push(case(format!("ftp://example.com/01/{GTIN}"), "4.11 scheme", false).engine(NOT_DL));
     out.push(case(format!("example.com/01/{GTIN}"), "4.11 scheme", false).engine(NOT_DL));
     out.push(
@@ -449,14 +485,22 @@ fn corpus() -> Vec<Case> {
         "gmn-value 25 characters is the most",
         false,
     ));
-    out.push(
-        case(
-            at("/8013/1987654Ad4X4bL5ttr2310c2X"),
-            "gmn-value check character pair",
-            false,
-        )
-        .ours("a Global Model Number's check character pair is not verified"),
-    );
+    out.push(case(
+        at("/8013/1987654Ad4X4bL5ttr2310c2X"),
+        "gmn-value check character pair",
+        false,
+    ));
+    // GS1's own vector, every symbol escaped: the pair weighs each one.
+    out.push(case(
+        at("/8013/12345_%21%22%25%26%27%28%29%2A%2B%2C-.%2FLC"),
+        "gmn-value check character pair over the symbols of CSET 82",
+        true,
+    ));
+    out.push(case(
+        at("/8004/ABCD123"),
+        "giai-value begins with a GS1 Company Prefix",
+        false,
+    ));
 
     // CPID: GS1 CSET 39.
     out.push(case(at("/8010/4012345ABC123"), "cpid-value", true));
@@ -637,6 +681,9 @@ fn corpus() -> Vec<Case> {
         )
         .ours(TRAILING_SLASH),
     );
+    for path in [format!("/01//{GTIN}"), format!("/01/{GTIN}//21/A")] {
+        out.push(case(at(&path), "4.12 no empty segment in the path", false));
+    }
 
     // ── characters of a value (4.2) ─────────────────────────────────────────
     // Every symbol of CSET 82 that is not `-`, `.` or `_`, in its escaped form.
@@ -692,6 +739,15 @@ fn corpus() -> Vec<Case> {
         )
         .engine("the engine refuses a raw double quote, which RFC 3986 forbids in a URI"),
     );
+    // RFC 3986 allows none of these raw anywhere in a URI. The grammar writes `<`
+    // and `>` only as escapes, and the rest are outside CSET 82.
+    for raw in ['<', '>', '{', '|', '\\', '^', '`'] {
+        out.push(case(
+            at(&format!("/01/{GTIN}/21/A{raw}B")),
+            "4.2 a character no URI holds raw",
+            false,
+        ));
+    }
     out.push(case(
         at(&format!("/01/{GTIN}/21/a%2fb")),
         "4.2 an escape in lower-case hexadecimal",

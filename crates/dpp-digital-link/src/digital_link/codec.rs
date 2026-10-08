@@ -99,6 +99,33 @@ pub(super) fn is_valid_authority(authority: &str) -> bool {
     port_ok && host_ok
 }
 
+/// Whether `segment` is a path segment: RFC 3986's `*pchar`, which GS1's grammar
+/// restates, where `pchar = unreserved / pct-encoded / sub-delims / ":" / "@"`.
+///
+/// `also` admits characters the grammar allows beyond that in one position: the
+/// value of an AI may hold the double quote, which `XSYMBOL` names as itself.
+/// Everything else outside `pchar` (a space, `<`, `>`, `#`, `[`, a character
+/// beyond ASCII) is not a character a path segment can hold raw.
+pub(super) fn is_segment(segment: &str, also: &[u8]) -> bool {
+    let bytes = segment.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if bytes.get(i + 1).is_some_and(u8::is_ascii_hexdigit)
+                && bytes.get(i + 2).is_some_and(u8::is_ascii_hexdigit) =>
+            {
+                i += 3;
+            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => i += 1,
+            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' => i += 1,
+            b':' | b'@' => i += 1,
+            b if also.contains(&b) => i += 1,
+            _ => return false,
+        }
+    }
+    true
+}
+
 /// `reg-name = *( unreserved / pct-encoded / sub-delims )`.
 fn is_reg_name(host: &str) -> bool {
     let bytes = host.as_bytes();
@@ -244,6 +271,22 @@ mod tests {
                 "{bad} must not decode"
             );
         }
+    }
+
+    #[test]
+    fn segments_are_pchar() {
+        for good in ["", "resolve", "a%20b", "r:e@s!$&'()*+,;=", "A-B.C_D~E"] {
+            assert!(is_segment(good, b""), "{good:?} is a segment");
+        }
+        for bad in [
+            "a b", "a\"b", "a<b", "a>b", "a#b", "a?b", "a{b", "a\\b", "a%2", "a%zz", "\u{e9}",
+        ] {
+            assert!(!is_segment(bad, b""), "{bad:?} is not a segment");
+        }
+        assert!(
+            is_segment("A\"B", b"\""),
+            "a value may hold the double quote"
+        );
     }
 
     #[test]

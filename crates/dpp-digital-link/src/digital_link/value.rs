@@ -7,14 +7,17 @@
 //! dictionary says the same thing per AI, in components, so this module reads
 //! the rule from there instead of writing it a second time.
 //!
-//! Two of the dictionary's linters are applied, because both are mechanical and
-//! both are decided by the entry's own text: `csum`, the GS1 modulo-10 check
-//! digit over the component that names it, and `zero`, which fixes a filler
-//! digit at `0`. The others — `gcppos1` and `gcppos2` (a plausible GS1 Company
-//! Prefix), `csumalpha` (the check character pair of a Global Model Number),
-//! `nozeroprefix`, `pieceoftotal` and the rest — are GS1's deeper validation,
-//! whose reference implementations are a separate resource that is not
-//! vendored. Nothing here supports a claim of having run them.
+//! Five of the dictionary's linters are applied, because all five are
+//! mechanical and decided by the value alone: `csum`, the GS1 modulo-10 check
+//! digit over the component that names it; `csumalpha`, the check character
+//! pair of an alphanumeric key such as a Global Model Number, as the GS1 General
+//! Specifications define it; `zero`, which fixes a filler digit at `0`; and
+//! `gcppos1` and `gcppos2`, which want the four digits a GS1 Company Prefix
+//! begins with at the first or second character, the check GS1's own linter
+//! makes. Whether those digits begin a prefix GS1 has actually allocated needs
+//! GS1's allocation data, and is not checked. The others — `nozeroprefix`,
+//! `pieceoftotal` and the rest — are GS1's deeper validation, and are not run.
+//! Nothing here supports a claim of having run them.
 
 use dpp_domain::gs1_check_digit;
 use dpp_rules::common::identifier::is_cset_82;
@@ -108,6 +111,9 @@ fn check_linters(code: &str, component: &Component, part: &[char]) -> Result<(),
     for linter in &component.linters {
         match linter.as_str() {
             "csum" => check_digit(code, part)?,
+            "csumalpha" => check_pair(code, part)?,
+            "gcppos1" => check_company_prefix(code, part, 0)?,
+            "gcppos2" => check_company_prefix(code, part, 1)?,
             "zero" if part.iter().any(|c| *c != '0') => {
                 return Err(DigitalLinkError::NonZeroFiller {
                     code: code.to_owned(),
@@ -142,6 +148,65 @@ fn check_digit(code: &str, part: &[char]) -> Result<(), DigitalLinkError> {
         code: code.to_owned(),
         expected,
         actual,
+    })
+}
+
+/// The last two characters of `part` are GS1's check character pair over the
+/// rest.
+///
+/// The GS1 General Specifications' "check character calculation (for
+/// alphanumeric keys)": each character before the pair is weighted by its
+/// position in CSET 82, the weights are multiplied by the primes 2, 3, 5, …
+/// counted from the right and summed modulo 1021, and the ten bits of the sum are
+/// written as two characters of CSET 32, high five bits first. GS1's syntax
+/// engine runs the same calculation, and the oracle holds this one to it.
+fn check_pair(code: &str, part: &[char]) -> Result<(), DigitalLinkError> {
+    const CSET_82: &str =
+        "!\"%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+    const CSET_32: &[u8; 32] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+    let Some((data, pair)) = part.split_last_chunk::<2>() else {
+        // Too short to hold a pair at all, which GS1's linter reports as such.
+        return Err(DigitalLinkError::ValueTooShort {
+            code: code.to_owned(),
+            min_len: 2,
+            actual: part.len(),
+        });
+    };
+    let mut primes = (2u32..).filter(|n| (2..*n).take_while(|d| d * d <= *n).all(|d| n % d != 0));
+    let mut sum = 0u32;
+    for c in data.iter().rev() {
+        // The character set was checked first, so every character is in CSET 82.
+        let weight = CSET_82.find(*c).map_or(0, |at| at as u32);
+        sum = (sum + weight * primes.next().expect("primes do not run out")) % 1021;
+    }
+    let expected: String = [sum >> 5, sum & 31]
+        .iter()
+        .map(|five| char::from(CSET_32[*five as usize]))
+        .collect();
+    let actual: String = pair.iter().collect();
+    if expected == actual {
+        return Ok(());
+    }
+    Err(DigitalLinkError::InvalidCheckPair {
+        code: code.to_owned(),
+        expected,
+        actual,
+    })
+}
+
+/// `part` holds, from `offset` on, the four digits the shortest GS1 Company
+/// Prefix has: `gcppos1` reads from the first character and `gcppos2` from the
+/// second, after an indicator or extension digit. This is all GS1's linter checks
+/// unless it is given GS1's allocation data, which this crate does not have.
+fn check_company_prefix(code: &str, part: &[char], offset: usize) -> Result<(), DigitalLinkError> {
+    const SHORTEST_PREFIX: usize = 4;
+    let digits = part.get(offset..offset + SHORTEST_PREFIX);
+    if digits.is_some_and(|digits| digits.iter().all(char::is_ascii_digit)) {
+        return Ok(());
+    }
+    Err(DigitalLinkError::InvalidCompanyPrefix {
+        code: code.to_owned(),
     })
 }
 

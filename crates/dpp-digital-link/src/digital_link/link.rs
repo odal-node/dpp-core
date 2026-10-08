@@ -4,7 +4,9 @@ use std::borrow::Cow;
 
 use dpp_domain::{CarrierQualifier, Gtin};
 
-use super::codec::{is_valid_authority, normalize_gtin_to_14, percent_decode, percent_encode};
+use super::codec::{
+    is_segment, is_valid_authority, normalize_gtin_to_14, percent_decode, percent_encode,
+};
 use super::error::DigitalLinkError;
 use super::primary_key::PrimaryKey;
 use super::syntax_dictionary::{ai_spec, qualifier_position, required_qualifier};
@@ -72,7 +74,11 @@ impl DigitalLink {
             return Err(DigitalLinkError::InvalidHost(host.to_owned()));
         }
 
-        let all_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        // `path` is empty or starts with `/`. One trailing slash is tolerated, as
+        // resolvers are asked to; every other empty segment is kept, so the
+        // checks below see it.
+        let body = path.strip_suffix('/').unwrap_or(path);
+        let all_segments: Vec<&str> = body.split('/').skip(1).collect();
 
         // Locate the primary key — everything before it is the resolver path
         // prefix. Read from the dictionary's `dlpkey` flag, so the set tracks
@@ -82,13 +88,27 @@ impl DigitalLink {
             .position(|s| ai_spec(s).is_some_and(|spec| spec.dl_primary_key))
             .ok_or(DigitalLinkError::MissingGtin)?;
 
-        let path_prefix = if key_pos > 0 {
-            format!("/{}", all_segments[..key_pos].join("/"))
-        } else {
+        // The stem's segments are the grammar's `segment`, which may be empty.
+        // From the primary key on, each segment is an AI or a value: never empty,
+        // and in a value the double quote, which `XSYMBOL` names as itself, is the
+        // one character beyond `pchar` the grammar writes raw. A `%` is let through
+        // here so that `percent_decode` names a malformed escape as one.
+        let (stem, ai_segments) = all_segments.split_at(key_pos);
+        let bad_stem = stem.iter().find(|s| !is_segment(s, b""));
+        let bad_ai = ai_segments
+            .iter()
+            .find(|s| s.is_empty() || !is_segment(s, b"\"%"));
+        if let Some(bad) = bad_stem.or(bad_ai) {
+            return Err(DigitalLinkError::InvalidPathSegment((*bad).to_owned()));
+        }
+
+        let stem: Vec<&str> = stem.iter().copied().filter(|s| !s.is_empty()).collect();
+        let path_prefix = if stem.is_empty() {
             String::new()
+        } else {
+            format!("/{}", stem.join("/"))
         };
 
-        let ai_segments = &all_segments[key_pos..];
         let mut i = 0;
         let mut primary_key: Option<PrimaryKey> = None;
         let mut primary_ai = "";

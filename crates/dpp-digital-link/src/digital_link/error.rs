@@ -24,6 +24,8 @@ pub enum DigitalLinkError {
         "'{0}' holds a percent escape that is not '%' and two hexadecimal digits, or does not decode to UTF-8"
     )]
     MalformedPercentEscape(String),
+    #[error("'{0}' is not a path segment a GS1 Digital Link URI can have")]
+    InvalidPathSegment(String),
     #[error("Unknown Application Identifier '{0}' in URI path")]
     UnknownApplicationIdentifier(String),
     #[error(
@@ -86,6 +88,18 @@ pub enum DigitalLinkError {
         code: String,
         expected: u8,
         actual: u8,
+    },
+    #[error(
+        "Application Identifier '{code}' value does not begin with the four digits of a GS1 Company Prefix"
+    )]
+    InvalidCompanyPrefix { code: String },
+    #[error(
+        "Application Identifier '{code}' check character pair invalid: expected '{expected}', got '{actual}'"
+    )]
+    InvalidCheckPair {
+        code: String,
+        expected: String,
+        actual: String,
     },
     #[error(
         "Application Identifier '{code}' value must carry a filler digit of 0 where it has another"

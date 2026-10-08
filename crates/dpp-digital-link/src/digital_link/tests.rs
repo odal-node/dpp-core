@@ -113,11 +113,9 @@ fn every_gs1_primary_key_parses_and_round_trips() {
 /// and can only be read through a method that says so.
 ///
 /// This is the API carrying the asymmetry rather than a doc paragraph carrying
-/// it. `Gtin::parse` verifies a mod-10 check digit; nothing here verifies the
-/// SSCC's, because what a `csum` covers differs per key — AI 8003's covers a
-/// middle component, AI 8013 uses a different algorithm entirely — and a check
-/// that is wrong in the permissive direction is worse than no check, since it
-/// reports a validation that did not happen.
+/// it. Every key's check digit or check character pair is verified on the way
+/// in, but only the GTIN comes back as a type this workspace models; the others
+/// are strings, and a caller has to say so to read one.
 #[test]
 fn only_the_gtin_comes_back_validated() {
     let gtin_link = DigitalLink::parse("https://id.odal-node.io/01/09506000134352").unwrap();
