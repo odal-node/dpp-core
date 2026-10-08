@@ -153,6 +153,45 @@ fn classify(header: &str) -> Header {
     Header::Other
 }
 
+/// Whether a line sets `package`, the key that renames a dependency.
+///
+/// A renamed dependency is recorded under its key, so `rt = { package = "tokio" }`
+/// would be read as a crate called `rt` and the one it really names would pass
+/// every check here unseen.
+fn renames_a_package(line: &str) -> bool {
+    line.match_indices("package").any(|(at, word)| {
+        let before = line[..at].chars().next_back();
+        let after = line[at + word.len()..].trim_start();
+        // `.` too: `rt.package = "tokio"` is the dotted spelling of the same key.
+        before.is_none_or(|c| matches!(c, '{' | ',' | '.') || c.is_whitespace())
+            && after.starts_with('=')
+    })
+}
+
+/// Panic on a renamed dependency anywhere in `text`'s dependency tables.
+///
+/// Its own pass, because the manifest that matters most has no `[package]` for
+/// `parse_manifest` to read: the root's `[workspace.dependencies]` holds every
+/// external dependency's spec, and a member's `rt = { workspace = true }` takes a
+/// rename from there without spelling one itself.
+fn reject_renames(text: &str) {
+    let mut header = Header::Other;
+    let mut depth = 0;
+    for raw in text.lines() {
+        let (code, delta) = scan(raw);
+        let line = code.trim();
+        if depth == 0 && line.starts_with('[') {
+            header = classify(line);
+            continue;
+        }
+        // At any depth, so a multi-line inline table is covered too.
+        if matches!(header, Header::Section(_) | Header::Single(..)) && renames_a_package(line) {
+            panic!("renamed dependency (`package = …`), which this tripwire cannot read: `{raw}`");
+        }
+        depth += delta;
+    }
+}
+
 fn record(kind: Kind, dep: &str, m: &mut Manifest) {
     let set = match kind {
         Kind::Normal => &mut m.normal,
@@ -162,6 +201,7 @@ fn record(kind: Kind, dep: &str, m: &mut Manifest) {
 }
 
 fn parse_manifest(text: &str) -> Manifest {
+    reject_renames(text);
     let mut m = Manifest::default();
     let mut header = Header::Other;
     let mut depth = 0;
@@ -232,7 +272,10 @@ fn workspace_members(root_manifest: &str) -> Vec<String> {
 
 fn member_manifests() -> Vec<Manifest> {
     let root = workspace_root();
-    let members = workspace_members(&read(&root.join("Cargo.toml")));
+    let root_manifest = read(&root.join("Cargo.toml"));
+    // Members inherit their specs from here, renames included.
+    reject_renames(&root_manifest);
+    let members = workspace_members(&root_manifest);
     assert!(
         members.len() > 10,
         "expected to discover the workspace members, found {} — has the root manifest moved?",
@@ -247,6 +290,7 @@ fn member_manifests() -> Vec<Manifest> {
 /// Every product group plugin's manifest. Discovered, not listed.
 fn plugin_manifests() -> Vec<Manifest> {
     let dir = workspace_root().join("plugins");
+    reject_renames(&read(&dir.join("Cargo.toml")));
     let found: Vec<Manifest> = fs::read_dir(&dir)
         .unwrap_or_else(|e| panic!("read {}: {e}", dir.display()))
         .flatten()
@@ -642,6 +686,51 @@ name = "not-the-package"
 #[should_panic(expected = "multi-line strings")]
 fn a_form_the_reader_cannot_follow_fails_loudly_instead_of_being_skipped() {
     parse_manifest("[package]\nname = \"x\"\ndescription = \"\"\"\nmore\n\"\"\"\n");
+}
+
+#[test]
+#[should_panic(expected = "renamed dependency")]
+fn a_renamed_dependency_fails_loudly_instead_of_being_read_under_its_key() {
+    parse_manifest("[package]\nname = \"x\"\n\n[dependencies]\nrt = { package = \"tokio\" }\n");
+}
+
+#[test]
+#[should_panic(expected = "renamed dependency")]
+fn a_renamed_dependency_table_fails_loudly_instead_of_being_skipped() {
+    parse_manifest("[package]\nname = \"x\"\n\n[dependencies.rt]\npackage = \"tokio\"\n");
+}
+
+#[test]
+#[should_panic(expected = "renamed dependency")]
+fn a_renamed_dependency_as_a_dotted_key_fails_loudly() {
+    parse_manifest("[package]\nname = \"x\"\n\n[dependencies]\nrt.package = \"tokio\"\n");
+}
+
+#[test]
+#[should_panic(expected = "renamed dependency")]
+fn a_renamed_dependency_on_a_continuation_line_fails_loudly() {
+    parse_manifest(
+        "[package]\nname = \"x\"\n\n[dependencies]\nrt = { version = \"1\",\n       package = \"tokio\" }\n",
+    );
+}
+
+/// The root manifest has no `[package]`, and its `[workspace.dependencies]` is
+/// where a member's `rt = { workspace = true }` takes its spec from.
+#[test]
+#[should_panic(expected = "renamed dependency")]
+fn a_rename_in_the_workspace_dependencies_fails_loudly() {
+    reject_renames(
+        "[workspace]\nmembers = []\n\n[workspace.dependencies]\nrt = { version = \"1\", package = \"tokio\" }\n",
+    );
+}
+
+/// And the real manifests carry none, so the checks above cannot be what keeps
+/// the graph tests green.
+#[test]
+fn no_manifest_here_renames_a_dependency() {
+    let root = workspace_root();
+    reject_renames(&read(&root.join("Cargo.toml")));
+    reject_renames(&read(&root.join("plugins/Cargo.toml")));
 }
 
 #[test]

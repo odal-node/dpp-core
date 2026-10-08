@@ -139,7 +139,9 @@ fn real_plugins() -> Vec<(String, String, String)> {
         .unwrap_or_else(|e| panic!("read {}: {e}", dir.display()))
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.join("Cargo.toml").is_file() && p.join("src/lib.rs").is_file())
+        // Not filtered on `src/lib.rs`: a plugin whose library is elsewhere would
+        // drop out of the check unseen. Reading it below fails on one instead.
+        .filter(|p| p.join("Cargo.toml").is_file())
         .map(|p| {
             let name = p.file_name().unwrap().to_string_lossy().into_owned();
             (
