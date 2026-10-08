@@ -21,6 +21,18 @@
 //! payload, so those tests give it a stub JWT around it. Key Binding is not
 //! checked either: the Key Binding JWT at the end of A.3 and A.4 is tolerated and
 //! carried, which is the most this module does with it.
+//!
+//! The RFC's data in this file is reused as Code Components under the IETF
+//! Trust's Legal Provisions Relating to IETF Documents:
+//!
+//! > Copyright (c) 2025 IETF Trust and the persons identified as authors of the
+//! > code. All rights reserved.
+//! >
+//! > Redistribution and use in source and binary forms, with or without
+//! > modification, is permitted pursuant to, and subject to the license terms
+//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
+//! > Trust's Legal Provisions Relating to IETF Documents
+//! > (<https://trustee.ietf.org/license-info>).
 
 use base64::Engine;
 use serde_json::{Map, Value, json};

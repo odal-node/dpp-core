@@ -397,8 +397,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     to the nearest one, which the table's rows for 2^53 pin. The row lists three
     deviations: `-0` is written as `0` and not refused, which a verified erratum
     (7920) says a parser should do; a repeated member name is resolved by
-    `serde_json` before the canonicaliser sees it; and a number beyond a double is
-    rounded silently, as clause 3.2.2.3 requires.
+    `serde_json` before the canonicaliser sees it; and an integer beyond ±2^53,
+    which clause 3.1 keeps out of the input by requiring every number to be a
+    double, is written as the nearest double without a warning and not refused.
   - **RFC 8032**: the five vectors of clause 7.1 are the evidence, run on the
     `ed25519-dalek` version locked in `Cargo.lock`, since nothing here
     implements the curve. Verification is `verify_strict`, which refuses a small-

@@ -2,10 +2,18 @@
 //!
 //! Copied verbatim, because the point of using them is that this code did not
 //! produce them: the base64url strings are the RFC's, with the line breaks of the
-//! text removed, and the JSON is the RFC's, in its layout. The RFC is
-//! Copyright (c) 2025 IETF Trust and the persons identified as the document
-//! authors, and is published under the IETF Trust's Legal Provisions Relating to
-//! IETF Documents, which permit reuse of code components such as these.
+//! text removed, and the JSON is the RFC's, in its layout. The RFC is published
+//! under the IETF Trust's Legal Provisions Relating to IETF Documents, and the
+//! examples are reused here as Code Components under its terms:
+//!
+//! > Copyright (c) 2025 IETF Trust and the persons identified as authors of the
+//! > code. All rights reserved.
+//! >
+//! > Redistribution and use in source and binary forms, with or without
+//! > modification, is permitted pursuant to, and subject to the license terms
+//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
+//! > Trust's Legal Provisions Relating to IETF Documents
+//! > (<https://trustee.ietf.org/license-info>).
 //!
 //! What is here, by where the RFC has it:
 //!
