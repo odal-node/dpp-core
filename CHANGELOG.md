@@ -305,6 +305,39 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   method specification is a W3C Community Group document marked `unofficial`,
   not a W3C standard.
 
+- **The JAdES module's headers are checked against ETSI's own JSON Schema, and the
+  register's JAdES row now makes a claim.** The module's tests check its output
+  against this repository's own reading of ETSI TS 119 182-1, and the DSS oracle
+  judges one signature. Annex B of V1.2.1 is normative and names ETSI's JSON
+  Schemas for the protected header. They are now vendored, under their
+  BSD-3-Clause licence, and every header shape the builder emits at B-B is
+  validated against `19182-protected-jsonSchema.json` in `just check`.
+  - `x5c` with `x5t#S256`, which is the form the EU profile of Implementing
+    Regulation (EU) 2026/248 asks for, and `x5t#S256` alone, pass, each with and
+    without a content type.
+  - Nine broken headers fail: no `alg`, no certificate reference, no signing time,
+    both `iat` and `sigT`, the SHA-1 `x5t`, and four wrong types. Dropping `iat`
+    from the builder, or adding `x5t`, fails the check with the schema's own
+    message.
+  - **ETSI's published schema cannot be applied as written.** It declares
+    `contentEncoding: base64` for `x5t#S256`, which RFC 7515 defines as base64url,
+    so a correct thumbprint containing `-` or `_` fails a validator that asserts
+    the keyword. The test reads `base64` as either alphabet, which still rejects a
+    string that is neither, and asserts the defect.
+  - **The schema is weaker than DSS.** It accepts a header with `x5c` alone, which
+    is clause 5.1.7's "at least one of", and DSS reports that as not baseline. The
+    test asserts the gap, and the claim does not cover that form.
+
+  The files carry their source, tag and SHA-256 in a `NOTICE.md`, are pinned
+  `-text`, and a test checks the bytes. Everything passed on the first run apart
+  from the encoding point, so the module did not change.
+
+  The register row reads `Yes`, with its class, scope and deviations and the
+  statement that it is self-declared. The comments that called the DSS oracle the
+  one check that is not circular now name both. Not run: ETSI's own Signature
+  Conformance Checker, which is an account-based web service with no API, so it
+  cannot run in CI. The oracle still pins DSS 6.2.
+
 - **The RFCs' own test vectors now run in `just check`.** The signature library,
   the canonicaliser and the key-derivation function had been checked only
   against this repository's own expectations, which cannot catch a misreading
