@@ -230,6 +230,49 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that writes a marked field must also write its statement. Write textile
   passports at v1.4.0.
 
+
+- **`DigitalLink::parse` holds every AI value to GS1's dictionary, and reads the
+  scheme and the host as the grammar has them.** Until now a value was checked
+  for its maximum length and, if the AI was all `X`, for CSET 82, and nothing
+  else. A 17-digit SSCC, a GLN with letters in it, and a GLN or SSCC with a wrong
+  check digit all parsed, and the README's own SSCC example had a wrong check
+  digit. GS1's syntax engine refuses every one of them. Now each value is held
+  to its AI's components: the minimum and maximum length, the character set of
+  each component (digits, CSET 82, CSET 39, CSET 64), the modulo-10 check digit
+  where the dictionary names `csum`, the check character pair where it names
+  `csumalpha`, the four leading digits of a GS1 Company Prefix where it names
+  `gcppos1` or `gcppos2`, and the filler `0` of `zero`.
+  - **AI 415 is refused without AI 8020**, which the dictionary declares as its
+    only requisite and which the grammar's `payTo-path` requires.
+  - **A malformed percent escape is an error**, where it was read as literal
+    characters; so is a value whose bytes are not UTF-8.
+  - **A host is checked against the URI grammar**: a registered name, an IPv4
+    address or a bracketed IPv6 literal, with digits for a port. A user name and
+    an `@` are refused, and so is an empty host.
+  - **`http://` is accepted**, with the grammar's four spellings of the scheme,
+    where only `https://` was. The scheme is kept as written, so a link builds back
+    to its own base.
+  - **Each path segment is held to the grammar's characters.** A segment of the
+    custom path stem is RFC 3986's `pchar`, where a raw space, `"`, `<` or a
+    character beyond ASCII had been taken into the resolver base as written. From
+    the primary key on no segment may be empty, where `/01//…` had been read as
+    `/01/…`, and a value may not hold a character no URI holds raw, such as `<`
+    or `>`, which the grammar writes only as escapes and which CSET 82 had let
+    through. GS1's syntax engine refuses the empty segments and the characters no
+    URI holds; it does not hold a stem to `pchar`, so a stem with `[`, `]` or a
+    malformed escape is recorded as a case where GS1's syntax engine is not the
+    evidence.
+  - A GTIN of fewer than 14 digits is still read and padded, as before.
+
+  `DigitalLinkError` gains `ValueTooShort`, `OutsideCharset`, `InvalidCheckDigit`,
+  `InvalidCheckPair`, `InvalidCompanyPrefix`, `NonZeroFiller`, `MissingQualifier`,
+  `InvalidHost`, `MalformedPercentEscape` and `InvalidPathSegment`
+  (the enum is `#[non_exhaustive]`). `AiSpec` gains `components` and `requisites`,
+  and the crate exports `Component`, `CharKind` and `required_qualifier`.
+  `percent_encode` now escapes everything outside RFC 3986's unreserved set, where
+  it left `!&'()*+,;=:` raw: the grammar spells those as escapes, so a carrier
+  with such a character in a serial is built differently, and reads back the same.
+
 ### Added
 
 - **A port for the archive of a passport's historical versions.** `ports::archive`
@@ -412,6 +455,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     and fails when the gap closes so the allowance is deleted. Whether to give
     those keys terms is a vocabulary decision this change does not make.
 
+- **GS1 Digital Link URI Syntax 1.7.0 is the revision this crate is read against,
+  and the register's GS1 row makes a claim.** The revision had never been
+  established: an earlier "v1.2" had no source, and the parser had been diffed
+  against nothing. Section 4's grammar was read in full and every rule compared,
+  and `gs1_syntax_rules_corpus.rs` now holds one URI for each: the value format of
+  each of the sixteen primary keys and of each qualifier, the qualifier sequences
+  and the four composite paths, the scheme and host, the percent escapes, and the
+  extension parameters of the query.
+  - **GS1's own engine judges the corpus, and does parse whole URIs.** The issue
+    left that open. The Barcode Syntax Engine, a component of the Barcode Syntax
+    Resource that section 2 of the standard names, takes any `http` or `https`
+    input as a Digital Link and validates it, so no second oracle was needed.
+  - Each case carries the grammar's verdict, and a reason wherever this reader or
+    GS1's engine departs from it. Both tools are pinned to the grammar except where a
+    reason says so, and a reason that stops being true fails the oracle, so
+    neither list of departures can go stale. Planted regressions were caught: a
+    check digit left unchecked, the 415 rule removed, a dropped or an invented
+    reason, and a flipped grammar verdict.
+  - **GS1's engine is not always the evidence.** It is lenient about a second
+    primary key in a path, a malformed percent escape, a raw sub-delimiter, a
+    port's digits, a fragment and the shape of the query, and it refuses an empty
+    host, a raw double quote, and the sub-delimiters and escapes the grammar's
+    `reg-name` allows in a host. For those the register says the verdict rests on
+    this repository's reading of the grammar.
+  - **A Global Model Number's check character pair is verified**, by the GS1
+    General Specifications' calculation for alphanumeric keys, wherever the
+    dictionary names `csumalpha`. GS1's engine runs the same calculation; its own
+    test vectors, which between them weigh every symbol of CSET 82, are unit
+    tests here, and the corpus holds the two implementations to each other.
+  - **A value that cannot begin with a GS1 Company Prefix is refused** where the
+    dictionary names `gcppos1` or `gcppos2`: it wants the four digits the shortest
+    prefix has, at the first or second character. That is the check GS1's linter
+    makes unless it is given GS1's allocation data.
+  - Not done: the query string is still not read, so a malformed data attribute is
+    accepted, and whether a GS1 Company Prefix is one GS1 has allocated is not
+    checked, which needs GS1's allocation data. Both are listed as deviations. EN 18219 clause 6.3.2 names 1.6.0, and whether a
+    1.7.0 claim carries over to it is left to the harmonised-standard assessment.
+
 - **The RFCs' own test vectors now run in `just check`.** The signature library,
   the canonicaliser and the key-derivation function had been checked only
   against this repository's own expectations, which cannot catch a misreading
@@ -516,6 +597,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   by running a processor over the credentials; nothing in this workspace had.
   The credential's `@context` array is unchanged in shape, and `dpp:productGroups`
   replaces `dpp:product_groups` as the IRI.
+
+- **A primary key's value was written into a Digital Link unescaped.** A CPID may
+  hold `#` and `/`, so `AB-C#/` was built as a fragment and a new path segment, and
+  the link no longer meant the key it was built from. `DigitalLink::build` now
+  escapes the primary key as it does a qualifier. The round-trip check over the new
+  corpus found it.
 
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
