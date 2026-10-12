@@ -24,9 +24,17 @@
  *                      `sd_hash` where there is one. Either covers every byte, so a
  *                      transcription slip in a vendored string fails here.
  *
- * What is NOT claimed by this: the hiding of claim order (clause 4.2.4.1), which no
- * verifier can observe, and the signature check. The signature is checked by Node's
- * `crypto`, in `lib.mjs`, not by the library, which only calls back for it.
+ * The hiding of claim order (clause 4.2.4.1) is judged too, in the one way it can
+ * be: the original order cannot be seen, but whether each `_sd` array is sorted can.
+ * A sorted array is a function of the salted digests alone, so it cannot carry the
+ * order the claims were in, and sorting is the method the clause names. Every `_sd`
+ * array in every token this crate issues must be strictly ascending, and so must
+ * the RFC's own, which shows the convention is theirs and not ours.
+ *
+ * What the signature check is: Node's `crypto`, in `lib.mjs`, doing the Ed25519
+ * arithmetic (OpenSSL, which shares nothing with this crate's `ed25519-dalek`). The
+ * library builds the JWS signing input and calls back for the check, so it frames
+ * the signature and Node verifies it.
  *
  * Negative controls run first, because a judge that cannot refuse proves nothing.
  * The script then reports every failure and exits non-zero if there is one.
@@ -35,9 +43,11 @@
 import { readFileSync } from "node:fs";
 import { generateKeyPairSync } from "node:crypto";
 import {
+  ascending,
   judge,
   libraryVersion,
   same,
+  sdArrays,
   verifyingInstance,
 } from "./lib.mjs";
 
@@ -125,6 +135,18 @@ async function negativeControls() {
     problems.push("a token with a changed Disclosure was accepted");
   }
 
+  // The order check has to be able to fail, on a real token and not only on a list.
+  if (ascending(["b", "a"]) || ascending(["a", "a"]) || !ascending(["a", "b"]) || !ascending([])) {
+    problems.push("the ascending check is wrong on a plain list");
+  }
+  if (sdArrays(valid).length === 0) problems.push("no _sd array is found in a token that has some");
+  const body = JSON.parse(Buffer.from(p, "base64url"));
+  body._sd.reverse();
+  const reversed = [[h, Buffer.from(JSON.stringify(body)).toString("base64url"), s].join("."), ...rest].join("~");
+  if (!sdArrays(reversed).some((a) => a.length > 1 && !ascending(a))) {
+    problems.push("a token whose _sd array was reversed is not flagged");
+  }
+
   if (!same({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 })) {
     problems.push("the comparison treats key order as a difference");
   }
@@ -152,8 +174,20 @@ console.log("negative controls: the judge refuses what it must");
 const counts = {};
 const tally = (group) => (counts[group] = (counts[group] ?? 0) + 1);
 
+/** Every `_sd` array in the token, counted, and each must be strictly ascending. */
+const order = { ours: { tokens: 0, arrays: 0 }, rfc: { tokens: 0, arrays: 0 } };
+function checkOrder(whose, id, token) {
+  order[whose].tokens++;
+  for (const digests of sdArrays(token)) {
+    if (digests.length < 2) continue;
+    order[whose].arrays++;
+    if (!ascending(digests)) fail(id, "an _sd array is not in ascending order, so its order may follow the claims'");
+  }
+}
+
 for (const c of corpus.cases.filter((c) => c.group === "issued" || c.group === "presented")) {
   tally(c.group);
+  checkOrder("ours", c.id, c.token);
   const theirs = await judge(ed25519, c.token);
   if (!c.ours.accepts) fail(c.id, `this crate refuses its own token: ${c.ours.error}`);
   if (!theirs.accepts) {
@@ -223,6 +257,7 @@ function claimsOf(jwt) {
 
 for (const c of corpus.cases.filter((c) => c.group === "rfc")) {
   tally("rfc");
+  checkOrder("rfc", c.id, c.token);
   const [jwt, ...tail] = c.token.split("~");
   const kb = tail.at(-1) ? claimsOf(tail.at(-1)) : null;
   // The examples are old; judge them as of when they were made.
@@ -252,6 +287,11 @@ console.log(
   Object.entries(counts)
     .map(([group, n]) => `${group}: ${n}`)
     .join(", "),
+);
+console.log(
+  `claim order (clause 4.2.4.1): ${order.ours.arrays} _sd arrays of two or more digests in ` +
+    `${order.ours.tokens} tokens this crate issued, ${order.rfc.arrays} in the RFC's ` +
+    `${order.rfc.tokens} vendored tokens; each strictly ascending`,
 );
 console.log(`known disagreements, each argued in the script: ${seenDisagreements.size}`);
 for (const id of seenDisagreements) {

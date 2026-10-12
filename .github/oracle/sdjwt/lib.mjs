@@ -121,6 +121,44 @@ export function ed25519FromSeed(seedText) {
   return { privateKey, publicJwk, sign: (data) => b64u(cryptoSign(null, Buffer.from(data), privateKey)) };
 }
 
+/**
+ * Every `_sd` array in a token: in the signed payload, and in the values of the
+ * Disclosures, where a recursive Disclosure carries its own. Read without
+ * checking anything.
+ */
+export function sdArrays(token) {
+  const found = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+    } else if (value && typeof value === "object") {
+      for (const [key, inner] of Object.entries(value)) {
+        if (key === "_sd" && Array.isArray(inner)) found.push(inner);
+        walk(inner);
+      }
+    }
+  };
+  const [jwt, ...rest] = token.split("~");
+  walk(JSON.parse(Buffer.from(jwt.split(".")[1], "base64url")));
+  for (const segment of rest) {
+    // A Key Binding JWT has dots; a Disclosure, being base64url alone, never does.
+    if (segment === "" || segment.includes(".")) continue;
+    const disclosure = JSON.parse(Buffer.from(segment, "base64url"));
+    walk(disclosure.at(-1));
+  }
+  return found;
+}
+
+/**
+ * Whether an `_sd` array is in strictly ascending order. RFC 9901 clause 4.2.4.1
+ * requires the Issuer to hide the original order of the claims, and names sorting
+ * the digests alphanumerically as a way to do it: an order that is a function of
+ * the salted digests alone cannot carry the order the claims were in. The
+ * original order cannot be seen. That the array is sorted can, by anyone.
+ * Digests are ASCII, so this order is the byte order a Rust `sort` gives.
+ */
+export const ascending = (digests) => digests.every((d, i) => i === 0 || digests[i - 1] < d);
+
 /** A deterministic generator (mulberry32), so a seed names one corpus. */
 export function prng(seed) {
   let a = seed >>> 0;

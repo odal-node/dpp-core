@@ -20,7 +20,9 @@ pub enum DisclosureError {
     /// the two elements `[salt, value]` of clause 4.2.2 for an array element.
     #[error("disclosure is not a [salt, name, value] triple or a [salt, value] pair")]
     NotATripleOrPair,
-    /// The claim name is one clause 4.2.1 forbids: `_sd` or `...`.
+    /// The claim name is one a disclosure may not carry: `_sd` or `...`, which
+    /// clause 4.2.1 forbids, or `_sd_alg`, which clauses 4.1.1 and 4.2.1 and step
+    /// 3.f make unusable.
     #[error("disclosure names a reserved claim")]
     ReservedClaimName,
 }

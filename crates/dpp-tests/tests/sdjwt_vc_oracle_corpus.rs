@@ -52,7 +52,7 @@ use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::{ProductGroup, ProductGroupCatalog, ProductGroupData};
 use dpp_tests::fixtures::base_passport;
 use dpp_vc::sd_jwt_vc::{issue, vct_for, verify};
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Number, Value, json};
 
 const ISSUER: &str = "https://passports.operator.example";
 const KEY_ID: &str = "issuer";
@@ -115,7 +115,9 @@ impl Issuer {
             "test-sdjwt-vc-corpus-{}.json",
             uuid::Uuid::now_v7()
         ));
-        let store = KeyStore::open(&path, "test-pass").expect("open the keystore");
+        // A new passphrase per run, for a store that lives for one test.
+        let passphrase = uuid::Uuid::now_v7().to_string();
+        let store = KeyStore::open(&path, &passphrase).expect("open the keystore");
         store.generate_key(KEY_ID).expect("generate the key");
         let info = store
             .public_key(KEY_ID)
@@ -316,7 +318,11 @@ fn disagreements(file: &Value) -> Vec<String> {
             .expect("a case names the vct it expects");
         match (case["verdict"].as_str(), verify(token, key, vct, now)) {
             (Some("accept"), Ok(claims)) => {
-                if let Some(at) = first_difference(&Value::Object(claims), &case["expected"], "") {
+                // `expected` is optional in the file: a case without it is judged
+                // on its verdict alone.
+                if let Some(expected) = case.get("expected")
+                    && let Some(at) = first_difference(&Value::Object(claims), expected, "")
+                {
                     out.push(format!(
                         "{id}: reads differently from the other implementation, at {at}"
                     ));
@@ -410,6 +416,67 @@ fn the_verify_check_fails_on_a_mismatch() {
     assert!(SdJwt::parse(&token).is_ok());
 }
 
+/// Past 2^53 a double cannot tell two integers apart, so the comparison that
+/// forgives `12` against `12.0` must not forgive those.
+#[test]
+fn numbers_are_compared_exactly_where_a_double_cannot_hold_them() {
+    let n = |text: &str| match serde_json::from_str::<Value>(text).expect("JSON") {
+        Value::Number(number) => number,
+        other => panic!("{text} is not a number: {other}"),
+    };
+    for (a, b) in [
+        ("12", "12.0"),
+        ("0", "-0.0"),
+        ("9007199254740992", "9007199254740992.0"),
+    ] {
+        assert!(
+            same_number(&n(a), &n(b)) && same_number(&n(b), &n(a)),
+            "{a} and {b}"
+        );
+    }
+    for (a, b) in [
+        ("12", "12.5"),
+        ("9007199254740993", "9007199254740992"),
+        ("9007199254740993", "9007199254740992.0"),
+        ("18446744073709551615", "18446744073709551616.0"),
+    ] {
+        assert!(
+            !same_number(&n(a), &n(b)) && !same_number(&n(b), &n(a)),
+            "{a} and {b}"
+        );
+    }
+}
+
+/// Whether two JSON numbers are one number.
+///
+/// `12.0` and `12` are: the issuer canonicalises numbers (RFC 8785), so a
+/// whole-number float in a passport comes back whole. Two integers are compared
+/// exactly and never through a double, because past 2^53 distinct integers share
+/// one. An integer and a float agree only when the float is whole and no larger
+/// than 2^53, where a double holds every integer exactly.
+fn same_number(x: &Number, y: &Number) -> bool {
+    /// 2^53.
+    const EXACT_LIMIT: f64 = 9_007_199_254_740_992.0;
+    let whole_float_is = |float: &Number, integer: &Number| {
+        let Some(f) = float
+            .as_f64()
+            .filter(|f| f.fract() == 0.0 && f.abs() <= EXACT_LIMIT)
+        else {
+            return false;
+        };
+        // Digits, not a cast: `-0.0` is `0`, and everything else prints whole.
+        let digits = if f == 0.0 {
+            "0".to_owned()
+        } else {
+            format!("{f:.0}")
+        };
+        digits == integer.to_string()
+    };
+    x == y
+        || (x.is_f64() && !y.is_f64() && whole_float_is(x, y))
+        || (y.is_f64() && !x.is_f64() && whole_float_is(y, x))
+}
+
 /// Where two documents first differ, as a path, so a failure names the claim.
 fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
     match (a, b) {
@@ -434,9 +501,7 @@ fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
             .zip(y)
             .enumerate()
             .find_map(|(i, (l, r))| first_difference(l, r, &format!("{path}/{i}"))),
-        // `12.0` and `12` are one JSON number. The issuer canonicalises numbers
-        // (RFC 8785), so a whole-number float in a passport comes back whole.
-        (Value::Number(x), Value::Number(y)) if x.as_f64() == y.as_f64() => None,
+        (Value::Number(x), Value::Number(y)) if same_number(x, y) => None,
         _ if a == b => None,
         _ => Some(format!("{path}: {a} against {b}")),
     }

@@ -273,6 +273,40 @@ fn wrong_structure(base: &Base<'_>, out: &mut Vec<Adversarial>) {
         "clause 4.2.1 forbids the name; clause 7.1 step 3.c.ii.2",
         with_disclosure(base, r#"["s","...","x"]"#),
     );
+    // `_sd_alg` as a Disclosure's name, in the three places it can sit. The
+    // library refuses all three as a reserved name, and the RFC supports it in
+    // each: the first collides with the hash claim (clause 4.2.1, step
+    // 3.c.ii.3), the second is below the top level (clause 4.1.1), and in the
+    // third step 3.f would strip the claim once revealed.
+    add(
+        out,
+        "reject/disclosure-names-the-claim-_sd_alg-top-level",
+        "clause 4.2.1: a name that exists as a permanently disclosed claim; step 3.c.ii.3",
+        with_disclosure(base, r#"["s","_sd_alg","sha-256"]"#),
+    );
+    add(
+        out,
+        "reject/disclosure-names-the-claim-_sd_alg-nested",
+        "clause 4.1.1: _sd_alg MUST NOT be used in any object nested within the payload",
+        base.altered(|p, ds| {
+            let (encoded, digest) = raw(r#"["s","_sd_alg","sha-256"]"#);
+            sd(&mut p["address"]).push(json!(digest));
+            ds.push(encoded);
+        }),
+    );
+    add(
+        out,
+        "reject/disclosure-names-the-claim-_sd_alg-hash-unstated",
+        "clause 7.1 step 3.f removes _sd_alg from the payload, so a revealed one could never reach the caller",
+        base.altered(|p, ds| {
+            p.as_object_mut()
+                .expect("the payload is an object")
+                .remove("_sd_alg");
+            let (encoded, digest) = raw(r#"["s","_sd_alg","sha-256"]"#);
+            sd(p).push(json!(digest));
+            ds.push(encoded);
+        }),
+    );
     add(
         out,
         "reject/unknown-hash-algorithm",

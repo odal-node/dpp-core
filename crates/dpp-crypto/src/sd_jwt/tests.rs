@@ -211,7 +211,7 @@ fn a_disclosure_survives_a_parse_and_reencode_unchanged() {
 fn reserved_claim_names_are_refused() {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    for name in ["_sd", "..."] {
+    for name in ["_sd", "...", "_sd_alg"] {
         let encoded = b64.encode(json!(["salt", name, 1]).to_string());
         assert_eq!(
             Disclosure::parse(&encoded),
@@ -398,10 +398,11 @@ fn a_digest_repeated_across_two_sd_arrays_is_refused() {
 }
 
 /// A constructor must not be able to build a value this crate's own parser
-/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names.
+/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names, and `_sd_alg`
+/// is refused with them.
 #[test]
 fn constructors_refuse_reserved_claim_names() {
-    for name in ["_sd", "..."] {
+    for name in ["_sd", "...", "_sd_alg"] {
         assert_eq!(
             Disclosure::new(name, json!(1)),
             Err(DisclosureError::ReservedClaimName)

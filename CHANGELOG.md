@@ -281,14 +281,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `WrongDisclosureKind`. Nothing outside the module's own tests and `dpp-vc`'s
   read a name.
 
-- **`SdJwt::parse` and `disclosed_payload` refuse three tokens they used to
+- **`SdJwt::parse` and `disclosed_payload` refuse four tokens they used to
   accept.** A segment after the last `~` that is not a compact JWS is refused as
   `SdJwtError::MalformedKeyBinding`. A `_sd_alg` anywhere but the top level is
   refused as `SdJwtError::NestedHashAlg`. An `_sd` array holding anything but
   strings carries no digests, so a Disclosure that only it could have matched
-  leaves the token refused as `UnusedDisclosures`. **Migration:** none for a
-  conformant token, which is read as before. Each of the three was not one. See
-  Fixed for what each lost. (#426)
+  leaves the token refused as `UnusedDisclosures`. A Disclosure named `_sd_alg`
+  is refused as `DisclosureError::ReservedClaimName`, and `Disclosure::new` and
+  `with_salt` refuse the name too. **Migration:** none for a conformant token,
+  which is read as before. Each of the four was not one. A claim called `_sd_alg`
+  can no longer be concealed, at any depth. See Fixed for what each lost. (#426)
 
 ### Added
 
@@ -707,12 +709,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `npm ci --ignore-scripts`, in four ways. It reads the claim trees this crate
   issues, each presented every way a small tree allows and in a sample of the ways
   a large one does, and must arrive at the claims a verifier is meant to see,
-  which the corpus works out without this crate's code. It judges forty-seven
-  tokens each broken in one clause and
-  re-signed, and must reach this crate's verdict, and its claims where both
-  accept; three differences are listed in the script with the clause and the side
-  the RFC supports, and a listed difference that has stopped being one fails the
-  run. It verifies the RFC's own seven vendored tokens against their ES256
+  which the corpus works out without this crate's code. It judges fifty tokens
+  each broken in one clause and re-signed, and must reach this crate's verdict,
+  and its claims where both accept; three differences are listed in the script
+  with the clause and the side the RFC supports, and a listed difference that has
+  stopped being one fails the run. The hiding of claim order (clause 4.2.4.1) is
+  judged in the one way it can be, since the original order cannot be seen but
+  whether an `_sd` array is sorted can: every such array in the tokens this crate
+  issues, and in the RFC's own, must be strictly ascending, which makes its order
+  a function of the salted digests alone. It verifies the RFC's own seven vendored tokens against their ES256
   signatures with the key of Appendix A.5, and the `sd_hash` of the two Key
   Binding JWTs, which covers every byte of a presentation. And it issues more than
   two hundred tokens, reproducibly from fixed seeds, that this crate reads back to
@@ -731,7 +736,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
-- **An independent implementation found three ways this crate read a malformed
+- **An independent implementation found four ways this crate read a malformed
   SD-JWT as a good one.** Its own tests could not, having been written from the
   same reading of RFC 9901 as the code.
   - **A last Disclosure that lost its closing `~` was taken for a Key Binding
@@ -746,6 +751,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     the number were treated as embedded and their Disclosures revealed, where the
     RFC reads the array as carrying none and refuses the token for the Disclosures
     left unreferenced (step 5).
+  - **A Disclosure named `_sd_alg` was accepted.** Clause 4.2.1 forbids a name that
+    already exists as a permanently disclosed claim, which at the top level is
+    `_sd_alg` once the hash is stated (step 3.c.ii.3 refuses the collision);
+    clause 4.1.1 forbids it below the top level; and where it is absent, step 3.f
+    would strip it once revealed. This crate stripped `_sd_alg` before it
+    substituted Disclosures, so none of the three could fire and the claim came
+    back as an ordinary one. The name is now reserved with `_sd` and `...`.
 
 - **A framed passport had no name in linked data.** The context aliases `id`
   to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI

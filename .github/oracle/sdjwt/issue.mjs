@@ -28,12 +28,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   SDJwtInstance,
+  ascending,
   b64u,
   ed25519FromSeed,
   hasher,
   kbVerifier,
   libraryVersion,
   prng,
+  sdArrays,
   verifierFor,
 } from "./lib.mjs";
 
@@ -249,17 +251,29 @@ const VCT = "tag:example.test:vct:oracle:1";
 const VC_NOW = 1_789_000_060;
 const vcCases = [];
 
-async function addVc(id, claims, frame, { vct = VCT, presentation } = {}) {
+// `intended` is what the case was written to show. The library's verdict is what
+// is recorded, but a case it judges the other way fails the run: otherwise a
+// credential refused through a mistake here (a wrong `currentDate`, say) would be
+// written down as a refusal, and this crate asked to agree with it.
+async function addVc(id, claims, frame, { vct = VCT, presentation, intended = "accept" } = {}) {
   try {
     const issued = await sd.issue(claims, frame, { header: { typ: "dc+sd-jwt" } });
     const token = presentation === undefined ? issued : await sd.present(issued, presentation);
     const options = { currentDate: VC_NOW, expectedVct: vct, requiredClaimKeys: ["iss", "vct"] };
     let verdict = "accept";
     let expected;
+    let why;
     try {
       expected = (await sd.verify(token, options)).payload;
-    } catch {
+    } catch (e) {
       verdict = "refuse";
+      why = e?.message ?? e;
+    }
+    if (verdict !== intended) {
+      problems.push(
+        `${id}: meant to be ${intended === "accept" ? "accepted" : "refused"}, ` +
+          `the library ${verdict === "accept" ? "accepts" : "refuses"} it${why ? ` (${why})` : ""}`,
+      );
     }
     vcCases.push({ id, token, vct, verdict, ...(expected && { expected }) });
   } catch (e) {
@@ -275,14 +289,14 @@ await addVc("vc/concealed-none-shown", credential, { _sd: ["name", "meta"] }, { 
 await addVc("vc/array-element-concealed", credential, { tags: { _sd: ["1"] } }, { presentation: { tags: { 1: true } } });
 await addVc("vc/decoys", credential, { _sd: ["name"], _sd_decoy: 3 }, { presentation: { name: true } });
 await addVc("vc/exp-in-the-future", { ...credential, exp: VC_NOW + 3600 }, undefined);
-await addVc("vc/exp-already-passed", { ...credential, exp: VC_NOW - 1 }, undefined);
-await addVc("vc/exp-is-this-very-second", { ...credential, exp: VC_NOW }, undefined);
+await addVc("vc/exp-already-passed", { ...credential, exp: VC_NOW - 1 }, undefined, { intended: "refuse" });
+await addVc("vc/exp-is-this-very-second", { ...credential, exp: VC_NOW }, undefined, { intended: "refuse" });
 await addVc("vc/nbf-already-reached", { ...credential, nbf: VC_NOW - 1 }, undefined);
-await addVc("vc/nbf-not-yet", { ...credential, nbf: VC_NOW + 1 }, undefined);
+await addVc("vc/nbf-not-yet", { ...credential, nbf: VC_NOW + 1 }, undefined, { intended: "refuse" });
 await addVc("vc/fractional-exp", { ...credential, exp: VC_NOW + 0.5 }, undefined);
-await addVc("vc/another-vct-than-expected", { ...credential, vct: "tag:example.test:vct:other:1" }, undefined);
-await addVc("vc/no-vct", { iss: credential.iss, iat: credential.iat, name: "Alice" }, undefined);
-await addVc("vc/no-iss", { vct: VCT, iat: credential.iat, name: "Alice" }, undefined);
+await addVc("vc/another-vct-than-expected", { ...credential, vct: "tag:example.test:vct:other:1" }, undefined, { intended: "refuse" });
+await addVc("vc/no-vct", { iss: credential.iss, iat: credential.iat, name: "Alice" }, undefined, { intended: "refuse" });
+await addVc("vc/no-iss", { vct: VCT, iat: credential.iat, name: "Alice" }, undefined, { intended: "refuse" });
 
 // -----------------------------------------------------------------------------
 
@@ -292,6 +306,13 @@ if (problems.length) {
   process.exit(1);
 }
 
+// Calibration, not a check: how this issuer orders its own `_sd` arrays. It sorts them,
+// as the RFC's examples do and as this crate does, which is why sortedness is a fair
+// thing to ask of ours. Printed so that a change in the library shows up in the log.
+// (The JSON forms are not compact tokens, and are left out.)
+const compact = cases.filter((c) => c.verdict === "accept");
+const sortedTokens = compact.filter((c) => sdArrays(c.token).every((a) => ascending(a))).length;
+
 mkdirSync(path.dirname(outPath), { recursive: true });
 writeFileSync(outPath, JSON.stringify({ publicKey: issuer.publicJwk.x, cases }));
 const vcPath = path.join(path.dirname(outPath), "issued-vc.json");
@@ -300,5 +321,6 @@ console.log(
   `@sd-jwt/core ${libraryVersion} issued ${cases.length} tokens ` +
     `(${cases.filter((c) => c.keyBinding).length} with a Key Binding JWT, ` +
     `${cases.filter((c) => c.verdict === "refuse").length} this crate must refuse) to ${outPath}\n` +
-    `and ${vcCases.length} credentials (${vcCases.filter((c) => c.verdict === "refuse").length} must be refused) to ${vcPath}`,
+    `and ${vcCases.length} credentials (${vcCases.filter((c) => c.verdict === "refuse").length} must be refused) to ${vcPath}\n` +
+    `calibration: this issuer sorted every _sd array ascending in ${sortedTokens} of ${compact.length} tokens`,
 );

@@ -29,7 +29,7 @@
 
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { judge, libraryVersion, same, verifyingInstance } from "./lib.mjs";
+import { ascending, judge, libraryVersion, same, sdArrays, verifyingInstance } from "./lib.mjs";
 
 const corpusPath = process.argv[2] ?? "target/sdjwt-oracle/credentials.json";
 const corpus = JSON.parse(readFileSync(corpusPath, "utf8"));
@@ -68,6 +68,7 @@ const issued = corpus.cases.find((c) => c.id.endsWith("/issued"));
   }
   const stranger = generateKeyPairSync("ed25519").publicKey.export({ format: "jwk" });
   if (thumbprintUri(stranger) === corpus.kid) problems.push("two different keys have one thumbprint");
+  if (ascending(["b", "a"]) || !ascending(["a", "b"])) problems.push("the ascending check is wrong on a plain list");
   // RFC 7638 section 3.1's own example is an RSA key; the OKP member order is
   // fixed by the same rule (crv, kty, x), checked here against RFC 8037 Appendix A.3.
   const rfc8037 = { kty: "OKP", crv: "Ed25519", x: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo" };
@@ -88,8 +89,16 @@ const expectedKid = thumbprintUri(corpus.issuerJwk);
 if (corpus.kid !== expectedKid) fail("corpus", `the corpus says the kid is ${corpus.kid}, the key's thumbprint is ${expectedKid}`);
 
 const groups = new Set();
+let orderArrays = 0;
 for (const c of corpus.cases) {
   groups.add(c.productGroup);
+  // Clause 4.2.4.1: the order of an _sd array must not be the order of the claims. Sorted
+  // is a function of the salted digests alone, and is the method the clause names.
+  for (const digests of sdArrays(c.token)) {
+    if (digests.length < 2) continue;
+    orderArrays++;
+    if (!ascending(digests)) fail(c.id, "an _sd array is not in ascending order");
+  }
   const header = headerOf(c.token);
   if (header.kid !== expectedKid) fail(c.id, `kid ${header.kid} is not the thumbprint of the signing key`);
   if (header.alg !== "EdDSA") fail(c.id, `alg is ${header.alg}`);
@@ -110,6 +119,7 @@ for (const c of corpus.cases) {
 }
 
 console.log(`${corpus.cases.length} credentials across ${groups.size} product groups; kid ${expectedKid}`);
+console.log(`claim order (clause 4.2.4.1): ${orderArrays} _sd arrays of two or more digests; each strictly ascending`);
 
 if (failures.length) {
   console.error(`\n${failures.length} FAILURE(S):`);
