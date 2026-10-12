@@ -251,10 +251,69 @@ fn a_token_without_a_trailing_separator_is_not_an_sd_jwt() {
 #[test]
 fn a_key_binding_segment_is_seen_and_not_read_as_a_disclosure() {
     let issued = issue();
-    let with_kb = format!("{}kb-jwt-placeholder", issued.serialise());
-    let parsed = SdJwt::parse(&with_kb).unwrap();
+    let kb = stub_jwt(&json!({ "iat": 1 }));
+    let parsed = SdJwt::parse(&format!("{}{kb}", issued.serialise())).unwrap();
     assert_eq!(parsed.disclosures().len(), 4);
     assert!(parsed.has_key_binding());
+}
+
+/// Clause 4: a token ends in `~`, or in a Key Binding JWT. A last Disclosure that
+/// lost its closing `~` is neither, and was once taken for a Key Binding JWT: the
+/// claim it carried went missing from the result and nothing said so.
+#[test]
+fn a_last_disclosure_missing_its_closing_separator_is_refused_not_dropped() {
+    let cut = issue().serialise().trim_end_matches('~').to_owned();
+    assert!(matches!(
+        SdJwt::parse(&cut),
+        Err(SdJwtError::MalformedKeyBinding)
+    ));
+}
+
+#[test]
+fn a_key_binding_segment_that_is_not_a_compact_jws_is_refused() {
+    let token = issue().serialise();
+    for not_a_jws in ["kb-jwt-placeholder", "a.b", "a.b.c.d", "a..c", "a.b.c d"] {
+        assert!(
+            matches!(
+                SdJwt::parse(&format!("{token}{not_a_jws}")),
+                Err(SdJwtError::MalformedKeyBinding)
+            ),
+            "{not_a_jws:?}"
+        );
+    }
+}
+
+/// Clause 7.1 step 3.b.i reads only an `_sd` that "refers to an array of
+/// strings". One that does not carries no digests, so a Disclosure its sibling
+/// strings would have matched is left unreferenced (step 5) and the token is
+/// refused, rather than half of the array being read.
+#[test]
+fn an_sd_array_holding_a_non_string_carries_no_digests() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest(), 7], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::UnusedDisclosures(1))
+    );
+}
+
+/// Clause 4.1.1: `_sd_alg` "MUST NOT be used in any object nested within the
+/// payload", and step 3.f removes it from the top level only. A nested one is a
+/// claim the issuer was not allowed to make, not an artefact to strip silently.
+#[test]
+fn sd_alg_inside_a_nested_object_is_refused() {
+    let payload = json!({ "_sd_alg": "sha-256", "nested": { "_sd_alg": "sha-256" } });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
+}
+
+#[test]
+fn sd_alg_inside_a_disclosed_object_is_refused() {
+    let d = Disclosure::new("o", json!({ "_sd_alg": "sha-256" })).unwrap();
+    let payload = json!({ "_sd": [d.digest()], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
 }
 
 #[test]

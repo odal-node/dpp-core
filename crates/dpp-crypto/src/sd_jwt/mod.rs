@@ -35,7 +35,9 @@
 //! - **It does not implement key binding.** RFC 9901 clause 4.3's KB-JWT proves
 //!   the presenter holds a key the credential names. That needs holders to have
 //!   keys. The parser tolerates a trailing KB-JWT segment so that a presentation
-//!   carrying one is not misread as malformed, and otherwise ignores it.
+//!   carrying one is not misread as malformed. It checks that the segment is
+//!   shaped like a JWT, because a Disclosure that lost its closing `~` would
+//!   otherwise pass for one and vanish, and ignores it beyond that.
 //! - **It does not issue decoy digests** (clause 4.2.5). They are optional, and
 //!   they buy concealment of *how many* claims or elements were withheld, which
 //!   the digest count already reveals only in aggregate. Reading them works: a

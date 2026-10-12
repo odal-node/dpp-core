@@ -251,7 +251,7 @@ fn long_value() -> Case {
 // ----- seeded random trees ---------------------------------------------------
 
 fn random(seed: u64) -> Case {
-    let mut rng = Rng(0x5D_5D_0000 + seed);
+    let mut rng = Rng(0x5D5D_0000 + seed);
     let mut root = Map::new();
     for n in 0..(3 + rng.below(5)) {
         root.insert(format!("k{n}"), random_value(&mut rng, 3));

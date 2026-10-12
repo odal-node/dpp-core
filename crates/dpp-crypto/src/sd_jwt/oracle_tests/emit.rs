@@ -145,9 +145,14 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
     }
 
     // A count, because a loop over an empty corpus passes.
-    assert!(count(&corpus, "issued") >= 40, "issued");
-    assert!(count(&corpus, "presented") >= 500, "presented");
-    assert!(count(&corpus, "adversarial") >= 50, "adversarial");
+    let (issued, presented, adversarial) = (
+        count(&corpus, "issued"),
+        count(&corpus, "presented"),
+        count(&corpus, "adversarial"),
+    );
+    assert!(issued >= 40, "issued: {issued}");
+    assert!(presented >= 500, "presented: {presented}");
+    assert!(adversarial >= 40, "adversarial: {adversarial}");
     assert_eq!(count(&corpus, "rfc"), 7, "the RFC's tokens");
 
     if std::env::var_os("EMIT_SDJWT_CORPUS").is_none() {

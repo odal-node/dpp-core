@@ -281,6 +281,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `WrongDisclosureKind`. Nothing outside the module's own tests and `dpp-vc`'s
   read a name.
 
+- **`SdJwt::parse` and `disclosed_payload` refuse three tokens they used to
+  accept.** A segment after the last `~` that is not a compact JWS is refused as
+  `SdJwtError::MalformedKeyBinding`. A `_sd_alg` anywhere but the top level is
+  refused as `SdJwtError::NestedHashAlg`. An `_sd` array holding anything but
+  strings carries no digests, so a Disclosure that only it could have matched
+  leaves the token refused as `UnusedDisclosures`. **Migration:** none for a
+  conformant token, which is read as before. Each of the three was not one. See
+  Fixed for what each lost. (#426)
+
 ### Added
 
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
@@ -692,7 +701,51 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   parameters and not through the keystore's own, so it would not support a claim
   about the keystore.
 
+- **An independent implementation of RFC 9901 now judges the SD-JWTs this
+  repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs
+  `@sd-jwt/core` 0.22.0, pinned by a committed lockfile and installed with
+  `npm ci --ignore-scripts`, in four ways. It reads the claim trees this crate
+  issues, each presented every way a small tree allows and in a sample of the ways
+  a large one does, and must arrive at the claims a verifier is meant to see,
+  which the corpus works out without this crate's code. It judges forty-seven
+  tokens each broken in one clause and
+  re-signed, and must reach this crate's verdict, and its claims where both
+  accept; three differences are listed in the script with the clause and the side
+  the RFC supports, and a listed difference that has stopped being one fails the
+  run. It verifies the RFC's own seven vendored tokens against their ES256
+  signatures with the key of Appendix A.5, and the `sd_hash` of the two Key
+  Binding JWTs, which covers every byte of a presentation. And it issues more than
+  two hundred tokens, reproducibly from fixed seeds, that this crate reads back to
+  the claims the library verified. A credential per product group, issued by
+  `dpp_vc::sd_jwt_vc::issue` from the group's schema fixture, is judged the same
+  way, with each `kid` recomputed from the signing key as its RFC 7638 thumbprint
+  in RFC 9278 form, and credentials the library issues are verified by
+  `dpp_vc::sd_jwt_vc::verify`. The judges refuse a token with a changed signature,
+  a stranger's key and a changed Disclosure before they judge anything, and report
+  every failure rather than the first. The signature itself is checked by Node's
+  `crypto`, not by the library, which calls back for it; and the credentials are
+  judged at the level of the RFC only, since the credential profile is an
+  Internet-Draft. The register row for RFC 9901 says what this shows and what
+  stays unclaimed, and RFC 8259, which the corpus cites for two edge cases, gets
+  a row of its own. (#420, #426)
+
 ### Fixed
+
+- **An independent implementation found three ways this crate read a malformed
+  SD-JWT as a good one.** Its own tests could not, having been written from the
+  same reading of RFC 9901 as the code.
+  - **A last Disclosure that lost its closing `~` was taken for a Key Binding
+    JWT.** `JWT~D1~D2` parsed as one Disclosure and a Key Binding JWT, so the
+    claim in `D2` was missing from the result and nothing said so. The last
+    segment must now be a compact JWS (clause 4).
+  - **`_sd_alg` was stripped at every depth.** Clause 4.1.1 forbids it below the
+    top level and step 3.f removes it from the top level only, so a nested one
+    deleted a claim of that name without a word. It is refused.
+  - **An `_sd` array with a number in it was read for its strings.** Step 3.b.i
+    reads only an `_sd` that refers to an array of strings, so the digests beside
+    the number were treated as embedded and their Disclosures revealed, where the
+    RFC reads the array as carrying none and refuses the token for the Disclosures
+    left unreferenced (step 5).
 
 - **A framed passport had no name in linked data.** The context aliases `id`
   to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI

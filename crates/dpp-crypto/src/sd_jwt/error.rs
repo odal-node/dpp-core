@@ -38,9 +38,25 @@ pub enum SdJwtError {
     /// The issuer-signed JWT is not three dot-separated parts.
     #[error("issuer-signed JWT is malformed")]
     MalformedJwt,
+    /// The segment after the last `~` is not a compact JWS.
+    ///
+    /// Clause 4: an SD-JWT ends in `~`, or in a Key Binding JWT. A last
+    /// Disclosure that lost its closing `~` is neither, and is refused rather than
+    /// taken for a Key Binding JWT, which would drop the claim it carries with no
+    /// sign that anything was lost.
+    #[error("the segment after the last '~' is not a JWT")]
+    MalformedKeyBinding,
     /// The JWT payload is not a JSON object.
     #[error("JWT payload is not a JSON object")]
     PayloadNotAnObject,
+    /// `_sd_alg` appears inside a nested object.
+    ///
+    /// Clause 4.1.1: it "MUST NOT be used in any object nested within the
+    /// payload", and clause 7.1 step 3.f removes it from the top level only. A
+    /// nested one is a claim the issuer was not allowed to make, so it is refused
+    /// and not stripped.
+    #[error("_sd_alg appears in a nested object")]
+    NestedHashAlg,
     /// `_sd_alg` names a hash function this does not implement.
     ///
     /// Carried rather than defaulted: clause 4.1.1 permits the claim to be

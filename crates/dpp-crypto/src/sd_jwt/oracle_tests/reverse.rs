@@ -17,6 +17,8 @@
 //! read. The second runs regardless and shows that the check itself fails on a
 //! mismatch, so a green run of the first means something.
 
+use std::path::Path;
+
 use serde_json::Value;
 
 use crate::jws::verifier::verify_jws;
@@ -70,11 +72,16 @@ fn disagreements(file: &Value) -> Vec<String> {
 
 #[test]
 fn what_an_independent_implementation_issued_reads_back_here() {
-    let Some(path) = std::env::var_os("CHECK_SDJWT_ORACLE_ISSUED") else {
+    let Some(given) = std::env::var_os("CHECK_SDJWT_ORACLE_ISSUED") else {
         return;
     };
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.to_string_lossy()));
+    // Tests run in the crate directory, so a relative path is read from the
+    // workspace root, where `emit` writes and where the command is run from.
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(given);
+    let text =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let file: Value = serde_json::from_str(&text).expect("the file is JSON");
 
     let count = file["cases"].as_array().map_or(0, Vec::len);

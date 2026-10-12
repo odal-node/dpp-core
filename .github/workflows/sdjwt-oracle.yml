@@ -1,0 +1,124 @@
+# Judges the SD-JWTs this workspace emits with an independent implementation of
+# RFC 9901, and has this workspace read what that implementation issues.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the AAS, GS1
+# and JSON-LD oracles are: this needs Node and npm, and `cargo build --workspace`
+# succeeding with no Node, no native toolchain and no services is a property this
+# project states publicly. Keeping the dependency here means the main gate never
+# acquires it.
+#
+# What it answers: *does an implementation with no code and no author in common
+# with `dpp_crypto::sd_jwt` read the tokens we issue to the claims a verifier must
+# see, and do we read the tokens it issues?* The Rust tests hold the module to this
+# repository's own reading of the RFC and to the RFC's examples, which fix their
+# salts and cannot show how an issuer builds the payload around the digests. A
+# misreading of the RFC that the author made twice passes both.
+#
+# Five checks, in order, each a step so a failure names itself:
+#
+#   1. the corpus: 700+ tokens built from claim trees, adversarial tokens, and the
+#      RFC's own, judged by the library (`judge.mjs`);
+#   2. a credential per product group, judged by the library, with the `kid`
+#      recomputed from the public key (`credentials.mjs`);
+#   3. the library issues tokens (`issue.mjs`), and `dpp_crypto` reads them;
+#   4. the library issues credentials, and `dpp_vc` verifies them;
+#   5. the same files are regenerated to show they are reproducible.
+#
+# What it does **not** answer, and the register row says so: the hiding of claim
+# order (RFC 9901 clause 4.2.4.1) cannot be observed by any verifier, and the
+# signature is checked by Node's `crypto` in `lib.mjs`, not by the library, which
+# calls back for it. Nothing here is evidence of conformance to the SD-JWT VC
+# credential profile, which is an Internet-Draft.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever.
+name: SD-JWT oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  judge:
+    name: SD-JWTs are read the same way by an independent implementation
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept. This job installs third-party code that touches
+      # signing, and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      # From the committed lockfile, with install scripts off. The library is
+      # somebody else's judgement about what RFC 9901 requires, and an unpinned
+      # upgrade would turn their tightening into our red build on code that did
+      # not change. `npm ci` fails if the lockfile and `package.json` disagree or
+      # a tarball's sha512 does not match. Moving the pin is a deliberate edit with
+      # a visible diff: change `package.json`, regenerate the lockfile, and cite
+      # the new version in the register row. Dependabot does not watch it.
+      - name: Install the independent implementation
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix .github/oracle/sdjwt
+
+      - name: Record what is actually being run
+        run: |
+          echo "node $(node --version)"
+          node -p "'@sd-jwt/core ' + require('./.github/oracle/sdjwt/node_modules/@sd-jwt/core/package.json').version"
+          node -p "'@owf/identity-common ' + require('./.github/oracle/sdjwt/node_modules/@owf/identity-common/package.json').version"
+          ls .github/oracle/sdjwt/node_modules/@sd-jwt .github/oracle/sdjwt/node_modules/@owf
+
+      - name: Build the corpus from our own issuer
+        run: EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::emit
+
+      - name: Judge the corpus
+        run: node .github/oracle/sdjwt/judge.mjs
+
+      - name: Build a credential for every product group
+        run: EMIT_SDJWT_VC_CORPUS=1 cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus
+
+      - name: Judge the credentials
+        run: node .github/oracle/sdjwt/credentials.mjs
+
+      - name: Have the independent implementation issue
+        run: node .github/oracle/sdjwt/issue.mjs
+
+      - name: Read what it issued
+        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+
+      - name: Verify the credentials it issued
+        run: CHECK_SDJWT_VC_ORACLE_ISSUED=target/sdjwt-oracle/issued-vc.json cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus what_an_independent
+
+      # Same seeds, same bytes. A difference means the library changed what it
+      # issues, which is worth knowing before it is a failure.
+      - name: Issue again and compare
+        run: |
+          sha256sum target/sdjwt-oracle/issued.json target/sdjwt-oracle/issued-vc.json > target/sdjwt-oracle/first.sha256
+          node .github/oracle/sdjwt/issue.mjs
+          sha256sum --check target/sdjwt-oracle/first.sha256
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the corpus
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sdjwt-oracle
+          path: target/sdjwt-oracle
+          retention-days: 7

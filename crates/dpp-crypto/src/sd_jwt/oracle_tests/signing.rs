@@ -87,10 +87,6 @@ pub(super) struct Verdict {
 }
 
 impl Verdict {
-    pub(super) fn accepts(&self) -> bool {
-        self.payload.is_some()
-    }
-
     pub(super) fn to_json(&self) -> Value {
         match (&self.payload, &self.error) {
             (Some(payload), _) => json!({ "accepts": true, "payload": payload }),
