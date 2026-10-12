@@ -4,7 +4,9 @@
 //! tokens with an independent SD-JWT library: object properties, nested and
 //! recursive ones, array elements, decoys, a Key Binding JWT. This crate has to
 //! verify the signature, process the Disclosures and arrive at what that library
-//! says the claims are. That is the half the RFC's examples cannot give, because
+//! says the claims are. A token bound to a Holder's key comes with the challenge
+//! the library verified it against, and this crate validates its Key Binding JWT
+//! against the same one. That is the half the RFC's examples cannot give, because
 //! the examples are one issuer's output and this crate's own tokens are the other
 //! direction.
 //!
@@ -22,12 +24,14 @@ use std::path::Path;
 use serde_json::Value;
 
 use crate::jws::verifier::verify_jws;
-use crate::sd_jwt::SdJwt;
+use crate::sd_jwt::{KeyBindingPolicy, SdJwt};
 
 /// Every way `file` disagrees with this crate.
 ///
 /// `file` is `{ "publicKey": <base64url raw Ed25519 key>, "cases": [...] }`, and a
-/// case is `{ "id", "verdict": "accept" | "refuse", "token", "expected"? }`.
+/// case is `{ "id", "verdict": "accept" | "refuse", "token", "expected"?,
+/// "challenge"? }`. A case with a `challenge` (`nonce`, `aud`, `now`, `window`) is
+/// read by a Verifier that requires Key Binding.
 fn disagreements(file: &Value) -> Vec<String> {
     let key = file["publicKey"].as_str().expect("the file names its key");
     let cases = file["cases"].as_array().expect("the file holds cases");
@@ -42,7 +46,11 @@ fn disagreements(file: &Value) -> Vec<String> {
                     Ok(true) => {}
                     other => return Err(format!("signature: {other:?}")),
                 }
-                let payload = sd_jwt.disclosed_payload().map_err(|e| format!("{e:?}"))?;
+                let payload = match challenge(&case["challenge"]) {
+                    Some(policy) => sd_jwt.disclosed_payload_with_key_binding(&policy),
+                    None => sd_jwt.disclosed_payload(),
+                }
+                .map_err(|e| format!("{e:?}"))?;
                 Ok((sd_jwt.has_key_binding(), Value::Object(payload)))
             });
         match (case["verdict"].as_str(), reading) {
@@ -68,6 +76,18 @@ fn disagreements(file: &Value) -> Vec<String> {
         }
     }
     out
+}
+
+/// The policy a case's `challenge` describes, when it has one.
+fn challenge(value: &Value) -> Option<KeyBindingPolicy> {
+    let window = value["window"].as_i64()?;
+    Some(KeyBindingPolicy {
+        audience: value["aud"].as_str()?.to_owned(),
+        nonce: value["nonce"].as_str()?.to_owned(),
+        now: value["now"].as_i64()?,
+        max_age: window,
+        leeway: window,
+    })
 }
 
 #[test]
@@ -141,5 +161,39 @@ fn the_readback_check_fails_on_a_mismatch() {
         disagreements(&wrong_key).len(),
         1,
         "a token under another key must be reported"
+    );
+
+    // A bound token is read with its Key Binding JWT checked: under the challenge
+    // it answers it reads back, and under another nonce it is reported.
+    let holder = super::signing::holder("sdjwt-oracle-reverse-holder");
+    let mut bound_claims = claims.clone();
+    bound_claims["cnf"] = crate::sd_jwt::holder_key_confirmation(&holder.verifying_key.to_bytes());
+    let plan = issue_to_plan(&bound_claims, &paths(&[&["a"]]));
+    let issued = SdJwt::new(issuer.sign(&plan.payload), plan.disclosures);
+    let binding = crate::sd_jwt::KeyBinding {
+        audience: "https://verifier.example".to_owned(),
+        nonce: "n".to_owned(),
+        issued_at: 1_800_000_000,
+    };
+    let reveal: Vec<String> = issued.disclosures().iter().map(|d| d.digest()).collect();
+    let reveal: Vec<&str> = reveal.iter().map(String::as_str).collect();
+    let bound = issued
+        .present_with_key_binding(&reveal, &binding, &holder)
+        .expect("binds")
+        .serialise();
+    let bound_file = |nonce: &str| {
+        json!({
+            "publicKey": issuer.public_key_b64,
+            "cases": [{
+                "id": "bound", "verdict": "accept", "token": bound, "expected": bound_claims,
+                "challenge": { "nonce": nonce, "aud": "https://verifier.example", "now": 1_800_000_000, "window": 0 },
+            }]
+        })
+    };
+    assert!(disagreements(&bound_file("n")).is_empty());
+    assert_eq!(
+        disagreements(&bound_file("another")).len(),
+        1,
+        "a Key Binding JWT that answers another challenge must be reported"
     );
 }

@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 
 use crate::jws::sign_typed;
 use crate::jws::verifier::verify_jws;
-use crate::keystore::KeyStore;
-use crate::sd_jwt::SdJwt;
+use crate::keystore::{KeyEntry, KeyStore};
+use crate::sd_jwt::{KeyBindingPolicy, SdJwt};
 use crate::test_support::temp_store;
 
 const KEY_ID: &str = "sdjwt-oracle-issuer";
@@ -47,6 +47,13 @@ impl Issuer {
 
     pub(super) fn kid(&self) -> &str {
         &self.kid
+    }
+
+    /// The issuer's own key pair, for a Key Binding JWT signed with the wrong key.
+    pub(super) fn key(&self) -> KeyEntry {
+        self.store
+            .load_key(KEY_ID)
+            .expect("the key was just generated")
     }
 
     /// A compact JWS over `payload`, with this issuer's `kid` and `typ`.
@@ -123,6 +130,37 @@ pub(super) fn ours(token: &str, public_key_b64: &str) -> Verdict {
     };
     match verify_jws(parsed.jwt(), public_key_b64) {
         Ok(true) => structure(token),
+        other => Verdict::refused(format!("signature: {other:?}")),
+    }
+}
+
+/// A Holder: the Ed25519 key an Issuer names in `cnf` and binds a presentation
+/// with.
+pub(super) fn holder(label: &str) -> KeyEntry {
+    temp_store(label, "holder")
+        .load_key("holder")
+        .expect("the key was just generated")
+}
+
+/// [`structure`] for a Verifier whose policy requires Key Binding: clause 7.1,
+/// then clause 7.3, without the Issuer's signature.
+pub(super) fn bound_structure(token: &str, policy: &KeyBindingPolicy) -> Verdict {
+    match SdJwt::parse(token).map(|parsed| parsed.disclosed_payload_with_key_binding(policy)) {
+        Ok(Ok(map)) => Verdict {
+            payload: Some(Value::Object(map)),
+            error: None,
+        },
+        Ok(Err(e)) | Err(e) => Verdict::refused(e),
+    }
+}
+
+/// [`bound_structure`], preceded by the Issuer's signature check.
+pub(super) fn ours_bound(token: &str, public_key_b64: &str, policy: &KeyBindingPolicy) -> Verdict {
+    let Ok(parsed) = SdJwt::parse(token) else {
+        return bound_structure(token, policy);
+    };
+    match verify_jws(parsed.jwt(), public_key_b64) {
+        Ok(true) => bound_structure(token, policy),
         other => Verdict::refused(format!("signature: {other:?}")),
     }
 }

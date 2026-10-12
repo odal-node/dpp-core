@@ -48,8 +48,11 @@
 //!
 //! - **Key binding.** RFC 9901 clause 4.3 proves the presenter holds a key the
 //!   credential names, which is real security and requires holders to have keys.
-//!   That is an ecosystem assumption, not a code change, so the design leaves
-//!   room for it and ships without it.
+//!   The mechanism is in `dpp_crypto::sd_jwt` (a Holder key in `cnf`, a bound
+//!   presentation, and a Verifier that requires one). This module neither names a
+//!   Holder key when it issues nor requires Key Binding when it verifies, because
+//!   who holds keys is an ecosystem assumption, not a code change. `cnf` is
+//!   already among the claims it never conceals.
 //! - **`x5c` issuance.** Clause 2.5's other key-discovery mechanism makes the
 //!   issuer the subject of an end-entity certificate. See
 //!   [`issuer_metadata::build_issuer_metadata`] for why that is not this

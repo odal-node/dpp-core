@@ -224,9 +224,20 @@ impl SdJwt {
         &self.disclosures
     }
 
-    /// Whether a key-binding JWT is attached. Its contents are not interpreted.
+    /// Whether a Key Binding JWT is attached. Only
+    /// [`Self::disclosed_payload_with_key_binding`] reads one.
     pub fn has_key_binding(&self) -> bool {
         self.key_binding_jwt.is_some()
+    }
+
+    pub(super) fn key_binding_jwt(&self) -> Option<&str> {
+        self.key_binding_jwt.as_deref()
+    }
+
+    /// This SD-JWT with `key_binding_jwt` attached, which makes it an SD-JWT+KB.
+    pub(super) fn bound(mut self, key_binding_jwt: String) -> Self {
+        self.key_binding_jwt = Some(key_binding_jwt);
+        self
     }
 
     /// The digests of every disclosure carrying `claim_name`. An array element has

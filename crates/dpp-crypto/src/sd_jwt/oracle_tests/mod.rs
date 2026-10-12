@@ -13,6 +13,8 @@
 //! - [`issued`] is the corpus of tokens this crate issues.
 //! - [`adversarial`] is the corpus of tokens it should refuse, each with the
 //!   verdict this crate gives, so the two implementations can be compared.
+//! - [`bound`] is the corpus of presentations bound to a Holder's key, judged
+//!   with Key Binding required.
 //! - [`rfc`] is the RFC's own tokens, as vendored in this repository.
 //! - [`emit`] writes them out. [`reverse`] reads back what the other
 //!   implementation issued.
@@ -22,6 +24,7 @@
 //! `just check` gets that coverage without producing files.
 
 mod adversarial;
+mod bound;
 mod emit;
 mod issued;
 mod plan;

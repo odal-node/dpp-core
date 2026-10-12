@@ -4,8 +4,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jca.JCAContext
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.OctetKeyPair
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.sdjwt.NimbusSdJwtOps
+import eu.europa.ec.eudi.sdjwt.cnf
 import eu.europa.ec.eudi.sdjwt.dsl.values.sdJwt
 import eu.europa.ec.eudi.sdjwt.vc.ClaimPath
 import kotlinx.coroutines.runBlocking
@@ -18,6 +21,7 @@ import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.NamedParameterSpec
 import java.util.Base64
+import java.util.Date
 
 /**
  * The other direction: tokens this library issues, for this crate to read.
@@ -48,7 +52,7 @@ class JdkEd25519Signer(private val key: PrivateKey) : JWSSigner {
 
 private val props = (0..5).map { "n$it" }
 
-private class Case(val id: String, val token: String)
+private class Case(val id: String, val token: String, val challenge: Challenge? = null)
 
 fun main(args: Array<String>) {
     val out = args.firstOrNull() ?: error("usage: IssueKt <issued-kotlin.json>")
@@ -59,9 +63,16 @@ fun main(args: Array<String>) {
     val cases = mutableListOf<Case>()
     val problems = mutableListOf<String>()
 
-    fun record(id: String, token: String) {
-        cases += Case(id, token)
+    fun record(id: String, token: String, challenge: Challenge? = null) {
+        cases += Case(id, token, challenge)
     }
+
+    // A Holder, for presentations bound to its key: the Issuer names it in `cnf`,
+    // and the library signs the Key Binding JWT with it through the JDK.
+    val holderPair = KeyPairGenerator.getInstance("Ed25519").apply { initialize(NamedParameterSpec.ED25519) }.generateKeyPair()
+    val holderJwk = OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(holderPair.public.encoded.takeLast(32).toByteArray())).build()
+    // Now, because Nimbus checks a Key Binding JWT's time claims against its own clock.
+    val now = System.currentTimeMillis() / 1000
 
     runBlocking {
         with(NimbusSdJwtOps) {
@@ -161,6 +172,44 @@ fun main(args: Array<String>) {
                     sdClaim("a", JsonPrimitive(1)); sdClaim("b", JsonPrimitive(2))
                 },
             )
+            // Bound to the Holder: the library issues with `cnf`, presents part, and
+            // adds a Key Binding JWT for one Verifier's challenge.
+            val kbIssuer = { nonce: String ->
+                kbJwtIssuer(JdkEd25519Signer(holderPair.private), JWSAlgorithm.EdDSA, holderJwk) {
+                    audience("https://verifier.example")
+                    claim("nonce", nonce)
+                    issueTime(Date(now * 1000))
+                }
+            }
+            val boundShapes = listOf(
+                Triple("key-binding/some-shown", sdJwt {
+                    claim("iss", "https://issuer.example"); cnf(holderJwk)
+                    sdClaim("given_name", JsonPrimitive("Erika")); sdClaim("family_name", JsonPrimitive("Mustermann"))
+                }, setOf(ClaimPath.claim("given_name"))),
+                Triple("key-binding/nothing-shown", sdJwt {
+                    claim("iss", "https://issuer.example"); cnf(holderJwk)
+                    sdClaim("given_name", JsonPrimitive("Erika"))
+                }, setOf(ClaimPath.claim("iss"))),
+                Triple("key-binding/array-element", sdJwt {
+                    claim("iss", "https://issuer.example"); cnf(holderJwk)
+                    arrClaim("list") { sdClaim(JsonPrimitive("a")); claim(JsonPrimitive("b")); sdClaim(JsonPrimitive("c")) }
+                }, setOf(ClaimPath.claim("list").arrayElement(2))),
+                Triple("key-binding/recursive", sdJwt {
+                    claim("iss", "https://issuer.example"); cnf(holderJwk)
+                    sdObjClaim("address") { sdClaim("city", JsonPrimitive("Berlin")); sdClaim("zip", JsonPrimitive("10115")) }
+                }, setOf(ClaimPath.claim("address").claim("city"))),
+            )
+            for ((id, spec, query) in boundShapes) {
+                val nonce = "nonce-$id"
+                runCatching {
+                    val presented = checkNotNull(issuer.issue(spec).getOrThrow().present(query)) { "nothing to present" }
+                    presented.serializeWithKeyBinding(kbIssuer(nonce)).getOrThrow()
+                }.fold(
+                    onSuccess = { record("$id/presented", it, Challenge(nonce, "https://verifier.example", now, 0)) },
+                    onFailure = { problems += "$id: ${it::class.simpleName}: ${it.message}" },
+                )
+            }
+
             for ((id, spec) in shapes) {
                 runCatching { issuer.issue(spec).getOrThrow() }.fold(
                     onSuccess = { record("$id/issued", it.serialize()) },
@@ -172,14 +221,29 @@ fun main(args: Array<String>) {
 
     // What the library itself says each token means.
     val written = cases.mapNotNull { case ->
-        when (val verdict = judge(case.token, verifier)) {
+        val verdict = case.challenge?.let { judgeBound(case.token, verifier, it) } ?: judge(case.token, verifier)
+        when (verdict) {
             is Outcome.Accepted -> JsonObject(
-                mapOf(
-                    "id" to JsonPrimitive(case.id),
-                    "verdict" to JsonPrimitive("accept"),
-                    "token" to JsonPrimitive(case.token),
-                    "expected" to verdict.claims,
-                ),
+                buildMap {
+                    put("id", JsonPrimitive(case.id))
+                    put("verdict", JsonPrimitive("accept"))
+                    put("token", JsonPrimitive(case.token))
+                    put("expected", verdict.claims)
+                    case.challenge?.let { ch ->
+                        put("keyBinding", JsonPrimitive(true))
+                        put(
+                            "challenge",
+                            JsonObject(
+                                mapOf(
+                                    "nonce" to JsonPrimitive(ch.nonce),
+                                    "aud" to JsonPrimitive(ch.aud),
+                                    "now" to JsonPrimitive(ch.now),
+                                    "window" to JsonPrimitive(ch.window),
+                                ),
+                            ),
+                        )
+                    }
+                },
             )
             is Outcome.Refused -> {
                 problems += "${case.id}: the library cannot read its own token (${verdict.why})"

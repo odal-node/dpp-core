@@ -4,7 +4,7 @@ use base64::Engine;
 use ed25519_dalek::Signer;
 use serde_json::Value;
 
-use crate::keystore::KeyStore;
+use crate::keystore::{KeyEntry, KeyStore};
 
 /// Produces a compact JWS with algorithm `EdDSA` over the **RFC 8785 (JCS)
 /// canonical** form of the JSON payload.
@@ -71,17 +71,29 @@ pub fn sign_typed(
     if let Some(cty) = cty {
         header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
-    let header_json = serde_json::to_string(&header)?;
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let canonical = super::canonical::canonicalize(payload)?;
-    let header_b64 = b64.encode(header_json.as_bytes());
-    let payload_b64 = b64.encode(&canonical);
+    Ok(sign_with_header(&key, &header, &canonical))
+}
+
+/// The compact JWS of `payload` under the protected `header`, signed with `key`.
+///
+/// For a caller that has already built the header from values it controls, as
+/// [`sign_typed`] does and as an SD-JWT Key Binding JWT does, whose header carries
+/// `alg` and `typ` and no `kid` (RFC 9901 clause 4.3).
+pub(crate) fn sign_with_header(
+    key: &KeyEntry,
+    header: &serde_json::Map<String, Value>,
+    payload: &[u8],
+) -> String {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let header_b64 = b64.encode(Value::Object(header.clone()).to_string());
+    let payload_b64 = b64.encode(payload);
 
     let signing_input = format!("{header_b64}.{payload_b64}");
     let signature = key.signing_key.sign(signing_input.as_bytes());
     let sig_b64 = b64.encode(signature.to_bytes());
 
-    Ok(format!("{signing_input}.{sig_b64}"))
+    format!("{signing_input}.{sig_b64}")
 }
 
 /// Verify a compact JWS produced by [`sign`] using the key store.

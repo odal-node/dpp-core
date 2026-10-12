@@ -1,14 +1,24 @@
 package io.odalnode.oracle
 
 import com.nimbusds.jose.JOSEException
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jca.JCAContext
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWKMatcher
+import com.nimbusds.jose.jwk.OctetKeyPair
+import com.nimbusds.jose.proc.BadJOSEException
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jose.util.Base64URL
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
+import eu.europa.ec.eudi.sdjwt.ChallengePredicate
+import eu.europa.ec.eudi.sdjwt.JwtSignatureVerifier
 import eu.europa.ec.eudi.sdjwt.KeyBindingVerifier
 import eu.europa.ec.eudi.sdjwt.NimbusSdJwtOps
 import eu.europa.ec.eudi.sdjwt.SdJwt
@@ -25,6 +35,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import java.io.File
 import java.math.BigDecimal
 import java.security.KeyFactory
@@ -35,6 +46,9 @@ import java.security.SignatureException
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Judge the SD-JWTs this workspace emits with the EU digital identity wallet's
@@ -65,6 +79,9 @@ class JdkEd25519Verifier(rawPublicKey: ByteArray) : JWSVerifier {
 
     override fun verify(header: JWSHeader, signingInput: ByteArray, signature: Base64URL): Boolean {
         if (header.algorithm != JWSAlgorithm.EdDSA) throw JOSEException("not an EdDSA token")
+        // RFC 7515 clause 4.1.11, as Nimbus's own verifiers apply it: an extension
+        // named critical that this verifier does not understand fails the JWS.
+        if (!header.criticalParams.isNullOrEmpty()) return false
         val verifier = Signature.getInstance("Ed25519")
         verifier.initVerify(key)
         verifier.update(signingInput)
@@ -141,6 +158,67 @@ fun judge(token: String, verifier: JWSVerifier): Outcome = runBlocking {
     }
 }
 
+/** What a bound case is held to: the Verifier's nonce and audience, and `iat` within `window` seconds of `now`. */
+data class Challenge(val nonce: String, val aud: String, val now: Long, val window: Long)
+
+private fun challengeOf(case: JsonObject): Challenge {
+    val ch = case.getValue("challenge").jsonObject
+    return Challenge(
+        ch.getValue("nonce").jsonPrimitive.content,
+        ch.getValue("aud").jsonPrimitive.content,
+        ch.getValue("now").jsonPrimitive.long,
+        ch.getValue("window").jsonPrimitive.long,
+    )
+}
+
+/**
+ * The Key Binding JWT check the library's `MustBePresentAndValid` calls, made the
+ * way the library's own default is made (its `keyBindingJWTProcess`, through
+ * Nimbus): the Holder key from `cnf`, `typ` kb+jwt, the key matched to the header
+ * as Nimbus matches a JWK to a JWS header, the four claims the RFC requires, and
+ * the nonce and audience matched exactly. One thing differs. The default verifies
+ * Ed25519 with Nimbus's `Ed25519Verifier`, which needs Tink, so the JDK's provider
+ * verifies it here, as it does the Issuer's signature. The library itself checks
+ * `sd_hash` and the `iat` window.
+ */
+private fun holderBinding(ch: Challenge): KeyBindingVerifier.MustBePresentAndValid<SignedJWT> =
+    KeyBindingVerifier.MustBePresentAndValid { sdJwtClaims ->
+        (NimbusSdJwtOps.HolderPubKeyInConfirmationClaim(sdJwtClaims) as? OctetKeyPair)?.let { holder ->
+            JwtSignatureVerifier { kbJwt ->
+                val signed = SignedJWT.parse(kbJwt)
+                DefaultJOSEObjectTypeVerifier<SecurityContext>(JOSEObjectType("kb+jwt")).verify(signed.header.type, null)
+                if (!JWKMatcher.forJWSHeader(signed.header).matches(holder)) {
+                    throw BadJOSEException("the Holder key does not match the header")
+                }
+                if (!signed.verify(JdkEd25519Verifier(holder.x.decode()))) {
+                    null
+                } else {
+                    val expected = JWTClaimsSet.Builder().audience(ch.aud).claim("nonce", ch.nonce).build()
+                    DefaultJWTClaimsVerifier<SecurityContext>(expected, setOf("iat", "aud", "nonce", "sd_hash"))
+                        .verify(signed.jwtClaimsSet, null)
+                    signed
+                }
+            }
+        }
+    }
+
+/** [judge], for a Verifier whose policy requires Key Binding, held to `ch`. */
+@OptIn(ExperimentalTime::class)
+@Suppress("TooGenericExceptionCaught")
+fun judgeBound(token: String, verifier: JWSVerifier, ch: Challenge): Outcome = runBlocking {
+    try {
+        with(NimbusSdJwtOps) {
+            val predicate = ChallengePredicate(Instant.fromEpochSeconds(ch.now), ch.aud, ch.nonce, ch.window.seconds)
+            verify(verifier.asJwtVerifier(), holderBinding(ch), predicate, token).fold(
+                onSuccess = { recreate(it.sdJwt) },
+                onFailure = { Outcome.Refused(describe(it)) },
+            )
+        }
+    } catch (e: Throwable) {
+        Outcome.Refused(describe(e))
+    }
+}
+
 /** Key order is not meaning in JSON, and `12.0` is `12`. */
 fun same(a: JsonElement, b: JsonElement): Boolean = when {
     a is JsonObject && b is JsonObject -> a.keys == b.keys && a.keys.all { same(a.getValue(it), b.getValue(it)) }
@@ -187,6 +265,15 @@ fun main(args: Array<String>) {
         KeyPairGenerator.getInstance("Ed25519").generateKeyPair().public.encoded.takeLast(32).toByteArray(),
     )
     if (judge(valid, stranger) is Outcome.Accepted) problems += "a stranger's key was accepted"
+    // Key Binding has to be able to fail too: the same bound token, another nonce.
+    cases.firstOrNull { it.getValue("id").jsonPrimitive.content == "bound/control/every-disclosure" }?.let { case ->
+        val token = case.getValue("token").jsonPrimitive.content
+        val ch = challengeOf(case)
+        if (judgeBound(token, ed25519, ch) !is Outcome.Accepted) problems += "a bound control is refused"
+        if (judgeBound(token, ed25519, ch.copy(nonce = "another nonce")) is Outcome.Accepted) {
+            problems += "a Key Binding JWT was accepted for a nonce it does not carry"
+        }
+    }
     if (problems.isNotEmpty()) {
         System.err.println("NEGATIVE CONTROLS FAILED: $problems")
         exitProcess(2)
@@ -204,7 +291,11 @@ fun main(args: Array<String>) {
         val group = case["group"]?.jsonPrimitive?.content ?: "credential"
         val token = case.getValue("token").jsonPrimitive.content
         counts.merge(group, 1, Int::plus)
-        val outcome = judge(token, if (group == "rfc") es256 else ed25519)
+        val outcome = when (group) {
+            "rfc" -> judge(token, es256)
+            "bound" -> judgeBound(token, ed25519, challengeOf(case))
+            else -> judge(token, ed25519)
+        }
         when (group) {
             "issued", "presented" -> {
                 val expected = case.getValue("expected")
@@ -213,7 +304,7 @@ fun main(args: Array<String>) {
                     is Outcome.Accepted -> if (!same(outcome.claims, expected)) failures += "$id: read different claims"
                 }
             }
-            "adversarial" -> {
+            "adversarial", "bound" -> {
                 val ours = case.getValue("ours").jsonObject
                 val oursAccepts = ours.getValue("accepts").jsonPrimitive.boolean
                 val line = when (outcome) {
@@ -331,6 +422,29 @@ private val KNOWN = mapOf(
         "Clause 7.1 step 3.c.iii.1: the SD-JWT MUST be rejected unless the Disclosure is a JSON array of two " +
             "elements (salt, value), with clause 4.2.1's salt, a string. The library accepts a number on this path " +
             "too. This crate and the first oracle refuse it. The library is the lenient one, as reported upstream.",
+    ),
+    "bound/reject/aud-is-an-array" to Known(
+        false,
+        "this crate",
+        "Clause 4.3: `aud` MUST be a single string. The library hands the claims to Nimbus, which reads `aud` as " +
+            "a list whether it is one or not, so an array naming this Verifier matches. This crate and the first " +
+            "oracle refuse it.",
+    ),
+    "bound/edge/typ-with-the-application-prefix" to Known(
+        true,
+        "both",
+        "Clause 4.3 says `typ` MUST be kb+jwt. RFC 7515 clause 4.1.9 says a recipient reads a `typ` with no '/' as " +
+            "if application/ came before it, which makes application/kb+jwt the same media type; this crate compares " +
+            "media types, Nimbus's type check compares the spelling, as the first oracle does.",
+    ),
+    "bound/edge/holder-key-disclosed-not-in-the-clear" to Known(
+        true,
+        "this crate",
+        "Clause 9.7 tells an Issuer not to make `cnf` selectively disclosable, and then tells a Verifier it cannot " +
+            "rely on that: it must operate as though such claims might be selectively disclosable, and ensure the " +
+            "ones it needs are present or disclosed. This crate and the first oracle read the Holder key from the " +
+            "processed payload (clause 7.3 step 5.a); the library reads it from the Issuer-signed JWT alone, so a " +
+            "disclosed `cnf` leaves it with no key. The case is an edge because the Issuer that made it broke 9.7.",
     ),
     "adversarial/edge/hash-algorithm-sha-512" to Known(
         false,

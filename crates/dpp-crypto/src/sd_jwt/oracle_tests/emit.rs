@@ -18,10 +18,11 @@ use serde_json::{Value, json};
 use crate::sd_jwt::SdJwt;
 
 use super::adversarial;
+use super::bound;
 use super::issued::{self, show};
 use super::plan::{self, Rng, issue_to_plan};
 use super::rfc;
-use super::signing::{Issuer, ours, structure};
+use super::signing::{Issuer, bound_structure, ours, ours_bound, structure};
 
 /// A hand-listed plan this small is presented every way; a larger one is sampled.
 const ENUMERATE_UP_TO: usize = 8;
@@ -92,6 +93,31 @@ fn build(issuer: &Issuer) -> Corpus {
         }));
     }
 
+    // From the clock, because one of the other implementations checks a Key
+    // Binding JWT's `exp` and `nbf` against its own. Each case carries the
+    // instant, so every reader judges the same one.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_secs()).ok())
+        .expect("a clock after 1970");
+    let policy = bound::policy(now);
+    for case in bound::cases(issuer, now) {
+        corpus.cases.push(json!({
+            "id": format!("bound/{}", case.id),
+            "group": "bound",
+            "clause": case.clause,
+            "token": case.token,
+            "challenge": {
+                "aud": bound::AUDIENCE,
+                "nonce": bound::NONCE,
+                "now": now,
+                "window": bound::WINDOW,
+            },
+            "ours": ours_bound(&case.token, &issuer.public_key_b64, &policy).to_json(),
+        }));
+    }
+
     for case in rfc::cases() {
         corpus.cases.push(json!({
             "id": format!("rfc/{}", case.id),
@@ -135,9 +161,9 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
 
     // Controls are the cases that make "both refused" mean something.
     for case in corpus.cases.iter().filter(|c| {
-        c["id"]
-            .as_str()
-            .is_some_and(|id| id.starts_with("adversarial/control/"))
+        c["id"].as_str().is_some_and(|id| {
+            id.starts_with("adversarial/control/") || id.starts_with("bound/control/")
+        })
     }) {
         assert_eq!(
             case["ours"]["accepts"],
@@ -152,18 +178,21 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
     // verdicts, and a misreading all three shared would otherwise pass as
     // agreement. Refused by the processing itself and not only by the signature
     // check in front of it, so the clause the case names is the reason.
+    // A `bound/` case is judged with Key Binding required, at its own instant.
     for case in corpus.cases.iter().filter(|c| {
-        c["id"]
-            .as_str()
-            .is_some_and(|id| id.starts_with("adversarial/reject/"))
+        c["id"].as_str().is_some_and(|id| {
+            id.starts_with("adversarial/reject/") || id.starts_with("bound/reject/")
+        })
     }) {
         let token = case["token"].as_str().expect("a string");
+        let verdict = match case["challenge"]["now"].as_i64() {
+            Some(now) => bound_structure(token, &bound::policy(now)),
+            None => structure(token),
+        };
         assert_eq!(
-            structure(token).payload,
-            None,
+            verdict.payload, None,
             "a reject case must be refused: {} ({})",
-            case["id"],
-            case["clause"]
+            case["id"], case["clause"]
         );
     }
 
@@ -176,6 +205,8 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
     assert!(issued >= 40, "issued: {issued}");
     assert!(presented >= 500, "presented: {presented}");
     assert!(adversarial >= 40, "adversarial: {adversarial}");
+    let bound = count(&corpus, "bound");
+    assert!(bound >= 25, "bound: {bound}");
     assert_eq!(count(&corpus, "rfc"), 7, "the RFC's tokens");
 
     if std::env::var_os("EMIT_SDJWT_CORPUS").is_none() {
@@ -194,11 +225,12 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
     )
     .expect("write the corpus");
     eprintln!(
-        "wrote {} cases ({} issued, {} presented, {} adversarial, {} RFC) to {}",
+        "wrote {} cases ({} issued, {} presented, {} adversarial, {} bound, {} RFC) to {}",
         corpus.cases.len(),
         count(&corpus, "issued"),
         count(&corpus, "presented"),
         count(&corpus, "adversarial"),
+        count(&corpus, "bound"),
         count(&corpus, "rfc"),
         dir.display()
     );

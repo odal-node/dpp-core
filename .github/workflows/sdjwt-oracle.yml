@@ -20,8 +20,9 @@
 #
 # Checks, in order, each a step so a failure names itself:
 #
-#   1. the corpus: 700+ tokens built from claim trees, adversarial tokens, and the
-#      RFC's own, judged by the TypeScript library (`judge.mjs`);
+#   1. the corpus: 700+ tokens built from claim trees, adversarial tokens,
+#      presentations bound to a Holder's key (judged with Key Binding required),
+#      and the RFC's own, judged by the TypeScript library (`judge.mjs`);
 #   2. a credential per product group, judged by it, with the `kid` recomputed from
 #      the public key (`credentials.mjs`);
 #   3. it issues tokens (`issue.mjs`), and `dpp_crypto` reads them;
