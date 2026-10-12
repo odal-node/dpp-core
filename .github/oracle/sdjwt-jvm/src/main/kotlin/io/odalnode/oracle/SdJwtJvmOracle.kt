@@ -250,8 +250,16 @@ fun main(args: Array<String>) {
                 is Outcome.Refused -> failures += "$id: the library does not verify the RFC's own token (${outcome.why})"
                 is Outcome.Accepted -> {
                     val printed = case["printed"]
+                    val ours = case.getValue("ours").jsonObject
                     if (printed != null && printed !is JsonNull && !same(outcome.claims, printed)) {
                         failures += "$id: differs from the payload the RFC prints"
+                    }
+                    // Two of the seven are printed issued and never processed, so the
+                    // RFC gives nothing to compare with; this crate's reading is.
+                    if (!ours.getValue("accepts").jsonPrimitive.boolean) {
+                        failures += "$id: this crate refuses it (${ours["error"]})"
+                    } else if (!same(outcome.claims, ours.getValue("payload"))) {
+                        failures += "$id: this crate and the library read different claims"
                     }
                 }
             }
@@ -285,10 +293,14 @@ private data class Known(val oursAccepts: Boolean, val supports: String, val rea
 private val KNOWN = mapOf(
     "adversarial/control/key-binding-segment-present" to Known(
         true,
-        "neither",
-        "The library has two modes for a Key Binding JWT: absent, or present and valid. This crate, and the first " +
-            "oracle, ignore one they are not asked to check. The control's Key Binding JWT is signed by the issuer's key " +
-            "and names no `cnf`, so there is nothing to check it against.",
+        "both",
+        "The RFC reads two ways for a Verifier that does not require Key Binding and is handed an SD-JWT+KB. Clause 4: " +
+            "a Verifier that expects an SD-JWT MUST verify that the last segment is empty, which is the library's " +
+            "refusal (it has two modes, a Key Binding JWT absent, or present and valid). Clause 7.3 step 3 parses an " +
+            "SD-JWT+KB whatever the policy and step 5 checks it only when required, which is how this crate and the " +
+            "first oracle read it. This crate cannot know which its caller is, so it carries the segment and leaves " +
+            "the refusal to a caller that expects none (`has_key_binding`). The control's Key Binding JWT is signed " +
+            "by the issuer's key and names no `cnf`, so there is nothing to check it against.",
     ),
     "adversarial/reject/sd-alg-nested-inside-an-object" to Known(
         false,
@@ -300,14 +312,25 @@ private val KNOWN = mapOf(
     "adversarial/reject/disclosure-salt-is-a-number" to Known(
         false,
         "this crate",
-        "Clause 4.2.1: the salt MUST be a string. The library accepts a number. This crate and the first oracle " +
-            "refuse it. The library is the lenient one.",
+        "Clause 7.1 step 3.c.ii.1: the SD-JWT MUST be rejected unless the Disclosure is a JSON array of three " +
+            "elements (salt, claim name, claim value), and clause 4.2.1 says the salt MUST be a string. The library " +
+            "accepts a number. This crate and the first oracle refuse it. The library is the lenient one, reported " +
+            "upstream as eudi-lib-jvm-sdjwt-kt#520.",
     ),
     "adversarial/reject/disclosure-name-is-a-number" to Known(
         false,
         "this crate",
-        "Clause 4.2.1: the claim name MUST be a string. The library accepts a number and reads the claim as \"5\". " +
-            "This crate and the first oracle refuse it. The library is the lenient one.",
+        "Clause 7.1 step 3.c.ii.1, with clause 4.2.1's claim name, which MUST be a string; step 3.c.ii.4 then " +
+            "inserts a claim under that name, and a JSON member name is a string (RFC 8259 section 4). The library " +
+            "accepts a number and reads the claim as \"5\", a name the Issuer never wrote. This crate and the first " +
+            "oracle refuse it. The library is the lenient one, reported upstream as eudi-lib-jvm-sdjwt-kt#520.",
+    ),
+    "adversarial/reject/array-element-disclosure-salt-is-a-number" to Known(
+        false,
+        "this crate",
+        "Clause 7.1 step 3.c.iii.1: the SD-JWT MUST be rejected unless the Disclosure is a JSON array of two " +
+            "elements (salt, value), with clause 4.2.1's salt, a string. The library accepts a number on this path " +
+            "too. This crate and the first oracle refuse it. The library is the lenient one, as reported upstream.",
     ),
     "adversarial/edge/hash-algorithm-sha-512" to Known(
         false,

@@ -140,11 +140,14 @@ async function negativeControls() {
     problems.push("the ascending check is wrong on a plain list");
   }
   if (sdArrays(valid).length === 0) problems.push("no _sd array is found in a token that has some");
+  // Sorted descending rather than reversed: reversing an array that was never
+  // sorted can leave it ascending, and then an issuer that stopped sorting would
+  // fail this control instead of the order check, for the wrong reason.
   const body = JSON.parse(Buffer.from(p, "base64url"));
-  body._sd.reverse();
-  const reversed = [[h, Buffer.from(JSON.stringify(body)).toString("base64url"), s].join("."), ...rest].join("~");
-  if (!sdArrays(reversed).some((a) => a.length > 1 && !ascending(a))) {
-    problems.push("a token whose _sd array was reversed is not flagged");
+  body._sd.sort().reverse();
+  const descending = [[h, Buffer.from(JSON.stringify(body)).toString("base64url"), s].join("."), ...rest].join("~");
+  if (!sdArrays(descending).some((a) => a.length > 1 && !ascending(a))) {
+    problems.push("a token whose _sd array is in descending order is not flagged");
   }
 
   if (!same({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 })) {

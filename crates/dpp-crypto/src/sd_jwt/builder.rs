@@ -265,8 +265,28 @@ impl SdJwt {
     /// Digests that match nothing are ignored rather than rejected: asking for
     /// a claim that was issued in cleartext is asking for something the
     /// presentation already carries.
-    pub fn present(&self, reveal_digests: &[&str]) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// The two duties clause 7.2 gives a Holder that this function can see.
+    ///
+    /// [`SdJwtError::KeyBindingAttached`] if this token carries a Key Binding
+    /// JWT. An Issuer provides an SD-JWT, not an SD-JWT+KB, and a Holder MUST
+    /// reject one. Its Key Binding JWT was made over some other selection of
+    /// Disclosures, so passing it on would bind this one to nothing.
+    ///
+    /// Whatever [`Self::disclosed_payload`] refuses the presentation for, and in
+    /// particular [`SdJwtError::UnusedDisclosures`] for a Disclosure chosen
+    /// without the one whose value holds its digest. Step 2 requires each chosen
+    /// Disclosure to be referenced by the Issuer-signed JWT or by another chosen
+    /// one, and reading the presentation the way a Verifier will (clause 7.1 step
+    /// 5) is that check. A Verifier would refuse the whole token, so it is refused
+    /// here, where the Holder can still choose again.
+    pub fn present(&self, reveal_digests: &[&str]) -> Result<Self, SdJwtError> {
+        if self.key_binding_jwt.is_some() {
+            return Err(SdJwtError::KeyBindingAttached);
+        }
+        let presentation = Self {
             jwt: self.jwt.clone(),
             disclosures: self
                 .disclosures
@@ -274,8 +294,10 @@ impl SdJwt {
                 .filter(|d| reveal_digests.contains(&d.digest().as_str()))
                 .cloned()
                 .collect(),
-            key_binding_jwt: self.key_binding_jwt.clone(),
-        }
+            key_binding_jwt: None,
+        };
+        presentation.disclosed_payload()?;
+        Ok(presentation)
     }
 
     /// The payload with every supplied disclosure substituted back in, and every

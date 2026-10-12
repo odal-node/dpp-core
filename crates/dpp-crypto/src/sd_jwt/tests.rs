@@ -93,7 +93,7 @@ fn a_two_of_four_presentation_does_not_carry_the_withheld_two() {
         .flat_map(|n| issued.digests_for_claim(n))
         .collect();
     let reveal: Vec<&str> = reveal.iter().map(String::as_str).collect();
-    let presentation = issued.present(&reveal);
+    let presentation = issued.present(&reveal).unwrap();
     let wire = presentation.serialise();
 
     assert_eq!(presentation.disclosures().len(), 2);
@@ -353,7 +353,7 @@ fn revealing_one_of_two_same_named_claims_withholds_the_other() {
 
     // Reveal only the outer one.
     let outer_digest = sd.disclosures()[0].digest();
-    let presentation = sd.present(&[outer_digest.as_str()]);
+    let presentation = sd.present(&[outer_digest.as_str()]).unwrap();
 
     assert_eq!(presentation.disclosures().len(), 1);
     let wire = presentation.serialise();

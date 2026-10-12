@@ -292,6 +292,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   which is read as before. Each of the four was not one. A claim called `_sd_alg`
   can no longer be concealed, at any depth. See Fixed for what each lost. (#426)
 
+- **`SdJwt::present` returns a `Result`, and refuses two presentations it used
+  to make.** A token that carries a Key Binding JWT is refused as
+  `SdJwtError::KeyBindingAttached`: an Issuer provides an SD-JWT, not an
+  SD-JWT+KB, and a Holder MUST reject one (RFC 9901 clause 7.2), where `present`
+  used to forward its Key Binding JWT, made over some other selection of
+  Disclosures, unchanged. A selection holding a Disclosure that neither the
+  Issuer-signed JWT nor another one chosen refers to, such as an array element
+  chosen without the array, is refused with what `disclosed_payload` says of it,
+  `UnusedDisclosures` (clause 7.2 step 2); it used to be presented, and a Verifier
+  then refused the whole token. **Migration:** handle the `Result`. A selection
+  that includes every Disclosure on the way down to the claims wanted presents as
+  before. (#426)
+
 ### Added
 
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
@@ -709,16 +722,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `npm ci --ignore-scripts`, in four ways. It reads the claim trees this crate
   issues, each presented every way a small tree allows and in a sample of the ways
   a large one does, and must arrive at the claims a verifier is meant to see,
-  which the corpus works out without this crate's code. It judges fifty tokens
+  which the corpus works out without this crate's code. It judges fifty-one tokens
   each broken in one clause and re-signed, and must reach this crate's verdict,
   and its claims where both accept; three differences are listed in the script
   with the clause and the side the RFC supports, and a listed difference that has
-  stopped being one fails the run. The hiding of claim order (clause 4.2.4.1) is
+  stopped being one fails the run. Agreement is not enough on its own: the
+  thirty-seven of those tokens that break a rule no reader may let through must be
+  refused by this crate's processing alone, whatever the libraries say, so a
+  misreading shared by all three still fails. The hiding of claim order (clause 4.2.4.1) is
   judged in the one way it can be, since the original order cannot be seen but
   whether an `_sd` array is sorted can: every such array in the tokens this crate
   issues, and in the RFC's own, must be strictly ascending, which makes its order
   a function of the salted digests alone. It verifies the RFC's own seven vendored tokens against their ES256
-  signatures with the key of Appendix A.5, and the `sd_hash` of the two Key
+  signatures with the key of Appendix A.5, and the `sd_hash` of the three Key
   Binding JWTs, which covers every byte of a presentation. And it issues more than
   two hundred tokens, reproducibly from fixed seeds, that this crate reads back to
   the claims the library verified. A credential per product group, issued by
@@ -734,12 +750,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   A second implementation of a different lineage, the EU wallet's Kotlin library
   `eudi-lib-jvm-sdjwt-kt` 0.20.2, runs in the same workflow, pinned by version and
-  by the checksum of each of its 22 jars. It judges the same corpus and
-  credentials, verifies the RFC's seven tokens, and signs and verifies Ed25519
-  through the JDK's provider, and it issues 195 tokens for this crate to read. It
-  differs from this crate in six places, each listed in its source with the clause
-  and none a defect here. Two, a number as a Disclosure's salt or claim name, are
-  the library's leniency against clause 4.2.1 and are reported upstream
+  by the checksum of each of its 22 jars, and judges even when the first judge has
+  failed, since a disagreement is when its verdict is wanted. It judges the same
+  corpus and credentials, verifies the RFC's seven tokens and reads them to the
+  claims this crate reads, and signs and verifies Ed25519 through the JDK's
+  provider, and it issues 195 tokens for this crate to read. It differs from this
+  crate in seven places, each listed in its source with the clause and none a
+  defect here. Three, a number as the salt of either kind of Disclosure or as a
+  claim name, are the library's leniency against clause 7.1 steps 3.c.ii.1 and
+  3.c.iii.1, which refuse a Disclosure that is not the array clause 4.2.1 or 4.2.2
+  defines, and are reported upstream
   (eu-digital-identity-wallet/eudi-lib-jvm-sdjwt-kt#520). Its issuer shuffles
   `_sd` rather than sorting it, which is why the sortedness check is a claim about
   this crate's issuer only. The register row for RFC 9901 says what this shows and

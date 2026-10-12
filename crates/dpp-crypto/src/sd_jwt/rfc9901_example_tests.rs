@@ -298,7 +298,7 @@ fn a_holder_presenting_the_rfcs_choice_from_the_issued_token_gives_the_rfcs_pres
         .collect();
     let digests: Vec<&str> = digests.iter().map(String::as_str).collect();
 
-    let presented = issued.present(&digests);
+    let presented = issued.present(&digests).expect("the RFC presents these");
 
     let mut ours: Vec<&str> = presented
         .disclosures()

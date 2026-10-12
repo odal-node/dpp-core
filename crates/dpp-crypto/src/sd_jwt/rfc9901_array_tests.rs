@@ -157,7 +157,7 @@ fn a_holder_presenting_the_rfcs_choice_gives_the_rfcs_presentation() {
         .collect();
     let digests: Vec<&str> = digests.iter().map(String::as_str).collect();
 
-    let presented = issued.present(&digests);
+    let presented = issued.present(&digests).expect("the RFC presents these");
 
     let mut ours: Vec<&str> = presented
         .disclosures()
@@ -187,11 +187,18 @@ fn revealing_either_nationality_alone_leaves_that_one() {
     let [(us, _), (de, _)] = S51_ARRAY_DISCLOSURES;
 
     for (digest, expected) in [(us, json!(["US"])), (de, json!(["DE"]))] {
-        let shown = issued.present(&[digest]).disclosed_payload();
+        let shown = issued
+            .present(&[digest])
+            .expect("an element is referenced")
+            .disclosed_payload();
         assert_eq!(shown.expect("processes")["nationalities"], expected);
     }
 
-    let none = issued.present(&[]).disclosed_payload().expect("processes");
+    let none = issued
+        .present(&[])
+        .expect("nothing chosen is a valid choice")
+        .disclosed_payload()
+        .expect("processes");
     assert_eq!(none["nationalities"], json!([]));
 }
 

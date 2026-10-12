@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  SD-JWT second oracle (SPIKE).
+  SD-JWT second oracle.
 
   Judges the SD-JWTs this workspace emits with the EU digital identity wallet's
   Kotlin SD-JWT library, a codebase, author and crypto stack that share nothing
-  with this crate or with the TypeScript library the first oracle uses. See the
-  issue that opened this, and `.github/workflows/sdjwt-oracle.yml` for the first.
+  with this crate or with the TypeScript library the first oracle uses, and issues
+  tokens for this crate to read. Run by `.github/workflows/sdjwt-oracle.yml`, after
+  the first.
 
   Deliberately outside the Rust workspace and outside `just check`. Building the
   whole workspace with zero infrastructure is a property this project states

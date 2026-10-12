@@ -58,7 +58,10 @@ fn build(issuer: &Issuer) -> Corpus {
                 .iter()
                 .map(|p| issued.digest_at[p].as_str())
                 .collect();
-            let token = sd_jwt.present(&digests).serialise();
+            let token = sd_jwt
+                .present(&digests)
+                .expect("a reachable selection presents")
+                .serialise();
             let expected = plan::reveal(&case.claims, &case.hidden, presented);
             let everything = presented.len() == case.hidden.len();
             let id = if everything {
@@ -141,6 +144,26 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
             json!(true),
             "a control must be accepted: {}",
             case["id"]
+        );
+    }
+
+    // A `reject/` case breaks a rule no reader may let through, so this crate
+    // refuses it whatever the other implementations do: the judges compare
+    // verdicts, and a misreading all three shared would otherwise pass as
+    // agreement. Refused by the processing itself and not only by the signature
+    // check in front of it, so the clause the case names is the reason.
+    for case in corpus.cases.iter().filter(|c| {
+        c["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("adversarial/reject/"))
+    }) {
+        let token = case["token"].as_str().expect("a string");
+        assert_eq!(
+            structure(token).payload,
+            None,
+            "a reject case must be refused: {} ({})",
+            case["id"],
+            case["clause"]
         );
     }
 

@@ -248,7 +248,9 @@ fn an_element_has_no_claim_name_to_look_for() {
     assert!(sd_jwt.digests_for_claim("").is_empty());
 
     // Chosen by digest, like any other.
-    let presented = sd_jwt.present(&[&disclosures[0].digest()]);
+    let presented = sd_jwt
+        .present(&[&disclosures[0].digest()])
+        .expect("the element is referenced");
     assert_eq!(presented.disclosures().len(), 1);
 }
 

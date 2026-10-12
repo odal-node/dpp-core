@@ -48,6 +48,13 @@ pub enum SdJwtError {
     /// sign that anything was lost.
     #[error("the segment after the last '~' is not a JWT")]
     MalformedKeyBinding,
+    /// A token that carries a Key Binding JWT was asked to be presented.
+    ///
+    /// Clause 7.2: an Issuer provides an SD-JWT, not an SD-JWT+KB, and a Holder
+    /// that receives one MUST reject it. The Key Binding JWT was made over another
+    /// selection of Disclosures, so presenting it again would bind nothing.
+    #[error("a token that carries a Key Binding JWT cannot be presented")]
+    KeyBindingAttached,
     /// The JWT payload is not a JSON object.
     #[error("JWT payload is not a JSON object")]
     PayloadNotAnObject,
@@ -68,7 +75,7 @@ pub enum SdJwtError {
     UnsupportedHashAlg(String),
     /// A disclosure was supplied whose digest appears nowhere in the token.
     ///
-    /// Clause 7.1 step 4: every disclosure must be used. The count is reported
+    /// Clause 7.1 step 5: every disclosure must be used. The count is reported
     /// rather than the disclosure itself, which carries a claim value.
     #[error("{0} disclosure(s) matched nothing in the token")]
     UnusedDisclosures(usize),

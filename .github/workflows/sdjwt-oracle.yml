@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   judge:
-    name: SD-JWTs are read the same way by an independent implementation
+    name: SD-JWTs are read the same way by two independent implementations
     runs-on: ubuntu-latest
     steps:
       # The token is not kept. This job installs third-party code that touches
@@ -94,12 +94,14 @@ jobs:
           ls .github/oracle/sdjwt/node_modules/@sd-jwt .github/oracle/sdjwt/node_modules/@owf
 
       - name: Build the corpus from our own issuer
+        id: corpus
         run: EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::emit
 
       - name: Judge the corpus
         run: node .github/oracle/sdjwt/judge.mjs
 
       - name: Build a credential for every product group
+        id: vc-corpus
         run: EMIT_SDJWT_VC_CORPUS=1 cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus
 
       - name: Judge the credentials
@@ -126,14 +128,26 @@ jobs:
       # same reader, so a disagreement between the two libraries is a clause to
       # read and not a difference of inputs. Temurin 17 is the library's own
       # target, and what the JAdES oracle uses.
+      #
+      # It runs whether or not the first judge passed. A disagreement is when the
+      # second verdict is most needed, to tell a defect here from one library's
+      # reading, so these steps wait only on the files they read and not on every
+      # step before them. The job still fails if any step did. One job and not two,
+      # so that one required check covers both judges.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
 
+      # `-C` fails the build on an artefact whose checksum is not the
+      # repository's, which covers the build-time artefacts the manifest below
+      # does not.
       - name: Build the second independent implementation
-        run: mvn -q -B -f .github/oracle/sdjwt-jvm/pom.xml package
+        id: kt-build
+        if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
+        run: mvn -q -B -C -f .github/oracle/sdjwt-jvm/pom.xml package
 
       # Maven does not lock. The jars the judge runs with are the ones in the
       # manifest, byte for byte, and no others. A changed artifact, or one more
@@ -141,26 +155,34 @@ jobs:
       # Moving a pin is a deliberate edit: change the version in `pom.xml`, rebuild,
       # and regenerate `jars.sha256` from `target/lib` in the same commit.
       - name: Check the resolved jars against the manifest
+        id: kt-jars
+        if: ${{ !cancelled() && steps.kt-build.outcome == 'success' }}
         working-directory: .github/oracle/sdjwt-jvm
         run: |
           (cd target/lib && sha256sum --check ../../jars.sha256)
           diff <(ls target/lib | LC_ALL=C sort) <(sed 's/^[0-9a-f]* \*//' jars.sha256 | LC_ALL=C sort)
 
       - name: Record what is actually being run
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
         run: |
           java -version
           sed -n 's/.*\*\(eudi-lib-jvm-sdjwt-kt-.*\)\.jar$/\1/p' .github/oracle/sdjwt-jvm/jars.sha256
 
       - name: Judge the corpus with it
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
         run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.SdJwtJvmOracleKt target/sdjwt-oracle/corpus.json
 
       - name: Judge the credentials with it
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' && steps.vc-corpus.outcome == 'success' }}
         run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.SdJwtJvmOracleKt target/sdjwt-oracle/credentials.json
 
       - name: Have it issue
+        id: kt-issue
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
         run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.IssueKt target/sdjwt-oracle/issued-kotlin.json
 
       - name: Read what it issued
+        if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}
         run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
 
       # What failed, in a form that can be read without rerunning anything.

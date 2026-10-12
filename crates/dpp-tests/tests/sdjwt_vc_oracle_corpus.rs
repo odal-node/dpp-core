@@ -205,7 +205,10 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
         }
 
         for (name, reveal) in presentations {
-            let token = credential.present(&reveal).serialise();
+            let token = credential
+                .present(&reveal)
+                .expect("each chosen Disclosure is referenced")
+                .serialise();
             let id = format!("{key}/{version}/{name}");
             let mut case = json!({
                 "id": id,

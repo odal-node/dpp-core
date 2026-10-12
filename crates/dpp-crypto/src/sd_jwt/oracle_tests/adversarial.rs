@@ -369,12 +369,12 @@ fn malformed_disclosures(base: &Base<'_>, out: &mut Vec<Adversarial>) {
         (
             "salt-is-a-number",
             r#"[1,"name","value"]"#,
-            "clause 4.2.1: the salt is a string",
+            "clause 7.1 step 3.c.ii.1: three elements, the salt of clause 4.2.1 a string",
         ),
         (
             "name-is-a-number",
             r#"["salt",5,"value"]"#,
-            "clause 4.2.1: the claim name is a string",
+            "clause 7.1 step 3.c.ii.1: three elements, the claim name of clause 4.2.1 a string",
         ),
         ("not-json", "not json at all", "clause 4.2: JSON"),
         (
@@ -390,6 +390,22 @@ fn malformed_disclosures(base: &Base<'_>, out: &mut Vec<Adversarial>) {
             with_disclosure(base, text),
         );
     }
+
+    // The same rule for the other kind of Disclosure, which both other readers
+    // parse on a path of their own: a pair whose salt is not a string.
+    add(
+        out,
+        "reject/array-element-disclosure-salt-is-a-number",
+        "clause 7.1 step 3.c.iii.1: two elements, the salt of clause 4.2.1 a string",
+        base.altered(|p, ds| {
+            let (encoded, digest) = raw(r#"[7,"ES"]"#);
+            p["nat"]
+                .as_array_mut()
+                .expect("the payload has nat")
+                .push(json!({ "...": digest }));
+            ds.push(encoded);
+        }),
+    );
 
     add(
         out,

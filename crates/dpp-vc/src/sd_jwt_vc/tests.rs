@@ -120,6 +120,7 @@ fn a_two_of_four_presentation_verifies_and_withholds_the_other_two() {
     let reveal = digests(&credential, &["cathodeMaterial", "stateOfHealthPct"]);
     let presentation = credential
         .present(&reveal.iter().map(String::as_str).collect::<Vec<_>>())
+        .expect("each chosen Disclosure is referenced")
         .serialise();
 
     let disclosed =
@@ -180,6 +181,7 @@ fn withholding_a_claim_needs_no_new_signature() {
     let reveal = digests(&credential, &["cathodeMaterial"]);
     let withheld = credential
         .present(&reveal.iter().map(String::as_str).collect::<Vec<_>>())
+        .expect("each chosen Disclosure is referenced")
         .serialise();
     let after = verify(&withheld, &public_key_b64(&store), &vct, now()).expect("still verifies");
     assert!(
