@@ -92,3 +92,6 @@ keys.json
 
 # The independent SD-JWT oracle's dependencies (CI-only; see .github/workflows/sdjwt-oracle.yml)
 .github/oracle/sdjwt/node_modules/
+
+# The second SD-JWT oracle's Maven output: classes and the resolved jar set (CI-only)
+.github/oracle/sdjwt-jvm/target/

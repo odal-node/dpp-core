@@ -730,9 +730,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   every failure rather than the first. The signature itself is checked by Node's
   `crypto`, not by the library, which calls back for it; and the credentials are
   judged at the level of the RFC only, since the credential profile is an
-  Internet-Draft. The register row for RFC 9901 says what this shows and what
-  stays unclaimed, and RFC 8259, which the corpus cites for two edge cases, gets
-  a row of its own. (#420, #426)
+  Internet-Draft.
+
+  A second implementation of a different lineage, the EU wallet's Kotlin library
+  `eudi-lib-jvm-sdjwt-kt` 0.20.2, runs in the same workflow, pinned by version and
+  by the checksum of each of its 22 jars. It judges the same corpus and
+  credentials, verifies the RFC's seven tokens, and signs and verifies Ed25519
+  through the JDK's provider, and it issues 195 tokens for this crate to read. It
+  differs from this crate in six places, each listed in its source with the clause
+  and none a defect here. Two, a number as a Disclosure's salt or claim name, are
+  the library's leniency against clause 4.2.1 and are reported upstream
+  (eu-digital-identity-wallet/eudi-lib-jvm-sdjwt-kt#520). Its issuer shuffles
+  `_sd` rather than sorting it, which is why the sortedness check is a claim about
+  this crate's issuer only. The register row for RFC 9901 says what this shows and
+  what stays unclaimed, and RFC 8259, which the corpus cites for two edge cases,
+  gets a row of its own. (#420, #426, #427)
 
 ### Fixed
 
