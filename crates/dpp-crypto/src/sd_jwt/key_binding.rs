@@ -53,10 +53,13 @@ pub struct KeyBindingPolicy {
     /// Now, in seconds since the epoch.
     pub now: i64,
     /// The oldest a Key Binding JWT may be, in seconds (step 5.e).
-    pub max_age: i64,
+    ///
+    /// Unsigned, as is `leeway`: a negative window would refuse every honest
+    /// token for a reason that names the token and not the policy.
+    pub max_age: u32,
     /// How far clocks may disagree, in seconds: how far ahead of `now` an `iat`
     /// may lie, and the leeway given to an `exp` or `nbf` the JWT carries.
-    pub leeway: i64,
+    pub leeway: u32,
 }
 
 /// The `cnf` value an Issuer puts in the payload to enable Key Binding for the
@@ -229,8 +232,8 @@ impl SdJwt {
         )]
         let (now, max_age, leeway) = (
             policy.now as f64,
-            policy.max_age as f64,
-            policy.leeway as f64,
+            f64::from(policy.max_age),
+            f64::from(policy.leeway),
         );
         let iat = seconds(&claims, "iat").ok_or(Rejected("iat"))?;
         if iat < now - max_age || iat > now + leeway {

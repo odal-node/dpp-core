@@ -80,7 +80,7 @@ fn disagreements(file: &Value) -> Vec<String> {
 
 /// The policy a case's `challenge` describes, when it has one.
 fn challenge(value: &Value) -> Option<KeyBindingPolicy> {
-    let window = value["window"].as_i64()?;
+    let window = u32::try_from(value["window"].as_u64()?).ok()?;
     Some(KeyBindingPolicy {
         audience: value["aud"].as_str()?.to_owned(),
         nonce: value["nonce"].as_str()?.to_owned(),

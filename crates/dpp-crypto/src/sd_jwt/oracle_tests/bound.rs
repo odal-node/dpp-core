@@ -23,7 +23,7 @@ pub(super) const NONCE: &str = "n-2RsH_0kQ8vLz";
 /// How far `iat` may lie from now either way, in seconds. One number for both
 /// directions, because one of the other implementations takes its window as a
 /// point and a symmetric skew.
-pub(super) const WINDOW: i64 = 300;
+pub(super) const WINDOW: u32 = 300;
 /// Far enough outside the window that no clock a judge reads can bring it back.
 const FAR: i64 = 3600;
 
