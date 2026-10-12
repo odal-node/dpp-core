@@ -109,7 +109,13 @@ private fun recreate(sdJwt: SdJwt<SignedJWT>): Outcome {
  * must be present and valid. So a token that carries one is verified in the second,
  * with the holder key from the `cnf` claim and the nonce and audience the Key
  * Binding JWT itself names, which is what the first oracle's judge does too.
+ *
+ * Never throws. This judge exists to be handed tokens built to break a reader, and
+ * what a library does with one may be anything, a stack overflow on deep nesting
+ * included. Whatever it is, it is a refusal to report, not a reason to stop the run
+ * and lose the verdicts after it. That is why the catch below is as wide as it is.
  */
+@Suppress("TooGenericExceptionCaught")
 fun judge(token: String, verifier: JWSVerifier): Outcome = runBlocking {
     try {
         with(NimbusSdJwtOps) {
