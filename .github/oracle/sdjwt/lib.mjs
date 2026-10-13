@@ -77,6 +77,21 @@ export function verifyingInstance(jwk, alg) {
 }
 
 /**
+ * The library's options for a Verifier that requires Key Binding, held to a case's
+ * `challenge` (its nonce, audience, instant and window). The library reads an
+ * `iat` as too old when it is more than the maximum age plus the skew in the past,
+ * and as too new when it is more than the skew ahead, so a maximum age of zero and
+ * a skew of the window is the window this crate applies.
+ */
+export const keyBindingOptions = (ch) => ({
+  keyBindingNonce: ch.nonce,
+  expectedKeyBindingAudience: ch.aud,
+  currentDate: ch.now,
+  keyBindingMaxAgeSeconds: 0,
+  skewSeconds: ch.window,
+});
+
+/**
  * What the library makes of a token: `{ accepts: true, payload }` or
  * `{ accepts: false, error }`. Never throws, so one odd token cannot stop the run.
  */

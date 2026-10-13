@@ -63,8 +63,8 @@ pub struct KeyBindingPolicy {
 }
 
 /// The `cnf` value an Issuer puts in the payload to enable Key Binding for the
-/// Holder whose Ed25519 public key is `holder_public_key` (clause 4.1.2): RFC
-/// 7800's `jwk` confirmation method, which the clause suggests.
+/// Holder whose Ed25519 public key is `holder_public_key` (clause 4.1.2):
+/// RFC 7800's `jwk` confirmation method, which the clause suggests.
 pub fn holder_key_confirmation(holder_public_key: &[u8]) -> Value {
     json!({ "jwk": KeyAlgorithm::Ed25519.public_key_jwk(holder_public_key) })
 }

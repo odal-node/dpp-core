@@ -50,6 +50,7 @@ import { generateKeyPairSync } from "node:crypto";
 import {
   ascending,
   judge,
+  keyBindingOptions,
   libraryVersion,
   same,
   sdArrays,
@@ -116,20 +117,6 @@ const KNOWN_DISAGREEMENTS = {
       "RFC 7517 clause 4.4: a JWK's `alg` names the algorithm the key is for, and RFC 8725 clause 3.1 says a key MUST be used with exactly one algorithm, checked when it is used. The Holder key here declares ES256 and signs with EdDSA; the library does not read the declaration.",
   },
 };
-
-/**
- * The library's options for a Verifier that requires Key Binding at the case's
- * instant. It reads an `iat` as too old when it is more than the maximum age plus
- * the skew in the past, and as too new when it is more than the skew ahead, so a
- * maximum age of zero and a skew of the window is the window this crate applies.
- */
-const keyBindingOptions = (ch) => ({
-  keyBindingNonce: ch.nonce,
-  expectedKeyBindingAudience: ch.aud,
-  currentDate: ch.now,
-  keyBindingMaxAgeSeconds: 0,
-  skewSeconds: ch.window,
-});
 
 const failures = [];
 const fail = (id, why) => failures.push(`${id}: ${why}`);

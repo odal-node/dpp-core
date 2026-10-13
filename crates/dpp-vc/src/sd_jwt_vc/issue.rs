@@ -3,7 +3,7 @@
 use serde_json::{Map, Value};
 
 use dpp_crypto::keystore::KeyStore;
-use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal};
+use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal, holder_key_confirmation};
 use dpp_domain::Disclosure as DisclosureClass;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
 
@@ -40,6 +40,26 @@ const PRODUCT_GROUP_DATA: &str = "productGroupData";
 /// end the day a schema declared one of these names or the default changed.
 const NEVER_CONCEALED: [&str; 8] = ["iss", "vct", "iat", "_sd_alg", "aud", "exp", "nbf", "cnf"];
 
+/// What the Issuer says about the credential itself, as opposed to the passport it
+/// carries: the claims [`issue`] sets at the root before the passport's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Issuance<'a> {
+    /// `iss`. Being an HTTPS URI, it selects the JWT VC Issuer Metadata key
+    /// discovery of clause 2.5.
+    pub issuer: &'a str,
+    /// `vct`, the type of the credential (clause 2.2.2.1).
+    pub vct: &'a str,
+    /// `iat`, in seconds since the epoch.
+    pub issued_at: i64,
+    /// The Holder's Ed25519 public key, to bind the credential to.
+    ///
+    /// Written as `cnf` with RFC 7800's `jwk` confirmation method, which clause
+    /// 2.2.2.3 recommends, and which Key Binding requires: a presentation must then
+    /// carry a Key Binding JWT signed by this key. `None` issues a credential that
+    /// anyone holding a copy can present as their own (RFC 9901 clause 9.5).
+    pub holder_key: Option<[u8; 32]>,
+}
+
 /// Build and sign an SD-JWT VC over `payload`.
 ///
 /// Every claim the policy classifies as anything other than
@@ -66,9 +86,7 @@ pub fn issue(
     key_id: &str,
     payload: &Value,
     policy: &ProductGroupAccessPolicy,
-    issuer: &str,
-    vct: &str,
-    issued_at: i64,
+    credential: &Issuance<'_>,
 ) -> Result<SdJwt, SdJwtVcError> {
     let Some(object) = payload.as_object() else {
         return Err(SdJwtVcError::PayloadNotAnObject);
@@ -78,9 +96,17 @@ pub fn issue(
     // Clause 2.2.2: `iss` identifies the issuer and, being an HTTPS URI, selects
     // the JWT VC Issuer Metadata key-discovery mechanism of clause 2.5. Set
     // before the walk so a passport field named `iss` cannot displace it.
-    claims.insert("iss".to_owned(), Value::String(issuer.to_owned()));
-    claims.insert("vct".to_owned(), Value::String(vct.to_owned()));
-    claims.insert("iat".to_owned(), Value::Number(issued_at.into()));
+    claims.insert(
+        "iss".to_owned(),
+        Value::String(credential.issuer.to_owned()),
+    );
+    claims.insert("vct".to_owned(), Value::String(credential.vct.to_owned()));
+    claims.insert("iat".to_owned(), Value::Number(credential.issued_at.into()));
+    // Clause 2.2.2.3: REQUIRED when Key Binding is to be supported, and never in a
+    // Disclosure. Set before the walk for the same reason as `iss`.
+    if let Some(key) = credential.holder_key {
+        claims.insert("cnf".to_owned(), holder_key_confirmation(&key));
+    }
 
     let mut disclosures = Vec::new();
     let mut segments: Vec<String> = Vec::new();
