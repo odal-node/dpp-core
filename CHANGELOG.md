@@ -716,6 +716,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   parameters and not through the keystore's own, so it would not support a claim
   about the keystore.
 
+- **SD-JWT Key Binding (RFC 9901 clauses 4.1.2, 4.3 and 7.3).** An Issuer
+  names the Holder's Ed25519 key in `cnf` with `sd_jwt::holder_key_confirmation`,
+  RFC 7800's `jwk` confirmation method. A Holder binds a presentation with
+  `SdJwt::present_with_key_binding`, which signs a Key Binding JWT (`typ:
+  kb+jwt`, `iat`, `aud`, `nonce` and the `sd_hash` of what is presented, which
+  `SdJwt::sd_hash` computes) with the key `cnf` names and no other. A Verifier
+  whose policy requires Key Binding reads with
+  `SdJwt::disclosed_payload_with_key_binding` and a `KeyBindingPolicy`, the
+  nonce, audience and an instant it supplies: a token without one is refused,
+  and each check of clause 7.3 step 5 that fails is named in
+  `SdJwtError::KeyBindingRejected`. Which of the two reads a Verifier calls is
+  its policy, never the token's shape. Both independent implementations judge
+  thirty-one bound presentations with Key Binding required, and this crate
+  validates the Key Binding JWTs they issue; the RFC's own three, made with P-256
+  Holder keys, are checked by their `sd_hash`. (#428)
+
 - **An independent implementation of RFC 9901 now judges the SD-JWTs this
   repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs
   `@sd-jwt/core` 0.22.0, pinned by a committed lockfile and installed with

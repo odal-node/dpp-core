@@ -59,7 +59,7 @@ pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
 /// Extract the base64url-encoded `x` from a JWK, but only if it is a genuine
 /// Ed25519 key (`kty:"OKP"`, `crv:"Ed25519"`). Returns `None` for any other
 /// key type/curve so a malformed or wrong-curve JWK can't be mis-selected.
-fn jwk_ed25519_x(jwk: &serde_json::Value) -> Option<String> {
+pub(crate) fn jwk_ed25519_x(jwk: &serde_json::Value) -> Option<String> {
     if jwk.get("kty")?.as_str()? != "OKP" {
         return None;
     }

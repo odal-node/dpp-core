@@ -55,6 +55,33 @@ pub enum SdJwtError {
     /// selection of Disclosures, so presenting it again would bind nothing.
     #[error("a token that carries a Key Binding JWT cannot be presented")]
     KeyBindingAttached,
+    /// Key Binding is required and the token carries no Key Binding JWT.
+    ///
+    /// Clause 7.3 step 2. Whether it is required is the Verifier's policy, which
+    /// MUST NOT depend on whether one arrived (step 1).
+    #[error("Key Binding is required and the token carries no Key Binding JWT")]
+    KeyBindingMissing,
+    /// The processed payload names no Holder key: no `cnf`, or no `jwk` in it.
+    ///
+    /// Clause 4.1.2: an Issuer enables Key Binding by naming the Holder's public
+    /// key in `cnf`. Without one there is nothing to check a signature against,
+    /// and nothing for a Holder to sign with.
+    #[error("the token names no Holder key in cnf")]
+    NoHolderKey,
+    /// The Holder key in `cnf` is not an Ed25519 key, the one algorithm this
+    /// crate verifies, or declares an algorithm that is not Ed25519.
+    #[error("the Holder key in cnf is not an Ed25519 key")]
+    UnsupportedHolderKey,
+    /// A Holder was asked to bind a presentation with a key other than the one
+    /// `cnf` names. Every Verifier would refuse the result (clause 7.3 step 5.c).
+    #[error("the signing key is not the Holder key the token names")]
+    HolderKeyMismatch,
+    /// The Key Binding JWT failed one of the checks of clause 7.3 step 5, named
+    /// here: `alg` or the signature (5.b, 5.c), `typ` (5.d), `iat` (5.e), `nonce`
+    /// or `aud` (5.f), `sd_hash` (5.g), or the JWT itself, its `exp` or its `nbf`
+    /// (5.h).
+    #[error("the Key Binding JWT is not valid: {0}")]
+    KeyBindingRejected(&'static str),
     /// The JWT payload is not a JSON object.
     #[error("JWT payload is not a JSON object")]
     PayloadNotAnObject,

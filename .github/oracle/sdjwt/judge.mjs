@@ -18,6 +18,11 @@
  *                      either fixed in this crate or listed below with the reason
  *                      and the side the RFC supports. A listed difference that no
  *                      longer exists fails, so the list cannot go stale.
+ *   bound              Presentations bound to a Holder's key, judged with Key Binding
+ *                      required (clauses 4.3 and 7.3): the controls this crate's Holder
+ *                      bound, and tokens each broken in one rule of Key Binding. Each
+ *                      carries the challenge, the nonce, audience and instant a Verifier
+ *                      holds it to, and is compared the way adversarial ones are.
  *   rfc                The RFC's own tokens, as vendored in this repository. The
  *                      library verifies the RFC's ES256 signature on each, with the
  *                      key the RFC prints in Appendix A.5, and the Key Binding JWT's
@@ -89,7 +94,42 @@ const KNOWN_DISAGREEMENTS = {
     reason:
       "No clause limits nesting. serde_json refuses a document nested more than 127 deep, and a receiver sets its own limit.",
   },
+  "bound/reject/crit-names-an-extension": {
+    ours: "refuse",
+    theirs: "accept",
+    supports: "ours",
+    reason:
+      "RFC 7515 clause 4.1.11: a recipient that does not understand an extension `crit` lists MUST reject the JWS, and clause 7.3 step 5.h asks for a Key Binding JWT valid in all other respects. The library does not read `crit`.",
+  },
+  "bound/edge/typ-with-the-application-prefix": {
+    ours: "accept",
+    theirs: "refuse",
+    supports: "both",
+    reason:
+      "Clause 4.3 says `typ` MUST be kb+jwt. RFC 7515 clause 4.1.9 says a recipient reads a `typ` with no '/' as if application/ came before it, which makes application/kb+jwt the same media type; this crate compares media types, the library compares the spelling.",
+  },
+  "bound/reject/holder-key-declares-another-algorithm": {
+    ours: "refuse",
+    theirs: "accept",
+    supports: "ours",
+    reason:
+      "RFC 7517 clause 4.4: a JWK's `alg` names the algorithm the key is for, and RFC 8725 clause 3.1 says a key MUST be used with exactly one algorithm, checked when it is used. The Holder key here declares ES256 and signs with EdDSA; the library does not read the declaration.",
+  },
 };
+
+/**
+ * The library's options for a Verifier that requires Key Binding at the case's
+ * instant. It reads an `iat` as too old when it is more than the maximum age plus
+ * the skew in the past, and as too new when it is more than the skew ahead, so a
+ * maximum age of zero and a skew of the window is the window this crate applies.
+ */
+const keyBindingOptions = (ch) => ({
+  keyBindingNonce: ch.nonce,
+  expectedKeyBindingAudience: ch.aud,
+  currentDate: ch.now,
+  keyBindingMaxAgeSeconds: 0,
+  skewSeconds: ch.window,
+});
 
 const failures = [];
 const fail = (id, why) => failures.push(`${id}: ${why}`);
@@ -150,6 +190,20 @@ async function negativeControls() {
     problems.push("a token whose _sd array is in descending order is not flagged");
   }
 
+  // Key Binding has to be able to fail too: the same bound token, another nonce.
+  const bound = byId.get("bound/control/every-disclosure");
+  if (!bound) {
+    problems.push("the corpus has no bound control");
+  } else {
+    if (!(await judge(ed25519, bound.token, keyBindingOptions(bound.challenge))).accepts) {
+      problems.push("a bound control is refused, so nothing it refuses with Key Binding means anything");
+    }
+    const replayed = { ...keyBindingOptions(bound.challenge), keyBindingNonce: "another nonce" };
+    if ((await judge(ed25519, bound.token, replayed)).accepts) {
+      problems.push("a Key Binding JWT was accepted for a nonce it does not carry");
+    }
+  }
+
   if (!same({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 })) {
     problems.push("the comparison treats key order as a difference");
   }
@@ -206,11 +260,14 @@ for (const c of corpus.cases.filter((c) => c.group === "issued" || c.group === "
 // ---- adversarial ------------------------------------------------------------
 
 const seenDisagreements = new Set();
-for (const c of corpus.cases.filter((c) => c.group === "adversarial")) {
-  tally("adversarial");
-  const theirs = await judge(ed25519, c.token);
+for (const c of corpus.cases.filter((c) => c.group === "adversarial" || c.group === "bound")) {
+  tally(c.group);
+  const theirs =
+    c.group === "bound"
+      ? await judge(ed25519, c.token, keyBindingOptions(c.challenge))
+      : await judge(ed25519, c.token);
   const known = KNOWN_DISAGREEMENTS[c.id];
-  const isControl = c.id.startsWith("adversarial/control/");
+  const isControl = c.id.startsWith(`${c.group}/control/`);
 
   if (isControl && !(c.ours.accepts && theirs.accepts)) {
     fail(c.id, `a control must be accepted by both (ours ${verdict(c.ours)}, library ${verdict(theirs)})`);

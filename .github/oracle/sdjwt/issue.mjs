@@ -21,7 +21,8 @@
  *
  * Writes `target/sdjwt-oracle/issued.json`:
  *   { publicKey: <base64url raw Ed25519 key>, cases: [{ id, verdict, token,
- *     expected?, keyBinding? }] }
+ *     expected?, keyBinding?, challenge? }] }, where `challenge` is the nonce,
+ *     audience and instant a bound token is verified against
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -82,7 +83,10 @@ async function add(id, payload, frame, presentation, { keyBinding = false } = {}
       ? { keyBindingNonce: nonce, currentDate: KB.iat, expectedKeyBindingAudience: KB.aud }
       : {};
     const { payload: expected } = await sd.verify(token, options);
-    cases.push({ id, verdict: "accept", token, expected, keyBinding });
+    // A bound token carries the challenge it answers, so the reader is held to
+    // the same nonce, audience and instant the library verified it with.
+    const challenge = keyBinding ? { challenge: { nonce, aud: KB.aud, now: KB.iat, window: 0 } } : {};
+    cases.push({ id, verdict: "accept", token, expected, keyBinding, ...challenge });
   } catch (e) {
     problems.push(`${id}: the library cannot issue or read this: ${e?.message ?? e}`);
   }
