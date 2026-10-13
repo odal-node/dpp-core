@@ -1,24 +1,14 @@
 package io.odalnode.oracle
 
-import com.nimbusds.jose.JOSEException
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jca.JCAContext
+import com.nimbusds.jose.crypto.Ed25519Verifier
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWKMatcher
 import com.nimbusds.jose.jwk.OctetKeyPair
-import com.nimbusds.jose.proc.BadJOSEException
-import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.SecurityContext
-import com.nimbusds.jose.util.Base64URL
-import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator
 import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import eu.europa.ec.eudi.sdjwt.ChallengePredicate
-import eu.europa.ec.eudi.sdjwt.JwtSignatureVerifier
 import eu.europa.ec.eudi.sdjwt.KeyBindingVerifier
 import eu.europa.ec.eudi.sdjwt.NimbusSdJwtOps
 import eu.europa.ec.eudi.sdjwt.SdJwt
@@ -38,12 +28,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import java.io.File
 import java.math.BigDecimal
-import java.security.KeyFactory
-import java.security.KeyPairGenerator
-import java.security.PublicKey
-import java.security.Signature
-import java.security.SignatureException
-import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
@@ -55,10 +39,10 @@ import kotlin.time.Instant
  * Kotlin SD-JWT library, which shares no code, author or crypto stack with this
  * crate or with the TypeScript library the first oracle uses.
  *
- * Reads the same `corpus.json` as `.github/oracle/sdjwt/judge.mjs`. The library
- * takes its signature check as a function, so Ed25519 is verified here with the
- * JDK's own provider (JDK 15 and later): a third implementation of the signature,
- * besides OpenSSL and `ed25519-dalek`.
+ * Reads the same `corpus.json` as `.github/oracle/sdjwt/judge.mjs`. Every check is
+ * the library's or Nimbus's own; the judge holds no cryptography. Ed25519 is
+ * verified by Nimbus's `Ed25519Verifier`, which runs on Tink: a third
+ * implementation of the signature, besides OpenSSL and `ed25519-dalek`.
  */
 
 /** What the library made of a token. */
@@ -67,36 +51,8 @@ sealed interface Outcome {
     data class Refused(val why: String) : Outcome
 }
 
-/** Ed25519 through the JDK's provider, offered to Nimbus as a JWS verifier. */
-class JdkEd25519Verifier(rawPublicKey: ByteArray) : JWSVerifier {
-    private val key: PublicKey = KeyFactory.getInstance("Ed25519")
-        .generatePublic(X509EncodedKeySpec(SPKI_PREFIX + rawPublicKey))
-    private val context = JCAContext()
-
-    override fun supportedJWSAlgorithms(): Set<JWSAlgorithm> = setOf(JWSAlgorithm.EdDSA)
-
-    override fun getJCAContext(): JCAContext = context
-
-    override fun verify(header: JWSHeader, signingInput: ByteArray, signature: Base64URL): Boolean {
-        if (header.algorithm != JWSAlgorithm.EdDSA) throw JOSEException("not an EdDSA token")
-        // RFC 7515 clause 4.1.11, as Nimbus's own verifiers apply it: an extension
-        // named critical that this verifier does not understand fails the JWS.
-        if (!header.criticalParams.isNullOrEmpty()) return false
-        val verifier = Signature.getInstance("Ed25519")
-        verifier.initVerify(key)
-        verifier.update(signingInput)
-        return try {
-            verifier.verify(signature.decode())
-        } catch (_: SignatureException) {
-            false
-        }
-    }
-
-    private companion object {
-        /** DER prefix of an Ed25519 SubjectPublicKeyInfo, RFC 8410 section 4. */
-        val SPKI_PREFIX = "302a300506032b6570032100".chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    }
-}
+/** Nimbus's Ed25519 verifier for the public key in `jwk`. */
+fun ed25519(jwk: OctetKeyPair): JWSVerifier = Ed25519Verifier(jwk.toPublicJWK())
 
 private val json = Json { isLenient = false }
 private val b64url = Base64.getUrlDecoder()
@@ -172,44 +128,23 @@ private fun challengeOf(case: JsonObject): Challenge {
 }
 
 /**
- * The Key Binding JWT check the library's `MustBePresentAndValid` calls, made the
- * way the library's own default is made (its `keyBindingJWTProcess`, through
- * Nimbus): the Holder key from `cnf`, `typ` kb+jwt, the key matched to the header
- * as Nimbus matches a JWK to a JWS header, the four claims the RFC requires, and
- * the nonce and audience matched exactly. One thing differs. The default verifies
- * Ed25519 with Nimbus's `Ed25519Verifier`, which needs Tink, so the JDK's provider
- * verifies it here, as it does the Issuer's signature. The library itself checks
- * `sd_hash` and the `iat` window.
+ * [judge], for a Verifier whose policy requires Key Binding, held to `ch`.
+ *
+ * The library's own default throughout: `mustBePresentAndValid` takes the Holder
+ * key from `cnf` and checks the Key Binding JWT through Nimbus (`typ` kb+jwt, the
+ * key matched to the header, the signature, the four claims the RFC requires, and
+ * the nonce and audience as given), and `verify` checks `sd_hash` and the `iat`
+ * window the predicate sets.
  */
-private fun holderBinding(ch: Challenge): KeyBindingVerifier.MustBePresentAndValid<SignedJWT> =
-    KeyBindingVerifier.MustBePresentAndValid { sdJwtClaims ->
-        (NimbusSdJwtOps.HolderPubKeyInConfirmationClaim(sdJwtClaims) as? OctetKeyPair)?.let { holder ->
-            JwtSignatureVerifier { kbJwt ->
-                val signed = SignedJWT.parse(kbJwt)
-                DefaultJOSEObjectTypeVerifier<SecurityContext>(JOSEObjectType("kb+jwt")).verify(signed.header.type, null)
-                if (!JWKMatcher.forJWSHeader(signed.header).matches(holder)) {
-                    throw BadJOSEException("the Holder key does not match the header")
-                }
-                if (!signed.verify(JdkEd25519Verifier(holder.x.decode()))) {
-                    null
-                } else {
-                    val expected = JWTClaimsSet.Builder().audience(ch.aud).claim("nonce", ch.nonce).build()
-                    DefaultJWTClaimsVerifier<SecurityContext>(expected, setOf("iat", "aud", "nonce", "sd_hash"))
-                        .verify(signed.jwtClaimsSet, null)
-                    signed
-                }
-            }
-        }
-    }
-
-/** [judge], for a Verifier whose policy requires Key Binding, held to `ch`. */
 @OptIn(ExperimentalTime::class)
 @Suppress("TooGenericExceptionCaught")
 fun judgeBound(token: String, verifier: JWSVerifier, ch: Challenge): Outcome = runBlocking {
     try {
         with(NimbusSdJwtOps) {
+            val challenge = JsonObject(mapOf("aud" to JsonPrimitive(ch.aud), "nonce" to JsonPrimitive(ch.nonce)))
+            val holderBinding = KeyBindingVerifier.mustBePresentAndValid(challenge = challenge)
             val predicate = ChallengePredicate(Instant.fromEpochSeconds(ch.now), ch.aud, ch.nonce, ch.window.seconds)
-            verify(verifier.asJwtVerifier(), holderBinding(ch), predicate, token).fold(
+            verify(verifier.asJwtVerifier(), holderBinding, predicate, token).fold(
                 onSuccess = { recreate(it.sdJwt) },
                 onFailure = { Outcome.Refused(describe(it)) },
             )
@@ -241,11 +176,10 @@ fun main(args: Array<String>) {
     val path = args.firstOrNull() ?: error("usage: SdJwtJvmOracleKt <corpus.json>")
     val corpus = json.parseToJsonElement(File(path).readText()).jsonObject
     val cases = corpus.getValue("cases").jsonArray.map { it.jsonObject }
-    val issuerKey = b64url.decode(corpus.getValue("issuerJwk").jsonObject.getValue("x").jsonPrimitive.content)
-    val ed25519 = JdkEd25519Verifier(issuerKey)
+    val ed25519 = ed25519(OctetKeyPair.parse(corpus.getValue("issuerJwk").toString()))
     val es256 = ECDSAVerifier(ECKey.parse(RFC_ISSUER_KEY))
 
-    println("independent implementation: eudi-lib-jvm-sdjwt-kt (Nimbus JOSE), signature: JDK Ed25519 / Nimbus ES256")
+    println("independent implementation: eudi-lib-jvm-sdjwt-kt (Nimbus JOSE), signature: Nimbus Ed25519 (Tink) / Nimbus ES256")
     println("java ${System.getProperty("java.version")} (${System.getProperty("java.vendor")}), ${cases.size} cases in $path")
 
     // Negative controls first: a judge that cannot refuse proves nothing.
@@ -261,9 +195,7 @@ fun main(args: Array<String>) {
     val flipped = listOf(parts[0], parts[1], (if (parts[2][0] == 'A') "B" else "A") + parts[2].drop(1)).joinToString(".") + "~" + rest
     if (judge(flipped, ed25519) is Outcome.Accepted) problems += "a changed signature was accepted"
     // A real key that did not sign it: arbitrary bytes need not be a point on the curve.
-    val stranger = JdkEd25519Verifier(
-        KeyPairGenerator.getInstance("Ed25519").generateKeyPair().public.encoded.takeLast(32).toByteArray(),
-    )
+    val stranger = ed25519(OctetKeyPairGenerator(Curve.Ed25519).generate())
     if (judge(valid, stranger) is Outcome.Accepted) problems += "a stranger's key was accepted"
     // Key Binding has to be able to fail too: the same bound token, another nonce.
     cases.firstOrNull { it.getValue("id").jsonPrimitive.content == "bound/control/every-disclosure" }?.let { case ->

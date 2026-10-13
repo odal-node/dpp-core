@@ -1,12 +1,9 @@
 package io.odalnode.oracle
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.jca.JCAContext
+import com.nimbusds.jose.crypto.Ed25519Signer
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.OctetKeyPair
-import com.nimbusds.jose.util.Base64URL
+import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator
 import eu.europa.ec.eudi.sdjwt.NimbusSdJwtOps
 import eu.europa.ec.eudi.sdjwt.cnf
 import eu.europa.ec.eudi.sdjwt.dsl.values.sdJwt
@@ -16,50 +13,28 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
-import java.security.KeyPairGenerator
-import java.security.PrivateKey
-import java.security.Signature
-import java.security.spec.NamedParameterSpec
-import java.util.Base64
 import java.util.Date
 
 /**
  * The other direction: tokens this library issues, for this crate to read.
  *
- * The library signs through a Nimbus `JWSSigner`, so Ed25519 is signed here with the
- * JDK's own provider and needs no extra library. For each token the library
- * verifies it first, and what it says the claims are is the `expected` value. The
- * file has the shape `.github/oracle/sdjwt/issue.mjs` writes, so
- * `sd_jwt::oracle_tests::reverse` reads it with `CHECK_SDJWT_ORACLE_ISSUED`.
+ * The library signs through a Nimbus `JWSSigner`, and Nimbus's `Ed25519Signer`
+ * signs on Tink. For each token the library verifies it first, and what it says
+ * the claims are is the `expected` value. The file has the shape
+ * `.github/oracle/sdjwt/issue.mjs` writes, so `sd_jwt::oracle_tests::reverse`
+ * reads it with `CHECK_SDJWT_ORACLE_ISSUED`.
  *
  * Not reproducible byte for byte: the library draws its salts from the system
  * generator, and a fresh key is made each run. The shapes are fixed.
  */
-class JdkEd25519Signer(private val key: PrivateKey) : JWSSigner {
-    private val context = JCAContext()
-
-    override fun supportedJWSAlgorithms(): Set<JWSAlgorithm> = setOf(JWSAlgorithm.EdDSA)
-
-    override fun getJCAContext(): JCAContext = context
-
-    override fun sign(header: JWSHeader, signingInput: ByteArray): Base64URL {
-        val signer = Signature.getInstance("Ed25519")
-        signer.initSign(key)
-        signer.update(signingInput)
-        return Base64URL.encode(signer.sign())
-    }
-}
-
 private val props = (0..5).map { "n$it" }
 
 private class Case(val id: String, val token: String, val challenge: Challenge? = null)
 
 fun main(args: Array<String>) {
     val out = args.firstOrNull() ?: error("usage: IssueKt <issued-kotlin.json>")
-    val pair = KeyPairGenerator.getInstance("Ed25519").apply { initialize(NamedParameterSpec.ED25519) }.generateKeyPair()
-    // The last 32 bytes of the SubjectPublicKeyInfo are the raw key (RFC 8410 section 4).
-    val raw = pair.public.encoded.takeLast(32).toByteArray()
-    val verifier = JdkEd25519Verifier(raw)
+    val issuerKey = OctetKeyPairGenerator(Curve.Ed25519).generate()
+    val verifier = ed25519(issuerKey)
     val cases = mutableListOf<Case>()
     val problems = mutableListOf<String>()
 
@@ -68,15 +43,15 @@ fun main(args: Array<String>) {
     }
 
     // A Holder, for presentations bound to its key: the Issuer names it in `cnf`,
-    // and the library signs the Key Binding JWT with it through the JDK.
-    val holderPair = KeyPairGenerator.getInstance("Ed25519").apply { initialize(NamedParameterSpec.ED25519) }.generateKeyPair()
-    val holderJwk = OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(holderPair.public.encoded.takeLast(32).toByteArray())).build()
+    // and the library signs the Key Binding JWT with it.
+    val holderKey = OctetKeyPairGenerator(Curve.Ed25519).generate()
+    val holderJwk = holderKey.toPublicJWK()
     // Now, because Nimbus checks a Key Binding JWT's time claims against its own clock.
     val now = System.currentTimeMillis() / 1000
 
     runBlocking {
         with(NimbusSdJwtOps) {
-            val issuer = issuer(signer = JdkEd25519Signer(pair.private), signAlgorithm = JWSAlgorithm.EdDSA)
+            val issuer = issuer(signer = Ed25519Signer(issuerKey), signAlgorithm = JWSAlgorithm.EdDSA)
 
             // Every hidden/shown combination of six properties, issued and with only the
             // lowest hidden property presented.
@@ -175,7 +150,7 @@ fun main(args: Array<String>) {
             // Bound to the Holder: the library issues with `cnf`, presents part, and
             // adds a Key Binding JWT for one Verifier's challenge.
             val kbIssuer = { nonce: String ->
-                kbJwtIssuer(JdkEd25519Signer(holderPair.private), JWSAlgorithm.EdDSA, holderJwk) {
+                kbJwtIssuer(Ed25519Signer(holderKey), JWSAlgorithm.EdDSA, holderJwk) {
                     audience("https://verifier.example")
                     claim("nonce", nonce)
                     issueTime(Date(now * 1000))
@@ -260,7 +235,7 @@ fun main(args: Array<String>) {
     File(out).also { it.parentFile?.mkdirs() }.writeText(
         JsonObject(
             mapOf(
-                "publicKey" to JsonPrimitive(Base64.getUrlEncoder().withoutPadding().encodeToString(raw)),
+                "publicKey" to JsonPrimitive(issuerKey.x.toString()),
                 "cases" to JsonArray(written),
             ),
         ).toString(),

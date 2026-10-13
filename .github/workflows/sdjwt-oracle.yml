@@ -34,9 +34,9 @@
 # What it does **not** answer, and the register row says so. The original order of
 # the claims (RFC 9901 clause 4.2.4.1) cannot be seen by any verifier; what is
 # checked is that this crate's `_sd` arrays are sorted, which the Kotlin issuer,
-# shuffling, shows is not a test every conforming issuer passes. Ed25519 is checked
-# by Node's `crypto` in the first judge and by the JDK's provider in the second,
-# not by the libraries, which call back for it. Nothing here is evidence of
+# shuffling, shows is not a test every conforming issuer passes. The TypeScript
+# library calls back for Ed25519, and Node's `crypto` checks it; the Kotlin library
+# checks it with its own default, Nimbus on Tink. Nothing here is evidence of
 # conformance to the SD-JWT VC credential profile, which is an Internet-Draft.
 #
 # Deliberately **not** path-filtered. A filtered check never reports on a PR that
