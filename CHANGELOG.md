@@ -784,6 +784,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
+  conceals an array element only when `_sd` names its index as a number. A string
+  index is ignored, and the library issues a valid token with no Disclosure for it.
+  `issue.mjs` wrote its indices as strings, so 11 of its 13 array cases, its
+  credential case for an array element, and every array element in its 120 random
+  trees hid nothing, and passed because the library reads back whatever it issued.
+  The independent evidence for array elements (RFC 9901 clause 4.2.2) was the
+  Kotlin issuer's and the RFC's own examples. The indices are now numbers, which
+  puts 495 array-element Disclosures, in 126 tokens, in front of this crate where
+  there were none. Every case also checks that the library issued as many
+  Disclosures as its frame asks for, so a frame it ignores fails the run.
+
 - **An independent implementation found four ways this crate read a malformed
   SD-JWT as a good one.** Its own tests could not, having been written from the
   same reading of RFC 9901 as the code.
