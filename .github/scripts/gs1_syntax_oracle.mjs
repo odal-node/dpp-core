@@ -50,6 +50,9 @@
 import { readFileSync } from "node:fs";
 import { GS1encoder } from "gs1encoder";
 
+// Forced failure, never to be merged: shows a failing oracle blocks the merge (#432).
+throw new Error("forced failure: a failing required oracle must block the merge (#432)");
+
 const paths =
   process.argv.length > 2
     ? process.argv.slice(2)
