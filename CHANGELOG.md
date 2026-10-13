@@ -775,8 +775,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   defect here. Three, a number as the salt of either kind of Disclosure or as a
   claim name, are the library's leniency against clause 7.1 steps 3.c.ii.1 and
   3.c.iii.1, which refuse a Disclosure that is not the array clause 4.2.1 or 4.2.2
-  defines, and are reported upstream
-  (eu-digital-identity-wallet/eudi-lib-jvm-sdjwt-kt#520). Its issuer shuffles
+  defines, and are reported to its maintainers. Its issuer shuffles
   `_sd` rather than sorting it, which is why the sortedness check is a claim about
   this crate's issuer only. The register row for RFC 9901 says what this shows and
   what stays unclaimed, and RFC 8259, which the corpus cites for two edge cases,
