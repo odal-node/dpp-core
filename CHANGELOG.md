@@ -1042,6 +1042,33 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   publishes, and this crate consumes lists, so there is no conformance class for
   it to claim.
 
+- **The vocabulary register was re-checked against its sources, and it had drifted.**
+  `dpp-vocab` records what other organisations publish. Nine weeks after the last
+  reading, seven of the ten records looked at again had moved. Five of the six
+  verified records now carry a re-check note:
+  - the Commission's battery guidance at the recorded URL is Version 2.0 of
+    15 August 2026, not 1.0, with the licence statement unchanged;
+  - IDTA released bug-fix versions of the battery passport submodels in
+    September;
+  - the Catena-X battery model has a 6.1.0, and the generic passport model it
+    imports is at 7.0.0;
+  - the Battery Pass Consortium's repository now points to BatteryPass-Ready,
+    which announced a longlist and a data model 2.0 on 2026-08-27 (neither file
+    read yet, so that record stays `tracked`);
+  - SEMIC's CCCEV is 2.2.0 where the record said 2.1.0.
+
+  CIRPASS-2's ontology is 2.0.7, not 2.0.5. GS1, schema.org and UNTP had not
+  changed. Four repository paths the records cite had moved with the module
+  renames and are corrected. A test (`vocabulary_record_paths`) now fails when a
+  record cites a path that does not exist, and another pins that nothing under an
+  unverified vocabulary's namespace is permitted, which no test did before. Six
+  records are added, all `surveyed`, so nothing they name is permitted: the generic
+  Catena-X passport model, DIN DKE SPEC 99100, the Publications Office's authority
+  tables, the Combined Nomenclature, ECHA's Candidate List and the W3C Data
+  Privacy Vocabulary. Three references to private material were reworded, and the
+  directory README's statement that nothing was verified, false since August, was
+  corrected.
+
 ## [0.21.0] - 2026-09-28
 
 ### Breaking

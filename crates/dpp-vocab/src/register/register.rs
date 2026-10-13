@@ -70,6 +70,30 @@ const EMBEDDED: &[Embedded] = &[
         key: "eclass",
         json: include_str!("../../vocabularies/eclass.json"),
     },
+    Embedded {
+        key: "catena-x-generic-dpp",
+        json: include_str!("../../vocabularies/catena-x-generic-dpp.json"),
+    },
+    Embedded {
+        key: "din-dke-spec-99100",
+        json: include_str!("../../vocabularies/din-dke-spec-99100.json"),
+    },
+    Embedded {
+        key: "eu-authority-tables",
+        json: include_str!("../../vocabularies/eu-authority-tables.json"),
+    },
+    Embedded {
+        key: "eu-combined-nomenclature",
+        json: include_str!("../../vocabularies/eu-combined-nomenclature.json"),
+    },
+    Embedded {
+        key: "echa-candidate-list",
+        json: include_str!("../../vocabularies/echa-candidate-list.json"),
+    },
+    Embedded {
+        key: "w3c-dpv",
+        json: include_str!("../../vocabularies/w3c-dpv.json"),
+    },
 ];
 
 /// The upstream vocabularies this project has recorded.

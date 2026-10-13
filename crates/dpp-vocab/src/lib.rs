@@ -32,13 +32,13 @@
 //!
 //! # Current state
 //!
-//! Six of the fourteen records in `vocabularies/` are verified as of
-//! 2026-08-11 (`batterypass-samm`, `catena-x-battery-pass`,
-//! `ec-battery-guidance`, `gs1`, `idta`, `semic`) — each because a person
-//! read the authority's own publication and recorded what it said, not
-//! because the claim looked plausible. Everything else stays refused. Each
-//! record carries the finding that got it to its status and the step that
-//! would move it on.
+//! Six of the twenty records in `vocabularies/` are verified (`batterypass-samm`,
+//! `catena-x-battery-pass`, `ec-battery-guidance`, `gs1`, `idta`, `semic`): each
+//! because a person read the authority's own publication and recorded what it said,
+//! on 2026-08-11, and each checked again for change on 2026-10-13. Five of the six
+//! now carry a re-check note recording a newer version, a successor or a correction,
+//! which is why they are re-checked. Everything else stays refused. Each record carries the finding that
+//! got it to its status and the step that would move it on.
 //!
 //! ```
 //! use dpp_vocab::{VocabularyRegister, Verdict};
