@@ -63,7 +63,7 @@
 //! of the array, because the order is the data. That is why [`conceal_elements`]
 //! does not sort the way [`conceal`] does.
 //!
-//! # Two requirements that are easy to miss and are tested
+//! # Requirements that are easy to miss and are tested
 //!
 //! - **Digest order must not follow claim order.** Clause 4.2.4.1: *"The Issuer
 //!   MUST hide the original order of the claims in the array."* Pushing digests

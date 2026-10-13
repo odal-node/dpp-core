@@ -59,11 +59,16 @@ Before running `cargo release`:
    an RFC become obsoleted. For the W3C, GS1, IDTA and ETSI rows this re-read is
    the only check.
 9. **Plugin version.** `plugins/Cargo.toml`'s `[workspace.package] version` must
-   equal the workspace's, and `plugins/Cargo.lock` must agree (`just lock-check`).
-   `plugin_version_lockstep` fails if the first is wrong, but **nothing moves it
-   for you**: `cargo release` has never changed `plugins/Cargo.toml`'s version, so
-   after a bump, edit that line and run `cargo update -w` in `plugins/`. Do not cut
-   a release until `cargo release` does this itself, checked with a dry run.
+   equal the workspace's, and the lockfiles of `plugins/` and `fuzz/` must agree
+   (`just lock-check`). `cargo release` does both, since those are separate
+   workspaces it does not otherwise see: a replacement and a hook in
+   `crates/dpp-tests/Cargo.toml`. Check that the dry run shows
+   `Replacing in ../../plugins/Cargo.toml` with the version you mean to ship,
+   and the `relock` hook's dry-run line. The lockfiles themselves move only on
+   `--execute`, where the release commit names `plugins/Cargo.toml`,
+   `plugins/Cargo.lock` and `fuzz/Cargo.lock`. When the version bump rides in on
+   a feature PR, that PR does the same by hand: edit the line and run
+   `just relock`.
 
 ## Publishing Order
 
