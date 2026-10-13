@@ -3,11 +3,16 @@
 # signature is.
 #
 # Deliberately its own workflow rather than a job in `ci.yml`, for the same
-# reason the AAS oracle is: it is the only check here that needs a JVM, and
-# `cargo build --workspace` succeeding with zero infrastructure — no Java, no
-# Maven, no services — is a property this project states publicly. Keeping the
-# dependency here means the main gate never acquires it, and this job is free to
-# be slow without ever being a reason to skip the fast one.
+# reason the AAS oracle is: it needs a JVM, and `cargo build --workspace`
+# succeeding with zero infrastructure — no Java, no Maven, no services — is a
+# property this project states publicly. Keeping the dependency here means the
+# main gate never acquires it, and this job is free to be slow without ever being
+# a reason to skip the fast one.
+#
+# Deliberately **not** path-filtered. It is the evidence for a conformance claim
+# in `docs/architecture/STANDARDS.md`, so it has to be a required check, and a
+# filtered check never reports on a PR that does not touch its paths, so
+# requiring it would block every other PR forever. The job is a minute or two.
 #
 # What it answers: *did we build the structure ETSI TS 119 182-1 describes?*
 # Every Rust test of that module checks our output against our own reading of
@@ -29,17 +34,7 @@ name: JAdES conformance oracle
 on:
   push:
     branches: [main]
-    paths:
-      - "crates/dpp-crypto/src/jades/**"
-      - "crates/dpp-crypto/tests/jades_oracle_artifact.rs"
-      - ".github/oracle/jades/**"
-      - ".github/workflows/jades-oracle.yml"
   pull_request:
-    paths:
-      - "crates/dpp-crypto/src/jades/**"
-      - "crates/dpp-crypto/tests/jades_oracle_artifact.rs"
-      - ".github/oracle/jades/**"
-      - ".github/workflows/jades-oracle.yml"
   workflow_dispatch:
 
 permissions:
