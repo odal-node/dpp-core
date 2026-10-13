@@ -7,8 +7,14 @@
 //!
 //! # The rule
 //!
-//! > An identifier is either in the `urn:odal-node:` namespace, or it belongs to
-//! > a vocabulary somebody has read. There is deliberately no third category.
+//! > An identifier is either in the `urn:odal-node:` namespace, or it is a term
+//! > somebody has read, in a vocabulary somebody has read. There is deliberately
+//! > no third category.
+//!
+//! The two readings are separate. A namespace is a prefix, so every string that
+//! begins with it looks like one of the vocabulary's terms, and reading the
+//! vocabulary's publication does not read each definition in it. Each record
+//! therefore lists the terms read, and only a listed term is permitted.
 //!
 //! Declining to make a claim beats making one we cannot support. An honest
 //! `urn:odal-node:` identifier says *"this is our concept"*; a wrong IRDI says
@@ -40,6 +46,9 @@
 //! which is why they are re-checked. Everything else stays refused. Each record carries the finding that
 //! got it to its status and the step that would move it on.
 //!
+//! One term has been read so far, GS1's `gtin`. A verified vocabulary whose `terms`
+//! is empty permits no term, so reading another GS1 term is a separate task.
+//!
 //! ```
 //! use dpp_vocab::{VocabularyRegister, Verdict};
 //!
@@ -61,4 +70,4 @@ pub mod vocabulary;
 
 pub use namespace::{OWN_JSONLD_NAMESPACE, OWN_NAMESPACE, is_own};
 pub use register::{Verdict, VocabularyRegister};
-pub use vocabulary::{Layer, Status, Vocabulary};
+pub use vocabulary::{Layer, ReadTerm, Status, Vocabulary};

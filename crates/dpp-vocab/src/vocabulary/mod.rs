@@ -14,11 +14,14 @@
 //! - `status` — [`Status`], how much of a record rests on somebody having read
 //!   the authority.
 //! - `record` — [`Vocabulary`], the record shape itself.
+//! - `term` — [`ReadTerm`], one term of a vocabulary that somebody has read.
 
 mod layer;
 mod record;
 mod status;
+mod term;
 
 pub use layer::Layer;
 pub use record::Vocabulary;
 pub use status::Status;
+pub use term::ReadTerm;

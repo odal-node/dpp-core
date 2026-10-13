@@ -14,8 +14,14 @@ that class of claim.
 
 ## The rule
 
-> An identifier is either in the `urn:odal-node:` namespace, or it belongs to a
-> vocabulary somebody has read. There is deliberately no third category.
+> An identifier is either in the `urn:odal-node:` namespace, or it is a term
+> somebody has read, in a vocabulary somebody has read. There is deliberately no
+> third category.
+
+The two readings are separate. A namespace is a prefix, so every string that
+begins with it looks like one of the vocabulary's terms, and reading the
+vocabulary's publication does not read each definition in it. Each record
+therefore lists the terms read, and only a listed term is permitted.
 
 Declining to make a claim beats making one we cannot support. An honest
 `urn:odal-node:` identifier says *"this is our concept"*. A wrong IRDI in its
@@ -37,6 +43,9 @@ now carry a re-check note recording a newer version, a successor or a correction
 which is why they are re-checked. Everything else stays refused. Each record carries the finding that
 got it to its status and the step that would move it on.
 
+One term has been read so far, GS1's `gtin`. A verified vocabulary whose `terms`
+is empty permits no term, so reading another GS1 term is a separate task.
+
 ```rust
 use dpp_vocab::{VocabularyRegister, Verdict};
 
@@ -49,8 +58,11 @@ assert_eq!(
 );
 
 // GS1's own definition of `gtin` was read on 2026-08-11 and matches our
-// `Gtin` type exactly, so its terms are permitted.
+// `Gtin` type exactly, so that term is permitted.
 assert!(register.verdict("https://ref.gs1.org/voc/gtin").is_permitted());
+
+// Reading one GS1 term does not read the rest of the namespace.
+assert!(!register.verdict("https://ref.gs1.org/voc/someOtherTerm").is_permitted());
 
 // Most third-party identifiers still are not — and the refusal says why.
 let verdict = register.verdict("https://schema.org/dateModified");
@@ -79,7 +91,8 @@ an external check into an internal dependency.
 One JSON file in `vocabularies/`, one entry in the embedded list. Never two
 authorities in one file — a reader would have no way to tell which one a
 `finding` belonged to. The fixed key set and the meaning of each status are
-documented in `vocabularies/README.md`.
+documented in `vocabularies/README.md`. Naming a term of that vocabulary is a
+second step: read its definition, then list it in the record's `terms`.
 
 ## The mapping layer, and the standard it will use
 

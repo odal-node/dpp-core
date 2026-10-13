@@ -351,6 +351,25 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that includes every Disclosure on the way down to the claims wanted presents as
   before. (#426)
 
+- **`dpp-vocab` permits a term somebody read, not a whole namespace.**
+  `VocabularyRegister::verdict` used to permit any IRI beginning with a verified
+  vocabulary's namespace, so `https://ref.gs1.org/voc/Totally_Made_Up_Term` was
+  permitted on the strength of GS1's `gtin` having been read. A namespace is a
+  prefix, and reading a vocabulary's publication does not read each definition in
+  it. Every record now carries `terms`, the list of terms read, each with `iri`,
+  `readOn`, `source` and `finding`, and only a listed term is permitted. `gtin`
+  is the one entry today. A verified vocabulary's namespace IRI on its own is
+  still permitted, since declaring a prefix defines no term; a test of the
+  JSON-LD context's `gs1:` declaration relies on it. A term may be listed at an address outside the
+  record's namespace, provided no other record claims it. Tests hold every entry
+  to a well-formed IRI, a real date no later than the record's `checkedOn`, a
+  speakable vocabulary, and no address under another record's namespace.
+  **Migration:** a caller that emits a third-party IRI must find it listed. The
+  refusal is the new `Verdict::TermNotRead`; the remedy is to read the term's
+  definition and add it to the record, not to widen the namespace. A record
+  deserialised from JSON needs a `terms` key (`[]` for none), and `Vocabulary`
+  gains a `terms` field and a `read_term` method.
+
 ### Added
 
 - **A Holder can choose what to present by claim path.**

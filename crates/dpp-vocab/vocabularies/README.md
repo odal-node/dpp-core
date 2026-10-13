@@ -32,11 +32,19 @@ never "not applicable" — a missing licence blocks reuse rather than allowing i
 | `source` | Where that look happened |
 | `finding` | What was learned. The load-bearing field |
 | `nextStep` | What would move it to the next status |
+| `terms` | The terms somebody has read, each with `iri`, `readOn`, `source` and `finding`. `[]` = none |
+
+A term is listed only on a `verified` record at a layer we may speak, and only
+after its definition was read. Listing it is what permits emitting it: the
+register permits a term, not a namespace. The IRI normally sits under
+`namespaceIri`; one that does not must not fall under any other record's
+namespace.
 
 ## Statuses
 
 - **`verified`** — a person read the authority's own publication. Only a
-  `verified` vocabulary can carry permitted terms.
+  `verified` vocabulary can carry permitted terms, and then only the ones its
+  `terms` list.
 - **`tracked`** — evaluated and not adopted, with a recorded finding. Refused.
 - **`surveyed`** — known to exist from a secondary source, or from a directory
   listing or release notes alone. **No term has been read.** Refused, and the
