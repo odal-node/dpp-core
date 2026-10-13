@@ -15,13 +15,17 @@
 //!   the authority.
 //! - `record` — [`Vocabulary`], the record shape itself.
 //! - `term` — [`ReadTerm`], one term of a vocabulary that somebody has read.
+//! - `pin` — [`Pin`], the upstream state a record was read at, and how it is
+//!   observed.
 
 mod layer;
+mod pin;
 mod record;
 mod status;
 mod term;
 
 pub use layer::Layer;
+pub use pin::{Pin, PinKind};
 pub use record::Vocabulary;
 pub use status::Status;
 pub use term::ReadTerm;

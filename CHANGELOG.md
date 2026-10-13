@@ -372,6 +372,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`just vocab-drift` names the vocabulary records whose source has moved.**
+  A `dpp-vocab` record rests on somebody having read another organisation's
+  publication, and that can change without a commit here; the last re-check found
+  that seven of the ten records it looked at had moved. Every record now carries `pins`, the upstream
+  state its findings were read at: the newest commit on a repository or on a
+  path in it, a repository's latest release tag, or the SHA-256 of a document
+  served at a URL. The recipe observes each pin again and exits 1 on a
+  difference, on a pin it cannot observe, or on a cited URL that answers 404 or
+  410. A redirect is reported and does not fail, and a refusal or timeout is
+  reported as unverified rather than failing, so a flaky network does not make it
+  cry wolf. It is not part of `just check`, since it depends on other people's
+  servers. A pin only says a record is due a reading, never that it is wrong.
+  Tests hold every pin to the shape its kind requires, a real date no later than
+  the record's `checkedOn`, and require every `verified` record to pin something.
+  Six records are pinned (seven pins), each to the narrowest thing whose change
+  would matter, such as a release-notes file rather than a directory of regenerated
+  artefacts. A record deserialised from JSON needs a `pins` key (`[]` for none).
+
 - **A Holder can choose what to present by claim path.**
   `SdJwt::digests_for_paths` takes the claims wanted as `ClaimPath`s and returns the
   digests of the Disclosures that reveal them, ready for `present` and

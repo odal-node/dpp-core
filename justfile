@@ -241,6 +241,16 @@ plugin-gates-self-test:
     done
     echo "Plugin gate guards fail on an empty match, as they must."
 
+# Name the vocabulary records whose source has moved since they were read.
+#
+# Not in `check` or `ci`, deliberately: it asks GitHub and the authorities'
+# own sites, and a gate that fails because someone else's server is down is a
+# gate people stop trusting. Run it before a release and whenever a record is
+# about to be relied on. Needs Node and an authenticated `gh`. Pass
+# `--pins-only` to skip the URL check.
+vocab-drift *args:
+    node .github/scripts/vocab_drift.mjs {{args}}
+
 # Ask the European Commission's AdES reference implementation (DSS) what our
 # JAdES signature actually is.
 #

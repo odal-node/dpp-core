@@ -1,5 +1,6 @@
 //! The term ledger: a verified vocabulary permits the terms read, not its namespace.
 
+use super::test_support::is_iso_date;
 use super::*;
 use crate::vocabulary::{Layer, ReadTerm, Status, Vocabulary};
 
@@ -28,6 +29,7 @@ fn record(
         source: "test".to_owned(),
         finding: "test".to_owned(),
         next_step: "test".to_owned(),
+        pins: Vec::new(),
         terms: terms
             .iter()
             .map(|iri| ReadTerm {
@@ -38,19 +40,6 @@ fn record(
             })
             .collect(),
     }
-}
-
-fn is_iso_date(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    bytes.len() == 10
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes
-            .iter()
-            .enumerate()
-            .all(|(i, b)| i == 4 || i == 7 || b.is_ascii_digit())
-        && (1..=12).contains(&text[5..7].parse::<u8>().unwrap_or(0))
-        && (1..=31).contains(&text[8..10].parse::<u8>().unwrap_or(0))
 }
 
 /// The case the ledger exists for: GS1's namespace is verified and one term in it
