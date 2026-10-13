@@ -728,9 +728,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and each check of clause 7.3 step 5 that fails is named in
   `SdJwtError::KeyBindingRejected`. Which of the two reads a Verifier calls is
   its policy, never the token's shape. Both independent implementations judge
-  thirty-one bound presentations with Key Binding required, and this crate
-  validates the Key Binding JWTs they issue; the RFC's own three, made with P-256
-  Holder keys, are checked by their `sd_hash`. (#428)
+  thirty-one bound presentations with Key Binding required, the Kotlin library
+  with its own default Key Binding verifier, and this crate validates the Key
+  Binding JWTs they issue; the RFC's own three, made with P-256 Holder keys, are
+  checked by their `sd_hash`. (#428, #431)
 
 - **An independent implementation of RFC 9901 now judges the SD-JWTs this
   repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs
@@ -766,11 +767,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
   A second implementation of a different lineage, the EU wallet's Kotlin library
   `eudi-lib-jvm-sdjwt-kt` 0.20.2, runs in the same workflow, pinned by version and
-  by the checksum of each of its 22 jars, and judges even when the first judge has
+  by the checksum of each of its 25 jars, and judges even when the first judge has
   failed, since a disagreement is when its verdict is wanted. It judges the same
   corpus and credentials, verifies the RFC's seven tokens and reads them to the
-  claims this crate reads, and signs and verifies Ed25519 through the JDK's
-  provider, and it issues 195 tokens for this crate to read. It differs from this
+  claims this crate reads, and signs and verifies Ed25519 with its own default,
+  Nimbus JOSE on Tink, and it issues 195 tokens for this crate to read. It differs from this
   crate in seven places, each listed in its source with the clause and none a
   defect here. Three, a number as the salt of either kind of Disclosure or as a
   claim name, are the library's leniency against clause 7.1 steps 3.c.ii.1 and
