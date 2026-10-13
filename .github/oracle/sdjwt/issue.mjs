@@ -21,8 +21,10 @@
  *
  * Writes `target/sdjwt-oracle/issued.json`:
  *   { publicKey: <base64url raw Ed25519 key>, cases: [{ id, verdict, token,
- *     expected?, keyBinding?, challenge? }] }, where `challenge` is the nonce,
- *     audience and instant a bound token is verified against
+ *     expected?, keyBinding?, challenge?, selection? }] }, where `challenge` is
+ *     the nonce, audience and instant a bound token is verified against, and
+ *     `selection` is `{ of, paths }` for a token presented from the issued token
+ *     `of`: the claim paths the presentation was made from
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -95,8 +97,34 @@ function checkIssued(id, frame, issued) {
 }
 
 /**
+ * The claim paths a presentation frame stands for, in the form of
+ * draft-ietf-oauth-sd-jwt-vc-19 clause 5.6.1: names for object members, numbers for
+ * array elements, as `claims` says each level is. A `true` names a claim, and so
+ * does an empty frame, which the library reads the same way (it reveals that claim's
+ * own Disclosure and none of what is hidden inside it). A frame with entries names
+ * only the claims in them.
+ */
+function pathsOfFrame(frame, claims, prefix = []) {
+  const paths = [];
+  for (const [key, value] of Object.entries(frame)) {
+    const segment = Array.isArray(claims) ? Number(key) : key;
+    const here = [...prefix, segment];
+    if (value === true || (value !== null && typeof value === "object" && Object.keys(value).length === 0)) {
+      paths.push(here);
+    } else if (value !== null && typeof value === "object") {
+      paths.push(...pathsOfFrame(value, claims?.[segment], here));
+    }
+  }
+  return paths;
+}
+
+/**
  * Issue `payload` under `frame`, present it under `presentation` (everything
  * when omitted), have the library read the result, and record both.
+ *
+ * A case that was presented from the issued token also records that token and the
+ * claim paths the presentation was made from, as `selection`. This crate has to
+ * choose the same Disclosures for those paths as the library did.
  */
 async function add(id, payload, frame, presentation, { keyBinding = false } = {}) {
   try {
@@ -116,7 +144,8 @@ async function add(id, payload, frame, presentation, { keyBinding = false } = {}
     // A bound token carries the challenge it answers, so the reader is held to
     // the same nonce, audience and instant the library verified it with.
     const challenge = keyBinding ? { challenge: { nonce, aud: KB.aud, now: KB.iat, window: 0 } } : {};
-    cases.push({ id, verdict: "accept", token, expected, keyBinding, ...challenge });
+    const selection = presentation === undefined ? {} : { selection: { of: issued, paths: pathsOfFrame(presentation, claims) } };
+    cases.push({ id, verdict: "accept", token, expected, keyBinding, ...challenge, ...selection });
   } catch (e) {
     problems.push(`${id}: the library cannot issue or read this: ${e?.message ?? e}`);
   }

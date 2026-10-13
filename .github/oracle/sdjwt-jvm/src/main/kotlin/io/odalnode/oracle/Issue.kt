@@ -22,14 +22,23 @@ import java.util.Date
  * signs on Tink. For each token the library verifies it first, and what it says
  * the claims are is the `expected` value. The file has the shape
  * `.github/oracle/sdjwt/issue.mjs` writes, so `sd_jwt::oracle_tests::reverse`
- * reads it with `CHECK_SDJWT_ORACLE_ISSUED`.
+ * reads it with `CHECK_SDJWT_ORACLE_ISSUED`. A token the library presented from an
+ * issued one carries `selection`: that issued token, and the claim paths the library
+ * was asked to present.
  *
  * Not reproducible byte for byte: the library draws its salts from the system
  * generator, and a fresh key is made each run. The shapes are fixed.
  */
 private val props = (0..5).map { "n$it" }
 
-private class Case(val id: String, val token: String, val challenge: Challenge? = null)
+/** A presentation, with the issued token it was made from and the claim paths it was made for. */
+private class Selection(val of: String, val paths: List<JsonArray>)
+
+private class Case(val id: String, val token: String, val challenge: Challenge? = null, val selection: Selection? = null)
+
+/** A claim path in the form of draft-ietf-oauth-sd-jwt-vc-19 clause 5.6.1: names and positions. */
+private fun path(vararg segments: Any) =
+    JsonArray(segments.map { if (it is Int) JsonPrimitive(it) else JsonPrimitive(it as String) })
 
 fun main(args: Array<String>) {
     val out = args.firstOrNull() ?: error("usage: IssueKt <issued-kotlin.json>")
@@ -38,8 +47,8 @@ fun main(args: Array<String>) {
     val cases = mutableListOf<Case>()
     val problems = mutableListOf<String>()
 
-    fun record(id: String, token: String, challenge: Challenge? = null) {
-        cases += Case(id, token, challenge)
+    fun record(id: String, token: String, challenge: Challenge? = null, selection: Selection? = null) {
+        cases += Case(id, token, challenge, selection)
     }
 
     // A Holder, for presentations bound to its key: the Issuer names it in `cnf`,
@@ -66,7 +75,9 @@ fun main(args: Array<String>) {
                 record("flat/$mask/issued", sdJwt.serialize())
                 val first = props.indexOfFirst { mask and (1 shl props.indexOf(it)) != 0 }
                 if (first >= 0) {
-                    sdJwt.present(setOf(ClaimPath.claim(props[first])))?.let { record("flat/$mask/first", it.serialize()) }
+                    sdJwt.present(setOf(ClaimPath.claim(props[first])))?.let {
+                        record("flat/$mask/first", it.serialize(), selection = Selection(sdJwt.serialize(), listOf(path(props[first]))))
+                    }
                 }
             }
 
@@ -86,7 +97,11 @@ fun main(args: Array<String>) {
                     val first = (0 until length).firstOrNull { mask and (1 shl it) != 0 }
                     if (first != null) {
                         sdJwt.present(setOf(ClaimPath.claim("list").arrayElement(first)))?.let {
-                            record("array/$length/$mask/first", it.serialize())
+                            record(
+                                "array/$length/$mask/first",
+                                it.serialize(),
+                                selection = Selection(sdJwt.serialize(), listOf(path("list", first))),
+                            )
                         }
                     }
                 }
@@ -174,13 +189,28 @@ fun main(args: Array<String>) {
                     sdObjClaim("address") { sdClaim("city", JsonPrimitive("Berlin")); sdClaim("zip", JsonPrimitive("10115")) }
                 }, setOf(ClaimPath.claim("address").claim("city"))),
             )
+            // The same queries as claim paths, for `selection`.
+            val boundPaths = mapOf(
+                "key-binding/some-shown" to listOf(path("given_name")),
+                "key-binding/nothing-shown" to listOf(path("iss")),
+                "key-binding/array-element" to listOf(path("list", 2)),
+                "key-binding/recursive" to listOf(path("address", "city")),
+            )
             for ((id, spec, query) in boundShapes) {
                 val nonce = "nonce-$id"
                 runCatching {
-                    val presented = checkNotNull(issuer.issue(spec).getOrThrow().present(query)) { "nothing to present" }
-                    presented.serializeWithKeyBinding(kbIssuer(nonce)).getOrThrow()
+                    val issued = issuer.issue(spec).getOrThrow()
+                    val presented = checkNotNull(issued.present(query)) { "nothing to present" }
+                    issued.serialize() to presented.serializeWithKeyBinding(kbIssuer(nonce)).getOrThrow()
                 }.fold(
-                    onSuccess = { record("$id/presented", it, Challenge(nonce, "https://verifier.example", now, 0)) },
+                    onSuccess = { (of, token) ->
+                        record(
+                            "$id/presented",
+                            token,
+                            Challenge(nonce, "https://verifier.example", now, 0),
+                            Selection(of, boundPaths.getValue(id)),
+                        )
+                    },
                     onFailure = { problems += "$id: ${it::class.simpleName}: ${it.message}" },
                 )
             }
@@ -204,6 +234,9 @@ fun main(args: Array<String>) {
                     put("verdict", JsonPrimitive("accept"))
                     put("token", JsonPrimitive(case.token))
                     put("expected", verdict.claims)
+                    case.selection?.let { sel ->
+                        put("selection", JsonObject(mapOf("of" to JsonPrimitive(sel.of), "paths" to JsonArray(sel.paths))))
+                    }
                     case.challenge?.let { ch ->
                         put("keyBinding", JsonPrimitive(true))
                         put(
