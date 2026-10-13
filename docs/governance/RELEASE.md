@@ -58,6 +58,12 @@ Before running `cargo release`:
    rows to the code, but it reads the register, not the IETF, so it cannot see
    an RFC become obsoleted. For the W3C, GS1, IDTA and ETSI rows this re-read is
    the only check.
+
+   The upstream vocabularies are read the same way. Run `just vocab-drift`: it
+   observes every pin in `crates/dpp-vocab/vocabularies/` again and names the
+   records whose source has moved. Read each record it names again before the
+   release, or say in its `finding` why not. It sees only what is pinned, which is
+   why a test requires every `verified` record to pin something.
 9. **Plugin version.** `plugins/Cargo.toml`'s `[workspace.package] version` must
    equal the workspace's, and the lockfiles of `plugins/` and `fuzz/` must agree
    (`just lock-check`). `cargo release` does both, since those are separate

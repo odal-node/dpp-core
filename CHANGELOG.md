@@ -1249,6 +1249,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Privacy Vocabulary. The directory README's statement that nothing was verified,
   false since August, was corrected.
 
+- **The `dpp-vocab` prose no longer keeps its own count.** The crate README and
+  `lib.rs` said how many records are verified, named them, and said how many had
+  been re-checked and what they had found; the directory README said how many were
+  verified. Each was a copy of the register, and a copy is what drifts. A test now
+  builds the sentences from the register (the verified count and list, and the
+  terms read) and fails when a file does not contain them, so the next record to
+  become verified or the next term to be read fails the build until the prose is
+  updated. The sentence about re-check findings is gone: it was history, and the
+  records hold it. The pre-release checklist's standards re-read now also says to
+  run `just vocab-drift`, so the vocabulary records are re-read at the same point
+  as the standards register.
+
 ## [0.21.0] - 2026-09-28
 
 ### Breaking
