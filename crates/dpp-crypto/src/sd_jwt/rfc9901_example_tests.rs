@@ -18,9 +18,10 @@
 //! The signatures. The RFC's examples are signed with ES256, which this crate
 //! does not implement, and the module does not verify the Issuer-signed JWT in
 //! any case: that is [`crate::jws::verifier`]. Sections 6.1 to 6.3 print only a
-//! payload, so those tests give it a stub JWT around it. Key Binding is not
-//! checked either: the Key Binding JWT at the end of A.3 and A.4 is tolerated and
-//! carried, which is the most this module does with it.
+//! payload, so those tests give it a stub JWT around it. The Key Binding JWTs at
+//! the end of A.3, A.4 and section 5.2 are carried here; their `sd_hash` is
+//! checked in `key_binding_tests.rs`, and their signatures, made with P-256 Holder
+//! keys, are not this crate's to check.
 
 use base64::Engine;
 use serde_json::{Map, Value, json};
@@ -298,7 +299,7 @@ fn a_holder_presenting_the_rfcs_choice_from_the_issued_token_gives_the_rfcs_pres
         .collect();
     let digests: Vec<&str> = digests.iter().map(String::as_str).collect();
 
-    let presented = issued.present(&digests);
+    let presented = issued.present(&digests).expect("the RFC presents these");
 
     let mut ours: Vec<&str> = presented
         .disclosures()

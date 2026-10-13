@@ -1,0 +1,196 @@
+# Judges the SD-JWTs this workspace emits with two independent implementations of
+# RFC 9901, and has this workspace read what each of them issues.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the AAS, GS1
+# and JSON-LD oracles are: this needs Node, npm and a JVM, and `cargo build
+# --workspace` succeeding with no Node, no JVM, no native toolchain and no services
+# is a property this project states publicly. Keeping the dependencies here means
+# the main gate never acquires them.
+#
+# What it answers: *does an implementation with no code and no author in common
+# with `dpp_crypto::sd_jwt` read the tokens we issue to the claims a verifier must
+# see, and do we read the tokens it issues?* The Rust tests hold the module to this
+# repository's own reading of the RFC and to the RFC's examples, which fix their
+# salts and cannot show how an issuer builds the payload around the digests. A
+# misreading of the RFC that the author made twice passes both. Two implementations
+# of different lineage make a shared misreading much less likely: the first is
+# TypeScript (`@sd-jwt/core`, whose fixtures carry the Python reference's test-case
+# names), the second the EU wallet's Kotlin library, a separate codebase on a
+# separate crypto stack.
+#
+# Checks, in order, each a step so a failure names itself:
+#
+#   1. the corpus: 700+ tokens built from claim trees, adversarial tokens,
+#      presentations bound to a Holder's key (judged with Key Binding required),
+#      and the RFC's own, judged by the TypeScript library (`judge.mjs`);
+#   2. a credential per product group, judged by it, with the `kid` recomputed from
+#      the public key (`credentials.mjs`);
+#   3. it issues tokens (`issue.mjs`), and `dpp_crypto` reads them;
+#   4. it issues credentials, and `dpp_vc` verifies them;
+#   5. the same files are regenerated to show they are reproducible;
+#   6. the same corpus and credentials, judged by the Kotlin library, and the
+#      tokens it issues read by `dpp_crypto` (`.github/oracle/sdjwt-jvm`).
+#
+# What it does **not** answer, and the register row says so. The original order of
+# the claims (RFC 9901 clause 4.2.4.1) cannot be seen by any verifier; what is
+# checked is that this crate's `_sd` arrays are sorted, which the Kotlin issuer,
+# shuffling, shows is not a test every conforming issuer passes. The TypeScript
+# library calls back for Ed25519, and Node's `crypto` checks it; the Kotlin library
+# checks it with its own default, Nimbus on Tink. Nothing here is evidence of
+# conformance to the SD-JWT VC credential profile, which is an Internet-Draft.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever.
+name: SD-JWT oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  judge:
+    name: SD-JWTs are read the same way by two independent implementations
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept. This job installs third-party code that touches
+      # signing, and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      # From the committed lockfile, with install scripts off. The library is
+      # somebody else's judgement about what RFC 9901 requires, and an unpinned
+      # upgrade would turn their tightening into our red build on code that did
+      # not change. `npm ci` fails if the lockfile and `package.json` disagree or
+      # a tarball's sha512 does not match. Moving the pin is a deliberate edit with
+      # a visible diff: change `package.json`, regenerate the lockfile, and cite
+      # the new version in the register row. Dependabot does not watch it.
+      - name: Install the independent implementation
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix .github/oracle/sdjwt
+
+      - name: Record what is actually being run
+        run: |
+          echo "node $(node --version)"
+          node -p "'@sd-jwt/core ' + require('./.github/oracle/sdjwt/node_modules/@sd-jwt/core/package.json').version"
+          node -p "'@owf/identity-common ' + require('./.github/oracle/sdjwt/node_modules/@owf/identity-common/package.json').version"
+          ls .github/oracle/sdjwt/node_modules/@sd-jwt .github/oracle/sdjwt/node_modules/@owf
+
+      - name: Build the corpus from our own issuer
+        id: corpus
+        run: EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::emit
+
+      - name: Judge the corpus
+        run: node .github/oracle/sdjwt/judge.mjs
+
+      - name: Build a credential for every product group
+        id: vc-corpus
+        run: EMIT_SDJWT_VC_CORPUS=1 cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus
+
+      - name: Judge the credentials
+        run: node .github/oracle/sdjwt/credentials.mjs
+
+      - name: Have the independent implementation issue
+        run: node .github/oracle/sdjwt/issue.mjs
+
+      - name: Read what it issued
+        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+
+      - name: Verify the credentials it issued
+        run: CHECK_SDJWT_VC_ORACLE_ISSUED=target/sdjwt-oracle/issued-vc.json cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus what_an_independent
+
+      # Same seeds, same bytes. A difference means the library changed what it
+      # issues, which is worth knowing before it is a failure.
+      - name: Issue again and compare
+        run: |
+          sha256sum target/sdjwt-oracle/issued.json target/sdjwt-oracle/issued-vc.json > target/sdjwt-oracle/first.sha256
+          node .github/oracle/sdjwt/issue.mjs
+          sha256sum --check target/sdjwt-oracle/first.sha256
+
+      # The second implementation. The same corpus, the same credentials and the
+      # same reader, so a disagreement between the two libraries is a clause to
+      # read and not a difference of inputs. Temurin 17 is the library's own
+      # target, and what the JAdES oracle uses.
+      #
+      # It runs whether or not the first judge passed. A disagreement is when the
+      # second verdict is most needed, to tell a defect here from one library's
+      # reading, so these steps wait only on the files they read and not on every
+      # step before them. The job still fails if any step did. One job and not two,
+      # so that one required check covers both judges.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # `-C` fails the build on an artefact whose checksum is not the
+      # repository's, which covers the build-time artefacts the manifest below
+      # does not.
+      - name: Build the second independent implementation
+        id: kt-build
+        if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
+        run: mvn -q -B -C -f .github/oracle/sdjwt-jvm/pom.xml package
+
+      # Maven does not lock. The jars the judge runs with are the ones in the
+      # manifest, byte for byte, and no others. A changed artifact, or one more
+      # jar on the classpath, fails here and not as a different verdict later.
+      # Moving a pin is a deliberate edit: change the version in `pom.xml`, rebuild,
+      # and regenerate `jars.sha256` from `target/lib` in the same commit.
+      - name: Check the resolved jars against the manifest
+        id: kt-jars
+        if: ${{ !cancelled() && steps.kt-build.outcome == 'success' }}
+        working-directory: .github/oracle/sdjwt-jvm
+        run: |
+          (cd target/lib && sha256sum --check ../../jars.sha256)
+          diff <(ls target/lib | LC_ALL=C sort) <(sed 's/^[0-9a-f]* \*//' jars.sha256 | LC_ALL=C sort)
+
+      - name: Record what is actually being run
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
+        run: |
+          java -version
+          sed -n 's/.*\*\(eudi-lib-jvm-sdjwt-kt-.*\)\.jar$/\1/p' .github/oracle/sdjwt-jvm/jars.sha256
+
+      - name: Judge the corpus with it
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
+        run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.SdJwtJvmOracleKt target/sdjwt-oracle/corpus.json
+
+      - name: Judge the credentials with it
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' && steps.vc-corpus.outcome == 'success' }}
+        run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.SdJwtJvmOracleKt target/sdjwt-oracle/credentials.json
+
+      - name: Have it issue
+        id: kt-issue
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' }}
+        run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.IssueKt target/sdjwt-oracle/issued-kotlin.json
+
+      - name: Read what it issued
+        if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}
+        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the corpus
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sdjwt-oracle
+          path: target/sdjwt-oracle
+          retention-days: 7

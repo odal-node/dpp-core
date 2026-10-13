@@ -29,13 +29,21 @@
 //!   still verifies, because it never covered that list. Only
 //!   [`SdJwt::disclosed_payload`] recomputes the digests, and it **refuses the
 //!   whole token** rather than filtering: a disclosure matching no `_sd` digest
-//!   is [`SdJwtError::UnusedDisclosures`], per clause 7.1 step 4. So **read
+//!   is [`SdJwtError::UnusedDisclosures`], per clause 7.1 step 5. So **read
 //!   claims from its output, never from `disclosures()`** — and read a failure
 //!   from it as a tampered credential, not as a claim that was dropped.
-//! - **It does not implement key binding.** RFC 9901 clause 4.3's KB-JWT proves
-//!   the presenter holds a key the credential names. That needs holders to have
-//!   keys. The parser tolerates a trailing KB-JWT segment so that a presentation
-//!   carrying one is not misread as malformed, and otherwise ignores it.
+//! - **[`SdJwt::disclosed_payload`] does not read a Key Binding JWT.** RFC 9901
+//!   clause 4.3's Key Binding JWT proves the presenter holds the key the Issuer
+//!   named, and only a Verifier whose policy requires Key Binding checks it, with
+//!   [`SdJwt::disclosed_payload_with_key_binding`] (see [`holder_key_confirmation`]
+//!   for the rest of it). The parser checks that a trailing segment is shaped like
+//!   a JWT, because a Disclosure that lost its closing `~` would otherwise pass
+//!   for one and vanish. Whether one may be there at all, when Key Binding is not
+//!   required, depends on who is reading, which this module cannot know: a Holder
+//!   MUST reject an SD-JWT+KB from its Issuer (clause 7.2), and a Verifier that
+//!   expects an SD-JWT MUST find the last segment empty (clause 4). Such a caller
+//!   refuses a token for which [`SdJwt::has_key_binding`] is true.
+//!   [`SdJwt::present`] refuses one itself.
 //! - **It does not issue decoy digests** (clause 4.2.5). They are optional, and
 //!   they buy concealment of *how many* claims or elements were withheld, which
 //!   the digest count already reveals only in aggregate. Reading them works: a
@@ -79,14 +87,26 @@
 //! - **A presentation selects disclosures by digest, not by claim name.** One
 //!   name can belong to several disclosures, so selecting by name reveals values
 //!   the holder did not choose. See [`SdJwt::present`].
+//! - **A presentation is checked before it leaves.** Clause 7.2 step 2: each
+//!   Disclosure chosen must be referenced by the Issuer-signed JWT or by another
+//!   one chosen. A child chosen without its parent is a Disclosure no Verifier can
+//!   place, so [`SdJwt::present`] reads its own result as a Verifier will and
+//!   refuses it.
 
 pub mod disclosure;
 pub mod error;
 
 mod builder;
+mod key_binding;
 
 #[cfg(test)]
 mod array_tests;
+#[cfg(test)]
+mod holder_tests;
+#[cfg(test)]
+mod key_binding_tests;
+#[cfg(test)]
+mod oracle_tests;
 #[cfg(test)]
 mod rfc9901_array_tests;
 #[cfg(test)]
@@ -103,3 +123,4 @@ mod tests;
 pub use builder::{SdJwt, build_payload, conceal, conceal_elements};
 pub use disclosure::{Disclosure, SD_HASH_ALG, digest_of};
 pub use error::{DisclosureError, SdJwtError};
+pub use key_binding::{KeyBinding, KeyBindingPolicy, holder_key_confirmation};

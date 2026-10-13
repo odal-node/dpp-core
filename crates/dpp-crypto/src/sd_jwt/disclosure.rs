@@ -21,9 +21,18 @@ pub const SD_HASH_ALG: &str = "sha-256";
 /// salt base64url-encoded — for no stated benefit.
 const SALT_BYTES: usize = 16;
 
-/// Claim names RFC 9901 clause 4.2.1 forbids a disclosure from carrying,
-/// because they are the mechanism's own keys.
-const RESERVED: [&str; 2] = ["_sd", "..."];
+/// Claim names a disclosure may not carry, because they are the mechanism's own
+/// keys.
+///
+/// Clause 4.2.1 forbids `_sd` and `...`. `_sd_alg` is the third, and the RFC
+/// reaches it by three routes rather than naming it here. At the top level it
+/// already exists when the hash algorithm is stated, and clause 4.2.1 forbids a
+/// name that "exists in the object as a permanently disclosed claim" (step
+/// 3.c.ii.3 refuses the collision). Below the top level clause 4.1.1 forbids it
+/// outright. And where it is absent, step 3.f would strip a revealed one, so the
+/// claim could never reach the caller anyway. Refused at every depth, which is
+/// what the independent implementation in the oracle does.
+const RESERVED: [&str; 3] = ["_sd", "...", "_sd_alg"];
 
 fn b64() -> base64::engine::general_purpose::GeneralPurpose {
     base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -64,8 +73,9 @@ impl Disclosure {
     /// two credentials for the same field is a correlation handle.
     /// # Errors
     ///
-    /// [`DisclosureError::ReservedClaimName`] for `_sd` or `...`. Clause 4.2.1
-    /// forbids them, and [`Disclosure::parse`] refuses them — so without this
+    /// [`DisclosureError::ReservedClaimName`] for `_sd`, `...` or `_sd_alg`.
+    /// Clause 4.2.1 and clause 4.1.1 forbid them, and [`Disclosure::parse`]
+    /// refuses them — so without this
     /// check a constructor could build a value that this crate's own parser
     /// rejects, and the disclosure would fail only at the verifier.
     pub fn new(claim_name: impl Into<String>, claim_value: Value) -> Result<Self, DisclosureError> {
