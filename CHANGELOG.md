@@ -281,6 +281,30 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `WrongDisclosureKind`. Nothing outside the module's own tests and `dpp-vc`'s
   read a name.
 
+- **`SdJwt::parse` and `disclosed_payload` refuse four tokens they used to
+  accept.** A segment after the last `~` that is not a compact JWS is refused as
+  `SdJwtError::MalformedKeyBinding`. A `_sd_alg` anywhere but the top level is
+  refused as `SdJwtError::NestedHashAlg`. An `_sd` array holding anything but
+  strings carries no digests, so a Disclosure that only it could have matched
+  leaves the token refused as `UnusedDisclosures`. A Disclosure named `_sd_alg`
+  is refused as `DisclosureError::ReservedClaimName`, and `Disclosure::new` and
+  `with_salt` refuse the name too. **Migration:** none for a conformant token,
+  which is read as before. Each of the four was not one. A claim called `_sd_alg`
+  can no longer be concealed, at any depth. See Fixed for what each lost. (#426)
+
+- **`SdJwt::present` returns a `Result`, and refuses two presentations it used
+  to make.** A token that carries a Key Binding JWT is refused as
+  `SdJwtError::KeyBindingAttached`: an Issuer provides an SD-JWT, not an
+  SD-JWT+KB, and a Holder MUST reject one (RFC 9901 clause 7.2), where `present`
+  used to forward its Key Binding JWT, made over some other selection of
+  Disclosures, unchanged. A selection holding a Disclosure that neither the
+  Issuer-signed JWT nor another one chosen refers to, such as an array element
+  chosen without the array, is refused with what `disclosed_payload` says of it,
+  `UnusedDisclosures` (clause 7.2 step 2); it used to be presented, and a Verifier
+  then refused the whole token. **Migration:** handle the `Result`. A selection
+  that includes every Disclosure on the way down to the claims wanted presents as
+  before. (#426)
+
 ### Added
 
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
@@ -692,7 +716,79 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   parameters and not through the keystore's own, so it would not support a claim
   about the keystore.
 
+- **An independent implementation of RFC 9901 now judges the SD-JWTs this
+  repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs
+  `@sd-jwt/core` 0.22.0, pinned by a committed lockfile and installed with
+  `npm ci --ignore-scripts`, in four ways. It reads the claim trees this crate
+  issues, each presented every way a small tree allows and in a sample of the ways
+  a large one does, and must arrive at the claims a verifier is meant to see,
+  which the corpus works out without this crate's code. It judges fifty-one tokens
+  each broken in one clause and re-signed, and must reach this crate's verdict,
+  and its claims where both accept; three differences are listed in the script
+  with the clause and the side the RFC supports, and a listed difference that has
+  stopped being one fails the run. Agreement is not enough on its own: the
+  thirty-seven of those tokens that break a rule no reader may let through must be
+  refused by this crate's processing alone, whatever the libraries say, so a
+  misreading shared by all three still fails. The hiding of claim order (clause 4.2.4.1) is
+  judged in the one way it can be, since the original order cannot be seen but
+  whether an `_sd` array is sorted can: every such array in the tokens this crate
+  issues, and in the RFC's own, must be strictly ascending, which makes its order
+  a function of the salted digests alone. It verifies the RFC's own seven vendored tokens against their ES256
+  signatures with the key of Appendix A.5, and the `sd_hash` of the three Key
+  Binding JWTs, which covers every byte of a presentation. And it issues more than
+  two hundred tokens, reproducibly from fixed seeds, that this crate reads back to
+  the claims the library verified. A credential per product group, issued by
+  `dpp_vc::sd_jwt_vc::issue` from the group's schema fixture, is judged the same
+  way, with each `kid` recomputed from the signing key as its RFC 7638 thumbprint
+  in RFC 9278 form, and credentials the library issues are verified by
+  `dpp_vc::sd_jwt_vc::verify`. The judges refuse a token with a changed signature,
+  a stranger's key and a changed Disclosure before they judge anything, and report
+  every failure rather than the first. The signature itself is checked by Node's
+  `crypto`, not by the library, which calls back for it; and the credentials are
+  judged at the level of the RFC only, since the credential profile is an
+  Internet-Draft.
+
+  A second implementation of a different lineage, the EU wallet's Kotlin library
+  `eudi-lib-jvm-sdjwt-kt` 0.20.2, runs in the same workflow, pinned by version and
+  by the checksum of each of its 22 jars, and judges even when the first judge has
+  failed, since a disagreement is when its verdict is wanted. It judges the same
+  corpus and credentials, verifies the RFC's seven tokens and reads them to the
+  claims this crate reads, and signs and verifies Ed25519 through the JDK's
+  provider, and it issues 195 tokens for this crate to read. It differs from this
+  crate in seven places, each listed in its source with the clause and none a
+  defect here. Three, a number as the salt of either kind of Disclosure or as a
+  claim name, are the library's leniency against clause 7.1 steps 3.c.ii.1 and
+  3.c.iii.1, which refuse a Disclosure that is not the array clause 4.2.1 or 4.2.2
+  defines, and are reported to its maintainers. Its issuer shuffles
+  `_sd` rather than sorting it, which is why the sortedness check is a claim about
+  this crate's issuer only. The register row for RFC 9901 says what this shows and
+  what stays unclaimed, and RFC 8259, which the corpus cites for two edge cases,
+  gets a row of its own. (#420, #426, #427)
+
 ### Fixed
+
+- **An independent implementation found four ways this crate read a malformed
+  SD-JWT as a good one.** Its own tests could not, having been written from the
+  same reading of RFC 9901 as the code.
+  - **A last Disclosure that lost its closing `~` was taken for a Key Binding
+    JWT.** `JWT~D1~D2` parsed as one Disclosure and a Key Binding JWT, so the
+    claim in `D2` was missing from the result and nothing said so. The last
+    segment must now be a compact JWS (clause 4).
+  - **`_sd_alg` was stripped at every depth.** Clause 4.1.1 forbids it below the
+    top level and step 3.f removes it from the top level only, so a nested one
+    deleted a claim of that name without a word. It is refused.
+  - **An `_sd` array with a number in it was read for its strings.** Step 3.b.i
+    reads only an `_sd` that refers to an array of strings, so the digests beside
+    the number were treated as embedded and their Disclosures revealed, where the
+    RFC reads the array as carrying none and refuses the token for the Disclosures
+    left unreferenced (step 5).
+  - **A Disclosure named `_sd_alg` was accepted.** Clause 4.2.1 forbids a name that
+    already exists as a permanently disclosed claim, which at the top level is
+    `_sd_alg` once the hash is stated (step 3.c.ii.3 refuses the collision);
+    clause 4.1.1 forbids it below the top level; and where it is absent, step 3.f
+    would strip it once revealed. This crate stripped `_sd_alg` before it
+    substituted Disclosures, so none of the three could fire and the claim came
+    back as an ordinary one. The name is now reserved with `_sd` and `...`.
 
 - **A framed passport had no name in linked data.** The context aliases `id`
   to `@id`, and a passport's `id` is a bare UUID, which is a relative IRI

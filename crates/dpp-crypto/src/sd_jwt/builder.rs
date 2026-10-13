@@ -159,12 +159,18 @@ impl SdJwt {
     /// `<JWT>~<Disclosure>~...~<optional KB-JWT>`.
     ///
     /// The trailing `~` is required by the format and is what distinguishes
-    /// "no key binding" from a truncated token.
+    /// "no key binding" from a truncated token. So a last segment that is not a
+    /// compact JWS is refused: it is a Disclosure that lost its `~`, and reading
+    /// it as a Key Binding JWT would drop its claim without a word. The Key
+    /// Binding JWT itself is not read beyond its shape.
     pub fn parse(serialised: &str) -> Result<Self, SdJwtError> {
         let segments: Vec<&str> = serialised.split('~').collect();
         let [jwt, rest @ .., last] = segments.as_slice() else {
             return Err(SdJwtError::NotAnSdJwt);
         };
+        if !last.is_empty() && !is_compact_jws(last) {
+            return Err(SdJwtError::MalformedKeyBinding);
+        }
         let disclosures = rest
             .iter()
             .map(|s| Disclosure::parse(s))
@@ -259,8 +265,28 @@ impl SdJwt {
     /// Digests that match nothing are ignored rather than rejected: asking for
     /// a claim that was issued in cleartext is asking for something the
     /// presentation already carries.
-    pub fn present(&self, reveal_digests: &[&str]) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// The two duties clause 7.2 gives a Holder that this function can see.
+    ///
+    /// [`SdJwtError::KeyBindingAttached`] if this token carries a Key Binding
+    /// JWT. An Issuer provides an SD-JWT, not an SD-JWT+KB, and a Holder MUST
+    /// reject one. Its Key Binding JWT was made over some other selection of
+    /// Disclosures, so passing it on would bind this one to nothing.
+    ///
+    /// Whatever [`Self::disclosed_payload`] refuses the presentation for, and in
+    /// particular [`SdJwtError::UnusedDisclosures`] for a Disclosure chosen
+    /// without the one whose value holds its digest. Step 2 requires each chosen
+    /// Disclosure to be referenced by the Issuer-signed JWT or by another chosen
+    /// one, and reading the presentation the way a Verifier will (clause 7.1 step
+    /// 5) is that check. A Verifier would refuse the whole token, so it is refused
+    /// here, where the Holder can still choose again.
+    pub fn present(&self, reveal_digests: &[&str]) -> Result<Self, SdJwtError> {
+        if self.key_binding_jwt.is_some() {
+            return Err(SdJwtError::KeyBindingAttached);
+        }
+        let presentation = Self {
             jwt: self.jwt.clone(),
             disclosures: self
                 .disclosures
@@ -268,8 +294,10 @@ impl SdJwt {
                 .filter(|d| reveal_digests.contains(&d.digest().as_str()))
                 .cloned()
                 .collect(),
-            key_binding_jwt: self.key_binding_jwt.clone(),
-        }
+            key_binding_jwt: None,
+        };
+        presentation.disclosed_payload()?;
+        Ok(presentation)
     }
 
     /// The payload with every supplied disclosure substituted back in, and every
@@ -341,34 +369,46 @@ fn substitute(
     }
     match value {
         Value::Object(map) => {
-            let digests = match map.remove(SD_CLAIM) {
-                Some(Value::Array(items)) => items,
-                // A non-array `_sd` is not a shape clause 4.2.4.1 defines. It is
-                // dropped rather than rejected: it conceals nothing, so it can
-                // hide nothing, and refusing would reject tokens over a claim
-                // that carries no information.
+            // Step 3.b.i reads only an `_sd` that "refers to an array of
+            // strings". Any other `_sd` carries no digests and is dropped with the
+            // rest of them (step 3.e); it conceals nothing, so it hides nothing.
+            // A Disclosure that only such an array could have matched is then
+            // unreferenced, and step 5 refuses the token, rather than the
+            // strings beside a stray number being read and the number ignored.
+            let digests: Vec<String> = match map.remove(SD_CLAIM) {
+                Some(Value::Array(items)) if items.iter().all(Value::is_string) => items
+                    .into_iter()
+                    .filter_map(|item| match item {
+                        Value::String(digest) => Some(digest),
+                        _ => None,
+                    })
+                    .collect(),
                 _ => Vec::new(),
             };
-            map.remove(SD_ALG_CLAIM);
+            // Step 3.f removes `_sd_alg` from the top level, and clause 4.1.1
+            // forbids it anywhere else. Stripping a nested one would delete a
+            // claim without a word, so it is refused.
+            if depth == 0 {
+                map.remove(SD_ALG_CLAIM);
+            } else if map.contains_key(SD_ALG_CLAIM) {
+                return Err(SdJwtError::NestedHashAlg);
+            }
 
             for digest in digests {
-                let Some(digest) = digest.as_str() else {
-                    continue;
-                };
                 // Clause 4.1's "MUST NOT appear more than once" is about the
                 // whole SD-JWT, not one `_sd` array, so the set spans the walk.
                 // Checked for *every* embedded digest, matched or not: an
                 // unmatched digest repeated across two objects is still a
                 // malformed token, and removing the arrays would otherwise make
                 // it indistinguishable from a well-formed one.
-                if !seen_digests.insert(digest.to_owned()) {
-                    return Err(SdJwtError::DuplicateDigest(digest.to_owned()));
+                if !seen_digests.insert(digest.clone()) {
+                    return Err(SdJwtError::DuplicateDigest(digest));
                 }
-                if let Some(d) = by_digest.get(digest) {
+                if let Some(d) = by_digest.get(&digest) {
                     // Step 3.c.ii.1: a two-element Disclosure has no name to
                     // insert under, and is not what an `_sd` array refers to.
                     let Some(name) = d.claim_name() else {
-                        return Err(SdJwtError::WrongDisclosureKind(digest.to_owned()));
+                        return Err(SdJwtError::WrongDisclosureKind(digest));
                     };
                     if map.contains_key(name) {
                         return Err(SdJwtError::ClaimCollision(name.to_owned()));
@@ -420,6 +460,20 @@ fn substitute(
         }
         _ => Ok(()),
     }
+}
+
+/// Three non-empty base64url parts joined by dots, RFC 7515's compact form. A
+/// Disclosure is base64url alone, so it never has the dots.
+fn is_compact_jws(segment: &str) -> bool {
+    let mut parts = 0;
+    let all_base64url = segment.split('.').all(|part| {
+        parts += 1;
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    });
+    all_base64url && parts == 3
 }
 
 fn decode_jwt_payload(jwt: &str) -> Result<Map<String, Value>, SdJwtError> {

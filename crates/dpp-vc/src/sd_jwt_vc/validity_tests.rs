@@ -148,7 +148,10 @@ fn exp_is_not_selectively_disclosable() {
     );
 
     // And it is therefore still enforced on a presentation that reveals nothing.
-    let bare = parsed.present(&[]).serialise();
+    let bare = parsed
+        .present(&[])
+        .expect("nothing chosen is a valid choice")
+        .serialise();
     assert!(matches!(
         check(&store, &bare, Utc.timestamp_opt(expiry + 1, 0).unwrap()),
         Err(SdJwtVcError::Expired { .. })

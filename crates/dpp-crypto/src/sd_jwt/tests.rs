@@ -93,7 +93,7 @@ fn a_two_of_four_presentation_does_not_carry_the_withheld_two() {
         .flat_map(|n| issued.digests_for_claim(n))
         .collect();
     let reveal: Vec<&str> = reveal.iter().map(String::as_str).collect();
-    let presentation = issued.present(&reveal);
+    let presentation = issued.present(&reveal).unwrap();
     let wire = presentation.serialise();
 
     assert_eq!(presentation.disclosures().len(), 2);
@@ -211,7 +211,7 @@ fn a_disclosure_survives_a_parse_and_reencode_unchanged() {
 fn reserved_claim_names_are_refused() {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    for name in ["_sd", "..."] {
+    for name in ["_sd", "...", "_sd_alg"] {
         let encoded = b64.encode(json!(["salt", name, 1]).to_string());
         assert_eq!(
             Disclosure::parse(&encoded),
@@ -251,10 +251,69 @@ fn a_token_without_a_trailing_separator_is_not_an_sd_jwt() {
 #[test]
 fn a_key_binding_segment_is_seen_and_not_read_as_a_disclosure() {
     let issued = issue();
-    let with_kb = format!("{}kb-jwt-placeholder", issued.serialise());
-    let parsed = SdJwt::parse(&with_kb).unwrap();
+    let kb = stub_jwt(&json!({ "iat": 1 }));
+    let parsed = SdJwt::parse(&format!("{}{kb}", issued.serialise())).unwrap();
     assert_eq!(parsed.disclosures().len(), 4);
     assert!(parsed.has_key_binding());
+}
+
+/// Clause 4: a token ends in `~`, or in a Key Binding JWT. A last Disclosure that
+/// lost its closing `~` is neither, and was once taken for a Key Binding JWT: the
+/// claim it carried went missing from the result and nothing said so.
+#[test]
+fn a_last_disclosure_missing_its_closing_separator_is_refused_not_dropped() {
+    let cut = issue().serialise().trim_end_matches('~').to_owned();
+    assert!(matches!(
+        SdJwt::parse(&cut),
+        Err(SdJwtError::MalformedKeyBinding)
+    ));
+}
+
+#[test]
+fn a_key_binding_segment_that_is_not_a_compact_jws_is_refused() {
+    let token = issue().serialise();
+    for not_a_jws in ["kb-jwt-placeholder", "a.b", "a.b.c.d", "a..c", "a.b.c d"] {
+        assert!(
+            matches!(
+                SdJwt::parse(&format!("{token}{not_a_jws}")),
+                Err(SdJwtError::MalformedKeyBinding)
+            ),
+            "{not_a_jws:?}"
+        );
+    }
+}
+
+/// Clause 7.1 step 3.b.i reads only an `_sd` that "refers to an array of
+/// strings". One that does not carries no digests, so a Disclosure its sibling
+/// strings would have matched is left unreferenced (step 5) and the token is
+/// refused, rather than half of the array being read.
+#[test]
+fn an_sd_array_holding_a_non_string_carries_no_digests() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest(), 7], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::UnusedDisclosures(1))
+    );
+}
+
+/// Clause 4.1.1: `_sd_alg` "MUST NOT be used in any object nested within the
+/// payload", and step 3.f removes it from the top level only. A nested one is a
+/// claim the issuer was not allowed to make, not an artefact to strip silently.
+#[test]
+fn sd_alg_inside_a_nested_object_is_refused() {
+    let payload = json!({ "_sd_alg": "sha-256", "nested": { "_sd_alg": "sha-256" } });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
+}
+
+#[test]
+fn sd_alg_inside_a_disclosed_object_is_refused() {
+    let d = Disclosure::new("o", json!({ "_sd_alg": "sha-256" })).unwrap();
+    let payload = json!({ "_sd": [d.digest()], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
 }
 
 #[test]
@@ -294,7 +353,7 @@ fn revealing_one_of_two_same_named_claims_withholds_the_other() {
 
     // Reveal only the outer one.
     let outer_digest = sd.disclosures()[0].digest();
-    let presentation = sd.present(&[outer_digest.as_str()]);
+    let presentation = sd.present(&[outer_digest.as_str()]).unwrap();
 
     assert_eq!(presentation.disclosures().len(), 1);
     let wire = presentation.serialise();
@@ -339,10 +398,11 @@ fn a_digest_repeated_across_two_sd_arrays_is_refused() {
 }
 
 /// A constructor must not be able to build a value this crate's own parser
-/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names.
+/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names, and `_sd_alg`
+/// is refused with them.
 #[test]
 fn constructors_refuse_reserved_claim_names() {
-    for name in ["_sd", "..."] {
+    for name in ["_sd", "...", "_sd_alg"] {
         assert_eq!(
             Disclosure::new(name, json!(1)),
             Err(DisclosureError::ReservedClaimName)

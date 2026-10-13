@@ -20,7 +20,9 @@ pub enum DisclosureError {
     /// the two elements `[salt, value]` of clause 4.2.2 for an array element.
     #[error("disclosure is not a [salt, name, value] triple or a [salt, value] pair")]
     NotATripleOrPair,
-    /// The claim name is one clause 4.2.1 forbids: `_sd` or `...`.
+    /// The claim name is one a disclosure may not carry: `_sd` or `...`, which
+    /// clause 4.2.1 forbids, or `_sd_alg`, which clauses 4.1.1 and 4.2.1 and step
+    /// 3.f make unusable.
     #[error("disclosure names a reserved claim")]
     ReservedClaimName,
 }
@@ -38,9 +40,32 @@ pub enum SdJwtError {
     /// The issuer-signed JWT is not three dot-separated parts.
     #[error("issuer-signed JWT is malformed")]
     MalformedJwt,
+    /// The segment after the last `~` is not a compact JWS.
+    ///
+    /// Clause 4: an SD-JWT ends in `~`, or in a Key Binding JWT. A last
+    /// Disclosure that lost its closing `~` is neither, and is refused rather than
+    /// taken for a Key Binding JWT, which would drop the claim it carries with no
+    /// sign that anything was lost.
+    #[error("the segment after the last '~' is not a JWT")]
+    MalformedKeyBinding,
+    /// A token that carries a Key Binding JWT was asked to be presented.
+    ///
+    /// Clause 7.2: an Issuer provides an SD-JWT, not an SD-JWT+KB, and a Holder
+    /// that receives one MUST reject it. The Key Binding JWT was made over another
+    /// selection of Disclosures, so presenting it again would bind nothing.
+    #[error("a token that carries a Key Binding JWT cannot be presented")]
+    KeyBindingAttached,
     /// The JWT payload is not a JSON object.
     #[error("JWT payload is not a JSON object")]
     PayloadNotAnObject,
+    /// `_sd_alg` appears inside a nested object.
+    ///
+    /// Clause 4.1.1: it "MUST NOT be used in any object nested within the
+    /// payload", and clause 7.1 step 3.f removes it from the top level only. A
+    /// nested one is a claim the issuer was not allowed to make, so it is refused
+    /// and not stripped.
+    #[error("_sd_alg appears in a nested object")]
+    NestedHashAlg,
     /// `_sd_alg` names a hash function this does not implement.
     ///
     /// Carried rather than defaulted: clause 4.1.1 permits the claim to be
@@ -50,7 +75,7 @@ pub enum SdJwtError {
     UnsupportedHashAlg(String),
     /// A disclosure was supplied whose digest appears nowhere in the token.
     ///
-    /// Clause 7.1 step 4: every disclosure must be used. The count is reported
+    /// Clause 7.1 step 5: every disclosure must be used. The count is reported
     /// rather than the disclosure itself, which carries a claim value.
     #[error("{0} disclosure(s) matched nothing in the token")]
     UnusedDisclosures(usize),
