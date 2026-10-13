@@ -38,6 +38,15 @@ pub enum SdJwtVcError {
     /// sub-claim of one, arrived in a Disclosure.
     #[error("claim '{0}' was selectively disclosed, which clause 2.2.2.3 forbids")]
     DisclosedClaim(&'static str),
+    /// `status` is present and is not a JSON object.
+    ///
+    /// Clause 2.2.2.3 registers `status` for a reference to a Token Status List,
+    /// and draft-ietf-oauth-status-list-21 section 6.2 gives its value as an
+    /// object. Nothing here follows the reference yet, so a value that is not one
+    /// cannot be read as a status at all, and passing it by would let a string
+    /// stand where a status mechanism is expected.
+    #[error("claim 'status' is not an object")]
+    MalformedStatus,
     /// A temporal claim is present but is not a JWT `NumericDate`.
     ///
     /// Refused rather than ignored: ignoring a malformed `exp` would read as an

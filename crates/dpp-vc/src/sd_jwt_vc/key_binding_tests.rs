@@ -11,7 +11,7 @@ use dpp_crypto::sd_jwt::{
 use dpp_domain::ProductGroup;
 
 use super::test_fixtures::*;
-use super::{Issuance, SdJwtVcError, TYP, issue, vct_for, verify};
+use super::{Issuance, PASSPORT_CLAIM, SdJwtVcError, TYP, issue, vct_for, verify};
 use crate::test_support::temp_store;
 
 const AUDIENCE: &str = "https://verifier.example";
@@ -121,10 +121,14 @@ fn a_bound_presentation_verifies_under_the_policy_and_reads_to_what_was_chosen()
     let claims = verify_as(&presentation, &store, Some(&key_binding_policy()))
         .expect("a bound presentation verifies");
     assert_eq!(
-        claims["productGroupData"]["cathodeMaterial"],
+        claims[PASSPORT_CLAIM]["productGroupData"]["cathodeMaterial"],
         json!(["LiFePO4"])
     );
-    assert!(claims["productGroupData"].get("stateOfHealthPct").is_none());
+    assert!(
+        claims[PASSPORT_CLAIM]["productGroupData"]
+            .get("stateOfHealthPct")
+            .is_none()
+    );
     assert_eq!(
         claims["cnf"],
         holder_key_confirmation(&holder.verifying_key.to_bytes())
