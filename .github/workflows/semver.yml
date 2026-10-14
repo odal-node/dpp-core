@@ -82,3 +82,12 @@ jobs:
           if [ -f semver.txt ] && grep -q 'failed to build rustdoc\|aborting due to' semver.txt; then
             echo "::warning title=Semver report incomplete::cargo-semver-checks could not build the rustdoc of a crate, so that crate was not checked. See the job summary."
           fi
+
+      # cargo-semver-checks builds the baseline in a copy of the repository under
+      # `target/semver-checks/`. rust-cache's post-job cleanup walks `target/` and
+      # cannot open directories inside that copy, which put ten error annotations
+      # on every pull request while the job stayed green, and the copy was saved
+      # into the cache. Post-job steps run after this one.
+      - name: Drop the baseline checkout before the cache is saved
+        if: always()
+        run: rm -rf target/semver-checks
