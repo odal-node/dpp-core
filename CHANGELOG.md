@@ -948,6 +948,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     that the artifacts are attached to GitHub Releases. Nothing did either, and
     no workflow in this repository attaches them. It now says what is true.
 
+- **`cargo release` moves the plugins' version.** The lockstep test only fails
+  when the plugins' version differs from the workspace's; nothing moved it,
+  because `plugins/` is a separate workspace that cargo-release never sees. A
+  release would have bumped the workspace, left the plugins behind, and turned
+  the next push red. `crates/dpp-tests/Cargo.toml` now carries a
+  `pre-release-replacements` entry that sets `plugins/Cargo.toml`'s version to
+  the one being released, and a `pre-release-hook`, `just relock`, that
+  re-resolves the lockfiles of `plugins/` and `fuzz/`. `fuzz/Cargo.lock` is in
+  the hook for the same reason: it records the workspace crates' versions too,
+  and a release without the hook left it failing `just lock-check`. The hook
+  does nothing under `--dry-run`, where cargo-release runs hooks as well. (#423)
+
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
   does not understand, and `dpp_crypto::jws` never read the member. A token its
@@ -983,6 +995,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     schema version.
 
 ### Documentation
+
+- **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
+  `digest_of` said it is a free function so a verifier can digest a Disclosure it
+  has not parsed yet. No verifier does: `SdJwt::parse` refuses an unreadable
+  Disclosure before any digest is computed. It is free because `SdJwt::sd_hash`
+  digests a presentation, which is not a Disclosure. The module docs also headed
+  a list of seven requirements "Two requirements". No behaviour changed. (#433)
 
 - **The back-up copy's availability period was cited to the wrong place.**
   `BackupCopyPort`'s docs and the port inventory gave the period as ESPR Annex

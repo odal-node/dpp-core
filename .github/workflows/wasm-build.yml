@@ -47,8 +47,8 @@ jobs:
         working-directory: crates/dpp-domain
         run: cargo build --target wasm32-unknown-unknown --release
 
-  sector-plugins:
-    name: WASM build — sector plugins
+  product-group-plugins:
+    name: WASM build — product group plugins
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
