@@ -33,12 +33,20 @@ never "not applicable" — a missing licence blocks reuse rather than allowing i
 | `finding` | What was learned. The load-bearing field |
 | `nextStep` | What would move it to the next status |
 | `terms` | The terms somebody has read, each with `iri`, `readOn`, `source` and `finding`. `[]` = none |
+| `pins` | The upstream state the findings rest on: each `kind` (`github-head`, `github-release`, `url-sha256`), `target`, optional `path`, `value` and `observedOn`. `[]` = nothing pinned |
 
 A term is listed only on a `verified` record at a layer we may speak, and only
 after its definition was read. Listing it is what permits emitting it: the
 register permits a term, not a namespace. The IRI normally sits under
 `namespaceIri`; one that does not must not fall under any other record's
 namespace.
+
+A `verified` record must pin its source. `just vocab-drift` observes every pin
+again and names the records whose source has moved; it cannot say a record is
+wrong, only that it is due a reading. After reading again, update the `finding`,
+`checkedOn` and the pin together. Pin the narrowest thing whose change would
+matter (a release-notes file, not a directory of generated artefacts), and only
+state that was actually read.
 
 ## Statuses
 

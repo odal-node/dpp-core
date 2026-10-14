@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Layer, ReadTerm, Status};
+use super::{Layer, Pin, ReadTerm, Status};
 
 /// Everything recorded about a single upstream vocabulary.
 ///
@@ -57,6 +57,9 @@ pub struct Vocabulary {
     /// Reading a vocabulary and reading a term are different acts, and only the
     /// second licenses emitting that term. See [`ReadTerm`].
     pub terms: Vec<ReadTerm>,
+    /// The upstream state the findings rest on, so a script can say when it has
+    /// moved. Empty means nothing is pinned, not that nothing can change.
+    pub pins: Vec<Pin>,
 }
 
 impl Vocabulary {

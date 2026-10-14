@@ -92,7 +92,9 @@ One JSON file in `vocabularies/`, one entry in the embedded list. Never two
 authorities in one file — a reader would have no way to tell which one a
 `finding` belonged to. The fixed key set and the meaning of each status are
 documented in `vocabularies/README.md`. Naming a term of that vocabulary is a
-second step: read its definition, then list it in the record's `terms`.
+second step: read its definition, then list it in the record's `terms`. A
+verified record also pins the upstream state it was read at, and `just
+vocab-drift` in the repository says when that has moved.
 
 ## The mapping layer, and the standard it will use
 

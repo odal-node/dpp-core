@@ -14,8 +14,12 @@
 
 #[cfg(test)]
 mod ledger_tests;
+#[cfg(test)]
+mod pin_tests;
 #[allow(clippy::module_inception)]
 mod register;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 mod verdict;

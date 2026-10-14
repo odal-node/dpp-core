@@ -70,4 +70,4 @@ pub mod vocabulary;
 
 pub use namespace::{OWN_JSONLD_NAMESPACE, OWN_NAMESPACE, is_own};
 pub use register::{Verdict, VocabularyRegister};
-pub use vocabulary::{Layer, ReadTerm, Status, Vocabulary};
+pub use vocabulary::{Layer, Pin, PinKind, ReadTerm, Status, Vocabulary};

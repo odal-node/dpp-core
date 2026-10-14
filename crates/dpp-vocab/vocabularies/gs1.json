@@ -18,5 +18,13 @@
       "source": "https://ref.gs1.org/voc/gtin, read directly in a browser (the page is client-rendered).",
       "finding": "Status stable, range `xsd:string`: the 14-digit GS1 Identification Key. It fits our `Gtin` type, as this record's `finding` sets out. No other GS1 term has been read."
     }
+  ],
+  "pins": [
+    {
+      "kind": "github-head",
+      "target": "gs1/WebVoc",
+      "value": "f8f407bf717233c871dca2f62f4e45b0940e8cad",
+      "observedOn": "2026-10-13"
+    }
   ]
 }
