@@ -154,6 +154,24 @@ fun judgeBound(token: String, verifier: JWSVerifier, ch: Challenge): Outcome = r
     }
 }
 
+/**
+ * [judge], for a Verifier that asks for no Key Binding: the library's
+ * `MustNotBePresent` mode, which refuses a token that carries a Key Binding JWT.
+ */
+@Suppress("TooGenericExceptionCaught")
+fun judgeExpectingNone(token: String, verifier: JWSVerifier): Outcome = runBlocking {
+    try {
+        with(NimbusSdJwtOps) {
+            verify(verifier.asJwtVerifier(), token).fold(
+                onSuccess = { recreate(it) },
+                onFailure = { Outcome.Refused(describe(it)) },
+            )
+        }
+    } catch (e: Throwable) {
+        Outcome.Refused(describe(e))
+    }
+}
+
 /** Key order is not meaning in JSON, and `12.0` is `12`. */
 fun same(a: JsonElement, b: JsonElement): Boolean = when {
     a is JsonObject && b is JsonObject -> a.keys == b.keys && a.keys.all { same(a.getValue(it), b.getValue(it)) }
@@ -197,8 +215,10 @@ fun main(args: Array<String>) {
     // A real key that did not sign it: arbitrary bytes need not be a point on the curve.
     val stranger = ed25519(OctetKeyPairGenerator(Curve.Ed25519).generate())
     if (judge(valid, stranger) is Outcome.Accepted) problems += "a stranger's key was accepted"
-    // Key Binding has to be able to fail too: the same bound token, another nonce.
-    cases.firstOrNull { it.getValue("id").jsonPrimitive.content == "bound/control/every-disclosure" }?.let { case ->
+    // Key Binding has to be able to fail too: a bound token this crate accepts, another nonce.
+    cases.firstOrNull {
+        it["challenge"] != null && it.getValue("ours").jsonObject.getValue("accepts").jsonPrimitive.boolean
+    }?.let { case ->
         val token = case.getValue("token").jsonPrimitive.content
         val ch = challengeOf(case)
         if (judgeBound(token, ed25519, ch) !is Outcome.Accepted) problems += "a bound control is refused"
@@ -223,9 +243,13 @@ fun main(args: Array<String>) {
         val group = case["group"]?.jsonPrimitive?.content ?: "credential"
         val token = case.getValue("token").jsonPrimitive.content
         counts.merge(group, 1, Int::plus)
-        val outcome = when (group) {
-            "rfc" -> judge(token, es256)
-            "bound" -> judgeBound(token, ed25519, challengeOf(case))
+        // A credential meant to be refused is a bound token handed to a reader that
+        // asks for no Key Binding.
+        val expectingNone = case["intended"]?.jsonPrimitive?.content == "refuse"
+        val outcome = when {
+            group == "rfc" -> judge(token, es256)
+            case["challenge"] != null -> judgeBound(token, ed25519, challengeOf(case))
+            expectingNone -> judgeExpectingNone(token, ed25519)
             else -> judge(token, ed25519)
         }
         when (group) {
@@ -258,8 +282,15 @@ fun main(args: Array<String>) {
                 }
             }
             "credential" -> when (outcome) {
-                is Outcome.Refused -> failures += "$id: refused (${outcome.why})"
-                is Outcome.Accepted -> {
+                is Outcome.Refused ->
+                    if (!expectingNone) {
+                        failures += "$id: refused (${outcome.why})"
+                    } else if (case.getValue("ours").jsonObject.getValue("accepts").jsonPrimitive.boolean) {
+                        failures += "$id: this crate accepts a token it is meant to refuse"
+                    }
+                is Outcome.Accepted -> if (expectingNone) {
+                    failures += "$id: the library accepts a Key Binding JWT it was not asked to check"
+                } else {
                     val ours = case.getValue("ours").jsonObject
                     val expected = case["expected"]
                     if (expected != null && !same(outcome.claims, expected)) {

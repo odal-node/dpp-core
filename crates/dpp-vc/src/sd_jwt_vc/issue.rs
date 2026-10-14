@@ -3,12 +3,12 @@
 use serde_json::{Map, Value};
 
 use dpp_crypto::keystore::KeyStore;
-use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal};
+use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal, holder_key_confirmation};
 use dpp_domain::Disclosure as DisclosureClass;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
 
-use super::TYP;
 use super::error::SdJwtVcError;
+use super::{PASSPORT_CLAIM, TYP};
 
 /// The envelope key below which a product group's own schema governs.
 ///
@@ -17,36 +17,51 @@ use super::error::SdJwtVcError;
 /// classes apply everywhere.
 const PRODUCT_GROUP_DATA: &str = "productGroupData";
 
-/// Claims that must never be concealed, however the disclosure policy classes
-/// them.
-///
-/// Two reasons, and the second is a `MUST NOT`.
-///
-/// **Structural.** draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2 requires `iss` and
-/// `vct` in the Unsecured Payload; `_sd_alg` is how a reader knows which hash to
-/// recompute. A credential that concealed `vct` could not say what it is.
-///
-/// **Validity-controlling.** RFC 9901 clause 9.7: *"An Issuer MUST NOT allow any
-/// content to be selectively disclosable that is critical for evaluating the
-/// SD-JWT's authenticity or validity"*, and it names `iss`, `aud`, `exp`, `nbf`
-/// and `cnf`. A concealable `exp` is one the holder can simply decline to
-/// present, turning an expired credential into an unbounded one — the party the
-/// expiry constrains is exactly the party choosing what to reveal.
-///
-/// These are listed rather than left to the policy because the policy's default
-/// is `Public`, so today they survive by *accident*: nothing in a product
-/// group's schema names them, so nothing classes them, so nothing conceals them.
-/// That is not a guarantee — it is the absence of a counterexample, and it would
-/// end the day a schema declared one of these names or the default changed.
-const NEVER_CONCEALED: [&str; 8] = ["iss", "vct", "iat", "_sd_alg", "aud", "exp", "nbf", "cnf"];
+/// What the Issuer says about the credential itself, as opposed to the passport it
+/// carries: the claims [`issue`] sets at the root, beside the passport's
+/// [`PASSPORT_CLAIM`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Issuance<'a> {
+    /// `iss`. Being an HTTPS URI, it selects the JWT VC Issuer Metadata key
+    /// discovery of clause 2.5.
+    pub issuer: &'a str,
+    /// `vct`, the type of the credential (clause 2.2.2.1).
+    pub vct: &'a str,
+    /// `iat`, in seconds since the epoch.
+    pub issued_at: i64,
+    /// The Holder's Ed25519 public key, to bind the credential to.
+    ///
+    /// Written as `cnf` with RFC 7800's `jwk` confirmation method, which clause
+    /// 2.2.2.3 recommends, and which Key Binding requires: a presentation must then
+    /// carry a Key Binding JWT signed by this key. `None` issues a credential that
+    /// anyone holding a copy can present as their own (RFC 9901 clause 9.5).
+    pub holder_key: Option<[u8; 32]>,
+}
 
 /// Build and sign an SD-JWT VC over `payload`.
 ///
-/// Every claim the policy classifies as anything other than
+/// The passport sits under one claim, [`PASSPORT_CLAIM`]. The root holds the
+/// claims the Issuer sets (`iss`, `vct`, `iat`, and `cnf` when a Holder key is
+/// named) and nothing else, so no passport member can be read as a registered
+/// claim of the credential. The passport has a lifecycle `status`; at the root
+/// that name is the profile's reference to a Token Status List.
+///
+/// Every claim of the passport the policy classifies as anything other than
 /// [`DisclosureClass::Public`] is concealed — at every depth, in both scopes.
 /// Public claims travel in cleartext, which is correct and is the point: the
 /// public view of a passport is public, and hiding it behind a disclosure would
 /// make an anonymous read require a holder to cooperate.
+///
+/// # The claims the Issuer sets are never concealed
+///
+/// RFC 9901 clause 9.7: *"An Issuer MUST NOT allow any content to be selectively
+/// disclosable that is critical for evaluating the SD-JWT's authenticity or
+/// validity"*, and it names `iss`, `aud`, `exp`, `nbf` and `cnf`. A concealable
+/// `exp` is one the Holder can decline to present, turning an expired credential
+/// into an unbounded one. Here that holds by construction: the root claims are
+/// written directly and only the passport is walked for concealment, so no policy,
+/// and no schema, can reach them. `_sd_alg` is added by [`build_payload`] when
+/// there is anything to conceal.
 ///
 /// # Why "non-public" and not "per audience"
 ///
@@ -66,9 +81,7 @@ pub fn issue(
     key_id: &str,
     payload: &Value,
     policy: &ProductGroupAccessPolicy,
-    issuer: &str,
-    vct: &str,
-    issued_at: i64,
+    credential: &Issuance<'_>,
 ) -> Result<SdJwt, SdJwtVcError> {
     let Some(object) = payload.as_object() else {
         return Err(SdJwtVcError::PayloadNotAnObject);
@@ -76,11 +89,18 @@ pub fn issue(
 
     let mut claims = Map::new();
     // Clause 2.2.2: `iss` identifies the issuer and, being an HTTPS URI, selects
-    // the JWT VC Issuer Metadata key-discovery mechanism of clause 2.5. Set
-    // before the walk so a passport field named `iss` cannot displace it.
-    claims.insert("iss".to_owned(), Value::String(issuer.to_owned()));
-    claims.insert("vct".to_owned(), Value::String(vct.to_owned()));
-    claims.insert("iat".to_owned(), Value::Number(issued_at.into()));
+    // the JWT VC Issuer Metadata key-discovery mechanism of clause 2.5.
+    claims.insert(
+        "iss".to_owned(),
+        Value::String(credential.issuer.to_owned()),
+    );
+    claims.insert("vct".to_owned(), Value::String(credential.vct.to_owned()));
+    claims.insert("iat".to_owned(), Value::Number(credential.issued_at.into()));
+    // Clause 2.2.2.3: REQUIRED when Key Binding is to be supported, and never in a
+    // Disclosure.
+    if let Some(key) = credential.holder_key {
+        claims.insert("cnf".to_owned(), holder_key_confirmation(&key));
+    }
 
     let mut disclosures = Vec::new();
     let mut segments: Vec<String> = Vec::new();
@@ -91,9 +111,7 @@ pub fn issue(
         &mut segments,
         &mut disclosures,
     )?;
-    for (key, value) in concealed {
-        claims.entry(key).or_insert(value);
-    }
+    claims.insert(PASSPORT_CLAIM.to_owned(), Value::Object(concealed));
 
     let jwt_payload = build_payload(claims, !disclosures.is_empty());
     // The `kid` is the key's thumbprint URI, which is the `kid` of its entry in
@@ -128,17 +146,6 @@ fn conceal_object(
     // keeps it that way.
     let mut hide = Vec::new();
     for key in object.keys() {
-        // 🚨 Root only. These are registered claims of the *token*, and the
-        // reason they are exempt — a verifier reads them before any disclosure
-        // is processed — is true of the payload root and nowhere else. Applied
-        // at every depth, as it was, the list silently exempted any nested
-        // field that happened to share one of these eight names: a
-        // `productGroupData` member called `exp` or `aud` would travel in
-        // cleartext however the policy classified it, which is precisely the
-        // over-disclosure this design exists to prevent.
-        if segments.is_empty() && NEVER_CONCEALED.contains(&key.as_str()) {
-            continue;
-        }
         segments.push(key.clone());
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let class = policy.disclosure_for_path(&borrowed, scope);

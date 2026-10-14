@@ -138,4 +138,23 @@ pub enum SdJwtError {
     /// `serde_json` would parse on its own reaches it.
     #[error("the processed payload holds a value more than {0} levels deep")]
     TooDeep(usize),
+    /// A claim path is empty, or names something a path cannot: a segment that is
+    /// not a string, a non-negative integer or `null`.
+    #[error("not a claim path: it must be a non-empty array of names, positions and null")]
+    InvalidClaimPath,
+    /// A claim path selects nothing in the token.
+    ///
+    /// Refused, and not ignored: a Holder who asked for a claim and was silently
+    /// not given it has presented less than it meant to, and has no way to know.
+    /// The path is reported in its JSON form. The claim it names is not.
+    #[error("the token holds no claim at {0}")]
+    ClaimNotInToken(String),
+    /// Choosing Disclosures by claim path contradicted itself.
+    ///
+    /// The Disclosures a path needs are found by walking the signed payload, and
+    /// then checked against plain navigation of the fully processed payload and
+    /// against the presentation they make. This is a failure of one of those checks:
+    /// a defect in this crate, never a property of the token.
+    #[error("choosing the Disclosures for {0} disagreed with reading the token a second way")]
+    SelectionDisagrees(String),
 }

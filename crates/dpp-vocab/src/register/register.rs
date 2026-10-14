@@ -70,6 +70,30 @@ const EMBEDDED: &[Embedded] = &[
         key: "eclass",
         json: include_str!("../../vocabularies/eclass.json"),
     },
+    Embedded {
+        key: "catena-x-generic-dpp",
+        json: include_str!("../../vocabularies/catena-x-generic-dpp.json"),
+    },
+    Embedded {
+        key: "din-dke-spec-99100",
+        json: include_str!("../../vocabularies/din-dke-spec-99100.json"),
+    },
+    Embedded {
+        key: "eu-authority-tables",
+        json: include_str!("../../vocabularies/eu-authority-tables.json"),
+    },
+    Embedded {
+        key: "eu-combined-nomenclature",
+        json: include_str!("../../vocabularies/eu-combined-nomenclature.json"),
+    },
+    Embedded {
+        key: "echa-candidate-list",
+        json: include_str!("../../vocabularies/echa-candidate-list.json"),
+    },
+    Embedded {
+        key: "w3c-dpv",
+        json: include_str!("../../vocabularies/w3c-dpv.json"),
+    },
 ];
 
 /// The upstream vocabularies this project has recorded.
@@ -84,8 +108,11 @@ const EMBEDDED: &[Embedded] = &[
 /// assert!(register.verdict("urn:odal-node:aas:property:product-name:1.0").is_permitted());
 ///
 /// // GS1's own definition of `gtin` was read on 2026-08-11 and matches our
-/// // `Gtin` type exactly, so its terms are now permitted.
+/// // `Gtin` type exactly, so that term is permitted.
 /// assert!(register.verdict("https://ref.gs1.org/voc/gtin").is_permitted());
+///
+/// // Reading one GS1 term does not read the rest of the namespace.
+/// assert!(!register.verdict("https://ref.gs1.org/voc/someOtherTerm").is_permitted());
 ///
 /// // Most third-party identifiers still are not — nobody has read them yet.
 /// assert!(!register.verdict("https://schema.org/dateModified").is_permitted());
@@ -123,6 +150,13 @@ impl VocabularyRegister {
         Self { entries }
     }
 
+    /// A register over records the caller supplies, so a test can put the gate
+    /// to a case the embedded records do not contain.
+    #[cfg(test)]
+    pub(super) fn from_records(entries: Vec<Vocabulary>) -> Self {
+        Self { entries }
+    }
+
     /// Look up a vocabulary by its key.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&Vocabulary> {
@@ -150,17 +184,22 @@ impl VocabularyRegister {
 
     /// Whether `iri` may be emitted in a serialisation, and why.
     ///
-    /// This is the gate. It answers at vocabulary granularity: a verified
-    /// vocabulary makes its terms *eligible*, and per-term verification is a
-    /// second question that a caller records separately. Today no vocabulary is
-    /// verified, so every third-party identifier is refused — which is the
-    /// accurate state of this project's knowledge, not a placeholder.
+    /// This is the gate, and it answers at the grain the claim is made at: a
+    /// **term**. A verified vocabulary makes its terms *eligible*; a term is
+    /// permitted only when the record lists it in `terms`, because reading a
+    /// vocabulary's publication is not reading each definition in it.
+    ///
+    /// A term is found by its exact IRI before the namespace is consulted, so a
+    /// term a record lists outside its own namespace is still found. The
+    /// vocabulary's namespace IRI itself is permitted when the vocabulary is,
+    /// since declaring a prefix names the vocabulary and defines no term.
     #[must_use]
     pub fn verdict(&self, iri: &str) -> Verdict {
         if is_own(iri) {
             return Verdict::Own;
         }
-        let Some(vocabulary) = self.vocabulary_for(iri) else {
+        let listed = self.entries.iter().find(|v| v.read_term(iri).is_some());
+        let Some(vocabulary) = listed.or_else(|| self.vocabulary_for(iri)) else {
             return Verdict::Unknown;
         };
         if !vocabulary.layer.may_be_adopted_as_prefix() {
@@ -174,8 +213,14 @@ impl VocabularyRegister {
                 status: vocabulary.status,
             };
         }
-        Verdict::Permitted {
-            vocabulary: vocabulary.key.clone(),
+        if listed.is_some() || vocabulary.namespace_iri.as_deref() == Some(iri) {
+            Verdict::Permitted {
+                vocabulary: vocabulary.key.clone(),
+            }
+        } else {
+            Verdict::TermNotRead {
+                vocabulary: vocabulary.key.clone(),
+            }
         }
     }
 }

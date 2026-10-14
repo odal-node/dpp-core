@@ -1,0 +1,16 @@
+{
+  "key": "catena-x-generic-dpp",
+  "title": "Catena-X generic Digital Product Passport aspect model",
+  "authority": "Catena-X / Eclipse Tractus-X",
+  "layer": "community-profile",
+  "namespaceIri": "urn:samm:io.catenax.generic.digital_product_passport",
+  "usedFor": "Gap source for the operator, manufacturer, importer and facility identity block, and for the passport fields common to every product group. The battery model recorded as `catena-x-battery-pass` imports it.",
+  "licence": "CC-BY-4.0 as reported at repository level by GitHub for `eclipse-tractusx/sldt-semantic-models`. The model file's own header has not been read.",
+  "status": "surveyed",
+  "checkedOn": "2026-10-13",
+  "source": "github.com/eclipse-tractusx/sldt-semantic-models, folder io.catenax.generic.digital_product_passport: the directory listing and RELEASE_NOTES.md, read through the GitHub API. The model file has not been read.",
+  "finding": "Versions 2.0.0 to 7.0.0 are present. The release notes head 7.0.0 \"R26.03\" and list new attributes including economicOperatorNames, economicOperatorContact and economicOperatorAddress, the same three for manufacturer and for importer, facilityAddress, productImages, codeDescription and specVersion. The battery model recorded as `catena-x-battery-pass` imports version 5.0.0 of this one (its 6.0.0 release notes say so), so reading the battery model alone shows an older generic layer than the one now published. The same repository holds models named io.catenax.pcf, io.catenax.secondary_material_content and io.catenax.material_for_recycling; none has been read.",
+  "nextStep": "Read the 7.0.0 model file and its SPDX header, then compare its operator, manufacturer, importer and facility attributes with `ResponsibleOperatorSnapshot` and `FacilitySnapshot`, the same identity block `semic` is planned to map. As with the battery models, each gap needs its own citation to the regulation before it becomes a field. Read the secondary-material-content model against the recycled-content fields at the same time.",
+  "terms": [],
+  "pins": []
+}
