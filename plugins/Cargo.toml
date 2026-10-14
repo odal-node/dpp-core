@@ -38,6 +38,10 @@ members = [
 version = "0.21.0"
 edition = "2024"
 license = "Apache-2.0"
+# Never published: they are built to Wasm and loaded by a host. Said here so that
+# `cargo deny`, which tells a private crate from a published one by this field,
+# applies its path-dependency rule to them as the private crates they are.
+publish = false
 
 [workspace.dependencies]
 dpp-plugin-sdk = { path = "../crates/dpp-plugin-sdk" }

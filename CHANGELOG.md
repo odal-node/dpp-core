@@ -1031,6 +1031,67 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   what stays unclaimed, and RFC 8259, which the corpus cites for two edge cases,
   gets a row of its own. (#420, #426, #427)
 
+- **The CI this repository described, and relied on, now exists.**
+  `VERSIONING.md` said CI ran `cargo-semver-checks`, and `.gitignore` said testing
+  against the newest dependencies "moves to the scheduled advisory run". No
+  workflow did either, and six more gaps sat beside them. They are closed
+  together:
+  - `semver.yml` prints, on each pull request, what the change breaks in the
+    public API against the branch it merges into. It reports and never fails:
+    below 1.0 a minor release may break, and the tool does not see a changed
+    parameter type. `just semver` stays the release-time check against the last
+    published release.
+  - `newest-deps.yml` runs weekly: it resolves the workspace and `plugins/` to the
+    newest releases the pinned compiler accepts, runs the tests, commits nothing,
+    and attaches the lockfiles when it fails. A release that needs a newer
+    compiler is listed in the job summary and is not a test failure.
+  - `just audit`, the `Security audit` job and the daily advisory run read only
+    the root lockfile. They now cover the root, `plugins/` and `fuzz/`, with
+    `cargo audit -f` and `cargo deny --manifest-path`, and each scans all three
+    before it fails. `cargo audit` found nothing in the other two. `cargo deny`
+    failed on both: the eleven plugins and the fuzz crate depend on workspace
+    crates by path without a version, which `deny.toml` refused outright, and
+    `libfuzzer-sys` is `(MIT OR Apache-2.0) AND NCSA`. The plugins are now
+    `publish = false`, which is what they are, `allow-wildcard-paths` applies to
+    private crates only (a published crate is still refused one, shown by
+    removing a version from `dpp-crypto`), and NCSA is allowed for
+    `libfuzzer-sys` alone.
+  - `just lock-regen` brings the three lockfiles back in line with their
+    manifests, and `lock-check` and CI's lockfile step name it when they fail.
+    It moves only what a changed requirement forces: re-locking `fuzz/` after a
+    `serde_json` bump moved `serde_json` and nothing else.
+  - `workflow-lint.yml` runs zizmor and actionlint over the workflows on every
+    pull request, on `main` and weekly, both downloaded at a pinned version and
+    checked against a recorded SHA-256. zizmor reported fifteen checkouts that
+    kept the job token (all now set `persist-credentials: false`), a pin of
+    every `dtolnay/rust-toolchain` and `taiki-e/install-action` use to a commit
+    with no history in the repository it names (below), five Dependabot entries
+    with no cooldown, and an unlocked `npm install` of a package with no
+    dependencies, which is accepted in the workflow with the reason. Every
+    pinned action's comment now names the exact release its commit is
+    (`# v7.0.1`, not `# v7`): zizmor checks the comment against the tag, so a
+    major tag moved upstream failed the lint on code that had not changed, as
+    `actions/setup-java` did by moving `v6` to v6.1.0 between two runs.
+  - `dependabot.yml` now watches `fuzz/`, the GS1 and SD-JWT npm pins, the DSS
+    Maven pin, and the AAS and JSON-LD pip pins, and every entry waits a week
+    after a release. The pip entries are unproven, because both files are
+    `uv pip compile` output; the file says what to do if the first run shows they
+    do not work. The Kotlin library's pin, the DID test suite's commit and the
+    two lint tools stay manual, each with its reason.
+  - `standards-status.yml` (`just standards-status`) compares the IETF rows of
+    the standards register with the RFC Editor's index every week: the status,
+    every RFC that updates or obsoletes the specification, and whether a draft has
+    since been published as an RFC. It never edits the register. All 22 rows
+    matched on its first run, and five errors planted in a copy of the register
+    were each reported.
+  - `mutants.yml` runs `cargo-mutants` monthly on `dpp-crypto` and `dpp-rules`,
+    in four shards each, and lists every surviving mutant on one page. It reports
+    and never fails.
+
+  Which oracles are required checks was settled by the ruleset change that
+  followed the conformance claims. The two WASM build workflows are still
+  path-filtered, so they cannot be required. (#412)
+
 - **The routes the registry's own interface uses to read a submission back.**
   Read from its web client on 2026-10-14 and `Observed` in `ENDPOINT_BASIS`: a
   submission's outcome is a task on a separate dashboard service,
@@ -1259,6 +1320,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     shared-definition problem as the battery arrays and on a new electronics
     schema version.
 
+- **Two actions were pinned to a commit that upstream has since replaced, and
+  one of the pins named the wrong channel.** `dtolnay/rust-toolchain` and
+  `taiki-e/install-action` publish a side commit per channel or tool and rewrite
+  it as their main line moves, so a pin to one is a pin to a commit no branch
+  contains. The content was checked and is upstream plus one line, but a pin the
+  new workflow lint has to be told to ignore is one it cannot watch.
+  `rust-toolchain` is now pinned to the `master` commit those side commits were
+  built on, with the toolchain passed as an input, which runs the same code, and
+  `install-action` to a release tag, with the tool passed, which Dependabot can
+  now move. `fuzz.yml` said it pinned the `nightly` commit and in fact pinned the
+  `stable` one; it ran only because `cargo +nightly` installs a toolchain it does
+  not find. It now asks for `nightly`. (#412)
+
 - **A proof of registration generated before the registration it reports said a
   field was missing.** `ProofOfRegistration::validate` refused it as
   `MissingRequiredField("generatedAt")`, naming a field that was present. It is
@@ -1407,6 +1481,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   records hold it. The pre-release checklist's standards re-read now also says to
   run `just vocab-drift`, so the vocabulary records are re-read at the same point
   as the standards register.
+
+- **`VERSIONING.md` and `GOVERNANCE.md` said CI fails a pull request on a semver
+  violation.** No workflow ran the tool. They now describe the two runs that
+  exist, a report on each pull request and `just semver` at release, and say
+  neither fails the build. The release checklist's standards re-read now says to
+  run `just standards-status` first. (#412)
 
 - **`dpp-registry` called its token endpoint structurally wrong, and it is half
   wrong.** IR (EU) 2026/1778 Art. 2(3) defines an authentication token for

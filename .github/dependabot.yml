@@ -1,14 +1,29 @@
 version: 2
+
+# Every entry waits a week after a release before proposing it (`cooldown`). A
+# release that is malicious or broken is usually withdrawn within days, and nothing
+# in this repository needs to be first to adopt one. Security updates ignore the
+# cooldown. The weekly run in `newest-deps.yml` is the other half: it tests the
+# newest releases at once, merges nothing, and so can afford to be first.
 updates:
   # Workspace members live under "/"; the product-group plugins are separate crates
   # excluded from the workspace (see Cargo.toml `exclude`), so list them too.
+  #
+  # `/fuzz` is a third workspace with its own lockfile and was watched by nothing.
+  # 🚨 Watching it does not stop a manifest bump from stranding its lockfile: a
+  # bump of a version in a `Cargo.toml` leaves the lockfile unsatisfiable under
+  # `--locked`, where a bump of the lockfile alone does not. `lock-check` then
+  # fails and names `just lock-regen`, which is the repair.
   - package-ecosystem: cargo
     directories:
       - "/"
       - "/plugins/*"
+      - "/fuzz"
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
     labels:
       - dependencies
       - rust
@@ -18,6 +33,66 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - ci
+
+  # What the conformance oracles are pinned to. Each pin is exact, and moving one
+  # is meant to be a deliberate edit with a visible diff, because a newer release
+  # of the tool that judges us can tighten and turn the build red on code that did
+  # not change. A Dependabot pull request is that edit: it runs the oracle against
+  # the new release, and a bump that tightens fails there, where it can be read,
+  # rather than on some unrelated pull request later. None of it is merged blind.
+  #
+  # Not listed, and why:
+  #   - `.github/oracle/sdjwt-jvm`: `pom.xml` is paired with `jars.sha256`, which
+  #     is regenerated from `target/lib` in the same commit as the version. A pull
+  #     request that bumped only the `pom.xml` would fail the jar check by design,
+  #     every week.
+  #   - the commit of the W3C DID test suite in `did-oracle.yml`: no ecosystem
+  #     reads a `ref:` in a workflow. Moving it is a deliberate edit.
+  #   - the pinned `actionlint` release in `workflow-lint.yml`, downloaded by URL
+  #     and checked against a recorded SHA-256. Moving it is a deliberate edit.
+  - package-ecosystem: npm
+    directories:
+      - "/.github/scripts"
+      - "/.github/oracle/sdjwt"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: maven
+    directory: "/.github/oracle/jades"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels:
+      - dependencies
+      - ci
+
+  # 🚨 Unproven. Both files are `uv pip compile --generate-hashes` output beside a
+  # `requirements.in`, and Dependabot's support for that pairing is not settled.
+  # If its first run opens nothing, or opens a pull request whose oracle fails on
+  # a hash, the entry does not work and should go, not be left to open the same
+  # red pull request each week. Re-pin by hand with the command in the file header.
+  - package-ecosystem: pip
+    directories:
+      - "/.github/oracle/aas"
+      - "/.github/oracle/jsonld"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
     labels:
       - dependencies
       - ci

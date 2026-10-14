@@ -33,14 +33,16 @@ jobs:
     name: Digital Links are well-formed GS1
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and
       # rustup is already on the runner, so invoking cargo selects the pinned
       # toolchain by itself — an action here would add a third-party dependency
       # to a job whose entire purpose is running somebody else's tool, and
       # `@stable` would name a channel this repo does not build against.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
 
@@ -48,8 +50,13 @@ jobs:
       # GS1's judgement about what their own syntax permits; an unpinned upgrade
       # would turn a tightening on their side into a red build here on code that
       # did not change. Moving the pin is a deliberate edit with a visible diff.
+      #
+      # `zizmor` flags an install made outside a lockfile, and that is accepted
+      # here: the one package is pinned exactly and has no dependencies of its own,
+      # so a lockfile would record nothing the manifest does not. (The lockfile is
+      # untracked on purpose; see `.gitignore`.)
       - name: Install the GS1 Barcode Syntax Engine
-        run: npm install --no-audit --no-fund --prefix .github/scripts
+        run: npm install --no-audit --no-fund --prefix .github/scripts # zizmor: ignore[adhoc-packages]
 
       # Both emitters in one invocation: the first is every link this crate
       # builds, and the second is one URI for each rule of the path grammar, with

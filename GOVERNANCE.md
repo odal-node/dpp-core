@@ -32,7 +32,8 @@ All contributions follow the process described in [CONTRIBUTING.md](CONTRIBUTING
 1. Open an issue describing the proposed change.
 2. Fork, implement, and submit a pull request.
 3. All commits must carry a DCO sign-off (`Signed-off-by:` line).
-4. CI must pass (fmt, clippy, nextest, audit, semver-checks).
+4. CI must pass (fmt, clippy, nextest, audit). The semver-checks report is read
+   but does not block; see [VERSIONING.md](docs/governance/VERSIONING.md).
 5. The maintainer reviews and merges.
 
 No pull request is merged without maintainer approval. Force-pushes to `main`

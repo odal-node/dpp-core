@@ -52,12 +52,26 @@ adds to a version bump.
 
 ## Breaking Change Detection
 
-CI runs [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks)
-on every pull request targeting `main`. A detected semver violation fails the
-check and requires the author to either:
+[`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks) is run
+twice, to answer two different questions. Neither run fails the build, because
+below 1.0 a minor release is allowed to break and a check that is red by design is
+one nobody reads.
 
-1. Adjust the change to be backwards-compatible, or
-2. Bump the version accordingly and add a **Breaking** entry to CHANGELOG.md.
+- **On every pull request**, `.github/workflows/semver.yml` compares the change
+  with the branch it merges into and prints what it breaks in the job summary. It
+  is a report. It does not see a changed function parameter type, so a clean
+  report is a floor and not the answer.
+- **At release**, `just semver` compares the workspace with the last published
+  release. Its list has to match CHANGELOG's `### Breaking` section
+  ([`RELEASE.md`](RELEASE.md), step 3), and that is where a break is reconciled
+  with the version number.
+
+A break the pull request report names is for the author and the reviewer to read,
+and the author either:
+
+1. Adjusts the change to be backwards-compatible, or
+2. Adds a **Breaking** entry to CHANGELOG.md. The version itself moves with the
+   release.
 
 ## Deprecation Process
 

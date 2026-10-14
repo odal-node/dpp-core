@@ -1,0 +1,84 @@
+name: Semver report
+
+# What this pull request breaks in the public API of the published crates,
+# measured against the branch it will merge into. Informational: it reports and
+# never fails the build.
+#
+# `docs/governance/VERSIONING.md` said CI ran `cargo-semver-checks` and none did.
+# It is a report and not a gate for the reasons `just semver` carries:
+#
+#   - Below 1.0 every release is a lockstep minor bump, which is where a break is
+#     allowed, so a failure here is not a defect in the change. A check that is
+#     red by design is one people stop reading.
+#   - `--release-type patch` is what makes the tool look at all. Without it the
+#     tool asks whether the version number admits the break, the pre-1.0 answer is
+#     always yes, and it waives every lint.
+#   - It does not see a changed parameter type, so a clean report is a floor and
+#     not the answer.
+#
+# This is the per-pull-request half. The half that is held against CHANGELOG's
+# `### Breaking` section is `just semver`, which compares with the last published
+# release and belongs to the release (`docs/governance/RELEASE.md`, step 3).
+#
+# Not a required check, and not path-filtered, so it could be made one.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # No colour codes in the job summary.
+  CARGO_TERM_COLOR: never
+
+jobs:
+  report:
+    name: Public API changes against the base (informational)
+    runs-on: ubuntu-latest
+    steps:
+      # The whole history, because the baseline is a commit that is not this one.
+      # The token is not kept: nothing here pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-semver-checks
+
+      - name: cargo semver-checks, this pull request against its base
+        id: semver
+        # The step may fail: that is the tool finding something, and it is the
+        # report. The job does not.
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          cargo semver-checks check-release --workspace --release-type patch --baseline-rev "$BASE_SHA" > semver.txt 2>&1
+
+      - name: Put the report in the job summary
+        if: always()
+        run: |
+          {
+            echo "### Public API changes, this pull request against its base"
+            echo
+            echo "Informational. Below 1.0 a break is allowed, and the tool does not see a changed parameter type, so a clean report is a floor and not the answer. The list held against the changelog is the one \`just semver\` prints at release."
+            echo
+            echo '```'
+            if [ -f semver.txt ]; then head -c 500000 semver.txt; else echo "No report was produced."; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # A crate whose rustdoc would not build is a crate that was not checked,
+          # and a report with a gap in it must not read as a clean one.
+          if [ -f semver.txt ] && grep -q 'failed to build rustdoc\|aborting due to' semver.txt; then
+            echo "::warning title=Semver report incomplete::cargo-semver-checks could not build the rustdoc of a crate, so that crate was not checked. See the job summary."
+          fi
