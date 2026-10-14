@@ -10,5 +10,6 @@
   "checkedOn": "2026-10-13",
   "source": "DIN and VDE press releases and trade coverage, and BatteryPass-Ready's v2.0 announcement, which names it as the basis of its longlist. The document has not been opened.",
   "finding": "Published in January 2025 under the title \"Requirements for Data Attributes of the Battery Passport\", as DIN DKE SPEC 99100:2025-02 in the edition the Battery Pass repository names. Press coverage says it can be downloaded free of charge from DIN Media. The terms of that download are not known, so `licence` stays null. It is a DIN and DKE specification, not a European standard, and it is not one of the six standards cited in Implementing Decision (EU) 2026/1736.",
-  "nextStep": "Read it alongside the BatteryPass-Ready v2.0 files (see `batterypass-ready`). Open the DIN Media page first and record the download terms; cite the document by clause and never quote it."
+  "nextStep": "Read it alongside the BatteryPass-Ready v2.0 files (see `batterypass-ready`). Open the DIN Media page first and record the download terms; cite the document by clause and never quote it.",
+  "terms": []
 }

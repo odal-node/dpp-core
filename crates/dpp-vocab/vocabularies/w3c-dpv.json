@@ -10,5 +10,6 @@
   "checkedOn": "2026-10-13",
   "source": "Search results only: a registry entry, a mirror of the GitHub repository and the Community Group's 2024 final report listing. Nothing has been read from w3.org or w3id.org.",
   "finding": "It is at version 2.x, and the sources found disagree on which: one gives 2.1 of March 2025, another 2.2, and one reports 2.3 in February 2026. It is not a W3C Standard and is not on the Standards Track. The licence the sources report is W3C's (the Community Final Specification Agreement, and the W3C Document License for the repository), not CC BY 4.0, which matters before any definition is reused. `licence` stays null because none of this was read at its source.",
-  "nextStep": "Nothing until personal-data statements are modelled as a vocabulary and not as a field. Then read the Community Group's licensing page and the repository's LICENSE before anything else."
+  "nextStep": "Nothing until personal-data statements are modelled as a vocabulary and not as a field. Then read the Community Group's licensing page and the repository's LICENSE before anything else.",
+  "terms": []
 }

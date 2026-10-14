@@ -609,7 +609,7 @@ fn no_product_group_template_yet_names_a_ratified_third_party_standard() {
         ratified.is_empty(),
         "these templates claim a ratified third-party template: {ratified:?}. \
          Confirm a named reader verified each identifier against the authority's \
-         own source and recorded it as verified in dpp-vocab, then update this \
+         own source and listed it as read in dpp-vocab, then update this \
          test."
     );
 }
@@ -679,7 +679,7 @@ fn every_catalog_product_group_has_an_aas_case() {
 // once it is written. So it is enforced here rather than trusted to a comment.
 //
 // The rule: every identifier we emit is either in our own `urn:odal-node:`
-// namespace, or belongs to a vocabulary `dpp-vocab` records as verified. One
+// namespace, or is a term `dpp-vocab` records as read in a verified vocabulary. One
 // gate, in one crate, regardless of which projection carries the identifier —
 // `SubmodelTemplate::is_placeholder` and this test cannot disagree about where
 // our namespace ends, because both defer to `dpp_vocab::is_own`.
