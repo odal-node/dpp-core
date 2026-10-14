@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::passport::PassportId;
 use crate::ports::registry_sync::RegistrationGranularity;
-use crate::ports::registry_sync::{RegistrationRequest, RegistryStatus, RegistrySyncPort};
+use crate::ports::registry_sync::{
+    RegistrationRequest, RegistrySyncPort, SubmissionAcknowledgement,
+};
 use crate::ports::seal::SealPort;
 use crate::seal::{
     SealChecks, SealConformanceLevel, SealEnvelope, SealFormat, SealIndication, SealMode,
@@ -94,8 +96,9 @@ async fn the_ghost_seals_what_it_advertises_and_refuses_the_rest() {
     assert!(GhostSeal.seal(req).await.is_ok());
 }
 
+/// The ghost accepts, under a handle that says what it is, and nothing more.
 #[tokio::test]
-async fn ghost_register_returns_pending() {
+async fn ghost_register_acknowledges_under_a_placeholder_handle() {
     let sync = GhostRegistrySync;
     let request = RegistrationRequest {
         request_id: Uuid::now_v7(),
@@ -114,19 +117,27 @@ async fn ghost_register_returns_pending() {
         country_code: String::new(),
         granularity: RegistrationGranularity::Item,
         model_id: None,
+        batch_id: None,
+        item_serial: None,
         commodity_code: None,
         backup_url: None,
         service_provider: None,
     };
-    let record = sync.register(request).await.unwrap();
-    assert_eq!(record.status, RegistryStatus::Pending);
-    assert!(record.identifiers.product_id.starts_with("GHOST-PROD-"));
+    let acknowledgement = sync.register(request).await.unwrap();
+    let SubmissionAcknowledgement::Accepted { correlation_id } = acknowledgement else {
+        panic!("the ghost accepts every submission, got {acknowledgement:?}");
+    };
+    assert!(correlation_id.starts_with("GHOST-CORR-"));
+
+    // …and knows nothing of it afterwards. Answering `Processing` would keep a
+    // caller polling a registry that was never contacted.
+    assert!(sync.check_submission(&correlation_id).await.is_err());
 }
 
 #[tokio::test]
 async fn ghost_check_status_returns_not_found() {
     let sync = GhostRegistrySync;
-    let result = sync.check_status(PassportId::new()).await;
+    let result = sync.check_status("EU-REG-1").await;
     assert!(result.is_err());
 }
 

@@ -1,35 +1,40 @@
 //! Port trait for EU Central DPP Registry synchronisation.
 //!
 //! ESPR Article 13 establishes a central EU registry that stores at minimum
-//! the unique identifiers for every product placed on the market. The registry
-//! is scheduled to go live on 19 July 2026.
+//! the unique identifiers for every product placed on the market. Its operating
+//! rules are Commission Implementing Regulation (EU) 2026/1778.
 //!
-//! This port defines the interface that platform adapters implement once the
-//! Commission publishes the registry API specification. Until then, a no-op
-//! `GhostRegistrySync` implementation is provided for testing and development.
+//! This port defines the interface a platform adapter implements. No registry
+//! API specification is published, so the port is shaped by the regulation's
+//! flow — submit, be checked, be registered — and not by any wire format. A
+//! no-op `GhostRegistrySync` implementation is provided for testing and
+//! development.
 
+mod acknowledgement;
 mod granularity;
-mod identifiers;
 mod port;
 mod record;
 mod registering_operator;
+mod report;
 mod request;
 mod service_provider;
 mod status;
 #[cfg(test)]
 mod tests;
 
+pub use acknowledgement::SubmissionAcknowledgement;
 pub use granularity::RegistrationGranularity;
-pub use identifiers::RegistryIdentifiers;
 pub use port::RegistrySyncPort;
 pub use record::RegistryRecord;
 pub use registering_operator::RegisteringOperator;
+pub use report::SubmissionReport;
 pub use request::RegistrationRequest;
 pub use service_provider::ServiceProviderRef;
 pub use status::RegistryStatus;
 
-/// No-op implementation for use before the EU Central Registry API is published.
+/// No-op implementation for use before a deployment is enrolled with the EU
+/// Central Registry.
 ///
-/// Returns synthetic records with `RegistryStatus::Pending` and placeholder
-/// identifiers. All operations succeed but perform no real network calls.
+/// Accepts every submission under a placeholder handle and knows of no
+/// submission or record afterwards. Performs no network calls.
 pub use crate::ports::ghosts::GhostRegistrySync;

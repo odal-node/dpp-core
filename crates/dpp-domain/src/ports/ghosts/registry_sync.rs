@@ -1,48 +1,50 @@
 //! [`GhostRegistrySync`] — a no-op registry sync for development.
 
 use async_trait::async_trait;
-use chrono::Utc;
 use uuid::Uuid;
 
 use crate::error::dpp::DppError;
-use crate::passport::PassportId;
 use crate::ports::registry_sync::{
-    RegistrationRequest, RegistryIdentifiers, RegistryRecord, RegistryStatus, RegistrySyncPort,
+    RegistrationRequest, RegistryRecord, RegistrySyncPort, SubmissionAcknowledgement,
+    SubmissionReport,
 };
 
-/// No-op implementation for use before the EU Central Registry API is published.
+/// No-op implementation for use before a deployment is enrolled with the EU
+/// Central Registry.
 ///
-/// Returns synthetic records with `RegistryStatus::Pending` and placeholder
-/// identifiers. All operations succeed but perform no real network calls.
+/// Accepts every submission under a placeholder correlation identifier and
+/// knows of no submission or record afterwards: nothing was sent, so there is
+/// nothing to report on, and answering `Processing` would keep a caller polling
+/// a registry that does not exist.
 pub struct GhostRegistrySync;
 
 #[async_trait]
 impl RegistrySyncPort for GhostRegistrySync {
-    async fn register(&self, request: RegistrationRequest) -> Result<RegistryRecord, DppError> {
-        let now = Utc::now();
-        Ok(RegistryRecord {
-            identifiers: RegistryIdentifiers {
-                product_id: format!("GHOST-PROD-{}", request.passport_id),
-                operator_id: format!("GHOST-OP-{}", &request.operator_identifier),
-                facility_id: format!("GHOST-FAC-{}", &request.facility_identifier),
-                registry_id: format!("GHOST-REG-{}", Uuid::now_v7()),
-            },
-            status: RegistryStatus::Pending,
-            registered_at: now,
-            updated_at: now,
+    async fn register(
+        &self,
+        _request: RegistrationRequest,
+    ) -> Result<SubmissionAcknowledgement, DppError> {
+        Ok(SubmissionAcknowledgement::Accepted {
+            correlation_id: format!("GHOST-CORR-{}", Uuid::now_v7()),
         })
     }
 
-    async fn check_status(&self, passport_id: PassportId) -> Result<RegistryRecord, DppError> {
+    async fn check_submission(&self, correlation_id: &str) -> Result<SubmissionReport, DppError> {
         Err(DppError::NotFound(format!(
-            "ghost registry has no record for {passport_id}"
+            "ghost registry has no submission {correlation_id}"
+        )))
+    }
+
+    async fn check_status(&self, registration_id: &str) -> Result<RegistryRecord, DppError> {
+        Err(DppError::NotFound(format!(
+            "ghost registry has no record {registration_id}"
         )))
     }
 
     async fn notify_transfer(
         &self,
         record: &crate::transfer::TransferRecord,
-        _registry_id: &str,
+        _registration_id: &str,
     ) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(
             "ghost registry has no record for {}",

@@ -424,6 +424,39 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   not now; nothing that validates now would be accepted less by the registry.
   (#98)
 
+- **`RegistrySyncPort` polls the registry by the registry's own handles.**
+  Submitting does not register: the registry accepts a submission for checking
+  under a correlation identifier and generates the passport's registration
+  identifier only once the check succeeds (IR (EU) 2026/1778 Art. 8(7)–(8)).
+  The port had one call for both and polled with this crate's `PassportId`, a
+  value the registry never received. Now `register` returns a
+  `SubmissionAcknowledgement` (`Accepted { correlation_id }`, or `AlreadyHeld`
+  when a replayed idempotency key says an earlier attempt got through without
+  saying under which handle); `check_submission(correlation_id)` returns a
+  `SubmissionReport` (`Processing`, `Registered { registration_id }`,
+  `Refused { reason }`, or `Unrecognised { state }`, which is not terminal); and
+  `check_status` and `notify_transfer` take the registration identifier.
+  `RegistryRecord` carries `registration_id` in place of `RegistryIdentifiers`,
+  which listed four identifiers as assigned by the registry when it assigns one;
+  the type is removed. `RegistryStatus` describes a registered record only:
+  `Pending` and `Rejected` were states of a submission and are now
+  `SubmissionReport::Processing` and `Refused`, and a status the type does not
+  name arrives as `Unrecognised(String)`. `GhostRegistrySync` accepts under a
+  placeholder handle and knows of nothing afterwards. **Migration:** keep the
+  correlation identifier `register` returns and poll with it; store the
+  registration identifier from `Registered` and pass it to `check_status` and
+  `notify_transfer`; treat `AlreadyHeld` as a submission to reconcile, not one
+  to resend. (#98)
+
+- **`RegistrationRequest` carries the batch and the item serial.** `batch_id`
+  is the passport's `batch_id` at batch and item level, where IR (EU) 2026/1778
+  Art. 8(4) and 8(5) link it, and `None` at model level. `item_serial` is the
+  serial the passport's carrier prints (`Passport::effective_carrier_serial`)
+  at item level, and `None` above it. Without them an adapter had no batch to
+  link, and nothing to build an item identifier from but the passport's
+  internal id, which matches no label. **Migration:** a struct literal of
+  `RegistrationRequest` adds `batch_id: None, item_serial: None`. (#98)
+
 ### Added
 
 - **`just vocab-drift` names the vocabulary records whose source has moved.**

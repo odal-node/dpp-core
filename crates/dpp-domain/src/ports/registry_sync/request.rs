@@ -117,6 +117,28 @@ pub struct RegistrationRequest {
     /// exists for it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
+    /// Identifier of the batch this product belongs to, where a batch design
+    /// exists for it — IR (EU) 2026/1778 Art. 8(4) links it at item level and
+    /// Art. 8(5) registers at batch level under it.
+    ///
+    /// `None` at model level always: a model-level registration covers every
+    /// batch, so naming one would contradict the level it declares.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch_id: Option<String>,
+    /// The serial this unit's data carrier prints, at item level.
+    ///
+    /// [`Passport::effective_carrier_serial`](crate::passport::Passport::effective_carrier_serial):
+    /// the serial the operator attributed, or the one derived for it. It is the
+    /// value a label is read by, so an item identifier built from it names the
+    /// same unit the label does.
+    ///
+    /// 🚨 **Not the passport's id.** Before this field an adapter had nothing
+    /// else to build an item identifier from but the internal passport UUID,
+    /// which matches no label and means nothing outside the issuing node.
+    ///
+    /// `None` above item level, where a registration covers a group of units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_serial: Option<String>,
     /// Customs tariff classification, copied from the passport.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commodity_code: Option<String>,
@@ -303,6 +325,18 @@ impl RegistrationRequest {
                 .as_ref()
                 .and_then(|d| d.model_identifier())
                 .map(ToOwned::to_owned),
+            // Art. 8(4)/(5): linked at batch and item level where a batch
+            // exists. A blank value is the same absence as none.
+            batch_id: match granularity {
+                RegistrationGranularity::Model => None,
+                RegistrationGranularity::Batch | RegistrationGranularity::Item => passport
+                    .batch_id
+                    .as_deref()
+                    .filter(|batch| !batch.trim().is_empty())
+                    .map(ToOwned::to_owned),
+            },
+            item_serial: (granularity == RegistrationGranularity::Item)
+                .then(|| passport.effective_carrier_serial().into_owned()),
             commodity_code: passport.commodity_code.as_ref().map(ToString::to_string),
             // Set by the caller: whether a published back-up exists is a
             // deployment fact, not something the passport records.
