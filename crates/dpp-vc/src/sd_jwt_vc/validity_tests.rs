@@ -7,7 +7,7 @@ use serde_json::json;
 use dpp_domain::ProductGroup;
 
 use super::test_fixtures::*;
-use super::{SdJwtVcError, vct_for, verify};
+use super::{Issuance, SdJwtVcError, vct_for, verify};
 use crate::test_support::temp_store;
 
 /// Both claims are OPTIONAL in the profile, so their absence means "no bound"
@@ -101,6 +101,7 @@ fn a_temporal_claim_that_is_not_a_numericdate_is_refused() {
         &public_key_b64(&store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
+        None,
     )
     .expect("issuer-set iat is well-formed");
     assert_eq!(disclosed["iat"], json!(ISSUED_AT));
@@ -296,9 +297,12 @@ fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
         KEY_ID,
         &payload,
         &policy,
-        ISSUER,
-        &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        ISSUED_AT,
+        &Issuance {
+            issuer: ISSUER,
+            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            issued_at: ISSUED_AT,
+            holder_key: None,
+        },
     )
     .expect("issue")
     .serialise();

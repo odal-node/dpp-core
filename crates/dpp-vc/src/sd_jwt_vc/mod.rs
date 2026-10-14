@@ -44,15 +44,39 @@
 //! The limit, stated plainly: this constrains a party that has not already been
 //! given the disclosure. A holder who has it can still reveal it.
 //!
+//! # Key Binding
+//!
+//! Without it, anyone who holds a copy of a credential can present it as their
+//! own (RFC 9901 clause 9.5). With it, a presentation carries a Key Binding JWT
+//! signed by a key the credential names, for one Verifier and one challenge
+//! (clause 4.3). The mechanism is `dpp_crypto::sd_jwt`'s. This module decides
+//! where it applies:
+//!
+//! - [`issue`] names the Holder's Ed25519 key when [`Issuance::holder_key`] is
+//!   set, as `cnf` with RFC 7800's `jwk` method, signed in the clear.
+//! - A Holder binds a presentation with
+//!   [`SdJwt::present_with_key_binding`](dpp_crypto::sd_jwt::SdJwt::present_with_key_binding).
+//! - [`verify`] takes the caller's policy: a
+//!   [`KeyBindingPolicy`](dpp_crypto::sd_jwt::KeyBindingPolicy) requires a Key
+//!   Binding JWT, and `None` refuses one, since a Verifier that expects an SD-JWT
+//!   MUST find the last segment empty (clause 4).
+//!
+//! What the profile adds to RFC 9901 for `cnf`, read in draft-19:
+//!
+//! - **Clause 2.2.2.3:** `cnf` is OPTIONAL unless Key Binding is to be supported,
+//!   and then REQUIRED; a JWK (RFC 7800 clause 3.2) is RECOMMENDED; and `cnf`, with
+//!   its sub-claims, MUST NOT be included in Disclosures. RFC 9901 clause 9.7 only
+//!   tells an Issuer not to make it selectively disclosable, and tells a Verifier to
+//!   expect that it might be. Under the profile, [`verify`] refuses a credential
+//!   whose `cnf`, or any other claim the clause lists, arrived in a Disclosure.
+//! - **Clause 2.4:** when Key Binding is required, the Key Binding JWT is verified
+//!   as RFC 9901 clause 7.3 says, with the key in `cnf`.
+//! - **Clause 8.3:** a confirmation method that fetches key material (`x5u`, `jku`,
+//!   a URL in `kid`) is not to be resolved. Only `jwk` with an Ed25519 key is read
+//!   here, so nothing is fetched.
+//!
 //! # What is deliberately absent
 //!
-//! - **Key binding.** RFC 9901 clause 4.3 proves the presenter holds a key the
-//!   credential names, which is real security and requires holders to have keys.
-//!   The mechanism is in `dpp_crypto::sd_jwt` (a Holder key in `cnf`, a bound
-//!   presentation, and a Verifier that requires one). This module neither names a
-//!   Holder key when it issues nor requires Key Binding when it verifies, because
-//!   who holds keys is an ecosystem assumption, not a code change. `cnf` is
-//!   already among the claims it never conceals.
 //! - **`x5c` issuance.** Clause 2.5's other key-discovery mechanism makes the
 //!   issuer the subject of an end-entity certificate. See
 //!   [`issuer_metadata::build_issuer_metadata`] for why that is not this
@@ -90,6 +114,8 @@ mod verify;
 #[cfg(test)]
 mod issuer_metadata_tests;
 #[cfg(test)]
+mod key_binding_tests;
+#[cfg(test)]
 mod test_fixtures;
 #[cfg(test)]
 mod tests;
@@ -99,7 +125,7 @@ mod validity_tests;
 mod vct_tests;
 
 pub use error::SdJwtVcError;
-pub use issue::issue;
+pub use issue::{Issuance, issue};
 pub use issuer_metadata::{WELL_KNOWN_PATH, build_issuer_metadata};
 pub use vct::vct_for;
 pub use verify::verify;

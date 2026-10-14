@@ -15,6 +15,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **An SD-JWT VC names its Holder, and its reader says whether it wants Key
+  Binding.** `dpp_vc::sd_jwt_vc::issue` takes the credential's own claims as one
+  `Issuance` (`issuer`, `vct`, `issued_at`, and `holder_key`, an Ed25519 public
+  key or `None`) in place of its last three arguments. `verify` takes a fifth,
+  `key_binding`: a `KeyBindingPolicy` requires a Key Binding JWT, and `None`
+  now refuses a token that carries one (`SdJwtVcError::UnexpectedKeyBinding`),
+  since RFC 9901 clause 4 says a Verifier that expects an SD-JWT MUST find the
+  last segment empty. **Migration:** wrap the three arguments in `Issuance {
+  ..., holder_key: None }`, which issues what was issued before, and pass `None`
+  to `verify`. See Added. (#430)
+
+- **`sd_jwt_vc::verify` refuses a credential that discloses a claim the profile
+  keeps out of Disclosures.** draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2.3 says
+  `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity`, `aka_vcts` and `status`,
+  with their sub-claims, MUST NOT be included in Disclosures. RFC 9901 clause 9.7
+  only advises an Issuer against it. A credential where one of them, or a part of
+  one, arrived in a Disclosure is refused with `SdJwtVcError::DisclosedClaim`.
+  A Disclosure the Holder withheld cannot be seen, so keeping these claims in the
+  clear stays the Issuer's half of the rule. (#430)
+
 - **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
   passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
   `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
@@ -732,6 +752,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   with its own default Key Binding verifier, and this crate validates the Key
   Binding JWTs they issue; the RFC's own three, made with P-256 Holder keys, are
   checked by their `sd_hash`. (#428, #431)
+
+- **SD-JWT VC Key Binding.** A credential bound to its Holder carries the
+  Holder's Ed25519 key as `cnf`, signed in the clear, which the profile's clause
+  2.2.2.3 requires for Key Binding. A Holder binds a presentation with
+  `SdJwt::present_with_key_binding`, and `sd_jwt_vc::verify` with a
+  `KeyBindingPolicy` checks it as RFC 9901 clause 7.3 and the profile's clause
+  2.4 say, with the key in `cnf`. Only the `jwk` confirmation method is read, so
+  no key material is fetched (the profile's clause 8.3). Both independent
+  implementations read a bound credential for every product group with Key
+  Binding required, to the passport plus `cnf`. The TypeScript library issues
+  five bound credentials and the Kotlin library four, and `verify` reaches each
+  library's verdict under the same challenge, including the refusal of one made
+  for another audience. Handed a bound token, a reader that asks for no Key
+  Binding refuses it, as the Kotlin library does in the same mode. The
+  TypeScript library reads clause 7.3 step 3 instead and accepts it, which its
+  judge lists. Still no conformance claim for the profile, which is an
+  Internet-Draft. RFC 7800, whose `jwk` method names the Holder's key, gets a
+  row in the standards register. (#430)
 
 - **An independent implementation of RFC 9901 now judges the SD-JWTs this
   repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs

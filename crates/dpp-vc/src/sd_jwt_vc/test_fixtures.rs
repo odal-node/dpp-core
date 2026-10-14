@@ -13,7 +13,7 @@ use dpp_crypto::keystore::KeyStore;
 use dpp_domain::ProductGroup;
 use dpp_domain::access::ProductGroupAccessPolicy;
 
-use super::{SdJwtVcError, issue, vct_for, verify};
+use super::{Issuance, SdJwtVcError, issue, vct_for, verify};
 
 pub(super) const KEY_ID: &str = "sd-jwt-issuer";
 pub(super) const ISSUER: &str = "https://passports.operator.example";
@@ -71,9 +71,12 @@ pub(super) fn issued(store: &KeyStore) -> dpp_crypto::sd_jwt::SdJwt {
         KEY_ID,
         &payload(),
         &policy(),
-        ISSUER,
-        &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        ISSUED_AT,
+        &Issuance {
+            issuer: ISSUER,
+            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            issued_at: ISSUED_AT,
+            holder_key: None,
+        },
     )
     .expect("issue")
 }
@@ -93,9 +96,12 @@ pub(super) fn issued_with(store: &KeyStore, extra: &[(&str, Value)]) -> String {
         KEY_ID,
         &payload,
         &policy(),
-        ISSUER,
-        &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        ISSUED_AT,
+        &Issuance {
+            issuer: ISSUER,
+            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            issued_at: ISSUED_AT,
+            holder_key: None,
+        },
     )
     .expect("issue")
     .serialise()
@@ -112,6 +118,7 @@ pub(super) fn check(
         &public_key_b64(store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         at,
+        None,
     )
     .map(|_| ())
 }

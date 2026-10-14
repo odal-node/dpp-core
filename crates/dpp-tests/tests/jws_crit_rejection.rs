@@ -29,7 +29,7 @@ use dpp_rules::bundle::{
 };
 use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::authenticate_access_credential;
-use dpp_vc::sd_jwt_vc::{issue, verify};
+use dpp_vc::sd_jwt_vc::{Issuance, issue, verify};
 use dpp_vc::{
     CredentialBuilder, CredentialRole, LocalIdentityService, SD_JWT_VC_TYP, SdJwtVcError,
     SnapshotBound, VerificationResult, build_did_document, vct_for, verify_snapshot_bound,
@@ -209,9 +209,12 @@ fn sd_jwt_vc_under(store: &KeyStore, vct: &str, header: &Value) -> String {
         KEY_ID,
         &payload,
         &policy,
-        "https://passports.operator.example",
-        vct,
-        1_789_000_000,
+        &Issuance {
+            issuer: "https://passports.operator.example",
+            vct,
+            issued_at: 1_789_000_000,
+            holder_key: None,
+        },
     )
     .expect("issue");
 
@@ -233,11 +236,24 @@ fn an_sd_jwt_vc_with_crit_is_refused() {
     let now = Utc.timestamp_opt(1_789_000_060, 0).unwrap();
 
     assert!(
-        verify(&sd_jwt_vc_under(&store, &vct, &plain()), &key, &vct, now).is_ok(),
+        verify(
+            &sd_jwt_vc_under(&store, &vct, &plain()),
+            &key,
+            &vct,
+            now,
+            None
+        )
+        .is_ok(),
         "control: the same credential without crit must verify"
     );
     assert!(matches!(
-        verify(&sd_jwt_vc_under(&store, &vct, &crit()), &key, &vct, now),
+        verify(
+            &sd_jwt_vc_under(&store, &vct, &crit()),
+            &key,
+            &vct,
+            now,
+            None
+        ),
         Err(SdJwtVcError::BadSignature)
     ));
 }

@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
-use dpp_crypto::sd_jwt::SdJwt;
+use dpp_crypto::sd_jwt::{KeyBindingPolicy, SdJwt};
 
 use super::TYP;
 use super::error::SdJwtVcError;
@@ -11,6 +11,19 @@ use super::error::SdJwtVcError;
 /// The temporal claims of draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2, each
 /// OPTIONAL, each a JWT `NumericDate` (RFC 7519 clause 2) when present.
 const TEMPORAL_CLAIMS: [&str; 3] = ["iat", "nbf", "exp"];
+
+/// The registered claims clause 2.2.2.3 says MUST NOT be included in Disclosures,
+/// sub-claims included.
+const NEVER_DISCLOSED: [&str; 8] = [
+    "iss",
+    "nbf",
+    "exp",
+    "cnf",
+    "vct",
+    "vct#integrity",
+    "aka_vcts",
+    "status",
+];
 
 /// Verify a credential or a presentation, and return what it discloses.
 ///
@@ -21,9 +34,23 @@ const TEMPORAL_CLAIMS: [&str; 3] = ["iat", "nbf", "exp"];
 /// job — the same reason `did:web` resolution has always lived outside it.
 ///
 /// Checks, in order: the issuer's signature over the token; `typ`; the
-/// disclosure mechanism, which refuses any disclosure that matches nothing; the
-/// presence of `iss` and `vct`; `vct` against what the caller expected; and the
-/// validity window.
+/// disclosure mechanism, which refuses any disclosure that matches nothing; Key
+/// Binding, as `key_binding` asks; that no claim clause 2.2.2.3 keeps out of
+/// Disclosures arrived in one; the presence of `iss` and `vct`; `vct` against what
+/// the caller expected; and the validity window.
+///
+/// # Key Binding
+///
+/// `key_binding` is the caller's policy, and never the token's shape (RFC 9901
+/// clause 7.3 step 1):
+///
+/// - **`Some(policy)`** requires a Key Binding JWT, signed by the key the
+///   credential's `cnf` names, for the policy's audience and nonce, and with an
+///   `iat` inside its window (clause 7.3 step 5, and the profile's clause 2.4).
+///   The policy carries its own instant, which should be `now`.
+/// - **`None`** expects an SD-JWT, and refuses a token that carries a Key Binding
+///   JWT: clause 4 says a Verifier that expects an SD-JWT MUST find the last
+///   segment empty.
 ///
 /// **Order matters.** The signature is checked first, so nothing downstream ever
 /// reasons about claims from an unauthenticated token.
@@ -52,6 +79,7 @@ pub fn verify(
     public_key_b64: &str,
     expected_vct: &str,
     now: DateTime<Utc>,
+    key_binding: Option<&KeyBindingPolicy>,
 ) -> Result<Map<String, Value>, SdJwtVcError> {
     let sd_jwt = SdJwt::parse(serialised)?;
 
@@ -60,12 +88,30 @@ pub fn verify(
         _ => return Err(SdJwtVcError::BadSignature),
     }
 
-    let typ = jwt_header_typ(sd_jwt.jwt()).unwrap_or_default();
+    let typ = jwt_part(sd_jwt.jwt(), 0)
+        .and_then(|header| header.get("typ")?.as_str().map(str::to_owned))
+        .unwrap_or_default();
     if typ != TYP {
         return Err(SdJwtVcError::WrongTyp(typ));
     }
 
-    let payload = sd_jwt.disclosed_payload()?;
+    let payload = match key_binding {
+        None if sd_jwt.has_key_binding() => return Err(SdJwtVcError::UnexpectedKeyBinding),
+        None => sd_jwt.disclosed_payload()?,
+        Some(policy) => sd_jwt.disclosed_payload_with_key_binding(policy)?,
+    };
+
+    // What the Issuer signed in the clear is the claim. Anything a Disclosure
+    // added or changed underneath one of these names makes the processed value
+    // differ from it. A Disclosure the Holder withheld cannot be seen here: keeping
+    // these claims out of Disclosures is the Issuer's half of the rule.
+    let signed = jwt_part(sd_jwt.jwt(), 1).unwrap_or_default();
+    if let Some(claim) = NEVER_DISCLOSED
+        .into_iter()
+        .find(|claim| payload.get(*claim) != signed.get(*claim))
+    {
+        return Err(SdJwtVcError::DisclosedClaim(claim));
+    }
 
     // Presence is not enough: `contains_key` accepts `"iss": null`, a number or
     // an array, and the credential would then verify while naming no issuer at
@@ -139,13 +185,16 @@ fn check_validity_window(
     Ok(())
 }
 
-/// The `typ` from a compact JWS protected header.
-fn jwt_header_typ(jwt: &str) -> Option<String> {
+/// Part `index` of a compact JWS, the protected header (0) or the payload (1), as
+/// a JSON object.
+fn jwt_part(jwt: &str, index: usize) -> Option<Map<String, Value>> {
     use base64::Engine;
-    let header_b64 = jwt.split('.').next()?;
+    let part = jwt.split('.').nth(index)?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(header_b64)
+        .decode(part)
         .ok()?;
-    let header: Value = serde_json::from_slice(&bytes).ok()?;
-    header.get("typ")?.as_str().map(str::to_owned)
+    match serde_json::from_slice(&bytes).ok()? {
+        Value::Object(map) => Some(map),
+        _ => None,
+    }
 }

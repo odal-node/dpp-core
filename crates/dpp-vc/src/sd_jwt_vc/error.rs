@@ -28,6 +28,16 @@ pub enum SdJwtVcError {
     /// A claim clause 2.2.2 requires is missing.
     #[error("required claim '{0}' is absent")]
     MissingClaim(&'static str),
+    /// The token carries a Key Binding JWT, and the caller's policy expects none.
+    ///
+    /// RFC 9901 clause 4: a Verifier that expects an SD-JWT MUST verify that the
+    /// last segment is empty.
+    #[error("the token carries a Key Binding JWT, and Key Binding was not asked for")]
+    UnexpectedKeyBinding,
+    /// A claim that clause 2.2.2.3 says MUST NOT be included in Disclosures, or a
+    /// sub-claim of one, arrived in a Disclosure.
+    #[error("claim '{0}' was selectively disclosed, which clause 2.2.2.3 forbids")]
+    DisclosedClaim(&'static str),
     /// A temporal claim is present but is not a JWT `NumericDate`.
     ///
     /// Refused rather than ignored: ignoring a malformed `exp` would read as an
