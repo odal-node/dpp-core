@@ -1065,9 +1065,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   records are added, all `surveyed`, so nothing they name is permitted: the generic
   Catena-X passport model, DIN DKE SPEC 99100, the Publications Office's authority
   tables, the Combined Nomenclature, ECHA's Candidate List and the W3C Data
-  Privacy Vocabulary. Three references to private material were reworded, and the
-  directory README's statement that nothing was verified, false since August, was
-  corrected.
+  Privacy Vocabulary. The directory README's statement that nothing was verified,
+  false since August, was corrected.
 
 ## [0.21.0] - 2026-09-28
 
