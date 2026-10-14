@@ -353,6 +353,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **A Holder can choose what to present by claim path.**
+  `SdJwt::digests_for_paths` takes the claims wanted as `ClaimPath`s and returns the
+  digests of the Disclosures that reveal them, ready for `present` and
+  `present_with_key_binding`. Until now the only way from a claim to its digests was
+  `digests_for_claim`, which matches a name at any depth: it could not name a nested
+  claim with the claims above it, and could not name an array element at all.
+  - **A path** is the syntax of draft-ietf-oauth-sd-jwt-vc-19 clause 5.6.1, which is
+    also the claims path of OpenID for Verifiable Presentations: names, non-negative
+    integers for one array element, and `null` for every element.
+    `ClaimPath::from_json` reads `["degrees", null, "type"]` as written. No
+    conformance to the draft is claimed.
+  - **It reveals the claim and what leads to it.** A nested claim brings the claims
+    above it and no others. A path to a container returns that container's own
+    Disclosure, and what is hidden inside it stays hidden. A claim in the clear needs
+    none, and naming it is not an error. Never a sibling, never another element.
+  - **A position is the one in the array as the Issuer made it.** With `[a, b, c, d]`
+    and `a` and `c` hidden, `2` is `c`, not the `d` a Verifier would see third. A
+    decoy (clause 4.2.5) is not an element and does not count. This is exact for a
+    token holding every Disclosure the Issuer made. A token already presented in
+    part cannot tell a withheld element from a decoy, so positions after one move;
+    the documentation says so.
+  - **It fails closed.** A path that selects nothing is `SdJwtError::ClaimNotInToken`,
+    naming the path, and nothing is returned for the others. The two libraries it was
+    read against differ: one returns nothing for the whole request, the other ignores
+    the path and presents the rest.
+  - **It checks its own work.** The result must read as a Verifier will read it, each
+    path must select what plain navigation of the fully processed payload does, and
+    each must still find its claim in the presentation. A failure is
+    `SdJwtError::SelectionDisagrees`, a defect in this crate and not a property of
+    the token.
+  - **Into an SD-JWT VC, a path starts at `passport`.** `sd_jwt_vc::issue` holds the
+    passport under `sd_jwt_vc::PASSPORT_CLAIM`, so a member of it is reached as
+    `["passport", "productGroupData", "cathodeMaterial"]`. A path written from the
+    passport alone names nothing in the credential, and choosing by it is refused
+    with `ClaimNotInToken`.
+  - **Evidence.** The RFC's section 5.2 and Appendix A.3 presentations are rebuilt
+    from their issued tokens by path. A property test builds random trees with random
+    hiding and compares the result to a model that finds the Disclosures a path needs
+    while it builds the token. And the oracle replay has this crate choose the
+    Disclosures for 145 presentations the TypeScript library made and 93 the Kotlin
+    library made, from the same paths, with no disagreement. Neither library places a
+    decoy ahead of a real array element (they append them), so that one case rests on
+    a unit test and on how processing removes a placeholder with no Disclosure.
+
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
   the passport another act requires.** `PassportObligation` gains
   `IncludedIn { basis }`, and the new `crm-act-2024-1252` instrument uses it.
