@@ -68,6 +68,16 @@ pub const STATUS_PATH_TEMPLATE: &str = "/registrations/{id}/status";
 /// the route they travel.
 pub const TRANSFER_PATH_TEMPLATE: &str = "/registrations/{id}/transfer";
 
+/// Where an authentication token is obtained, relative to the registry's
+/// **host** — not to [`RegistryEndpoint::base_url`], which already carries the
+/// `/api/v1` prefix the API sits under.
+///
+/// ⚠️ **Invented.** IR (EU) 2026/1778 Art. 2(3) makes a token part of the
+/// access model; nothing published says where one comes from or how it is
+/// exchanged. Declared as a constant so that the route has a stated basis like
+/// every other one, and a stand-in serving it can say so.
+pub const TOKEN_PATH: &str = "/oauth2/token";
+
 /// The HTTP header carrying the request's idempotency key.
 ///
 /// 👁️ **Observed 2026-09-16.** The web client sets this header, with a UUID
@@ -102,6 +112,7 @@ pub const ENDPOINT_BASIS: &[(&str, RegistryBasis)] = &[
     (SUBMISSION_STATUS_PATH_TEMPLATE, RegistryBasis::Assumed),
     (STATUS_PATH_TEMPLATE, RegistryBasis::Assumed),
     (TRANSFER_PATH_TEMPLATE, RegistryBasis::Assumed),
+    (TOKEN_PATH, RegistryBasis::Assumed),
     (
         IDEMPOTENCY_KEY_HEADER,
         RegistryBasis::Observed { on: LAST_READ },
@@ -254,7 +265,7 @@ impl RegistryEndpoint {
             base_url: format!("{origin}/api/v1"),
             api_version: "1.0".into(),
             mtls_required: false,
-            token_endpoint: Some(format!("{origin}/oauth2/token")),
+            token_endpoint: Some(format!("{origin}{TOKEN_PATH}")),
         }
     }
 }

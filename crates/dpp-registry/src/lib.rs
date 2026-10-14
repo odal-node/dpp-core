@@ -59,6 +59,8 @@
 //!   batch / item level a registration declares and the higher-level
 //!   identifiers it must link.
 //! - [`payload`] — [`RegistrationPayload`] and its [`EuRegistryEnvelope`].
+//! - [`coherence`] — whether a registration agrees with the passport it
+//!   registers, as the registry checks on submission (Art. 8(7)(b)–(c)).
 //! - [`submission`] — [`RegistrationSubmission`]: the passports that travel and
 //!   fail together, and the caps and outcome of one act of submitting.
 //! - [`response`] — [`EuRegistryResponse`], [`StatusResponse`],
@@ -76,6 +78,7 @@
 //!   ⚠️ COMPLIANCE-PIN block visible in one small file).
 
 pub mod basis;
+pub mod coherence;
 pub mod endpoint;
 pub mod error;
 pub mod granularity;
@@ -91,7 +94,7 @@ pub mod transfer;
 pub use basis::RegistryBasis;
 pub use endpoint::{
     ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
-    STATUS_PATH_TEMPLATE, SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
+    STATUS_PATH_TEMPLATE, SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,

@@ -171,6 +171,10 @@ Verified against the OJ text of IR 2026/1778 (adopted 16 July 2026, published
 - **Automated checks on submission** (**Art. 8(7)**): semantic conformity,
   coherence of mandatory data, conformity with the required granularity level,
   and — *where relevant* — validity of the commodity code.
+  `RegistrationPayload::check_coherence` runs the coherence and level checks
+  (points (b) and (c)) against the passport, over the fields this crate
+  registers; which data the registry treats as mandatory is not yet published
+  for any product group.
 - **Transfer of registered passports** (**Art. 6a**): a registered DPP "may be
   transferred to another verified economic operator or, where applicable, to a
   verified value chain actor that takes over the obligations from the previous

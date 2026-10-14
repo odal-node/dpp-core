@@ -106,6 +106,20 @@ pub enum RegistryValidationError {
         /// When the proof says it was generated.
         generated_at: DateTime<Utc>,
     },
+    /// The registration contradicts the passport it registers, or leaves out a
+    /// link the passport shows exists.
+    ///
+    /// IR (EU) 2026/1778 Art. 8(7)(b)–(c): the registry reads the passport on
+    /// submission and confirms the registration data against it, and against
+    /// the level it is registered at.
+    Incoherent {
+        /// The registration field, by its wire name.
+        field: &'static str,
+        /// What the registration says, or `None` where it says nothing.
+        registered: Option<String>,
+        /// What the passport states.
+        in_passport: String,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -190,6 +204,26 @@ impl std::fmt::Display for RegistryValidationError {
                 write!(
                     f,
                     "the proof was generated at {generated_at}, before the registration it reports at {registered_at}"
+                )
+            }
+            Self::Incoherent {
+                field,
+                registered: Some(registered),
+                in_passport,
+            } => {
+                write!(
+                    f,
+                    "the registration's {field} is '{registered}', and the passport states '{in_passport}'"
+                )
+            }
+            Self::Incoherent {
+                field,
+                registered: None,
+                in_passport,
+            } => {
+                write!(
+                    f,
+                    "the registration leaves out {field}, which the passport states as '{in_passport}'"
                 )
             }
         }
