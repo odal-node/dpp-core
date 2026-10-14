@@ -1,6 +1,7 @@
 //! Error types: identifier validation ([`RegistryValidationError`]) and
 //! registry-operation errors ([`EuRegistryError`] / [`EuRegistryErrorKind`]).
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::basis::RegistryBasis;
@@ -74,6 +75,51 @@ pub enum RegistryValidationError {
         /// not recognise.
         identifier: String,
     },
+    /// Two passports in one submission carry the same unique product identifier.
+    ///
+    /// 👁️ A named refusal in the registry's User Guide (v1.03, chapter 6.2.2):
+    /// each passport in a request must be uniquely identifiable. Both positions
+    /// are given, because either one may be the mistake.
+    DuplicateProductIdentifier {
+        /// Zero-based position of the first passport carrying the identifier.
+        first: usize,
+        /// Zero-based position of the passport repeating it.
+        second: usize,
+    },
+    /// The unique product identifier is not a URL the registry accepts.
+    InvalidProductIdentifierUrl {
+        /// The identifier as given.
+        value: String,
+        /// What is wrong with it.
+        reason: &'static str,
+    },
+    /// A proof of registration says the registration happened after the proof
+    /// reporting it was generated.
+    ///
+    /// IR (EU) 2026/1778 Art. 9(2)(d) has the proof carry the registration of the
+    /// latest version *at the time it is generated*, so the order is fixed by
+    /// the article, and a proof stating the reverse describes events that did not
+    /// happen.
+    ProofPredatesRegistration {
+        /// When the proof says the passport was registered.
+        registered_at: DateTime<Utc>,
+        /// When the proof says it was generated.
+        generated_at: DateTime<Utc>,
+    },
+    /// The registration contradicts the passport it registers, or leaves out a
+    /// link the passport shows exists.
+    ///
+    /// IR (EU) 2026/1778 Art. 8(7)(b)–(c): the registry reads the passport on
+    /// submission and confirms the registration data against it, and against
+    /// the level it is registered at.
+    Incoherent {
+        /// The registration field, by its wire name.
+        field: &'static str,
+        /// What the registration says, or `None` where it says nothing.
+        registered: Option<String>,
+        /// What the passport states.
+        in_passport: String,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -140,6 +186,44 @@ impl std::fmt::Display for RegistryValidationError {
                 write!(
                     f,
                     "'{identifier}' is under an EN 18219 scheme this crate has no registry scheme value for"
+                )
+            }
+            Self::DuplicateProductIdentifier { first, second } => {
+                write!(
+                    f,
+                    "passports at index {first} and {second} carry the same unique product identifier"
+                )
+            }
+            Self::InvalidProductIdentifierUrl { value, reason } => {
+                write!(f, "unique product identifier '{value}' {reason}")
+            }
+            Self::ProofPredatesRegistration {
+                registered_at,
+                generated_at,
+            } => {
+                write!(
+                    f,
+                    "the proof was generated at {generated_at}, before the registration it reports at {registered_at}"
+                )
+            }
+            Self::Incoherent {
+                field,
+                registered: Some(registered),
+                in_passport,
+            } => {
+                write!(
+                    f,
+                    "the registration's {field} is '{registered}', and the passport states '{in_passport}'"
+                )
+            }
+            Self::Incoherent {
+                field,
+                registered: None,
+                in_passport,
+            } => {
+                write!(
+                    f,
+                    "the registration leaves out {field}, which the passport states as '{in_passport}'"
                 )
             }
         }
@@ -230,7 +314,8 @@ impl std::error::Error for EuRegistryError {}
 
 /// An error body returned by the registry.
 ///
-/// 👁️ **Observed 2026-09-16** in the registry's web client, which reads
+/// 👁️ **Observed** in the registry's web client (first 2026-09-16, again
+/// 2026-10-14), which reads
 /// `subCode` to recognise a replayed idempotency key and `traceId` to report a
 /// failure to the helpdesk. Both are therefore fields the registry really
 /// sends; the rest of the body's shape is unknown, which is why this models
@@ -263,9 +348,11 @@ pub struct RegistryErrorBody {
 /// `subCode`, and there is no `Conflict` kind for it to hang on.
 pub const STATUS_IDEMPOTENCY_KEY_REUSED: u16 = 409;
 
-/// What backs [`STATUS_IDEMPOTENCY_KEY_REUSED`].
-pub const STATUS_IDEMPOTENCY_KEY_REUSED_BASIS: RegistryBasis =
-    RegistryBasis::Observed { on: "2026-09-16" };
+/// What backs [`STATUS_IDEMPOTENCY_KEY_REUSED`]: the client's check of a 409
+/// against this sub-code, read on the date the client was last read.
+pub const STATUS_IDEMPOTENCY_KEY_REUSED_BASIS: RegistryBasis = RegistryBasis::Observed {
+    on: crate::endpoint::LAST_READ,
+};
 
 /// The `subCode` accompanying **409** when an idempotency key is replayed.
 ///

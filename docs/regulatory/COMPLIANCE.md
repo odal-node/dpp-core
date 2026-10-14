@@ -171,6 +171,10 @@ Verified against the OJ text of IR 2026/1778 (adopted 16 July 2026, published
 - **Automated checks on submission** (**Art. 8(7)**): semantic conformity,
   coherence of mandatory data, conformity with the required granularity level,
   and — *where relevant* — validity of the commodity code.
+  `RegistrationPayload::check_coherence` runs the coherence and level checks
+  (points (b) and (c)) against the passport, over the fields this crate
+  registers; which data the registry treats as mandatory is not yet published
+  for any product group.
 - **Transfer of registered passports** (**Art. 6a**): a registered DPP "may be
   transferred to another verified economic operator or, where applicable, to a
   verified value chain actor that takes over the obligations from the previous
@@ -220,18 +224,32 @@ listed separately below so the two are never confused.
 
 ### Still divergent — blocked on the published API specification
 
-- **Authentication** — `EuRegistryEnvelope` anticipates a bearer-token
-  mechanism; registration rests on eIDAS verified-operator identity instead
-  (Arts. 4–5). This is a structural mismatch, not a wrong endpoint, and it is
-  the largest remaining gap.
-- **Endpoint paths and API version** — the registry hosts are the Commission's
-  published ones; the resource paths beneath them and `api_version` are not
-  specified anywhere we can read, and remain our own construction.
-- **Proof of registration** (Art. 9) — a secure electronic document, valid 90
-  calendar days with regeneration, retrievable on request. No type models it,
-  because the retrieval contract is unspecified.
+- **Authentication** — two layers that must not be confused. A token in front
+  of the API fits the act: **Art. 2(3)** defines an *authentication token* for
+  sessions and delegated access between applications and the registry, and
+  **Art. 18(1)(b)** stores tokens as user credentials. Identity is the
+  verified status of **Arts. 4–5**, proved by qualified electronic seal or
+  attestation, and a token proves none of it. How a token is obtained is
+  unpublished, so `RegistryEndpoint::token_endpoint` and any exchange performed
+  against it are our construction. This is the largest remaining gap.
+- **Endpoint paths and API version** — the hosts are the ones the registry's
+  own interface calls, read from its runtime configuration on 2026-10-14: the
+  API on `reg.product-passport.ec.europa.eu` (and `reg.acc.…` for the test
+  environment), which is not the published `registry.…` address the interface
+  itself is served from. The registration, product-group and dashboard task
+  routes are observed in the same client; the status and transfer routes and
+  `api_version` are not specified anywhere we can read, and remain our own
+  construction.
+- **Proof of registration** (Art. 9) — `ProofOfRegistration` models the
+  Art. 9(2) content and the Art. 9(4) ninety days, which are how long the
+  registry keeps a proof available, not how long the proof is valid. The
+  retrieval call is unspecified, so nothing fetches one.
 - **Payload and envelope shape** — the field names and nesting are a reading of
-  what Art. 8 requires to be registered, not a transcription of a schema.
+  what Art. 8 requires to be registered, not a transcription of a schema. The
+  registry's guide describes the outcome of a submission per passport — the
+  unique product identifier with its registration identifier, or with its error
+  — so `SubmissionReceipt` matches results by identifier; the field names are
+  ours.
 
 Do not treat the shapes in the second list as an implementation target.
 

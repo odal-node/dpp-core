@@ -4,14 +4,15 @@
 //! ESPR Article 13. It provides request/response envelopes, error types, and
 //! identifier structures.
 //!
-//! ⚠️ **One structural divergence remains, and it is the authentication model.**
-//! [`RegistryEndpoint::token_endpoint`] models an OAuth2 bearer-token exchange.
-//! Registration identity is eIDAS-based: a verified operator proves identity by
-//! qualified electronic seal or qualified electronic attestation of attributes
-//! (IR (EU) 2026/1778 Arts. 4–5). Those are different mechanisms and one does
-//! not stand in for the other. The field exists so an adapter compiles, and is
-//! marked wrong at its own definition. **Do not treat it as an implementation
-//! target.**
+//! ⚠️ **Authentication is the least known part, and two things must not be
+//! confused in it.** A token in front of the API fits the act: IR (EU)
+//! 2026/1778 Art. 2(3) defines an *authentication token* for sessions and
+//! delegated access between applications and the registry. Identity is
+//! something else — the verified status of Art. 4, proved by qualified
+//! electronic seal or qualified electronic attestation of attributes — and a
+//! token proves none of it. How a token is obtained is unpublished, so
+//! [`RegistryEndpoint::token_endpoint`] and any exchange performed against it
+//! are ours. **Do not treat them as an implementation target.**
 //!
 //! `api_version` is likewise our own construction. Endpoint paths are now a
 //! mix: some are **observed** in the registry's own published web client, some
@@ -58,6 +59,10 @@
 //!   batch / item level a registration declares and the higher-level
 //!   identifiers it must link.
 //! - [`payload`] — [`RegistrationPayload`] and its [`EuRegistryEnvelope`].
+//! - [`coherence`] — whether a registration agrees with the passport it
+//!   registers, as the registry checks on submission (Art. 8(7)(b)–(c)).
+//! - [`product_groups`] — the registry's codes for product groups
+//!   ([`registry_product_group`]).
 //! - [`submission`] — [`RegistrationSubmission`]: the passports that travel and
 //!   fail together, and the caps and outcome of one act of submitting.
 //! - [`response`] — [`EuRegistryResponse`], [`StatusResponse`],
@@ -75,11 +80,13 @@
 //!   ⚠️ COMPLIANCE-PIN block visible in one small file).
 
 pub mod basis;
+pub mod coherence;
 pub mod endpoint;
 pub mod error;
 pub mod granularity;
 pub mod identifiers;
 pub mod payload;
+pub mod product_groups;
 pub mod proof;
 pub mod response;
 pub mod submission;
@@ -89,8 +96,9 @@ pub mod transfer;
 
 pub use basis::RegistryBasis;
 pub use endpoint::{
-    ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
-    STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
+    ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH,
+    RegistryAuthority, RegistryEndpoint, STATUS_PATH_TEMPLATE, TASK_RESULT_PATH_TEMPLATE,
+    TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
@@ -104,11 +112,13 @@ pub use identifiers::{
     ServiceProviderReference,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
+pub use product_groups::{PRODUCT_GROUP_BATTERIES, registry_product_group};
 pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
-    RegistrationSubmission, SubmissionOutcome, SubmissionReceipt, fits_file_limit,
+    PassportOutcome, PassportResult, REGISTRATION_ERROR_CODES, RegistrationSubmission,
+    SubmissionOutcome, SubmissionReceipt, fits_file_limit,
 };
 pub use transfer::TransferNotification;
 

@@ -88,6 +88,9 @@ fn published_passport(identifier: SchemeIdentifier) -> dpp_domain::Passport {
     // `a_passport_missing_its_operator_identifier_cannot_be_registered`.
     passport.operator_identifier = Some("DE123456789".into());
     passport.qr_code_url = Some("https://id.ecotextile.de/01/09506000134352/21/ABC123".into());
+    // The serial that carrier prints, attributed so the label and the
+    // registration name the same unit.
+    passport.carrier_serial = Some("ABC123".into());
     passport.facility = Some(dpp_domain::passport::FacilitySnapshot {
         scheme: "gln".into(),
         value: "4012345000009".into(),
@@ -136,16 +139,28 @@ fn identifier_on(request: &RegistrationRequest) -> ProductIdentifier {
     )
 }
 
+/// 🚨 The batch and the item serial come off the request too.
+///
+/// This used to hard-code an item serial, for the same reason the identifier
+/// above was once passed in beside the request: the request carried none, so
+/// an adapter had nothing to build one from but the internal passport UUID.
 fn payload_from(request: &RegistrationRequest) -> RegistrationPayload {
+    let mut level = RegistrationLevel::new(Granularity::Item).with_model("MODEL-1");
+    if let Some(batch) = &request.batch_id {
+        level = level.with_batch(batch.clone());
+    }
     RegistrationPayload {
         passport_id: request.passport_id.0,
         product_id: identifier_on(request),
-        level: RegistrationLevel::new(Granularity::Item).with_model("MODEL-1"),
-        item_id: Some(ProductItemIdentifier {
-            scheme: "serial".into(),
-            value: "ABC123".into(),
-            batch_id: None,
-        }),
+        level,
+        item_id: request
+            .item_serial
+            .as_ref()
+            .map(|serial| ProductItemIdentifier {
+                scheme: "serial".into(),
+                value: serial.clone(),
+                batch_id: request.batch_id.clone(),
+            }),
         facility_id: FacilityIdentifier {
             scheme: "gln".into(),
             value: "4012345000009".into(),
@@ -219,6 +234,12 @@ fn a_passport_under_any_en_18219_scheme_reaches_a_valid_submission() {
 
         assert_eq!(payload.product_id.scheme, expected_scheme);
         assert_eq!(payload.product_id.value, expected_value);
+        // The item is named by the serial its label prints, not by the
+        // passport's internal id.
+        assert_eq!(
+            payload.item_id.as_ref().map(|item| item.value.as_str()),
+            Some("ABC123")
+        );
 
         let submission = RegistrationSubmission::single(payload);
         assert!(
@@ -296,11 +317,11 @@ fn one_bad_passport_refuses_a_hundred_registrations() {
     );
 }
 
-/// The receipt closes the loop: one Art. 8(8) identifier per passport, in
-/// submission order.
+/// The receipt closes the loop: one Art. 8(8) identifier per passport, found by
+/// the identifier each passport was submitted under.
 #[test]
 fn a_successful_submission_is_acknowledged_per_passport() {
-    use dpp_registry::{SubmissionOutcome, SubmissionReceipt};
+    use dpp_registry::{PassportOutcome, PassportResult, SubmissionOutcome, SubmissionReceipt};
 
     let identifier = SchemeIdentifier::gs1(Gtin::parse("09506000134352").unwrap());
     let passport = published_passport(identifier.clone());
@@ -310,22 +331,45 @@ fn a_successful_submission_is_acknowledged_per_passport() {
         RegistrationGranularity::Item,
     )
     .expect("the fixture passport carries all three");
-    let submission = RegistrationSubmission::new((0..3).map(|_| payload_from(&request)).collect())
-        .expect("within bounds");
-    assert!(submission.validate().is_ok());
+    // Three units, three serials: one identifier each, since the registry
+    // refuses a request carrying the same one twice.
+    let payloads: Vec<RegistrationPayload> = ["A1", "A2", "A3"]
+        .into_iter()
+        .map(|serial| RegistrationPayload {
+            digital_link_url: format!("https://id.ecotextile.de/01/09506000134352/21/{serial}"),
+            ..payload_from(&request)
+        })
+        .collect();
+    let submission = RegistrationSubmission::new(payloads).expect("within bounds");
+    assert!(submission.validate().is_ok(), "{:?}", submission.validate());
 
     let receipt = SubmissionReceipt {
         correlation_id: "corr-8f31".into(),
         outcome: SubmissionOutcome::Success,
-        registration_identifiers: vec!["EU-DPP-1".into(), "EU-DPP-2".into(), "EU-DPP-3".into()],
+        results: submission
+            .passports()
+            .iter()
+            .enumerate()
+            .map(|(n, passport)| PassportResult {
+                unique_product_identifier: passport.digital_link_url.clone(),
+                product_group: Some(passport.product_group.clone()),
+                outcome: Some(PassportOutcome::Accepted),
+                registration_identifier: Some(format!("EU-DPP-{n}")),
+                error_code: None,
+            })
+            .collect(),
     };
 
     assert!(receipt.outcome.is_terminal());
-    assert_eq!(
-        receipt.registration_identifiers.len(),
-        submission.len(),
-        "Art. 8(10) communicates an identifier for each specific product"
-    );
+    for passport in submission.passports() {
+        assert!(
+            receipt
+                .result_for(&passport.digital_link_url)
+                .and_then(|r| r.registration_identifier.as_ref())
+                .is_some(),
+            "Art. 8(10) communicates an identifier for each specific product"
+        );
+    }
 }
 /// 🚨 What this composition first exposed, now the other way round.
 ///

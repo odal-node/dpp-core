@@ -157,8 +157,32 @@ fn sandbox_endpoint() {
     // with our own guess instead of an outside fact.
     assert_eq!(
         ep.base_url,
-        "https://registry.acc.product-passport.ec.europa.eu/api/v1"
+        "https://reg.acc.product-passport.ec.europa.eu/api/v1"
     );
+    assert_eq!(
+        ep.dashboard_base_url,
+        "https://reg.acc.product-passport.ec.europa.eu/dashboard/api/v1"
+    );
+}
+
+/// 🚨 The API is not on the host the Commission publishes for the registry.
+///
+/// `registry.…` serves the web interface. The interface's own runtime
+/// configuration (read 2026-10-14) sends its API calls to `reg.…`, and this
+/// crate pointed every request at the interface's host until then.
+#[test]
+fn the_api_is_called_on_the_hosts_the_registry_interface_calls() {
+    for ep in [RegistryEndpoint::sandbox(), RegistryEndpoint::production()] {
+        for url in [&ep.base_url, &ep.dashboard_base_url] {
+            assert!(
+                url.starts_with("https://reg."),
+                "{url} is not on the API host"
+            );
+            assert!(!url.contains("://registry."), "{url} is the interface host");
+        }
+        let token = ep.token_endpoint.as_deref().expect("a token URL");
+        assert!(token.starts_with("https://auth."), "{token}");
+    }
 }
 
 /// The two environments must never collapse onto one host — submitting test
@@ -185,6 +209,50 @@ fn production_endpoint() {
     let ep = RegistryEndpoint::production();
     assert_eq!(ep.authority, RegistryAuthority::EuCentral);
     assert!(ep.mtls_required);
+}
+
+/// Every endpoint's token URL is the declared route, so the basis the table
+/// gives `TOKEN_PATH` is the basis of the URL a caller actually calls.
+#[test]
+fn every_token_endpoint_is_the_declared_token_route() {
+    for ep in [
+        RegistryEndpoint::sandbox(),
+        RegistryEndpoint::production(),
+        RegistryEndpoint::stand_in("http://127.0.0.1:8090"),
+    ] {
+        let token = ep.token_endpoint.expect("each endpoint names a token URL");
+        assert!(
+            token.ends_with(TOKEN_PATH),
+            "{token} is not the declared token route"
+        );
+        // Beside the API, not under it.
+        assert!(!token.contains("/api/v1"), "{token}");
+    }
+}
+
+/// A stand-in is shaped like the registry's endpoints, so a caller takes the
+/// same path against it, and is named as what it is, so nothing mistakes it for
+/// either of them.
+#[test]
+fn a_stand_in_endpoint_mirrors_the_registry_shape_under_its_own_name() {
+    let ep = RegistryEndpoint::stand_in("http://127.0.0.1:8090/");
+    assert_eq!(ep.authority, RegistryAuthority::StandIn);
+    assert_eq!(ep.base_url, "http://127.0.0.1:8090/api/v1");
+    assert_eq!(
+        ep.dashboard_base_url,
+        "http://127.0.0.1:8090/dashboard/api/v1"
+    );
+    assert_eq!(
+        ep.token_endpoint.as_deref(),
+        Some("http://127.0.0.1:8090/oauth2/token")
+    );
+    assert_ne!(ep.authority, RegistryEndpoint::sandbox().authority);
+    assert_ne!(ep.authority, RegistryEndpoint::production().authority);
+    assert_eq!(
+        serde_json::to_value(&ep.authority).unwrap(),
+        "stand_in",
+        "a stored configuration names the stand-in as one"
+    );
 }
 
 #[test]
@@ -829,6 +897,55 @@ fn the_identifier_limit_counts_characters_not_bytes() {
     assert!(payload.validate().is_ok());
 }
 
+/// 👁️ The registry takes the identifier only as an `https://` URL, and refuses
+/// one naming a non-permitted port (User Guide v1.03 chapter 6.2). Which ports
+/// are permitted is unstated, so only the default one is let through.
+#[test]
+fn the_identifier_must_be_an_https_url_on_the_default_port() {
+    let with_url = |url: &str| RegistrationPayload {
+        digital_link_url: url.into(),
+        ..sample_payload()
+    };
+    let refused = |url: &str| match with_url(url).validate() {
+        Err(RegistryValidationError::InvalidProductIdentifierUrl { value, reason }) => {
+            assert_eq!(value, url);
+            reason
+        }
+        other => panic!("{url} should be refused as a URL, got {other:?}"),
+    };
+
+    assert_eq!(
+        refused("http://id.example.com/01/09506000134352"),
+        "must start with https://"
+    );
+    assert_eq!(
+        refused("did:web:id.example.com:p:1"),
+        "must start with https://"
+    );
+    assert_eq!(refused("https:///01/09506000134352"), "names no host");
+    assert_eq!(
+        refused("https://id.example.com:8443/01/09506000134352"),
+        "names a port other than 443"
+    );
+    assert_eq!(
+        refused("https://[2001:db8::1]:8443/01/09506000134352"),
+        "names a port other than 443"
+    );
+
+    for accepted in [
+        "https://id.example.com/01/09506000134352",
+        "https://id.example.com:443/01/09506000134352",
+        "https://[2001:db8::1]/01/09506000134352",
+        "https://id.example.com?x=1",
+    ] {
+        assert!(
+            with_url(accepted).validate().is_ok(),
+            "{accepted} should be accepted: {:?}",
+            with_url(accepted).validate()
+        );
+    }
+}
+
 /// The submission limits, recorded so a batch implementation inherits them
 /// rather than rediscovering them at the registry.
 #[test]
@@ -851,14 +968,18 @@ fn the_observed_submission_limits_are_recorded() {
 #[test]
 fn every_wire_constant_declares_a_basis() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
-        basis_of,
+        IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     for declared in [
         REGISTRATION_PATH,
+        PRODUCT_GROUPS_PATH,
+        TASKS_PATH,
+        TASK_RESULT_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
+        TOKEN_PATH,
         IDEMPOTENCY_KEY_HEADER,
     ] {
         assert!(
@@ -871,7 +992,7 @@ fn every_wire_constant_declares_a_basis() {
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
         crate::ENDPOINT_BASIS.len(),
-        4,
+        8,
         "the table grew or shrank without this test being told"
     );
 }
@@ -884,24 +1005,31 @@ fn every_wire_constant_declares_a_basis() {
 #[test]
 fn each_route_carries_the_tier_its_prose_claims() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
-        basis_of,
+        IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
-    // Read off the registry's own web client.
-    for observed in [REGISTRATION_PATH, IDEMPOTENCY_KEY_HEADER] {
+    // Read off the registry's own web client, on the date it was last read.
+    for observed in [
+        REGISTRATION_PATH,
+        PRODUCT_GROUPS_PATH,
+        TASKS_PATH,
+        TASK_RESULT_PATH_TEMPLATE,
+        IDEMPOTENCY_KEY_HEADER,
+    ] {
         let basis = basis_of(observed).expect("declared");
         assert!(basis.is_observed(), "{observed} is observed");
         assert_eq!(
             basis.observed_on(),
-            Some("2026-09-16"),
+            Some("2026-10-14"),
             "an observation must carry the date it was made"
         );
     }
 
-    // Nothing behind them. The asynchronous flow needs *a* status route and
-    // transfers need *a* route, and naming one is not knowing it.
-    for assumed in [STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE] {
+    // Nothing behind them. A registered record needs *a* status route,
+    // transfers need *a* route, a token has to come from somewhere, and naming
+    // one is not knowing it.
+    for assumed in [STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, TOKEN_PATH] {
         let basis = basis_of(assumed).expect("declared");
         assert!(!basis.is_observed(), "{assumed} rests on nothing");
         assert_eq!(basis.observed_on(), None);
@@ -962,7 +1090,7 @@ fn the_replayed_key_status_is_the_only_observed_one() {
     assert!(crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.is_observed());
     assert_eq!(
         crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.observed_on(),
-        Some("2026-09-16")
+        Some("2026-10-14")
     );
 }
 

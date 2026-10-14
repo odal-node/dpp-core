@@ -375,6 +375,105 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   observes (under Added). **Migration:** a record deserialised from JSON needs a
   `pins` key (`[]` for none).
 
+- **A registry submission reports each passport by its identifier.**
+  `SubmissionReceipt::registration_identifiers`, one identifier per passport in
+  submission order, is replaced by `results: Vec<PassportResult>`. Each result
+  names the unique product identifier it is about, its product group, its
+  `outcome` (`PassportOutcome`: `ACCEPTED`, `REJECTED`, or unrecognised), and
+  the registration identifier (IR (EU) 2026/1778 Art. 8(8)) or the registry's
+  `errorCode`. The registry's User Guide (v1.02 and v1.03, chapter 6.2.2)
+  describes a completed request that way, and its web client, read on
+  2026-10-14, reads each passport's row of a registration task under exactly
+  those names, except the registration identifier, which it does not show and
+  is named by us. Position was our guess, and a failure report lists only the
+  passports that failed, so the n-th result is not the n-th passport.
+  `SubmissionReceipt::result_for` finds one by identifier.
+  `REGISTRATION_ERROR_CODES` lists the 22 codes the client knows a wording for.
+  **Migration:** read `results` and match on `unique_product_identifier`. (#98)
+
+- **A registry state this crate does not know is kept, not refused.**
+  `SubmissionOutcome` and `RegistryStatusCode` gain `Unrecognised(String)`, which
+  is what an unknown wire value now deserialises to, instead of failing the whole
+  reply. Neither vocabulary is published: the outcome names are what the web
+  interface shows, and Art. 4(4) and Art. 10(1) of IR (EU) 2026/1778 imply record
+  states the status codes do not name. An unknown outcome is not terminal, so a
+  caller keeps polling rather than settling a submission that may have
+  succeeded. Because of that, both spellings the registry's web client was seen
+  using on 2026-10-14 read as finished: a task's `status` (`SUCCESS`,
+  `FAILURE`) and its `outcomeResult` (`SUCCEEDED`, `FAILED`); a value is
+  written in the `status` spelling. `RegistryStatusCode` is now `#[non_exhaustive]` and has a
+  `wire_str`. Both types lose `Copy`, and `SubmissionOutcome::is_terminal` and
+  `wire_str` take `&self`. **Migration:** add a wildcard arm to a `match` on
+  `RegistryStatusCode`, and clone where a copy was implied. (#98)
+
+- **`RegistryAuthority` is `#[non_exhaustive]` and names a stand-in.**
+  `RegistryAuthority::StandIn` is a registry a consumer runs itself to exercise
+  its own registration path, and `RegistryEndpoint::stand_in(origin)` builds an
+  endpoint for one, shaped like the Commission's. Without it the only labels
+  available were the EU's own and `National(..)`, each a false statement about
+  a stand-in. **Migration:** add a wildcard arm to a `match` on
+  `RegistryAuthority`. (#98)
+
+- **`ENDPOINT_BASIS` and `PRODUCT_SCHEME_BASIS` are slices.** Both were
+  fixed-length arrays, so declaring a route or mapping a scheme changed their
+  type. **Migration:** none for iteration or `len()`; a binding that named the
+  array type names `&[(&str, RegistryBasis)]`. (#98)
+
+- **`RegistrationPayload::validate` and `RegistrationSubmission::validate`
+  refuse what the registry's guide says it refuses.** The unique product
+  identifier must be an `https://` URL with a host and no port other than 443
+  (`RegistryValidationError::InvalidProductIdentifierUrl`); the guide names a
+  missing `https://` and a non-permitted port, and does not say which ports are
+  permitted, so only the default one passes. Two passports in one submission
+  must not share an identifier (`DuplicateProductIdentifier`, naming both
+  positions). **Migration:** a payload or submission that validated before may
+  not now; nothing that validates now would be accepted less by the registry.
+  (#98)
+
+- **`RegistrySyncPort` polls the registry by the registry's own handles.**
+  Submitting does not register: the registry accepts a submission for checking
+  under a correlation identifier and generates the passport's registration
+  identifier only once the check succeeds (IR (EU) 2026/1778 Art. 8(7)–(8)).
+  The port had one call for both and polled with this crate's `PassportId`, a
+  value the registry never received. Now `register` returns a
+  `SubmissionAcknowledgement` (`Accepted { correlation_id }`, or `AlreadyHeld`
+  when a replayed idempotency key says an earlier attempt got through without
+  saying under which handle); `check_submission(correlation_id)` returns a
+  `SubmissionReport` (`Processing`, `Registered { registration_id }`,
+  `Refused { reason }`, or `Unrecognised { state }`, which is not terminal); and
+  `check_status` and `notify_transfer` take the registration identifier.
+  `RegistryRecord` carries `registration_id` in place of `RegistryIdentifiers`,
+  which listed four identifiers as assigned by the registry when it assigns one;
+  the type is removed. `RegistryStatus` describes a registered record only:
+  `Pending` and `Rejected` were states of a submission and are now
+  `SubmissionReport::Processing` and `Refused`, and a status the type does not
+  name arrives as `Unrecognised(String)`. `GhostRegistrySync` accepts under a
+  placeholder handle and knows of nothing afterwards. **Migration:** keep the
+  correlation identifier `register` returns and poll with it; store the
+  registration identifier from `Registered` and pass it to `check_status` and
+  `notify_transfer`; treat `AlreadyHeld` as a submission to reconcile, not one
+  to resend. (#98)
+
+- **`RegistrationRequest` carries the batch and the item serial.** `batch_id`
+  is the passport's `batch_id` at batch and item level, where IR (EU) 2026/1778
+  Art. 8(4) and 8(5) link it, and `None` at model level. `item_serial` is the
+  serial the passport's carrier prints (`Passport::effective_carrier_serial`)
+  at item level, and `None` above it. Without them an adapter had no batch to
+  link, and nothing to build an item identifier from but the passport's
+  internal id, which matches no label. **Migration:** a struct literal of
+  `RegistrationRequest` adds `batch_id: None, item_serial: None`. (#98)
+
+- **`RegistryEndpoint` points at the hosts the registry's interface calls.**
+  The registry's runtime configuration, read on 2026-10-14, sends the
+  interface's API calls to `reg.product-passport.ec.europa.eu` (`reg.acc.…` for
+  the test environment), its dashboard to `reg.…/dashboard`, and its sign-in to
+  `auth.…`. The published `registry.…` address serves the interface, and every
+  request this crate built went there. `sandbox()` and `production()` now use
+  the API hosts, the token URL sits on the authentication host (its path is
+  still ours), and a new `dashboard_base_url` field carries the dashboard
+  service. **Migration:** a struct literal or stored configuration of
+  `RegistryEndpoint` adds `dashboard_base_url`. (#98)
+
 ### Added
 
 - **`just vocab-drift` names the vocabulary records whose source has moved.**
@@ -989,6 +1088,48 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   followed the conformance claims. The two WASM build workflows are still
   path-filtered, so they cannot be required. (#412)
 
+- **The routes the registry's own interface uses to read a submission back.**
+  Read from its web client on 2026-10-14 and `Observed` in `ENDPOINT_BASIS`: a
+  submission's outcome is a task on a separate dashboard service,
+  `RegistryEndpoint::dashboard_base_url`, listed at `TASKS_PATH` (paged; a
+  registration is a `DPP_REGISTRATION` task carrying a `taskId`, the
+  `correlationId` and a `status`) and read at `TASK_RESULT_PATH_TEMPLATE`, keyed
+  by the task identifier. `PRODUCT_GROUPS_PATH` lists the registry's product
+  groups. No route that takes a correlation identifier was seen, and the
+  registration POST's response is not read by the client, so how a caller gets
+  from one to its task is unobserved. `STATUS_PATH_TEMPLATE` and
+  `TRANSFER_PATH_TEMPLATE` now say that their `{id}` is the registration
+  identifier, never a caller's own passport identifier, which the registry has
+  no record of. (#98)
+
+- **The registry's product-group codes.** A registration names its group by
+  the registry's code, and `registry_product_group` gives it for this
+  workspace's group: `PRODUCT_GROUP_BATTERIES` (`"BATTERIES"`, observed as the
+  group the registration screen preselects). No other group's code has been
+  seen, and none is invented: the answer for every other group is `None`.
+  `RegistrationPayload::check_coherence` compares the product group in the
+  registry's code where there is one. (#98)
+
+- **`RegistrationPayload::check_coherence` checks a registration against the
+  passport it registers.** IR (EU) 2026/1778 Art. 8(7) has the registry read
+  the passport on submission and confirm that the registration data cohere
+  with it (point (b)) and that it conforms to the level registered (point (c)).
+  The check compares the carrier URL, the product identifier, the product
+  group, the level, the model and batch identifiers, the commodity code and the
+  operator and facility identifiers, and requires the model and batch links
+  Art. 8(4) and 8(5) make where the passport shows they exist. A value the
+  passport does not state is not compared, since the registry cannot
+  contradict what it cannot read: a public view withholds the batch unless the
+  product group opens it. Which data are mandatory for the registry is for
+  delegated acts and templates no product group has yet, so this is a reading
+  of point (b) over the fields this crate registers. Refusals are
+  `RegistryValidationError::Incoherent`. (#98)
+
+- **`TOKEN_PATH`, with its basis.** The token URL every `RegistryEndpoint`
+  builds is now a declared route, `Assumed` in `ENDPOINT_BASIS` like the others:
+  Art. 2(3) makes a token part of the access model, and nothing published says
+  where one comes from. (#98)
+
 ### Fixed
 
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
@@ -1188,6 +1329,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `stable` one; it ran only because `cargo +nightly` installs a toolchain it does
   not find. It now asks for `nightly`. (#412)
 
+- **A proof of registration generated before the registration it reports said a
+  field was missing.** `ProofOfRegistration::validate` refused it as
+  `MissingRequiredField("generatedAt")`, naming a field that was present. It is
+  now `RegistryValidationError::ProofPredatesRegistration`, carrying both
+  times. (#98)
+
 ### Documentation
 
 - **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
@@ -1336,6 +1483,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   exist, a report on each pull request and `just semver` at release, and say
   neither fails the build. The release checklist's standards re-read now says to
   run `just standards-status` first. (#412)
+
+- **`dpp-registry` called its token endpoint structurally wrong, and it is half
+  wrong.** IR (EU) 2026/1778 Art. 2(3) defines an authentication token for
+  sessions and delegated access between applications and the registry, so a
+  token in front of the API fits the act. What a token is not is identity, which
+  is the Art. 4 verification by qualified seal or attestation; how a token is
+  obtained is unpublished. The crate docs and the compliance notes now say that,
+  and the compliance notes no longer say that no type models the proof of
+  registration. (#98)
 
 ## [0.21.0] - 2026-09-28
 

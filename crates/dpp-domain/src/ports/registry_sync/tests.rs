@@ -148,18 +148,137 @@ fn a_passport_missing_only_its_carrier_url_reports_only_that() {
 
 #[test]
 fn registry_status_serde_round_trip() {
-    let statuses = vec![
-        RegistryStatus::Pending,
-        RegistryStatus::Registered,
-        RegistryStatus::Rejected,
-        RegistryStatus::SuspendedByAuthority,
-        RegistryStatus::Deactivated,
-    ];
-    for status in statuses {
-        let json = serde_json::to_string(&status).unwrap();
-        let back: RegistryStatus = serde_json::from_str(&json).unwrap();
+    for (status, wire) in [
+        (RegistryStatus::Registered, "REGISTERED"),
+        (
+            RegistryStatus::SuspendedByAuthority,
+            "SUSPENDED_BY_AUTHORITY",
+        ),
+        (RegistryStatus::Deactivated, "DEACTIVATED"),
+    ] {
+        assert_eq!(serde_json::to_value(&status).unwrap(), wire);
+        let back: RegistryStatus = serde_json::from_value(wire.into()).unwrap();
         assert_eq!(status, back);
     }
+}
+
+/// A record state nobody has named here reads as itself, not as a refusal.
+///
+/// `PENDING` and `REJECTED` are among them now: they were states of a
+/// submission, which `SubmissionReport` carries.
+#[test]
+fn an_unnamed_record_state_is_kept() {
+    for wire in ["VERIFICATION_LAPSED", "PENDING", "REJECTED"] {
+        let status: RegistryStatus = serde_json::from_value(wire.into()).unwrap();
+        assert_eq!(status, RegistryStatus::Unrecognised(wire.into()));
+        assert_eq!(serde_json::to_value(&status).unwrap(), wire);
+    }
+}
+
+/// Only a ruling ends polling, and an unrecognised state is not one.
+#[test]
+fn a_submission_report_is_terminal_only_once_ruled_on() {
+    assert!(!SubmissionReport::Processing.is_terminal());
+    assert!(
+        !SubmissionReport::Unrecognised {
+            state: "QUEUED".into()
+        }
+        .is_terminal()
+    );
+    assert!(
+        SubmissionReport::Registered {
+            registration_id: "URI-1".into()
+        }
+        .is_terminal()
+    );
+    assert!(
+        SubmissionReport::Refused {
+            reason: "The UPI URL is invalid.".into()
+        }
+        .is_terminal()
+    );
+}
+
+/// Both handles survive a queue: a caller stores them between polls.
+#[test]
+fn the_acknowledgement_and_the_report_round_trip() {
+    let accepted = SubmissionAcknowledgement::Accepted {
+        correlation_id: "corr-1".into(),
+    };
+    let json = serde_json::to_value(&accepted).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({"kind": "accepted", "correlationId": "corr-1"})
+    );
+    assert_eq!(
+        serde_json::from_value::<SubmissionAcknowledgement>(json).unwrap(),
+        accepted
+    );
+    assert_eq!(
+        serde_json::to_value(SubmissionAcknowledgement::AlreadyHeld).unwrap(),
+        serde_json::json!({"kind": "alreadyHeld"})
+    );
+
+    let registered = SubmissionReport::Registered {
+        registration_id: "URI-1".into(),
+    };
+    let json = serde_json::to_value(&registered).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({"outcome": "registered", "registrationId": "URI-1"})
+    );
+    assert_eq!(
+        serde_json::from_value::<SubmissionReport>(json).unwrap(),
+        registered
+    );
+}
+
+/// Art. 8(4)/(5): the batch is linked at batch and item level, and the item's
+/// serial — the one its label prints, never the passport's id — at item level.
+#[test]
+fn the_batch_and_the_item_serial_follow_the_registration_level() {
+    let mut passport = make_published_passport();
+    passport.batch_id = Some("LOT-2026-07".into());
+    passport.carrier_serial = Some("SN0001".into());
+
+    let at = |granularity| {
+        RegistrationRequest::from_published_passport(&passport, acme(), granularity)
+            .expect("the fixture passport is complete")
+    };
+
+    let item = at(RegistrationGranularity::Item);
+    assert_eq!(item.batch_id.as_deref(), Some("LOT-2026-07"));
+    assert_eq!(item.item_serial.as_deref(), Some("SN0001"));
+    assert_ne!(item.item_serial, Some(passport.id.to_string()));
+
+    let batch = at(RegistrationGranularity::Batch);
+    assert_eq!(batch.batch_id.as_deref(), Some("LOT-2026-07"));
+    assert_eq!(batch.item_serial, None);
+
+    let model = at(RegistrationGranularity::Model);
+    assert_eq!(model.batch_id, None, "a model covers every batch");
+    assert_eq!(model.item_serial, None);
+}
+
+/// No attributed serial: the item's serial is the one derived for its label,
+/// and a blank batch is no batch.
+#[test]
+fn an_unattributed_serial_is_the_derived_one_and_a_blank_batch_is_none() {
+    let mut passport = make_published_passport();
+    passport.batch_id = Some("  ".into());
+    passport.carrier_serial = None;
+
+    let request = RegistrationRequest::from_published_passport(
+        &passport,
+        acme(),
+        RegistrationGranularity::Item,
+    )
+    .expect("the fixture passport is complete");
+    assert_eq!(request.batch_id, None);
+    assert_eq!(
+        request.item_serial.as_deref(),
+        Some(passport.effective_carrier_serial().as_ref())
+    );
 }
 
 /// Art. 8(4): an item-level registration links the model identifier where a

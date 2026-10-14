@@ -120,8 +120,9 @@ impl ProofOfRegistration {
     /// # Errors
     ///
     /// [`RegistryValidationError::MissingRequiredField`] for any of the points
-    /// that cannot be empty, and whatever [`OperatorIdentifier::validate`]
-    /// refuses for point (c).
+    /// that cannot be empty, whatever [`OperatorIdentifier::validate`] refuses
+    /// for point (c), and [`RegistryValidationError::ProofPredatesRegistration`]
+    /// for a proof generated before the registration it reports.
     ///
     /// The commodity code is checked only when present: Art. 9(2)(b) is *"where
     /// relevant"*, so its absence is lawful and its malformation is not.
@@ -149,9 +150,10 @@ impl ProofOfRegistration {
         // otherwise describes an order of events that did not happen, and is the
         // one internal contradiction the five points can express between them.
         if self.registered_at > self.generated_at {
-            return Err(RegistryValidationError::MissingRequiredField(
-                "generatedAt".into(),
-            ));
+            return Err(RegistryValidationError::ProofPredatesRegistration {
+                registered_at: self.registered_at,
+                generated_at: self.generated_at,
+            });
         }
         Ok(())
     }

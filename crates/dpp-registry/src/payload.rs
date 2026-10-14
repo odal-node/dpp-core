@@ -36,7 +36,13 @@ pub struct RegistrationPayload {
     pub facility_id: FacilityIdentifier,
     /// The responsible economic operator identifier.
     pub operator_id: OperatorIdentifier,
-    /// EU ESPR product group code (e.g. `"textile"`, `"battery"`).
+    /// The product group, by the registry's code for it (`"BATTERIES"`).
+    ///
+    /// 👁️ The registry names groups by its own codes — see
+    /// [`registry_product_group`](crate::registry_product_group) — not by this
+    /// workspace's wire names. For a group whose code has not been observed
+    /// there is nothing correct to put here, and nothing the registry would
+    /// accept.
     pub product_group: String,
     /// Schema version of the DPP data (e.g. `"1.1.0"`).
     pub schema_version: String,
@@ -152,6 +158,16 @@ impl RegistrationPayload {
                 return Err(RegistryValidationError::MissingRequiredField(name.into()));
             }
         }
+        // 👁️ User Guide v1.03 chapter 6.2: the identifier is a URL starting with
+        // `https://`, and one that names a non-permitted port is refused. Which
+        // ports are permitted is not stated, so only the default one is assumed
+        // to be.
+        if let Some(reason) = upi_url_defect(&self.digital_link_url) {
+            return Err(RegistryValidationError::InvalidProductIdentifierUrl {
+                value: self.digital_link_url.clone(),
+                reason,
+            });
+        }
         // The registry caps the unique product identifier. Counted in `char`s
         // rather than bytes: the guide says "chars", and a host with a non-ASCII
         // internationalised domain would otherwise be measured as longer than
@@ -165,6 +181,36 @@ impl RegistrationPayload {
         }
         Ok(())
     }
+}
+
+/// What the registry would refuse about `url` as a unique product identifier.
+///
+/// Checks the scheme and the authority only. Anything a structural check cannot
+/// see — a disallowed domain, a redirect the registry will not follow — is the
+/// registry's to report when it fetches the URL.
+fn upi_url_defect(url: &str) -> Option<&'static str> {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return Some("must start with https://");
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host_and_port = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    // An IPv6 literal carries colons of its own, inside its brackets, so the
+    // port separator is looked for only after the closing one.
+    let literal_end = host_and_port.rfind(']').map_or(0, |end| end + 1);
+    let (host, port) = match host_and_port[literal_end..].find(':') {
+        Some(colon) => {
+            let colon = literal_end + colon;
+            (&host_and_port[..colon], Some(&host_and_port[colon + 1..]))
+        }
+        None => (host_and_port, None),
+    };
+    if host.is_empty() {
+        return Some("names no host");
+    }
+    if port.is_some_and(|port| port != "443") {
+        return Some("names a port other than 443");
+    }
+    None
 }
 
 /// Wrapper envelope for all requests to the EU registry.
