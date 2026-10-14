@@ -383,6 +383,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     each must still find its claim in the presentation. A failure is
     `SdJwtError::SelectionDisagrees`, a defect in this crate and not a property of
     the token.
+  - **Into an SD-JWT VC, a path starts at `passport`.** `sd_jwt_vc::issue` holds the
+    passport under `sd_jwt_vc::PASSPORT_CLAIM`, so a member of it is reached as
+    `["passport", "productGroupData", "cathodeMaterial"]`. A path written from the
+    passport alone names nothing in the credential, and choosing by it is refused
+    with `ClaimNotInToken`.
   - **Evidence.** The RFC's section 5.2 and Appendix A.3 presentations are rebuilt
     from their issued tokens by path. A property test builds random trees with random
     hiding and compares the result to a model that finds the Disclosures a path needs

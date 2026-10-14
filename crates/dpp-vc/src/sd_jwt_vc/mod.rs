@@ -65,6 +65,11 @@
 //! object claim instead. The profile's examples put them at the root; it does not
 //! require it.
 //!
+//! So a [`ClaimPath`](dpp_crypto::sd_jwt::ClaimPath) that chooses what a Holder
+//! presents starts at [`PASSPORT_CLAIM`]: `["passport", "productGroupData",
+//! "cathodeMaterial"]`. A path written from the passport alone names nothing in the
+//! credential, and choosing by it is refused (`SdJwtError::ClaimNotInToken`).
+//!
 //! The passport's own `status` is a snapshot, like every other member of it: the
 //! credential cannot follow a passport that is later suspended or retired.
 //!
@@ -137,6 +142,8 @@ pub mod issuer_metadata;
 mod vct;
 mod verify;
 
+#[cfg(test)]
+mod claim_path_tests;
 #[cfg(test)]
 mod issuer_metadata_tests;
 #[cfg(test)]
