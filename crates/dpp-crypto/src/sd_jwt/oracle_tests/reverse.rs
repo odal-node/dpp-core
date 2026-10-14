@@ -10,6 +10,11 @@
 //! the examples are one issuer's output and this crate's own tokens are the other
 //! direction.
 //!
+//! A token the library presented from an issued one also comes with the issued token
+//! and the claim paths it was asked to present. Choosing the Disclosures for those
+//! paths is the library's job in the other direction, and this crate's
+//! [`SdJwt::digests_for_paths`] has to choose the same ones.
+//!
 //! ```text
 //! CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued.json \
 //!   cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
@@ -19,19 +24,22 @@
 //! read. The second runs regardless and shows that the check itself fails on a
 //! mismatch, so a green run of the first means something.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use serde_json::Value;
 
 use crate::jws::verifier::verify_jws;
-use crate::sd_jwt::{KeyBindingPolicy, SdJwt};
+use crate::sd_jwt::{ClaimPath, Disclosure, KeyBindingPolicy, SdJwt};
 
 /// Every way `file` disagrees with this crate.
 ///
 /// `file` is `{ "publicKey": <base64url raw Ed25519 key>, "cases": [...] }`, and a
 /// case is `{ "id", "verdict": "accept" | "refuse", "token", "expected"?,
-/// "challenge"? }`. A case with a `challenge` (`nonce`, `aud`, `now`, `window`) is
-/// read by a Verifier that requires Key Binding.
+/// "challenge"?, "selection"? }`. A case with a `challenge` (`nonce`, `aud`, `now`,
+/// `window`) is read by a Verifier that requires Key Binding. A case with a
+/// `selection` (`of`: the issued token, `paths`: claim paths) was presented from `of`
+/// by the other library, and this crate has to choose the same Disclosures.
 fn disagreements(file: &Value) -> Vec<String> {
     let key = file["publicKey"].as_str().expect("the file names its key");
     let cases = file["cases"].as_array().expect("the file holds cases");
@@ -55,6 +63,11 @@ fn disagreements(file: &Value) -> Vec<String> {
             });
         match (case["verdict"].as_str(), reading) {
             (Some("accept"), Ok((has_kb, payload))) => {
+                if let Some(selection) = case.get("selection")
+                    && let Some(why) = selection_disagreement(selection, token)
+                {
+                    out.push(format!("{id}: {why}"));
+                }
                 if payload != case["expected"] {
                     out.push(format!(
                         "{id}: read {payload}, the other implementation says {}",
@@ -76,6 +89,47 @@ fn disagreements(file: &Value) -> Vec<String> {
         }
     }
     out
+}
+
+/// How this crate's choice of Disclosures for a case's claim paths differs from the
+/// Disclosures the other library presented, if it does.
+fn selection_disagreement(selection: &Value, presented: &str) -> Option<String> {
+    let issued = SdJwt::parse(selection["of"].as_str()?).ok()?;
+    let theirs: BTreeSet<String> = SdJwt::parse(presented)
+        .ok()?
+        .disclosures()
+        .iter()
+        .map(Disclosure::digest)
+        .collect();
+    let paths: Result<Vec<ClaimPath>, _> = selection["paths"]
+        .as_array()?
+        .iter()
+        .map(ClaimPath::from_json)
+        .collect();
+    let Ok(paths) = paths else {
+        return Some(format!(
+            "{} holds a claim path that is not one",
+            selection["paths"]
+        ));
+    };
+    match issued.digests_for_paths(&paths) {
+        Ok(ours) => {
+            let ours: BTreeSet<String> = ours.into_iter().collect();
+            (ours != theirs).then(|| {
+                format!(
+                    "for {} this crate chooses {} Disclosure(s), the other library presented {}",
+                    selection["paths"],
+                    ours.len(),
+                    theirs.len()
+                )
+            })
+        }
+        Err(e) => Some(format!(
+            "the other library presented {} Disclosure(s) for {}, and this crate says: {e}",
+            theirs.len(),
+            selection["paths"]
+        )),
+    }
 }
 
 /// The policy a case's `challenge` describes, when it has one.
@@ -106,6 +160,17 @@ fn what_an_independent_implementation_issued_reads_back_here() {
 
     let count = file["cases"].as_array().map_or(0, Vec::len);
     assert!(count >= 100, "only {count} tokens to read back");
+    // A file with no selections would pass the choice check by never making it.
+    let selections = file["cases"].as_array().map_or(0, |cases| {
+        cases
+            .iter()
+            .filter(|c| c.get("selection").is_some())
+            .count()
+    });
+    assert!(
+        selections >= 20,
+        "only {selections} presentations to choose the Disclosures of"
+    );
     let found = disagreements(&file);
     assert!(
         found.is_empty(),
@@ -114,7 +179,10 @@ fn what_an_independent_implementation_issued_reads_back_here() {
         found.len(),
         found.join("\n")
     );
-    eprintln!("read back {count} tokens issued by an independent implementation");
+    eprintln!(
+        "read back {count} tokens issued by an independent implementation, \
+         and chose the same Disclosures for {selections} presentations of them"
+    );
 }
 
 #[test]
@@ -161,6 +229,41 @@ fn the_readback_check_fails_on_a_mismatch() {
         disagreements(&wrong_key).len(),
         1,
         "a token under another key must be reported"
+    );
+
+    // A presentation is held to the claim paths it was made for. The paths it was
+    // made for agree, other paths are reported, and so is a path not in the token.
+    let full = SdJwt::parse(&token).expect("parses");
+    let only_a: Vec<String> = full
+        .disclosures()
+        .iter()
+        .filter(|d| d.claim_name() == Some("a"))
+        .map(Disclosure::digest)
+        .collect();
+    let presented_a = full
+        .present(&only_a.iter().map(String::as_str).collect::<Vec<_>>())
+        .expect("presents")
+        .serialise();
+    let selection_file = |paths: Value| {
+        json!({
+            "publicKey": issuer.public_key_b64,
+            "cases": [{
+                "id": "selected", "verdict": "accept", "token": presented_a,
+                "expected": {"a": 1, "b": ["x"]},
+                "selection": { "of": token, "paths": paths },
+            }]
+        })
+    };
+    assert!(disagreements(&selection_file(json!([["a"]]))).is_empty());
+    assert_eq!(
+        disagreements(&selection_file(json!([["b", 1]]))).len(),
+        1,
+        "a presentation made for other paths must be reported"
+    );
+    assert_eq!(
+        disagreements(&selection_file(json!([["nope"]]))).len(),
+        1,
+        "a path this crate cannot find must be reported"
     );
 
     // A bound token is read with its Key Binding JWT checked: under the challenge

@@ -63,7 +63,7 @@
 //! of the array, because the order is the data. That is why [`conceal_elements`]
 //! does not sort the way [`conceal`] does.
 //!
-//! # Two requirements that are easy to miss and are tested
+//! # Requirements that are easy to miss and are tested
 //!
 //! - **Digest order must not follow claim order.** Clause 4.2.4.1: *"The Issuer
 //!   MUST hide the original order of the claims in the array."* Pushing digests
@@ -86,7 +86,10 @@
 //!   deduplicating collection.
 //! - **A presentation selects disclosures by digest, not by claim name.** One
 //!   name can belong to several disclosures, so selecting by name reveals values
-//!   the holder did not choose. See [`SdJwt::present`].
+//!   the holder did not choose. See [`SdJwt::present`]. Going from the claims a
+//!   holder wants to those digests is [`SdJwt::digests_for_paths`], which takes
+//!   claim paths, so a nested claim brings the claims above it and an array element
+//!   can be named by its position.
 //! - **A presentation is checked before it leaves.** Clause 7.2 step 2: each
 //!   Disclosure chosen must be referenced by the Issuer-signed JWT or by another
 //!   one chosen. A child chosen without its parent is a Disclosure no Verifier can
@@ -98,6 +101,7 @@ pub mod error;
 
 mod builder;
 mod key_binding;
+mod select;
 
 #[cfg(test)]
 mod array_tests;
@@ -118,9 +122,16 @@ mod rfc9901_vector_tests;
 #[cfg(test)]
 mod salt_tests;
 #[cfg(test)]
+mod select_model_tests;
+#[cfg(test)]
+mod select_position_tests;
+#[cfg(test)]
+mod select_tests;
+#[cfg(test)]
 mod tests;
 
 pub use builder::{SdJwt, build_payload, conceal, conceal_elements};
 pub use disclosure::{Disclosure, SD_HASH_ALG, digest_of};
 pub use error::{DisclosureError, SdJwtError};
 pub use key_binding::{KeyBinding, KeyBindingPolicy, holder_key_confirmation};
+pub use select::{ClaimPath, PathSegment};

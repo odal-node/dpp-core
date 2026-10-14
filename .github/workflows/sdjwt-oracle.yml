@@ -23,13 +23,15 @@
 #   1. the corpus: 700+ tokens built from claim trees, adversarial tokens,
 #      presentations bound to a Holder's key (judged with Key Binding required),
 #      and the RFC's own, judged by the TypeScript library (`judge.mjs`);
-#   2. a credential per product group, judged by it, with the `kid` recomputed from
-#      the public key (`credentials.mjs`);
+#   2. a credential per product group, and one bound to a Holder per group
+#      (judged with Key Binding required), judged by it, with the `kid` recomputed
+#      from the public key (`credentials.mjs`);
 #   3. it issues tokens (`issue.mjs`), and `dpp_crypto` reads them;
-#   4. it issues credentials, and `dpp_vc` verifies them;
+#   4. it issues credentials, some bound, and `dpp_vc` verifies them;
 #   5. the same files are regenerated to show they are reproducible;
 #   6. the same corpus and credentials, judged by the Kotlin library, and the
-#      tokens it issues read by `dpp_crypto` (`.github/oracle/sdjwt-jvm`).
+#      tokens and credentials it issues read by `dpp_crypto` and `dpp_vc`
+#      (`.github/oracle/sdjwt-jvm`).
 #
 # What it does **not** answer, and the register row says so. The original order of
 # the claims (RFC 9901 clause 4.2.4.1) cannot be seen by any verifier; what is
@@ -185,6 +187,10 @@ jobs:
       - name: Read what it issued
         if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}
         run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+
+      - name: Verify the credentials it issued
+        if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}
+        run: CHECK_SDJWT_VC_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin-vc.json cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus what_an_independent
 
       # What failed, in a form that can be read without rerunning anything.
       - name: Keep the corpus
