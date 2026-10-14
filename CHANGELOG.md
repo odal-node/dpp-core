@@ -1023,6 +1023,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   identifier, never a caller's own passport identifier, which the registry has
   no record of. (#98)
 
+- **`RegistrationPayload::check_coherence` checks a registration against the
+  passport it registers.** IR (EU) 2026/1778 Art. 8(7) has the registry read
+  the passport on submission and confirm that the registration data cohere
+  with it (point (b)) and that it conforms to the level registered (point (c)).
+  The check compares the carrier URL, the product identifier, the product
+  group, the level, the model and batch identifiers, the commodity code and the
+  operator and facility identifiers, and requires the model and batch links
+  Art. 8(4) and 8(5) make where the passport shows they exist. A value the
+  passport does not state is not compared, since the registry cannot
+  contradict what it cannot read: a public view withholds the batch unless the
+  product group opens it. Which data are mandatory for the registry is for
+  delegated acts and templates no product group has yet, so this is a reading
+  of point (b) over the fields this crate registers. Refusals are
+  `RegistryValidationError::Incoherent`. (#98)
+
+- **`TOKEN_PATH`, with its basis.** The token URL every `RegistryEndpoint`
+  builds is now a declared route, `Assumed` in `ENDPOINT_BASIS` like the others:
+  Art. 2(3) makes a token part of the access model, and nothing published says
+  where one comes from. (#98)
+
 ### Fixed
 
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`

@@ -187,6 +187,25 @@ fn production_endpoint() {
     assert!(ep.mtls_required);
 }
 
+/// Every endpoint's token URL is the declared route, so the basis the table
+/// gives `TOKEN_PATH` is the basis of the URL a caller actually calls.
+#[test]
+fn every_token_endpoint_is_the_declared_token_route() {
+    for ep in [
+        RegistryEndpoint::sandbox(),
+        RegistryEndpoint::production(),
+        RegistryEndpoint::stand_in("http://127.0.0.1:8090"),
+    ] {
+        let token = ep.token_endpoint.expect("each endpoint names a token URL");
+        assert!(
+            token.ends_with(TOKEN_PATH),
+            "{token} is not the declared token route"
+        );
+        // Beside the API, not under it.
+        assert!(!token.contains("/api/v1"), "{token}");
+    }
+}
+
 /// A stand-in is shaped like the registry's endpoints, so a caller takes the
 /// same path against it, and is named as what it is, so nothing mistakes it for
 /// either of them.
@@ -922,7 +941,7 @@ fn the_observed_submission_limits_are_recorded() {
 fn every_wire_constant_declares_a_basis() {
     use crate::endpoint::{
         IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, basis_of,
+        SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     for declared in [
@@ -930,6 +949,7 @@ fn every_wire_constant_declares_a_basis() {
         SUBMISSION_STATUS_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
+        TOKEN_PATH,
         IDEMPOTENCY_KEY_HEADER,
     ] {
         assert!(
@@ -942,7 +962,7 @@ fn every_wire_constant_declares_a_basis() {
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
         crate::ENDPOINT_BASIS.len(),
-        5,
+        6,
         "the table grew or shrank without this test being told"
     );
 }
@@ -956,7 +976,7 @@ fn every_wire_constant_declares_a_basis() {
 fn each_route_carries_the_tier_its_prose_claims() {
     use crate::endpoint::{
         IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, basis_of,
+        SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     // Read off the registry's own web client.
@@ -971,12 +991,13 @@ fn each_route_carries_the_tier_its_prose_claims() {
     }
 
     // Nothing behind them. The asynchronous flow needs *a* route to read a
-    // submission back and *a* status route, transfers need *a* route, and
-    // naming one is not knowing it.
+    // submission back and *a* status route, transfers need *a* route, a token
+    // has to come from somewhere, and naming one is not knowing it.
     for assumed in [
         SUBMISSION_STATUS_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
+        TOKEN_PATH,
     ] {
         let basis = basis_of(assumed).expect("declared");
         assert!(!basis.is_observed(), "{assumed} rests on nothing");
