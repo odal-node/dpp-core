@@ -38,11 +38,13 @@ never "not applicable" — a missing licence blocks reuse rather than allowing i
 - **`verified`** — a person read the authority's own publication. Only a
   `verified` vocabulary can carry permitted terms.
 - **`tracked`** — evaluated and not adopted, with a recorded finding. Refused.
-- **`surveyed`** — known to exist from a secondary source. **Nothing has been
-  read.** Refused, and the weakest state: a survey can be wrong about the IRI,
-  the version, the licence and the scope at once.
+- **`surveyed`** — known to exist from a secondary source, or from a directory
+  listing or release notes alone. **No term has been read.** Refused, and the
+  weakest state: a survey can be wrong about the IRI, the version, the licence
+  and the scope at once.
 
-Nothing here is `verified` today. That is the accurate state, not an omission.
+Six of the twenty records are `verified`; the crate README names them. The rest
+stay refused. That is the accurate state, not an omission.
 
 ## Term counts are deliberately absent
 
@@ -50,5 +52,5 @@ Every published term count for these vocabularies traces to one third-party
 site's own summaries. Two independent readings of the same CIRPASS-2 version
 produced **233** and **338**. A count is not load-bearing, and an unverified
 number in a published crate is the defect class this directory exists to
-prevent. The survey figures are recorded in the private research notes, marked
+prevent. The survey figures are recorded outside this repository, marked
 as reported rather than measured.
