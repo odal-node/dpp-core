@@ -224,11 +224,13 @@ impl Disclosure {
     }
 }
 
-/// The digest of an already-encoded disclosure string.
+/// The digest of an already-encoded string: base64url(SHA-256(ASCII(`encoded`))).
 ///
-/// Free function because a verifier hashes strings it has not parsed yet: an
-/// unreadable disclosure must still be digested to be reported as unmatched,
-/// rather than silently dropped.
+/// Free function because not everything hashed this way is a Disclosure. A
+/// Disclosure's digest (clause 4.2.3, [`Disclosure::digest`]) is one; the other is
+/// the presentation a Key Binding JWT's `sd_hash` covers (clause 4.3.1,
+/// [`SdJwt::sd_hash`](super::SdJwt::sd_hash)), which is the Issuer-signed JWT and
+/// its Disclosures joined by `~`.
 pub fn digest_of(encoded: &str) -> String {
     b64().encode(Sha256::digest(encoded.as_bytes()))
 }

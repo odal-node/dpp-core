@@ -291,12 +291,30 @@ const vcCases = [];
 // is recorded, but a case it judges the other way fails the run: otherwise a
 // credential refused through a mistake here (a wrong `currentDate`, say) would be
 // written down as a refusal, and this crate asked to agree with it.
-async function addVc(id, claims, frame, { vct = VCT, presentation, intended = "accept" } = {}) {
+//
+// A bound credential names the Holder in `cnf`, and its presentation carries a Key
+// Binding JWT made for `aud` (the Verifier's audience unless a case says
+// otherwise). The library verifies it with Key Binding required, held to the
+// challenge the case records, and so must `dpp_vc`.
+const VC_AUDIENCE = "https://verifier.example";
+async function addVc(id, claims, frame, { vct = VCT, presentation, intended = "accept", keyBinding, aud = VC_AUDIENCE } = {}) {
   try {
-    const issued = await sd.issue(claims, frame, { header: { typ: "dc+sd-jwt" } });
+    const nonce = `nonce-${id}`;
+    const issued = await sd.issue(keyBinding ? { ...claims, cnf: { jwk: holder.publicJwk } } : claims, frame, {
+      header: { typ: "dc+sd-jwt" },
+    });
     if (!checkIssued(id, frame, issued)) return;
-    const token = presentation === undefined ? issued : await sd.present(issued, presentation);
-    const options = { currentDate: VC_NOW, expectedVct: vct, requiredClaimKeys: ["iss", "vct"] };
+    const token =
+      presentation === undefined && !keyBinding
+        ? issued
+        : await sd.present(issued, presentation ?? {}, keyBinding ? { kb: { payload: { iat: VC_NOW, aud, nonce } } } : undefined);
+    const challenge = keyBinding ? { nonce, aud: VC_AUDIENCE, now: VC_NOW, window: 0 } : undefined;
+    const options = {
+      currentDate: VC_NOW,
+      expectedVct: vct,
+      requiredClaimKeys: ["iss", "vct"],
+      ...(challenge && { keyBindingNonce: nonce, expectedKeyBindingAudience: VC_AUDIENCE }),
+    };
     let verdict = "accept";
     let expected;
     let why;
@@ -312,7 +330,7 @@ async function addVc(id, claims, frame, { vct = VCT, presentation, intended = "a
           `the library ${verdict === "accept" ? "accepts" : "refuses"} it${why ? ` (${why})` : ""}`,
       );
     }
-    vcCases.push({ id, token, vct, verdict, ...(expected && { expected }) });
+    vcCases.push({ id, token, vct, verdict, ...(expected && { expected }), ...(challenge && { challenge }) });
   } catch (e) {
     problems.push(`${id}: the library cannot issue this credential: ${e?.message ?? e}`);
   }
@@ -334,6 +352,16 @@ await addVc("vc/fractional-exp", { ...credential, exp: VC_NOW + 0.5 }, undefined
 await addVc("vc/another-vct-than-expected", { ...credential, vct: "tag:example.test:vct:other:1" }, undefined, { intended: "refuse" });
 await addVc("vc/no-vct", { iss: credential.iss, iat: credential.iat, name: "Alice" }, undefined, { intended: "refuse" });
 await addVc("vc/no-iss", { vct: VCT, iat: credential.iat, name: "Alice" }, undefined, { intended: "refuse" });
+await addVc("vc/bound-all-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true, meta: true } });
+await addVc("vc/bound-one-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true } });
+await addVc("vc/bound-nothing-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: {} });
+await addVc("vc/bound-array-element", credential, { tags: { _sd: ["1"] } }, { keyBinding: true, presentation: { tags: { 1: true } } });
+await addVc("vc/bound-for-another-audience", credential, { _sd: ["name"] }, {
+  keyBinding: true,
+  presentation: { name: true },
+  aud: "https://another-verifier.example",
+  intended: "refuse",
+});
 
 // -----------------------------------------------------------------------------
 

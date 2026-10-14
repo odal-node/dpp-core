@@ -9,6 +9,16 @@ repository.workspace  = true
 rust-version.workspace = true
 publish = false
 
+# `plugins/` and `fuzz/` are separate workspaces, so cargo-release never sees
+# them. This crate carries the two steps that keep them in lockstep
+# (`plugin_version_lockstep.rs`, `just lock-check`): move the plugins' version,
+# then re-resolve both lockfiles against it. It is one crate so each runs once.
+[package.metadata.release]
+pre-release-replacements = [
+    { file = "../../plugins/Cargo.toml", search = '(?m)^version = "[^"]*"', replace = 'version = "{{version}}"', exactly = 1 },
+]
+pre-release-hook = ["just", "relock"]
+
 [lib]
 name = "dpp_tests"
 path = "src/lib.rs"

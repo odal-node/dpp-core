@@ -1,11 +1,13 @@
 package io.odalnode.oracle
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.Ed25519Signer
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator
 import eu.europa.ec.eudi.sdjwt.NimbusSdJwtOps
 import eu.europa.ec.eudi.sdjwt.cnf
+import eu.europa.ec.eudi.sdjwt.dsl.values.SdJwtObjectBuilder
 import eu.europa.ec.eudi.sdjwt.dsl.values.sdJwt
 import eu.europa.ec.eudi.sdjwt.vc.ClaimPath
 import kotlinx.coroutines.runBlocking
@@ -24,12 +26,23 @@ import java.util.Date
  * `.github/oracle/sdjwt/issue.mjs` writes, so `sd_jwt::oracle_tests::reverse`
  * reads it with `CHECK_SDJWT_ORACLE_ISSUED`.
  *
+ * Beside it, `issued-kotlin-vc.json`: credentials with the `dc+sd-jwt` type and a
+ * `vct`, four of them bound to the Holder, in the shape `issue.mjs` writes
+ * `issued-vc.json`, so `dpp_vc::sd_jwt_vc::verify` reads them with
+ * `CHECK_SDJWT_VC_ORACLE_ISSUED`, with Key Binding required for a bound one. The
+ * library's verdict is its RFC 9901 reading; it is not asked about the profile.
+ *
  * Not reproducible byte for byte: the library draws its salts from the system
  * generator, and a fresh key is made each run. The shapes are fixed.
  */
 private val props = (0..5).map { "n$it" }
 
-private class Case(val id: String, val token: String, val challenge: Challenge? = null)
+private class Case(val id: String, val token: String, val challenge: Challenge? = null, val vct: String? = null)
+
+/** The credentials' type, and the instant they are issued a minute before. */
+private const val VCT = "tag:example.test:vct:oracle:1"
+private const val VC_NOW = 1_789_000_060L
+private const val AUDIENCE = "https://verifier.example"
 
 fun main(args: Array<String>) {
     val out = args.firstOrNull() ?: error("usage: IssueKt <issued-kotlin.json>")
@@ -191,6 +204,65 @@ fun main(args: Array<String>) {
                     onFailure = { problems += "$id: ${it::class.simpleName}: ${it.message}" },
                 )
             }
+
+            // Credentials: the same library, issuing with the profile's type.
+            val vcIssuer = issuer(
+                signer = Ed25519Signer(issuerKey),
+                signAlgorithm = JWSAlgorithm.EdDSA,
+                jwsHeaderCustomization = { type(JOSEObjectType("dc+sd-jwt")) },
+            )
+            val vcKbIssuer = { nonce: String ->
+                kbJwtIssuer(Ed25519Signer(holderKey), JWSAlgorithm.EdDSA, holderJwk) {
+                    audience(AUDIENCE)
+                    claim("nonce", nonce)
+                    issueTime(Date(VC_NOW * 1000))
+                }
+            }
+            fun credential(bound: Boolean, minimumDigests: Int? = null, body: SdJwtObjectBuilder.() -> Unit) =
+                sdJwt(minimumDigests = minimumDigests) {
+                    claim("iss", "https://issuer.example"); claim("vct", VCT); claim("iat", VC_NOW - 60)
+                    if (bound) cnf(holderJwk)
+                    body()
+                }
+            val vcShapes = listOf(
+                Triple("vc/plain", credential(false) { claim("name", JsonPrimitive("Alice")); claim("age", JsonPrimitive(30)) }, null),
+                Triple("vc/concealed-all-shown", credential(false) { sdClaim("name", JsonPrimitive("Alice")); sdClaim("age", JsonPrimitive(30)) }, null),
+                Triple("vc/concealed-one-shown", credential(false) { sdClaim("name", JsonPrimitive("Alice")); sdClaim("age", JsonPrimitive(30)) }, setOf(ClaimPath.claim("name"))),
+                Triple("vc/array-element-concealed", credential(false) {
+                    arrClaim("tags") { claim(JsonPrimitive("a")); sdClaim(JsonPrimitive("b")) }
+                }, setOf(ClaimPath.claim("tags").arrayElement(1))),
+                Triple("vc/nested-concealed", credential(false) { objClaim("meta") { sdClaim("k", JsonPrimitive(1)) } }, null),
+                Triple("vc/decoys", credential(false, minimumDigests = 6) { sdClaim("name", JsonPrimitive("Alice")) }, null),
+            )
+            for ((id, spec, query) in vcShapes) {
+                runCatching {
+                    val issued = vcIssuer.issue(spec).getOrThrow()
+                    if (query == null) issued.serialize() else checkNotNull(issued.present(query)) { "nothing to present" }.serialize()
+                }.fold(
+                    onSuccess = { cases += Case(id, it, vct = VCT) },
+                    onFailure = { problems += "$id: ${it::class.simpleName}: ${it.message}" },
+                )
+            }
+            val boundVcShapes = listOf(
+                "vc/bound-all-shown" to setOf(ClaimPath.claim("name"), ClaimPath.claim("age")),
+                "vc/bound-one-shown" to setOf(ClaimPath.claim("name")),
+                "vc/bound-nothing-shown" to setOf(ClaimPath.claim("iss")),
+                "vc/bound-array-element" to setOf(ClaimPath.claim("tags").arrayElement(1)),
+            )
+            for ((id, query) in boundVcShapes) {
+                val nonce = "nonce-$id"
+                runCatching {
+                    val spec = credential(true) {
+                        sdClaim("name", JsonPrimitive("Alice")); sdClaim("age", JsonPrimitive(30))
+                        arrClaim("tags") { claim(JsonPrimitive("a")); sdClaim(JsonPrimitive("b")) }
+                    }
+                    val presented = checkNotNull(vcIssuer.issue(spec).getOrThrow().present(query)) { "nothing to present" }
+                    presented.serializeWithKeyBinding(vcKbIssuer(nonce)).getOrThrow()
+                }.fold(
+                    onSuccess = { cases += Case(id, it, Challenge(nonce, AUDIENCE, VC_NOW, 0), VCT) },
+                    onFailure = { problems += "$id: ${it::class.simpleName}: ${it.message}" },
+                )
+            }
         }
     }
 
@@ -204,6 +276,7 @@ fun main(args: Array<String>) {
                     put("verdict", JsonPrimitive("accept"))
                     put("token", JsonPrimitive(case.token))
                     put("expected", verdict.claims)
+                    case.vct?.let { put("vct", JsonPrimitive(it)) }
                     case.challenge?.let { ch ->
                         put("keyBinding", JsonPrimitive(true))
                         put(
@@ -232,13 +305,25 @@ fun main(args: Array<String>) {
         problems.forEach { System.err.println("  $it") }
         kotlin.system.exitProcess(1)
     }
+    val (credentials, tokens) = written.partition { it["vct"] != null }
     File(out).also { it.parentFile?.mkdirs() }.writeText(
         JsonObject(
             mapOf(
                 "publicKey" to JsonPrimitive(issuerKey.x.toString()),
-                "cases" to JsonArray(written),
+                "cases" to JsonArray(tokens),
             ),
         ).toString(),
     )
-    println("eudi-lib-jvm-sdjwt-kt issued ${written.size} tokens to $out")
+    val vcOut = File(File(out).absoluteFile.parentFile, "issued-kotlin-vc.json")
+    vcOut.writeText(
+        JsonObject(
+            mapOf(
+                "publicKey" to JsonPrimitive(issuerKey.x.toString()),
+                "now" to JsonPrimitive(VC_NOW),
+                "cases" to JsonArray(credentials),
+            ),
+        ).toString(),
+    )
+    println("eudi-lib-jvm-sdjwt-kt issued ${tokens.size} tokens to $out")
+    println("and ${credentials.size} credentials (${credentials.count { it["challenge"] != null }} bound) to $vcOut")
 }

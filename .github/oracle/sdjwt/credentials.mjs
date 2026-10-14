@@ -12,12 +12,22 @@
  *                             public key, and reads the claims. They must be the
  *                             claims this crate reads.
  *   the passport              The credential as issued must reveal exactly the
- *                             passport that went in, plus the `iss`, `vct` and
- *                             `iat` the issuer sets. Concealment that lost or
- *                             invented a claim shows here.
+ *                             passport that went in, under the `passport` claim,
+ *                             plus the `iss`, `vct` and `iat` the issuer sets at
+ *                             the root. Concealment that lost or invented a claim
+ *                             shows here, and so does a passport member that
+ *                             reached the root.
  *   the `kid`                 Recomputed from the public key as the RFC 7638
  *                             thumbprint in the RFC 9278 URI form, and compared
  *                             with the `kid` in every JWT header.
+ *   Key Binding               A case with a `challenge` is a credential bound to a
+ *                             Holder's key and presented for that challenge. The
+ *                             library reads it with Key Binding required, held to
+ *                             the nonce, audience and instant, and must reveal the
+ *                             passport plus the `cnf` naming the Holder. A case
+ *                             `intended` to be refused is a bound token handed to a
+ *                             reader that asks for no Key Binding, which this crate
+ *                             refuses; what the library does with it is listed below.
  *
  * **RFC 9901 level only.** The credential profile (the `dc+sd-jwt` type, `vct`) is
  * an Internet-Draft and nothing here is evidence of conformance to it; the `typ`
@@ -29,13 +39,35 @@
 
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { ascending, judge, libraryVersion, same, sdArrays, verifyingInstance } from "./lib.mjs";
+import {
+  ascending,
+  judge,
+  keyBindingOptions,
+  libraryVersion,
+  same,
+  sdArrays,
+  verifyingInstance,
+} from "./lib.mjs";
 
 const corpusPath = process.argv[2] ?? "target/sdjwt-oracle/credentials.json";
 const corpus = JSON.parse(readFileSync(corpusPath, "utf8"));
 
 const failures = [];
 const fail = (id, why) => failures.push(`${id}: ${why}`);
+
+/**
+ * Cases this crate refuses and the library accepts, keyed by the end of the case
+ * id, with the reason it is not a defect here. A refused case not listed fails the
+ * run, and so does an entry the library has stopped accepting.
+ */
+const KNOWN_DISAGREEMENTS = {
+  "/bound-to-a-reader-expecting-none": {
+    supports: "both",
+    reason:
+      "A reader that asks for no Key Binding is handed an SD-JWT+KB. Clause 4: a Verifier that expects an SD-JWT MUST verify that the last segment is empty, which is this crate's refusal. The library follows clause 7.3 step 3, which parses an SD-JWT+KB whatever the policy, and checks the Key Binding JWT only when asked to.",
+  },
+};
+const knownFor = (id) => Object.entries(KNOWN_DISAGREEMENTS).find(([suffix]) => id.endsWith(suffix));
 
 /** RFC 7638 for an OKP key, then the URI form of RFC 9278. */
 function thumbprintUri(jwk) {
@@ -66,6 +98,13 @@ const issued = corpus.cases.find((c) => c.id.endsWith("/issued"));
     const flipped = [[h, p, (s[0] === "A" ? "B" : "A") + s.slice(1)].join("."), ...rest].join("~");
     if ((await judge(instance, flipped, options)).accepts) problems.push("a changed signature was accepted");
   }
+  // Key Binding has to be able to fail too: a bound credential, another nonce.
+  const bound = corpus.cases.find((c) => c.challenge && c.ours.accepts);
+  if (!bound || !(await judge(instance, bound.token, keyBindingOptions(bound.challenge))).accepts) {
+    problems.push("a bound credential is refused under its own challenge");
+  } else if ((await judge(instance, bound.token, keyBindingOptions({ ...bound.challenge, nonce: "another nonce" }))).accepts) {
+    problems.push("a Key Binding JWT was accepted for a nonce it does not carry");
+  }
   const stranger = generateKeyPairSync("ed25519").publicKey.export({ format: "jwk" });
   if (thumbprintUri(stranger) === corpus.kid) problems.push("two different keys have one thumbprint");
   if (ascending(["b", "a"]) || !ascending(["a", "b"])) problems.push("the ascending check is wrong on a plain list");
@@ -89,6 +128,7 @@ const expectedKid = thumbprintUri(corpus.issuerJwk);
 if (corpus.kid !== expectedKid) fail("corpus", `the corpus says the kid is ${corpus.kid}, the key's thumbprint is ${expectedKid}`);
 
 const groups = new Set();
+const listed = [];
 let orderArrays = 0;
 for (const c of corpus.cases) {
   groups.add(c.productGroup);
@@ -104,7 +144,15 @@ for (const c of corpus.cases) {
   if (header.alg !== "EdDSA") fail(c.id, `alg is ${header.alg}`);
   if (header.typ !== "dc+sd-jwt") fail(c.id, `typ is ${header.typ}`);
 
-  const theirs = await judge(instance, c.token, options);
+  const theirs = await judge(instance, c.token, c.challenge ? keyBindingOptions(c.challenge) : options);
+  if (c.intended === "refuse") {
+    const known = knownFor(c.id);
+    if (c.ours.accepts) fail(c.id, "this crate accepts a token it is meant to refuse");
+    if (theirs.accepts && !known) fail(c.id, "this crate refuses it, the library accepts it, and no reason is listed");
+    if (!theirs.accepts && known) fail(c.id, "listed as a difference, but the library refuses it too: remove the entry");
+    if (theirs.accepts && known) listed.push([c.id, known[1]]);
+    continue;
+  }
   if (!c.ours.accepts) fail(c.id, `this crate refuses its own credential: ${c.ours.error}`);
   if (!theirs.accepts) {
     fail(c.id, `the library refuses it: ${theirs.error}`);
@@ -118,8 +166,15 @@ for (const c of corpus.cases) {
   }
 }
 
-console.log(`${corpus.cases.length} credentials across ${groups.size} product groups; kid ${expectedKid}`);
+for (const suffix of Object.keys(KNOWN_DISAGREEMENTS)) {
+  if (!corpus.cases.some((c) => c.id.endsWith(suffix))) fail(suffix, "listed as a difference, but no case has that id");
+}
+
+const bound = corpus.cases.filter((c) => c.challenge).length;
+console.log(`${corpus.cases.length} credentials across ${groups.size} product groups, ${bound} bound to a Holder; kid ${expectedKid}`);
 console.log(`claim order (clause 4.2.4.1): ${orderArrays} _sd arrays of two or more digests; each strictly ascending`);
+console.log(`known differences, each argued above: ${listed.length}`);
+for (const [id, k] of listed) console.log(`  ${id}\n    this crate refuses; RFC supports ${k.supports}. ${k.reason}`);
 
 if (failures.length) {
   console.error(`\n${failures.length} FAILURE(S):`);

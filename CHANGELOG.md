@@ -15,6 +15,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **An SD-JWT VC names its Holder, and its reader says whether it wants Key
+  Binding.** `dpp_vc::sd_jwt_vc::issue` takes the credential's own claims as one
+  `Issuance` (`issuer`, `vct`, `issued_at`, and `holder_key`, an Ed25519 public
+  key or `None`) in place of its last three arguments. `verify` takes a fifth,
+  `key_binding`: a `KeyBindingPolicy` requires a Key Binding JWT, and `None`
+  now refuses a token that carries one (`SdJwtVcError::UnexpectedKeyBinding`),
+  since RFC 9901 clause 4 says a Verifier that expects an SD-JWT MUST find the
+  last segment empty. **Migration:** wrap the three arguments in `Issuance {
+  ..., holder_key: None }`, which issues what was issued before, and pass `None`
+  to `verify`. See Added. (#430)
+
+- **`sd_jwt_vc::verify` refuses a credential that discloses a claim the profile
+  keeps out of Disclosures.** draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2.3 says
+  `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity`, `aka_vcts` and `status`,
+  with their sub-claims, MUST NOT be included in Disclosures. RFC 9901 clause 9.7
+  only advises an Issuer against it. A credential where one of them, or a part of
+  one, arrived in a Disclosure is refused with `SdJwtVcError::DisclosedClaim`.
+  A Disclosure the Holder withheld cannot be seen, so keeping these claims in the
+  clear stays the Issuer's half of the rule. (#430)
+
+- **An SD-JWT VC holds its passport under one claim.** `sd_jwt_vc::issue` used to
+  merge the passport's root members into the credential's claims. It now writes
+  `iss`, `vct`, `iat` and, for a bound credential, `cnf` at the root, and the whole
+  passport under `passport` (`sd_jwt_vc::PASSPORT_CLAIM`). The merge left the
+  credential's claim names to the passport schema, and one collided: a passport's
+  lifecycle `status` became the credential's `status`, which the profile registers
+  as the reference to a Token Status List and tells a Verifier to check
+  (draft-ietf-oauth-sd-jwt-vc-19 clauses 2.2.2.3 and 2.4). Every credential in the
+  oracle corpus carried `"status": "draft"` in the clear. An `exp`, `nbf`, `cnf` or
+  `aud` in a passport would have collided the same way. Nested, no passport member
+  can be read as a claim of the credential, whatever a later schema adds, and the
+  claims the issuer sets are no longer walked for concealment at all, so the list of
+  names that were exempt from it is gone. `verify` still returns every claim of the
+  credential: a caller reads the passport from `claims["passport"]`.
+  **Migration:** read the passport from `passport`, not from the root. A credential
+  issued before this change carries the passport's `status`, a string, at the
+  root, and `verify` now refuses it (`SdJwtVcError::MalformedStatus`, below), so
+  issue it again. (#435)
+
+- **`sd_jwt_vc::verify` refuses a `status` claim that is not an object.** The
+  profile registers `status` for a reference to a Token Status List, and
+  draft-ietf-oauth-status-list-21 section 6.2 gives its value as an object. Nothing
+  follows the reference yet, so the shape is all that can be held to; a string
+  where a status mechanism is expected is refused as `SdJwtVcError::MalformedStatus`
+  instead of passing for one. The draft has a row in the standards register. (#435)
+
 - **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
   passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
   `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
@@ -733,6 +779,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Binding JWTs they issue; the RFC's own three, made with P-256 Holder keys, are
   checked by their `sd_hash`. (#428, #431)
 
+- **SD-JWT VC Key Binding.** A credential bound to its Holder carries the
+  Holder's Ed25519 key as `cnf`, signed in the clear, which the profile's clause
+  2.2.2.3 requires for Key Binding. A Holder binds a presentation with
+  `SdJwt::present_with_key_binding`, and `sd_jwt_vc::verify` with a
+  `KeyBindingPolicy` checks it as RFC 9901 clause 7.3 and the profile's clause
+  2.4 say, with the key in `cnf`. Only the `jwk` confirmation method is read, so
+  no key material is fetched (the profile's clause 8.3). Both independent
+  implementations read a bound credential for every product group with Key
+  Binding required, to the passport plus `cnf`. The TypeScript library issues
+  five bound credentials and the Kotlin library four, and `verify` reaches each
+  library's verdict under the same challenge, including the refusal of one made
+  for another audience. Handed a bound token, a reader that asks for no Key
+  Binding refuses it, as the Kotlin library does in the same mode. The
+  TypeScript library reads clause 7.3 step 3 instead and accepts it, which its
+  judge lists. Still no conformance claim for the profile, which is an
+  Internet-Draft. RFC 7800, whose `jwk` method names the Holder's key, gets a
+  row in the standards register. (#430)
+
 - **An independent implementation of RFC 9901 now judges the SD-JWTs this
   repository issues, and issues some for it to read.** `sdjwt-oracle.yml` runs
   `@sd-jwt/core` 0.22.0, pinned by a committed lockfile and installed with
@@ -922,6 +986,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     that the artifacts are attached to GitHub Releases. Nothing did either, and
     no workflow in this repository attaches them. It now says what is true.
 
+- **`cargo release` moves the plugins' version.** The lockstep test only fails
+  when the plugins' version differs from the workspace's; nothing moved it,
+  because `plugins/` is a separate workspace that cargo-release never sees. A
+  release would have bumped the workspace, left the plugins behind, and turned
+  the next push red. `crates/dpp-tests/Cargo.toml` now carries a
+  `pre-release-replacements` entry that sets `plugins/Cargo.toml`'s version to
+  the one being released, and a `pre-release-hook`, `just relock`, that
+  re-resolves the lockfiles of `plugins/` and `fuzz/`. `fuzz/Cargo.lock` is in
+  the hook for the same reason: it records the workspace crates' versions too,
+  and a release without the hook left it failing `just lock-check`. The hook
+  does nothing under `--dry-run`, where cargo-release runs hooks as well. (#423)
+
 - **A JWS whose protected header carries `crit` was accepted.** RFC 7515 clause
   4.1.11 says a recipient must reject a JWS whose `crit` lists an extension it
   does not understand, and `dpp_crypto::jws` never read the member. A token its
@@ -957,6 +1033,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     schema version.
 
 ### Documentation
+
+- **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
+  `digest_of` said it is a free function so a verifier can digest a Disclosure it
+  has not parsed yet. No verifier does: `SdJwt::parse` refuses an unreadable
+  Disclosure before any digest is computed. It is free because `SdJwt::sd_hash`
+  digests a presentation, which is not a Disclosure. The module docs also headed
+  a list of seven requirements "Two requirements". No behaviour changed. (#433)
 
 - **The back-up copy's availability period was cited to the wrong place.**
   `BackupCopyPort`'s docs and the port inventory gave the period as ESPR Annex
