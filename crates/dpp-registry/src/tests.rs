@@ -157,8 +157,32 @@ fn sandbox_endpoint() {
     // with our own guess instead of an outside fact.
     assert_eq!(
         ep.base_url,
-        "https://registry.acc.product-passport.ec.europa.eu/api/v1"
+        "https://reg.acc.product-passport.ec.europa.eu/api/v1"
     );
+    assert_eq!(
+        ep.dashboard_base_url,
+        "https://reg.acc.product-passport.ec.europa.eu/dashboard/api/v1"
+    );
+}
+
+/// 🚨 The API is not on the host the Commission publishes for the registry.
+///
+/// `registry.…` serves the web interface. The interface's own runtime
+/// configuration (read 2026-10-14) sends its API calls to `reg.…`, and this
+/// crate pointed every request at the interface's host until then.
+#[test]
+fn the_api_is_called_on_the_hosts_the_registry_interface_calls() {
+    for ep in [RegistryEndpoint::sandbox(), RegistryEndpoint::production()] {
+        for url in [&ep.base_url, &ep.dashboard_base_url] {
+            assert!(
+                url.starts_with("https://reg."),
+                "{url} is not on the API host"
+            );
+            assert!(!url.contains("://registry."), "{url} is the interface host");
+        }
+        let token = ep.token_endpoint.as_deref().expect("a token URL");
+        assert!(token.starts_with("https://auth."), "{token}");
+    }
 }
 
 /// The two environments must never collapse onto one host — submitting test
@@ -214,6 +238,10 @@ fn a_stand_in_endpoint_mirrors_the_registry_shape_under_its_own_name() {
     let ep = RegistryEndpoint::stand_in("http://127.0.0.1:8090/");
     assert_eq!(ep.authority, RegistryAuthority::StandIn);
     assert_eq!(ep.base_url, "http://127.0.0.1:8090/api/v1");
+    assert_eq!(
+        ep.dashboard_base_url,
+        "http://127.0.0.1:8090/dashboard/api/v1"
+    );
     assert_eq!(
         ep.token_endpoint.as_deref(),
         Some("http://127.0.0.1:8090/oauth2/token")
@@ -940,13 +968,15 @@ fn the_observed_submission_limits_are_recorded() {
 #[test]
 fn every_wire_constant_declares_a_basis() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
+        IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     for declared in [
         REGISTRATION_PATH,
-        SUBMISSION_STATUS_PATH_TEMPLATE,
+        PRODUCT_GROUPS_PATH,
+        TASKS_PATH,
+        TASK_RESULT_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
         TOKEN_PATH,
@@ -962,7 +992,7 @@ fn every_wire_constant_declares_a_basis() {
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
         crate::ENDPOINT_BASIS.len(),
-        6,
+        8,
         "the table grew or shrank without this test being told"
     );
 }
@@ -975,30 +1005,31 @@ fn every_wire_constant_declares_a_basis() {
 #[test]
 fn each_route_carries_the_tier_its_prose_claims() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
+        IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
-    // Read off the registry's own web client.
-    for observed in [REGISTRATION_PATH, IDEMPOTENCY_KEY_HEADER] {
+    // Read off the registry's own web client, on the date it was last read.
+    for observed in [
+        REGISTRATION_PATH,
+        PRODUCT_GROUPS_PATH,
+        TASKS_PATH,
+        TASK_RESULT_PATH_TEMPLATE,
+        IDEMPOTENCY_KEY_HEADER,
+    ] {
         let basis = basis_of(observed).expect("declared");
         assert!(basis.is_observed(), "{observed} is observed");
         assert_eq!(
             basis.observed_on(),
-            Some("2026-09-16"),
+            Some("2026-10-14"),
             "an observation must carry the date it was made"
         );
     }
 
-    // Nothing behind them. The asynchronous flow needs *a* route to read a
-    // submission back and *a* status route, transfers need *a* route, a token
-    // has to come from somewhere, and naming one is not knowing it.
-    for assumed in [
-        SUBMISSION_STATUS_PATH_TEMPLATE,
-        STATUS_PATH_TEMPLATE,
-        TRANSFER_PATH_TEMPLATE,
-        TOKEN_PATH,
-    ] {
+    // Nothing behind them. A registered record needs *a* status route,
+    // transfers need *a* route, a token has to come from somewhere, and naming
+    // one is not knowing it.
+    for assumed in [STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, TOKEN_PATH] {
         let basis = basis_of(assumed).expect("declared");
         assert!(!basis.is_observed(), "{assumed} rests on nothing");
         assert_eq!(basis.observed_on(), None);
@@ -1059,7 +1090,7 @@ fn the_replayed_key_status_is_the_only_observed_one() {
     assert!(crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.is_observed());
     assert_eq!(
         crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.observed_on(),
-        Some("2026-09-16")
+        Some("2026-10-14")
     );
 }
 

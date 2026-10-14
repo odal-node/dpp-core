@@ -232,9 +232,14 @@ listed separately below so the two are never confused.
   attestation, and a token proves none of it. How a token is obtained is
   unpublished, so `RegistryEndpoint::token_endpoint` and any exchange performed
   against it are our construction. This is the largest remaining gap.
-- **Endpoint paths and API version** — the registry hosts are the Commission's
-  published ones; the resource paths beneath them and `api_version` are not
-  specified anywhere we can read, and remain our own construction.
+- **Endpoint paths and API version** — the hosts are the ones the registry's
+  own interface calls, read from its runtime configuration on 2026-10-14: the
+  API on `reg.product-passport.ec.europa.eu` (and `reg.acc.…` for the test
+  environment), which is not the published `registry.…` address the interface
+  itself is served from. The registration, product-group and dashboard task
+  routes are observed in the same client; the status and transfer routes and
+  `api_version` are not specified anywhere we can read, and remain our own
+  construction.
 - **Proof of registration** (Art. 9) — `ProofOfRegistration` models the
   Art. 9(2) content and the Art. 9(4) ninety days, which are how long the
   registry keeps a proof available, not how long the proof is valid. The

@@ -63,11 +63,14 @@ impl RegistrationPayload {
             )?;
         }
 
-        compare(
-            "productGroup",
-            Some(&self.product_group),
-            Some(passport.product_group.wire_str()),
-        )?;
+        // In the registry's vocabulary where it has a code for the group, and in
+        // this workspace's otherwise — a registration for a group the registry
+        // does not list is still compared against what the passport says.
+        let group = match crate::registry_product_group(&passport.product_group) {
+            Some(code) => code,
+            None => passport.product_group.wire_str(),
+        };
+        compare("productGroup", Some(&self.product_group), Some(group))?;
 
         // Art. 8(7)(c): the level the passport states is the level registered.
         // The passport's level is a different type from this crate's, so the

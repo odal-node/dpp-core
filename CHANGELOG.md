@@ -378,15 +378,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **A registry submission reports each passport by its identifier.**
   `SubmissionReceipt::registration_identifiers`, one identifier per passport in
   submission order, is replaced by `results: Vec<PassportResult>`. Each result
-  names the unique product identifier it is about, with the registration
-  identifier (IR (EU) 2026/1778 Art. 8(8)) or the registry's error. The
-  registry's User Guide (v1.02 and v1.03, chapter 6.2.2) describes a completed
-  request that way: identifier, registration identifier and product group per
-  passport on success; identifier, product group and error per failed passport
-  on failure. Position was our guess, and a failure report lists only the
+  names the unique product identifier it is about, its product group, its
+  `outcome` (`PassportOutcome`: `ACCEPTED`, `REJECTED`, or unrecognised), and
+  the registration identifier (IR (EU) 2026/1778 Art. 8(8)) or the registry's
+  `errorCode`. The registry's User Guide (v1.02 and v1.03, chapter 6.2.2)
+  describes a completed request that way, and its web client, read on
+  2026-10-14, reads each passport's row of a registration task under exactly
+  those names, except the registration identifier, which it does not show and
+  is named by us. Position was our guess, and a failure report lists only the
   passports that failed, so the n-th result is not the n-th passport.
-  `SubmissionReceipt::result_for` finds one by identifier. **Migration:** read
-  `results` and match on `unique_product_identifier`. (#98)
+  `SubmissionReceipt::result_for` finds one by identifier.
+  `REGISTRATION_ERROR_CODES` lists the 22 codes the client knows a wording for.
+  **Migration:** read `results` and match on `unique_product_identifier`. (#98)
 
 - **A registry state this crate does not know is kept, not refused.**
   `SubmissionOutcome` and `RegistryStatusCode` gain `Unrecognised(String)`, which
@@ -395,7 +398,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   interface shows, and Art. 4(4) and Art. 10(1) of IR (EU) 2026/1778 imply record
   states the status codes do not name. An unknown outcome is not terminal, so a
   caller keeps polling rather than settling a submission that may have
-  succeeded. `RegistryStatusCode` is now `#[non_exhaustive]` and has a
+  succeeded. Because of that, both spellings the registry's web client was seen
+  using on 2026-10-14 read as finished: a task's `status` (`SUCCESS`,
+  `FAILURE`) and its `outcomeResult` (`SUCCEEDED`, `FAILED`); a value is
+  written in the `status` spelling. `RegistryStatusCode` is now `#[non_exhaustive]` and has a
   `wire_str`. Both types lose `Copy`, and `SubmissionOutcome::is_terminal` and
   `wire_str` take `&self`. **Migration:** add a wildcard arm to a `match` on
   `RegistryStatusCode`, and clone where a copy was implied. (#98)
@@ -456,6 +462,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   link, and nothing to build an item identifier from but the passport's
   internal id, which matches no label. **Migration:** a struct literal of
   `RegistrationRequest` adds `batch_id: None, item_serial: None`. (#98)
+
+- **`RegistryEndpoint` points at the hosts the registry's interface calls.**
+  The registry's runtime configuration, read on 2026-10-14, sends the
+  interface's API calls to `reg.product-passport.ec.europa.eu` (`reg.acc.…` for
+  the test environment), its dashboard to `reg.…/dashboard`, and its sign-in to
+  `auth.…`. The published `registry.…` address serves the interface, and every
+  request this crate built went there. `sandbox()` and `production()` now use
+  the API hosts, the token URL sits on the authentication host (its path is
+  still ours), and a new `dashboard_base_url` field carries the dashboard
+  service. **Migration:** a struct literal or stored configuration of
+  `RegistryEndpoint` adds `dashboard_base_url`. (#98)
 
 ### Added
 
@@ -1014,14 +1031,27 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   what stays unclaimed, and RFC 8259, which the corpus cites for two edge cases,
   gets a row of its own. (#420, #426, #427)
 
-- **A route to read a registry submission back.**
-  `SUBMISSION_STATUS_PATH_TEMPLATE` takes the correlation identifier the
-  registry assigned a submission, the only handle on one before its passports
-  are records and on one that failed. It is invented, and `ENDPOINT_BASIS` says
-  so (`RegistryBasis::Assumed`). `STATUS_PATH_TEMPLATE` and
+- **The routes the registry's own interface uses to read a submission back.**
+  Read from its web client on 2026-10-14 and `Observed` in `ENDPOINT_BASIS`: a
+  submission's outcome is a task on a separate dashboard service,
+  `RegistryEndpoint::dashboard_base_url`, listed at `TASKS_PATH` (paged; a
+  registration is a `DPP_REGISTRATION` task carrying a `taskId`, the
+  `correlationId` and a `status`) and read at `TASK_RESULT_PATH_TEMPLATE`, keyed
+  by the task identifier. `PRODUCT_GROUPS_PATH` lists the registry's product
+  groups. No route that takes a correlation identifier was seen, and the
+  registration POST's response is not read by the client, so how a caller gets
+  from one to its task is unobserved. `STATUS_PATH_TEMPLATE` and
   `TRANSFER_PATH_TEMPLATE` now say that their `{id}` is the registration
   identifier, never a caller's own passport identifier, which the registry has
   no record of. (#98)
+
+- **The registry's product-group codes.** A registration names its group by
+  the registry's code, and `registry_product_group` gives it for this
+  workspace's group: `PRODUCT_GROUP_BATTERIES` (`"BATTERIES"`, observed as the
+  group the registration screen preselects). No other group's code has been
+  seen, and none is invented: the answer for every other group is `None`.
+  `RegistrationPayload::check_coherence` compares the product group in the
+  registry's code where there is one. (#98)
 
 - **`RegistrationPayload::check_coherence` checks a registration against the
   passport it registers.** IR (EU) 2026/1778 Art. 8(7) has the registry read

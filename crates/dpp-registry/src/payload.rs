@@ -36,7 +36,13 @@ pub struct RegistrationPayload {
     pub facility_id: FacilityIdentifier,
     /// The responsible economic operator identifier.
     pub operator_id: OperatorIdentifier,
-    /// EU ESPR product group code (e.g. `"textile"`, `"battery"`).
+    /// The product group, by the registry's code for it (`"BATTERIES"`).
+    ///
+    /// 👁️ The registry names groups by its own codes — see
+    /// [`registry_product_group`](crate::registry_product_group) — not by this
+    /// workspace's wire names. For a group whose code has not been observed
+    /// there is nothing correct to put here, and nothing the registry would
+    /// accept.
     pub product_group: String,
     /// Schema version of the DPP data (e.g. `"1.1.0"`).
     pub schema_version: String,
