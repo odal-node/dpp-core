@@ -355,7 +355,7 @@ await addVc("vc/no-iss", { vct: VCT, iat: credential.iat, name: "Alice" }, undef
 await addVc("vc/bound-all-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true, meta: true } });
 await addVc("vc/bound-one-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true } });
 await addVc("vc/bound-nothing-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: {} });
-await addVc("vc/bound-array-element", credential, { tags: { _sd: ["1"] } }, { keyBinding: true, presentation: { tags: { 1: true } } });
+await addVc("vc/bound-array-element", credential, { tags: { _sd: [1] } }, { keyBinding: true, presentation: { tags: { 1: true } } });
 await addVc("vc/bound-for-another-audience", credential, { _sd: ["name"] }, {
   keyBinding: true,
   presentation: { name: true },
