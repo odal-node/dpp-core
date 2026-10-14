@@ -72,15 +72,14 @@ export function parseIndex(xml) {
     const id = /<doc-id>RFC0*(\d+)<\/doc-id>/.exec(body);
     if (!id) continue;
     const number = Number(id[1]);
-    const block = (tag) => {
-      const m = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(body);
-      return new Set(m ? rfcNumbers(m[1].replace(/<doc-id>RFC/g, "RFC ")) : []);
-    };
+    // The two blocks are written out as literals, not built from a tag name, so
+    // that no pattern here is made of a variable.
+    const numbersIn = (m) => new Set(m ? rfcNumbers(m[1].replace(/<doc-id>RFC/g, "RFC ")) : []);
     const status = /<current-status>([^<]*)<\/current-status>/.exec(body)?.[1] ?? "";
     rfcs.set(number, {
       status: status.trim().toLowerCase(),
-      updatedBy: block("updated-by"),
-      obsoletedBy: block("obsoleted-by"),
+      updatedBy: numbersIn(/<updated-by>([\s\S]*?)<\/updated-by>/.exec(body)),
+      obsoletedBy: numbersIn(/<obsoleted-by>([\s\S]*?)<\/obsoleted-by>/.exec(body)),
     });
     const draft = /<draft>([^<]*)<\/draft>/.exec(body)?.[1]?.trim();
     // `draft-ietf-name-NN` becomes `draft-ietf-name`, the part that survives a
