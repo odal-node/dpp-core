@@ -33,7 +33,7 @@ jobs:
     name: Digital Links are well-formed GS1
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -42,7 +42,7 @@ jobs:
       # toolchain by itself — an action here would add a third-party dependency
       # to a job whose entire purpose is running somebody else's tool, and
       # `@stable` would name a channel this repo does not build against.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
 

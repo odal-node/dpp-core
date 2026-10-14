@@ -1067,7 +1067,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     every `dtolnay/rust-toolchain` and `taiki-e/install-action` use to a commit
     with no history in the repository it names (below), five Dependabot entries
     with no cooldown, and an unlocked `npm install` of a package with no
-    dependencies, which is accepted in the workflow with the reason.
+    dependencies, which is accepted in the workflow with the reason. Every
+    pinned action's comment now names the exact release its commit is
+    (`# v7.0.1`, not `# v7`): zizmor checks the comment against the tag, so a
+    major tag moved upstream failed the lint on code that had not changed, as
+    `actions/setup-java` did by moving `v6` to v6.1.0 between two runs.
   - `dependabot.yml` now watches `fuzz/`, the GS1 and SD-JWT npm pins, the DSS
     Maven pin, and the AAS and JSON-LD pip pins, and every entry waits a week
     after a release. The pip entries are unproven, because both files are

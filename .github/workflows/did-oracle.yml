@@ -33,7 +33,7 @@ jobs:
     steps:
       # Neither checkout keeps the token. This job installs a few hundred npm
       # packages that run lifecycle scripts, and nothing here ever pushes.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -44,7 +44,7 @@ jobs:
       # unpinned run would turn their next change into a red build here on code
       # that did not change. Dependabot does not watch this line.
       - name: Check out the W3C DID test suite
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: w3c/did-test-suite
           ref: 939b31d07d5b1699340ac0702ec0fa46ffcdef0a
@@ -54,7 +54,7 @@ jobs:
       # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and
       # rustup is already on the runner, so invoking cargo selects the pinned
       # toolchain by itself.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
 
