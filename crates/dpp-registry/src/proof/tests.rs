@@ -95,8 +95,14 @@ fn the_commodity_code_is_optional_and_checked_when_present() {
 fn a_registration_after_its_own_proof_is_refused() {
     let mut p = proof();
     p.registered_at = p.generated_at + Duration::seconds(1);
-    assert!(
-        p.validate().is_err(),
+    // Named for what is wrong. This used to be reported as a missing
+    // `generatedAt`, a field that was present and correct.
+    assert_eq!(
+        p.validate(),
+        Err(RegistryValidationError::ProofPredatesRegistration {
+            registered_at: p.registered_at,
+            generated_at: p.generated_at,
+        }),
         "a proof generated before the registration it reports was accepted"
     );
 

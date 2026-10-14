@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::SubmissionOutcome;
+use super::{PassportResult, SubmissionOutcome};
 
 /// The registry's acknowledgement of a submission.
 ///
@@ -10,8 +10,9 @@ use super::SubmissionOutcome;
 /// whose passports do not yet exist as records, which is every submission until
 /// validation completes and all of them if it fails.
 ///
-/// ⚠️ **The field names are ours.** The guide describes a correlation ID and an
-/// outcome in prose; it does not publish a response schema.
+/// ⚠️ **The field names are ours.** The guide describes a correlation ID, an
+/// outcome and a per-passport detail in prose; it does not publish a response
+/// schema.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmissionReceipt {
@@ -23,30 +24,32 @@ pub struct SubmissionReceipt {
     pub correlation_id: String,
     /// Where the submission has got to.
     pub outcome: SubmissionOutcome,
-    /// The Art. 8(8) registration identifiers, one per passport, **in
-    /// submission order**.
+    /// What the registry reported about each passport, once the submission is
+    /// complete.
     ///
-    /// ✅ COMPLIANCE-PIN: IR (EU) 2026/1778 **Art. 8(8)** — *"the registry shall
-    /// generate and store a unique and persistent registration identifier as
-    /// part of the registration data"* — and **Art. 8(10)**, which has the
-    /// Commission communicate it *"for that specific product … through the user
-    /// interface or the API response"*. Per product, so a submission of a
-    /// hundred passports yields a hundred of them.
-    ///
-    /// Empty until the submission reaches [`SubmissionOutcome::Success`]: Art.
-    /// 8(8) generates the identifier following successful verification, and a
-    /// submission that fails produces no records and therefore no identifiers.
-    ///
-    /// 🚨 **Correlation is by position, and that is ours.** Nothing published
-    /// says how the response ties an identifier to a passport; submission order
-    /// is the only correspondence the article's text supports without inventing
-    /// a key, and a caller must not read it as the registry's stated contract.
-    /// Art. 8(10) also sits awkwardly with 8(8): it communicates the identifier
-    /// *"upon successful submission"* while 8(8) generates it *following
-    /// successful verification*, which are different moments in an asynchronous
-    /// flow — and 8(10) cites paragraph 9 for what paragraph 8 generates. This
-    /// models the later moment, because an identifier that verification has not
-    /// yet produced is one the registry cannot have sent.
+    /// Empty while the outcome is
+    /// [`Processing`](SubmissionOutcome::Processing): nothing has been ruled on.
+    /// On [`Success`](SubmissionOutcome::Success) each passport carries its
+    /// Art. 8(8) registration identifier; on
+    /// [`Failure`](SubmissionOutcome::Failure) the passports that failed carry
+    /// their error, and none carries an identifier, because a refused
+    /// submission produces no records. See [`PassportResult`] for why a result
+    /// is matched by identifier and never by position.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub registration_identifiers: Vec<String>,
+    pub results: Vec<PassportResult>,
+}
+
+impl SubmissionReceipt {
+    /// The result for the passport submitted under `unique_product_identifier`,
+    /// if the registry reported one.
+    ///
+    /// `None` is not a verdict. A failure report lists only the passports that
+    /// failed, so a passport absent from it was refused with the rest of the
+    /// submission and has no error of its own to show.
+    #[must_use]
+    pub fn result_for(&self, unique_product_identifier: &str) -> Option<&PassportResult> {
+        self.results
+            .iter()
+            .find(|result| result.unique_product_identifier == unique_product_identifier)
+    }
 }

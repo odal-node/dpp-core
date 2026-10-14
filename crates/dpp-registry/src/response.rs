@@ -6,8 +6,18 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Status codes returned by the EU registry.
+///
+/// ⚠️ **An unverified vocabulary**, and so an open one. The registry publishes
+/// no record-status list, and IR (EU) 2026/1778 implies states none of these
+/// names: **Art. 4(4)** has the status of a passport *"updated accordingly"*
+/// when its operator's verification lapses, and **Art. 10(1)** reflects every
+/// creation, modification and deletion in *"the status of the registration"*.
+/// A value outside the five below deserialises as
+/// [`Unrecognised`](Self::Unrecognised), carrying the value, rather than
+/// failing the whole reply.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[serde(from = "String", into = "String")]
+#[non_exhaustive]
 pub enum RegistryStatusCode {
     /// Registration received and being processed.
     Pending,
@@ -19,6 +29,50 @@ pub enum RegistryStatusCode {
     SuspendedByAuthority,
     /// DPP has been deactivated (product withdrawn from market).
     Deactivated,
+    /// A value outside the five above, exactly as the registry sent it.
+    ///
+    /// A caller must not map it onto one of the others. Read as `Rejected` it
+    /// sends an operator to fix a submission that may be fine; read as
+    /// `Registered` it reports a record that may be suspended.
+    Unrecognised(String),
+}
+
+impl RegistryStatusCode {
+    /// The wire value, spelled out rather than derived from `Serialize`, so a
+    /// renamed variant cannot silently change what is matched.
+    #[must_use]
+    pub fn wire_str(&self) -> &str {
+        match self {
+            Self::Pending => "pending",
+            Self::Registered => "registered",
+            Self::Rejected => "rejected",
+            Self::SuspendedByAuthority => "suspended_by_authority",
+            Self::Deactivated => "deactivated",
+            Self::Unrecognised(value) => value,
+        }
+    }
+}
+
+impl From<String> for RegistryStatusCode {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "pending" => Self::Pending,
+            "registered" => Self::Registered,
+            "rejected" => Self::Rejected,
+            "suspended_by_authority" => Self::SuspendedByAuthority,
+            "deactivated" => Self::Deactivated,
+            _ => Self::Unrecognised(value),
+        }
+    }
+}
+
+impl From<RegistryStatusCode> for String {
+    fn from(status: RegistryStatusCode) -> Self {
+        match status {
+            RegistryStatusCode::Unrecognised(value) => value,
+            known => known.wire_str().to_owned(),
+        }
+    }
 }
 
 /// Response from the EU registry after a registration or status query.

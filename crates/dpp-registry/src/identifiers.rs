@@ -509,7 +509,10 @@ pub const SCHEME_DID: &str = "did";
 /// published specification names any of them and none has been observed on the
 /// wire; `"gtin"` and `"did"` have in-crate precedent, which is a convention of
 /// ours and not evidence about the registry.
-pub const PRODUCT_SCHEME_BASIS: [(&str, RegistryBasis); 3] = [
+///
+/// A slice rather than an array, so that mapping a new scheme does not change
+/// the constant's type for every caller that names it.
+pub const PRODUCT_SCHEME_BASIS: &[(&str, RegistryBasis)] = &[
     (SCHEME_GTIN, RegistryBasis::Assumed),
     (SCHEME_IDENTIFICATION_LINK, RegistryBasis::Assumed),
     (SCHEME_DID, RegistryBasis::Assumed),

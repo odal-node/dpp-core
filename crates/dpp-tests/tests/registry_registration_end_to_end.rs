@@ -296,11 +296,11 @@ fn one_bad_passport_refuses_a_hundred_registrations() {
     );
 }
 
-/// The receipt closes the loop: one Art. 8(8) identifier per passport, in
-/// submission order.
+/// The receipt closes the loop: one Art. 8(8) identifier per passport, found by
+/// the identifier each passport was submitted under.
 #[test]
 fn a_successful_submission_is_acknowledged_per_passport() {
-    use dpp_registry::{SubmissionOutcome, SubmissionReceipt};
+    use dpp_registry::{PassportResult, SubmissionOutcome, SubmissionReceipt};
 
     let identifier = SchemeIdentifier::gs1(Gtin::parse("09506000134352").unwrap());
     let passport = published_passport(identifier.clone());
@@ -310,22 +310,44 @@ fn a_successful_submission_is_acknowledged_per_passport() {
         RegistrationGranularity::Item,
     )
     .expect("the fixture passport carries all three");
-    let submission = RegistrationSubmission::new((0..3).map(|_| payload_from(&request)).collect())
-        .expect("within bounds");
-    assert!(submission.validate().is_ok());
+    // Three units, three serials: one identifier each, since the registry
+    // refuses a request carrying the same one twice.
+    let payloads: Vec<RegistrationPayload> = ["A1", "A2", "A3"]
+        .into_iter()
+        .map(|serial| RegistrationPayload {
+            digital_link_url: format!("https://id.ecotextile.de/01/09506000134352/21/{serial}"),
+            ..payload_from(&request)
+        })
+        .collect();
+    let submission = RegistrationSubmission::new(payloads).expect("within bounds");
+    assert!(submission.validate().is_ok(), "{:?}", submission.validate());
 
     let receipt = SubmissionReceipt {
         correlation_id: "corr-8f31".into(),
         outcome: SubmissionOutcome::Success,
-        registration_identifiers: vec!["EU-DPP-1".into(), "EU-DPP-2".into(), "EU-DPP-3".into()],
+        results: submission
+            .passports()
+            .iter()
+            .enumerate()
+            .map(|(n, passport)| PassportResult {
+                unique_product_identifier: passport.digital_link_url.clone(),
+                product_group: Some(passport.product_group.clone()),
+                registration_identifier: Some(format!("EU-DPP-{n}")),
+                error: None,
+            })
+            .collect(),
     };
 
     assert!(receipt.outcome.is_terminal());
-    assert_eq!(
-        receipt.registration_identifiers.len(),
-        submission.len(),
-        "Art. 8(10) communicates an identifier for each specific product"
-    );
+    for passport in submission.passports() {
+        assert!(
+            receipt
+                .result_for(&passport.digital_link_url)
+                .and_then(|r| r.registration_identifier.as_ref())
+                .is_some(),
+            "Art. 8(10) communicates an identifier for each specific product"
+        );
+    }
 }
 /// 🚨 What this composition first exposed, now the other way round.
 ///

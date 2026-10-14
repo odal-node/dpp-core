@@ -94,6 +94,30 @@ fn the_reported_index_is_the_offending_passport() {
     ));
 }
 
+/// 👁️ The registry refuses a request carrying one identifier twice (User Guide
+/// v1.03 chapter 6.2.2), so a submission does before it travels — naming both
+/// positions, because either may be the mistake.
+#[test]
+fn a_repeated_identifier_refuses_the_submission() {
+    let distinct = |serial: &str| crate::RegistrationPayload {
+        digital_link_url: format!("https://id.example.com/01/09506000134352/21/{serial}"),
+        ..payload()
+    };
+    let passports = vec![distinct("A"), distinct("B"), distinct("A")];
+    let submission = RegistrationSubmission::new(passports).expect("within bounds");
+    assert_eq!(
+        submission.validate(),
+        Err(RegistryValidationError::DuplicateProductIdentifier {
+            first: 0,
+            second: 2
+        })
+    );
+
+    let unique = vec![distinct("A"), distinct("B"), distinct("C")];
+    let submission = RegistrationSubmission::new(unique).expect("within bounds");
+    assert!(submission.validate().is_ok());
+}
+
 /// The bound is an invariant on the way back too: a stored or in-flight
 /// submission the registry would refuse must not deserialise into a value that
 /// looks well-formed.

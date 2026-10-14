@@ -220,18 +220,27 @@ listed separately below so the two are never confused.
 
 ### Still divergent — blocked on the published API specification
 
-- **Authentication** — `EuRegistryEnvelope` anticipates a bearer-token
-  mechanism; registration rests on eIDAS verified-operator identity instead
-  (Arts. 4–5). This is a structural mismatch, not a wrong endpoint, and it is
-  the largest remaining gap.
+- **Authentication** — two layers that must not be confused. A token in front
+  of the API fits the act: **Art. 2(3)** defines an *authentication token* for
+  sessions and delegated access between applications and the registry, and
+  **Art. 18(1)(b)** stores tokens as user credentials. Identity is the
+  verified status of **Arts. 4–5**, proved by qualified electronic seal or
+  attestation, and a token proves none of it. How a token is obtained is
+  unpublished, so `RegistryEndpoint::token_endpoint` and any exchange performed
+  against it are our construction. This is the largest remaining gap.
 - **Endpoint paths and API version** — the registry hosts are the Commission's
   published ones; the resource paths beneath them and `api_version` are not
   specified anywhere we can read, and remain our own construction.
-- **Proof of registration** (Art. 9) — a secure electronic document, valid 90
-  calendar days with regeneration, retrievable on request. No type models it,
-  because the retrieval contract is unspecified.
+- **Proof of registration** (Art. 9) — `ProofOfRegistration` models the
+  Art. 9(2) content and the Art. 9(4) ninety days, which are how long the
+  registry keeps a proof available, not how long the proof is valid. The
+  retrieval call is unspecified, so nothing fetches one.
 - **Payload and envelope shape** — the field names and nesting are a reading of
-  what Art. 8 requires to be registered, not a transcription of a schema.
+  what Art. 8 requires to be registered, not a transcription of a schema. The
+  registry's guide describes the outcome of a submission per passport — the
+  unique product identifier with its registration identifier, or with its error
+  — so `SubmissionReceipt` matches results by identifier; the field names are
+  ours.
 
 Do not treat the shapes in the second list as an implementation target.
 
