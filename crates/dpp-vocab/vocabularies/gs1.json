@@ -7,8 +7,24 @@
   "usedFor": "Supply-chain identifiers (GTIN, GLN) and general product attributes. Candidate `gs1:` prefix for this project's JSON-LD context.",
   "licence": "Apache License 2.0. Confirmed 2026-08-11 two ways from GS1's own repository (`github.com/gs1/WebVoc`): the `LICENSE` file itself, and the README stating verbatim \"The GS1 Web vocabulary is released under an Apache 2.0 licence.\" Fully compatible with this project's own Apache-2.0 licensing — redistributing the term identifier and definition with attribution carries no copyleft risk.",
   "status": "verified",
-  "checkedOn": "2026-08-11",
+  "checkedOn": "2026-10-13",
   "source": "https://ref.gs1.org/voc/gtin — fetched and read directly (a client-rendered page; a naive HTTP-only fetch under-renders it, a real browser was needed).",
-  "finding": "`gs1:gtin`'s own definition, verbatim: \"A Global Trade Item Number (GTIN) is the 14 digit GS1 Identification Key used to identify products. The key comprises a GS1 Company Prefix followed by an Item Reference Number and a Check Digit.\" Status: stable. Range `xsd:string`. Recorded as `skos:exactMatch` to `schema:gtin14` and `skos:closeMatch` (not exact) to `schema:gtin13/12/8` — GS1's own model already treats the 14-digit form as canonical and shorter forms as related-but-distinct. That matches `crates/dpp-domain/src/domain/gtin.rs` exactly: `Gtin` requires 14 ASCII digits with a verified mod-10 check digit, and explicitly tests that a valid EAN-13 zero-padded to 14 digits parses (`prepend_zero_to_valid_ean13_gives_valid_gtin14`) — same canonical-form-plus-related-forms shape GS1 describes.",
-  "nextStep": "Restore `gtin -> gs1:gtin` in the JSON-LD context (removed 2026-08-10 in favour of `dpp:gtin` pending exactly this verification), citing `https://ref.gs1.org/voc/gtin` and Apache-2.0 in the provenance record. This is the first entry in this register with nothing left to check — a code change, not further research."
+  "finding": "`gs1:gtin`'s own definition, verbatim: \"A Global Trade Item Number (GTIN) is the 14 digit GS1 Identification Key used to identify products. The key comprises a GS1 Company Prefix followed by an Item Reference Number and a Check Digit.\" Status: stable. Range `xsd:string`. Recorded as `skos:exactMatch` to `schema:gtin14` and `skos:closeMatch` (not exact) to `schema:gtin13/12/8` — GS1's own model already treats the 14-digit form as canonical and shorter forms as related-but-distinct. That matches `crates/dpp-domain/src/identifier/gtin/key.rs` exactly: `Gtin` requires 14 ASCII digits with a verified mod-10 check digit, and explicitly tests that a valid EAN-13 zero-padded to 14 digits parses (`prepend_zero_to_valid_ean13_gives_valid_gtin14`) — same canonical-form-plus-related-forms shape GS1 describes. **Re-checked 2026-10-13 from the repository only:** github.com/gs1/WebVoc still reports Apache-2.0 and has no commit after 2026-01-29, so nothing it holds changed after the reading above. The `gtin` page itself was not read again. The `Gtin` type described above has moved to the path now named, and still normalises the 8, 12, 13 and 14 digit forms to 14 digits.",
+  "nextStep": "Read further GS1 terms one at a time, and list each in `terms` before it is emitted. `gtin` is the only one read; the rest of the namespace is refused until it is.",
+  "terms": [
+    {
+      "iri": "https://ref.gs1.org/voc/gtin",
+      "readOn": "2026-08-11",
+      "source": "https://ref.gs1.org/voc/gtin, read directly in a browser (the page is client-rendered).",
+      "finding": "Status stable, range `xsd:string`: the 14-digit GS1 Identification Key. It fits our `Gtin` type, as this record's `finding` sets out. No other GS1 term has been read."
+    }
+  ],
+  "pins": [
+    {
+      "kind": "github-head",
+      "target": "gs1/WebVoc",
+      "value": "f8f407bf717233c871dca2f62f4e45b0940e8cad",
+      "observedOn": "2026-10-13"
+    }
+  ]
 }

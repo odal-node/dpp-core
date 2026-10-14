@@ -17,10 +17,11 @@
 //! # What the other implementation checks
 //!
 //! `.github/oracle/sdjwt/credentials.mjs` reads the corpus. For the credential as
-//! issued, it must arrive at the passport that went in, plus the three claims the
-//! issuer adds (`iss`, `vct`, `iat`). For the presentations built from it, it must
-//! agree with this crate. The signature is checked there with Node's `crypto`, and
-//! the `kid` is recomputed from the public key.
+//! issued, it must arrive at the passport that went in, under `passport`, plus the
+//! three claims the issuer adds at the root (`iss`, `vct`, `iat`). For the
+//! presentations built from it, it must agree with this crate. The signature is
+//! checked there with Node's `crypto`, and the `kid` is recomputed from the public
+//! key.
 //!
 //! Each group also has a credential bound to a Holder's key, presented with a Key
 //! Binding JWT and carrying the `challenge` it answers: the libraries read it with
@@ -58,7 +59,7 @@ use dpp_crypto::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt, holder_key_confirm
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::{ProductGroup, ProductGroupCatalog, ProductGroupData};
 use dpp_tests::fixtures::base_passport;
-use dpp_vc::sd_jwt_vc::{Issuance, SdJwtVcError, issue, vct_for, verify};
+use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, SdJwtVcError, issue, vct_for, verify};
 use serde_json::{Map, Number, Value, json};
 
 const ISSUER: &str = "https://passports.operator.example";
@@ -189,22 +190,17 @@ fn verdict(token: &str, issuer: &Issuer, vct: &str, policy: Option<&KeyBindingPo
 }
 
 /// The claims a credential issued from `passport` must reveal in full: the
-/// passport, and the claims the issuer sets: `iss`, `vct`, `iat`, and `cnf` when
-/// it names a Holder.
+/// passport, under [`PASSPORT_CLAIM`], and the claims the issuer sets: `iss`,
+/// `vct`, `iat`, and `cnf` when it names a Holder.
 fn full_disclosure_of(passport: &Value, vct: &str, cnf: Option<Value>) -> Value {
-    let mut claims: Map<String, Value> = passport.as_object().expect("an object").clone();
-    for reserved in ["iss", "vct", "iat", "cnf"] {
-        assert!(
-            !claims.contains_key(reserved),
-            "the passport envelope already uses '{reserved}', which the issuer sets"
-        );
-    }
+    let mut claims = Map::new();
     claims.insert("iss".to_owned(), json!(ISSUER));
     claims.insert("vct".to_owned(), json!(vct));
     claims.insert("iat".to_owned(), json!(ISSUED_AT));
     if let Some(cnf) = cnf {
         claims.insert("cnf".to_owned(), cnf);
     }
+    claims.insert(PASSPORT_CLAIM.to_owned(), passport.clone());
     Value::Object(claims)
 }
 
@@ -407,6 +403,68 @@ fn every_product_group_has_a_credential_that_reads_back_to_its_passport() {
     )
     .expect("write the corpus");
     eprintln!("wrote {} credentials to {}", cases.len(), dir.display());
+}
+
+/// The root of every credential holds the claims the issuer set and nothing a
+/// passport put there.
+///
+/// A passport has a lifecycle `status`, and at the root of an SD-JWT VC that name
+/// is the reference to a Token Status List. Before the passport had a claim of its
+/// own, every credential in this corpus carried `"status": "draft"` in the clear,
+/// where a Verifier is told to check it. Held over both readings of each token: the
+/// claims as signed, before any Disclosure is processed, and the claims `verify`
+/// returns.
+#[test]
+fn no_credential_carries_a_claim_at_its_root_that_the_issuer_did_not_set() {
+    let issuer = Issuer::new();
+    let cases = corpus(&issuer);
+    let set_by_the_issuer = ["iss", "vct", "iat", "cnf", PASSPORT_CLAIM];
+
+    let mut stray = Vec::new();
+    for case in &cases {
+        let id = case["id"].as_str().unwrap_or("?");
+        let jwt = SdJwt::parse(case["token"].as_str().expect("a token"))
+            .unwrap_or_else(|e| panic!("{id}: the corpus holds an unreadable token: {e:?}"))
+            .jwt()
+            .to_owned();
+        let signed: Value = serde_json::from_slice(
+            &B64.decode(jwt.split('.').nth(1).expect("a compact JWS"))
+                .expect("base64url"),
+        )
+        .expect("a JSON payload");
+        for (reading, claims) in [
+            ("signed", signed.as_object()),
+            ("verified", case["ours"]["payload"].as_object()),
+        ] {
+            let Some(claims) = claims else { continue };
+            for name in claims.keys() {
+                // `_sd_alg` is the mechanism's, and it is only in the signed reading.
+                let mechanism = reading == "signed" && name == "_sd_alg";
+                if !mechanism && !set_by_the_issuer.contains(&name.as_str()) {
+                    stray.push(format!("{id}: '{name}' at the root, as {reading}"));
+                }
+            }
+        }
+    }
+    assert!(
+        stray.is_empty(),
+        "{}",
+        stray.join(
+            "
+"
+        )
+    );
+
+    // Every passport in the corpus has a `status`, and none of them is the
+    // credential's: the check above is only worth its name while the name is there.
+    for case in cases.iter().filter(|c| c["expected"].is_object()) {
+        let id = case["id"].as_str().unwrap_or("?");
+        let claims = case["ours"]["payload"].as_object().expect("accepted");
+        assert!(
+            claims[PASSPORT_CLAIM]["status"].is_string(),
+            "{id}: the passport has lost its status, so the collision this test guards is untested"
+        );
+    }
 }
 
 /// Every way `file` disagrees with `dpp_vc::sd_jwt_vc::verify`.

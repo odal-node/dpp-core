@@ -35,6 +35,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A Disclosure the Holder withheld cannot be seen, so keeping these claims in the
   clear stays the Issuer's half of the rule. (#430)
 
+- **An SD-JWT VC holds its passport under one claim.** `sd_jwt_vc::issue` used to
+  merge the passport's root members into the credential's claims. It now writes
+  `iss`, `vct`, `iat` and, for a bound credential, `cnf` at the root, and the whole
+  passport under `passport` (`sd_jwt_vc::PASSPORT_CLAIM`). The merge left the
+  credential's claim names to the passport schema, and one collided: a passport's
+  lifecycle `status` became the credential's `status`, which the profile registers
+  as the reference to a Token Status List and tells a Verifier to check
+  (draft-ietf-oauth-sd-jwt-vc-19 clauses 2.2.2.3 and 2.4). Every credential in the
+  oracle corpus carried `"status": "draft"` in the clear. An `exp`, `nbf`, `cnf` or
+  `aud` in a passport would have collided the same way. Nested, no passport member
+  can be read as a claim of the credential, whatever a later schema adds, and the
+  claims the issuer sets are no longer walked for concealment at all, so the list of
+  names that were exempt from it is gone. `verify` still returns every claim of the
+  credential: a caller reads the passport from `claims["passport"]`.
+  **Migration:** read the passport from `passport`, not from the root. A credential
+  issued before this change carries the passport's `status`, a string, at the
+  root, and `verify` now refuses it (`SdJwtVcError::MalformedStatus`, below), so
+  issue it again. (#435)
+
+- **`sd_jwt_vc::verify` refuses a `status` claim that is not an object.** The
+  profile registers `status` for a reference to a Token Status List, and
+  draft-ietf-oauth-status-list-21 section 6.2 gives its value as an object. Nothing
+  follows the reference yet, so the shape is all that can be held to; a string
+  where a status mechanism is expected is refused as `SdJwtVcError::MalformedStatus`
+  instead of passing for one. The draft has a row in the standards register. (#435)
+
 - **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
   passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
   `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
@@ -325,7 +351,93 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that includes every Disclosure on the way down to the claims wanted presents as
   before. (#426)
 
+- **`dpp-vocab` permits a term somebody read, not a whole namespace.**
+  `VocabularyRegister::verdict` used to permit any IRI beginning with a verified
+  vocabulary's namespace, so `https://ref.gs1.org/voc/Totally_Made_Up_Term` was
+  permitted on the strength of GS1's `gtin` having been read. A namespace is a
+  prefix, and reading a vocabulary's publication does not read each definition in
+  it. Every record now carries `terms`, the list of terms read, each with `iri`,
+  `readOn`, `source` and `finding`, and only a listed term is permitted. `gtin`
+  is the one entry today. A verified vocabulary's namespace IRI on its own is
+  still permitted, since declaring a prefix defines no term; a test of the
+  JSON-LD context's `gs1:` declaration relies on it. A term may be listed at an address outside the
+  record's namespace, provided no other record claims it. Tests hold every entry
+  to a well-formed IRI, a real date no later than the record's `checkedOn`, a
+  speakable vocabulary, and no address under another record's namespace.
+  **Migration:** a caller that emits a third-party IRI must find it listed. The
+  refusal is the new `Verdict::TermNotRead`; the remedy is to read the term's
+  definition and add it to the record, not to widen the namespace. A record
+  deserialised from JSON needs a `terms` key (`[]` for none), and `Vocabulary`
+  gains a `terms` field and a `read_term` method.
+
+- **A `dpp-vocab` record needs a `pins` key.** `Vocabulary` gains `pins`, the
+  upstream state a record's findings were read at, which `just vocab-drift`
+  observes (under Added). **Migration:** a record deserialised from JSON needs a
+  `pins` key (`[]` for none).
+
 ### Added
+
+- **`just vocab-drift` names the vocabulary records whose source has moved.**
+  A `dpp-vocab` record rests on somebody having read another organisation's
+  publication, and that can change without a commit here; the last re-check found
+  that seven of the ten records it looked at had moved. Every record now carries `pins`, the upstream
+  state its findings were read at: the newest commit on a repository or on a
+  path in it, a repository's latest release tag, or the SHA-256 of a document
+  served at a URL. The recipe observes each pin again and exits 1 on a
+  difference, on a pin it cannot observe, or on a cited URL that answers 404 or
+  410. A redirect is reported and does not fail, and a refusal or timeout is
+  reported as unverified rather than failing, so a flaky network does not make it
+  cry wolf. It is not part of `just check`, since it depends on other people's
+  servers. A pin only says a record is due a reading, never that it is wrong.
+  Tests hold every pin to the shape its kind requires, a real date no later than
+  the record's `checkedOn`, and require every `verified` record to pin something.
+  Six records are pinned (seven pins), each to the narrowest thing whose change
+  would matter, such as a release-notes file rather than a directory of regenerated
+  artefacts.
+
+- **A Holder can choose what to present by claim path.**
+  `SdJwt::digests_for_paths` takes the claims wanted as `ClaimPath`s and returns the
+  digests of the Disclosures that reveal them, ready for `present` and
+  `present_with_key_binding`. Until now the only way from a claim to its digests was
+  `digests_for_claim`, which matches a name at any depth: it could not name a nested
+  claim with the claims above it, and could not name an array element at all.
+  - **A path** is the syntax of draft-ietf-oauth-sd-jwt-vc-19 clause 5.6.1, which is
+    also the claims path of OpenID for Verifiable Presentations: names, non-negative
+    integers for one array element, and `null` for every element.
+    `ClaimPath::from_json` reads `["degrees", null, "type"]` as written. No
+    conformance to the draft is claimed.
+  - **It reveals the claim and what leads to it.** A nested claim brings the claims
+    above it and no others. A path to a container returns that container's own
+    Disclosure, and what is hidden inside it stays hidden. A claim in the clear needs
+    none, and naming it is not an error. Never a sibling, never another element.
+  - **A position is the one in the array as the Issuer made it.** With `[a, b, c, d]`
+    and `a` and `c` hidden, `2` is `c`, not the `d` a Verifier would see third. A
+    decoy (clause 4.2.5) is not an element and does not count. This is exact for a
+    token holding every Disclosure the Issuer made. A token already presented in
+    part cannot tell a withheld element from a decoy, so positions after one move;
+    the documentation says so.
+  - **It fails closed.** A path that selects nothing is `SdJwtError::ClaimNotInToken`,
+    naming the path, and nothing is returned for the others. The two libraries it was
+    read against differ: one returns nothing for the whole request, the other ignores
+    the path and presents the rest.
+  - **It checks its own work.** The result must read as a Verifier will read it, each
+    path must select what plain navigation of the fully processed payload does, and
+    each must still find its claim in the presentation. A failure is
+    `SdJwtError::SelectionDisagrees`, a defect in this crate and not a property of
+    the token.
+  - **Into an SD-JWT VC, a path starts at `passport`.** `sd_jwt_vc::issue` holds the
+    passport under `sd_jwt_vc::PASSPORT_CLAIM`, so a member of it is reached as
+    `["passport", "productGroupData", "cathodeMaterial"]`. A path written from the
+    passport alone names nothing in the credential, and choosing by it is refused
+    with `ClaimNotInToken`.
+  - **Evidence.** The RFC's section 5.2 and Appendix A.3 presentations are rebuilt
+    from their issued tokens by path. A property test builds random trees with random
+    hiding and compares the result to a model that finds the Disclosures a path needs
+    while it builds the token. And the oracle replay has this crate choose the
+    Disclosures for 145 presentations the TypeScript library made and 93 the Kotlin
+    library made, from the same paths, with no disagreement. Neither library places a
+    decoy ahead of a real array element (they append them), so that one case rests on
+    a unit test and on how processing removes a placeholder with no Disclosure.
 
 - **The Critical Raw Materials Act is recorded, as an act that owes content to
   the passport another act requires.** `PassportObligation` gains
@@ -822,6 +934,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
+  conceals an array element only when `_sd` names its index as a number. A string
+  index is ignored, and the library issues a valid token with no Disclosure for it.
+  `issue.mjs` wrote its indices as strings, so 11 of its 13 array cases, its
+  credential case for an array element, and every array element in its 120 random
+  trees hid nothing, and passed because the library reads back whatever it issued.
+  The independent evidence for array elements (RFC 9901 clause 4.2.2) was the
+  Kotlin issuer's and the RFC's own examples. The indices are now numbers, which
+  puts 495 array-element Disclosures, in 126 tokens, in front of this crate where
+  there were none. Every case also checks that the library issued as many
+  Disclosures as its frame asks for, so a frame it ignores fails the run.
+
 - **An independent implementation found four ways this crate read a malformed
   SD-JWT as a good one.** Its own tests could not, having been written from the
   same reading of RFC 9901 as the code.
@@ -1098,6 +1222,44 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   The register row stays `No`: the standard defines the list a scheme operator
   publishes, and this crate consumes lists, so there is no conformance class for
   it to claim.
+
+- **The vocabulary register was re-checked against its sources, and it had drifted.**
+  `dpp-vocab` records what other organisations publish. Nine weeks after the last
+  reading, seven of the ten records looked at again had moved. Five of the six
+  verified records now carry a re-check note:
+  - the Commission's battery guidance at the recorded URL is Version 2.0 of
+    15 August 2026, not 1.0, with the licence statement unchanged;
+  - IDTA released bug-fix versions of the battery passport submodels in
+    September;
+  - the Catena-X battery model has a 6.1.0, and the generic passport model it
+    imports is at 7.0.0;
+  - the Battery Pass Consortium's repository now points to BatteryPass-Ready,
+    which announced a longlist and a data model 2.0 on 2026-08-27 (neither file
+    read yet, so that record stays `tracked`);
+  - SEMIC's CCCEV is 2.2.0 where the record said 2.1.0.
+
+  CIRPASS-2's ontology is 2.0.7, not 2.0.5. GS1, schema.org and UNTP had not
+  changed. Four repository paths the records cite had moved with the module
+  renames and are corrected. A test (`vocabulary_record_paths`) now fails when a
+  record cites a path that does not exist, and another pins that nothing under an
+  unverified vocabulary's namespace is permitted, which no test did before. Six
+  records are added, all `surveyed`, so nothing they name is permitted: the generic
+  Catena-X passport model, DIN DKE SPEC 99100, the Publications Office's authority
+  tables, the Combined Nomenclature, ECHA's Candidate List and the W3C Data
+  Privacy Vocabulary. The directory README's statement that nothing was verified,
+  false since August, was corrected.
+
+- **The `dpp-vocab` prose no longer keeps its own count.** The crate README and
+  `lib.rs` said how many records are verified, named them, and said how many had
+  been re-checked and what they had found; the directory README said how many were
+  verified. Each was a copy of the register, and a copy is what drifts. A test now
+  builds the sentences from the register (the verified count and list, and the
+  terms read) and fails when a file does not contain them, so the next record to
+  become verified or the next term to be read fails the build until the prose is
+  updated. The sentence about re-check findings is gone: it was history, and the
+  records hold it. The pre-release checklist's standards re-read now also says to
+  run `just vocab-drift`, so the vocabulary records are re-read at the same point
+  as the standards register.
 
 ## [0.21.0] - 2026-09-28
 

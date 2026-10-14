@@ -12,9 +12,11 @@
  *                             public key, and reads the claims. They must be the
  *                             claims this crate reads.
  *   the passport              The credential as issued must reveal exactly the
- *                             passport that went in, plus the `iss`, `vct` and
- *                             `iat` the issuer sets. Concealment that lost or
- *                             invented a claim shows here.
+ *                             passport that went in, under the `passport` claim,
+ *                             plus the `iss`, `vct` and `iat` the issuer sets at
+ *                             the root. Concealment that lost or invented a claim
+ *                             shows here, and so does a passport member that
+ *                             reached the root.
  *   the `kid`                 Recomputed from the public key as the RFC 7638
  *                             thumbprint in the RFC 9278 URI form, and compared
  *                             with the `kid` in every JWT header.
