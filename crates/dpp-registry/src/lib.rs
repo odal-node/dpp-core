@@ -61,6 +61,8 @@
 //! - [`payload`] — [`RegistrationPayload`] and its [`EuRegistryEnvelope`].
 //! - [`coherence`] — whether a registration agrees with the passport it
 //!   registers, as the registry checks on submission (Art. 8(7)(b)–(c)).
+//! - [`product_groups`] — the registry's codes for product groups
+//!   ([`registry_product_group`]).
 //! - [`submission`] — [`RegistrationSubmission`]: the passports that travel and
 //!   fail together, and the caps and outcome of one act of submitting.
 //! - [`response`] — [`EuRegistryResponse`], [`StatusResponse`],
@@ -84,6 +86,7 @@ pub mod error;
 pub mod granularity;
 pub mod identifiers;
 pub mod payload;
+pub mod product_groups;
 pub mod proof;
 pub mod response;
 pub mod submission;
@@ -93,8 +96,9 @@ pub mod transfer;
 
 pub use basis::RegistryBasis;
 pub use endpoint::{
-    ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
-    STATUS_PATH_TEMPLATE, SUBMISSION_STATUS_PATH_TEMPLATE, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
+    ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH,
+    RegistryAuthority, RegistryEndpoint, STATUS_PATH_TEMPLATE, TASK_RESULT_PATH_TEMPLATE,
+    TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
@@ -108,11 +112,13 @@ pub use identifiers::{
     ServiceProviderReference,
 };
 pub use payload::{EuRegistryEnvelope, RegistrationPayload};
+pub use product_groups::{PRODUCT_GROUP_BATTERIES, registry_product_group};
 pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
-    PassportResult, RegistrationSubmission, SubmissionOutcome, SubmissionReceipt, fits_file_limit,
+    PassportOutcome, PassportResult, REGISTRATION_ERROR_CODES, RegistrationSubmission,
+    SubmissionOutcome, SubmissionReceipt, fits_file_limit,
 };
 pub use transfer::TransferNotification;
 

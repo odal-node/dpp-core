@@ -30,8 +30,10 @@
 mod batch;
 #[cfg(test)]
 mod batch_tests;
+mod error_codes;
 mod limits;
 mod outcome;
+mod passport_outcome;
 mod passport_result;
 mod receipt;
 
@@ -39,10 +41,12 @@ mod receipt;
 mod tests;
 
 pub use batch::RegistrationSubmission;
+pub use error_codes::REGISTRATION_ERROR_CODES;
 pub use limits::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
     fits_file_limit,
 };
 pub use outcome::SubmissionOutcome;
+pub use passport_outcome::PassportOutcome;
 pub use passport_result::PassportResult;
 pub use receipt::SubmissionReceipt;

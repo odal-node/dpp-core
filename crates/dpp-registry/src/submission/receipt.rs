@@ -32,9 +32,12 @@ pub struct SubmissionReceipt {
     /// On [`Success`](SubmissionOutcome::Success) each passport carries its
     /// Art. 8(8) registration identifier; on
     /// [`Failure`](SubmissionOutcome::Failure) the passports that failed carry
-    /// their error, and none carries an identifier, because a refused
+    /// their error code, and none carries an identifier, because a refused
     /// submission produces no records. See [`PassportResult`] for why a result
     /// is matched by identifier and never by position.
+    ///
+    /// 👁️ In the registry's web client (2026-10-14) these are the task's
+    /// `resultPayload.report.itemDetails`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub results: Vec<PassportResult>,
 }

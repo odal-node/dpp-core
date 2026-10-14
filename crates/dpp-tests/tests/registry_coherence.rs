@@ -120,7 +120,10 @@ fn registration_for(
             country: request.country_code.clone(),
             did: None,
         },
-        product_group: request.product_category.clone(),
+        // The registry's code for the group, as an adapter must send it.
+        product_group: dpp_registry::registry_product_group(&passport.product_group)
+            .expect("batteries have a registry code")
+            .to_owned(),
         schema_version: request.schema_version.clone(),
         digital_link_url: request.data_carrier_uri.clone(),
         published_at: Utc::now(),
@@ -192,6 +195,15 @@ fn a_value_the_passport_states_differently_is_incoherent() {
     assert_eq!(
         incoherent_field(group.check_coherence(&passport)).0,
         "productGroup"
+    );
+
+    // Our own name for the group is not the registry's: a battery filed as
+    // `battery` names a group the registry does not list.
+    let mut our_name = item();
+    our_name.product_group = "battery".into();
+    assert_eq!(
+        incoherent_field(our_name.check_coherence(&passport)),
+        ("productGroup", Some("battery".into()))
     );
 }
 

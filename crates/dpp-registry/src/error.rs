@@ -314,7 +314,8 @@ impl std::error::Error for EuRegistryError {}
 
 /// An error body returned by the registry.
 ///
-/// 👁️ **Observed 2026-09-16** in the registry's web client, which reads
+/// 👁️ **Observed** in the registry's web client (first 2026-09-16, again
+/// 2026-10-14), which reads
 /// `subCode` to recognise a replayed idempotency key and `traceId` to report a
 /// failure to the helpdesk. Both are therefore fields the registry really
 /// sends; the rest of the body's shape is unknown, which is why this models
@@ -347,9 +348,11 @@ pub struct RegistryErrorBody {
 /// `subCode`, and there is no `Conflict` kind for it to hang on.
 pub const STATUS_IDEMPOTENCY_KEY_REUSED: u16 = 409;
 
-/// What backs [`STATUS_IDEMPOTENCY_KEY_REUSED`].
-pub const STATUS_IDEMPOTENCY_KEY_REUSED_BASIS: RegistryBasis =
-    RegistryBasis::Observed { on: "2026-09-16" };
+/// What backs [`STATUS_IDEMPOTENCY_KEY_REUSED`]: the client's check of a 409
+/// against this sub-code, read on the date the client was last read.
+pub const STATUS_IDEMPOTENCY_KEY_REUSED_BASIS: RegistryBasis = RegistryBasis::Observed {
+    on: crate::endpoint::LAST_READ,
+};
 
 /// The `subCode` accompanying **409** when an idempotency key is replayed.
 ///

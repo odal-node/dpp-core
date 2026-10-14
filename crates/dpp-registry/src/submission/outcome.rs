@@ -8,6 +8,15 @@ use serde::{Deserialize, Serialize};
 /// validation are listed as `PROCESSING`, and completed ones as `SUCCESS` or
 /// `FAILURE`.
 ///
+/// 👁️ **Two spellings on the wire**, read from the registry's web client on
+/// 2026-10-14. A registration's dashboard task carries a `status` of
+/// `PROCESSING`, `SUCCESS` or `FAILURE`, and its `resultPayload.outcomeResult`
+/// says `SUCCEEDED` or `FAILED`; the interface shows the latter when it is
+/// present and the former otherwise. Both read as the same outcome here, so a
+/// caller can take either field without an outcome turning into
+/// [`Unrecognised`](Self::Unrecognised) — which is not terminal, and would keep
+/// a finished submission polled. A value is written in the `status` spelling.
+///
 /// Deliberately **not** merged with
 /// [`RegistryStatusCode`](crate::RegistryStatusCode) — see the module
 /// documentation for why the two are different questions.
@@ -78,8 +87,8 @@ impl From<String> for SubmissionOutcome {
     fn from(value: String) -> Self {
         match value.as_str() {
             "PROCESSING" => Self::Processing,
-            "SUCCESS" => Self::Success,
-            "FAILURE" => Self::Failure,
+            "SUCCESS" | "SUCCEEDED" => Self::Success,
+            "FAILURE" | "FAILED" => Self::Failure,
             _ => Self::Unrecognised(value),
         }
     }

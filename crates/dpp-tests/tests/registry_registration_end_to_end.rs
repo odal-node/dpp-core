@@ -321,7 +321,7 @@ fn one_bad_passport_refuses_a_hundred_registrations() {
 /// the identifier each passport was submitted under.
 #[test]
 fn a_successful_submission_is_acknowledged_per_passport() {
-    use dpp_registry::{PassportResult, SubmissionOutcome, SubmissionReceipt};
+    use dpp_registry::{PassportOutcome, PassportResult, SubmissionOutcome, SubmissionReceipt};
 
     let identifier = SchemeIdentifier::gs1(Gtin::parse("09506000134352").unwrap());
     let passport = published_passport(identifier.clone());
@@ -353,8 +353,9 @@ fn a_successful_submission_is_acknowledged_per_passport() {
             .map(|(n, passport)| PassportResult {
                 unique_product_identifier: passport.digital_link_url.clone(),
                 product_group: Some(passport.product_group.clone()),
+                outcome: Some(PassportOutcome::Accepted),
                 registration_identifier: Some(format!("EU-DPP-{n}")),
-                error: None,
+                error_code: None,
             })
             .collect(),
     };
