@@ -7,7 +7,7 @@ use serde_json::json;
 use dpp_domain::ProductGroup;
 
 use super::test_fixtures::*;
-use super::{Issuance, SdJwtVcError, vct_for, verify};
+use super::{Issuance, SdJwtVcError, issue, vct_for};
 use crate::test_support::temp_store;
 
 /// Both claims are OPTIONAL in the profile, so their absence means "no bound"
@@ -32,7 +32,7 @@ fn a_credential_without_exp_or_nbf_is_unbounded() {
 fn an_expired_credential_is_refused() {
     let store = temp_store("sdjwtvc-expired", KEY_ID);
     let expiry = ISSUED_AT + 3600;
-    let credential = issued_with(&store, &[("exp", json!(expiry))]);
+    let credential = credential_with(&store, &[("exp", json!(expiry))]);
 
     // A second before expiry it verifies; at and after it, it does not.
     assert!(
@@ -61,7 +61,7 @@ fn an_expired_credential_is_refused() {
 fn a_credential_presented_before_nbf_is_refused() {
     let store = temp_store("sdjwtvc-nbf", KEY_ID);
     let start = ISSUED_AT + 3600;
-    let credential = issued_with(&store, &[("nbf", json!(start))]);
+    let credential = credential_with(&store, &[("nbf", json!(start))]);
 
     assert!(matches!(
         check(
@@ -81,8 +81,10 @@ fn a_credential_presented_before_nbf_is_refused() {
 fn a_temporal_claim_that_is_not_a_numericdate_is_refused() {
     let store = temp_store("sdjwtvc-malformed", KEY_ID);
 
-    for claim in ["nbf", "exp"] {
-        let credential = issued_with(&store, &[(claim, json!("2026-09-16T00:00:00Z"))]);
+    // `iat` is in the list too: it is a root claim like the other two, and it can
+    // only be malformed here because `issue` writes its own.
+    for claim in ["nbf", "exp", "iat"] {
+        let credential = credential_with(&store, &[(claim, json!("2026-09-16T00:00:00Z"))]);
         assert!(
             matches!(
                 check(&store, &credential, now()),
@@ -91,64 +93,54 @@ fn a_temporal_claim_that_is_not_a_numericdate_is_refused() {
             "{claim} as a string was accepted"
         );
     }
-
-    // `iat` is not in that list because it cannot get there: `issue` writes its
-    // own, and the payload walk cannot displace it. Asserted rather than
-    // assumed, since it is the reason the loop above is short.
-    let credential = issued_with(&store, &[("iat", json!("not-a-date"))]);
-    let disclosed = verify(
-        &credential,
-        &public_key_b64(&store),
-        &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        now(),
-        None,
-    )
-    .expect("issuer-set iat is well-formed");
-    assert_eq!(disclosed["iat"], json!(ISSUED_AT));
 }
 
 /// RFC 9901 clause 9.7 names the claims an issuer MUST NOT make selectively
-/// disclosable. None of them may appear as a disclosure, whatever the policy
-/// says — and the policy is asked directly here so the test does not pass
-/// merely because no schema happens to mention them.
+/// disclosable. The ones `issue` sets are written straight into the root and only
+/// the passport is walked for concealment, so none can be a disclosure, whatever
+/// a policy or a schema says. Asserted over a bound credential, which has all four.
 #[test]
-fn validity_controlling_claims_are_never_disclosable() {
+fn the_claims_the_issuer_sets_are_never_disclosable() {
     let store = temp_store("sdjwtvc-critical", KEY_ID);
-    let credential = issued_with(
+    let holder = temp_store("sdjwtvc-critical-holder", "holder")
+        .load_key("holder")
+        .expect("the key was just generated");
+    let credential = issue(
         &store,
-        &[
-            ("exp", json!(ISSUED_AT + 3600)),
-            ("nbf", json!(ISSUED_AT - 10)),
-            ("aud", json!("https://verifier.example")),
-            ("cnf", json!({"jwk": {"kty": "OKP"}})),
-        ],
-    );
-    let parsed = dpp_crypto::sd_jwt::SdJwt::parse(&credential).unwrap();
+        KEY_ID,
+        &payload(),
+        &policy(),
+        &Issuance {
+            issuer: ISSUER,
+            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            issued_at: ISSUED_AT,
+            holder_key: Some(holder.verifying_key.to_bytes()),
+        },
+    )
+    .expect("issue");
 
-    for claim in ["iss", "aud", "exp", "nbf", "cnf", "vct", "iat"] {
+    assert!(
+        !credential.disclosures().is_empty(),
+        "control: the fixture conceals something, so there is a Disclosure to hide a claim in"
+    );
+    for claim in ["iss", "vct", "iat", "cnf"] {
         assert!(
-            parsed.digests_for_claim(claim).is_empty(),
+            credential.digests_for_claim(claim).is_empty(),
             "{claim} was issued as a disclosure, so a holder can withhold it"
         );
     }
 }
 
-/// `exp` is issued in cleartext, not as a disclosure. If it were concealable, a
-/// holder could drop the disclosure and turn an expired credential into an
-/// unbounded one — RFC 9901 clause 9.7 warns about exactly this.
+/// An `exp` in the clear is enforced on a presentation that reveals nothing. If it
+/// were concealable, a holder could drop the disclosure and turn an expired
+/// credential into an unbounded one — RFC 9901 clause 9.7 warns about exactly this.
 #[test]
-fn exp_is_not_selectively_disclosable() {
+fn exp_is_still_enforced_on_a_presentation_that_reveals_nothing() {
     let store = temp_store("sdjwtvc-exp-cleartext", KEY_ID);
     let expiry = ISSUED_AT + 3600;
-    let credential = issued_with(&store, &[("exp", json!(expiry))]);
+    let credential = credential_with(&store, &[("exp", json!(expiry))]);
 
     let parsed = dpp_crypto::sd_jwt::SdJwt::parse(&credential).unwrap();
-    assert!(
-        parsed.digests_for_claim("exp").is_empty(),
-        "exp travels as a disclosure, so a holder can withhold its own expiry"
-    );
-
-    // And it is therefore still enforced on a presentation that reveals nothing.
     let bare = parsed
         .present(&[])
         .expect("nothing chosen is a valid choice")
@@ -168,7 +160,7 @@ fn exp_is_not_selectively_disclosable() {
 fn a_fractional_numericdate_is_accepted_and_keeps_its_fraction() {
     let store = temp_store("sdjwtvc-fractional", KEY_ID);
     let expiry = ISSUED_AT + 3600;
-    let credential = issued_with(&store, &[("exp", json!(expiry as f64 + 0.5))]);
+    let credential = credential_with(&store, &[("exp", json!(expiry as f64 + 0.5))]);
 
     // Half a second before the fractional expiry: still valid. Truncating the
     // fraction would place expiry at `expiry` exactly, and `now >= instant`
@@ -196,7 +188,7 @@ fn a_non_finite_or_out_of_range_numericdate_is_still_refused() {
     let store = temp_store("sdjwtvc-notfinite", KEY_ID);
 
     for value in [json!(1.0e300), json!(-1.0e300)] {
-        let credential = issued_with(&store, &[("exp", value.clone())]);
+        let credential = credential_with(&store, &[("exp", value.clone())]);
         assert!(
             matches!(
                 check(&store, &credential, now()),
@@ -207,31 +199,6 @@ fn a_non_finite_or_out_of_range_numericdate_is_still_refused() {
     }
 }
 
-/// Mint a credential the way a foreign issuer would: sign a payload we choose,
-/// with the right `typ`, using the fixture's key so the signature verifies.
-///
-/// Nothing is concealed, so there are no disclosures and no `_sd` — the point is
-/// the shape of `iss`, and a verifier must reach the claim check at all.
-fn foreign_credential_with_iss(
-    store: &dpp_crypto::keystore::KeyStore,
-    iss: serde_json::Value,
-) -> String {
-    let jwt_payload = json!({
-        "iss": iss,
-        "vct": vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-        "iat": ISSUED_AT,
-    });
-    let kid = store
-        .public_key(KEY_ID)
-        .expect("fixture key exists")
-        .thumbprint_uri()
-        .expect("a valid public key");
-    let jwt =
-        dpp_crypto::jws::sign_typed(store, KEY_ID, &jwt_payload, &kid, Some(super::TYP), None)
-            .expect("fixture key signs");
-    dpp_crypto::sd_jwt::SdJwt::new(jwt, Vec::new()).serialise()
-}
-
 /// `contains_key("iss")` accepted `null`, a number or an array, and the
 /// credential then verified while naming no issuer — the one claim a relying
 /// party needs in order to decide whose key should have signed it.
@@ -239,13 +206,14 @@ fn foreign_credential_with_iss(
 /// Minted here rather than through [`issue`], which writes its own `iss` and so
 /// cannot produce the case. That is the point: the shape a verifier has to
 /// refuse is one *somebody else's* issuer emitted, and a verifier that only
-/// ever sees its own output is the one that grows this class of hole.
+/// ever sees its own output is the one that grows this class of hole. Nothing is
+/// concealed, so the verifier has to reach the claim check at all.
 #[test]
 fn an_iss_that_is_not_a_string_is_refused() {
     let store = temp_store("sdjwtvc-iss-shape", KEY_ID);
 
     for value in [json!(null), json!(42), json!(["a"]), json!({})] {
-        let credential = foreign_credential_with_iss(&store, value.clone());
+        let credential = credential_with(&store, &[("iss", value.clone())]);
         assert!(
             matches!(
                 check(&store, &credential, now()),
@@ -256,17 +224,18 @@ fn an_iss_that_is_not_a_string_is_refused() {
     }
 }
 
-/// `NEVER_CONCEALED` exempts eight registered JWT claims, and it was applied at
-/// **every** recursion depth — so any nested field that happened to share one of
-/// those names was skipped before it was ever classified, and travelled in
-/// cleartext however the policy graded it.
+/// A passport member that shares a registered claim's name is an ordinary member,
+/// whatever its depth: the policy classes it and, when it is non-public, it is
+/// concealed. Registered names were once exempt from concealment at the payload
+/// root, and at every depth before that, so a non-public `exp` travelled in
+/// cleartext however the policy graded it. The passport now sits under its own
+/// claim, the claims the issuer sets are not walked at all, and nothing is exempt.
 ///
-/// Latent rather than live: no shipped schema classifies a nested `exp`, `aud`
-/// or `cnf` today, and `issue`'s own note says these "survive by accident". This
-/// test supplies the policy that ends the accident, which is the only way to
+/// Latent rather than live: no shipped schema classifies an `exp`, `aud` or `cnf`
+/// today. This test supplies the policy that makes it so, which is the only way to
 /// pin the rule without waiting for a schema to add such a field.
 #[test]
-fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
+fn a_passport_member_sharing_a_registered_claim_name_is_concealed_at_every_depth() {
     use std::collections::HashMap;
 
     use dpp_domain::Disclosure;
@@ -276,11 +245,13 @@ fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
 
     let mut field_disclosure = HashMap::new();
     field_disclosure.insert("exp".to_owned(), Disclosure::Individual);
+    let mut envelope_disclosure = HashMap::new();
+    envelope_disclosure.insert("exp".to_owned(), Disclosure::Individual);
     let policy = ProductGroupAccessPolicy {
         name: "nested-registered-name".into(),
         product_group: "battery".into(),
         field_disclosure,
-        envelope_disclosure: HashMap::new(),
+        envelope_disclosure,
         default_disclosure: Disclosure::Public,
         public_envelope_fields: Default::default(),
     };
@@ -289,6 +260,7 @@ fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
         "id": "018f3a4c-0000-7000-8000-000000000001",
         "productGroup": "battery",
         "schemaVersion": SCHEMA_VERSION,
+        "exp": "an envelope member that is not an expiry",
         "productGroupData": { "exp": "a non-public value that is not an expiry" },
     });
 
@@ -308,16 +280,16 @@ fn a_nested_field_sharing_a_registered_claim_name_is_still_concealed() {
     .serialise();
 
     let parsed = dpp_crypto::sd_jwt::SdJwt::parse(&credential).unwrap();
-    assert!(
-        !parsed.digests_for_claim("exp").is_empty(),
-        "a nested, non-public `exp` travelled in cleartext — the root-claim \
-         exemption is leaking into the payload"
+    assert_eq!(
+        parsed.digests_for_claim("exp").len(),
+        2,
+        "a non-public `exp` travelled in cleartext, at the passport's root or below it"
     );
 
-    // And the root exemption it protects is untouched: the token's own `iat`
-    // stays in cleartext, or a verifier could not read it before disclosure.
+    // And the token's own claims are untouched: `iat` stays in cleartext, or a
+    // verifier could not read it before disclosure.
     assert!(
         parsed.digests_for_claim("iat").is_empty(),
-        "the root `iat` was concealed — the exemption is now too narrow"
+        "the root `iat` was concealed"
     );
 }
