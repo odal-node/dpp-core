@@ -77,6 +77,23 @@ lock-check:
     done
     echo "3 lockfiles match their manifests."
 
+# Re-resolve the lockfiles of the two workspaces beside this one, after a version
+# moved. `plugins/` and `fuzz/` record the version of the workspace crates they
+# take by path, and cargo-release only sees this workspace, so it leaves both
+# lockfiles stale and `lock-check` red. It is the `pre-release-hook` in
+# `crates/dpp-tests/Cargo.toml`; it runs under `cargo release --dry-run` too,
+# so it does nothing there. By hand: `just relock`.
+relock:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${DRY_RUN:-false}" = "true" ]; then
+        echo "dry run: leaving the plugins and fuzz lockfiles alone."
+        exit 0
+    fi
+    for ws in plugins fuzz; do
+        (cd "$ws" && cargo update --workspace)
+    done
+
 # Check the public API against the last published release.
 #
 # All members share one lockstep version, so every crate is republished on every
