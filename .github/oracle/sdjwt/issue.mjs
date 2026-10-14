@@ -66,6 +66,35 @@ const cases = [];
 const problems = [];
 
 /**
+ * How many Disclosures `frame` asks the library to issue: one for every entry of
+ * every `_sd`, at any depth. Decoys (`_sd_decoy`) have none.
+ */
+function disclosuresAskedFor(frame) {
+  if (frame === null || typeof frame !== "object") return 0;
+  return Object.entries(frame).reduce(
+    (total, [key, value]) =>
+      total + (key === "_sd" ? value.length : key === "_sd_decoy" ? 0 : disclosuresAskedFor(value)),
+    0,
+  );
+}
+
+/**
+ * Whether the library issued every Disclosure `frame` asked for. A frame it
+ * does not understand is not refused: it issues fewer, or none, and the token is
+ * still valid. `@sd-jwt/core` does exactly that with an array index written as a
+ * string, so a case meant to hide an array element hid nothing and passed, because
+ * what the library reads back is what a case expects. Such a case proves nothing,
+ * so it fails the run instead.
+ */
+function checkIssued(id, frame, issued) {
+  const asked = disclosuresAskedFor(frame);
+  const made = issued.split("~").length - 2;
+  if (made === asked) return true;
+  problems.push(`${id}: the frame asks for ${asked} Disclosures and the library issued ${made}, so the case does not hide what it says it hides`);
+  return false;
+}
+
+/**
  * Issue `payload` under `frame`, present it under `presentation` (everything
  * when omitted), have the library read the result, and record both.
  */
@@ -74,6 +103,7 @@ async function add(id, payload, frame, presentation, { keyBinding = false } = {}
     const claims = { iss: "https://issuer.example", ...payload };
     if (keyBinding) claims.cnf = { jwk: holder.publicJwk };
     const issued = await sd.issue(claims, frame);
+    if (!checkIssued(id, frame, issued)) return;
     const nonce = `nonce-${id}`;
     const token =
       presentation === undefined && !keyBinding
@@ -124,31 +154,32 @@ await add(
   { person: true },
 );
 
+// An index into an array is a number in `_sd`. A string is ignored, and nothing is hidden.
 const list = { list: ["first", "middle", "last"] };
-for (const [name, index] of [["first", "0"], ["middle", "1"], ["last", "2"]]) {
+for (const [name, index] of [["first", 0], ["middle", 1], ["last", 2]]) {
   await add(`array/${name}-element-hidden-shown`, list, { list: { _sd: [index] } }, { list: { [index]: true } });
   await add(`array/${name}-element-hidden-withheld`, list, { list: { _sd: [index] } }, { list: {} });
 }
-await add("array/every-element-hidden-some-shown", list, { list: { _sd: ["0", "1", "2"] } }, { list: { 1: true } });
-await add("array/array-itself-hidden", list, { _sd: ["list"], list: { _sd: ["0"] } }, { list: { 0: true } });
+await add("array/every-element-hidden-some-shown", list, { list: { _sd: [0, 1, 2] } }, { list: { 1: true } });
+await add("array/array-itself-hidden", list, { _sd: ["list"], list: { _sd: [0] } }, { list: { 0: true } });
 await add(
   "array/elements-that-are-objects",
   { people: [{ n: "A", a: 1 }, { n: "B", a: 2 }] },
-  { people: { _sd: ["0", "1"], 0: { _sd: ["a"] }, 1: { _sd: ["n"] } } },
+  { people: { _sd: [0, 1], 0: { _sd: ["a"] }, 1: { _sd: ["n"] } } },
   { people: { 0: { a: true }, 1: true } },
 );
 await add(
   "array/array-in-array",
   { m: [[1, 2], [3, 4]] },
-  { m: { _sd: ["1"], 1: { _sd: ["0"] } } },
+  { m: { _sd: [1], 1: { _sd: [0] } } },
   { m: { 1: { 0: true } } },
 );
-await add("array/empty-and-null-elements", { a: [], b: [null, 0, ""] }, { b: { _sd: ["0", "1", "2"] } }, { b: { 0: true, 2: true } });
+await add("array/empty-and-null-elements", { a: [], b: [null, 0, ""] }, { b: { _sd: [0, 1, 2] } }, { b: { 0: true, 2: true } });
 
 // ---- Decoys -----------------------------------------------------------------
 
 await add("decoys/object-level", record, { _sd: ["name", "age"], _sd_decoy: 4 }, { name: true });
-await add("decoys/array-level", list, { list: { _sd: ["1"], _sd_decoy: 3 } }, { list: { 1: true } });
+await add("decoys/array-level", list, { list: { _sd: [1], _sd_decoy: 3 } }, { list: { 1: true } });
 await add("decoys/nothing-hidden-only-decoys", record, { _sd_decoy: 5 });
 await add(
   "decoys/at-every-level",
@@ -161,7 +192,7 @@ await add(
 
 await add("key-binding/some-shown", record, { _sd: ["name", "age"] }, { name: true }, { keyBinding: true });
 await add("key-binding/nothing-shown", record, { _sd: ["name", "age"] }, {}, { keyBinding: true });
-await add("key-binding/array-elements", list, { list: { _sd: ["0", "2"] } }, { list: { 2: true } }, { keyBinding: true });
+await add("key-binding/array-elements", list, { list: { _sd: [0, 2] } }, { list: { 2: true } }, { keyBinding: true });
 
 // ---- Seeded random trees ----------------------------------------------------
 
@@ -192,7 +223,8 @@ const object = (depth) =>
   Object.fromEntries(Array.from({ length: between(1, 4) }, (_, i) => [`k${i}`, value(depth)]));
 const array = (depth) => Array.from({ length: between(1, 4) }, () => value(depth));
 
-const entries = (v) => (Array.isArray(v) ? v.map((x, i) => [String(i), x]) : Object.entries(v));
+// Array indices stay numbers, because a string index hides nothing (see `checkIssued`).
+const entries = (v) => (Array.isArray(v) ? v.map((x, i) => [i, x]) : Object.entries(v));
 const isContainer = (v) => v !== null && typeof v === "object";
 
 function disclosureFrame(v) {
@@ -271,6 +303,7 @@ async function addVc(id, claims, frame, { vct = VCT, presentation, intended = "a
     const issued = await sd.issue(keyBinding ? { ...claims, cnf: { jwk: holder.publicJwk } } : claims, frame, {
       header: { typ: "dc+sd-jwt" },
     });
+    if (!checkIssued(id, frame, issued)) return;
     const token =
       presentation === undefined && !keyBinding
         ? issued
@@ -308,7 +341,7 @@ const credential = { iss: "https://issuer.example", vct: VCT, iat: VC_NOW - 60, 
 await addVc("vc/plain", credential, undefined);
 await addVc("vc/concealed-all-shown", credential, { _sd: ["name", "meta"] });
 await addVc("vc/concealed-none-shown", credential, { _sd: ["name", "meta"] }, { presentation: {} });
-await addVc("vc/array-element-concealed", credential, { tags: { _sd: ["1"] } }, { presentation: { tags: { 1: true } } });
+await addVc("vc/array-element-concealed", credential, { tags: { _sd: [1] } }, { presentation: { tags: { 1: true } } });
 await addVc("vc/decoys", credential, { _sd: ["name"], _sd_decoy: 3 }, { presentation: { name: true } });
 await addVc("vc/exp-in-the-future", { ...credential, exp: VC_NOW + 3600 }, undefined);
 await addVc("vc/exp-already-passed", { ...credential, exp: VC_NOW - 1 }, undefined, { intended: "refuse" });
@@ -322,7 +355,7 @@ await addVc("vc/no-iss", { vct: VCT, iat: credential.iat, name: "Alice" }, undef
 await addVc("vc/bound-all-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true, meta: true } });
 await addVc("vc/bound-one-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: { name: true } });
 await addVc("vc/bound-nothing-shown", credential, { _sd: ["name", "meta"] }, { keyBinding: true, presentation: {} });
-await addVc("vc/bound-array-element", credential, { tags: { _sd: ["1"] } }, { keyBinding: true, presentation: { tags: { 1: true } } });
+await addVc("vc/bound-array-element", credential, { tags: { _sd: [1] } }, { keyBinding: true, presentation: { tags: { 1: true } } });
 await addVc("vc/bound-for-another-audience", credential, { _sd: ["name"] }, {
   keyBinding: true,
   presentation: { name: true },
