@@ -40,13 +40,12 @@
 //!
 //! Six of the twenty records in `vocabularies/` are verified (`batterypass-samm`,
 //! `catena-x-battery-pass`, `ec-battery-guidance`, `gs1`, `idta`, `semic`): each
-//! because a person read the authority's own publication and recorded what it said,
-//! on 2026-08-11, and each checked again for change on 2026-10-13. Five of the six
-//! now carry a re-check note recording a newer version, a successor or a correction,
-//! which is why they are re-checked. Everything else stays refused. Each record carries the finding that
-//! got it to its status and the step that would move it on.
+//! because a person read the authority's own publication and recorded what it said.
+//! Everything else stays refused. Each record carries the finding that got it to its
+//! status, the step that would move it on, and pins that say when its source has
+//! moved.
 //!
-//! One term has been read so far, GS1's `gtin`. A verified vocabulary whose `terms`
+//! Terms read so far: `https://ref.gs1.org/voc/gtin`. A verified vocabulary whose `terms`
 //! is empty permits no term, so reading another GS1 term is a separate task.
 //!
 //! ```

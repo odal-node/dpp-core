@@ -16,6 +16,8 @@
 mod ledger_tests;
 #[cfg(test)]
 mod pin_tests;
+#[cfg(test)]
+mod prose_tests;
 #[allow(clippy::module_inception)]
 mod register;
 #[cfg(test)]
