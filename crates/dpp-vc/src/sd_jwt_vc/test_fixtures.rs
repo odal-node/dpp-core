@@ -13,7 +13,7 @@ use dpp_crypto::keystore::KeyStore;
 use dpp_domain::ProductGroup;
 use dpp_domain::access::ProductGroupAccessPolicy;
 
-use super::{Issuance, SdJwtVcError, issue, vct_for, verify};
+use super::{Issuance, SdJwtVcError, TYP, issue, vct_for, verify};
 
 pub(super) const KEY_ID: &str = "sd-jwt-issuer";
 pub(super) const ISSUER: &str = "https://passports.operator.example";
@@ -81,30 +81,32 @@ pub(super) fn issued(store: &KeyStore) -> dpp_crypto::sd_jwt::SdJwt {
     .expect("issue")
 }
 
-/// Issue with extra top-level claims merged into the fixture payload.
+/// A credential with `extra` claims at its root, minted the way a foreign issuer
+/// would: a payload we choose, the right `typ`, and the fixture's key so the
+/// signature verifies. A claim in `extra` replaces the base `iss`, `vct` or `iat`.
 ///
-/// Lets a validity window be put on a credential that is otherwise exactly the
-/// one every other test here uses.
-pub(super) fn issued_with(store: &KeyStore, extra: &[(&str, Value)]) -> String {
-    let mut payload = payload();
-    let object = payload.as_object_mut().unwrap();
-    for (k, v) in extra {
-        object.insert((*k).to_owned(), v.clone());
+/// [`issue`] cannot produce these. It keeps a passport under one claim, so a
+/// registered claim such as `exp` or `status` cannot reach the root through the
+/// payload, and what a verifier must refuse at the root is what somebody else's
+/// issuer emits. Nothing is concealed, so there are no disclosures and no `_sd`.
+pub(super) fn credential_with(store: &KeyStore, extra: &[(&str, Value)]) -> String {
+    let mut claims = json!({
+        "iss": ISSUER,
+        "vct": vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+        "iat": ISSUED_AT,
+    });
+    let object = claims.as_object_mut().expect("a JSON object");
+    for (name, value) in extra {
+        object.insert((*name).to_owned(), value.clone());
     }
-    issue(
-        store,
-        KEY_ID,
-        &payload,
-        &policy(),
-        &Issuance {
-            issuer: ISSUER,
-            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
-            issued_at: ISSUED_AT,
-            holder_key: None,
-        },
-    )
-    .expect("issue")
-    .serialise()
+    let kid = store
+        .public_key(KEY_ID)
+        .expect("fixture key exists")
+        .thumbprint_uri()
+        .expect("a valid public key");
+    let jwt = dpp_crypto::jws::sign_typed(store, KEY_ID, &claims, &kid, Some(TYP), None)
+        .expect("fixture key signs");
+    dpp_crypto::sd_jwt::SdJwt::new(jwt, Vec::new()).serialise()
 }
 
 /// Verify at a given instant, discarding the payload.

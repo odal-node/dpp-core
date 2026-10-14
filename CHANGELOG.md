@@ -35,6 +35,32 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   A Disclosure the Holder withheld cannot be seen, so keeping these claims in the
   clear stays the Issuer's half of the rule. (#430)
 
+- **An SD-JWT VC holds its passport under one claim.** `sd_jwt_vc::issue` used to
+  merge the passport's root members into the credential's claims. It now writes
+  `iss`, `vct`, `iat` and, for a bound credential, `cnf` at the root, and the whole
+  passport under `passport` (`sd_jwt_vc::PASSPORT_CLAIM`). The merge left the
+  credential's claim names to the passport schema, and one collided: a passport's
+  lifecycle `status` became the credential's `status`, which the profile registers
+  as the reference to a Token Status List and tells a Verifier to check
+  (draft-ietf-oauth-sd-jwt-vc-19 clauses 2.2.2.3 and 2.4). Every credential in the
+  oracle corpus carried `"status": "draft"` in the clear. An `exp`, `nbf`, `cnf` or
+  `aud` in a passport would have collided the same way. Nested, no passport member
+  can be read as a claim of the credential, whatever a later schema adds, and the
+  claims the issuer sets are no longer walked for concealment at all, so the list of
+  names that were exempt from it is gone. `verify` still returns every claim of the
+  credential: a caller reads the passport from `claims["passport"]`.
+  **Migration:** read the passport from `passport`, not from the root. A credential
+  issued before this change carries the passport's `status`, a string, at the
+  root, and `verify` now refuses it (`SdJwtVcError::MalformedStatus`, below), so
+  issue it again. (#435)
+
+- **`sd_jwt_vc::verify` refuses a `status` claim that is not an object.** The
+  profile registers `status` for a reference to a Token Status List, and
+  draft-ietf-oauth-status-list-21 section 6.2 gives its value as an object. Nothing
+  follows the reference yet, so the shape is all that can be held to; a string
+  where a status mechanism is expected is refused as `SdJwtVcError::MalformedStatus`
+  instead of passing for one. The draft has a row in the standards register. (#435)
+
 - **A framed passport's `id` is `urn:uuid:<id>`.** `frame_passport` writes the
   passport's `id` as `dpp_vc::passport_iri` gives it, so a reader of the
   `ld+json` form sees `urn:uuid:01a1…` where it saw the bare UUID, and
