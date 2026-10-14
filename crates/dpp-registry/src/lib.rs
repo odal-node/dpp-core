@@ -4,14 +4,15 @@
 //! ESPR Article 13. It provides request/response envelopes, error types, and
 //! identifier structures.
 //!
-//! ⚠️ **One structural divergence remains, and it is the authentication model.**
-//! [`RegistryEndpoint::token_endpoint`] models an OAuth2 bearer-token exchange.
-//! Registration identity is eIDAS-based: a verified operator proves identity by
-//! qualified electronic seal or qualified electronic attestation of attributes
-//! (IR (EU) 2026/1778 Arts. 4–5). Those are different mechanisms and one does
-//! not stand in for the other. The field exists so an adapter compiles, and is
-//! marked wrong at its own definition. **Do not treat it as an implementation
-//! target.**
+//! ⚠️ **Authentication is the least known part, and two things must not be
+//! confused in it.** A token in front of the API fits the act: IR (EU)
+//! 2026/1778 Art. 2(3) defines an *authentication token* for sessions and
+//! delegated access between applications and the registry. Identity is
+//! something else — the verified status of Art. 4, proved by qualified
+//! electronic seal or qualified electronic attestation of attributes — and a
+//! token proves none of it. How a token is obtained is unpublished, so
+//! [`RegistryEndpoint::token_endpoint`] and any exchange performed against it
+//! are ours. **Do not treat them as an implementation target.**
 //!
 //! `api_version` is likewise our own construction. Endpoint paths are now a
 //! mix: some are **observed** in the registry's own published web client, some
@@ -90,7 +91,7 @@ pub mod transfer;
 pub use basis::RegistryBasis;
 pub use endpoint::{
     ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, RegistryAuthority, RegistryEndpoint,
-    STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
+    STATUS_PATH_TEMPLATE, SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
@@ -108,7 +109,7 @@ pub use proof::{AVAILABILITY_DAYS, ProofOfRegistration};
 pub use response::{EuRegistryResponse, RegistryStatusCode, StatusResponse};
 pub use submission::{
     MAX_PASSPORTS_PER_SUBMISSION, MAX_PRODUCT_IDENTIFIER_CHARS, MAX_SUBMISSION_BYTES,
-    RegistrationSubmission, SubmissionOutcome, SubmissionReceipt, fits_file_limit,
+    PassportResult, RegistrationSubmission, SubmissionOutcome, SubmissionReceipt, fits_file_limit,
 };
 pub use transfer::TransferNotification;
 

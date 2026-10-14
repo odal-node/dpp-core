@@ -1,6 +1,7 @@
 //! Error types: identifier validation ([`RegistryValidationError`]) and
 //! registry-operation errors ([`EuRegistryError`] / [`EuRegistryErrorKind`]).
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::basis::RegistryBasis;
@@ -74,6 +75,37 @@ pub enum RegistryValidationError {
         /// not recognise.
         identifier: String,
     },
+    /// Two passports in one submission carry the same unique product identifier.
+    ///
+    /// 👁️ A named refusal in the registry's User Guide (v1.03, chapter 6.2.2):
+    /// each passport in a request must be uniquely identifiable. Both positions
+    /// are given, because either one may be the mistake.
+    DuplicateProductIdentifier {
+        /// Zero-based position of the first passport carrying the identifier.
+        first: usize,
+        /// Zero-based position of the passport repeating it.
+        second: usize,
+    },
+    /// The unique product identifier is not a URL the registry accepts.
+    InvalidProductIdentifierUrl {
+        /// The identifier as given.
+        value: String,
+        /// What is wrong with it.
+        reason: &'static str,
+    },
+    /// A proof of registration says the registration happened after the proof
+    /// reporting it was generated.
+    ///
+    /// IR (EU) 2026/1778 Art. 9(2)(d) has the proof carry the registration of the
+    /// latest version *at the time it is generated*, so the order is fixed by
+    /// the article, and a proof stating the reverse describes events that did not
+    /// happen.
+    ProofPredatesRegistration {
+        /// When the proof says the passport was registered.
+        registered_at: DateTime<Utc>,
+        /// When the proof says it was generated.
+        generated_at: DateTime<Utc>,
+    },
 }
 
 impl std::fmt::Display for RegistryValidationError {
@@ -140,6 +172,24 @@ impl std::fmt::Display for RegistryValidationError {
                 write!(
                     f,
                     "'{identifier}' is under an EN 18219 scheme this crate has no registry scheme value for"
+                )
+            }
+            Self::DuplicateProductIdentifier { first, second } => {
+                write!(
+                    f,
+                    "passports at index {first} and {second} carry the same unique product identifier"
+                )
+            }
+            Self::InvalidProductIdentifierUrl { value, reason } => {
+                write!(f, "unique product identifier '{value}' {reason}")
+            }
+            Self::ProofPredatesRegistration {
+                registered_at,
+                generated_at,
+            } => {
+                write!(
+                    f,
+                    "the proof was generated at {generated_at}, before the registration it reports at {registered_at}"
                 )
             }
         }

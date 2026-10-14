@@ -33,15 +33,35 @@ const LAST_READ: &str = "2026-09-16";
 /// is now known to be wrong rather than merely unverified.
 pub const REGISTRATION_PATH: &str = "/dpp-registration-requests";
 
-/// Registration status polling, relative to [`RegistryEndpoint::base_url`].
+/// What became of one submission, relative to [`RegistryEndpoint::base_url`].
+///
+/// `{id}` is the **correlation identifier** the registry assigned the
+/// submission — see [`SubmissionReceipt`](crate::SubmissionReceipt). It is the
+/// only handle there is while a submission is being validated, and the only one
+/// at all if it fails, because a refused submission creates no records.
+///
+/// ⚠️ **Invented.** The guide confirms that a submission is tracked by its
+/// correlation ID; no route for reading one back exists in the web client. The
+/// path extends [`REGISTRATION_PATH`] because that is where the submission
+/// was sent, which is a guess at a convention and nothing more.
+pub const SUBMISSION_STATUS_PATH_TEMPLATE: &str = "/dpp-registration-requests/{id}";
+
+/// The status of one registration, relative to [`RegistryEndpoint::base_url`].
+///
+/// `{id}` is the **registration identifier** the registry generated — IR (EU)
+/// 2026/1778 Art. 8(8) — and never a caller's own passport identifier, which
+/// the registry has no record of.
 ///
 /// ⚠️ **Invented.** No constant for a status or polling route exists in the web
 /// client, so unlike [`REGISTRATION_PATH`] this has nothing behind it. Kept
-/// because the asynchronous flow needs *a* path and a caller must be able to
-/// name one; it is a placeholder, not an observation.
+/// because a registered record has a status (Art. 10(1)) and a caller must be
+/// able to name *a* path to read it; it is a placeholder, not an observation.
 pub const STATUS_PATH_TEMPLATE: &str = "/registrations/{id}/status";
 
 /// Transfer notification, relative to [`RegistryEndpoint::base_url`].
+///
+/// `{id}` is the registration identifier, as for [`STATUS_PATH_TEMPLATE`]: a
+/// transfer moves a registered passport (Art. 6a), so it names the record.
 ///
 /// ⚠️ **Invented**, on the same terms as [`STATUS_PATH_TEMPLATE`]. IR (EU)
 /// 2026/1778 Art. 6a establishes that transfers happen; it says nothing about
@@ -74,8 +94,12 @@ pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
 /// path added to this module and not to the table would be a route with no
 /// stated provenance, which is the state the module was in before the table
 /// existed — so `every_wire_constant_declares_a_basis` fails until both agree.
-pub const ENDPOINT_BASIS: [(&str, RegistryBasis); 4] = [
+///
+/// A slice rather than an array, so that declaring a route does not change the
+/// constant's type for every caller that names it.
+pub const ENDPOINT_BASIS: &[(&str, RegistryBasis)] = &[
     (REGISTRATION_PATH, RegistryBasis::Observed { on: LAST_READ }),
+    (SUBMISSION_STATUS_PATH_TEMPLATE, RegistryBasis::Assumed),
     (STATUS_PATH_TEMPLATE, RegistryBasis::Assumed),
     (TRANSFER_PATH_TEMPLATE, RegistryBasis::Assumed),
     (
@@ -97,9 +121,10 @@ pub fn basis_of(value: &str) -> Option<RegistryBasis> {
         .map(|(_, basis)| *basis)
 }
 
-/// Known EU registry authority types.
+/// Who answers at an endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum RegistryAuthority {
     /// EU Central DPP Registry (production).
     EuCentral,
@@ -107,6 +132,16 @@ pub enum RegistryAuthority {
     EuSandbox,
     /// National registry (member state specific).
     National(String),
+    /// A stand-in a consumer runs itself, to exercise its own registration path
+    /// end to end without the Commission's registry.
+    ///
+    /// 🚨 **Not an authority.** Nothing registered with a stand-in is
+    /// registered, and a consumer must refuse to run against one wherever a
+    /// registration would carry legal weight. It exists as a named variant so
+    /// that a stand-in is never described as something it is not — the
+    /// alternative is labelling it `National(..)` or `EuSandbox`, which states a
+    /// relationship with a public authority that does not exist.
+    StandIn,
 }
 
 /// Configuration for connecting to a specific EU registry endpoint.
@@ -121,7 +156,18 @@ pub struct RegistryEndpoint {
     pub api_version: String,
     /// Whether mTLS is required.
     pub mtls_required: bool,
-    /// OAuth2 / OIDC token endpoint, if applicable.
+    /// Where an authentication token for the API is obtained, if applicable.
+    ///
+    /// ⚠️ **The token is the session, not the identity.** IR (EU) 2026/1778
+    /// **Art. 2(3)** defines an *authentication token* as one used to prove
+    /// authenticated sessions or delegated access between applications and the
+    /// registry, and **Art. 18(1)(b)** stores such tokens as user credentials,
+    /// so a token in front of the API is consistent with the act. Identity is a
+    /// separate thing: the verified status of **Art. 4**, proved by qualified
+    /// electronic seal or attestation and lapsing after at most three years. A
+    /// token proves neither. How a token is *obtained* is unpublished, so this
+    /// URL, and the client-credentials exchange an adapter may perform against
+    /// it, are ours.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_endpoint: Option<String>,
 }
@@ -146,9 +192,8 @@ impl RegistryEndpoint {
             // publicly available is itself unconfirmed.
             api_version: "1.0".into(),
             mtls_required: false,
-            // ⚠️ Structurally wrong, kept only so the adapter compiles: registry
-            // identity is eIDAS-based (qualified seal or qualified electronic
-            // attestation of attributes), not an OAuth2 token exchange.
+            // ⚠️ Invented URL. A token is the session layer (Art. 2(3)), not
+            // identity, which is Art. 4 verification — see the field's docs.
             token_endpoint: Some(
                 "https://registry.acc.product-passport.ec.europa.eu/oauth2/token".into(),
             ),
@@ -162,12 +207,12 @@ impl RegistryEndpoint {
     /// 2026/1778. The **host** is now the Commission's published one; the API
     /// path, `api_version` and auth flow are still inherited guesses.
     ///
-    /// The **auth flow in particular rests on a wrong assumption** —
-    /// `token_endpoint` models a bearer-token exchange, whereas registration
-    /// identity is eIDAS-based: a verified operator proves identity by qualified
-    /// electronic seal or qualified electronic attestation of attributes
-    /// (IR 2026/1778 Arts. 4–5). That is a structural mismatch, not a wrong URL.
-    /// Registration itself is performed over the registry's API (Art. 3(b)).
+    /// The **auth flow is half known.** A token in front of the API fits the act
+    /// (IR 2026/1778 Art. 2(3)), but it is not identity: a verified operator
+    /// proves identity by qualified electronic seal or qualified electronic
+    /// attestation of attributes (Arts. 4–5), and how a token is obtained is
+    /// unpublished — see [`token_endpoint`](Self::token_endpoint). Registration
+    /// itself is performed over the registry's API (Art. 3(b)).
     ///
     /// Do NOT point this at real products. Reconciliation against the published
     /// specification is a breaking change scheduled for the next minor
@@ -184,11 +229,32 @@ impl RegistryEndpoint {
             base_url: "https://registry.product-passport.ec.europa.eu/api/v1".into(),
             api_version: "1.0".into(),
             mtls_required: true,
-            // ⚠️ See the sandbox note: an OAuth2 token exchange is the wrong
-            // model for eIDAS-based registry identity.
+            // ⚠️ Invented URL, on the same terms as the sandbox's.
             token_endpoint: Some(
                 "https://registry.product-passport.ec.europa.eu/oauth2/token".into(),
             ),
+        }
+    }
+
+    /// An endpoint for a [`StandIn`](RegistryAuthority::StandIn) served at
+    /// `origin` (scheme, host and port; a trailing slash is dropped).
+    ///
+    /// Shaped like the Commission's two endpoints — the API under `/api/v1`, a
+    /// token URL beside it — so that a caller exercises the same path against a
+    /// stand-in as it would against the registry. That sameness is the point
+    /// and also the limit: a stand-in built from this crate's paths agrees with
+    /// this crate, and says nothing about the registry. Check the
+    /// [`RegistryBasis`] of each route it serves before reading a green run as
+    /// more than that.
+    #[must_use]
+    pub fn stand_in(origin: &str) -> Self {
+        let origin = origin.trim_end_matches('/');
+        Self {
+            authority: RegistryAuthority::StandIn,
+            base_url: format!("{origin}/api/v1"),
+            api_version: "1.0".into(),
+            mtls_required: false,
+            token_endpoint: Some(format!("{origin}/oauth2/token")),
         }
     }
 }

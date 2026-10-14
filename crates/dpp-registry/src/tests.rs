@@ -187,6 +187,27 @@ fn production_endpoint() {
     assert!(ep.mtls_required);
 }
 
+/// A stand-in is shaped like the registry's endpoints, so a caller takes the
+/// same path against it, and is named as what it is, so nothing mistakes it for
+/// either of them.
+#[test]
+fn a_stand_in_endpoint_mirrors_the_registry_shape_under_its_own_name() {
+    let ep = RegistryEndpoint::stand_in("http://127.0.0.1:8090/");
+    assert_eq!(ep.authority, RegistryAuthority::StandIn);
+    assert_eq!(ep.base_url, "http://127.0.0.1:8090/api/v1");
+    assert_eq!(
+        ep.token_endpoint.as_deref(),
+        Some("http://127.0.0.1:8090/oauth2/token")
+    );
+    assert_ne!(ep.authority, RegistryEndpoint::sandbox().authority);
+    assert_ne!(ep.authority, RegistryEndpoint::production().authority);
+    assert_eq!(
+        serde_json::to_value(&ep.authority).unwrap(),
+        "stand_in",
+        "a stored configuration names the stand-in as one"
+    );
+}
+
 #[test]
 fn status_response_round_trip() {
     let status = StatusResponse {
@@ -829,6 +850,55 @@ fn the_identifier_limit_counts_characters_not_bytes() {
     assert!(payload.validate().is_ok());
 }
 
+/// 👁️ The registry takes the identifier only as an `https://` URL, and refuses
+/// one naming a non-permitted port (User Guide v1.03 chapter 6.2). Which ports
+/// are permitted is unstated, so only the default one is let through.
+#[test]
+fn the_identifier_must_be_an_https_url_on_the_default_port() {
+    let with_url = |url: &str| RegistrationPayload {
+        digital_link_url: url.into(),
+        ..sample_payload()
+    };
+    let refused = |url: &str| match with_url(url).validate() {
+        Err(RegistryValidationError::InvalidProductIdentifierUrl { value, reason }) => {
+            assert_eq!(value, url);
+            reason
+        }
+        other => panic!("{url} should be refused as a URL, got {other:?}"),
+    };
+
+    assert_eq!(
+        refused("http://id.example.com/01/09506000134352"),
+        "must start with https://"
+    );
+    assert_eq!(
+        refused("did:web:id.example.com:p:1"),
+        "must start with https://"
+    );
+    assert_eq!(refused("https:///01/09506000134352"), "names no host");
+    assert_eq!(
+        refused("https://id.example.com:8443/01/09506000134352"),
+        "names a port other than 443"
+    );
+    assert_eq!(
+        refused("https://[2001:db8::1]:8443/01/09506000134352"),
+        "names a port other than 443"
+    );
+
+    for accepted in [
+        "https://id.example.com/01/09506000134352",
+        "https://id.example.com:443/01/09506000134352",
+        "https://[2001:db8::1]/01/09506000134352",
+        "https://id.example.com?x=1",
+    ] {
+        assert!(
+            with_url(accepted).validate().is_ok(),
+            "{accepted} should be accepted: {:?}",
+            with_url(accepted).validate()
+        );
+    }
+}
+
 /// The submission limits, recorded so a batch implementation inherits them
 /// rather than rediscovering them at the registry.
 #[test]
@@ -851,12 +921,13 @@ fn the_observed_submission_limits_are_recorded() {
 #[test]
 fn every_wire_constant_declares_a_basis() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
-        basis_of,
+        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     for declared in [
         REGISTRATION_PATH,
+        SUBMISSION_STATUS_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
         IDEMPOTENCY_KEY_HEADER,
@@ -871,7 +942,7 @@ fn every_wire_constant_declares_a_basis() {
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
         crate::ENDPOINT_BASIS.len(),
-        4,
+        5,
         "the table grew or shrank without this test being told"
     );
 }
@@ -884,8 +955,8 @@ fn every_wire_constant_declares_a_basis() {
 #[test]
 fn each_route_carries_the_tier_its_prose_claims() {
     use crate::endpoint::{
-        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE,
-        basis_of,
+        IDEMPOTENCY_KEY_HEADER, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
+        SUBMISSION_STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     // Read off the registry's own web client.
@@ -899,9 +970,14 @@ fn each_route_carries_the_tier_its_prose_claims() {
         );
     }
 
-    // Nothing behind them. The asynchronous flow needs *a* status route and
-    // transfers need *a* route, and naming one is not knowing it.
-    for assumed in [STATUS_PATH_TEMPLATE, TRANSFER_PATH_TEMPLATE] {
+    // Nothing behind them. The asynchronous flow needs *a* route to read a
+    // submission back and *a* status route, transfers need *a* route, and
+    // naming one is not knowing it.
+    for assumed in [
+        SUBMISSION_STATUS_PATH_TEMPLATE,
+        STATUS_PATH_TEMPLATE,
+        TRANSFER_PATH_TEMPLATE,
+    ] {
         let basis = basis_of(assumed).expect("declared");
         assert!(!basis.is_observed(), "{assumed} rests on nothing");
         assert_eq!(basis.observed_on(), None);

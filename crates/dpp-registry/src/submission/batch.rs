@@ -1,5 +1,7 @@
 //! [`RegistrationSubmission`] — the passports that travel and fail together.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::MAX_PASSPORTS_PER_SUBMISSION;
@@ -114,6 +116,8 @@ impl RegistrationSubmission {
     ///
     /// [`RegistryValidationError::SubmissionPassportInvalid`], naming the index
     /// of the passport that failed and carrying its own error.
+    /// [`RegistryValidationError::DuplicateProductIdentifier`] when two
+    /// passports carry the same unique product identifier.
     ///
     /// 🚨 **Stops at the first failure, and that is the faithful behaviour.**
     /// Collecting every error would be friendlier and would misdescribe the
@@ -128,6 +132,16 @@ impl RegistrationSubmission {
                     source: Box::new(source),
                 }
             })?;
+        }
+        // 👁️ User Guide v1.03 chapter 6.2.2 names a repeated identifier within
+        // one request as a refusal. The identifier is the URL the passport is
+        // registered under, the value the registry caps and reports against.
+        let mut seen: HashMap<&str, usize> = HashMap::new();
+        for (second, passport) in self.passports.iter().enumerate() {
+            if let Some(&first) = seen.get(passport.digital_link_url.as_str()) {
+                return Err(RegistryValidationError::DuplicateProductIdentifier { first, second });
+            }
+            seen.insert(&passport.digital_link_url, second);
         }
         Ok(())
     }
