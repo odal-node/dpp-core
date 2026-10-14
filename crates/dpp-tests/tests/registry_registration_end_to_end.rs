@@ -88,6 +88,9 @@ fn published_passport(identifier: SchemeIdentifier) -> dpp_domain::Passport {
     // `a_passport_missing_its_operator_identifier_cannot_be_registered`.
     passport.operator_identifier = Some("DE123456789".into());
     passport.qr_code_url = Some("https://id.ecotextile.de/01/09506000134352/21/ABC123".into());
+    // The serial that carrier prints, attributed so the label and the
+    // registration name the same unit.
+    passport.carrier_serial = Some("ABC123".into());
     passport.facility = Some(dpp_domain::passport::FacilitySnapshot {
         scheme: "gln".into(),
         value: "4012345000009".into(),
@@ -136,16 +139,28 @@ fn identifier_on(request: &RegistrationRequest) -> ProductIdentifier {
     )
 }
 
+/// 🚨 The batch and the item serial come off the request too.
+///
+/// This used to hard-code an item serial, for the same reason the identifier
+/// above was once passed in beside the request: the request carried none, so
+/// an adapter had nothing to build one from but the internal passport UUID.
 fn payload_from(request: &RegistrationRequest) -> RegistrationPayload {
+    let mut level = RegistrationLevel::new(Granularity::Item).with_model("MODEL-1");
+    if let Some(batch) = &request.batch_id {
+        level = level.with_batch(batch.clone());
+    }
     RegistrationPayload {
         passport_id: request.passport_id.0,
         product_id: identifier_on(request),
-        level: RegistrationLevel::new(Granularity::Item).with_model("MODEL-1"),
-        item_id: Some(ProductItemIdentifier {
-            scheme: "serial".into(),
-            value: "ABC123".into(),
-            batch_id: None,
-        }),
+        level,
+        item_id: request
+            .item_serial
+            .as_ref()
+            .map(|serial| ProductItemIdentifier {
+                scheme: "serial".into(),
+                value: serial.clone(),
+                batch_id: request.batch_id.clone(),
+            }),
         facility_id: FacilityIdentifier {
             scheme: "gln".into(),
             value: "4012345000009".into(),
@@ -219,6 +234,12 @@ fn a_passport_under_any_en_18219_scheme_reaches_a_valid_submission() {
 
         assert_eq!(payload.product_id.scheme, expected_scheme);
         assert_eq!(payload.product_id.value, expected_value);
+        // The item is named by the serial its label prints, not by the
+        // passport's internal id.
+        assert_eq!(
+            payload.item_id.as_ref().map(|item| item.value.as_str()),
+            Some("ABC123")
+        );
 
         let submission = RegistrationSubmission::single(payload);
         assert!(
