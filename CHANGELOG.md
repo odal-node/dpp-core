@@ -1339,6 +1339,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   now `RegistryValidationError::ProofPredatesRegistration`, carrying both
   times. (#98)
 
+- **The semver report put ten error annotations on every pull request.**
+  cargo-semver-checks builds its baseline in a copy of the repository under
+  `target/semver-checks/`, and the rust-cache post-job cleanup failed to open
+  directories inside it. The job stayed green, so the errors read as noise on a
+  passing check, and the copy was saved into the cache. The job now removes it
+  before the post-job steps run. (#412)
+
 ### Documentation
 
 - **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
