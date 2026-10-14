@@ -370,6 +370,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   deserialised from JSON needs a `terms` key (`[]` for none), and `Vocabulary`
   gains a `terms` field and a `read_term` method.
 
+- **A `dpp-vocab` record needs a `pins` key.** `Vocabulary` gains `pins`, the
+  upstream state a record's findings were read at, which `just vocab-drift`
+  observes (under Added). **Migration:** a record deserialised from JSON needs a
+  `pins` key (`[]` for none).
+
 ### Added
 
 - **`just vocab-drift` names the vocabulary records whose source has moved.**
@@ -388,7 +393,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the record's `checkedOn`, and require every `verified` record to pin something.
   Six records are pinned (seven pins), each to the narrowest thing whose change
   would matter, such as a release-notes file rather than a directory of regenerated
-  artefacts. A record deserialised from JSON needs a `pins` key (`[]` for none).
+  artefacts.
 
 - **A Holder can choose what to present by claim path.**
   `SdJwt::digests_for_paths` takes the claims wanted as `ClaimPath`s and returns the
