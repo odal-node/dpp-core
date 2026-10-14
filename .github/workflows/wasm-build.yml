@@ -6,10 +6,23 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Everything the two jobs build from: the crates they compile by path (as
+    # `cargo tree` lists them for each target), the workspace manifest the
+    # crates take their dependencies from, the lockfile, which a dependency bump
+    # changes alone (the plugins have their own, under `plugins/`), the cargo
+    # config that sets the wasm32 flags, the toolchain, and this file.
     paths:
       - "crates/dpp-registry/**"
       - "crates/dpp-domain/**"
+      - "crates/dpp-rules/**"
+      - "crates/dpp-plugin-sdk/**"
+      - "crates/dpp-plugin-traits/**"
       - "plugins/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - "rust-toolchain.toml"
+      - ".github/workflows/wasm-build.yml"
   workflow_dispatch:
 
 permissions:
