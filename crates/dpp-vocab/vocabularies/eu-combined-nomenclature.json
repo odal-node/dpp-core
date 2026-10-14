@@ -1,0 +1,16 @@
+{
+  "key": "eu-combined-nomenclature",
+  "title": "EU Combined Nomenclature (CN) as published by the Publications Office",
+  "authority": "European Commission, published through the Publications Office",
+  "layer": "foundational",
+  "namespaceIri": null,
+  "usedFor": "Customs commodity codes. `CommodityCode` holds a plain code today.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-10-13",
+  "source": "One redirect observed on 2026-10-13: https://data.europa.eu/xsp/cn2026/ answers 307 to http://publications.europa.eu/resource/authority/xsp/cn2026/. The scheme itself has not been read.",
+  "finding": "A scheme IRI exists per edition, and the one seen is for 2026. The Combined Nomenclature is revised every year, so a code's IRI would change with the edition. That is the property to settle before any such IRI is stored in a passport that is signed and cannot be rewritten: a later edition may not contain the scheme or the code the passport named. `namespaceIri` is null for that reason and not because none exists.",
+  "nextStep": "Read the cn2026 scheme: its licence, whether a code keeps one IRI across editions, and how a code retired in a later edition is represented. Until then `CommodityCode` stays a plain code with no IRI.",
+  "terms": [],
+  "pins": []
+}

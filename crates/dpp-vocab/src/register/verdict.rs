@@ -6,15 +6,17 @@ use crate::vocabulary::{Layer, Status};
 ///
 /// A refusal carries its reason rather than a bare `false`. The reasons are
 /// materially different — an unknown IRI is a research task, a bridge IRI is a
-/// category error, and a surveyed vocabulary is a reading task — and a caller
-/// that cannot tell them apart will treat all three as "add it to the
-/// allowlist".
+/// category error, and a surveyed vocabulary or an unread term is a reading task
+/// — and a caller that cannot tell them apart will treat all of them as "add it
+/// to the allowlist".
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Verdict {
     /// One of our own identifiers. Always permitted, no record needed.
     Own,
-    /// Belongs to a vocabulary that has been read, at a layer we may speak.
+    /// A term somebody has read, in a vocabulary we may speak. Also the
+    /// vocabulary's own namespace IRI, which names the vocabulary and makes no
+    /// claim about any term in it.
     Permitted {
         /// The vocabulary's lookup key.
         vocabulary: String,
@@ -25,6 +27,17 @@ pub enum Verdict {
         vocabulary: String,
         /// How far the record got.
         status: Status,
+    },
+    /// Sits in a verified vocabulary's namespace, but nobody has recorded
+    /// reading this term.
+    ///
+    /// A namespace is a prefix, so every string beginning with it looks like a
+    /// term of that vocabulary — including ones its authority never defined.
+    /// Verifying the vocabulary reads the publication; it does not read the
+    /// term. The remedy is a reading task, not an allowlist entry.
+    TermNotRead {
+        /// The vocabulary's lookup key.
+        vocabulary: String,
     },
     /// Belongs to a conformance bridge. Being measured against a model is not
     /// the same as speaking its language.
@@ -59,6 +72,10 @@ impl Verdict {
                     Status::Tracked => "evaluated and not adopted",
                     Status::Verified => "verified",
                 }
+            ),
+            Self::TermNotRead { vocabulary } => format!(
+                "vocabulary '{vocabulary}' is verified, but nobody has recorded reading this \
+                 term; read its definition and list it in the record's `terms`"
             ),
             Self::BridgeNotSpeakable { vocabulary } => format!(
                 "vocabulary '{vocabulary}' is a conformance bridge ({:?}); we are tested by it, we do not speak it",

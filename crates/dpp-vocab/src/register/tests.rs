@@ -356,3 +356,36 @@ fn the_record_behind_the_retraction_still_carries_it() {
         "and it must still cite the Implementing Decision it was verified against"
     );
 }
+
+/// Recording a vocabulary is not adopting it. A record that is not `Verified` may
+/// carry a namespace, and a term under that namespace is still refused. This holds
+/// for the `Surveyed` records that name a namespace (nothing about them has been
+/// read) as much as for the `Tracked` ones, so adding a record cannot widen what the
+/// crate permits.
+#[test]
+fn nothing_under_an_unverified_vocabularys_namespace_is_permitted() {
+    let register = register();
+    let mut checked = 0;
+    for v in register
+        .all()
+        .iter()
+        .filter(|v| v.status != Status::Verified)
+    {
+        let Some(namespace) = v.namespace_iri.as_deref() else {
+            continue;
+        };
+        checked += 1;
+        assert!(
+            !register
+                .verdict(&format!("{namespace}anyTerm"))
+                .is_permitted(),
+            "'{}' is {:?} and a term under its namespace is permitted",
+            v.key,
+            v.status
+        );
+    }
+    assert!(
+        checked >= 5,
+        "only {checked} unverified namespaces were exercised"
+    );
+}

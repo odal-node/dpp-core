@@ -1,0 +1,16 @@
+{
+  "key": "echa-candidate-list",
+  "title": "ECHA Candidate List of substances of very high concern, and EC inventory identifiers",
+  "authority": "European Chemicals Agency (ECHA)",
+  "layer": "foundational",
+  "namespaceIri": null,
+  "usedFor": "Substance identity for the `svhcSubstances` entries, which carry a CAS number and a SCIP notification identifier.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-10-13",
+  "source": "A search for ECHA's legal notice, which returned its German edition. ECHA's own English page answered 403 to an automated fetch on 2026-10-13. Nothing from the Candidate List pages has been read.",
+  "finding": "The legal notice that surfaced reserves the right to prohibit systematic automated collection of ECHA's databases (scraping, data mining, extraction and reuse) and excludes content protected by third-party rights. No licence statement for the Candidate List itself was found, so `licence` stays null and not \"open\". CAS Registry Numbers, which `casNumber` carries, are issued by Chemical Abstracts Service and not by ECHA, and their reuse terms have not been looked at.",
+  "nextStep": "Read ECHA's English legal notice and the Candidate List page for their reuse terms, and note whether ECHA publishes substance IRIs at all. Whatever they say, `casNumber` and `scipNotificationId` stay plain identifiers: naming a CAS number is not the same act as reusing a list.",
+  "terms": [],
+  "pins": []
+}

@@ -124,7 +124,7 @@ fn placeholder(digest: &str) -> Value {
 /// Clause 7.1 step 3.b.ii: an object with **one** key, that key being `...` and
 /// its value a string. Anything else, an object with a second key or a value that
 /// is not a string, is an ordinary object and is left to be read as one.
-fn placeholder_digest(item: &Value) -> Option<&str> {
+pub(super) fn placeholder_digest(item: &Value) -> Option<&str> {
     let object = item.as_object()?;
     if object.len() != 1 {
         return None;
@@ -243,6 +243,11 @@ impl SdJwt {
     /// The digests of every disclosure carrying `claim_name`. An array element has
     /// no name, so none of them is among these.
     ///
+    /// This matches a name at any depth and brings nothing above it, so a nested
+    /// claim chosen this way is refused by [`Self::present`] until its parents are
+    /// added. [`Self::digests_for_paths`] chooses by path instead, and reaches the
+    /// parents and the array elements this cannot.
+    ///
     /// Plural on purpose. One claim name can occur at several places in a
     /// credential — RFC 9901 clause 9.3 says so explicitly, which is why each
     /// occurrence gets its own salt — so "the disclosure for `name`" is not
@@ -271,7 +276,9 @@ impl SdJwt {
     /// *other* disclosure that happened to share its name — a value the holder
     /// did not choose to release, leaving by the door built to stop exactly
     /// that. Use [`Self::digests_for_claim`] to go from a name to the digests,
-    /// where the ambiguity is visible instead of silently resolved.
+    /// where the ambiguity is visible instead of silently resolved, or
+    /// [`Self::digests_for_paths`] to go from claim paths, which names one claim
+    /// and the Disclosures above it and no other.
     ///
     /// Digests that match nothing are ignored rather than rejected: asking for
     /// a claim that was issued in cleartext is asking for something the
@@ -487,7 +494,7 @@ fn is_compact_jws(segment: &str) -> bool {
     all_base64url && parts == 3
 }
 
-fn decode_jwt_payload(jwt: &str) -> Result<Map<String, Value>, SdJwtError> {
+pub(super) fn decode_jwt_payload(jwt: &str) -> Result<Map<String, Value>, SdJwtError> {
     use base64::Engine;
     let payload_b64 = jwt.split('.').nth(1).ok_or(SdJwtError::MalformedJwt)?;
     if jwt.split('.').count() != 3 {

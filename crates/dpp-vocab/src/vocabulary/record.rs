@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Layer, Status};
+use super::{Layer, Pin, ReadTerm, Status};
 
 /// Everything recorded about a single upstream vocabulary.
 ///
@@ -52,16 +52,36 @@ pub struct Vocabulary {
     pub finding: String,
     /// What would move this to the next status.
     pub next_step: String,
+    /// The terms somebody has read, one by one. Empty means none has.
+    ///
+    /// Reading a vocabulary and reading a term are different acts, and only the
+    /// second licenses emitting that term. See [`ReadTerm`].
+    pub terms: Vec<ReadTerm>,
+    /// The upstream state the findings rest on, so a script can say when it has
+    /// moved. Empty means nothing is pinned, not that nothing can change.
+    pub pins: Vec<Pin>,
 }
 
 impl Vocabulary {
     /// Whether a term from this vocabulary may be emitted in a serialisation.
     ///
     /// Both conditions must hold: the vocabulary has been read, and its layer
-    /// is one we may speak rather than one we are measured by.
+    /// is one we may speak rather than one we are measured by. **Necessary,
+    /// not sufficient** — the term itself must also be listed in
+    /// [`terms`](Self::terms), which is what [`crate::VocabularyRegister::verdict`]
+    /// checks.
     #[must_use]
     pub fn permits_emission(&self) -> bool {
         self.status.permits_emission() && self.layer.may_be_adopted_as_prefix()
+    }
+
+    /// The entry recording that `iri` was read, if this vocabulary has one.
+    ///
+    /// Exact string comparison, for the reason [`contains`](Self::contains)
+    /// gives.
+    #[must_use]
+    pub fn read_term(&self, iri: &str) -> Option<&ReadTerm> {
+        self.terms.iter().find(|term| term.iri == iri)
     }
 
     /// Whether `iri` sits inside this vocabulary's namespace.

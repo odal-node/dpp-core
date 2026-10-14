@@ -41,11 +41,11 @@
 //! specification, and nothing here should be described as IDTA-conformant.
 //!
 //! Every `semanticId` emitted is either in the `urn:odal-node:` namespace — our
-//! own concept, honestly named — or belongs to a vocabulary the
-//! [`dpp-vocab`](../dpp_vocab/index.html) crate records as verified. That rule
-//! is enforced by a test, not by a comment, because six identifiers claiming
-//! IDTA and ECLASS authority once sat here behind comments asking someone to
-//! check them.
+//! own concept, honestly named — or is a term the
+//! [`dpp-vocab`](../dpp_vocab/index.html) crate records as read, in a vocabulary
+//! it records as verified. That rule is enforced by a test, not by a comment,
+//! because six identifiers claiming IDTA and ECLASS authority once sat here
+//! behind comments asking someone to check them.
 //!
 //! Split out of [`dpp-digital-link`], which retains the GS1 parser this used to
 //! ship alongside.

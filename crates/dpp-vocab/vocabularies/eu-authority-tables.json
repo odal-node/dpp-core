@@ -1,0 +1,16 @@
+{
+  "key": "eu-authority-tables",
+  "title": "EU Publications Office authority tables (named authority lists)",
+  "authority": "Publications Office of the European Union",
+  "layer": "foundational",
+  "namespaceIri": "http://publications.europa.eu/resource/authority/",
+  "usedFor": "Country, currency and language code lists, if a value-list IRI is ever wanted for fields such as `countryOfOrigin`. Intent only: those fields are plain codes today.",
+  "licence": null,
+  "status": "surveyed",
+  "checkedOn": "2026-10-13",
+  "source": "Search results about the Publications Office's EU Vocabularies site, and the redirect of data.europa.eu/xsp/cn2026/ to this namespace, observed 2026-10-13. No authority table page has been read.",
+  "finding": "Individual tables carry their own licence labels. Some are marked CC0 1.0. The Office's website states CC BY 4.0 for its editorial content, and one secondhand report says CC BY is the default for its vocabularies. A licence statement for the country, language and currency tables specifically was not found, so none should be assumed to be CC0. Nothing in this repository names an authority-table IRI: country values are two-letter codes and the schemas pin them with a pattern.",
+  "nextStep": "Read the Country table's own page for its licence, the IRI form it gives a member state, and how it aligns with ISO 3166-1, before deciding whether an IRI adds anything over a plain code.",
+  "terms": [],
+  "pins": []
+}

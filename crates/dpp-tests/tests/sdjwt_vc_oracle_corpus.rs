@@ -17,17 +17,25 @@
 //! # What the other implementation checks
 //!
 //! `.github/oracle/sdjwt/credentials.mjs` reads the corpus. For the credential as
-//! issued, it must arrive at the passport that went in, plus the three claims the
-//! issuer adds (`iss`, `vct`, `iat`). For the presentations built from it, it must
-//! agree with this crate. The signature is checked there with Node's `crypto`, and
-//! the `kid` is recomputed from the public key.
+//! issued, it must arrive at the passport that went in, under `passport`, plus the
+//! three claims the issuer adds at the root (`iss`, `vct`, `iat`). For the
+//! presentations built from it, it must agree with this crate. The signature is
+//! checked there with Node's `crypto`, and the `kid` is recomputed from the public
+//! key.
+//!
+//! Each group also has a credential bound to a Holder's key, presented with a Key
+//! Binding JWT and carrying the `challenge` it answers: the libraries read it with
+//! Key Binding required, held to that nonce, audience and instant. One of those
+//! tokens is also handed to a reader that asks for no Key Binding, which this crate
+//! refuses (RFC 9901 clause 4).
 //!
 //! # The other direction
 //!
 //! `CHECK_SDJWT_VC_ORACLE_ISSUED` names a file of credentials the other library
-//! issued, with a `typ` of `dc+sd-jwt`, a `vct`, a validity window and what the
-//! library makes of each. `dpp_vc::sd_jwt_vc::verify` has to reach the same
-//! verdict and the same claims.
+//! issued, with a `typ` of `dc+sd-jwt`, a `vct`, a validity window, for a bound
+//! one the `challenge` it answers, and what the library makes of each.
+//! `dpp_vc::sd_jwt_vc::verify` has to reach the same verdict and the same claims,
+//! with Key Binding required wherever a case carries a challenge.
 //!
 //! # Running
 //!
@@ -46,23 +54,46 @@ use std::path::{Path, PathBuf};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
 use chrono::{DateTime, TimeZone, Utc};
-use dpp_crypto::keystore::KeyStore;
-use dpp_crypto::sd_jwt::SdJwt;
+use dpp_crypto::keystore::{KeyEntry, KeyStore};
+use dpp_crypto::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt, holder_key_confirmation};
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::{ProductGroup, ProductGroupCatalog, ProductGroupData};
 use dpp_tests::fixtures::base_passport;
-use dpp_vc::sd_jwt_vc::{issue, vct_for, verify};
+use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, SdJwtVcError, issue, vct_for, verify};
 use serde_json::{Map, Number, Value, json};
 
 const ISSUER: &str = "https://passports.operator.example";
 const KEY_ID: &str = "issuer";
+const HOLDER_KEY_ID: &str = "holder";
 /// A fixed instant, so nothing here depends on the wall clock.
 const ISSUED_AT: i64 = 1_789_000_000;
 /// How many Disclosures are presented one at a time per credential.
 const ONE_AT_A_TIME: usize = 12;
+/// The Verifier a bound presentation is made for.
+const AUDIENCE: &str = "https://verifier.example";
+/// How far from the instant a Key Binding JWT's `iat` may be, in seconds.
+const WINDOW: u32 = 300;
 
 fn now() -> DateTime<Utc> {
     Utc.timestamp_opt(ISSUED_AT + 60, 0).unwrap()
+}
+
+/// The challenge a bound presentation answers, as the corpus files carry it.
+fn challenge(nonce: &str) -> Value {
+    json!({ "aud": AUDIENCE, "nonce": nonce, "now": ISSUED_AT + 60, "window": WINDOW })
+}
+
+/// The policy a case's `challenge` stands for: the nonce and audience, and an
+/// `iat` within the window either side of the instant.
+fn policy_of(challenge: &Value) -> Option<KeyBindingPolicy> {
+    let window = u32::try_from(challenge["window"].as_u64()?).ok()?;
+    Some(KeyBindingPolicy {
+        audience: challenge["aud"].as_str()?.to_owned(),
+        nonce: challenge["nonce"].as_str()?.to_owned(),
+        now: challenge["now"].as_i64()?,
+        max_age: window,
+        leeway: window,
+    })
 }
 
 /// The group's fixture at its current schema version.
@@ -105,6 +136,9 @@ struct Issuer {
     path: PathBuf,
     public_key_b64: String,
     kid: String,
+    /// The Holder the bound credentials name. Kept in the Issuer's store only
+    /// because it is a test: an Issuer never holds a Holder's private key.
+    holder: KeyEntry,
 }
 
 impl Issuer {
@@ -123,11 +157,15 @@ impl Issuer {
             .public_key(KEY_ID)
             .expect("the key was just generated");
         let raw = hex::decode(&info.verifying_key_hex).expect("a hex key");
+        let holder = store
+            .generate_key(HOLDER_KEY_ID)
+            .expect("generate the Holder's key");
         Self {
             public_key_b64: B64.encode(raw),
             kid: info.thumbprint_uri().expect("a thumbprint"),
             store,
             path,
+            holder,
         }
     }
 
@@ -142,28 +180,51 @@ impl Drop for Issuer {
     }
 }
 
-/// What `dpp_vc` makes of a token: accepted with these claims, or refused.
-fn verdict(token: &str, issuer: &Issuer, vct: &str) -> Value {
-    match verify(token, &issuer.public_key_b64, vct, now()) {
+/// What `dpp_vc` makes of a token under a Key Binding policy, or none: accepted
+/// with these claims, or refused.
+fn verdict(token: &str, issuer: &Issuer, vct: &str, policy: Option<&KeyBindingPolicy>) -> Value {
+    match verify(token, &issuer.public_key_b64, vct, now(), policy) {
         Ok(claims) => json!({ "accepts": true, "payload": claims }),
         Err(e) => json!({ "accepts": false, "error": format!("{e:?}") }),
     }
 }
 
 /// The claims a credential issued from `passport` must reveal in full: the
-/// passport, and the three claims the issuer sets.
-fn full_disclosure_of(passport: &Value, vct: &str) -> Value {
-    let mut claims: Map<String, Value> = passport.as_object().expect("an object").clone();
-    for reserved in ["iss", "vct", "iat"] {
-        assert!(
-            !claims.contains_key(reserved),
-            "the passport envelope already uses '{reserved}', which the issuer sets"
-        );
-    }
+/// passport, under [`PASSPORT_CLAIM`], and the claims the issuer sets: `iss`,
+/// `vct`, `iat`, and `cnf` when it names a Holder.
+fn full_disclosure_of(passport: &Value, vct: &str, cnf: Option<Value>) -> Value {
+    let mut claims = Map::new();
     claims.insert("iss".to_owned(), json!(ISSUER));
     claims.insert("vct".to_owned(), json!(vct));
     claims.insert("iat".to_owned(), json!(ISSUED_AT));
+    if let Some(cnf) = cnf {
+        claims.insert("cnf".to_owned(), cnf);
+    }
+    claims.insert(PASSPORT_CLAIM.to_owned(), passport.clone());
     Value::Object(claims)
+}
+
+/// A credential for `passport`, bound to the Holder when `bound`.
+fn issue_for(
+    issuer: &Issuer,
+    passport: &Value,
+    policy: &ProductGroupAccessPolicy,
+    vct: &str,
+    bound: bool,
+) -> SdJwt {
+    issue(
+        &issuer.store,
+        KEY_ID,
+        passport,
+        policy,
+        &Issuance {
+            issuer: ISSUER,
+            vct,
+            issued_at: ISSUED_AT,
+            holder_key: bound.then(|| issuer.holder.verifying_key.to_bytes()),
+        },
+    )
+    .unwrap_or_else(|e| panic!("issuing a credential for {vct}: {e:?}"))
 }
 
 fn corpus(issuer: &Issuer) -> Vec<Value> {
@@ -177,16 +238,7 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
             .unwrap_or_else(|| panic!("no access policy for {key} {version}"));
         let vct = vct_for(group, version);
 
-        let credential = issue(
-            &issuer.store,
-            KEY_ID,
-            &passport,
-            &policy,
-            ISSUER,
-            &vct,
-            ISSUED_AT,
-        )
-        .unwrap_or_else(|e| panic!("issuing a {key} credential: {e:?}"));
+        let credential = issue_for(issuer, &passport, &policy, &vct, false);
         let digests: Vec<String> = credential
             .disclosures()
             .iter()
@@ -216,12 +268,53 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
                 "schemaVersion": version,
                 "disclosures": reveal.len(),
                 "token": token,
-                "ours": verdict(&token, issuer, &vct),
+                "ours": verdict(&token, issuer, &vct, None),
             });
             if name == "issued" {
-                case["expected"] = full_disclosure_of(&passport, &vct);
+                case["expected"] = full_disclosure_of(&passport, &vct, None);
             }
             cases.push(case);
+        }
+
+        // Bound to the Holder, every Disclosure presented, with a Key Binding JWT
+        // for one Verifier's challenge.
+        let bound = issue_for(issuer, &passport, &policy, &vct, true);
+        let every: Vec<String> = bound.disclosures().iter().map(|d| d.digest()).collect();
+        let every: Vec<&str> = every.iter().map(String::as_str).collect();
+        let nonce = format!("nonce-{key}");
+        let binding = KeyBinding {
+            audience: AUDIENCE.to_owned(),
+            nonce: nonce.clone(),
+            issued_at: ISSUED_AT + 60,
+        };
+        let token = bound
+            .present_with_key_binding(&every, &binding, &issuer.holder)
+            .expect("the Holder binds its presentation")
+            .serialise();
+        let challenge = challenge(&nonce);
+        let cnf = holder_key_confirmation(&issuer.holder.verifying_key.to_bytes());
+        cases.push(json!({
+            "id": format!("{key}/{version}/bound"),
+            "productGroup": key,
+            "schemaVersion": version,
+            "disclosures": every.len(),
+            "token": token,
+            "challenge": challenge,
+            "ours": verdict(&token, issuer, &vct, policy_of(&challenge).as_ref()),
+            "expected": full_disclosure_of(&passport, &vct, Some(cnf)),
+        }));
+        // The same token, to a reader that asks for no Key Binding.
+        if key == "battery" {
+            cases.push(json!({
+                "id": format!("{key}/{version}/bound-to-a-reader-expecting-none"),
+                "productGroup": key,
+                "schemaVersion": version,
+                "disclosures": every.len(),
+                "token": token,
+                "intended": "refuse",
+                "clause": "RFC 9901 clause 4: a Verifier that expects an SD-JWT MUST find the last segment empty",
+                "ours": verdict(&token, issuer, &vct, None),
+            }));
         }
     }
     cases
@@ -235,7 +328,15 @@ fn every_product_group_has_a_credential_that_reads_back_to_its_passport() {
     let mut wrong = Vec::new();
     for case in &cases {
         let id = case["id"].as_str().unwrap_or("?");
-        if case["ours"]["accepts"] != json!(true) {
+        if case["intended"] == json!("refuse") {
+            let unexpected = format!("{:?}", SdJwtVcError::UnexpectedKeyBinding);
+            if case["ours"]["error"] != json!(unexpected) {
+                wrong.push(format!(
+                    "{id}: meant to be refused as {unexpected}, is {}",
+                    case["ours"]
+                ));
+            }
+        } else if case["ours"]["accepts"] != json!(true) {
             wrong.push(format!("{id}: refused: {}", case["ours"]["error"]));
         } else if let Some(expected) = case.get("expected")
             && let Some(at) = first_difference(&case["ours"]["payload"], expected, "")
@@ -249,15 +350,17 @@ fn every_product_group_has_a_credential_that_reads_back_to_its_passport() {
 
     let catalog = ProductGroupCatalog::new();
     for descriptor in catalog.all().iter() {
-        let id = format!(
-            "{}/{}/issued",
-            descriptor.key, descriptor.current_schema_version
-        );
-        assert!(
-            cases.iter().any(|c| c["id"] == json!(id)),
-            "the corpus holds no credential for product group '{}'",
-            descriptor.key
-        );
+        for kind in ["issued", "bound"] {
+            let id = format!(
+                "{}/{}/{kind}",
+                descriptor.key, descriptor.current_schema_version
+            );
+            assert!(
+                cases.iter().any(|c| c["id"] == json!(id)),
+                "the corpus holds no {kind} credential for product group '{}'",
+                descriptor.key
+            );
+        }
     }
 
     // A credential that conceals nothing proves nothing about concealment, and the
@@ -302,11 +405,74 @@ fn every_product_group_has_a_credential_that_reads_back_to_its_passport() {
     eprintln!("wrote {} credentials to {}", cases.len(), dir.display());
 }
 
+/// The root of every credential holds the claims the issuer set and nothing a
+/// passport put there.
+///
+/// A passport has a lifecycle `status`, and at the root of an SD-JWT VC that name
+/// is the reference to a Token Status List. Before the passport had a claim of its
+/// own, every credential in this corpus carried `"status": "draft"` in the clear,
+/// where a Verifier is told to check it. Held over both readings of each token: the
+/// claims as signed, before any Disclosure is processed, and the claims `verify`
+/// returns.
+#[test]
+fn no_credential_carries_a_claim_at_its_root_that_the_issuer_did_not_set() {
+    let issuer = Issuer::new();
+    let cases = corpus(&issuer);
+    let set_by_the_issuer = ["iss", "vct", "iat", "cnf", PASSPORT_CLAIM];
+
+    let mut stray = Vec::new();
+    for case in &cases {
+        let id = case["id"].as_str().unwrap_or("?");
+        let jwt = SdJwt::parse(case["token"].as_str().expect("a token"))
+            .unwrap_or_else(|e| panic!("{id}: the corpus holds an unreadable token: {e:?}"))
+            .jwt()
+            .to_owned();
+        let signed: Value = serde_json::from_slice(
+            &B64.decode(jwt.split('.').nth(1).expect("a compact JWS"))
+                .expect("base64url"),
+        )
+        .expect("a JSON payload");
+        for (reading, claims) in [
+            ("signed", signed.as_object()),
+            ("verified", case["ours"]["payload"].as_object()),
+        ] {
+            let Some(claims) = claims else { continue };
+            for name in claims.keys() {
+                // `_sd_alg` is the mechanism's, and it is only in the signed reading.
+                let mechanism = reading == "signed" && name == "_sd_alg";
+                if !mechanism && !set_by_the_issuer.contains(&name.as_str()) {
+                    stray.push(format!("{id}: '{name}' at the root, as {reading}"));
+                }
+            }
+        }
+    }
+    assert!(
+        stray.is_empty(),
+        "{}",
+        stray.join(
+            "
+"
+        )
+    );
+
+    // Every passport in the corpus has a `status`, and none of them is the
+    // credential's: the check above is only worth its name while the name is there.
+    for case in cases.iter().filter(|c| c["expected"].is_object()) {
+        let id = case["id"].as_str().unwrap_or("?");
+        let claims = case["ours"]["payload"].as_object().expect("accepted");
+        assert!(
+            claims[PASSPORT_CLAIM]["status"].is_string(),
+            "{id}: the passport has lost its status, so the collision this test guards is untested"
+        );
+    }
+}
+
 /// Every way `file` disagrees with `dpp_vc::sd_jwt_vc::verify`.
 ///
 /// `file` is `{ "publicKey": <base64url raw Ed25519 key>, "now": <seconds>,
 /// "cases": [...] }`, and a case is `{ "id", "token", "vct", "verdict": "accept" |
-/// "refuse", "expected"? }`.
+/// "refuse", "expected"?, "challenge"? }`. A case with a `challenge` is verified
+/// with Key Binding required, held to it.
 fn disagreements(file: &Value) -> Vec<String> {
     let key = file["publicKey"].as_str().expect("the file names its key");
     let now = Utc
@@ -319,7 +485,14 @@ fn disagreements(file: &Value) -> Vec<String> {
         let vct = case["vct"]
             .as_str()
             .expect("a case names the vct it expects");
-        match (case["verdict"].as_str(), verify(token, key, vct, now)) {
+        let policy = case.get("challenge").map(|c| {
+            policy_of(c)
+                .unwrap_or_else(|| panic!("{id}: a challenge needs aud, nonce, now and window"))
+        });
+        match (
+            case["verdict"].as_str(),
+            verify(token, key, vct, now, policy.as_ref()),
+        ) {
             (Some("accept"), Ok(claims)) => {
                 // `expected` is optional in the file: a case without it is judged
                 // on its verdict alone.
@@ -379,18 +552,9 @@ fn the_verify_check_fails_on_a_mismatch() {
     let passport = passport_with(&group, version, fixture_for("battery", version));
     let policy = ProductGroupAccessPolicy::for_passport("battery", version).expect("a policy");
     let vct = vct_for(group, version);
-    let credential = issue(
-        &issuer.store,
-        KEY_ID,
-        &passport,
-        &policy,
-        ISSUER,
-        &vct,
-        ISSUED_AT,
-    )
-    .expect("issues");
+    let credential = issue_for(&issuer, &passport, &policy, &vct, false);
     let token: String = credential.serialise();
-    let expected = full_disclosure_of(&passport, &vct);
+    let expected = full_disclosure_of(&passport, &vct, None);
 
     let file = |verdict: &str, vct: &str, expected: &Value| {
         json!({
@@ -399,6 +563,38 @@ fn the_verify_check_fails_on_a_mismatch() {
             "cases": [{ "id": "case", "verdict": verdict, "token": token, "vct": vct, "expected": expected }]
         })
     };
+
+    // A bound credential, presented for one challenge: read under it, and refused
+    // under another, or when it carries none.
+    let bound = issue_for(&issuer, &passport, &policy, &vct, true);
+    let binding = KeyBinding {
+        audience: AUDIENCE.to_owned(),
+        nonce: "nonce-case".to_owned(),
+        issued_at: ISSUED_AT + 60,
+    };
+    let bound_token = bound
+        .present_with_key_binding(&[], &binding, &issuer.holder)
+        .expect("binds")
+        .serialise();
+    let bound_file = |verdict: &str, challenge: Option<Value>| {
+        let mut case =
+            json!({ "id": "bound", "verdict": verdict, "token": bound_token, "vct": vct });
+        if let Some(challenge) = challenge {
+            case["challenge"] = challenge;
+        }
+        json!({ "publicKey": issuer.public_key_b64, "now": ISSUED_AT + 60, "cases": [case] })
+    };
+    assert!(disagreements(&bound_file("accept", Some(challenge("nonce-case")))).is_empty());
+    assert_eq!(
+        disagreements(&bound_file("accept", Some(challenge("another nonce")))).len(),
+        1,
+        "a bound credential read under the wrong challenge must be reported"
+    );
+    assert_eq!(
+        disagreements(&bound_file("accept", None)).len(),
+        1,
+        "a bound credential read with no Key Binding asked for must be reported"
+    );
     assert!(disagreements(&file("accept", &vct, &expected)).is_empty());
     assert_eq!(
         disagreements(&file("accept", &vct, &json!({}))).len(),
