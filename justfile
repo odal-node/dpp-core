@@ -57,9 +57,21 @@ fmt-check:
 # Apache-2.0 library* as a runtime dependency. It is permissive and now
 # explicitly allowed — but nothing had ever looked, which for a crate other
 # people vendor is the part that mattered.
+#
+# 🚨 All three workspaces, not the root alone. `plugins/` and `fuzz/` have their
+# own lockfiles and manifests, and a scan of the root reads neither: both were
+# unchecked for advisories, licences and bans until this looped over them. Every
+# workspace is scanned before the recipe fails, so one run names every finding.
 audit:
-    cargo audit --deny yanked
-    cargo deny check bans licenses sources
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    for ws in . plugins fuzz; do
+        echo "== $ws"
+        cargo audit -f "$ws/Cargo.lock" --deny yanked || rc=1
+        cargo deny --manifest-path "$ws/Cargo.toml" check bans licenses sources || rc=1
+    done
+    exit "$rc"
 
 # The committed lockfiles must match the manifests.
 #
@@ -67,15 +79,39 @@ audit:
 # Bump a version in a `Cargo.toml` without regenerating, and `cargo audit` and
 # the daily advisory run keep scanning the **old** graph — authoritative-looking
 # and wrong, which is the failure this whole branch is about. `--locked` fails
-# instead of silently re-resolving. Regenerate with `cargo update -w`, never by
+# instead of silently re-resolving. Regenerate with `just lock-regen`, never by
 # hand. One per workspace, matching the three tracked lockfiles.
 lock-check:
     #!/usr/bin/env bash
     set -euo pipefail
     for ws in . plugins fuzz; do
-        (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null)
+        (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null) || {
+            echo "ERROR: $ws/Cargo.lock does not match $ws/Cargo.toml. Run 'just lock-regen' and commit the lockfile."
+            exit 1
+        }
     done
     echo "3 lockfiles match their manifests."
+
+# Bring all three lockfiles back in line with their manifests, moving only what a
+# changed requirement forces.
+#
+# The repair for `lock-check`. A manifest edit (a Dependabot bump of a version in
+# a `Cargo.toml` is the usual one) leaves the lockfile naming a version the
+# requirement no longer accepts, and `--locked` refuses it. `--workspace` locks
+# the workspace's own entries and whatever the changed requirement drags in, and
+# no other dependency moves: re-locking `fuzz/` after a `serde_json` bump moved
+# `serde_json` and left the other 61 where they were. `cargo update` with no flag
+# would instead move every dependency to its newest release, which is a different
+# change from the one being made. A bump of the lockfile alone leaves the two in
+# step; a bump of the manifest is what strands the lockfile, and has left
+# `fuzz/Cargo.lock` unsatisfiable under `--locked`. Not the release hook: that is
+# `relock`, which leaves the root alone because cargo-release has already moved it.
+lock-regen:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for ws in . plugins fuzz; do
+        (cd "$ws" && cargo update --workspace)
+    done
 
 # Re-resolve the lockfiles of the two workspaces beside this one, after a version
 # moved. `plugins/` and `fuzz/` record the version of the workspace crates they
@@ -251,6 +287,17 @@ plugin-gates-self-test:
 vocab-drift *args:
     node .github/scripts/vocab_drift.mjs {{args}}
 
+# Compare the IETF rows of the standards register with the RFC Editor's index.
+#
+# Not in `check` or `ci`, deliberately, for the reason `vocab-drift` is not: it
+# asks someone else's server, and a gate that fails because that server is down is
+# a gate people stop trusting. CI runs it weekly as `standards-status.yml`. It
+# reports and never edits the register, because `Read` records a person reading a
+# source. `--self-test` runs it on fixtures; `--index FILE` uses a saved copy of
+# the index. Needs Node.
+standards-status *args:
+    node .github/scripts/standards_status.mjs {{args}}
+
 # Ask the European Commission's AdES reference implementation (DSS) what our
 # JAdES signature actually is.
 #
@@ -304,7 +351,9 @@ check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins 
 # `semver` is in neither, deliberately. It is not a gate: pre-1.0 minor releases
 # are *allowed* to break, so its output is red for most of any cycle and a check
 # that is red by design is one people stop reading. It belongs to the release,
-# not to the commit — see `docs/governance/RELEASE.md` step 3.
+# not to the commit — see `docs/governance/RELEASE.md` step 3. The pull-request
+# job (`.github/workflows/semver.yml`) prints the same tool's list against the
+# branch being merged into, and never fails, for the same reason.
 
 # Everything CI runs, plus docs. Run before pushing; `check` is the inner loop.
 ci: check wasm-build build-plugins test-count

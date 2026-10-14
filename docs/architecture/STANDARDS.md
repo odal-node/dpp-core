@@ -38,6 +38,14 @@ status is a fact about the Official Journal, are covered in
   [`governance/RELEASE.md`](../governance/RELEASE.md) re-reads each row at its
   source and updates the date. The gate proves that every citation has a status
   somebody read and dated. It cannot prove that status is still current.
+- **IETF rows are compared with the RFC Editor's index every week.**
+  `.github/workflows/standards-status.yml` (`just standards-status`) fails when a
+  row's status differs from the index, when the index lists an RFC that updates or
+  obsoletes the specification and the row does not name it, or when a draft has
+  been published as an RFC. It never edits the register: `Read` records a person
+  reading a source. It cannot say whether the revision of a draft cited is still
+  the current one. W3C, GS1, IDTA and ETSI rows have no equally plain feed, so for
+  those the re-read above is still the only check.
 
 ## Claiming conformance
 

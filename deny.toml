@@ -61,7 +61,15 @@ allow = [
     "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
-exceptions = []
+exceptions = [
+    # libFuzzer's C++ sources are NCSA-licensed, so `libfuzzer-sys` is
+    # `(MIT OR Apache-2.0) AND NCSA`. NCSA is a permissive, BSD-style licence
+    # and imposes nothing a consumer would notice, but the crate is reached only
+    # from `fuzz/`, which is `publish = false` and in no consumer's graph. Allowed
+    # for that crate alone rather than for the whole list, so it cannot admit
+    # anything else by the same name.
+    { allow = ["NCSA"], crate = "libfuzzer-sys" },
+]
 
 [licenses.private]
 # Workspace members are not published under someone else's terms, and several
@@ -75,7 +83,12 @@ wildcards = "deny"
 # A wildcard dependency in a *published* crate is the sharper case: it resolves
 # to whatever exists at vendor time, so two consumers of the same released
 # version can get different graphs.
-allow-wildcard-paths = false
+#
+# `true` exempts path dependencies of a *private* crate only; a published crate
+# is still refused one without a version. `plugins/` and `fuzz/` are separate
+# workspaces made of private crates whose dependencies on this workspace are
+# paths, and this file is applied to both (see `just audit`).
+allow-wildcard-paths = true
 
 # 🚨 The network stack, banned by name so it cannot return by transitive accident.
 #

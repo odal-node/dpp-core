@@ -1,0 +1,122 @@
+name: Newest dependencies
+
+# The tests, run against whatever the registry resolves to today instead of what
+# `Cargo.lock` says.
+#
+# `Cargo.lock` is committed so that a build is reproducible (see `.gitignore`),
+# and the price is that nothing exercises a dependency's newest release until
+# Dependabot has proposed it. This run gets there first: when a dependency has
+# released something that breaks us, it fails here, before any pull request exists
+# to merge, and names the release in the log.
+#
+# The result is never committed. The resolution happens in a throwaway checkout,
+# and on a failure the lockfiles it produced are attached to the run so the same
+# resolution can be reproduced.
+#
+# 🚨 A release that needs a newer compiler than the pinned one is not a failure of
+# ours, and must not read as one. Cargo's own answer is used: with the
+# `fallback` resolver it picks, for each dependency, the newest release the pinned
+# compiler can build, so the tests below always run on a graph they can compile.
+# What that held back is listed in the job summary, because a dependency whose
+# newest release is out of reach is the signal that the pinned toolchain is
+# ageing, which is worth knowing and is not a red build.
+#
+# Root workspace and `plugins/`. `fuzz/` is left out: it needs the nightly
+# toolchain and has its own run (`fuzz.yml`).
+on:
+  schedule:
+    # Mondays, early, so a finding is waiting at the start of the week.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Newest release whose declared `rust-version` the active compiler accepts,
+  # for every `cargo update` in this workflow.
+  CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
+
+jobs:
+  newest:
+    name: Tests against the newest dependencies
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept: nothing here pushes, and this job runs the newest
+      # code from every dependency.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+      # No `rust-cache`: a cache keyed on the committed lockfile would restore the
+      # build of a graph this job has just replaced.
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-nextest
+      - name: Install just
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: just
+
+      - name: Resolve the root workspace to the newest releases
+        run: |
+          cargo update --verbose > update.log 2>&1 || { cat update.log; exit 1; }
+          cat update.log
+      - name: Resolve the plugins to the newest releases
+        run: |
+          cd plugins
+          cargo update --verbose > ../update-plugins.log 2>&1 || { cat ../update-plugins.log; exit 1; }
+          cat ../update-plugins.log
+
+      # Cargo marks a release it held back with `requires Rust N`. The full logs
+      # follow, so a pattern that stopped matching shows as an empty list above a
+      # log that still names the lines.
+      - name: Say what the pinned compiler holds back
+        run: |
+          {
+            echo "### Newest releases the pinned compiler cannot build"
+            echo
+            if grep -qi 'requires rust' update.log update-plugins.log; then
+              echo '```'
+              grep -i 'requires rust' update.log update-plugins.log
+              echo '```'
+            else
+              echo "None: every dependency's newest release builds with the pinned compiler."
+            fi
+            echo
+            echo "<details><summary><code>cargo update</code>, root workspace</summary>"
+            echo
+            echo '```'
+            cat update.log
+            echo '```'
+            echo "</details>"
+            echo
+            echo "<details><summary><code>cargo update</code>, plugins</summary>"
+            echo
+            echo '```'
+            cat update-plugins.log
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Same flags as the pull-request job, so a failure here is a failure of the
+      # same tests on newer code and not of a different command.
+      - name: Tests
+        run: cargo nextest run --workspace --all-features
+      - name: Product group plugin tests
+        run: just test-plugins
+
+      - name: Keep the resolution that failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: newest-dependency-lockfiles
+          path: |
+            Cargo.lock
+            plugins/Cargo.lock
+          retention-days: 14

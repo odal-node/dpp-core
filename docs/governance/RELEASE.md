@@ -56,8 +56,12 @@ Before running `cargo release`:
 
    A status that changed is the finding. `standard_citations.rs` holds the IETF
    rows to the code, but it reads the register, not the IETF, so it cannot see
-   an RFC become obsoleted. For the W3C, GS1, IDTA and ETSI rows this re-read is
-   the only check.
+   an RFC become obsoleted. Run `just standards-status` first: it compares every
+   IETF row with the RFC Editor's index and names the ones that differ, and it
+   runs weekly between releases (`standards-status.yml`). That narrows the
+   re-read for those rows and does not replace it, since a row can be right about
+   a status and stale about what it says of how the code uses the text. For the
+   W3C, GS1, IDTA and ETSI rows this re-read is the only check.
 
    The upstream vocabularies are read the same way. Run `just vocab-drift`: it
    observes every pin in `crates/dpp-vocab/vocabularies/` again and names the

@@ -1,0 +1,136 @@
+name: Mutation testing
+
+# Monthly: which small breakages of `dpp-crypto` and `dpp-rules` do the tests not
+# notice?
+#
+# `cargo-mutants` changes the code one way at a time (a comparison reversed, a
+# function made to return a constant) and runs the tests. A change nothing fails
+# on is a mutant that survived: either a missing test or a line that does nothing.
+# This was done by hand on both crates during recent changes and found things; this
+# makes it routine.
+#
+# Report only, and worth keeping only for as long as the surviving mutants are
+# read. The report is the job summary of the final job, which lists every survivor
+# in one place. Nothing fails on a survivor: a mutant that survives is not a defect
+# in a change, it is a question about the tests.
+#
+# Cost: each crate takes about an hour end to end, which is why it is monthly, why
+# each crate is cut into four shards that run side by side, and why it is not a
+# pull-request check. `dpp-crypto`'s baseline alone is more than a minute of
+# tests, and each mutant pays for the rebuild and the test run again.
+#
+# A mutant is judged by the tests of the crate that holds it. One that only
+# another crate's tests would catch, such as the cross-crate suite in `dpp-tests`,
+# is reported as a survivor here and is not one in the workspace. Read the list
+# with that in mind before writing a test for it.
+on:
+  schedule:
+    # The first of the month, in the small hours.
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: 1
+  SHARDS: 4
+
+jobs:
+  mutants:
+    name: ${{ matrix.package }}, shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [dpp-rules, dpp-crypto]
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: stable
+      # No `rust-cache`: `cargo-mutants` builds in a copy of the tree, so a cache of
+      # this checkout's `target/` would be restored and never used.
+      - name: Install cargo-mutants and cargo-nextest
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-mutants,cargo-nextest
+
+      # Exit status 0 is every mutant caught, 2 some survived, 3 some timed out.
+      # Anything else is the tool not running to the end (4 is the unmutated tests
+      # failing), and that is a failure, because a report with nothing in it must
+      # not read as one with nothing to report. `--all-features` for the reason in
+      # `ci.yml`: without it `dpp-rules` does not build its signed-ruleset code.
+      - name: cargo mutants
+        env:
+          PACKAGE: ${{ matrix.package }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          rc=0
+          cargo mutants --package "$PACKAGE" --all-features --test-tool nextest \
+            --shard "$SHARD/$SHARDS" --output out || rc=$?
+          case "$rc" in
+            0|2|3) ;;
+            *) echo "::error::cargo-mutants did not run to the end (exit status $rc)"; exit "$rc" ;;
+          esac
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutants-${{ matrix.package }}-${{ matrix.shard }}
+          path: |
+            out/mutants.out/missed.txt
+            out/mutants.out/timeout.txt
+            out/mutants.out/caught.txt
+            out/mutants.out/unviable.txt
+          if-no-files-found: error
+          retention-days: 90
+
+  report:
+    name: Surviving mutants
+    needs: mutants
+    # Even when a shard failed to run: the others' survivors are still worth
+    # reading, and the failed shard shows as failed.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mutants-*
+          path: results
+      - name: Put every survivor in the job summary
+        run: |
+          {
+            echo "### Mutants the tests did not catch"
+            echo
+            echo "A survivor is a question about the tests, not a defect. A mutant that only another crate's tests would catch shows up here."
+            for package in dpp-crypto dpp-rules; do
+              echo
+              echo "#### $package"
+              caught=$(cat results/mutants-"$package"-*/caught.txt 2>/dev/null | wc -l)
+              missed=$(cat results/mutants-"$package"-*/missed.txt 2>/dev/null | wc -l)
+              timeout=$(cat results/mutants-"$package"-*/timeout.txt 2>/dev/null | wc -l)
+              unviable=$(cat results/mutants-"$package"-*/unviable.txt 2>/dev/null | wc -l)
+              echo
+              echo "caught $caught, **survived $missed**, timed out $timeout, did not compile $unviable"
+              if [ "$missed" -gt 0 ]; then
+                echo
+                echo '```'
+                cat results/mutants-"$package"-*/missed.txt | sort
+                echo '```'
+              fi
+              if [ "$timeout" -gt 0 ]; then
+                echo
+                echo "Timed out:"
+                echo '```'
+                cat results/mutants-"$package"-*/timeout.txt | sort
+                echo '```'
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
