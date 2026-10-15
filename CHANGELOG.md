@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-15
+
 ### Breaking
 
 - **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
