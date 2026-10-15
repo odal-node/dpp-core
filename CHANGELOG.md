@@ -13,7 +13,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-16
+
 ### Breaking
+
+- **`dpp_rules::canonical::content_hash` takes a type parameter.** It is now
+  generic over `T: Serialize + ?Sized`, so a caller can hash a typed value
+  without converting it to a `serde_json::Value` first (see Changed). A call
+  passing a `&Value` compiles and hashes as before. **Migration:** where the
+  function is named as a value and the argument type cannot be inferred, write
+  `content_hash::<serde_json::Value>`. (#473)
 
 - **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
   return `false` outside this crate: `KeyStore::open` refuses every store that
@@ -236,7 +245,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     statement, the data inside the passport, and the archive port.
   - **Schemas mark the fields.** `"x-personal-data": true` marks
     operator-written free text describing one item's life after sale. Battery
-    v2.8.0 (unreleased, so edited in place) marks
+    v2.8.0 (new in this release, so edited in place) marks
     `usageHistory.negativeEvents` and `usageHistory.operatingConditions[].note`,
     the only free text in the individual-battery tier. A new **textile v1.4.0**
     marks `repairHistoryUrl`, a log of repairs to one specific item, and is
@@ -1271,7 +1280,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a closed list of products. Scoped to batteries it is true, since batteries are
   not on that list, but the sentence did not say so. A published schema version is
   never edited, so v2.6.0 and v2.7.0 keep the wording and this entry is the
-  erratum. v2.8.0, which has not shipped, now says that Annex II of the Act lists
+  erratum. v2.8.0, new in this release, says that Annex II of the Act lists
   the critical raw materials and that the field's disclosure rests on the
   Batteries Regulation alone. (#314)
 
@@ -1305,8 +1314,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   separate workspace, so cargo never moved its version: it sat at 0.2.0 from
   0.11.0 to 0.20.0 while the artifacts changed, and was set to 0.3.0 by hand.
   Anything that caches, pins or reports a plugin by version was describing
-  several releases' worth of different artifacts with one string. It is now
-  0.21.0, in lockstep, and a test fails when the two differ. (#354)
+  several releases' worth of different artifacts with one string. It now moves
+  in lockstep with the workspace's, and a test fails when the two differ. (#354)
   - **Why not "bump it when a plugin changes".** Every plugin compiles
     `dpp-plugin-sdk`, `dpp-plugin-traits` and `dpp-rules`, none of which is under
     `plugins/`. Across the eleven releases from 0.11.0 to 0.21.0, `plugins/`
