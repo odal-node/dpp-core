@@ -123,26 +123,7 @@ pub fn validate_raw_product_group_data(
     registry: &ProductGroupValidatorRegistry,
 ) -> Result<(), ValidationErrors> {
     let mut errors: Vec<FieldError> = Vec::new();
-    let catalog = default_catalog();
-    let has_schema = catalog.current_schema_version(product_group_key).is_some();
-
-    if let Some(version_str) = catalog.current_schema_version(product_group_key) {
-        match version_str.parse::<semver::Version>() {
-            Ok(version) => {
-                if let Err(ve) = default_registry().validate(product_group_key, &version, data) {
-                    errors.extend(ve.errors);
-                }
-            }
-            // Fail closed: a registered product group with an unparseable current
-            // version must not silently skip schema validation.
-            Err(_) => errors.push(FieldError {
-                field: "/schemaVersion".to_owned(),
-                message: format!(
-                    "product_group '{product_group_key}' has an invalid current schema version '{version_str}'"
-                ),
-            }),
-        }
-    }
+    let has_schema = embedded_schema_errors(product_group_key, data, &mut errors);
 
     match registry.get(product_group_key) {
         Some(v) => {
@@ -171,29 +152,43 @@ pub fn validate_raw_product_group_data(
 /// Schema validation via the registry at the catalog-resolved current version.
 fn schema_errors(product_group_data: &ProductGroupData, errors: &mut Vec<FieldError>) {
     let product_group = product_group_data.product_group();
-    let key = product_group.catalog_key();
-    // No catalog entry (e.g. `Other`) → no schema to validate against.
+    embedded_schema_errors(
+        product_group.catalog_key(),
+        &product_group_data_instance(product_group_data),
+        errors,
+    );
+}
+
+/// Validate `instance` against the embedded schema at `key`'s current catalog
+/// version, and say whether the catalog has a schema for `key` at all.
+///
+/// The one home for this rule, which both the typed and the untyped path need:
+/// a catalog entry whose current version will not parse is a misconfiguration,
+/// so it is reported rather than treated as "no schema". Two copies of a
+/// fail-closed rule are two chances for one of them to start failing open.
+fn embedded_schema_errors(
+    key: &str,
+    instance: &serde_json::Value,
+    errors: &mut Vec<FieldError>,
+) -> bool {
+    // No catalog entry (e.g. an unmodelled product group) → no schema.
     let Some(version_str) = default_catalog().current_schema_version(key) else {
-        return;
+        return false;
     };
-    // A catalog entry whose current version won't parse is a misconfiguration,
-    // not a reason to skip validation — surface it rather than fail open.
-    let version = match version_str.parse::<Version>() {
-        Ok(v) => v,
-        Err(_) => {
-            errors.push(FieldError {
-                field: "/schemaVersion".to_owned(),
-                message: format!(
-                    "product_group '{key}' has an invalid current schema version '{version_str}'"
-                ),
-            });
-            return;
+    match version_str.parse::<Version>() {
+        Ok(version) => {
+            if let Err(ve) = default_registry().validate(key, &version, instance) {
+                errors.extend(ve.errors);
+            }
         }
-    };
-    let instance = product_group_data_instance(product_group_data);
-    if let Err(ve) = default_registry().validate(key, &version, &instance) {
-        errors.extend(ve.errors);
+        Err(_) => errors.push(FieldError {
+            field: "/schemaVersion".to_owned(),
+            message: format!(
+                "product_group '{key}' has an invalid current schema version '{version_str}'"
+            ),
+        }),
     }
+    true
 }
 
 /// The JSON the schema expects: the inner product group fields without the `"productGroup"`
