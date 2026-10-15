@@ -38,11 +38,13 @@ impl KeyStore {
     /// persist it with an integrity tag.
     ///
     /// Returns `true` if migration ran, `false` if the store was already in the
-    /// current format. A store returned by `open` is always current, because
-    /// `open` refuses the others, so upgrade a store with `open_and_migrate`. It
-    /// also re-opens the file, which this does not: this object's `self.cipher`
-    /// still holds the old key afterwards.
-    pub fn migrate_if_needed(&self, passphrase: &str) -> Result<bool> {
+    /// current format. This object's `self.cipher` still holds the old key
+    /// afterwards, which is why `open_and_migrate` re-opens the file.
+    ///
+    /// `pub(crate)` because nothing outside the crate can hold a store it would
+    /// migrate: `open` refuses every such store, so a public caller only ever
+    /// got `false` back. `open_and_migrate` is the one way to upgrade a store.
+    pub(crate) fn migrate_if_needed(&self, passphrase: &str) -> Result<bool> {
         // Three things can require an upgrade and they are not independent: a
         // legacy-KDF store also lacks an integrity tag and record binding. One
         // pass re-encrypts every record under the current key with its

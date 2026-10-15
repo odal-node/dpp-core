@@ -398,7 +398,7 @@ impl KeyStore {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
-                 call migrate_if_needed() first"
+                 open it with `KeyStore::open_and_migrate`"
             );
         }
         let signing_key = SigningKey::generate(&mut crate::os_rng());
