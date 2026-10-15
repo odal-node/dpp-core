@@ -1144,6 +1144,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Two ruleset resolvers gave a different reason than the third for the same
+  situation.** `resolve_recycled_content` reported a ruleset awaiting an act, or
+  one that had ended, as `OutOfScope`. `resolve_repairability_index` reported
+  an ended ruleset as `NotYetInForce`, with a start date already past. All three
+  now share one function, so each gives the reason `resolve_repairability`
+  always gave: a known future date first, then a pending act, then an expiry.
+  No ruleset in this build reached either case, so no answer changes. (#476)
+
 - **Four shipped strings carried a run of spaces mid-sentence.** Each had lost
   the `\` of a line continuation but kept the indentation after it:
   - the battery plugin's `reporting_year_missing` finding;
