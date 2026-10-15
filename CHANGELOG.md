@@ -1355,13 +1355,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   included, and no write ever migrates one. The docs on
   `open_and_migrate`, `migrate_if_needed` and the store envelope now say so, and
   so does the warning `open` logs for a SHA-256 store just before it refuses it.
-  Only that log line's text changed.
+  Only that log line's text changed. (#472)
 
 - **`PERSISTED-SHAPES.md` did not mention `REMOVED_ENVELOPE_KEYS`.** It is the
   list that makes `Passport::from_stored` refuse a document carrying a renamed
   envelope key instead of reading it with the field silently missing. The
   document now explains it, and lists adding the old key as a step for any
-  envelope rename.
+  envelope rename. (#472)
 
 - **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
   `digest_of` said it is a free function so a verifier can digest a Disclosure it
