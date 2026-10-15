@@ -977,7 +977,8 @@ pub const ART8_DECLARATION_FLOOR_2028: CalendarDate = CalendarDate::new(2028, 8,
 pub const ART8_DECLARATION_FLOOR_2033: CalendarDate = CalendarDate::new(2033, 8, 18);
 
 /// The empowerment whose entry into force can push the Art. 8(1) duty later.
-pub const ART8_DECLARATION_EMPOWERMENT: &str = "EU 2023/1542 Art. 8(1), third subparagraph — recycled content calculation,      verification and documentation format";
+pub const ART8_DECLARATION_EMPOWERMENT: &str = "EU 2023/1542 Art. 8(1), third subparagraph — \
+     recycled content calculation, verification and documentation format";
 
 /// Whether the Art. 8(1) documentation duty has begun for a battery.
 ///

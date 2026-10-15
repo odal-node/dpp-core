@@ -36,7 +36,8 @@ fn gs1_namespace() -> &'static str {
             .clone();
         assert!(
             record.permits_emission(),
-            "the gs1 record no longer permits emission ({:?}/{:?}), so this context              must not declare a gs1: prefix",
+            "the gs1 record no longer permits emission ({:?}/{:?}), so this context \
+             must not declare a gs1: prefix",
             record.status,
             record.layer
         );

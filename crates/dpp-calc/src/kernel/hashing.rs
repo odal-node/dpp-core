@@ -3,6 +3,11 @@
 //! These back the input/output hashes stored in a [`CalculationReceipt`], so an
 //! auditor can confirm the same inputs deterministically produce the same outputs.
 //!
+//! The digest itself is [`dpp_rules::canonical::content_hash`], the one content
+//! hasher this workspace has. A receipt's hashes are integrity hashes like any
+//! other, and a second implementation would agree with the first only until one
+//! of them changed.
+//!
 //! [`CalculationReceipt`]: super::receipt::CalculationReceipt
 
 use super::error::CalcError;
@@ -12,10 +17,8 @@ use super::error::CalcError;
 /// Fails if `value` cannot be serialized to JCS — returns the error rather
 /// than silently hashing empty bytes.
 pub fn jcs_hash<T: serde::Serialize>(value: &T) -> Result<String, CalcError> {
-    use sha2::{Digest, Sha256};
-    let bytes =
-        serde_jcs::to_vec(value).map_err(|e| CalcError::CanonicalizeError(e.to_string()))?;
-    Ok(hex::encode(Sha256::digest(&bytes)))
+    dpp_rules::canonical::content_hash(value)
+        .map_err(|e| CalcError::CanonicalizeError(e.to_string()))
 }
 
 /// SHA-256 of the JCS canonical JSON of calculator inputs — alias for [`jcs_hash`].

@@ -15,6 +15,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
+  return `false` outside this crate: `KeyStore::open` refuses every store that
+  needs migrating, so a caller never held one to pass it. Its public existence
+  suggested a second way to upgrade a store, and the error a write to an
+  unmigrated store returned pointed at it. That error now names
+  `open_and_migrate`. **Migration:** open the store with
+  `KeyStore::open_and_migrate`, which upgrades and re-opens it. (#474)
+
 - **An SD-JWT VC names its Holder, and its reader says whether it wants Key
   Binding.** `dpp_vc::sd_jwt_vc::issue` takes the credential's own claims as one
   `Issuance` (`issuer`, `vct`, `issued_at`, and `holder_key`, an Ed25519 public
@@ -1134,7 +1142,42 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Art. 2(3) makes a token part of the access model, and nothing published says
   where one comes from. (#98)
 
+### Changed
+
+- **A calculation receipt's hashes come from the workspace's one content
+  hasher.** `dpp-calc`'s `jcs_hash` computed SHA-256 over JCS bytes itself,
+  beside `dpp_rules::canonical::content_hash`, whose docs say no integrity-hash
+  consumer re-implements it. It now calls that function, and the digests are
+  unchanged. To make that possible, `content_hash` takes any `Serialize`, not
+  only a `serde_json::Value`. A caller holding a `&Value` compiles as before. A
+  caller that converted a typed value with `serde_json::to_value` first can now
+  pass it directly, and should: that conversion turns a non-finite float into
+  `null` and hashes it, where the typed value is refused. (#473)
+
 ### Fixed
+
+- **Two ruleset resolvers gave a different reason than the third for the same
+  situation.** `resolve_recycled_content` reported a ruleset awaiting an act, or
+  one that had ended, as `OutOfScope`. `resolve_repairability_index` reported
+  an ended ruleset as `NotYetInForce`, with a start date already past. All three
+  now share one function, so each gives the reason `resolve_repairability`
+  always gave: a known future date first, then a pending act, then an expiry.
+  No ruleset in this build reached either case, so no answer changes. (#476)
+
+- **Four shipped strings carried a run of spaces mid-sentence.** Each had lost
+  the `\` of a line continuation but kept the indentation after it:
+  - the battery plugin's `reporting_year_missing` finding;
+  - `dpp_rules::batteries::recycled_content::ART8_DECLARATION_EMPOWERMENT`, which
+    callers receive in `Art8DeclarationDuty::Undetermined`;
+  - the message of `JadesError::EmptyCertificateChain`;
+  - a panic message in `dpp-vc`'s JSON-LD context.
+
+  Five test assertion messages had it too, two of them with the backslash turned
+  into a `\n`. New `string_literals.rs` in `dpp-tests` fails on any string
+  literal with four or more spaces between words on one line, unless the
+  literal writes its own `\n`. Two doc comments in `dpp-digital-link`'s syntax
+  dictionary also named a test that does not exist and said the URI parser
+  accepts only AI `01`. (#475)
 
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
   conceals an array element only when `_sd` names its index as a number. A string
@@ -1347,6 +1390,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   before the post-job steps run. (#412)
 
 ### Documentation
+
+- **The key store's docs still described the migration it replaced.**
+  `KeyStore` said a legacy store is migrated on its first write, and
+  `open_and_migrate` said an Argon2id store opens the same as with `open`.
+  Neither is true: `open` refuses every store written before V4, Argon2id ones
+  included, and no write ever migrates one. The docs on
+  `open_and_migrate`, `migrate_if_needed` and the store envelope now say so, and
+  so does the warning `open` logs for a SHA-256 store just before it refuses it.
+  Only that log line's text changed. (#472)
+
+- **`PERSISTED-SHAPES.md` did not mention `REMOVED_ENVELOPE_KEYS`.** It is the
+  list that makes `Passport::from_stored` refuse a document carrying a renamed
+  envelope key instead of reading it with the field silently missing. The
+  document now explains it, and lists adding the old key as a step for any
+  envelope rename. (#472)
 
 - **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
   `digest_of` said it is a free function so a verifier can digest a Disclosure it
