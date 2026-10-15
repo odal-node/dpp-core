@@ -15,6 +15,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
+  return `false` outside this crate: `KeyStore::open` refuses every store that
+  needs migrating, so a caller never held one to pass it. Its public existence
+  suggested a second way to upgrade a store, and the error a write to an
+  unmigrated store returned pointed at it. That error now names
+  `open_and_migrate`. **Migration:** open the store with
+  `KeyStore::open_and_migrate`, which upgrades and re-opens it. (#474)
+
 - **An SD-JWT VC names its Holder, and its reader says whether it wants Key
   Binding.** `dpp_vc::sd_jwt_vc::issue` takes the credential's own claims as one
   `Issuance` (`issuer`, `vct`, `issued_at`, and `holder_key`, an Ed25519 public
@@ -1362,6 +1370,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   before the post-job steps run. (#412)
 
 ### Documentation
+
+- **The key store's docs still described the migration it replaced.**
+  `KeyStore` said a legacy store is migrated on its first write, and
+  `open_and_migrate` said an Argon2id store opens the same as with `open`.
+  Neither is true: `open` refuses every store written before V4, Argon2id ones
+  included, and no write ever migrates one. The docs on
+  `open_and_migrate`, `migrate_if_needed` and the store envelope now say so, and
+  so does the warning `open` logs for a SHA-256 store just before it refuses it.
+  Only that log line's text changed. (#472)
+
+- **`PERSISTED-SHAPES.md` did not mention `REMOVED_ENVELOPE_KEYS`.** It is the
+  list that makes `Passport::from_stored` refuse a document carrying a renamed
+  envelope key instead of reading it with the field silently missing. The
+  document now explains it, and lists adding the old key as a step for any
+  envelope rename. (#472)
 
 - **Two statements in `dpp_crypto::sd_jwt`'s docs were not true of the code.**
   `digest_of` said it is a free function so a verifier can digest a Disclosure it
