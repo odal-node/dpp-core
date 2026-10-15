@@ -1149,7 +1149,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   literal with four or more spaces between words on one line, unless the
   literal writes its own `\n`. Two doc comments in `dpp-digital-link`'s syntax
   dictionary also named a test that does not exist and said the URI parser
-  accepts only AI `01`.
+  accepts only AI `01`. (#475)
 
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
   conceals an array element only when `_sd` names its index as a number. A string
