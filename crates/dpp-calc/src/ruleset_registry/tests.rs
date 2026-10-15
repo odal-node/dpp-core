@@ -280,3 +280,135 @@ fn active_map_entries_reference_real_rulesets() {
         }
     }
 }
+
+// ── One reason, whichever methodology asks ───────────────────────────────────
+
+/// A ruleset with whatever effectivity a test needs. It lives in a module its
+/// parent declares `#[cfg(test)]`, which keeps it out of the completeness gate
+/// on `all_rulesets()`.
+#[derive(Debug)]
+struct Row {
+    id: crate::ruleset::RulesetId,
+    effectivity: Effectivity,
+    basis: crate::ruleset::RegulatoryBasis,
+}
+
+impl crate::ruleset::Ruleset for Row {
+    fn id(&self) -> &crate::ruleset::RulesetId {
+        &self.id
+    }
+    fn version(&self) -> &crate::ruleset::RulesetVersion {
+        static VERSION: crate::ruleset::RulesetVersion = crate::ruleset::RulesetVersion("1.0.0");
+        &VERSION
+    }
+    fn effectivity(&self) -> &Effectivity {
+        &self.effectivity
+    }
+    fn regulatory_basis(&self) -> &crate::ruleset::RegulatoryBasis {
+        &self.basis
+    }
+    fn parameters(&self) -> crate::parameters::RulesetParameters {
+        crate::parameters::RulesetParameters::new()
+    }
+}
+
+fn row(
+    id: &'static str,
+    effectivity: Effectivity,
+    superseded_by: Option<&'static str>,
+) -> &'static Row {
+    Box::leak(Box::new(Row {
+        id: crate::ruleset::RulesetId(id),
+        effectivity,
+        basis: crate::ruleset::RegulatoryBasis {
+            regulation: "unspecified",
+            article: "unspecified",
+            standard: None,
+            technical_study: None,
+            source_url: None,
+            superseded_by,
+        },
+    }))
+}
+
+/// The index resolver used to read its one row's start date whatever the
+/// date asked about, so an ended ruleset came back as not yet in force.
+#[test]
+fn an_ended_ruleset_is_expired_not_yet_to_come() {
+    let ended = row(
+        "ended",
+        Effectivity::closed(date(2020, 1, 1), date(2024, 12, 31)),
+        Some("successor"),
+    );
+    let got = super::resolve::resolve(&[("cat", ended)], "cat", date(2026, 1, 1));
+    let Assessability::Expired {
+        ruleset_id,
+        until,
+        superseded_by,
+    } = got
+    else {
+        panic!("expected Expired, got {got:?}");
+    };
+    assert_eq!(ruleset_id, "ended");
+    assert_eq!(until, date(2024, 12, 31));
+    assert_eq!(superseded_by, Some("successor"));
+}
+
+/// The recycled-content resolver used to look only for a future start date,
+/// so a ruleset awaiting an act came back as out of scope.
+#[test]
+fn a_ruleset_awaiting_an_act_is_undetermined_not_out_of_scope() {
+    let waiting = row(
+        "waiting",
+        Effectivity::pending("an act not yet adopted", None),
+        None,
+    );
+    let got = super::resolve::resolve(&[("cat", waiting)], "cat", date(2026, 1, 1));
+    assert!(
+        matches!(
+            got,
+            Assessability::Undetermined {
+                ruleset_id: "waiting",
+                empowerment: "an act not yet adopted",
+            }
+        ),
+        "got {got:?}"
+    );
+}
+
+/// With nothing active, the row closest to applying gives the reason.
+#[test]
+fn a_dated_ruleset_outranks_one_awaiting_an_act_and_one_that_ended() {
+    let ended = row(
+        "ended",
+        Effectivity::closed(date(2020, 1, 1), date(2024, 12, 31)),
+        None,
+    );
+    let waiting = row("waiting", Effectivity::pending("an act", None), None);
+    let dated = row("dated", Effectivity::open(date(2030, 1, 1)), None);
+    let all = [("cat", ended), ("cat", waiting), ("cat", dated)];
+
+    let got = super::resolve::resolve(&all, "cat", date(2026, 1, 1));
+    assert!(
+        matches!(
+            got,
+            Assessability::NotYetInForce {
+                ruleset_id: "dated",
+                ..
+            }
+        ),
+        "got {got:?}"
+    );
+
+    let got = super::resolve::resolve(&all[..2], "cat", date(2026, 1, 1));
+    assert!(
+        matches!(
+            got,
+            Assessability::Undetermined {
+                ruleset_id: "waiting",
+                ..
+            }
+        ),
+        "got {got:?}"
+    );
+}

@@ -380,14 +380,16 @@ fn every_passport_key_has_a_term_and_every_term_has_a_key() {
     {
         assert!(
             emitted.contains(term),
-            "term `{term}` defines a key no passport emits, so it expands nothing: the \n             field was renamed and the term left behind, or the term was a guess"
+            "term `{term}` defines a key no passport emits, so it expands nothing: the \
+             field was renamed and the term left behind, or the term was a guess"
         );
     }
 
     for key in &emitted {
         assert!(
             terms.contains_key(key),
-            "`{key}` is emitted by Passport and has no term, so it and everything \n             inside it is dropped on expansion"
+            "`{key}` is emitted by Passport and has no term, so it and everything \
+             inside it is dropped on expansion"
         );
     }
     // 🚨 And each envelope term points into our own namespace. The context's
