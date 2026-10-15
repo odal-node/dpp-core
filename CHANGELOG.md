@@ -1144,7 +1144,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   only a `serde_json::Value`. A caller holding a `&Value` compiles as before. A
   caller that converted a typed value with `serde_json::to_value` first can now
   pass it directly, and should: that conversion turns a non-finite float into
-  `null` and hashes it, where the typed value is refused.
+  `null` and hashes it, where the typed value is refused. (#473)
 
 ### Fixed
 
