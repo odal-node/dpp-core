@@ -667,7 +667,8 @@ fn every_catalog_product_group_has_an_aas_case() {
         let key = d.key.as_str();
         assert!(
             covered.iter().any(|c| c == key) || COVERED_ELSEWHERE.contains(&key),
-            "catalog product_group '{key}' has no case in all_product_group_cases() — its AAS              mapping is untested"
+            "catalog product_group '{key}' has no case in all_product_group_cases() — its AAS \
+             mapping is untested"
         );
     }
 }

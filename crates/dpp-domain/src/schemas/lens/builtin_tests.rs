@@ -275,7 +275,8 @@ fn battery_v2_5_to_v2_6_carries_both_legacy_keys_verbatim() {
     ] {
         assert!(
             derived.data.get(successor).is_none(),
-            "the lens populated '{successor}', inventing a distinction the                  source never made"
+            "the lens populated '{successor}', inventing a distinction the \
+             source never made"
         );
     }
     schemas

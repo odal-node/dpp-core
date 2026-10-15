@@ -176,6 +176,20 @@ rather than a green test run.
 Closing this gap means a frozen *envelope* fixture, independent of product group.
 Worth doing; not done.
 
+**One envelope failure is refused at read time, but only once it is recorded by
+hand.** `Passport` sets no `deny_unknown_fields`, so a stored document carrying a
+key this build removed deserialises *successfully*, with the replacement field at
+its default. `parentPassportRef` → `derivedFrom` did exactly that: a second-life
+passport loaded with no error and no predecessor links. `REMOVED_ENVELOPE_KEYS`
+in `crates/dpp-domain/src/passport/record.rs` lists each removed key with its
+replacement, and `Passport::from_stored` refuses any document carrying one with
+`DppError::RemovedEnvelopeKey`. A direct `serde_json::from_value::<Passport>`
+bypasses that check and still drops the key silently.
+
+`removed_envelope_keys_name_real_replacements` holds the list to
+`PASSPORT_WIRE_KEYS`. Nothing checks that a rename was added to it in the first
+place, so forgetting is silent.
+
 ---
 
 ## 7. If you have to break it anyway
@@ -188,6 +202,10 @@ what it costs"**:
   existing documents must perform.
 - Say which failure mode it has: refusing to load, or loading with the field
   silently missing. The second is worse and must never be left unstated.
+- Close the silent one: add the old key and its replacement to
+  `REMOVED_ENVELOPE_KEYS`, so `Passport::from_stored` refuses a document still
+  carrying it and names the replacement (§6). Entries are permanent. A key
+  removed two renames ago is still a key some stored document may carry.
 - Record why it was acceptable *now*. Every such change so far has rested on
   there being no published passports to strand. **That licence expires at the
   first real one**, and after that an envelope rename must carry the old key or a

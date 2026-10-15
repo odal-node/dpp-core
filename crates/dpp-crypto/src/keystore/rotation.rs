@@ -31,7 +31,7 @@ impl KeyStore {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
-                 call migrate_if_needed() first"
+                 open it with `KeyStore::open_and_migrate`"
             );
         }
         let mut map = self.records.write().expect("key store write lock poisoned");
@@ -68,7 +68,7 @@ impl KeyStore {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
-                 call migrate_if_needed() first"
+                 open it with `KeyStore::open_and_migrate`"
             );
         }
 
