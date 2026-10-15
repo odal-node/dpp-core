@@ -6,6 +6,11 @@ use sha2::{Digest, Sha256};
 /// reach the same digest for semantically identical values — that is the
 /// property every caller of this function depends on.
 ///
+/// Takes any `Serialize`, not only a `serde_json::Value`, so a caller holding a
+/// typed value never has to route it through `serde_json::to_value` first. That
+/// route is not neutral: it turns a non-finite float into `null`, so the hash
+/// would cover a value the caller never had instead of refusing the one it has.
+///
 /// **Fallible by design, and it must stay that way.** RFC 8785 rejects
 /// non-finite floats (`NaN`/`Infinity`). A caller that "knows" its own input is
 /// finite still must not collapse this into a panic: the point of a tamper hash
@@ -15,6 +20,6 @@ use sha2::{Digest, Sha256};
 /// # Errors
 /// Returns the underlying serialisation error if `value` cannot be
 /// JCS-canonicalised.
-pub fn content_hash(value: &serde_json::Value) -> Result<String, serde_json::Error> {
+pub fn content_hash<T: serde::Serialize + ?Sized>(value: &T) -> Result<String, serde_json::Error> {
     Ok(hex::encode(Sha256::digest(serde_jcs::to_vec(value)?)))
 }

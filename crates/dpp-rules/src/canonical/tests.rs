@@ -26,3 +26,27 @@ fn hash_detects_value_change() {
     let b = json!({ "threshold": 11 });
     assert_ne!(content_hash(&a).unwrap(), content_hash(&b).unwrap());
 }
+
+/// A typed value hashes to exactly what its `Value` form does, so a caller
+/// may hand over either and land on the same digest.
+#[test]
+fn typed_and_value_forms_hash_alike() {
+    let typed = ("threshold", [1.5_f64, 2.0]);
+    assert_eq!(
+        content_hash(&typed).unwrap(),
+        content_hash(&json!(["threshold", [1.5, 2.0]])).unwrap()
+    );
+}
+
+/// Why the hasher takes any `Serialize`: going through `Value` first would
+/// quietly hash `null` where the caller held a non-finite float, while hashing
+/// the float itself refuses it.
+#[test]
+fn a_non_finite_float_is_refused_not_hashed_as_null() {
+    assert!(content_hash(&f64::NAN).is_err());
+    assert_eq!(
+        serde_json::to_value(f64::NAN).unwrap(),
+        serde_json::Value::Null,
+        "if this stops holding, the reason in content_hash's docs is stale"
+    );
+}

@@ -1142,6 +1142,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Art. 2(3) makes a token part of the access model, and nothing published says
   where one comes from. (#98)
 
+### Changed
+
+- **A calculation receipt's hashes come from the workspace's one content
+  hasher.** `dpp-calc`'s `jcs_hash` computed SHA-256 over JCS bytes itself,
+  beside `dpp_rules::canonical::content_hash`, whose docs say no integrity-hash
+  consumer re-implements it. It now calls that function, and the digests are
+  unchanged. To make that possible, `content_hash` takes any `Serialize`, not
+  only a `serde_json::Value`. A caller holding a `&Value` compiles as before. A
+  caller that converted a typed value with `serde_json::to_value` first can now
+  pass it directly, and should: that conversion turns a non-finite float into
+  `null` and hashes it, where the typed value is refused. (#473)
+
 ### Fixed
 
 - **Two ruleset resolvers gave a different reason than the third for the same
