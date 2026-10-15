@@ -33,7 +33,7 @@ jobs:
       # `stable` branch's commit: the job ran only because `cargo +nightly`
       # installs a toolchain it does not find. A pin that cannot be read as the
       # channel it claims is what passing the input removes.
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f
         with:
           toolchain: nightly
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
