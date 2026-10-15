@@ -415,9 +415,9 @@ const INLINE_TESTS_BASELINE: &[&str] = &[
     "crates/dpp-vc/src/local_service.rs",
     "crates/dpp-vc/src/passport_credential.rs",
     "crates/dpp-vc/src/status_list.rs",
-    // Every plugin keeps its tests inline; the plugin pass is a later phase.
+    // These plugins keep their tests inline; battery, the reference
+    // implementation, shows the shape to move them to.
     "plugins/product-group-aluminium/src/lib.rs",
-    "plugins/product-group-battery/src/lib.rs",
     "plugins/product-group-construction/src/lib.rs",
     "plugins/product-group-detergent/src/lib.rs",
     "plugins/product-group-electronics/src/lib.rs",
