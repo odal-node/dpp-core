@@ -17,6 +17,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`dpp_rules::canonical::content_hash` takes a type parameter.** It is now
+  generic over `T: Serialize + ?Sized`, so a caller can hash a typed value
+  without converting it to a `serde_json::Value` first (see Changed). A call
+  passing a `&Value` compiles and hashes as before. **Migration:** where the
+  function is named as a value and the argument type cannot be inferred, write
+  `content_hash::<serde_json::Value>`. (#473)
+
 - **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
   return `false` outside this crate: `KeyStore::open` refuses every store that
   needs migrating, so a caller never held one to pass it. Its public existence
