@@ -176,7 +176,10 @@ impl DppProductGroupPlugin for BatteryPlugin {
             warnings.push(PluginFinding::new(
                 "battery.recycled_content.reporting_year_missing",
                 "/recycledContentReportingYear",
-                "Recycled-content shares are declared without a reporting year.                  EU 2023/1542 Art. 8(1) requires them per battery model, per year                  and per manufacturing plant, so a share without its year is not                  the Art. 8(1) declaration.",
+                "Recycled-content shares are declared without a reporting year. \
+                 EU 2023/1542 Art. 8(1) requires them per battery model, per year \
+                 and per manufacturing plant, so a share without its year is not \
+                 the Art. 8(1) declaration.",
             ));
         }
 
