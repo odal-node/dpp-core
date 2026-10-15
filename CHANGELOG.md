@@ -1142,7 +1142,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   an ended ruleset as `NotYetInForce`, with a start date already past. All three
   now share one function, so each gives the reason `resolve_repairability`
   always gave: a known future date first, then a pending act, then an expiry.
-  No ruleset in this build reached either case, so no answer changes.
+  No ruleset in this build reached either case, so no answer changes. (#476)
 
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
   conceals an array element only when `_sd` names its index as a number. A string
