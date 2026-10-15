@@ -39,7 +39,8 @@ impl std::fmt::Display for JadesError {
         match self {
             Self::EmptyCertificateChain => write!(
                 f,
-                "x5c was supplied with no certificates, leaving the signature without                  the certificate reference TS 119 182-1 clause 5.1.7 requires"
+                "x5c was supplied with no certificates, leaving the signature without \
+                 the certificate reference TS 119 182-1 clause 5.1.7 requires"
             ),
             Self::EmptyThumbprint => write!(
                 f,
