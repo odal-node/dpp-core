@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust toolchain with wasm32 target
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
@@ -72,7 +72,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust toolchain with wasm32-wasip1 target
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f
         with:
           toolchain: stable
           targets: wasm32-wasip1

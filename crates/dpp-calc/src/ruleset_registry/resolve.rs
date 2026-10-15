@@ -68,32 +68,7 @@ pub fn resolve_recycled_content(
         // deliberately no Phase 1 row here.
         ("lmt", &Art8Phase2Ruleset),
     ];
-
-    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
-
-    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
-        return Assessability::Assessed(*r);
-    }
-
-    // Before any phase binds, the actionable answer is the soonest start date;
-    // after the last one there is none, because Phase 2 is open-ended.
-    let mut soonest: Option<(&'static str, NaiveDate)> = None;
-    for (_, r) in rows() {
-        if let Effectivity::InForce { from, .. } = r.effectivity()
-            && law_in_force_on < *from
-            && soonest.is_none_or(|(_, best)| *from < best)
-        {
-            soonest = Some((r.id().0, *from));
-        }
-    }
-
-    match soonest {
-        Some((ruleset_id, applies_from)) => Assessability::NotYetInForce {
-            ruleset_id,
-            applies_from,
-        },
-        None => Assessability::OutOfScope,
-    }
+    resolve(all, product_category, law_in_force_on)
 }
 
 /// Return the repairability ruleset governing `product_category` for a product
@@ -101,13 +76,6 @@ pub fn resolve_recycled_content(
 ///
 /// The date is the product's regulated triggering event, never today — see
 /// [`AssessmentClock`](crate::clock::AssessmentClock).
-///
-/// When nothing governs, the returned [`Assessability`] says which of the four
-/// reasons applies. Where several rows exist for one category and none is
-/// active, the reason is taken from the row closest to applying: a known future
-/// start date first, then a ruleset awaiting an unadopted act, then an expired
-/// one. A dated answer is more actionable than an undated one, and both beat
-/// pointing at a rule that has already been replaced.
 pub fn resolve_repairability(
     product_category: &str,
     law_in_force_on: NaiveDate,
@@ -120,18 +88,61 @@ pub fn resolve_repairability(
         ("displays", &DisplaysRuleset),
         ("washing-machine", &WashingMachineRuleset),
     ];
+    resolve(all, product_category, law_in_force_on)
+}
 
-    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
+/// Return the EU 2023/1669 repairability-index ruleset governing
+/// `product_category` for a product whose law was fixed on `law_in_force_on`,
+/// or the reason there isn't one.
+///
+/// The enacted index is a different methodology from the non-regulatory
+/// heuristic behind [`resolve_repairability`] — different parameters, a 1–5
+/// scale and its own class boundaries — so it gets its own resolver rather than
+/// overloading that one.
+pub fn resolve_repairability_index(
+    product_category: &str,
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static dyn RepairabilityIndexRuleset> {
+    // Reg. (EU) 2023/1669 covers smartphones and slate tablets.
+    let all: &[(&str, &'static dyn RepairabilityIndexRuleset)] =
+        &[("smartphone-tablet", &Eu2023_1669Ruleset)];
+    resolve(all, product_category, law_in_force_on)
+}
 
-    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
-        return Assessability::Assessed(*r);
+/// The ruleset in `all` governing `product_category` on `law_in_force_on`, or
+/// the reason there isn't one. Every `resolve_*` is this over its own table.
+///
+/// One function rather than one per methodology because the reason is the part
+/// an operator acts on, and it must not depend on which methodology was asked.
+/// It did: the recycled-content resolver reported a ruleset awaiting an act, or
+/// an expired one, as out of scope, and the index resolver reported an expired
+/// ruleset as not yet in force. No row in this build reached either, so nothing
+/// returned a wrong answer, but the first row to expire would have.
+///
+/// When nothing governs, the reason is taken from the row closest to applying:
+/// a known future start date first, then a ruleset awaiting an unadopted act,
+/// then an expired one. A dated answer is more actionable than an undated one,
+/// and both beat pointing at a rule that has already been replaced.
+pub(super) fn resolve<R: Ruleset + ?Sized>(
+    all: &[(&str, &'static R)],
+    product_category: &str,
+    law_in_force_on: NaiveDate,
+) -> Assessability<&'static R> {
+    let rows = || {
+        all.iter()
+            .filter(|(cat, _)| *cat == product_category)
+            .map(|(_, r)| *r)
+    };
+
+    if let Some(r) = rows().find(|r| r.effectivity().is_active_on(law_in_force_on)) {
+        return Assessability::Assessed(r);
     }
 
     let mut not_yet: Option<(&'static str, NaiveDate)> = None;
     let mut undetermined: Option<(&'static str, &'static str)> = None;
     let mut expired: Option<(&'static str, NaiveDate, Option<&'static str>)> = None;
 
-    for (_, r) in rows() {
+    for r in rows() {
         let id = r.id().0;
         match r.effectivity() {
             Effectivity::Pending { empowerment, .. } => {
@@ -173,41 +184,5 @@ pub fn resolve_repairability(
         }
     } else {
         Assessability::OutOfScope
-    }
-}
-
-/// Return the EU 2023/1669 repairability-index ruleset governing
-/// `product_category` for a product whose law was fixed on `law_in_force_on`,
-/// or the reason there isn't one.
-///
-/// The enacted index is a different methodology from the non-regulatory
-/// heuristic behind [`resolve_repairability`] — different parameters, a 1–5
-/// scale and its own class boundaries — so it gets its own resolver rather than
-/// overloading that one.
-pub fn resolve_repairability_index(
-    product_category: &str,
-    law_in_force_on: NaiveDate,
-) -> Assessability<&'static dyn RepairabilityIndexRuleset> {
-    // Reg. (EU) 2023/1669 covers smartphones and slate tablets.
-    let all: &[(&str, &'static dyn RepairabilityIndexRuleset)] =
-        &[("smartphone-tablet", &Eu2023_1669Ruleset)];
-
-    let rows = || all.iter().filter(|(cat, _)| *cat == product_category);
-
-    if let Some((_, r)) = rows().find(|(_, r)| r.effectivity().is_active_on(law_in_force_on)) {
-        return Assessability::Assessed(*r);
-    }
-    match rows().next() {
-        None => Assessability::OutOfScope,
-        Some((_, r)) => match r.effectivity() {
-            Effectivity::Pending { empowerment, .. } => Assessability::Undetermined {
-                ruleset_id: r.id().0,
-                empowerment,
-            },
-            Effectivity::InForce { from, .. } => Assessability::NotYetInForce {
-                ruleset_id: r.id().0,
-                applies_from: *from,
-            },
-        },
     }
 }

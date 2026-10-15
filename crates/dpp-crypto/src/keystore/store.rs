@@ -128,8 +128,8 @@ impl PublicKeyInfo {
 /// On-disk envelope for the key store file.
 ///
 /// V2 adds `kdf` and `salt` fields. If `kdf` is missing (V1 format), the
-/// store was encrypted with bare SHA-256 and will be transparently migrated
-/// to Argon2id on next write.
+/// store was encrypted with bare SHA-256: [`KeyStore::open`] refuses it and
+/// [`KeyStore::open_and_migrate`] upgrades it to Argon2id.
 ///
 /// V3 adds `hmac` — an HMAC-SHA256 over the serialised `keys` map, keyed
 /// with a 32-byte integrity key derived separately from the passphrase.
@@ -192,8 +192,9 @@ impl UpgradeNeeded {
 /// 128-bit salt. A separate 32-byte integrity key (derived from the same
 /// passphrase + salt with a different Argon2 context) is used to compute
 /// an HMAC-SHA256 over the serialised key map, protecting against file
-/// tampering. Legacy stores (pre-0.1.0) that used bare SHA-256 are
-/// automatically migrated on first write.
+/// tampering. A store in an older format, including the bare SHA-256 one, is
+/// refused by [`Self::open`] and upgraded in place by
+/// [`Self::open_and_migrate`]; see [`UpgradeNeeded`].
 pub struct KeyStore {
     pub(crate) path: std::path::PathBuf,
     pub(crate) cipher: Aes256Gcm,
@@ -202,7 +203,8 @@ pub struct KeyStore {
     pub(crate) salt: [u8; ARGON2_SALT_LEN],
     pub(crate) records: RwLock<KeyRecordMap>,
     /// True if the store was opened with a legacy SHA-256 derived key and
-    /// needs re-encryption with Argon2id on next write.
+    /// needs re-encryption with Argon2id. Writes are refused until
+    /// `migrate_if_needed` clears it.
     pub(crate) needs_migration: RwLock<bool>,
     /// Which security property this store predates, if any. `None` once it is
     /// at [`STORE_VERSION`] with an Argon2id key and a verified integrity tag.
@@ -331,7 +333,7 @@ impl KeyStore {
             } else {
                 // V1 format — legacy SHA-256. Open with legacy KDF, flag for migration.
                 tracing::warn!(
-                    "key store at {:?} uses legacy SHA-256 KDF — will migrate to Argon2id on next write",
+                    "key store at {:?} uses legacy SHA-256 KDF — `open_and_migrate` upgrades it to Argon2id",
                     path.as_ref()
                 );
 
@@ -396,7 +398,7 @@ impl KeyStore {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
-                 call migrate_if_needed() first"
+                 open it with `KeyStore::open_and_migrate`"
             );
         }
         let signing_key = SigningKey::generate(&mut crate::os_rng());
