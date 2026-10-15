@@ -1144,6 +1144,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Four shipped strings carried a run of spaces mid-sentence.** Each had lost
+  the `\` of a line continuation but kept the indentation after it:
+  - the battery plugin's `reporting_year_missing` finding;
+  - `dpp_rules::batteries::recycled_content::ART8_DECLARATION_EMPOWERMENT`, which
+    callers receive in `Art8DeclarationDuty::Undetermined`;
+  - the message of `JadesError::EmptyCertificateChain`;
+  - a panic message in `dpp-vc`'s JSON-LD context.
+
+  Five test assertion messages had it too, two of them with the backslash turned
+  into a `\n`. New `string_literals.rs` in `dpp-tests` fails on any string
+  literal with four or more spaces between words on one line, unless the
+  literal writes its own `\n`. Two doc comments in `dpp-digital-link`'s syntax
+  dictionary also named a test that does not exist and said the URI parser
+  accepts only AI `01`. (#475)
+
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
   conceals an array element only when `_sd` names its index as a number. A string
   index is ignored, and the library issues a valid token with no Disclosure for it.

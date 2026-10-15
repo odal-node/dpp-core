@@ -572,7 +572,8 @@ fn passport_validate_catches_bad_fibre_sum() {
         .to_string();
     assert!(
         err.contains("fibre") || err.contains("Fibre") || err.contains("50"),
-        "validate_passport must surface fibre-sum error from product_group_data          validation, got: {err}"
+        "validate_passport must surface fibre-sum error from product_group_data \
+         validation, got: {err}"
     );
 
     // Fix the fibre sum and confirm validate() now passes.

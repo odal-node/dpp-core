@@ -183,8 +183,8 @@ pub fn ai_len_for_prefix(prefix: &str) -> Option<usize> {
 ///
 /// Malformed entries are skipped rather than panicking: a future release
 /// introducing syntax this parser does not know should degrade to not
-/// recognising those AIs, not take the process down. `dictionary_covers_every_entry`
-/// is what turns such a skip into a failing test.
+/// recognising those AIs, not take the process down. `every_entry_parses` is
+/// what turns such a skip into a failing test.
 fn parse_dictionary(text: &str) -> HashMap<String, AiSpec> {
     let mut table = HashMap::new();
 
@@ -441,10 +441,10 @@ mod tests {
         assert_eq!((net_weight.min_len, net_weight.max_len), (6, 6));
     }
 
-    /// GS1 defines sixteen Digital Link primary keys. This crate's URI parser
-    /// accepts only `01`; the set is pinned here so that gap stays measured
-    /// rather than assumed, and so a dictionary update that adds a key shows up
-    /// as a failing test instead of passing unnoticed.
+    /// GS1 defines sixteen Digital Link primary keys, and the URI parser takes
+    /// its set from this flag rather than a list of its own. The set is pinned
+    /// here so a dictionary update that adds or drops a key shows up as a
+    /// failing test instead of quietly changing which URIs parse.
     #[test]
     fn records_every_digital_link_primary_key() {
         let mut keys: Vec<&str> = dictionary()
