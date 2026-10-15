@@ -1136,6 +1136,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **Two ruleset resolvers gave a different reason than the third for the same
+  situation.** `resolve_recycled_content` reported a ruleset awaiting an act, or
+  one that had ended, as `OutOfScope`. `resolve_repairability_index` reported
+  an ended ruleset as `NotYetInForce`, with a start date already past. All three
+  now share one function, so each gives the reason `resolve_repairability`
+  always gave: a known future date first, then a pending act, then an expiry.
+  No ruleset in this build reached either case, so no answer changes.
+
 - **The TypeScript SD-JWT oracle's array cases hid nothing.** `@sd-jwt/core`
   conceals an array element only when `_sd` names its index as a number. A string
   index is ignored, and the library issues a valid token with no Disclosure for it.
