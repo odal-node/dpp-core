@@ -15,6 +15,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`KeyStore::migrate_if_needed` is no longer public.** It could only ever
+  return `false` outside this crate: `KeyStore::open` refuses every store that
+  needs migrating, so a caller never held one to pass it. Its public existence
+  suggested a second way to upgrade a store, and the error a write to an
+  unmigrated store returned pointed at it. That error now names
+  `open_and_migrate`. **Migration:** open the store with
+  `KeyStore::open_and_migrate`, which upgrades and re-opens it. (#474)
+
 - **An SD-JWT VC names its Holder, and its reader says whether it wants Key
   Binding.** `dpp_vc::sd_jwt_vc::issue` takes the credential's own claims as one
   `Issuance` (`issuer`, `vct`, `issued_at`, and `holder_key`, an Ed25519 public
