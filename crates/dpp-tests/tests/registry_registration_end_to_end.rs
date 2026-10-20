@@ -86,7 +86,9 @@ fn published_passport(identifier: SchemeIdentifier) -> dpp_domain::Passport {
     // them unset, and `from_published_passport` now refuses rather than
     // defaulting them to `""` — see
     // `a_passport_missing_its_operator_identifier_cannot_be_registered`.
-    passport.operator_identifier = Some("DE123456789".into());
+    // An LEI, because a registration carries an identifier with an EN 18219
+    // clause 6 route and a VAT number has none.
+    passport.operator_identifier = Some("529900T8BM49AURSDO55".into());
     passport.qr_code_url = Some("https://id.ecotextile.de/01/09506000134352/21/ABC123".into());
     // The serial that carrier prints, attributed so the label and the
     // registration name the same unit.
@@ -97,6 +99,7 @@ fn published_passport(identifier: SchemeIdentifier) -> dpp_domain::Passport {
         name: "Dhaka Unit 3".into(),
         country: "BD".into(),
         address: None,
+        identifier: None,
     });
     passport
 }
@@ -105,7 +108,7 @@ fn operator() -> RegisteringOperator<'static> {
     RegisteringOperator {
         legal_name: "EcoTextile GmbH",
         country: "DE",
-        identifier_scheme: "vat",
+        identifier_scheme: "lei",
     }
 }
 

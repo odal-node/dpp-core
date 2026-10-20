@@ -10,6 +10,7 @@ fn snapshot(role: OperatorRole, basis: ResponsibilityBasis) -> ResponsibleOperat
             role,
             eu_operator_id: Some("DE123456789".into()),
             eu_operator_id_scheme: Some("vat".into()),
+            identifier: None,
             country: "DE".into(),
             registered_trade_name: Some("Acme".into()),
             postal_address: Some("Alexanderplatz 1, 10178 Berlin".into()),

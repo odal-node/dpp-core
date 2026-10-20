@@ -35,6 +35,7 @@ pub(super) fn make_published_passport() -> Passport {
             name: "Acme Plant".into(),
             country: "DE".into(),
             address: None,
+            identifier: None,
         }),
         ..crate::test_support::sample_passport()
     }

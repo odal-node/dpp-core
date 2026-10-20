@@ -47,7 +47,9 @@ fn published_battery() -> Passport {
     );
     passport.status = PassportStatus::Published;
     passport.published_at = Some(Utc::now());
-    passport.operator_identifier = Some("DE123456789".into());
+    // An LEI, because a registration carries an identifier with an EN 18219
+    // clause 6 route and a VAT number has none.
+    passport.operator_identifier = Some("529900T8BM49AURSDO55".into());
     passport.qr_code_url = Some(CARRIER.into());
     passport.carrier_serial = Some("SN0001".into());
     passport.batch_id = Some("LOT-7".into());
@@ -57,6 +59,7 @@ fn published_battery() -> Passport {
         name: "Plant 3".into(),
         country: "DE".into(),
         address: None,
+        identifier: None,
     });
     passport
 }
@@ -71,7 +74,7 @@ fn registration_for(
         RegisteringOperator {
             legal_name: "Volt GmbH",
             country: "DE",
-            identifier_scheme: "vat",
+            identifier_scheme: "lei",
         },
         granularity,
     )

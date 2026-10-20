@@ -148,6 +148,50 @@ pub fn check_did(did: &str) -> Result<(), DidRejection<'_>> {
     Ok(())
 }
 
+/// A Legal Entity Identifier: ISO 17442, twenty upper-case alphanumeric
+/// characters whose last two are an ISO 7064 MOD 97-10 check.
+///
+/// Letters map `A` to 10 and `Z` to 35, and the value streamed through mod 97
+/// must equal 1. A lower-case letter is refused, not folded: the identifier that
+/// is stored has to be the one that is printed.
+///
+/// One home on purpose, like the checks above: the registry's operator
+/// identifier and the typed EN 18219 clause 6 identifier both ask whether a value
+/// is an LEI, and two copies of a checksum are how two tiers come to disagree.
+#[must_use]
+pub fn is_valid_lei(s: &str) -> bool {
+    if s.len() != 20
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
+    {
+        return false;
+    }
+    let mut rem: u32 = 0;
+    for b in s.bytes() {
+        let v = if b.is_ascii_digit() {
+            u32::from(b - b'0')
+        } else {
+            u32::from(b - b'A') + 10
+        };
+        // A letter contributes two decimal positions (10–35); a digit one.
+        rem = if v >= 10 {
+            (rem * 100 + v) % 97
+        } else {
+            (rem * 10 + v) % 97
+        };
+    }
+    rem == 1
+}
+
+/// A D-U-N-S number: exactly nine ASCII digits.
+///
+/// A shape check. Whether the number is assigned is Dun & Bradstreet's to say.
+#[must_use]
+pub fn is_duns(s: &str) -> bool {
+    s.len() == 9 && s.bytes().all(|b| b.is_ascii_digit())
+}
+
 /// The most characters a GS1 AI 21 serial number may carry.
 ///
 /// GS1's Barcode Syntax Dictionary specifies AI 21 as `X..20`: one to twenty

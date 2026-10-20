@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::identifier::{ActorIdentifier, ActorIdentifierError, ActorPosition};
+
 /// Identifies an economic operator responsible for a DPP.
 ///
 /// Under ESPR, the "responsible economic operator" is whoever places or
@@ -60,6 +62,19 @@ pub struct ResponsibleOperator {
     /// and guessing produces a false claim rather than a missing one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eu_operator_id_scheme: Option<String>,
+    /// The Annex III point (k) identifier typed by EN 18219 clause 6 scheme,
+    /// beside the legacy [`eu_operator_id`](Self::eu_operator_id) and
+    /// [`eu_operator_id_scheme`](Self::eu_operator_id_scheme) pair.
+    ///
+    /// `Option`, for the reason every field on this type is one: it is a persisted
+    /// shape, stored inside the transfer chain, and the envelope rule is
+    /// additive-only. A record written before this field existed reads back as
+    /// `None` and is written without the key, so its signed bytes do not move. The
+    /// legacy pair is kept because a reader that has not upgraded still reads it.
+    ///
+    /// Read the identifier with [`actor_identifier`](Self::actor_identifier).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<ActorIdentifier>,
     /// ISO 3166-1 alpha-2 country code of the operator's establishment.
     pub country: String,
     /// Registered trade name or registered trade mark, where it differs from
@@ -90,6 +105,38 @@ pub struct ResponsibleOperator {
     /// as one would satisfy the obligation on paper and not in fact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub electronic_address: Option<String>,
+}
+
+impl ResponsibleOperator {
+    /// This operator's Annex III point (k) identifier as an EN 18219 clause 6
+    /// identifier, or `None` when the operator states none.
+    ///
+    /// The typed [`identifier`](Self::identifier) when there is one. It is **not**
+    /// checked against the legacy pair: when both are present the typed one is
+    /// what the operator states. Otherwise the legacy
+    /// [`eu_operator_id`](Self::eu_operator_id) and
+    /// [`eu_operator_id_scheme`](Self::eu_operator_id_scheme) are read through
+    /// [`ActorIdentifier::from_legacy`], at an operator, so a `gln` is a party.
+    ///
+    /// A value with no scheme is read as the empty scheme, which is
+    /// [`Unmapped`](ActorIdentifierError::Unmapped): the value alone does not say
+    /// what it is, and guessing would be a false claim and not a missing one.
+    ///
+    /// `Some(Err(Unmapped))` is not a statement that the identifier is wrong. See
+    /// [`ActorIdentifier::from_legacy`] for what has no clause 6 route here.
+    #[must_use]
+    pub fn actor_identifier(&self) -> Option<Result<ActorIdentifier, ActorIdentifierError>> {
+        if let Some(identifier) = &self.identifier {
+            return Some(Ok(identifier.clone()));
+        }
+        let value = self.eu_operator_id.as_deref()?;
+        let scheme = self.eu_operator_id_scheme.as_deref().unwrap_or_default();
+        Some(ActorIdentifier::from_legacy(
+            scheme,
+            value,
+            ActorPosition::Operator,
+        ))
+    }
 }
 
 /// The role of an economic operator in the DPP supply chain.

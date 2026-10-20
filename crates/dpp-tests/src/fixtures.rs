@@ -111,6 +111,7 @@ pub fn make_operator(
         role,
         eu_operator_id: None,
         eu_operator_id_scheme: None,
+        identifier: None,
         country: country.into(),
         registered_trade_name: None,
         postal_address: Some("Hauptstraße 1, 10115 Berlin".into()),

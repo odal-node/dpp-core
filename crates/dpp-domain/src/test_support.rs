@@ -259,6 +259,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
             role: crate::operator::OperatorRole::AuthorisedRepresentative,
             eu_operator_id: Some("DE123456789".to_owned()),
             eu_operator_id_scheme: Some("vat".to_owned()),
+            identifier: None,
             country: "DE".to_owned(),
             registered_trade_name: Some("Acme".to_owned()),
             postal_address: Some("Alexanderplatz 1, 10178 Berlin".to_owned()),
@@ -272,6 +273,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
         name: "Werk Nord".to_owned(),
         country: "DE".to_owned(),
         address: Some("Werkstrasse 4, 21079 Hamburg, DE".to_owned()),
+        identifier: None,
     });
     passport.seal = Some(SealedEnvelope {
         format: SealFormat::Cades,

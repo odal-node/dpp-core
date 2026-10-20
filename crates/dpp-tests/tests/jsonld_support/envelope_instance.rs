@@ -27,11 +27,11 @@ use dpp_domain::passport::{
 };
 use dpp_domain::seal::{SealConformanceLevel, SealFormat, SealedEnvelope};
 use dpp_domain::{
-    CarbonFootprint, CarbonFootprintClass, ComplianceFinding, ComplianceResult, ComplianceStatus,
-    FacilitySnapshot, InstrumentRef, LifecycleStage, LintFinding, LintResult, LintSeverity,
-    ManufacturerInfo, MaterialEntry, OperatorRole, Passport, RecordedBasis, RepairCriterion,
-    RepairabilityScore, ResponsibilityBasis, ResponsibleOperator, ResponsibleOperatorSnapshot,
-    SystemBoundary,
+    ActorIdentifier, CarbonFootprint, CarbonFootprintClass, ComplianceFinding, ComplianceResult,
+    ComplianceStatus, FacilitySnapshot, Gln, GlnAi, Icd, InstrumentRef, LifecycleStage,
+    LintFinding, LintResult, LintSeverity, ManufacturerInfo, MaterialEntry, OperatorRole, Passport,
+    RecordedBasis, RepairCriterion, RepairabilityScore, ResponsibilityBasis, ResponsibleOperator,
+    ResponsibleOperatorSnapshot, SystemBoundary,
 };
 use serde_json::json;
 
@@ -157,6 +157,9 @@ pub fn populate_envelope(passport: &mut Passport, basis: ResponsibilityBasis) {
             registered_trade_name: Some("Operator".into()),
             postal_address: Some("Hauptstraße 2, 10115 Berlin, DE".into()),
             electronic_address: Some("https://operator.example.com/contact".into()),
+            identifier: Some(
+                ActorIdentifier::iso6523(Icd::lei(), "529900T8BM49AURSDO55").expect("an LEI"),
+            ),
         },
         basis,
     });
@@ -167,6 +170,10 @@ pub fn populate_envelope(passport: &mut Passport, basis: ResponsibilityBasis) {
         name: "Berlin plant".into(),
         country: "DE".into(),
         address: Some("Werkstraße 3, 10115 Berlin, DE".into()),
+        identifier: Some(ActorIdentifier::gs1(
+            GlnAi::Location,
+            Gln::parse("9506000134352").expect("a GLN"),
+        )),
     });
 
     passport.seal = Some(SealedEnvelope {

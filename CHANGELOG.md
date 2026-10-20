@@ -37,6 +37,24 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   same key, on `Processing` and `Unrecognised`. The ghost still answers
   `NotFound`.
 
+- **A registration refuses an operator or facility identifier with no EN 18219
+  clause 6 route.** `RegistrationPayload::validate` returns the new
+  `RegistryValidationError::NoClause6Route` when the operator's or the facility's
+  scheme is not `lei`, `duns` or `gln`. An `eori`, a `vat`, a `did` and a `national`
+  code are well formed, and `OperatorIdentifier::validate` and
+  `FacilityIdentifier::validate` still accept them, but none has a clause 6 route
+  this build can establish: an EU-wide VAT number has no ICD, none was found for an
+  EORI number, and a DID is scheme 8 only with a credential a register has issued.
+  A proof of registration the registry sent is **not** held to this, since refusing
+  the registry's own document would refuse something nobody here can rewrite.
+  **Migration:** register under an LEI, a D-U-N-S number or a GLN. (#494)
+
+- **`ResponsibleOperator` and `FacilitySnapshot` gain an `identifier` field.** It is
+  `Option<ActorIdentifier>`, so a struct literal of either needs `identifier: None`.
+  Documents do not change: the field is `#[serde(default)]` and is not written when
+  it is `None`, so a stored record reads as before and is written back with the
+  same bytes, which a signed passport and a signed transfer chain need. (#494)
+
 ### Added
 
 - **The registry's web client was read again (2026-10-20), and the task list's
@@ -118,6 +136,60 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   prose, so the two cannot disagree about a token. `NoMatchingKey`'s `document`
   and `kid` are `None` when the document has no `id` or the token no `kid`; the
   prose still prints `(no id)` and `(none)` for them.
+
+- **`ActorIdentifier`: an operator or facility identifier, typed by EN 18219
+  clause 6 scheme.** An operator or a facility is named by a free `scheme` string
+  and a value, and none of the strings says which of the clause 6 schemes it is.
+  `dpp_domain::ActorIdentifier` does: **scheme 6** (clause 6.2), an identifier in a
+  scheme registered under ISO/IEC 6523, carried with its ICD, and **scheme 7**
+  (clause 6.3), a GLN carried with the GS1 Application Identifier that says
+  whether it names a party (417) or a physical location (414), so the two are told
+  apart by what the identifier says and not by where it was found. (#494)
+  - `ActorIdentifier::from_legacy` is the one place a legacy `(scheme, value)` pair
+    is read. `lei` is scheme 6 under ICD 0199, `duns` is scheme 6 under ICD 0060,
+    and `gln` is scheme 7, a party at an operator and a location at a facility.
+    **Everything else is `ActorIdentifierError::Unmapped`, never a guess:** an
+    EU-wide VAT number has no ICD, none was found for an EORI number, and a `did`
+    is scheme 8 only with a credential a register has issued, which is not
+    modelled. `Unmapped` is not a validation failure of the identifier.
+  - **The envelope's identifiers are typed additively.** `ResponsibleOperator`'s
+    Annex III point (k) identifier and `FacilitySnapshot` each carry an optional
+    typed `identifier` beside their legacy strings, which stay readable
+    indefinitely. `actor_identifier()` on each uses the typed field when there is
+    one, and reads the legacy pair through `from_legacy` otherwise. A document that
+    carries an `eori`, a `vat` or a `national` code still reads, and says it is
+    unplaced when asked.
+  - `OperatorIdentifier::actor_identifier` and `FacilityIdentifier::actor_identifier`
+    in `dpp-registry` give that reading of a registry identifier, and
+    `require_clause_6` is the refusal above. The registry types keep their wire
+    strings: the registry's own wire format is not one this crate can change on a
+    guess.
+  - **Reading is not issuing.** The constructors check a value's shape, an LEI under
+    ICD 0199 and nine digits under 0060. A document read from JSON is held to its
+    shape only, so a signed passport carrying a value this build would not have
+    issued is still read, and `ActorIdentifier::validate` asks again.
+  - **A scheme this build does not know is read, not refused.** Any `scheme` other
+    than `icd` and `gs1`, and a `gs1` identifier under an AI other than 417 or 414,
+    is read as `ActorIdentifier::Unrecognised` and written back member for member,
+    so a passport from a build that knows scheme 8, scheme 9 or AI 416 still reads
+    here and keeps its signed bytes. `validate` refuses it
+    (`ActorIdentifierError::UnrecognisedScheme`), and `en_18219_scheme` and `value`
+    return `None` for it. A known scheme in the wrong shape is still refused.
+  - In the passport's JSON-LD context, `identifier` under `facility` and under
+    `responsibleOperator.operator` is a JSON literal (`@json`), carried whole:
+    its members depend on its scheme, and as terms an identifier in a scheme
+    this build does not know would be dropped from the linked-data form.
+  - A facility's malformed LEI or D-U-N-S number is reported as
+    `RegistryValidationError::InvalidFacilityId`, not as a malformed GLN.
+  - The ICD is checked for shape, four digits, and not against the Registration
+    Authority's list, which this crate does not hold. AI 416, the GLN of a
+    production or service location, is left out until something settles whether a
+    facility may be named by it.
+  - The LEI and D-U-N-S checks now live in `dpp_rules::common::identifier`
+    (`is_valid_lei`, `is_duns`), where the registry and the typed identifier both
+    read them. The registry's behaviour is unchanged.
+  - `Gln` now serialises as a bare string and refuses an invalid one on
+    deserialization, as `Gtin` does.
 
 ### Fixed
 

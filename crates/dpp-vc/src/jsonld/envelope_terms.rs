@@ -43,6 +43,12 @@
 //! recorded, and `disclosureSignatures`, which is keyed by the dotted path of the
 //! field each signature covers. Neither's keys are terms or IRIs, so as plain
 //! terms they would be dropped.
+//!
+//! An operator's and a facility's `identifier` is a literal for a different
+//! reason: its members depend on its scheme, and one in a scheme this build does
+//! not know is carried as it came, with members no table here can name. As
+//! terms they would be dropped from the linked-data form of exactly the passports
+//! a newer build wrote.
 
 use serde_json::{Map, Value, json};
 
@@ -118,6 +124,7 @@ const NESTED: &[(&str, &[(&str, Member)])] = &[
             ("name", Leaf),
             ("country", Leaf),
             ("address", Leaf),
+            ("identifier", Json),
         ],
     ),
     (
@@ -181,6 +188,7 @@ const NESTED: &[(&str, &[(&str, Member)])] = &[
                     ("registeredTradeName", Leaf),
                     ("postalAddress", Leaf),
                     ("electronicAddress", Leaf),
+                    ("identifier", Json),
                 ]),
             ),
             // A basis is a string, except the one that names the law, which is

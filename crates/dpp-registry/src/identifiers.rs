@@ -19,11 +19,17 @@
 //! Regulation (EU) 2019/1020 or Art. 16 of Regulation (EU) 2023/988 tasks, so
 //! there are **three** classes of operator identifier, not two.
 //!
-//! ⚠️ That has a consequence this module does not yet carry: (g) and (h) travel
-//! as [`OperatorIdentifier`], while point (k)'s identifier is a bare `String` on
-//! `dpp_domain::operator::ResponsibleOperator`. Annex III subjects all three to
-//! the same conformity rule, and only two of them are shaped to express it.
-//! Closing that is a persisted-shape change, not a doc fix.
+//! That has a consequence for the shape: (g) and (h) travel as
+//! [`OperatorIdentifier`], while point (k)'s identifier was a bare `String` on
+//! `dpp_domain::operator::ResponsibleOperator`, and Annex III subjects all three
+//! to the same conformity rule. All three are now readable as an EN 18219
+//! clause 6 identifier, [`dpp_domain::ActorIdentifier`], and `ResponsibleOperator`
+//! and `FacilitySnapshot` carry one in an **additive** optional field beside their
+//! legacy strings, since the envelope has no lens and a signed passport cannot be
+//! rewritten. This module's types keep their wire strings, because the registry's
+//! own wire format is not one this crate can change on a guess. A registration
+//! requires a clause 6 route of both identifiers: see
+//! [`OperatorIdentifier::require_clause_6`].
 //!
 //! [`ProductItemIdentifier`] is not a fourth Annex III class: it is the product
 //! identifier at item granularity, which Annex III point (b) leaves to "the
@@ -39,6 +45,7 @@
 //! with symmetric shape (scheme + value + metadata), and share the
 //! country-code / checksum validation helpers below.
 
+use dpp_domain::{ActorIdentifier, ActorIdentifierError, ActorPosition};
 use serde::{Deserialize, Serialize};
 
 use super::basis::RegistryBasis;
@@ -192,6 +199,55 @@ impl FacilityIdentifier {
         }
         Ok(())
     }
+
+    /// This identifier read as an EN 18219 clause 6 identifier.
+    ///
+    /// A `gln` is a scheme 7 GLN qualified as a **physical location** (AI 414), and
+    /// an `lei` or a `duns` is scheme 6. Anything else is
+    /// [`ActorIdentifierError::Unmapped`], including `national`, which names no
+    /// scheme at all. That is not a validation failure: [`validate`](Self::validate)
+    /// is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// See [`ActorIdentifier::from_legacy`].
+    pub fn actor_identifier(&self) -> Result<ActorIdentifier, ActorIdentifierError> {
+        ActorIdentifier::from_legacy(&self.scheme, &self.value, ActorPosition::Facility)
+    }
+
+    /// Require this identifier to follow an EN 18219 clause 6 scheme, as a
+    /// registration does. See
+    /// [`OperatorIdentifier::require_clause_6`] for why this is not part of
+    /// [`validate`](Self::validate).
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::NoClause6Route`] for a scheme this build cannot
+    /// place, such as `national`. When it can place the scheme and the value
+    /// does not fit it, [`RegistryValidationError::InvalidGln`] for a GLN and
+    /// [`RegistryValidationError::InvalidFacilityId`] for an LEI or a D-U-N-S
+    /// number.
+    pub fn require_clause_6(&self) -> Result<(), RegistryValidationError> {
+        match self.actor_identifier() {
+            Ok(_) => Ok(()),
+            Err(ActorIdentifierError::Unmapped { scheme }) => {
+                Err(RegistryValidationError::NoClause6Route {
+                    subject: "facility",
+                    scheme,
+                })
+            }
+            Err(ActorIdentifierError::InvalidGln { reason, .. }) => {
+                Err(RegistryValidationError::InvalidGln {
+                    value: self.value.clone(),
+                    reason,
+                })
+            }
+            Err(_) => Err(RegistryValidationError::InvalidFacilityId {
+                scheme: self.scheme.clone(),
+                value: self.value.clone(),
+            }),
+        }
+    }
 }
 
 /// Economic operator identifier — identifies the responsible legal entity.
@@ -239,6 +295,58 @@ impl OperatorIdentifier {
         validate_country_code(&self.country)?;
         validate_operator_scheme(&self.scheme, &self.value)
     }
+
+    /// This identifier read as an EN 18219 clause 6 identifier: which of the
+    /// clause 6 schemes the `(scheme, value)` pair is.
+    ///
+    /// `lei` and `duns` are scheme 6, and a `gln` is a scheme 7 party GLN. Anything
+    /// else is [`ActorIdentifierError::Unmapped`], which is **not** a validation
+    /// failure: [`validate`](Self::validate) is unchanged and still accepts an
+    /// `eori`, a `vat` and a `did`, because no rule yet says an identifier must
+    /// have a clause 6 route.
+    ///
+    /// The [`did`](Self::did) field is the operator's DID for authentication and
+    /// is not the identifier, so it plays no part here.
+    ///
+    /// # Errors
+    ///
+    /// See [`ActorIdentifier::from_legacy`].
+    pub fn actor_identifier(&self) -> Result<ActorIdentifier, ActorIdentifierError> {
+        ActorIdentifier::from_legacy(&self.scheme, &self.value, ActorPosition::Operator)
+    }
+
+    /// Require this identifier to follow an EN 18219 clause 6 scheme, as a
+    /// registration does.
+    ///
+    /// 🚨 This is the one place [`actor_identifier`](Self::actor_identifier)'s
+    /// `Unmapped` becomes a refusal, and it is not applied to
+    /// [`validate`](Self::validate): an `eori` or a `vat` identifier is well formed
+    /// and `validate` has always accepted it. Clause 6.1 asks for a clause 6
+    /// scheme where regulation requires the identifier, and a registration is where
+    /// the operator identifier is required. A proof of registration the registry
+    /// *sent* is not held to it, since refusing the registry's own data would be
+    /// refusing a document nobody here can rewrite.
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::NoClause6Route`] for a scheme this build cannot
+    /// place, and [`RegistryValidationError::InvalidOperatorId`] when it can place
+    /// the scheme and the value does not fit it.
+    pub fn require_clause_6(&self) -> Result<(), RegistryValidationError> {
+        match self.actor_identifier() {
+            Ok(_) => Ok(()),
+            Err(ActorIdentifierError::Unmapped { scheme }) => {
+                Err(RegistryValidationError::NoClause6Route {
+                    subject: "operator",
+                    scheme,
+                })
+            }
+            Err(_) => Err(RegistryValidationError::InvalidOperatorId {
+                scheme: self.scheme.clone(),
+                value: self.value.clone(),
+            }),
+        }
+    }
 }
 
 /// Per-scheme structural/checksum validation of an economic-operator identifier.
@@ -271,10 +379,10 @@ fn validate_operator_scheme(scheme: &str, value: &str) -> Result<(), RegistryVal
         });
     }
     let ok = match scheme {
-        "lei" => lei_checksum_valid(value),
+        "lei" => dpp_rules::common::identifier::is_valid_lei(value),
         "eori" => has_country_prefix(value, 15),
         "vat" => has_country_prefix(value, usize::MAX),
-        "duns" => value.len() == 9 && value.bytes().all(|b| b.is_ascii_digit()),
+        "duns" => dpp_rules::common::identifier::is_duns(value),
         // "did" and unknown schemes are accepted without structural
         // verification — but never without a value. See the check above.
         _ => true,
@@ -287,34 +395,6 @@ fn validate_operator_scheme(scheme: &str, value: &str) -> Result<(), RegistryVal
             value: value.to_owned(),
         })
     }
-}
-
-/// ISO 7064 MOD 97-10 check over a 20-character LEI (ISO 17442).
-///
-/// Letters map A→10 … Z→35; the streamed value mod 97 must equal 1.
-fn lei_checksum_valid(s: &str) -> bool {
-    if s.len() != 20
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit())
-    {
-        return false;
-    }
-    let mut rem: u32 = 0;
-    for b in s.bytes() {
-        let v = if b.is_ascii_digit() {
-            u32::from(b - b'0')
-        } else {
-            u32::from(b - b'A') + 10
-        };
-        // A letter contributes two decimal positions (10–35); a digit one.
-        rem = if v >= 10 {
-            (rem * 100 + v) % 97
-        } else {
-            (rem * 10 + v) % 97
-        };
-    }
-    rem == 1
 }
 
 /// Two-letter country prefix followed by 1..=`max_body` alphanumeric characters.

@@ -170,6 +170,7 @@ async fn ghost_notify_transfer_returns_not_found() {
         role: OperatorRole::Manufacturer,
         eu_operator_id: None,
         eu_operator_id_scheme: None,
+        identifier: None,
         country: "DE".to_owned(),
         registered_trade_name: None,
         postal_address: None,
