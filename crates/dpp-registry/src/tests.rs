@@ -30,10 +30,12 @@ fn sample_facility_id() -> FacilityIdentifier {
     }
 }
 
+/// An LEI, because a registration carries an identifier with an EN 18219 clause 6
+/// route, and a VAT number has none.
 fn sample_operator_id() -> OperatorIdentifier {
     OperatorIdentifier {
-        scheme: "vat".into(),
-        value: "DE123456789".into(),
+        scheme: "lei".into(),
+        value: "529900T8BM49AURSDO55".into(),
         name: "EcoTextile GmbH".into(),
         country: "DE".into(),
         did: Some("did:web:ecotextile.de".into()),
@@ -1417,4 +1419,86 @@ fn an_unchecked_scheme_still_accepts_a_stated_value() {
         label: None,
     };
     assert!(product.validate().is_ok());
+}
+
+/// 🚨 A registration carries operator and facility identifiers that follow an EN
+/// 18219 clause 6 scheme.
+///
+/// An `eori`, a `vat` and a `did` identifier are well formed, and `validate` has
+/// always accepted them. None has a clause 6 route this build can establish, so a
+/// registration is where they stop: it is a separate error from a malformed value,
+/// because the value is fine.
+#[test]
+fn a_registration_whose_operator_identifier_has_no_clause_6_route_is_refused() {
+    for (scheme, value) in [
+        ("eori", "DE123456789012345"),
+        ("vat", "DE123456789"),
+        ("did", "did:web:example.com"),
+    ] {
+        let mut payload = sample_payload();
+        payload.operator_id.scheme = scheme.into();
+        payload.operator_id.value = value.into();
+
+        assert!(
+            payload.operator_id.validate().is_ok(),
+            "{scheme} is well formed and must still validate as an identifier"
+        );
+        assert_eq!(
+            payload.validate(),
+            Err(RegistryValidationError::NoClause6Route {
+                subject: "operator",
+                scheme: scheme.into(),
+            }),
+            "{scheme} was registered"
+        );
+    }
+}
+
+#[test]
+fn a_registration_whose_facility_identifier_has_no_clause_6_route_is_refused() {
+    let mut payload = sample_payload();
+    payload.facility_id.scheme = "national".into();
+    payload.facility_id.value = "DE-BY-0042".into();
+
+    assert!(payload.facility_id.validate().is_ok());
+    assert_eq!(
+        payload.validate(),
+        Err(RegistryValidationError::NoClause6Route {
+            subject: "facility",
+            scheme: "national".into(),
+        })
+    );
+}
+
+/// What has a route is accepted, as an operator and as a facility.
+#[test]
+fn an_lei_a_duns_number_and_a_gln_are_accepted_in_a_registration() {
+    for (scheme, value) in [("lei", "529900T8BM49AURSDO55"), ("duns", "123456789")] {
+        let mut payload = sample_payload();
+        payload.operator_id.scheme = scheme.into();
+        payload.operator_id.value = value.into();
+        assert!(payload.validate().is_ok(), "{scheme} was refused");
+    }
+
+    let mut payload = sample_payload();
+    payload.operator_id.scheme = "gln".into();
+    payload.operator_id.value = "4012345000009".into();
+    assert!(payload.validate().is_ok(), "a party GLN was refused");
+
+    let mut payload = sample_payload();
+    payload.facility_id.scheme = "lei".into();
+    payload.facility_id.value = "529900T8BM49AURSDO55".into();
+    assert!(payload.validate().is_ok(), "an LEI facility was refused");
+}
+
+/// A malformed value is reported as malformed, not as lacking a route: the route
+/// check comes after the shape check.
+#[test]
+fn a_malformed_value_is_not_reported_as_a_missing_route() {
+    let mut payload = sample_payload();
+    payload.operator_id.value = "529900T8BM49AURSDO56".into();
+    assert!(matches!(
+        payload.validate(),
+        Err(RegistryValidationError::InvalidOperatorId { .. })
+    ));
 }

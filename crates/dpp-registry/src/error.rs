@@ -16,6 +16,20 @@ pub enum RegistryValidationError {
     InvalidGln { value: String, reason: String },
     /// An operator identifier failed the structural/checksum check for its scheme.
     InvalidOperatorId { scheme: String, value: String },
+    /// An operator or facility identifier whose scheme has no EN 18219 clause 6
+    /// route this build can establish.
+    ///
+    /// EN 18219:2026 clause 6.1 has such an identifier follow one of the clause 6
+    /// schemes where regulation requires one, and a registration carries both. An
+    /// `eori` or a `vat` identifier is well-formed and has no ICD, so it passes
+    /// [`validate`](crate::OperatorIdentifier::validate) and is refused here, which
+    /// is why this is a separate error and not `InvalidOperatorId`.
+    NoClause6Route {
+        /// What the identifier names: `"operator"` or `"facility"`.
+        subject: &'static str,
+        /// The scheme string as given.
+        scheme: String,
+    },
     /// A country code is not a valid ISO 3166-1 alpha-2 code.
     InvalidCountryCode { code: String },
     /// A required payload field is empty.
@@ -133,6 +147,13 @@ impl std::fmt::Display for RegistryValidationError {
             }
             Self::InvalidOperatorId { scheme, value } => {
                 write!(f, "invalid {scheme} operator identifier '{value}'")
+            }
+            Self::NoClause6Route { subject, scheme } => {
+                write!(
+                    f,
+                    "the {subject} identifier scheme '{scheme}' has no EN 18219 clause 6 route in \
+                     this build: a registration carries an LEI, a D-U-N-S number or a GLN"
+                )
             }
             Self::InvalidCountryCode { code } => {
                 write!(

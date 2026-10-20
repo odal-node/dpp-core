@@ -156,6 +156,7 @@ fn v02_fields_round_trip() {
         name: "Plant One".to_owned(),
         country: "DE".to_owned(),
         address: None,
+        identifier: None,
     });
 
     let json = serde_json::to_string(&p).unwrap();

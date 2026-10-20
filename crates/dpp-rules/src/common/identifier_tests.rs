@@ -49,6 +49,41 @@ fn a_did_needs_a_named_method_and_a_well_formed_id() {
 }
 
 #[test]
+fn an_lei_is_twenty_upper_case_characters_with_a_correct_iso_7064_check() {
+    // The two characters at the end are the check digits, and these two carry
+    // correct ones.
+    assert!(is_valid_lei("529900T8BM49AURSDO55"));
+    assert!(is_valid_lei("5493001KJTIIGC8Y1R12"));
+
+    // One digit moved, so the check fails.
+    assert!(!is_valid_lei("529900T8BM49AURSDO56"));
+    assert!(!is_valid_lei("5493001KJTIIGC8Y1R13"));
+    // Not folded: the identifier that is stored has to be the one that is printed.
+    assert!(!is_valid_lei("529900t8bm49aursdo55"));
+    // Twenty characters, and ASCII ones.
+    assert!(!is_valid_lei("529900T8BM49AURSDO5"));
+    assert!(!is_valid_lei("529900T8BM49AURSDO555"));
+    assert!(!is_valid_lei(""));
+    assert!(!is_valid_lei("529900T8BM49AURSDÖ55"));
+}
+
+#[test]
+fn a_duns_number_is_nine_ascii_digits() {
+    assert!(is_duns("123456789"));
+    assert!(is_duns("000000000"));
+    for bad in [
+        "",
+        "12345678",
+        "1234567890",
+        "12345678a",
+        "12345 789",
+        "１２３４５６７８９",
+    ] {
+        assert!(!is_duns(bad), "{bad:?}");
+    }
+}
+
+#[test]
 fn an_ai_21_serial_is_one_to_twenty_cset_82_characters() {
     assert_eq!(check_gs1_serial("SN-2026/00042"), Ok(()));
     assert_eq!(check_gs1_serial("cdef1032547698badcfe"), Ok(()));

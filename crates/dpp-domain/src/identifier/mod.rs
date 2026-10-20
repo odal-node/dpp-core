@@ -11,6 +11,7 @@
 //! They look alike and are not interchangeable, which is easier to see when they
 //! are neighbours.
 
+pub mod actor;
 mod check_digit;
 pub mod cn_category;
 pub mod commodity_code;
@@ -20,6 +21,7 @@ pub mod product_identifier;
 #[cfg(test)]
 mod tests;
 
+pub use actor::{ActorIdentifier, ActorIdentifierError, ActorPosition, GlnAi, Icd};
 pub use check_digit::gs1_check_digit;
 pub use cn_category::{CnCategory, CnCategoryError};
 pub use commodity_code::{CommodityCode, CommodityCodeError};

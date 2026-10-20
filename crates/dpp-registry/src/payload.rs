@@ -115,6 +115,11 @@ impl RegistrationPayload {
         }
         self.facility_id.validate()?;
         self.operator_id.validate()?;
+        // EN 18219 clause 6.1: both identifiers follow a clause 6 scheme. After the
+        // checks above, so a malformed value is reported as malformed and not as
+        // lacking a route.
+        self.facility_id.require_clause_6()?;
+        self.operator_id.require_clause_6()?;
         // Structural only: 6/8/10 digits. Whether the code is the *right* one
         // for this product group is the registry's check, against ranges we do
         // not hold. Absent is lawful ("where relevant"); malformed is not.
