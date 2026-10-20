@@ -46,6 +46,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   on 2026-10-14 and keep that date, since a response is shown only to a
   signed-in session.
 
+### Fixed
+
+- **An identification link with a non-ASCII character passed validation.**
+  `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
+  EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing
+  looked at what the characters were. EN 18219:2026 clause 4.3.2 makes a unique
+  identifier an ISO/IEC 646 string and, as a URI, percent-encoded, and a link
+  stored raw and the same link stored percent-encoded would be two identifiers for
+  one product. Both are now refused, **with the remedy and without converting
+  anything**, because the identifier stored has to be the one that is printed: a
+  non-ASCII character in the host is written in its ASCII (punycode) form, and any
+  other character outside printable ASCII is percent-encoded. (#489)
+  - `dpp_rules::common::identifier::check_web_url` says which rule a link breaks,
+    in a `WebUrlRejection`, as `check_did` does for a DID. `is_absolute_web_url` is
+    now `check_web_url(url).is_ok()`, so it too is false for these.
+    `ProductIdentifier::identification_link` and the plugin SDK both use it.
+  - `ProductIdentifierError` gains `NonAsciiHost` and `NotPrintableAscii`, each
+    carrying the link and the first character at fault. The enum is
+    `#[non_exhaustive]`, so this is not breaking.
+  - **Reading is not issuing.** A document carrying such a link still **reads**,
+    as it is. The product identifier is in the signed public view, so a passport
+    carrying one can arrive from another operator, signed and unrewritable, and a
+    reader that refused it would refuse correct data permanently and report a node
+    that had not upgraded as having tampered with it. The plugin refuses the link
+    the next time the passport is written, naming the field and the remedy. A
+    value that is not a web URL at all is still refused on read, as it always was.
+    **What this does not cover:** a write path that builds a passport from a body
+    without going through the plugin's validation does not meet the rule, since
+    typed reading cannot tell a write from a read.
+  - **Only printable ASCII is checked.** The rest of RFC 3986 is not: an ASCII
+    character it does not allow unencoded, such as `<` or `|`, is still accepted.
+    Whether plain `http` is admissible and what the structured form requires are
+    EN IEC 61406-1 and -2, which this check does not attempt.
+
 ## [0.22.0] - 2026-10-16
 
 ### Breaking
