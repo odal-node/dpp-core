@@ -30,6 +30,13 @@
 //! each product group, so the keys the corpus exercises are the ones every
 //! passport of that group has.
 //!
+//! Beside each of those is a framed passport for **every embedded schema
+//! version** of every group, whose `productGroupData` carries every field the
+//! schema declares (see `jsonld_support/schema_instance.rs`). A fixture holds
+//! only what a passport must have, so on its own it would say nothing about the
+//! optional fields and the objects nested inside them, and those are most of what
+//! the context's terms for `productGroupData` cover.
+//!
 //! # Running
 //!
 //! ```text
@@ -44,6 +51,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use dpp_crypto::keystore::KeyStore;
+use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_domain::{
     PassportCredential, PassportCredentialSubject, ProductGroup, ProductGroupCatalog,
     ProductGroupData,
@@ -53,6 +61,11 @@ use dpp_vc::credential::{CredentialBuilder, CredentialRole, CredentialStatus};
 use dpp_vc::did_builder::build_did_document;
 use dpp_vc::{context_value, frame_passport};
 use serde_json::{Value, json};
+
+#[path = "jsonld_support/schema_instance.rs"]
+mod schema_instance;
+
+use schema_instance::full_instance;
 
 const ISSUER: &str = "did:web:issuer.example.com";
 
@@ -203,7 +216,38 @@ fn corpus() -> (Labelled, Labelled) {
         ));
     }
 
+    documents.extend(full_documents());
+
     (contexts, documents)
+}
+
+/// The label of the document carrying every field of one schema version.
+fn full_label(group: &str, version: impl std::fmt::Display) -> String {
+    format!("a framed {group} passport carrying every field of schema {version}")
+}
+
+/// A framed passport for every embedded schema version of every group, with all
+/// of the schema's fields populated.
+fn full_documents() -> Labelled {
+    let registry = VersionedSchemaRegistry::new();
+    let mut listed = registry.list();
+    listed.sort();
+
+    listed
+        .into_iter()
+        .map(|(group, version)| {
+            let schema: Value = serde_json::from_str(
+                registry
+                    .get(group, version)
+                    .expect("a listed schema is held by the registry"),
+            )
+            .expect("an embedded schema is JSON");
+            (
+                full_label(group, version),
+                framed_passport(&ProductGroup::from_wire_tag(group), full_instance(&schema)),
+            )
+        })
+        .collect()
 }
 
 #[test]
@@ -234,6 +278,15 @@ fn the_corpus_covers_every_context_and_product_group() {
             documents.iter().any(|(note, _)| *note == label),
             "the corpus holds no passport for product group '{}'",
             descriptor.key
+        );
+    }
+
+    let registry = VersionedSchemaRegistry::new();
+    for (group, version) in registry.list() {
+        let label = full_label(group, version);
+        assert!(
+            documents.iter().any(|(note, _)| *note == label),
+            "the corpus holds no document carrying every field of '{group}' {version}"
         );
     }
 
