@@ -24,9 +24,12 @@ use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_vc::context_value;
 use serde_json::{Map, Value};
 
+#[path = "jsonld_support/lockstep.rs"]
+mod lockstep;
 #[path = "jsonld_support/schema_instance.rs"]
 mod schema_instance;
 
+use lockstep::{document_paths, members_of, missing_terms, scope_paths};
 use schema_instance::full_instance;
 
 /// The inline term map of the passport context.
@@ -72,47 +75,6 @@ fn schemas() -> Vec<(String, Value)> {
     schemas
 }
 
-/// Whether a value is, or holds, an object whose members can carry terms.
-fn members_of(value: &Value) -> Option<&Map<String, Value>> {
-    match value {
-        Value::Object(object) => Some(object),
-        Value::Array(items) => items.iter().find_map(members_of),
-        _ => None,
-    }
-}
-
-/// Walk `document` and `scope` together, reporting each key the scope has no term
-/// for at that position.
-///
-/// A key with members must be defined with a scoped context of its own, because
-/// the scope above it does not propagate; one without need only be defined.
-fn missing_terms(
-    document: &Map<String, Value>,
-    scope: &Map<String, Value>,
-    path: &str,
-    out: &mut Vec<String>,
-) {
-    for (key, value) in document {
-        let here = if path.is_empty() {
-            key.clone()
-        } else {
-            format!("{path}.{key}")
-        };
-        let Some(definition) = scope.get(key) else {
-            out.push(here);
-            continue;
-        };
-        if let Some(members) = members_of(value) {
-            match definition.get("@context").and_then(Value::as_object) {
-                Some(inner) => missing_terms(members, inner, &here, out),
-                None => out.push(format!(
-                    "{here} (defined, but with no scope for its members)"
-                )),
-            }
-        }
-    }
-}
-
 /// 🚨 Every field of every schema version has a term at its position.
 ///
 /// The documents are the widest each schema describes, and `productIdentifier` is
@@ -154,39 +116,6 @@ fn every_field_of_every_schema_has_a_term_at_its_position() {
             "{label}: fields with no JSON-LD term at their position, which a processor drops \
              with everything inside them: {missing:?}"
         );
-    }
-}
-
-/// The path of every term the generated scope defines, as a dotted string.
-fn scope_paths(scope: &Map<String, Value>, prefix: &str, out: &mut BTreeSet<String>) {
-    for (key, definition) in scope {
-        if key.starts_with('@') {
-            continue;
-        }
-        let path = if prefix.is_empty() {
-            key.clone()
-        } else {
-            format!("{prefix}.{key}")
-        };
-        out.insert(path.clone());
-        if let Some(inner) = definition.get("@context").and_then(Value::as_object) {
-            scope_paths(inner, &path, out);
-        }
-    }
-}
-
-/// The path of every field a document carries, as a dotted string.
-fn document_paths(document: &Map<String, Value>, prefix: &str, out: &mut BTreeSet<String>) {
-    for (key, value) in document {
-        let path = if prefix.is_empty() {
-            key.clone()
-        } else {
-            format!("{prefix}.{key}")
-        };
-        out.insert(path.clone());
-        if let Some(members) = members_of(value) {
-            document_paths(members, &path, out);
-        }
     }
 }
 
