@@ -13,6 +13,59 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`RegistrySyncPort::notify_transfer` answers with a `TransferReport`, not a
+  `RegistryRecord`.** A notification amends a record that already exists, so
+  what the registry says about it is whether it took the notification, not where
+  a registration stands. Answering with a `RegistryRecord` forced an adapter to
+  carry a refusal inside a `RegistryStatus` the port had no name for, and left a
+  caller unable to tell an acceptance from a state nobody recognised, so one
+  that closed on anything it could not read recorded a handover the registry may
+  never have taken. `TransferReport` has one variant per thing a caller does
+  next: `Accepted`, `AlreadyHeld` (a replayed idempotency key: an earlier attempt
+  got through), `Processing` (received, not yet applied), `Refused { reason }`,
+  and `Unrecognised { state }`. `Accepted`, `AlreadyHeld` and `Refused` settle a
+  notification; `Processing` and `Unrecognised` end in a resend, which is safe
+  only under a stable key, so the port now says an adapter sends
+  `TransferRecord::transfer_id` as the registry's idempotency key. A replay is
+  then answered `AlreadyHeld`, which is how a notification whose first answer was
+  lost, unreadable or unrecognised is settled without a second one reaching the
+  registry. **Migration:** an implementation returns a `TransferReport` and sends
+  the idempotency key; a caller closes the notification on `Accepted` and
+  `AlreadyHeld`, stops on `Refused`, and keeps it open, sending it again under the
+  same key, on `Processing` and `Unrecognised`. The ghost still answers
+  `NotFound`.
+
+### Added
+
+- **`RegistrySyncPort::find_submission` recovers a submission whose handle was
+  lost.** `SubmissionAcknowledgement::AlreadyHeld` leaves a caller with a
+  submission it cannot poll: a replayed key is answered with the conflict and not
+  with the submission, and the port could say that handle had to be recovered
+  without offering a way to. The new method takes the `RegistrationRequest` and
+  answers with a `SubmissionLookup`: `Found { correlation_id, report }`,
+  `NotFound { exhaustive }`, `Ambiguous { candidates }`, or `Unsupported`. A
+  match is by the unique product identifier the passport was submitted under,
+  which is what the registry reports each passport against, and never by
+  position. An identifier is not unique to a passport, since a successor can be
+  submitted under its predecessor's, so more than one submission reporting it is
+  `Ambiguous` and the lookup does not choose. The method has a default that
+  answers `Unsupported`, so an existing implementation still compiles.
+  `GhostRegistrySync` answers `NotFound { exhaustive: true }`.
+
+- **`authenticate_access_credential_with_reason` refuses with the reason as a
+  type.** `authenticate_access_credential` reported every refusal as
+  `VerificationResult::InvalidSignature` carrying prose, so a caller that wanted
+  to tell a presenter what to fix matched on text, and the text of two of the
+  refusals names the `kid` and the document, which the presenter chose. The new
+  function returns an `AuthenticationFailure`: `NoMatchingKey`,
+  `SignatureDoesNotVerify`, `Unverifiable`, `NotTypedAsCredential`,
+  `MalformedPayload`, `IssuerMismatch` and `NotACompactJws`. It runs the same
+  checks in the same order, and `authenticate_access_credential` is now that
+  function with the reason folded into a `VerificationResult`, with the same
+  prose, so the two cannot disagree about a token.
+
 ## [0.22.0] - 2026-10-16
 
 ### Breaking

@@ -30,6 +30,8 @@
 mod builder;
 pub mod jwt;
 #[cfg(test)]
+mod jwt_reason_tests;
+#[cfg(test)]
 mod jwt_tests;
 mod revocation;
 #[cfg(test)]
@@ -41,7 +43,10 @@ mod types;
 mod verify;
 
 pub use builder::CredentialBuilder;
-pub use jwt::{authenticate_access_credential, sign_access_credential};
+pub use jwt::{
+    AuthenticationFailure, authenticate_access_credential,
+    authenticate_access_credential_with_reason, sign_access_credential,
+};
 pub use revocation::{REVOCATION_PURPOSE, RevocationOutcome, check_revocation};
 pub use trust::{AllowAllIssuers, StaticTrustedIssuers, TrustedIssuerRegistry};
 pub use types::{

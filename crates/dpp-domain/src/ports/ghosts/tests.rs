@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::passport::PassportId;
 use crate::ports::registry_sync::RegistrationGranularity;
 use crate::ports::registry_sync::{
-    RegistrationRequest, RegistrySyncPort, SubmissionAcknowledgement,
+    RegistrationRequest, RegistrySyncPort, SubmissionAcknowledgement, SubmissionLookup,
 };
 use crate::ports::seal::SealPort;
 use crate::seal::{
@@ -123,7 +123,7 @@ async fn ghost_register_acknowledges_under_a_placeholder_handle() {
         backup_url: None,
         service_provider: None,
     };
-    let acknowledgement = sync.register(request).await.unwrap();
+    let acknowledgement = sync.register(request.clone()).await.unwrap();
     let SubmissionAcknowledgement::Accepted { correlation_id } = acknowledgement else {
         panic!("the ghost accepts every submission, got {acknowledgement:?}");
     };
@@ -132,6 +132,14 @@ async fn ghost_register_acknowledges_under_a_placeholder_handle() {
     // …and knows nothing of it afterwards. Answering `Processing` would keep a
     // caller polling a registry that was never contacted.
     assert!(sync.check_submission(&correlation_id).await.is_err());
+
+    // Looking it up by what was submitted finds nothing either, and says that all
+    // of it was read: `Unsupported` would tell a caller the ghost could not look,
+    // when there is simply nothing there.
+    assert_eq!(
+        sync.find_submission(&request).await.unwrap(),
+        SubmissionLookup::NotFound { exhaustive: true }
+    );
 }
 
 #[tokio::test]

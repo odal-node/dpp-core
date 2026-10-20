@@ -16,12 +16,12 @@ use crate::did_builder::build_did_document;
 use crate::test_support::temp_store;
 use dpp_crypto::keystore::KeyStore;
 
-const KEY_ID: &str = "issuer-key";
-const BASE_URL: &str = "https://authority.example";
+pub(super) const KEY_ID: &str = "issuer-key";
+pub(super) const BASE_URL: &str = "https://authority.example";
 /// What `build_did_document` derives from `BASE_URL`.
-const ISSUER_DID: &str = "did:web:authority.example";
+pub(super) const ISSUER_DID: &str = "did:web:authority.example";
 
-fn credential_from(issuer: &str) -> crate::credential::DppAccessCredential {
+pub(super) fn credential_from(issuer: &str) -> crate::credential::DppAccessCredential {
     CredentialBuilder::new(
         issuer.to_owned(),
         DppCredentialSubject {
@@ -250,7 +250,7 @@ fn a_payload_that_is_not_a_credential_is_refused() {
 }
 
 /// Sign `payload` under `kid` with the given `typ` and `cty`.
-fn signed(
+pub(super) fn signed(
     store: &KeyStore,
     payload: &serde_json::Value,
     kid: &str,

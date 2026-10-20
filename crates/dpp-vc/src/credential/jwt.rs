@@ -147,6 +147,108 @@ fn header_type_refusal(jws: &str) -> Option<String> {
     }
 }
 
+/// Why a VC-JWT was not authenticated: one variant per thing an issuer would go
+/// and fix.
+///
+/// [`authenticate_access_credential`] reports every one of these as
+/// [`VerificationResult::InvalidSignature`] carrying prose, which leaves a caller
+/// that wants to tell a presenter *what is wrong* with matching on text, and the
+/// text of two of them names the `kid` and the document, both of which the
+/// presenter chose. A caller that shows its own sentence per variant needs
+/// neither: the specifics are in fields it can leave out of what it says.
+///
+/// [`Display`](std::fmt::Display) is the prose
+/// [`authenticate_access_credential`] has always carried, so the two functions
+/// agree on it, and [`into_verification_result`](Self::into_verification_result)
+/// is the mapping that function applies.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AuthenticationFailure {
+    /// The token is not a compact JWS: it has no payload segment.
+    NotACompactJws,
+    /// The issuer's DID document publishes no key the token's `kid` names, or
+    /// the document is for a different DID than the `kid` is.
+    ///
+    /// Every token signed before keys were named by thumbprint ends here: its
+    /// `kid` is a bare fingerprint, which no document names.
+    NoMatchingKey {
+        /// The `id` of the document that was checked.
+        document: String,
+        /// The `kid` the token carries, or `(none)`.
+        kid: String,
+    },
+    /// A key matched and the signature does not verify against it.
+    SignatureDoesNotVerify,
+    /// The token could not be verified at all: an unreadable protected header,
+    /// an algorithm the verifier does not accept, or a malformed signature.
+    Unverifiable {
+        /// What the verifier reported.
+        reason: String,
+    },
+    /// The signature is the issuer's, and the token is not typed as a VC-JWT:
+    /// `typ` is absent or names something else, or `cty` does.
+    ///
+    /// A signature of another kind by the same key, a passport proof or an
+    /// SD-JWT VC, is authentic and still not a credential.
+    NotTypedAsCredential {
+        /// Which header member failed, and what it said.
+        reason: String,
+    },
+    /// The payload is not a credential: not base64url, or not the document.
+    MalformedPayload {
+        /// What was wrong with it.
+        reason: String,
+    },
+    /// The credential names an issuer other than the DID document it was
+    /// checked against.
+    IssuerMismatch {
+        /// The issuer the credential claims.
+        claimed: String,
+        /// The `id` of the document it was checked against.
+        document: String,
+    },
+}
+
+impl std::fmt::Display for AuthenticationFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotACompactJws => f.write_str("not a compact JWS"),
+            Self::NoMatchingKey { document, kid } => write!(
+                f,
+                "the DID document for {document} publishes no key matching kid {kid}"
+            ),
+            Self::SignatureDoesNotVerify => {
+                f.write_str("signature did not verify against the issuer's published key")
+            }
+            Self::Unverifiable { reason }
+            | Self::NotTypedAsCredential { reason }
+            | Self::MalformedPayload { reason } => f.write_str(reason),
+            Self::IssuerMismatch { claimed, document } => write!(
+                f,
+                "credential names issuer {claimed} but was checked against the DID document for {document}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for AuthenticationFailure {}
+
+impl AuthenticationFailure {
+    /// The [`VerificationResult`] [`authenticate_access_credential`] reports this
+    /// as: a payload that is not a credential is
+    /// [`MalformedCredential`](VerificationResult::MalformedCredential), and
+    /// every other refusal is
+    /// [`InvalidSignature`](VerificationResult::InvalidSignature).
+    #[must_use]
+    pub fn into_verification_result(self) -> VerificationResult {
+        let text = self.to_string();
+        match self {
+            Self::MalformedPayload { .. } => VerificationResult::MalformedCredential(text),
+            _ => VerificationResult::InvalidSignature(text),
+        }
+    }
+}
+
 /// Authenticate a VC-JWT and return the credential it carries.
 ///
 /// Establishes exactly one thing: the document was signed by a key published in
@@ -160,6 +262,10 @@ fn header_type_refusal(jws: &str) -> Option<String> {
 /// it was handed, so a caller that resolves the wrong document is refused rather
 /// than silently trusted.
 ///
+/// This is [`authenticate_access_credential_with_reason`] with the refusal
+/// folded into a [`VerificationResult`], for a caller that goes on to compose it
+/// with the other verifiers. A caller that wants to say *why* uses that one.
+///
 /// # Errors
 /// [`VerificationResult::InvalidSignature`] when the JWS is malformed, no key in
 /// the document matches, the signature does not verify, the header does not type
@@ -171,50 +277,69 @@ pub fn authenticate_access_credential(
     jws: &str,
     issuer_did_document: &serde_json::Value,
 ) -> Result<DppAccessCredential, VerificationResult> {
+    authenticate_access_credential_with_reason(jws, issuer_did_document)
+        .map_err(AuthenticationFailure::into_verification_result)
+}
+
+/// [`authenticate_access_credential`], refusing with the reason as a type.
+///
+/// The same checks in the same order; the difference is only what a refusal
+/// carries. Each [`AuthenticationFailure`] is something an issuer would fix, so a
+/// caller can answer a presenter with a sentence per variant instead of one for
+/// all of them, and without repeating the `kid` or the document, which the
+/// presenter chose.
+///
+/// # Errors
+/// An [`AuthenticationFailure`] naming the first check the token failed.
+pub fn authenticate_access_credential_with_reason(
+    jws: &str,
+    issuer_did_document: &serde_json::Value,
+) -> Result<DppAccessCredential, AuthenticationFailure> {
     use base64::Engine as _;
 
     // The key the JWS names. A token that names none is refused, not verified
     // against a key chosen for it. The refusal says which document was checked
     // and what was looked for, since a document for another DID fails here.
     let key = resolve_verification_key(issuer_did_document, jws).ok_or_else(|| {
-        let document_subject = issuer_did_document
-            .get("id")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("(no id)");
-        let kid = extract_kid_from_jws(jws).unwrap_or_else(|| "(none)".to_owned());
-        VerificationResult::InvalidSignature(format!(
-            "the DID document for {document_subject} publishes no key matching kid {kid}"
-        ))
+        AuthenticationFailure::NoMatchingKey {
+            document: issuer_did_document
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("(no id)")
+                .to_owned(),
+            kid: extract_kid_from_jws(jws).unwrap_or_else(|| "(none)".to_owned()),
+        }
     })?;
 
     match verify_jws(jws, &key) {
         Ok(true) => {}
-        Ok(false) => {
-            return Err(VerificationResult::InvalidSignature(
-                "signature did not verify against the issuer's published key".into(),
-            ));
+        Ok(false) => return Err(AuthenticationFailure::SignatureDoesNotVerify),
+        Err(e) => {
+            return Err(AuthenticationFailure::Unverifiable {
+                reason: e.to_string(),
+            });
         }
-        Err(e) => return Err(VerificationResult::InvalidSignature(e.to_string())),
     }
 
     // Read once the header is known to be the issuer's. A signature of any other
     // kind by the same key is authentic and still not a credential.
-    if let Some(refusal) = header_type_refusal(jws) {
-        return Err(VerificationResult::InvalidSignature(refusal));
+    if let Some(reason) = header_type_refusal(jws) {
+        return Err(AuthenticationFailure::NotTypedAsCredential { reason });
     }
 
     let payload = jws
         .split('.')
         .nth(1)
-        .ok_or_else(|| VerificationResult::InvalidSignature("not a compact JWS".into()))?;
+        .ok_or(AuthenticationFailure::NotACompactJws)?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(payload)
-        .map_err(|e| {
-            VerificationResult::MalformedCredential(format!("payload is not base64url: {e}"))
+        .map_err(|e| AuthenticationFailure::MalformedPayload {
+            reason: format!("payload is not base64url: {e}"),
         })?;
-    let credential: DppAccessCredential = serde_json::from_slice(&bytes).map_err(|e| {
-        VerificationResult::MalformedCredential(format!("payload is not a credential: {e}"))
-    })?;
+    let credential: DppAccessCredential =
+        serde_json::from_slice(&bytes).map_err(|e| AuthenticationFailure::MalformedPayload {
+            reason: format!("payload is not a credential: {e}"),
+        })?;
 
     // Bind the credential to the document it was checked against. Without this, a
     // caller that resolved the wrong DID — or was handed one — would accept a
@@ -226,10 +351,10 @@ pub fn authenticate_access_credential(
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default();
     if document_subject != credential.issuer {
-        return Err(VerificationResult::InvalidSignature(format!(
-            "credential names issuer {} but was checked against the DID document for {document_subject}",
-            credential.issuer
-        )));
+        return Err(AuthenticationFailure::IssuerMismatch {
+            claimed: credential.issuer,
+            document: document_subject.to_owned(),
+        });
     }
 
     Ok(credential)
