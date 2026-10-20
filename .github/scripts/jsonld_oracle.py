@@ -40,13 +40,22 @@ Six checks, each catching something the others do not:
              passport embedded in a credential.
 
 **One gap is known and listed, not hidden.** The passport context defines a term
-for every key of the passport envelope and for the product identifier, and for
-nothing beneath those: the keys inside `manufacturer`, `materials` and the rest,
-and every key of `productGroupData` except the identifier, have no term. A
-processor drops them. They are allowed below as `NESTED_UNDEFINED`, and they are
-the register row's stated deviation. The allowance is checked both ways: any
-other drop fails, and the day the context defines those terms the allowance is
-reported as stale and has to be deleted.
+for every key of the passport envelope, and for everything beneath
+`productGroupData`: a term for every field of every embedded product-group schema
+version, at the position the field occupies. It defines nothing beneath the other
+envelope keys: the keys inside `manufacturer`, `materials`, `applicableInstruments`,
+`co2ePerUnit` and `repairabilityScore` have no term, and a processor drops them.
+They are allowed below as `NESTED_UNDEFINED`, and they are the register row's
+stated deviation. The allowance is checked both ways: any other drop fails, and
+the day the context defines those terms the allowance is reported as stale and
+has to be deleted. **Nothing under `productGroupData` is allowed**, so a field a
+schema declares and the context does not reach fails here by path.
+
+The corpus holds two framed passports for each product group: one whose
+`productGroupData` is the group's fixture, which carries the fields a passport
+must have, and one for **every embedded schema version** carrying every field
+that schema declares. Only the second says anything about optional fields and the
+objects nested in them.
 
 **Passing this is conformance of the documents, not of the vocabulary.** It says
 a JSON-LD 1.1 processor accepts the documents and loses nothing outside the
@@ -91,12 +100,16 @@ VENDORED = {
 }
 
 # What a framed passport's context does not define: any key nested below an
-# envelope key, except beneath `productGroupData.productIdentifier`, which has a
-# scoped context, and `personalData`, which is kept whole as a JSON literal.
+# envelope key, except beneath `productGroupData`, whose fields all have terms,
+# and `personalData`, which is kept whole as a JSON literal.
 NESTED_UNDEFINED = (
-    "keys nested below an envelope key of a framed passport, including every key "
-    "of productGroupData except productIdentifier"
+    "keys nested below an envelope key of a framed passport other than "
+    "productGroupData"
 )
+
+# Envelope keys whose members the context does define, so a drop beneath one is a
+# defect and never the known gap.
+DEFINED_BELOW = ("personalData", "productGroupData")
 
 
 def is_nested_undefined(label: str, path: str) -> bool:
@@ -105,9 +118,7 @@ def is_nested_undefined(label: str, path: str) -> bool:
     parts = path.strip("/").split("/")
     if len(parts) < 2:
         return False
-    if parts[0] == "personalData":
-        return False
-    return not (parts[0] == "productGroupData" and parts[1] == "productIdentifier")
+    return parts[0] not in DEFINED_BELOW
 
 
 ABSOLUTE_IRI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")

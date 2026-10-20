@@ -13,6 +13,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Fixed
+
+- **A framed passport's JSON-LD no longer drops everything a product group
+  adds.** The context defined a term for the product identifier beneath
+  `productGroupData` and for nothing else there, so a JSON-LD 1.1 processor
+  dropped every other key, and everything inside it: the chemistry of a battery,
+  the composition of a textile. A consumer reading the `ld+json` form saw the
+  envelope and none of the product data. `productGroupData` now carries a scoped
+  context holding a term for every field of every embedded product-group schema
+  version, at the position the field occupies. (#487)
+  - The terms are **generated from the schemas** whenever the context is built,
+    not listed, so a field added to an embedded schema has a term without anyone
+    writing one. A schema construct the reader does not follow
+    (`patternProperties`, a conditional, a map keyed by the document, a recursive
+    reference) fails the build instead of leaving fields without terms.
+  - A term's IRI is `dpp:productGroupData.` and the field's dotted path, such as
+    `dpp:productGroupData.anodeMaterial.name`. It names this library's concept and
+    nothing about any other vocabulary. The IRI identifies a position in the group
+    data, not a group, so two groups that declare the same field at the same path
+    share one term.
+  - Every scope sets `@propagate: false`, so a term is active at exactly the
+    position its key occupies and not beneath it. `productIdentifier`, whose terms
+    are written by hand because `gtin` names GS1's vocabulary, is unchanged.
+  - **The context is larger.** It is inline in every framed passport and grows
+    from about 1.6 KB to about 21.6 KB, or 0.6 KB to 3.6 KB compressed. Hosting it
+    at a URL would avoid that, and is a commitment this crate does not make.
+  - `jsonld_product_group_terms.rs` holds the context to the schemas without the
+    generator's help: every field of every schema version has a term at its
+    position, and every term is a field of some schema. The PyLD oracle now also
+    expands, for every embedded schema version, a framed passport carrying every
+    field that schema declares, and allows nothing dropped beneath
+    `productGroupData`.
+  - **A narrower gap remains, and is listed.** The keys inside `manufacturer`,
+    `materials`, `applicableInstruments`, `co2ePerUnit` and `repairabilityScore`
+    still have no term and are still dropped. The register's JSON-LD row records
+    exactly that.
+
 ## [0.22.0] - 2026-10-16
 
 ### Breaking
