@@ -10,7 +10,7 @@ use serde_json::json;
 
 use super::jwt_tests::{BASE_URL, ISSUER_DID, KEY_ID, credential_from, signed};
 use crate::credential::{
-    AuthenticationFailure, authenticate_access_credential,
+    AuthenticationFailure, VerificationResult, authenticate_access_credential,
     authenticate_access_credential_with_reason,
 };
 use crate::did_builder::build_did_document;
@@ -64,8 +64,8 @@ fn each_refusal_is_its_own_reason() {
     assert_eq!(
         authenticate_access_credential_with_reason(&good, &empty),
         Err(AuthenticationFailure::NoMatchingKey {
-            document: ISSUER_DID.to_owned(),
-            kid: s.kid.clone(),
+            document: Some(ISSUER_DID.to_owned()),
+            kid: Some(s.kid.clone()),
         })
     );
 
@@ -132,55 +132,133 @@ fn a_kid_that_is_a_bare_fingerprint_names_no_key() {
     assert_eq!(
         authenticate_access_credential_with_reason(&jws, &s.doc),
         Err(AuthenticationFailure::NoMatchingKey {
-            document: ISSUER_DID.to_owned(),
-            kid: fingerprint.to_owned(),
+            document: Some(ISSUER_DID.to_owned()),
+            kid: Some(fingerprint.to_owned()),
         })
     );
 }
 
-/// The two functions are one check. The untyped one is the typed one with the
-/// reason folded into a [`VerificationResult`], so a token cannot pass one and be
-/// refused by the other, and the prose a caller already shows is unchanged.
+/// The untyped function answers every token as it did before the reason had a
+/// type: the same [`VerificationResult`] variant and the same prose, so a caller
+/// that already shows it sees no change.
+///
+/// Each expected answer is written out rather than derived from the typed
+/// function. The untyped one is defined as the typed one folded, so comparing
+/// the two would pass whatever the folding did; only a pinned answer catches a
+/// refusal moved to another variant or reworded.
 #[test]
-fn the_untyped_function_is_the_typed_one_folded() {
+fn the_untyped_function_answers_as_it_always_has() {
     let s = signer("jwt-agree");
     let credential = serde_json::to_value(credential_from(ISSUER_DID)).expect("serialise");
+    let good = signed(&s.store, &credential, &s.kid, Some("vc+jwt"), Some("vc"));
     let empty = json!({ "id": ISSUER_DID, "verificationMethod": [] });
+    let no_id = json!({ "verificationMethod": [] });
     let other_store = temp_store("jwt-agree-other", KEY_ID);
     let other_doc =
         build_did_document(&other_store, "https://other.example", KEY_ID).expect("did document");
 
-    let tokens = [
-        signed(&s.store, &credential, &s.kid, Some("vc+jwt"), Some("vc")),
-        signed(&s.store, &credential, &s.kid, None, None),
-        signed(
-            &s.store,
-            &json!({ "hello": "world" }),
-            &s.kid,
-            Some("vc+jwt"),
-            Some("vc"),
+    // A key matches and the bytes it signed were changed.
+    let mut tampered: Vec<String> = good.split('.').map(String::from).collect();
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let mut payload: serde_json::Value =
+        serde_json::from_slice(&b64.decode(&tampered[1]).expect("payload decodes")).expect("json");
+    payload["credentialSubject"]["role"] = json!("recycler");
+    tampered[1] = b64.encode(serde_json::to_vec(&payload).expect("re-encode"));
+    let tampered = tampered.join(".");
+
+    let no_key = |document: &str, kid: &str| {
+        Err(VerificationResult::InvalidSignature(format!(
+            "the DID document for {document} publishes no key matching kid {kid}"
+        )))
+    };
+    let cases = [
+        ("authenticates", &good, &s.doc, Ok(ISSUER_DID.to_owned())),
+        ("no key", &good, &empty, no_key(ISSUER_DID, &s.kid)),
+        (
+            "another DID's document",
+            &good,
+            &other_doc,
+            no_key("did:web:other.example", &s.kid),
         ),
-        "not-a-jws".to_owned(),
-        "a.b.c".to_owned(),
+        (
+            "a document with no id",
+            &good,
+            &no_id,
+            no_key("(no id)", &s.kid),
+        ),
+        (
+            "a signature that does not verify",
+            &tampered,
+            &s.doc,
+            Err(VerificationResult::InvalidSignature(
+                "signature did not verify against the issuer's published key".to_owned(),
+            )),
+        ),
+        (
+            "not typed as a credential",
+            &signed(&s.store, &credential, &s.kid, None, None),
+            &s.doc,
+            Err(VerificationResult::InvalidSignature(
+                "the token's typ is absent, not vc+jwt".to_owned(),
+            )),
+        ),
+        (
+            "not a JWS",
+            &"not-a-jws".to_owned(),
+            &s.doc,
+            no_key(ISSUER_DID, "(none)"),
+        ),
+        (
+            "an unreadable header",
+            &"a.b.c".to_owned(),
+            &s.doc,
+            no_key(ISSUER_DID, "(none)"),
+        ),
     ];
-    for jws in &tokens {
-        for doc in [&s.doc, &empty, &other_doc] {
-            let untyped = authenticate_access_credential(jws, doc).map(|c| c.issuer);
-            let typed = authenticate_access_credential_with_reason(jws, doc)
-                .map(|c| c.issuer)
-                .map_err(AuthenticationFailure::into_verification_result);
-            assert_eq!(untyped, typed, "{jws:?} against {doc}");
-        }
+    for (case, jws, doc, expected) in cases {
+        assert_eq!(
+            authenticate_access_credential(jws, doc).map(|c| c.issuer),
+            expected,
+            "{case}"
+        );
     }
 
-    // …and the prose is what it always was.
-    let reason =
-        authenticate_access_credential_with_reason(&tokens[0], &empty).expect_err("no key to find");
+    // The payload's own error text is serde's, so only its variant and the
+    // sentence it opens with are this crate's to pin.
+    let not_a_credential = signed(
+        &s.store,
+        &json!({ "hello": "world" }),
+        &s.kid,
+        Some("vc+jwt"),
+        Some("vc"),
+    );
+    assert!(matches!(
+        authenticate_access_credential(&not_a_credential, &s.doc),
+        Err(VerificationResult::MalformedCredential(reason))
+            if reason.starts_with("payload is not a credential: ")
+    ));
+}
+
+/// A token with no `kid`, checked against a document with no `id`, is refused
+/// with neither: the typed reason says each is absent rather than carrying the
+/// placeholder the prose prints for it.
+#[test]
+fn an_absent_kid_and_document_id_are_absent() {
+    let failure = authenticate_access_credential_with_reason(
+        "not-a-jws",
+        &json!({ "verificationMethod": [] }),
+    )
+    .expect_err("there is no key to find");
+
     assert_eq!(
-        reason.to_string(),
-        format!(
-            "the DID document for {ISSUER_DID} publishes no key matching kid {}",
-            s.kid
-        )
+        failure,
+        AuthenticationFailure::NoMatchingKey {
+            document: None,
+            kid: None,
+        }
+    );
+    assert_eq!(
+        failure.to_string(),
+        "the DID document for (no id) publishes no key matching kid (none)"
     );
 }

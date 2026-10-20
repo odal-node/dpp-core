@@ -71,6 +71,12 @@ pub trait RegistrySyncPort: Send + Sync {
     /// which is what the registry reports each passport against, and answers
     /// with the handle and what became of the submission.
     ///
+    /// The registry's *unique product identifier* is that URL, not
+    /// [`product_identifier`](RegistrationRequest::product_identifier), which is
+    /// the EN 18219 clause 5 value the request also carries. The two are
+    /// different values, so a match on `product_identifier` would never find the
+    /// submission.
+    ///
     /// 🚨 A match is by that identifier and nothing else, and an identifier is
     /// not unique to a passport: a successor can be submitted under its
     /// predecessor's. When more than one submission reports it the answer is

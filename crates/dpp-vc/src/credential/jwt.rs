@@ -161,26 +161,38 @@ fn header_type_refusal(jws: &str) -> Option<String> {
 /// [`authenticate_access_credential`] has always carried, so the two functions
 /// agree on it, and [`into_verification_result`](Self::into_verification_result)
 /// is the mapping that function applies.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum AuthenticationFailure {
     /// The token is not a compact JWS: it has no payload segment.
+    #[error("not a compact JWS")]
     NotACompactJws,
     /// The issuer's DID document publishes no key the token's `kid` names, or
     /// the document is for a different DID than the `kid` is.
     ///
     /// Every token signed before keys were named by thumbprint ends here: its
     /// `kid` is a bare fingerprint, which no document names.
+    ///
+    /// Both fields are `None` when the token or the document does not carry
+    /// one, so a missing `kid` is not mistaken for one that is spelled
+    /// `(none)`. Only [`Display`](std::fmt::Display) writes the placeholders.
+    #[error(
+        "the DID document for {} publishes no key matching kid {}",
+        .document.as_deref().unwrap_or("(no id)"),
+        .kid.as_deref().unwrap_or("(none)")
+    )]
     NoMatchingKey {
-        /// The `id` of the document that was checked.
-        document: String,
-        /// The `kid` the token carries, or `(none)`.
-        kid: String,
+        /// The `id` of the document that was checked, if it has one.
+        document: Option<String>,
+        /// The `kid` the token carries, if it carries one.
+        kid: Option<String>,
     },
     /// A key matched and the signature does not verify against it.
+    #[error("signature did not verify against the issuer's published key")]
     SignatureDoesNotVerify,
     /// The token could not be verified at all: an unreadable protected header,
     /// an algorithm the verifier does not accept, or a malformed signature.
+    #[error("{reason}")]
     Unverifiable {
         /// What the verifier reported.
         reason: String,
@@ -190,17 +202,22 @@ pub enum AuthenticationFailure {
     ///
     /// A signature of another kind by the same key, a passport proof or an
     /// SD-JWT VC, is authentic and still not a credential.
+    #[error("{reason}")]
     NotTypedAsCredential {
         /// Which header member failed, and what it said.
         reason: String,
     },
     /// The payload is not a credential: not base64url, or not the document.
+    #[error("{reason}")]
     MalformedPayload {
         /// What was wrong with it.
         reason: String,
     },
     /// The credential names an issuer other than the DID document it was
     /// checked against.
+    #[error(
+        "credential names issuer {claimed} but was checked against the DID document for {document}"
+    )]
     IssuerMismatch {
         /// The issuer the credential claims.
         claimed: String,
@@ -208,30 +225,6 @@ pub enum AuthenticationFailure {
         document: String,
     },
 }
-
-impl std::fmt::Display for AuthenticationFailure {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NotACompactJws => f.write_str("not a compact JWS"),
-            Self::NoMatchingKey { document, kid } => write!(
-                f,
-                "the DID document for {document} publishes no key matching kid {kid}"
-            ),
-            Self::SignatureDoesNotVerify => {
-                f.write_str("signature did not verify against the issuer's published key")
-            }
-            Self::Unverifiable { reason }
-            | Self::NotTypedAsCredential { reason }
-            | Self::MalformedPayload { reason } => f.write_str(reason),
-            Self::IssuerMismatch { claimed, document } => write!(
-                f,
-                "credential names issuer {claimed} but was checked against the DID document for {document}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for AuthenticationFailure {}
 
 impl AuthenticationFailure {
     /// The [`VerificationResult`] [`authenticate_access_credential`] reports this
@@ -305,9 +298,8 @@ pub fn authenticate_access_credential_with_reason(
             document: issuer_did_document
                 .get("id")
                 .and_then(serde_json::Value::as_str)
-                .unwrap_or("(no id)")
-                .to_owned(),
-            kid: extract_kid_from_jws(jws).unwrap_or_else(|| "(none)".to_owned()),
+                .map(str::to_owned),
+            kid: extract_kid_from_jws(jws),
         }
     })?;
 

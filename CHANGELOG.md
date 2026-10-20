@@ -64,7 +64,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `MalformedPayload`, `IssuerMismatch` and `NotACompactJws`. It runs the same
   checks in the same order, and `authenticate_access_credential` is now that
   function with the reason folded into a `VerificationResult`, with the same
-  prose, so the two cannot disagree about a token.
+  prose, so the two cannot disagree about a token. `NoMatchingKey`'s `document`
+  and `kid` are `None` when the document has no `id` or the token no `kid`; the
+  prose still prints `(no id)` and `(none)` for them.
 
 ## [0.22.0] - 2026-10-16
 
