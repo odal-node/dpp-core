@@ -326,6 +326,66 @@ fn a_carrier_shaped_value_with_nothing_to_resolve_is_refused() {
     }
 }
 
+/// The messages the plugin reports for `identifier`, in order.
+fn pi_messages(identifier: Value) -> Vec<String> {
+    let input = json!({ "productIdentifier": identifier });
+    match crate::validate::Validator::new(&input)
+        .require_product_identifier("productIdentifier")
+        .finish()
+    {
+        Ok(()) => vec![],
+        Err(PluginError::ValidationErrors(errors)) => {
+            errors.into_iter().map(|e| e.message).collect()
+        }
+        Err(other) => panic!("unexpected error: {other:?}"),
+    }
+}
+
+/// 🚨 A link outside printable ASCII is refused with its remedy, the same as the
+/// domain type refuses it, and never converted.
+///
+/// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string. The
+/// plugin is the first thing to see product group data, so a link it accepted
+/// would be stored under two spellings, raw and percent-encoded, as if they were
+/// two identifiers.
+#[test]
+fn a_link_outside_printable_ascii_is_refused_with_its_remedy() {
+    for (url, remedy) in [
+        // A raw non-ASCII host: written in punycode instead.
+        ("https://exämple.com/item", "punycode"),
+        // A raw non-ASCII path: percent-encoded.
+        ("https://example.com/ü", "percent-encode"),
+        // The same two elsewhere in the link.
+        ("https://example.com/?q=é", "percent-encode"),
+        ("https://üser@example.com/", "percent-encode"),
+        ("https://user@exämple.com/", "punycode"),
+    ] {
+        assert_eq!(
+            pi_errors(json!({ "scheme": "identificationLink", "url": url })),
+            vec![("/productIdentifier/url".to_owned(), "format".to_owned())],
+            "{url} is not printable ASCII"
+        );
+        let messages = pi_messages(json!({ "scheme": "identificationLink", "url": url }));
+        assert!(
+            messages[0].contains(remedy),
+            "the message for {url} does not name the remedy ({remedy}): {}",
+            messages[0]
+        );
+    }
+
+    // The same links written as the standard asks are accepted.
+    for url in [
+        "https://example.com/%C3%BC",
+        "https://xn--exmple-cua.com/item",
+        "https://xn--exmple-cua.com/%C3%BC?q=%C3%A9",
+    ] {
+        assert!(
+            pi_errors(json!({ "scheme": "identificationLink", "url": url })).is_empty(),
+            "{url} is printable ASCII and was refused"
+        );
+    }
+}
+
 #[test]
 fn an_unmapped_scheme_is_refused_rather_than_skipped() {
     // 🚨 The `passport_id` case. A scheme nobody has mapped is where an
