@@ -7,7 +7,7 @@ use crate::{
 };
 use chrono::Utc;
 
-fn make_published_passport() -> Passport {
+pub(super) fn make_published_passport() -> Passport {
     Passport {
         product_name: "Test".into(),
         manufacturer: ManufacturerInfo {
@@ -42,7 +42,7 @@ fn make_published_passport() -> Passport {
 }
 
 /// The operator identity a test registration is filed under.
-fn acme() -> RegisteringOperator<'static> {
+pub(super) fn acme() -> RegisteringOperator<'static> {
     RegisteringOperator {
         legal_name: "Acme GmbH",
         country: "DE",

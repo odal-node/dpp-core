@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::error::dpp::DppError;
 use crate::ports::registry_sync::{
     RegistrationRequest, RegistryRecord, RegistrySyncPort, SubmissionAcknowledgement,
-    SubmissionReport,
+    SubmissionConfirmation, SubmissionLookup, SubmissionReport, TransferReport,
 };
 
 /// No-op implementation for use before a deployment is enrolled with the EU
@@ -35,6 +35,25 @@ impl RegistrySyncPort for GhostRegistrySync {
         )))
     }
 
+    /// Nothing was ever submitted, so there is nothing to find, and all of it was
+    /// read.
+    async fn find_submission(
+        &self,
+        _request: &RegistrationRequest,
+    ) -> Result<SubmissionLookup, DppError> {
+        Ok(SubmissionLookup::NotFound { exhaustive: true })
+    }
+
+    /// Nothing was ever submitted, so no handle names anything, and all of it was
+    /// read.
+    async fn confirm_submission(
+        &self,
+        _request: &RegistrationRequest,
+        _correlation_id: &str,
+    ) -> Result<SubmissionConfirmation, DppError> {
+        Ok(SubmissionConfirmation::Unlisted { exhaustive: true })
+    }
+
     async fn check_status(&self, registration_id: &str) -> Result<RegistryRecord, DppError> {
         Err(DppError::NotFound(format!(
             "ghost registry has no record {registration_id}"
@@ -45,7 +64,7 @@ impl RegistrySyncPort for GhostRegistrySync {
         &self,
         record: &crate::transfer::TransferRecord,
         _registration_id: &str,
-    ) -> Result<RegistryRecord, DppError> {
+    ) -> Result<TransferReport, DppError> {
         Err(DppError::NotFound(format!(
             "ghost registry has no record for {}",
             record.passport_id

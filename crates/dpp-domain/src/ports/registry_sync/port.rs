@@ -3,9 +3,12 @@
 use async_trait::async_trait;
 
 use super::acknowledgement::SubmissionAcknowledgement;
+use super::confirmation::SubmissionConfirmation;
+use super::lookup::SubmissionLookup;
 use super::record::RegistryRecord;
 use super::report::SubmissionReport;
 use super::request::RegistrationRequest;
+use super::transfer_report::TransferReport;
 use crate::error::DppError;
 
 /// Port trait for synchronising DPP records with the EU Central Registry.
@@ -25,6 +28,11 @@ use crate::error::DppError;
 ///   identifier;
 /// - [`check_submission`](Self::check_submission) polls the submission by it,
 ///   and answers with the registration identifier once there is one;
+/// - [`find_submission`](Self::find_submission) recovers the correlation
+///   identifier when a replayed key says the registry already holds the
+///   submission and does not say under which handle;
+/// - [`confirm_submission`](Self::confirm_submission) checks a handle a person
+///   supplied when that recovery could not settle it;
 /// - [`check_status`](Self::check_status) and
 ///   [`notify_transfer`](Self::notify_transfer) act on the registered record by
 ///   its registration identifier.
@@ -54,6 +62,71 @@ pub trait RegistrySyncPort: Send + Sync {
     /// assigned it.
     async fn check_submission(&self, correlation_id: &str) -> Result<SubmissionReport, DppError>;
 
+    /// Find the submission a request made, when its correlation identifier is no
+    /// longer held.
+    ///
+    /// For a caller that was told
+    /// [`AlreadyHeld`](SubmissionAcknowledgement::AlreadyHeld): the registry has
+    /// the submission and a replayed key does not say under which handle. An
+    /// adapter that can read the registry's record of the operator's requests
+    /// matches `request` to it by the unique product identifier the passport was
+    /// submitted under, [`data_carrier_uri`](RegistrationRequest::data_carrier_uri),
+    /// which is what the registry reports each passport against, and answers
+    /// with the handle and what became of the submission.
+    ///
+    /// The registry's *unique product identifier* is that URL, not
+    /// [`product_identifier`](RegistrationRequest::product_identifier), which is
+    /// the EN 18219 clause 5 value the request also carries. The two are
+    /// different values, so a match on `product_identifier` would never find the
+    /// submission.
+    ///
+    /// 🚨 A match is by that identifier and nothing else, and an identifier is
+    /// not unique to a passport: a successor can be submitted under its
+    /// predecessor's. When more than one submission reports it the answer is
+    /// [`Ambiguous`](SubmissionLookup::Ambiguous), never the nearest in time or
+    /// position, which would give a passport another passport's registration.
+    ///
+    /// The default answers [`Unsupported`](SubmissionLookup::Unsupported), so an
+    /// adapter written before this method existed still compiles and a caller
+    /// treats it as it always did.
+    async fn find_submission(
+        &self,
+        _request: &RegistrationRequest,
+    ) -> Result<SubmissionLookup, DppError> {
+        Ok(SubmissionLookup::Unsupported)
+    }
+
+    /// Whether a correlation identifier a person supplied is this request's
+    /// submission.
+    ///
+    /// For a caller whose [`find_submission`](Self::find_submission) could not
+    /// settle the matter, because several submissions report the identifier or
+    /// none could be placed, and who has been given the handle by someone reading
+    /// the registry's own interface. A handle taken on trust can give a passport
+    /// another passport's registration, so it is read back from the registry and
+    /// checked against what `request` submitted.
+    ///
+    /// 🚨 The check is by the unique product identifier the passport was
+    /// submitted under, [`data_carrier_uri`](RegistrationRequest::data_carrier_uri),
+    /// and an identifier is not unique to a passport: a successor can be
+    /// submitted under its predecessor's. So
+    /// [`Confirmed`](SubmissionConfirmation::Confirmed) says the submission
+    /// *reports* this identifier, which is as much as the registry says, and a
+    /// caller that has a predecessor and a successor under one identifier is
+    /// still choosing between them. What it rules out is a handle that names a
+    /// submission carrying a different identifier altogether.
+    ///
+    /// The default answers [`Unsupported`](SubmissionConfirmation::Unsupported),
+    /// so an adapter written before this method existed still compiles and a
+    /// caller does not record a handle it could not check.
+    async fn confirm_submission(
+        &self,
+        _request: &RegistrationRequest,
+        _correlation_id: &str,
+    ) -> Result<SubmissionConfirmation, DppError> {
+        Ok(SubmissionConfirmation::Unsupported)
+    }
+
     /// The current state of a registered passport, by its registration
     /// identifier (IR (EU) 2026/1778 Art. 8(8)).
     async fn check_status(&self, registration_id: &str) -> Result<RegistryRecord, DppError>;
@@ -75,9 +148,21 @@ pub trait RegistrySyncPort: Send + Sync {
     /// passing only the new identifier left an adapter no way to express the
     /// outgoing operator or either signature, so it could only send empty
     /// strings for data the system had already collected.
+    ///
+    /// The answer is a [`TransferReport`], not a [`RegistryRecord`]: a
+    /// notification amends a record, so what the registry says about it is
+    /// whether it took the notification, not where a registration stands.
+    ///
+    /// 🚨 **An adapter sends [`record.transfer_id`](crate::transfer::TransferRecord::transfer_id)
+    /// as the registry's idempotency key.** Three answers
+    /// ([`Processing`](TransferReport::Processing),
+    /// [`Unrecognised`](TransferReport::Unrecognised) and an error) end in a
+    /// caller sending the notification again, and the key is what makes that the
+    /// same notification and not a second one. A caller that retries over an
+    /// adapter that does not send one is sending duplicates.
     async fn notify_transfer(
         &self,
         record: &crate::transfer::TransferRecord,
         registration_id: &str,
-    ) -> Result<RegistryRecord, DppError>;
+    ) -> Result<TransferReport, DppError>;
 }

@@ -161,7 +161,8 @@ pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
 pub use ports::personal_data::{ErasureReceipt, HeldRecord, PersonalDataPort, PersonalDataRecord};
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryRecord, RegistryStatus, RegistrySyncPort,
-    SubmissionAcknowledgement, SubmissionReport,
+    SubmissionAcknowledgement, SubmissionConfirmation, SubmissionLookup, SubmissionReport,
+    TransferReport,
 };
 
 pub use passthrough::{
