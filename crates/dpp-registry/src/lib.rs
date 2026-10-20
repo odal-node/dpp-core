@@ -98,7 +98,7 @@ pub use basis::RegistryBasis;
 pub use endpoint::{
     ENDPOINT_BASIS, IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH,
     RegistryAuthority, RegistryEndpoint, STATUS_PATH_TEMPLATE, TASK_RESULT_PATH_TEMPLATE,
-    TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
+    TASKS_PATH, TASKS_SORT_NEWEST_FIRST, TOKEN_PATH, TRANSFER_PATH_TEMPLATE,
 };
 pub use error::{
     EuRegistryError, EuRegistryErrorKind, RegistryErrorBody, RegistryValidationError,
