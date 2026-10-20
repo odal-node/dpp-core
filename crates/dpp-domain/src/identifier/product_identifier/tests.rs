@@ -55,6 +55,106 @@ fn an_identification_link_must_be_an_absolute_web_url() {
     assert!(ProductIdentifier::identification_link("http://example.com/p/1").is_ok());
 }
 
+/// 🚨 An identification link is printable ASCII, and it is refused rather than
+/// converted.
+///
+/// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string, and
+/// as a URI it is percent-encoded. Both of these were accepted: each has a host
+/// and no whitespace. A link stored raw and the same link stored percent-encoded
+/// would then be two identifiers for one product.
+#[test]
+fn an_identification_link_outside_printable_ascii_is_refused_with_its_remedy() {
+    // A raw non-ASCII host: punycode is the remedy, and the error says so.
+    let host = ProductIdentifier::identification_link("https://exämple.com/item")
+        .expect_err("a Unicode host is not ASCII");
+    assert_eq!(
+        host,
+        ProductIdentifierError::NonAsciiHost {
+            url: "https://exämple.com/item".into(),
+            character: 'ä',
+        }
+    );
+    assert!(host.to_string().contains("punycode"), "{host}");
+
+    // A raw non-ASCII path: percent-encoding is the remedy.
+    let path = ProductIdentifier::identification_link("https://example.com/ü")
+        .expect_err("a raw non-ASCII path is not ASCII");
+    assert_eq!(
+        path,
+        ProductIdentifierError::NotPrintableAscii {
+            url: "https://example.com/ü".into(),
+            character: 'ü',
+        }
+    );
+    assert!(path.to_string().contains("percent-encode"), "{path}");
+
+    // Written as the standard asks, both are accepted, and stored as given.
+    for url in [
+        "https://example.com/%C3%BC",
+        "https://xn--exmple-cua.com/item",
+    ] {
+        let link = ProductIdentifier::identification_link(url).expect("printable ASCII");
+        assert_eq!(
+            link.as_str(),
+            url,
+            "the stored identifier is the printed one"
+        );
+    }
+}
+
+/// 🚨 Reading a document is not issuing an identifier: a link outside printable
+/// ASCII is refused by the constructor and **still read** from a document, as it
+/// is, never converted.
+///
+/// The product identifier is in the signed public view, so a passport carrying one
+/// can arrive from another operator, signed and unrewritable. A reader that
+/// refused it would refuse correct data permanently, and report a node that has not
+/// upgraded as having tampered with it. The fetched side decides, because it is
+/// the stricter. A stored document is not turned away either; the plugin refuses
+/// the link the next time the passport is written, naming the field and the
+/// remedy.
+#[test]
+fn a_document_carrying_a_non_ascii_link_is_still_read_as_it_is() {
+    for url in [
+        "https://exämple.com/item",
+        "https://example.com/ü",
+        "https://example.com/\u{7f}",
+    ] {
+        assert!(
+            ProductIdentifier::identification_link(url).is_err(),
+            "the constructor accepted {url}"
+        );
+        let read: ProductIdentifier =
+            serde_json::from_value(json!({"scheme": "identificationLink", "url": url}))
+                .unwrap_or_else(|e| panic!("{url} no longer reads: {e}"));
+        assert_eq!(read.as_str(), url, "reading must not convert the link");
+        assert_eq!(
+            serde_json::to_value(&read).expect("serialises"),
+            json!({"scheme": "identificationLink", "url": url}),
+            "and writing it back must not either: a signed document stays byte-for-byte"
+        );
+    }
+}
+
+/// What reading has always refused, it still refuses: a value that is not a web
+/// URL at all has nothing for a reader to resolve.
+#[test]
+fn a_document_carrying_a_link_that_is_not_a_web_url_is_still_refused() {
+    for url in [
+        "https:///ü",
+        "ftp://example.com/p/1",
+        "https://exa mple.com/",
+    ] {
+        assert!(
+            serde_json::from_value::<ProductIdentifier>(
+                json!({"scheme": "identificationLink", "url": url})
+            )
+            .is_err(),
+            "{url} read"
+        );
+    }
+}
+
 /// Clause 5 names `web`, `ethr` and `ebsi`. A method outside that set is refused
 /// rather than carried: an identifier nobody can resolve points at no passport,
 /// and accepting it would let one be created that is unreachable by design.

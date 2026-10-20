@@ -278,7 +278,11 @@ fn every_passport_wire_key_has_a_term() {
 fn every_term_in_our_namespace_is_named_after_its_key() {
     let mut checked = 0usize;
     for (term, target) in term_map() {
-        let Some(local) = target.as_str().and_then(|t| t.strip_prefix("dpp:")) else {
+        // A term that has a scope, or is typed, is an object whose IRI is its `@id`.
+        let iri = target
+            .as_str()
+            .or_else(|| target.get("@id").and_then(serde_json::Value::as_str));
+        let Some(local) = iri.and_then(|t| t.strip_prefix("dpp:")) else {
             continue;
         };
         checked += 1;

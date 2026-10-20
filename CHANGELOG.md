@@ -39,6 +39,37 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **The registry's web client was read again (2026-10-20), and the task list's
+  sort is now a constant.** Both the acceptance and the production build of the
+  client were read; their API surface is identical, twenty-one calls. What it
+  settles:
+
+  *The dashboard's sort syntax.* `sort` is `<field>,<direction>`, and the client
+  asks for `submittedAt,desc` on every read until a column is chosen, so a task
+  just submitted is on the first page. That value is now
+  `TASKS_SORT_NEWEST_FIRST`, `Observed` in `ENDPOINT_BASIS`, so a caller can ask
+  for newest first and read the front of a long list rather than both ends of
+  it. The offered columns are `submittedAt`, `type`, `displayName` and `status`,
+  pages count from `0`, and a read that sends no `sort` is not observed. The
+  constant's docs say the client's request is not a promise about what the
+  registry honours, so a caller relying on the order checks it.
+
+  *What it does not settle, and cannot.* The client has no call that transfers
+  responsibility for a passport and none that reads a registered record, so
+  `TRANSFER_PATH_TEMPLATE` and `STATUS_PATH_TEMPLATE` stay `Assumed` and their
+  docs now say they were looked for again and are absent. A transfer
+  notification's reply is therefore not observable from this source, and neither
+  is whether that route honours an idempotency key: the header is set by one
+  interceptor, on `POST`s to the enrolment and registration paths only, and the
+  docs on `IDEMPOTENCY_KEY_HEADER` now say exactly that, and that a key names one
+  body.
+
+  `LAST_READ`, which dates every `Observed` route and header in the table, is
+  now `2026-10-20`. It dates the routes and the header only: the response
+  fields, status vocabularies and error codes documented beside them were read
+  on 2026-10-14 and keep that date, since a response is shown only to a
+  signed-in session.
+
 - **`RegistrySyncPort::find_submission` recovers a submission whose handle was
   lost.** `SubmissionAcknowledgement::AlreadyHeld` leaves a caller with a
   submission it cannot poll: a replayed key is answered with the conflict and not
@@ -84,7 +115,108 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `MalformedPayload`, `IssuerMismatch` and `NotACompactJws`. It runs the same
   checks in the same order, and `authenticate_access_credential` is now that
   function with the reason folded into a `VerificationResult`, with the same
-  prose, so the two cannot disagree about a token.
+  prose, so the two cannot disagree about a token. `NoMatchingKey`'s `document`
+  and `kid` are `None` when the document has no `id` or the token no `kid`; the
+  prose still prints `(no id)` and `(none)` for them.
+
+### Fixed
+
+- **An identification link with a non-ASCII character passed validation.**
+  `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
+  EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing
+  looked at what the characters were. EN 18219:2026 clause 4.3.2 makes a unique
+  identifier an ISO/IEC 646 string and, as a URI, percent-encoded, and a link
+  stored raw and the same link stored percent-encoded would be two identifiers for
+  one product. Both are now refused, **with the remedy and without converting
+  anything**, because the identifier stored has to be the one that is printed: a
+  non-ASCII character in the host is written in its ASCII (punycode) form, and any
+  other character outside printable ASCII is percent-encoded. (#489)
+  - `dpp_rules::common::identifier::check_web_url` says which rule a link breaks,
+    in a `WebUrlRejection`, as `check_did` does for a DID. `is_absolute_web_url` is
+    now `check_web_url(url).is_ok()`, so it too is false for these.
+    `ProductIdentifier::identification_link` and the plugin SDK both use it.
+  - `ProductIdentifierError` gains `NonAsciiHost` and `NotPrintableAscii`, each
+    carrying the link and the first character at fault. The enum is
+    `#[non_exhaustive]`, so this is not breaking.
+  - **Reading is not issuing.** A document carrying such a link still **reads**,
+    as it is. The product identifier is in the signed public view, so a passport
+    carrying one can arrive from another operator, signed and unrewritable, and a
+    reader that refused it would refuse correct data permanently and report a node
+    that had not upgraded as having tampered with it. The plugin refuses the link
+    the next time the passport is written, naming the field and the remedy. A
+    value that is not a web URL at all is still refused on read, as it always was.
+    **What this does not cover:** a write path that builds a passport from a body
+    without going through the plugin's validation does not meet the rule, since
+    typed reading cannot tell a write from a read.
+  - **Only printable ASCII is checked.** The rest of RFC 3986 is not: an ASCII
+    character it does not allow unencoded, such as `<` or `|`, is still accepted.
+    Whether plain `http` is admissible and what the structured form requires are
+    EN IEC 61406-1 and -2, which this check does not attempt.
+
+- **A framed passport's JSON-LD no longer drops everything a product group
+  adds.** The context defined a term for the product identifier beneath
+  `productGroupData` and for nothing else there, so a JSON-LD 1.1 processor
+  dropped every other key, and everything inside it: the chemistry of a battery,
+  the composition of a textile. A consumer reading the `ld+json` form saw the
+  envelope and none of the product data. `productGroupData` now carries a scoped
+  context holding a term for every field of every embedded product-group schema
+  version, at the position the field occupies. (#487)
+  - The terms are **generated from the schemas** whenever the context is built,
+    not listed, so a field added to an embedded schema has a term without anyone
+    writing one. A schema construct the reader does not follow
+    (`patternProperties`, a conditional, a map keyed by the document, a recursive
+    reference) fails the build instead of leaving fields without terms.
+  - A term's IRI is `dpp:productGroupData.` and the field's dotted path, such as
+    `dpp:productGroupData.anodeMaterial.name`. It names this library's concept and
+    nothing about any other vocabulary. The IRI identifies a position in the group
+    data, not a group, so two groups that declare the same field at the same path
+    share one term.
+  - Every scope sets `@propagate: false`, so a term is active at exactly the
+    position its key occupies and not beneath it. `productIdentifier`, whose terms
+    are written by hand because `gtin` names GS1's vocabulary, is unchanged.
+  - **The context is larger.** It is inline in every framed passport and grows
+    from about 1.6 KB to about 21.6 KB, or 0.6 KB to 3.6 KB compressed. Hosting it
+    at a URL would avoid that, and is a commitment this crate does not make.
+  - `jsonld_product_group_terms.rs` holds the context to the schemas without the
+    generator's help: every field of every schema version has a term at its
+    position, and every term is a field of some schema. The PyLD oracle now also
+    expands, for every embedded schema version, a framed passport carrying every
+    field that schema declares, and allows nothing dropped beneath
+    `productGroupData`.
+
+- **The members of a framed passport's own objects no longer drop either.** The
+  same defect, one level up. The envelope had a term for `manufacturer`,
+  `materials`, `complianceResult` and every other key, and none for what is
+  inside them, so a processor dropped the manufacturer's name, each material's
+  weight, the findings of a compliance result and everything else nested in the
+  envelope. The oracle listed the five it could see (`manufacturer`, `materials`,
+  `applicableInstruments`, `co2ePerUnit`, `repairabilityScore`); its fixture
+  passport leaves the rest unset, which hid that the gap was wider: the
+  compliance result, the lint result, the facility, the responsible operator, the
+  seal, and the derivation and component references had no terms beneath them
+  either. All twelve now do. (#488)
+  - A term's IRI is `dpp:` and the member's dotted path from the envelope, such
+    as `dpp:manufacturer.name` and `dpp:facility.scheme`, and every scope sets
+    `@propagate: false`, as `productGroupData`'s does. `facility.scheme` and the
+    product identifier's `scheme` are different things and stay different terms.
+  - **Two members are carried whole as JSON literals**, as `personalData` is: the
+    compliance result's `receipt`, which holds whatever a calculation recorded,
+    and `disclosureSignatures`, which is keyed by the path of the field each
+    signature covers. Neither's keys are terms. `disclosureSignatures` was a plain
+    term, so a processor dropped every signature in it and left an empty node.
+  - These objects are Rust types, so the terms are a table
+    (`jsonld/envelope_terms.rs`), not generated. `jsonld_envelope_terms.rs` holds
+    it to a passport whose every nested object has every field set, built as struct
+    literals: a type that gains a field stops compiling there until the field is
+    named, and then the term is what fails. It checks both ways, a member with no
+    term and a term for a member that does not exist.
+  - The PyLD oracle now expands a passport with every nested envelope object set
+    for each responsibility basis, and **allows nothing to drop**: the listed gap
+    and the check that notices when it closes are deleted, and the register's
+    JSON-LD row lists no deviation.
+  - What this cannot see: an enum that carries data and gains a variant this
+    test never builds. `ResponsibilityBasis` is the only one on the envelope, and
+    the test builds every variant it lists.
 
 ## [0.22.0] - 2026-10-16
 

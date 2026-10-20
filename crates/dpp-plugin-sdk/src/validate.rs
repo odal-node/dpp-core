@@ -11,7 +11,7 @@
 //! "measured value at or under threshold" classification they compare against.
 
 use dpp_plugin_traits::{PluginComplianceStatus, PluginError, PluginFieldError, PluginInput};
-use dpp_rules::common::identifier::{DidRejection, check_did, is_absolute_web_url};
+use dpp_rules::common::identifier::{DidRejection, WebUrlRejection, check_did, check_web_url};
 use serde_json::Value;
 
 /// A present, non-null value for `key`, or `None` if absent/null.
@@ -199,11 +199,31 @@ impl<'a> Validator<'a> {
                         "missing",
                         format!("{key}.url is required for scheme identificationLink"),
                     )),
-                    // Checked only to be an absolute http(s) URL with a host.
-                    // EN IEC 61406 format rules are not applied, so passing is
-                    // not a conformance claim — the schema says the same.
-                    Some(u) if is_absolute_web_url(u) => None,
-                    Some(_) => Some(("format", format!("{key}.url must be an absolute URL"))),
+                    // Checked only to be an absolute http(s) URL with a host, in
+                    // printable ASCII. EN IEC 61406 format rules are not applied,
+                    // so passing is not a conformance claim — the schema says the
+                    // same. A character outside ASCII is refused with its remedy
+                    // and never converted: what is stored is what is printed.
+                    Some(u) => match check_web_url(u) {
+                        Ok(()) => None,
+                        Err(WebUrlRejection::NotAnAbsoluteWebUrl) => {
+                            Some(("format", format!("{key}.url must be an absolute URL")))
+                        }
+                        Err(WebUrlRejection::NonAsciiHost(c)) => Some((
+                            "format",
+                            format!(
+                                "{key}.url has a non-ASCII character ({c:?}) in its host; write \
+                                 the host in its ASCII (punycode) form"
+                            ),
+                        )),
+                        Err(WebUrlRejection::NotPrintableAscii(c)) => Some((
+                            "format",
+                            format!(
+                                "{key}.url has a character outside printable ASCII ({c:?}); \
+                                 percent-encode it"
+                            ),
+                        )),
+                    },
                 },
             ),
             "did" => (
