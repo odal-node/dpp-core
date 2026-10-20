@@ -66,6 +66,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     ICD 0199 and nine digits under 0060. A document read from JSON is held to its
     shape only, so a signed passport carrying a value this build would not have
     issued is still read, and `ActorIdentifier::validate` asks again.
+  - **A scheme this build does not know is read, not refused.** Any `scheme` other
+    than `icd` and `gs1`, and a `gs1` identifier under an AI other than 417 or 414,
+    is read as `ActorIdentifier::Unrecognised` and written back member for member,
+    so a passport from a build that knows scheme 8, scheme 9 or AI 416 still reads
+    here and keeps its signed bytes. `validate` refuses it
+    (`ActorIdentifierError::UnrecognisedScheme`), and `en_18219_scheme` and `value`
+    return `None` for it. A known scheme in the wrong shape is still refused.
+  - A facility's malformed LEI or D-U-N-S number is reported as
+    `RegistryValidationError::InvalidFacilityId`, not as a malformed GLN.
   - The ICD is checked for shape, four digits, and not against the Registration
     Authority's list, which this crate does not hold. AI 416, the GLN of a
     production or service location, is left out until something settles whether a

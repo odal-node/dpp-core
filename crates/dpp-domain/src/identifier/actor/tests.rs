@@ -87,8 +87,8 @@ fn a_gln_carries_the_ai_that_says_what_it_names() {
 
     // The same thirteen digits, told apart by the AI and not by where they were found.
     assert_ne!(party, place);
-    assert_eq!(party.value(), GLN);
-    assert_eq!(place.value(), GLN);
+    assert_eq!(party.value(), Some(GLN));
+    assert_eq!(place.value(), Some(GLN));
     assert_eq!(GlnAi::Party.digits(), "417");
     assert_eq!(GlnAi::Location.digits(), "414");
 }
@@ -99,11 +99,11 @@ fn each_identifier_says_which_clause_6_scheme_it_follows() {
         ActorIdentifier::iso6523(Icd::lei(), LEI)
             .expect("an LEI")
             .en_18219_scheme(),
-        6
+        Some(6)
     );
     assert_eq!(
         ActorIdentifier::gs1(GlnAi::Party, gln()).en_18219_scheme(),
-        7
+        Some(7)
     );
 }
 
@@ -147,7 +147,7 @@ fn a_document_is_read_as_it_is_and_its_value_is_checked_when_asked() {
 
     assert_eq!(
         read.value(),
-        "not-an-lei",
+        Some("not-an-lei"),
         "reading must not alter the value"
     );
     assert_eq!(
@@ -158,17 +158,56 @@ fn a_document_is_read_as_it_is_and_its_value_is_checked_when_asked() {
         })
     );
 
-    // The shape still binds: an ICD is four digits, and a GLN is a GLN.
+    // The shape of a known scheme still binds: an ICD is four digits, a GLN is a
+    // GLN, a GLN has its AI, and every identifier names its scheme. No build
+    // writes any of these, so refusing them refuses no one's data.
     for wire in [
         json!({ "scheme": "icd", "icd": "199", "value": "x" }),
         json!({ "scheme": "icd", "icd": "0199" }),
         json!({ "scheme": "gs1", "ai": "417", "gln": "9506000134353" }),
-        json!({ "scheme": "gs1", "ai": "416", "gln": GLN }),
-        json!({ "scheme": "doi", "value": "10.1000/1" }),
+        json!({ "scheme": "gs1", "gln": GLN }),
+        json!({ "icd": "0199", "value": LEI }),
+        json!({ "scheme": 6, "value": LEI }),
     ] {
         assert!(
             serde_json::from_value::<ActorIdentifier>(wire.clone()).is_err(),
             "{wire} was read"
+        );
+    }
+}
+
+/// 🚨 A scheme or an AI this build does not know is read, and written back as it
+/// came.
+///
+/// The identifier is in a passport that can come from a build that knows more
+/// schemes than this one: scheme 8 or 9, or a GLN under AI 416. Refusing it would
+/// refuse the whole passport, which is signed and cannot be rewritten, on nothing
+/// but a version difference. Kept as it came, its signed bytes do not move. It is
+/// not this build's to issue, so `validate` refuses it.
+#[test]
+fn a_scheme_or_an_ai_this_build_does_not_know_is_kept_as_it_came() {
+    for (wire, named) in [
+        (
+            json!({ "scheme": "did", "did": "did:web:acme.example", "credential": { "id": "x" } }),
+            "did",
+        ),
+        (json!({ "scheme": "doi", "value": "10.1000/182" }), "doi"),
+        (
+            json!({ "scheme": "gs1", "ai": "416", "gln": GLN }),
+            "gs1 (AI 416)",
+        ),
+    ] {
+        let read: ActorIdentifier =
+            serde_json::from_value(wire.clone()).expect("a later scheme is read");
+        assert!(matches!(read, ActorIdentifier::Unrecognised(_)), "{wire}");
+        assert_eq!(serde_json::to_value(&read).expect("serialises"), wire);
+        assert_eq!(read.en_18219_scheme(), None);
+        assert_eq!(read.value(), None);
+        assert_eq!(
+            read.validate(),
+            Err(ActorIdentifierError::UnrecognisedScheme {
+                scheme: named.to_owned()
+            })
         );
     }
 }

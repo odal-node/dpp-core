@@ -16,6 +16,10 @@ pub enum RegistryValidationError {
     InvalidGln { value: String, reason: String },
     /// An operator identifier failed the structural/checksum check for its scheme.
     InvalidOperatorId { scheme: String, value: String },
+    /// A facility identifier in a scheme other than `gln` failed the
+    /// structural/checksum check for its scheme, as a malformed LEI or D-U-N-S
+    /// number does. A malformed GLN is [`InvalidGln`](Self::InvalidGln).
+    InvalidFacilityId { scheme: String, value: String },
     /// An operator or facility identifier whose scheme has no EN 18219 clause 6
     /// route this build can establish.
     ///
@@ -147,6 +151,9 @@ impl std::fmt::Display for RegistryValidationError {
             }
             Self::InvalidOperatorId { scheme, value } => {
                 write!(f, "invalid {scheme} operator identifier '{value}'")
+            }
+            Self::InvalidFacilityId { scheme, value } => {
+                write!(f, "invalid {scheme} facility identifier '{value}'")
             }
             Self::NoClause6Route { subject, scheme } => {
                 write!(

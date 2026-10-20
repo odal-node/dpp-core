@@ -1502,3 +1502,22 @@ fn a_malformed_value_is_not_reported_as_a_missing_route() {
         Err(RegistryValidationError::InvalidOperatorId { .. })
     ));
 }
+
+/// A facility's malformed LEI or D-U-N-S number is a malformed facility
+/// identifier, under its own scheme, and not a malformed GLN.
+#[test]
+fn a_malformed_facility_lei_or_duns_number_is_not_reported_as_a_gln() {
+    for (scheme, value) in [("lei", "529900T8BM49AURSDO56"), ("duns", "12345678")] {
+        let mut payload = sample_payload();
+        payload.facility_id.scheme = scheme.into();
+        payload.facility_id.value = value.into();
+        assert_eq!(
+            payload.validate(),
+            Err(RegistryValidationError::InvalidFacilityId {
+                scheme: scheme.into(),
+                value: value.into(),
+            }),
+            "{scheme}"
+        );
+    }
+}

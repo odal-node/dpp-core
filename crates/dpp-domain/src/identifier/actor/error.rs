@@ -35,4 +35,11 @@ pub enum ActorIdentifierError {
         /// The legacy scheme string, as given.
         scheme: String,
     },
+    /// A typed identifier in a scheme this build has no name for, which was read
+    /// and kept but cannot be checked, so it is not issued.
+    #[error("scheme '{scheme}' is not one this build knows, so it cannot be checked or issued")]
+    UnrecognisedScheme {
+        /// The scheme the identifier names, with its AI where it has one.
+        scheme: String,
+    },
 }

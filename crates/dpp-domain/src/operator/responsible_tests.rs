@@ -197,6 +197,31 @@ fn a_point_k_identifier_with_no_clause_6_route_still_reads_and_is_unplaced() {
     );
 }
 
+/// 🚨 An operator whose typed identifier is in a scheme this build does not know
+/// still reads, and is written back unchanged. The record is in the signed public
+/// view and the transfer chain, so it can come from a build that knows the
+/// scheme, and refusing the identifier would refuse the passport.
+#[test]
+fn an_operator_with_an_identifier_in_a_later_scheme_reads_and_is_written_back() {
+    use crate::identifier::ActorIdentifier;
+
+    let stored = serde_json::json!({
+        "did": "did:web:acme.example.com",
+        "name": "Acme GmbH",
+        "role": "manufacturer",
+        "euOperatorId": "10.1000/182",
+        "identifier": { "scheme": "doi", "value": "10.1000/182" },
+        "country": "DE"
+    });
+    let read: ResponsibleOperator =
+        serde_json::from_value(stored.clone()).expect("a record from a later build reads");
+    assert!(matches!(
+        read.actor_identifier(),
+        Some(Ok(ActorIdentifier::Unrecognised(_)))
+    ));
+    assert_eq!(serde_json::to_value(&read).unwrap(), stored);
+}
+
 /// The fallback role exists precisely so a product handled only by a fulfilment
 /// service provider still has an answerable party. Before it, that case could
 /// not be written down at all.

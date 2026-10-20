@@ -32,10 +32,11 @@ use super::position::ActorPosition;
 /// party/location distinction.
 ///
 /// Not here, and not an oversight: scheme 8, a DID that a register has issued a
-/// credential to (clause 6.4), and scheme 9, a DOI (clause 6.5). The enum is
-/// `#[non_exhaustive]` so either can be added without moving what is here. A DID
-/// that an operator names for itself, with no register credential behind it, is
-/// not a clause 6 identifier, so a legacy `did` string is not read as one.
+/// credential to (clause 6.4), and scheme 9, a DOI (clause 6.5). Either can be
+/// added without moving what is here, and a build that predates it reads it as
+/// [`Unrecognised`](Self::Unrecognised). A DID that an operator names for
+/// itself, with no register credential behind it, is not a clause 6 identifier,
+/// so a legacy `did` string is not read as one.
 ///
 /// # What serialising and reading mean
 ///
@@ -54,8 +55,15 @@ use super::position::ActorPosition;
 /// correct data permanently. What stops a bad value persisting is the write path:
 /// it goes through [`Self::iso6523`], and [`Self::validate`] is there to ask
 /// again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "scheme", rename_all = "camelCase")]
+///
+/// 🚨 **A scheme this build does not know is read too.** The same passport can
+/// come from a build that knows a scheme this one does not, and refusing the
+/// identifier would refuse the whole passport, permanently, on nothing but a
+/// version difference. So any `scheme` other than `icd` and `gs1`, and a `gs1`
+/// identifier under an AI [`GlnAi`] does not name, is read into
+/// [`Unrecognised`](Self::Unrecognised) and written back as it came. A known
+/// scheme in the wrong shape is still refused: no build writes one.
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ActorIdentifier {
     /// **Scheme 6** (clause 6.2): an identifier registered under ISO/IEC 6523.
@@ -73,6 +81,69 @@ pub enum ActorIdentifier {
         /// The Global Location Number, check digit verified.
         gln: Gln,
     },
+    /// An identifier in a scheme this build has no name for, kept member for
+    /// member as it was read, `scheme` included.
+    ///
+    /// Read, never issued: no constructor makes one, and
+    /// [`validate`](ActorIdentifier::validate) refuses it, because this build
+    /// cannot say whether its value fits its scheme.
+    Unrecognised(serde_json::Map<String, serde_json::Value>),
+}
+
+/// The schemes this build names, as they are written. Derived, so the wire form
+/// of a known identifier is the one serde gives it, and [`ActorIdentifier`]'s own
+/// impls only decide which identifiers go through it.
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "scheme", rename_all = "camelCase")]
+enum Known {
+    Icd { icd: Icd, value: String },
+    Gs1 { ai: GlnAi, gln: Gln },
+}
+
+impl Serialize for ActorIdentifier {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Icd { icd, value } => Known::Icd {
+                icd: icd.clone(),
+                value: value.clone(),
+            }
+            .serialize(serializer),
+            Self::Gs1 { ai, gln } => Known::Gs1 {
+                ai: *ai,
+                gln: gln.clone(),
+            }
+            .serialize(serializer),
+            Self::Unrecognised(members) => members.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ActorIdentifier {
+    /// A known scheme is held to its shape, and anything else is kept as it is.
+    /// See the type's note on reading.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+
+        let members = serde_json::Map::deserialize(deserializer)?;
+        let known = match members.get("scheme") {
+            Some(serde_json::Value::String(scheme)) if scheme == "icd" => true,
+            // A `gs1` identifier with no AI, or one that is not a string, is no
+            // build's: only an AI this build has not listed is a newer one.
+            Some(serde_json::Value::String(scheme)) if scheme == "gs1" => match members.get("ai") {
+                Some(serde_json::Value::String(ai)) => GlnAi::from_digits(ai).is_some(),
+                _ => true,
+            },
+            Some(serde_json::Value::String(_)) => false,
+            _ => return Err(D::Error::custom("an actor identifier names its scheme")),
+        };
+        if !known {
+            return Ok(Self::Unrecognised(members));
+        }
+        match Known::deserialize(serde_json::Value::Object(members)).map_err(D::Error::custom)? {
+            Known::Icd { icd, value } => Ok(Self::Icd { icd, value }),
+            Known::Gs1 { ai, gln } => Ok(Self::Gs1 { ai, gln }),
+        }
+    }
 }
 
 impl ActorIdentifier {
@@ -159,9 +230,18 @@ impl ActorIdentifier {
     ///
     /// As [`Self::iso6523`]. A scheme 7 identifier holds a [`Gln`] that was
     /// validated when it was made, so it cannot fail here.
+    /// [`ActorIdentifierError::UnrecognisedScheme`] for an
+    /// [`Unrecognised`](Self::Unrecognised) identifier: it was read and kept, and
+    /// this build cannot say whether its value fits, so it is not one to issue.
     pub fn validate(&self) -> Result<(), ActorIdentifierError> {
-        let Self::Icd { icd, value } = self else {
-            return Ok(());
+        let (icd, value) = match self {
+            Self::Icd { icd, value } => (icd, value),
+            Self::Gs1 { .. } => return Ok(()),
+            Self::Unrecognised(members) => {
+                return Err(ActorIdentifierError::UnrecognisedScheme {
+                    scheme: describe(members),
+                });
+            }
         };
         if value.trim().is_empty() {
             return Err(ActorIdentifierError::BlankValue);
@@ -182,21 +262,38 @@ impl ActorIdentifier {
         }
     }
 
-    /// The EN 18219 scheme number this identifier follows: 6 or 7.
+    /// The EN 18219 scheme number this identifier follows: 6 or 7, or `None`
+    /// for an [`Unrecognised`](Self::Unrecognised) one, whose scheme this build
+    /// cannot number.
     #[must_use]
-    pub fn en_18219_scheme(&self) -> u8 {
+    pub fn en_18219_scheme(&self) -> Option<u8> {
         match self {
-            Self::Icd { .. } => 6,
-            Self::Gs1 { .. } => 7,
+            Self::Icd { .. } => Some(6),
+            Self::Gs1 { .. } => Some(7),
+            Self::Unrecognised(_) => None,
         }
     }
 
-    /// The identifier's value, without its scheme.
+    /// The identifier's value, without its scheme, or `None` for an
+    /// [`Unrecognised`](Self::Unrecognised) one, whose members this build cannot
+    /// name.
     #[must_use]
-    pub fn value(&self) -> &str {
+    pub fn value(&self) -> Option<&str> {
         match self {
-            Self::Icd { value, .. } => value,
-            Self::Gs1 { gln, .. } => gln.as_str(),
+            Self::Icd { value, .. } => Some(value),
+            Self::Gs1 { gln, .. } => Some(gln.as_str()),
+            Self::Unrecognised(_) => None,
         }
+    }
+}
+
+/// What an [`ActorIdentifier::Unrecognised`] identifier says it is: its scheme,
+/// and its AI where it has one, for a refusal to name.
+fn describe(members: &serde_json::Map<String, serde_json::Value>) -> String {
+    let member = |key: &str| members.get(key).and_then(serde_json::Value::as_str);
+    match (member("scheme"), member("ai")) {
+        (Some(scheme), Some(ai)) => format!("{scheme} (AI {ai})"),
+        (Some(scheme), None) => scheme.to_owned(),
+        (None, _) => String::new(),
     }
 }

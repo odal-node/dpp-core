@@ -223,8 +223,10 @@ impl FacilityIdentifier {
     /// # Errors
     ///
     /// [`RegistryValidationError::NoClause6Route`] for a scheme this build cannot
-    /// place, such as `national`, and [`RegistryValidationError::InvalidGln`] when
-    /// it can place the scheme and the value does not fit it.
+    /// place, such as `national`. When it can place the scheme and the value
+    /// does not fit it, [`RegistryValidationError::InvalidGln`] for a GLN and
+    /// [`RegistryValidationError::InvalidFacilityId`] for an LEI or a D-U-N-S
+    /// number.
     pub fn require_clause_6(&self) -> Result<(), RegistryValidationError> {
         match self.actor_identifier() {
             Ok(_) => Ok(()),
@@ -234,9 +236,15 @@ impl FacilityIdentifier {
                     scheme,
                 })
             }
-            Err(other) => Err(RegistryValidationError::InvalidGln {
+            Err(ActorIdentifierError::InvalidGln { reason, .. }) => {
+                Err(RegistryValidationError::InvalidGln {
+                    value: self.value.clone(),
+                    reason,
+                })
+            }
+            Err(_) => Err(RegistryValidationError::InvalidFacilityId {
+                scheme: self.scheme.clone(),
                 value: self.value.clone(),
-                reason: other.to_string(),
             }),
         }
     }

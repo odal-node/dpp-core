@@ -53,7 +53,7 @@ fn an_operator_lei_or_duns_is_scheme_6_and_a_gln_is_a_party() {
             ..
         }
     ));
-    assert_eq!(party.en_18219_scheme(), 7);
+    assert_eq!(party.en_18219_scheme(), Some(7));
 }
 
 /// The same GLN is a different identifier at a facility, and the AI is what says so.
