@@ -12,7 +12,7 @@ pub enum ProductIdentifierError {
     NotAWebUrl(String),
     /// The identification link has a character outside ASCII in its host.
     ///
-    /// EN 18219:2026 clause 4.3 makes a unique identifier an ISO/IEC 646 string.
+    /// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string.
     /// The remedy is the host's ASCII (punycode) form, and it is the caller's to
     /// apply: the identifier stored has to be the one that is printed, so the
     /// link is refused and not converted.

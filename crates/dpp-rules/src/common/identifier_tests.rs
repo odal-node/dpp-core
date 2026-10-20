@@ -19,7 +19,7 @@ fn an_absolute_web_url_needs_a_host() {
 
 /// 🚨 A link is printable ASCII, and it is refused rather than rewritten.
 ///
-/// EN 18219:2026 clause 4.3 makes a unique identifier an ISO/IEC 646 string, and
+/// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string, and
 /// as a URI it is percent-encoded. These two used to pass: both are a non-empty
 /// authority and no whitespace, and nothing looked at what the characters were.
 #[test]

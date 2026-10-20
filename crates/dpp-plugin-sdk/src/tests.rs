@@ -344,7 +344,7 @@ fn pi_messages(identifier: Value) -> Vec<String> {
 /// 🚨 A link outside printable ASCII is refused with its remedy, the same as the
 /// domain type refuses it, and never converted.
 ///
-/// EN 18219:2026 clause 4.3 makes a unique identifier an ISO/IEC 646 string. The
+/// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string. The
 /// plugin is the first thing to see product group data, so a link it accepted
 /// would be stored under two spellings, raw and percent-encoded, as if they were
 /// two identifiers.

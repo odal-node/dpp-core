@@ -58,7 +58,7 @@ fn an_identification_link_must_be_an_absolute_web_url() {
 /// 🚨 An identification link is printable ASCII, and it is refused rather than
 /// converted.
 ///
-/// EN 18219:2026 clause 4.3 makes a unique identifier an ISO/IEC 646 string, and
+/// EN 18219:2026 clause 4.3.2 makes a unique identifier an ISO/IEC 646 string, and
 /// as a URI it is percent-encoded. Both of these were accepted: each has a host
 /// and no whitespace. A link stored raw and the same link stored percent-encoded
 /// would then be two identifiers for one product.

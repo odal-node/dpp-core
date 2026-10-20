@@ -67,7 +67,7 @@ pub enum ProductIdentifier {
     /// Self-issuing: the operator needs its own web domain and nothing else.
     ///
     /// 🚨 Only checked to be an absolute `http`/`https` URL written in printable
-    /// ASCII, which EN 18219:2026 clause 4.3 requires of every identifier: a
+    /// ASCII, which EN 18219:2026 clause 4.3.2 requires of every identifier: a
     /// non-ASCII host is refused and written in punycode instead, any other
     /// character outside printable ASCII is percent-encoded, and neither is done
     /// for the caller. EN IEC 61406's own format rules are not applied here, so

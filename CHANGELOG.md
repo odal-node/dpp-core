@@ -18,7 +18,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **An identification link with a non-ASCII character passed validation.**
   `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
   EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing
-  looked at what the characters were. EN 18219:2026 clause 4.3 makes a unique
+  looked at what the characters were. EN 18219:2026 clause 4.3.2 makes a unique
   identifier an ISO/IEC 646 string and, as a URI, percent-encoded, and a link
   stored raw and the same link stored percent-encoded would be two identifiers for
   one product. Both are now refused, **with the remedy and without converting

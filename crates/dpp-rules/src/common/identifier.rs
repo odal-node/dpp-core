@@ -76,7 +76,7 @@ pub enum WebUrlRejection {
 /// non-empty remainder and no host whatsoever, so testing that remainder for
 /// emptiness accepted two values nothing can resolve.
 ///
-/// 🚨 **Printable ASCII, not just a URL.** EN 18219:2026 clause 4.3 makes a unique
+/// 🚨 **Printable ASCII, not just a URL.** EN 18219:2026 clause 4.3.2 makes a unique
 /// identifier a string of ISO/IEC 646 characters and, used as a URI, RFC 3986
 /// with everything but the unreserved characters percent-encoded. A link with a
 /// raw `ü` in its path is not such a string, and it lets one link be stored under
