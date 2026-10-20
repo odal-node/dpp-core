@@ -13,7 +13,72 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **The registry's web client was read again (2026-10-20), and the task list's
+  sort is now a constant.** Both the acceptance and the production build of the
+  client were read; their API surface is identical, twenty-one calls. What it
+  settles:
+
+  *The dashboard's sort syntax.* `sort` is `<field>,<direction>`, and the client
+  asks for `submittedAt,desc` on every read until a column is chosen, so a task
+  just submitted is on the first page. That value is now
+  `TASKS_SORT_NEWEST_FIRST`, `Observed` in `ENDPOINT_BASIS`, so a caller can ask
+  for newest first and read the front of a long list rather than both ends of
+  it. The offered columns are `submittedAt`, `type`, `displayName` and `status`,
+  pages count from `0`, and a read that sends no `sort` is not observed. The
+  constant's docs say the client's request is not a promise about what the
+  registry honours, so a caller relying on the order checks it.
+
+  *What it does not settle, and cannot.* The client has no call that transfers
+  responsibility for a passport and none that reads a registered record, so
+  `TRANSFER_PATH_TEMPLATE` and `STATUS_PATH_TEMPLATE` stay `Assumed` and their
+  docs now say they were looked for again and are absent. A transfer
+  notification's reply is therefore not observable from this source, and neither
+  is whether that route honours an idempotency key: the header is set by one
+  interceptor, on `POST`s to the enrolment and registration paths only, and the
+  docs on `IDEMPOTENCY_KEY_HEADER` now say exactly that, and that a key names one
+  body.
+
+  `LAST_READ`, which dates every `Observed` route and header in the table, is
+  now `2026-10-20`. It dates the routes and the header only: the response
+  fields, status vocabularies and error codes documented beside them were read
+  on 2026-10-14 and keep that date, since a response is shown only to a
+  signed-in session.
+
 ### Fixed
+
+- **An identification link with a non-ASCII character passed validation.**
+  `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
+  EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing
+  looked at what the characters were. EN 18219:2026 clause 4.3.2 makes a unique
+  identifier an ISO/IEC 646 string and, as a URI, percent-encoded, and a link
+  stored raw and the same link stored percent-encoded would be two identifiers for
+  one product. Both are now refused, **with the remedy and without converting
+  anything**, because the identifier stored has to be the one that is printed: a
+  non-ASCII character in the host is written in its ASCII (punycode) form, and any
+  other character outside printable ASCII is percent-encoded. (#489)
+  - `dpp_rules::common::identifier::check_web_url` says which rule a link breaks,
+    in a `WebUrlRejection`, as `check_did` does for a DID. `is_absolute_web_url` is
+    now `check_web_url(url).is_ok()`, so it too is false for these.
+    `ProductIdentifier::identification_link` and the plugin SDK both use it.
+  - `ProductIdentifierError` gains `NonAsciiHost` and `NotPrintableAscii`, each
+    carrying the link and the first character at fault. The enum is
+    `#[non_exhaustive]`, so this is not breaking.
+  - **Reading is not issuing.** A document carrying such a link still **reads**,
+    as it is. The product identifier is in the signed public view, so a passport
+    carrying one can arrive from another operator, signed and unrewritable, and a
+    reader that refused it would refuse correct data permanently and report a node
+    that had not upgraded as having tampered with it. The plugin refuses the link
+    the next time the passport is written, naming the field and the remedy. A
+    value that is not a web URL at all is still refused on read, as it always was.
+    **What this does not cover:** a write path that builds a passport from a body
+    without going through the plugin's validation does not meet the rule, since
+    typed reading cannot tell a write from a read.
+  - **Only printable ASCII is checked.** The rest of RFC 3986 is not: an ASCII
+    character it does not allow unencoded, such as `<` or `|`, is still accepted.
+    Whether plain `http` is admissible and what the structured form requires are
+    EN IEC 61406-1 and -2, which this check does not attempt.
 
 - **A framed passport's JSON-LD no longer drops everything a product group
   adds.** The context defined a term for the product identifier beneath

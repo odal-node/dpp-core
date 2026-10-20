@@ -46,25 +46,86 @@ pub enum DidRejection<'a> {
     EmptyMethodId,
 }
 
-/// An absolute `http`/`https` URL with a host, as EN 18219 scheme 2 requires.
+/// Why a candidate scheme 2 value is not an admissible identification link.
+///
+/// Three variants rather than a `bool` because two of the rejections have a
+/// remedy the caller should name, and the remedies differ: a character outside
+/// printable ASCII is percent-encoded, while a host is written in its ASCII
+/// (punycode) form. Neither is done for the caller. The identifier that is stored
+/// has to be the one that is printed, so a link is refused rather than rewritten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebUrlRejection {
+    /// Not `http://` or `https://` followed by a host, or it contains
+    /// whitespace.
+    NotAnAbsoluteWebUrl,
+    /// A character outside ASCII in the host, the first one met. A host is
+    /// written in its ASCII (punycode) form, `xn--…`, and never in Unicode.
+    NonAsciiHost(char),
+    /// A character outside printable ASCII anywhere else in the link, the first
+    /// one met: a non-ASCII character in the path, the query, the fragment or
+    /// the user information, or an ASCII control character. It is
+    /// percent-encoded.
+    NotPrintableAscii(char),
+}
+
+/// An absolute `http`/`https` URL with a host, written in printable ASCII, as
+/// EN 18219 scheme 2 requires.
 ///
 /// 🚨 The authority ends at the first `/`, `?` or `#` — it is not simply
 /// "whatever follows the scheme". `https:///p/1` and `https://?q` each leave a
 /// non-empty remainder and no host whatsoever, so testing that remainder for
 /// emptiness accepted two values nothing can resolve.
 ///
+/// 🚨 **Printable ASCII, not just a URL.** EN 18219:2026 clause 4.3.2 makes a unique
+/// identifier a string of ISO/IEC 646 characters and, used as a URI, RFC 3986
+/// with everything but the unreserved characters percent-encoded. A link with a
+/// raw `ü` in its path is not such a string, and it lets one link be stored under
+/// two spellings, raw and percent-encoded, as if they were two identifiers. So the
+/// first character outside `!`..=`~` is refused, and the remedy is named. It is
+/// not converted: what is stored must be what is printed.
+///
 /// This is a shape check, not a conformance claim: scheme 2's format is
-/// specified by EN IEC 61406-1/-2 and those rules are **not** applied here.
-#[must_use]
-pub fn is_absolute_web_url(url: &str) -> bool {
+/// specified by EN IEC 61406-1/-2 and those rules are **not** applied here. Nor
+/// is the rest of RFC 3986: an ASCII character that RFC 3986 does not allow
+/// unencoded, such as `<` or `|`, is not refused.
+///
+/// # Errors
+///
+/// [`WebUrlRejection`], naming the first rule the value breaks. Whitespace and a
+/// missing host are [`WebUrlRejection::NotAnAbsoluteWebUrl`], decided before any
+/// character is looked at.
+pub fn check_web_url(url: &str) -> Result<(), WebUrlRejection> {
     let Some(rest) = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
     else {
-        return false;
+        return Err(WebUrlRejection::NotAnAbsoluteWebUrl);
     };
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    !authority.is_empty() && !url.contains(char::is_whitespace)
+    if authority.is_empty() || url.contains(|c: char| c.is_ascii_whitespace()) {
+        return Err(WebUrlRejection::NotAnAbsoluteWebUrl);
+    }
+
+    // The host is what follows the last `@` of the authority; the user
+    // information before it is percent-encoded like the rest, not punycoded.
+    let scheme_len = url.len() - rest.len();
+    let host_start = scheme_len + authority.rfind('@').map_or(0, |at| at + 1);
+    let host_end = scheme_len + authority.len();
+
+    match url.char_indices().find(|(_, c)| !c.is_ascii_graphic()) {
+        None => Ok(()),
+        Some((at, c)) if !c.is_ascii() && (host_start..host_end).contains(&at) => {
+            Err(WebUrlRejection::NonAsciiHost(c))
+        }
+        Some((_, c)) => Err(WebUrlRejection::NotPrintableAscii(c)),
+    }
+}
+
+/// Whether `url` is an absolute `http`/`https` URL with a host, in printable
+/// ASCII. See [`check_web_url`], which says which rule a value breaks.
+#[must_use]
+pub fn is_absolute_web_url(url: &str) -> bool {
+    check_web_url(url).is_ok()
 }
 
 /// A DID under one of the methods [`DID_METHODS`] names.
