@@ -37,6 +37,13 @@
 //! optional fields and the objects nested inside them, and those are most of what
 //! the context's terms for `productGroupData` cover.
 //!
+//! And one framed passport for each **responsibility basis** the build models,
+//! whose nested envelope objects all have every field set (see
+//! `jsonld_support/envelope_instance.rs`). The fixture passport sets only a few of
+//! them, so on its own it would leave the compliance result, the lint result, the
+//! facility, the operator, the seal and the second-life references unexpanded. The
+//! basis varies because one of them is an object and the rest are strings.
+//!
 //! # Running
 //!
 //! ```text
@@ -53,8 +60,8 @@ use std::path::{Path, PathBuf};
 use dpp_crypto::keystore::KeyStore;
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_domain::{
-    PassportCredential, PassportCredentialSubject, ProductGroup, ProductGroupCatalog,
-    ProductGroupData,
+    Passport, PassportCredential, PassportCredentialSubject, ProductGroup, ProductGroupCatalog,
+    ProductGroupData, ResponsibilityBasis,
 };
 use dpp_tests::fixtures::{base_passport, make_subject};
 use dpp_vc::credential::{CredentialBuilder, CredentialRole, CredentialStatus};
@@ -62,9 +69,12 @@ use dpp_vc::did_builder::build_did_document;
 use dpp_vc::{context_value, frame_passport};
 use serde_json::{Value, json};
 
+#[path = "jsonld_support/envelope_instance.rs"]
+mod envelope_instance;
 #[path = "jsonld_support/schema_instance.rs"]
 mod schema_instance;
 
+use envelope_instance::{bases, populate_envelope};
 use schema_instance::full_instance;
 
 const ISSUER: &str = "did:web:issuer.example.com";
@@ -76,14 +86,20 @@ const ISSUER: &str = "did:web:issuer.example.com";
 /// swapped as JSON rather than deserialised into a typed variant, so the corpus
 /// holds exactly the keys the fixture holds.
 fn framed_passport(group: &ProductGroup, data: Value) -> Value {
+    framed_with(group, data, |_| {})
+}
+
+/// [`framed_passport`], with `populate` run on the passport before it is written.
+fn framed_with(group: &ProductGroup, data: Value, populate: impl FnOnce(&mut Passport)) -> Value {
     let placeholder: ProductGroupData = serde_json::from_value(json!({
         "productGroup": "packaging",
         "materialFamily": "placeholder",
     }))
     .expect("an unmodelled product group deserialises");
 
-    let mut passport = serde_json::to_value(base_passport(group.clone(), placeholder, "1.0.0"))
-        .expect("a passport serialises");
+    let mut base = base_passport(group.clone(), placeholder, "1.0.0");
+    populate(&mut base);
+    let mut passport = serde_json::to_value(base).expect("a passport serialises");
 
     let tag = serde_json::to_value(group).expect("a product group serialises");
     let mut data = data;
@@ -217,8 +233,50 @@ fn corpus() -> (Labelled, Labelled) {
     }
 
     documents.extend(full_documents());
+    documents.extend(full_envelope_documents());
 
     (contexts, documents)
+}
+
+/// What a basis is called on the wire: a unit basis serialises to a string, and
+/// one that carries data to an object keyed by its name.
+fn basis_name(basis: &ResponsibilityBasis) -> String {
+    match serde_json::to_value(basis).expect("a basis serialises") {
+        Value::String(name) => name,
+        Value::Object(object) => object.keys().next().cloned().unwrap_or_default(),
+        other => other.to_string(),
+    }
+}
+
+/// The label of the document whose envelope objects all have every field set, for
+/// one responsibility basis.
+fn full_envelope_label(basis: &str) -> String {
+    format!("a framed textile passport carrying every envelope field, with basis {basis}")
+}
+
+/// A framed passport per responsibility basis the build models, each with every
+/// nested envelope object populated, so the envelope's own members are expanded
+/// and not only the keys the fixture passport happens to set.
+///
+/// The product group is the textile one, with its fixture as `productGroupData`,
+/// since the point is the envelope and its data only has to expand too.
+fn full_envelope_documents() -> Labelled {
+    let group = ProductGroup::from_wire_tag("textile");
+    let catalog = ProductGroupCatalog::new();
+    let descriptor = catalog.get("textile").expect("textile is in the catalog");
+
+    bases()
+        .into_iter()
+        .map(|basis| {
+            let data = fixture_for("textile", &descriptor.current_schema_version);
+            (
+                full_envelope_label(&basis_name(&basis)),
+                framed_with(&group, data, |passport| {
+                    populate_envelope(passport, basis);
+                }),
+            )
+        })
+        .collect()
 }
 
 /// The label of the document carrying every field of one schema version.
@@ -278,6 +336,14 @@ fn the_corpus_covers_every_context_and_product_group() {
             documents.iter().any(|(note, _)| *note == label),
             "the corpus holds no passport for product group '{}'",
             descriptor.key
+        );
+    }
+
+    for basis in bases() {
+        let label = full_envelope_label(&basis_name(&basis));
+        assert!(
+            documents.iter().any(|(note, _)| *note == label),
+            "the corpus holds no passport with every envelope field set for basis {basis:?}"
         );
     }
 

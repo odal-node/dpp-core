@@ -6,6 +6,7 @@
 //! then, one file is the right size.
 
 mod context;
+mod envelope_terms;
 mod product_terms;
 #[cfg(test)]
 mod product_terms_tests;

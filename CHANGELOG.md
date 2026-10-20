@@ -110,10 +110,40 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     expands, for every embedded schema version, a framed passport carrying every
     field that schema declares, and allows nothing dropped beneath
     `productGroupData`.
-  - **A narrower gap remains, and is listed.** The keys inside `manufacturer`,
-    `materials`, `applicableInstruments`, `co2ePerUnit` and `repairabilityScore`
-    still have no term and are still dropped. The register's JSON-LD row records
-    exactly that.
+
+- **The members of a framed passport's own objects no longer drop either.** The
+  same defect, one level up. The envelope had a term for `manufacturer`,
+  `materials`, `complianceResult` and every other key, and none for what is
+  inside them, so a processor dropped the manufacturer's name, each material's
+  weight, the findings of a compliance result and everything else nested in the
+  envelope. The oracle listed the five it could see (`manufacturer`, `materials`,
+  `applicableInstruments`, `co2ePerUnit`, `repairabilityScore`); its fixture
+  passport leaves the rest unset, which hid that the gap was wider: the
+  compliance result, the lint result, the facility, the responsible operator, the
+  seal, and the derivation and component references had no terms beneath them
+  either. All twelve now do. (#488)
+  - A term's IRI is `dpp:` and the member's dotted path from the envelope, such
+    as `dpp:manufacturer.name` and `dpp:facility.scheme`, and every scope sets
+    `@propagate: false`, as `productGroupData`'s does. `facility.scheme` and the
+    product identifier's `scheme` are different things and stay different terms.
+  - **Two members are carried whole as JSON literals**, as `personalData` is: the
+    compliance result's `receipt`, which holds whatever a calculation recorded,
+    and `disclosureSignatures`, which is keyed by the path of the field each
+    signature covers. Neither's keys are terms. `disclosureSignatures` was a plain
+    term, so a processor dropped every signature in it and left an empty node.
+  - These objects are Rust types, so the terms are a table
+    (`jsonld/envelope_terms.rs`), not generated. `jsonld_envelope_terms.rs` holds
+    it to a passport whose every nested object has every field set, built as struct
+    literals: a type that gains a field stops compiling there until the field is
+    named, and then the term is what fails. It checks both ways, a member with no
+    term and a term for a member that does not exist.
+  - The PyLD oracle now expands a passport with every nested envelope object set
+    for each responsibility basis, and **allows nothing to drop**: the listed gap
+    and the check that notices when it closes are deleted, and the register's
+    JSON-LD row lists no deviation.
+  - What this cannot see: an enum that carries data and gains a variant this
+    test never builds. `ResponsibilityBasis` is the only one on the envelope, and
+    the test builds every variant it lists.
 
 ## [0.22.0] - 2026-10-16
 
