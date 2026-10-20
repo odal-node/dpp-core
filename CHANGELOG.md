@@ -13,6 +13,39 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Added
+
+- **The registry's web client was read again (2026-10-20), and the task list's
+  sort is now a constant.** Both the acceptance and the production build of the
+  client were read; their API surface is identical, twenty-one calls. What it
+  settles:
+
+  *The dashboard's sort syntax.* `sort` is `<field>,<direction>`, and the client
+  asks for `submittedAt,desc` on every read until a column is chosen, so a task
+  just submitted is on the first page. That value is now
+  `TASKS_SORT_NEWEST_FIRST`, `Observed` in `ENDPOINT_BASIS`, so a caller can ask
+  for newest first and read the front of a long list rather than both ends of
+  it. The offered columns are `submittedAt`, `type`, `displayName` and `status`,
+  pages count from `0`, and a read that sends no `sort` is not observed. The
+  constant's docs say the client's request is not a promise about what the
+  registry honours, so a caller relying on the order checks it.
+
+  *What it does not settle, and cannot.* The client has no call that transfers
+  responsibility for a passport and none that reads a registered record, so
+  `TRANSFER_PATH_TEMPLATE` and `STATUS_PATH_TEMPLATE` stay `Assumed` and their
+  docs now say they were looked for again and are absent. A transfer
+  notification's reply is therefore not observable from this source, and neither
+  is whether that route honours an idempotency key: the header is set by one
+  interceptor, on `POST`s to the enrolment and registration paths only, and the
+  docs on `IDEMPOTENCY_KEY_HEADER` now say exactly that, and that a key names one
+  body.
+
+  `LAST_READ`, which dates every `Observed` route and header in the table, is
+  now `2026-10-20`. It dates the routes and the header only: the response
+  fields, status vocabularies and error codes documented beside them were read
+  on 2026-10-14 and keep that date, since a response is shown only to a
+  signed-in session.
+
 ### Fixed
 
 - **An identification link with a non-ASCII character passed validation.**

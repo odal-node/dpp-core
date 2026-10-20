@@ -10,7 +10,12 @@
 //! **2026-10-14**, together with the runtime configuration the client loads
 //! (`assets/env-json-config.json`), it names the hosts the API is served from —
 //! which are not the host the web interface is served from — and the dashboard
-//! service a submission's outcome is read back from.
+//! service a submission's outcome is read back from. Re-read **2026-10-20**, in
+//! both the acceptance and the production build of the client, it showed three
+//! things: the client's whole API surface is twenty-one calls and **none of them
+//! transfers responsibility or reads a record's status**; the idempotency header
+//! is set by one interceptor and nothing else; and the dashboard sorts by
+//! `field,direction`, newest first by default.
 //!
 //! That is better evidence than an invention and it is **not a specification**.
 //! It is one consumer's behaviour on one date, and a client can change without
@@ -27,9 +32,17 @@ use crate::basis::RegistryBasis;
 ///
 /// One constant rather than a literal per entry: every observation below came
 /// from the same reading, and repeating the date invites the entries to drift
-/// apart when the next reading updates some of them and not others. The
-/// observations first made on 2026-09-16 were each found again on this date.
-pub(crate) const LAST_READ: &str = "2026-10-14";
+/// apart when the next reading updates some of them and not others. The routes
+/// and the header declared here, first observed on 2026-09-16 and 2026-10-14,
+/// were each found again on this date, in the acceptance and the production
+/// build of the client alike.
+///
+/// It dates the **routes and the header**, and no more. What the documentation
+/// beside them says about a response's fields, a status vocabulary or an error
+/// code was read on the earlier date and carries it in its own entry; this
+/// reading did not touch a response, which the client only shows to a signed-in
+/// session.
+pub(crate) const LAST_READ: &str = "2026-10-20";
 
 /// Registration submission, relative to [`RegistryEndpoint::base_url`].
 ///
@@ -62,7 +75,29 @@ pub const PRODUCT_GROUPS_PATH: &str = "/product-groups";
 /// The client finds a submission's task by paging this list: no route that
 /// takes a correlation identifier was seen, and the client does not read the
 /// body the registration POST answers with, so what it returns is unobserved.
+///
+/// # How the list is ordered
+///
+/// `sort` is `<field>,<direction>`, with `asc` or `desc` as the direction, and
+/// the client sends it on every read: [`TASKS_SORT_NEWEST_FIRST`] until a person
+/// picks a column. The columns it offers to sort by are `submittedAt`, `type`,
+/// `displayName` and `status`. A request that sends no `sort` is **not**
+/// observed, so an order the caller did not ask for is an order it does not
+/// know. The pages are numbered from `0`.
+///
+/// What the client sends is not a promise about what the registry honours, so a
+/// caller that relies on the order checks it on the first page it reads.
 pub const TASKS_PATH: &str = "/tasks";
+
+/// The `sort` the registry's own client asks the task list for: newest
+/// submission first.
+///
+/// 👁️ **Observed** as the client's default, sent on every read of
+/// [`TASKS_PATH`] until a column is chosen. A task just submitted is therefore on
+/// the first page of a list asked for in this order, which is what makes reading
+/// only the front of a long one sound. Nothing observed says the registry
+/// *guarantees* the order, only that this is what its own interface depends on.
+pub const TASKS_SORT_NEWEST_FIRST: &str = "submittedAt,desc";
 
 /// One task's result, relative to [`RegistryEndpoint::dashboard_base_url`].
 ///
@@ -86,6 +121,13 @@ pub const TASK_RESULT_PATH_TEMPLATE: &str = "/tasks/{id}/result";
 /// client, so unlike [`REGISTRATION_PATH`] this has nothing behind it. Kept
 /// because a registered record has a status (Art. 10(1)) and a caller must be
 /// able to name *a* path to read it; it is a placeholder, not an observation.
+///
+/// Looked for again on **2026-10-20**, in both builds of the client, and still
+/// absent. The client makes twenty-one calls (product groups, a registration
+/// template and a registration request, the dashboard's task list, result and
+/// export, and the enrolment and sign-in calls) and none of them reads a
+/// registered record. The only read of anything registered is a dashboard
+/// task's result.
 pub const STATUS_PATH_TEMPLATE: &str = "/registrations/{id}/status";
 
 /// Transfer notification, relative to [`RegistryEndpoint::base_url`].
@@ -96,6 +138,16 @@ pub const STATUS_PATH_TEMPLATE: &str = "/registrations/{id}/status";
 /// ⚠️ **Invented**, on the same terms as [`STATUS_PATH_TEMPLATE`]. IR (EU)
 /// 2026/1778 Art. 6a establishes that transfers happen; it says nothing about
 /// the route they travel.
+///
+/// Looked for again on **2026-10-20**, in both builds of the client, and the
+/// client has no call that moves responsibility for a passport at all: no
+/// route, no screen, and none of the words a handover would use. So there is
+/// nothing to observe here, and **its reply and whether it honours an
+/// idempotency key cannot be settled from this source**. The header is set by
+/// one interceptor, on POSTs to the enrolment and registration paths only (see
+/// [`IDEMPOTENCY_KEY_HEADER`]); whether a transfer route would honour one is a
+/// question about a route nobody has seen. A caller that sends the key on a
+/// transfer is relying on the registry doing so, which is a guess.
 pub const TRANSFER_PATH_TEMPLATE: &str = "/registrations/{id}/transfer";
 
 /// Where an authentication token is obtained, relative to the authentication
@@ -119,6 +171,15 @@ pub const TOKEN_PATH: &str = "/oauth2/token";
 /// client deliberately *keeps* the key on that response rather than minting a
 /// new one — it reads a conflict as "this already succeeded", not as "try
 /// again differently".
+///
+/// One interceptor sets it, on a `POST` whose URL contains the enrolment path
+/// (`/api/v1/enrolment-applications`, so its verification and draft sub-paths
+/// too) or the registration path ([`REGISTRATION_PATH`]'s
+/// `/api/v1/dpp-registration-requests`). It keeps a key for a URL while the
+/// request body is unchanged and mints a new one when the body changes, so a key
+/// names one body: the same key with another body is not a case the client ever
+/// produces. A route outside those two paths carries no key and nothing observed
+/// says it would honour one.
 ///
 /// This is a **header**, which is the correction it carries: idempotency was
 /// previously assumed to ride on the envelope body. See
@@ -147,6 +208,10 @@ pub const ENDPOINT_BASIS: &[(&str, RegistryBasis)] = &[
         RegistryBasis::Observed { on: LAST_READ },
     ),
     (TASKS_PATH, RegistryBasis::Observed { on: LAST_READ }),
+    (
+        TASKS_SORT_NEWEST_FIRST,
+        RegistryBasis::Observed { on: LAST_READ },
+    ),
     (
         TASK_RESULT_PATH_TEMPLATE,
         RegistryBasis::Observed { on: LAST_READ },
