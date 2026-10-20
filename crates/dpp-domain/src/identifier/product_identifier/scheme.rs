@@ -1,6 +1,6 @@
 //! [`ProductIdentifier`] — a unique product identifier under EN 18219 clause 5.
 
-use dpp_rules::common::identifier::{DidRejection, check_did, is_absolute_web_url};
+use dpp_rules::common::identifier::{DidRejection, WebUrlRejection, check_did, check_web_url};
 use serde::{Deserialize, Serialize};
 
 use super::super::gtin::Gtin;
@@ -66,10 +66,14 @@ pub enum ProductIdentifier {
     ///
     /// Self-issuing: the operator needs its own web domain and nothing else.
     ///
-    /// 🚨 Only checked to be an absolute `http`/`https` URL. EN IEC 61406's own
-    /// format rules are not applied here, so a value that passes this check is
-    /// **not** thereby conformant. Recorded on the variant so a reader does not
-    /// infer a conformance claim from the absence of an error.
+    /// 🚨 Only checked to be an absolute `http`/`https` URL written in printable
+    /// ASCII, which EN 18219:2026 clause 4.3 requires of every identifier: a
+    /// non-ASCII host is refused and written in punycode instead, any other
+    /// character outside printable ASCII is percent-encoded, and neither is done
+    /// for the caller. EN IEC 61406's own format rules are not applied here, so
+    /// a value that passes this check is **not** thereby conformant. Recorded on
+    /// the variant so a reader does not infer a conformance claim from the
+    /// absence of an error.
     #[serde(rename_all = "camelCase")]
     IdentificationLink {
         /// The identification link URL.
@@ -98,13 +102,37 @@ impl ProductIdentifier {
     /// # Errors
     ///
     /// [`ProductIdentifierError::NotAWebUrl`] if `url` is not an absolute
-    /// `http`/`https` URL. See the variant's note on what is *not* checked.
+    /// `http`/`https` URL, [`ProductIdentifierError::NonAsciiHost`] if its host
+    /// is not in ASCII (punycode) form, and
+    /// [`ProductIdentifierError::NotPrintableAscii`] if anything else in it is
+    /// outside printable ASCII, which is percent-encoded. A link is refused
+    /// rather than converted, because the identifier stored has to be the one
+    /// that is printed. See the variant's note on what is *not* checked.
+    ///
+    /// This is the rule for **issuing** an identifier. A document being *read*
+    /// is held to it for everything but printable ASCII: a link that was issued
+    /// before the rule existed, or by an operator that has not upgraded, is
+    /// signed and cannot be rewritten, so it is read as it is. The reason is on
+    /// the type that does the reading.
     pub fn identification_link(url: &str) -> Result<Self, ProductIdentifierError> {
         // The syntax lives in `dpp_rules` so the plugin SDK checks the same
-        // thing this does — it previously had a weaker copy of its own.
-        if !is_absolute_web_url(url) {
-            return Err(ProductIdentifierError::NotAWebUrl(url.to_owned()));
-        }
+        // thing this does — it previously had a weaker copy of its own. Each
+        // rejection keeps its own error here, because the remedies differ.
+        check_web_url(url).map_err(|rejection| match rejection {
+            WebUrlRejection::NotAnAbsoluteWebUrl => {
+                ProductIdentifierError::NotAWebUrl(url.to_owned())
+            }
+            WebUrlRejection::NonAsciiHost(character) => ProductIdentifierError::NonAsciiHost {
+                url: url.to_owned(),
+                character,
+            },
+            WebUrlRejection::NotPrintableAscii(character) => {
+                ProductIdentifierError::NotPrintableAscii {
+                    url: url.to_owned(),
+                    character,
+                }
+            }
+        })?;
         Ok(Self::IdentificationLink {
             url: url.to_owned(),
         })
@@ -209,7 +237,22 @@ impl ProductIdentifier {
 /// that problem, because it validates inside its own `Deserialize`; that is what
 /// made the gap easy to miss, since scheme 1 was safe and the other two were
 /// not. Reading goes through here so a document is held to the same rules as a
-/// constructor argument.
+/// constructor argument, **with one deliberate exception**, below.
+///
+/// 🚨 **Reading is not issuing, for printable ASCII.** A link outside printable
+/// ASCII is refused when one is issued ([`ProductIdentifier::identification_link`])
+/// and when a plugin validates one, and it is **read** all the same. The product
+/// identifier is in the signed public view, so it is on the wire between
+/// operators as well as on disk, and a signed passport fetched from another
+/// operator cannot be rewritten by anyone: a reader that refused it would refuse
+/// correct, signed data permanently, and report a node that has not upgraded as
+/// having tampered with it. The fetched side is the one that decides, because it
+/// is the stricter. A stored document is not turned away either, which would be
+/// an unannounced non-additive change to what is on disk. What stops a
+/// non-conformant link persisting is the write path: the plugin refuses it the
+/// next time the passport is written, which names the field and the remedy, and
+/// the node that owns the bytes can fix it. A link that is not a web URL at all
+/// is still refused on read, as it always was.
 ///
 /// The variants and their serde attributes must mirror [`ProductIdentifier`]'s
 /// exactly: this type defines the wire form on read, and a divergence here is a
@@ -232,7 +275,17 @@ impl TryFrom<Wire> for ProductIdentifier {
         match wire {
             // `Gtin` has already validated its own check digit by this point.
             Wire::Gs1 { gtin } => Ok(Self::gs1(gtin)),
-            Wire::IdentificationLink { url } => Self::identification_link(&url),
+            Wire::IdentificationLink { url } => match check_web_url(&url) {
+                // The two printable-ASCII rejections are for issuing, not for
+                // reading. See the note on `Wire`.
+                Ok(())
+                | Err(WebUrlRejection::NonAsciiHost(_) | WebUrlRejection::NotPrintableAscii(_)) => {
+                    Ok(Self::IdentificationLink { url })
+                }
+                Err(WebUrlRejection::NotAnAbsoluteWebUrl) => {
+                    Err(ProductIdentifierError::NotAWebUrl(url))
+                }
+            },
             Wire::Did { did } => Self::did(&did),
         }
     }
