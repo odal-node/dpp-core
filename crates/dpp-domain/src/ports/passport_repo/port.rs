@@ -85,7 +85,9 @@ pub trait PassportRepository: Send + Sync {
     /// for. A label resolves through
     /// [`find_by_carrier`](PassportRepository::find_by_carrier). This method
     /// answers someone holding the manufacturer's serial — read off the unit,
-    /// or out of an ERP — or a bare GTIN.
+    /// or out of an ERP — or a bare GTIN. Someone holding a link or a DID, which
+    /// names a passport at whatever level it is, wants
+    /// [`find_by_product_identifier`](PassportRepository::find_by_product_identifier).
     ///
     /// 🚨 **Typed, not `&str`.** A bare string invites taking a value out of
     /// one namespace and looking it up in another because both are strings,
@@ -223,6 +225,66 @@ pub trait PassportRepository: Send + Sync {
                         level => p.carrier_qualifier().as_ref() == Some(level),
                     }
             })
+            .collect())
+    }
+
+    /// Every passport whose product identifier is `identifier`, at **every**
+    /// level: the model record, each production run and each unit, with no
+    /// narrowing.
+    ///
+    /// The lookup for an identifier that is the whole key. Under EN 18219:2026 a
+    /// scheme 3 DID can stand for a model, a batch or an item (clause 5.4.1), and
+    /// a scheme 2 identification link either names one item (clause 5.3.2.1) or
+    /// carries its own model, batch or item data identifiers inside the link
+    /// (clause 5.3.2.2). Either way the identifier says everything there is to
+    /// say, so there is no qualifier to narrow by and the match is on the whole
+    /// value. This crate does not read the data identifiers inside a link.
+    ///
+    /// 🚨 **The two lookups beside this one cannot answer it.**
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier) reads the
+    /// level from which of `batch_id` and `serial_number` it is given, so asked
+    /// with neither it returns the model-level record only, and never a passport
+    /// that carries a batch or a serial.
+    /// [`find_by_carrier`](PassportRepository::find_by_carrier) needs a carrier
+    /// qualifier, and its serial is the carrier serial, which a caller holding
+    /// only a link or a DID does not have. So an item-level passport identified
+    /// by a link or a DID, which carries a serial number, had no method that
+    /// found it.
+    ///
+    /// For a GTIN this is every passport of the product, which is what a caller
+    /// listing them wants and not what a caller resolving one wants: a GTIN is
+    /// narrowed by its qualifiers, through those two.
+    ///
+    /// # Why `Vec`, and no status filter
+    ///
+    /// An amendment carries the identifier forward, so a predecessor and its
+    /// successor both answer it, and nothing in this tier can promise there is
+    /// one record. The caller picks by `status`, or walks
+    /// [`find_superseding_head`](PassportRepository::find_superseding_head). No
+    /// status filter, for the reason
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier) gives: a
+    /// withdrawn passport must still be found, so the route can say so.
+    ///
+    /// # Ordering
+    ///
+    /// Unspecified.
+    ///
+    /// # Default implementation
+    ///
+    /// An unindexed `list()` scan — correctness only, so adding this method
+    /// breaks no implementation. A real store should index the identifier,
+    /// which lives inside `productGroupData` and so needs a generated column or
+    /// an expression index, as
+    /// [`find_by_identifier`](PassportRepository::find_by_identifier) does.
+    async fn find_by_product_identifier(
+        &self,
+        identifier: &ProductIdentifier,
+    ) -> Result<Vec<Passport>, DppError> {
+        Ok(self
+            .list(None, None, None, u32::MAX, 0)
+            .await?
+            .into_iter()
+            .filter(|p| carries_identifier(p, identifier))
             .collect())
     }
 

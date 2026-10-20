@@ -191,6 +191,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - `Gln` now serialises as a bare string and refuses an invalid one on
     deserialization, as `Gtin` does.
 
+- **`PassportRepository::find_by_product_identifier` finds every passport
+  carrying an identifier, at every level.** A scheme 3 DID can stand for a
+  model, a batch or an item (EN 18219:2026 clause 5.4.1), and a scheme 2
+  identification link names one item or carries its own level inside the link
+  (clause 5.3.2), so for either the identifier is the whole key. No method found
+  such a passport once it carried a batch or a serial: `find_by_identifier`
+  with no batch and no serial answers the model-level record only, and
+  `find_by_carrier` needs a carrier qualifier, which a caller holding only a
+  link or a DID does not have. The new method matches the identifier alone and
+  returns a `Vec`, with no status filter, as its siblings do: an amendment
+  carries the identifier forward, and a withdrawn passport must still be found.
+  For a GTIN it returns every passport of the product. It has a default body
+  that scans `list()`, so no implementation breaks; a real store should index
+  the identifier. (#409)
+
 ### Fixed
 
 - **An identification link with a non-ASCII character passed validation.**
