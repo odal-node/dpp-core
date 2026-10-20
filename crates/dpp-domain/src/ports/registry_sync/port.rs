@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 
 use super::acknowledgement::SubmissionAcknowledgement;
+use super::confirmation::SubmissionConfirmation;
 use super::lookup::SubmissionLookup;
 use super::record::RegistryRecord;
 use super::report::SubmissionReport;
@@ -30,6 +31,8 @@ use crate::error::DppError;
 /// - [`find_submission`](Self::find_submission) recovers the correlation
 ///   identifier when a replayed key says the registry already holds the
 ///   submission and does not say under which handle;
+/// - [`confirm_submission`](Self::confirm_submission) checks a handle a person
+///   supplied when that recovery could not settle it;
 /// - [`check_status`](Self::check_status) and
 ///   [`notify_transfer`](Self::notify_transfer) act on the registered record by
 ///   its registration identifier.
@@ -85,6 +88,37 @@ pub trait RegistrySyncPort: Send + Sync {
         _request: &RegistrationRequest,
     ) -> Result<SubmissionLookup, DppError> {
         Ok(SubmissionLookup::Unsupported)
+    }
+
+    /// Whether a correlation identifier a person supplied is this request's
+    /// submission.
+    ///
+    /// For a caller whose [`find_submission`](Self::find_submission) could not
+    /// settle the matter, because several submissions report the identifier or
+    /// none could be placed, and who has been given the handle by someone reading
+    /// the registry's own interface. A handle taken on trust can give a passport
+    /// another passport's registration, so it is read back from the registry and
+    /// checked against what `request` submitted.
+    ///
+    /// 🚨 The check is by the unique product identifier the passport was
+    /// submitted under, [`data_carrier_uri`](RegistrationRequest::data_carrier_uri),
+    /// and an identifier is not unique to a passport: a successor can be
+    /// submitted under its predecessor's. So
+    /// [`Confirmed`](SubmissionConfirmation::Confirmed) says the submission
+    /// *reports* this identifier, which is as much as the registry says, and a
+    /// caller that has a predecessor and a successor under one identifier is
+    /// still choosing between them. What it rules out is a handle that names a
+    /// submission carrying a different identifier altogether.
+    ///
+    /// The default answers [`Unsupported`](SubmissionConfirmation::Unsupported),
+    /// so an adapter written before this method existed still compiles and a
+    /// caller does not record a handle it could not check.
+    async fn confirm_submission(
+        &self,
+        _request: &RegistrationRequest,
+        _correlation_id: &str,
+    ) -> Result<SubmissionConfirmation, DppError> {
+        Ok(SubmissionConfirmation::Unsupported)
     }
 
     /// The current state of a registered passport, by its registration
