@@ -12,6 +12,9 @@
 
 mod acknowledgement;
 mod granularity;
+mod lookup;
+#[cfg(test)]
+mod outcome_tests;
 mod port;
 mod record;
 mod registering_operator;
@@ -21,9 +24,11 @@ mod service_provider;
 mod status;
 #[cfg(test)]
 mod tests;
+mod transfer_report;
 
 pub use acknowledgement::SubmissionAcknowledgement;
 pub use granularity::RegistrationGranularity;
+pub use lookup::SubmissionLookup;
 pub use port::RegistrySyncPort;
 pub use record::RegistryRecord;
 pub use registering_operator::RegisteringOperator;
@@ -31,6 +36,7 @@ pub use report::SubmissionReport;
 pub use request::RegistrationRequest;
 pub use service_provider::ServiceProviderRef;
 pub use status::RegistryStatus;
+pub use transfer_report::TransferReport;
 
 /// No-op implementation for use before a deployment is enrolled with the EU
 /// Central Registry.
