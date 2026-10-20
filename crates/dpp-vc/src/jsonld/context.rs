@@ -152,6 +152,17 @@ pub const REMOTE_CONTEXTS: &[&str] = &[];
 /// holds a provenance record for it. `id` is absent here because it aliases the
 /// `@id` keyword rather than naming a vocabulary term.
 ///
+/// Three envelope keys are absent from this table too: `productGroupData`,
+/// `personalData` and `disclosureSignatures`. `productGroupData`'s term carries a
+/// scoped context holding a term for every field of every product group,
+/// generated from the schemas rather than listed. The other two are typed
+/// `@json`, because their keys are paths. All three are defined in
+/// [`passport_context`] beside the product identifier's.
+///
+/// A key in this table that holds an object of its own is still defined here by
+/// its IRI alone: [`passport_context`] adds the scope for its members from
+/// `envelope_terms`, which is where those members' terms are listed.
+///
 /// # These IRIs are names, not addresses
 ///
 /// `dpp:` expands into [`OWN_JSONLD_NAMESPACE`], which does not resolve and is
@@ -173,7 +184,6 @@ const PASSPORT_TERMS: &[(&str, &str)] = &[
     ("componentRefs", "dpp:componentRefs"),
     ("createdAt", "dpp:createdAt"),
     ("derivedFrom", "dpp:derivedFrom"),
-    ("disclosureSignatures", "dpp:disclosureSignatures"),
     ("facility", "dpp:facility"),
     ("granularity", "dpp:granularity"),
     ("jwsSignature", "dpp:jwsSignature"),
@@ -184,7 +194,6 @@ const PASSPORT_TERMS: &[(&str, &str)] = &[
     ("operatorIdentifier", "dpp:operatorIdentifier"),
     ("placedOnMarketDate", "dpp:placedOnMarketDate"),
     ("productGroup", "dpp:productGroup"),
-    ("productGroupData", "dpp:productGroupData"),
     ("productId", "dpp:productId"),
     ("productName", "dpp:productName"),
     ("publicJwsSignature", "dpp:publicJwsSignature"),
@@ -261,6 +270,23 @@ pub fn passport_context() -> Value {
                 }),
             );
 
+            // 🚨 Everything below `productGroupData` has a term only because of
+            // this scope. The envelope used to define the key and nothing under
+            // it, so a processor dropped every field a product group adds: the
+            // chemistry of a battery, the composition of a textile. The terms
+            // are generated from the embedded schemas, so a field added to one
+            // has a term without anyone listing it; `product_terms` says how.
+            //
+            // `productIdentifier`, defined above, still resolves inside this
+            // scope: the generated terms leave it out so there is one definition.
+            terms.insert(
+                "productGroupData".to_owned(),
+                json!({
+                    "@id": "dpp:productGroupData",
+                    "@context": super::product_terms::product_group_data_scope()
+                }),
+            );
+
             // 🚨 `personalData` is a map keyed by field paths such as
             // `usageHistory.negativeEvents`. Those keys are not terms and not
             // IRIs, so expansion would drop every one of them and leave the
@@ -271,8 +297,24 @@ pub fn passport_context() -> Value {
                 json!({ "@id": "dpp:personalData", "@type": "@json" }),
             );
 
+            // 🚨 `disclosureSignatures` is keyed by the dotted path of the field
+            // each signature covers, so like `personalData` its keys are neither
+            // terms nor IRIs, and as a plain term a processor dropped every
+            // signature and left an empty node. Carried whole as a literal.
+            terms.insert(
+                "disclosureSignatures".to_owned(),
+                json!({ "@id": "dpp:disclosureSignatures", "@type": "@json" }),
+            );
+
+            // A key that holds an object of its own is defined with a scope for
+            // that object's members, since a member has a term only where it is
+            // defined. See `envelope_terms`.
             for (term, iri) in PASSPORT_TERMS {
-                terms.insert((*term).to_owned(), json!(iri));
+                let definition = match super::envelope_terms::scope_of(term) {
+                    Some(scope) => json!({ "@id": iri, "@context": scope }),
+                    None => json!(iri),
+                };
+                terms.insert((*term).to_owned(), definition);
             }
 
             // Built from the list rather than indexing it: `REMOTE_CONTEXTS[0]`

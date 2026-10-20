@@ -971,13 +971,15 @@ fn the_observed_submission_limits_are_recorded() {
 fn every_wire_constant_declares_a_basis() {
     use crate::endpoint::{
         IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TASKS_SORT_NEWEST_FIRST, TOKEN_PATH,
+        TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     for declared in [
         REGISTRATION_PATH,
         PRODUCT_GROUPS_PATH,
         TASKS_PATH,
+        TASKS_SORT_NEWEST_FIRST,
         TASK_RESULT_PATH_TEMPLATE,
         STATUS_PATH_TEMPLATE,
         TRANSFER_PATH_TEMPLATE,
@@ -994,7 +996,7 @@ fn every_wire_constant_declares_a_basis() {
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
         crate::ENDPOINT_BASIS.len(),
-        8,
+        9,
         "the table grew or shrank without this test being told"
     );
 }
@@ -1008,7 +1010,8 @@ fn every_wire_constant_declares_a_basis() {
 fn each_route_carries_the_tier_its_prose_claims() {
     use crate::endpoint::{
         IDEMPOTENCY_KEY_HEADER, PRODUCT_GROUPS_PATH, REGISTRATION_PATH, STATUS_PATH_TEMPLATE,
-        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TOKEN_PATH, TRANSFER_PATH_TEMPLATE, basis_of,
+        TASK_RESULT_PATH_TEMPLATE, TASKS_PATH, TASKS_SORT_NEWEST_FIRST, TOKEN_PATH,
+        TRANSFER_PATH_TEMPLATE, basis_of,
     };
 
     // Read off the registry's own web client, on the date it was last read.
@@ -1016,6 +1019,7 @@ fn each_route_carries_the_tier_its_prose_claims() {
         REGISTRATION_PATH,
         PRODUCT_GROUPS_PATH,
         TASKS_PATH,
+        TASKS_SORT_NEWEST_FIRST,
         TASK_RESULT_PATH_TEMPLATE,
         IDEMPOTENCY_KEY_HEADER,
     ] {
@@ -1023,7 +1027,7 @@ fn each_route_carries_the_tier_its_prose_claims() {
         assert!(basis.is_observed(), "{observed} is observed");
         assert_eq!(
             basis.observed_on(),
-            Some("2026-10-14"),
+            Some("2026-10-20"),
             "an observation must carry the date it was made"
         );
     }
@@ -1049,6 +1053,20 @@ fn each_route_carries_the_tier_its_prose_claims() {
 fn an_undeclared_route_has_no_basis_rather_than_a_default_one() {
     assert_eq!(crate::endpoint::basis_of("/registrations"), None);
     assert_eq!(crate::endpoint::basis_of(""), None);
+}
+
+/// The dashboard sorts by `<field>,<direction>`, and the one value the client
+/// sends by default is newest first. A caller builds its query from this value
+/// and reads only the front of a long list on the strength of it, so what it
+/// names is pinned: the field a task carries its submission time under, and the
+/// descending direction.
+#[test]
+fn the_newest_first_sort_is_a_field_and_a_direction() {
+    let (field, direction) = crate::endpoint::TASKS_SORT_NEWEST_FIRST
+        .split_once(',')
+        .expect("a sort is a field, a comma and a direction");
+    assert_eq!(field, "submittedAt");
+    assert_eq!(direction, "desc");
 }
 
 /// Every error kind decides its status here, or says it has none — and every
@@ -1092,7 +1110,7 @@ fn the_replayed_key_status_is_the_only_observed_one() {
     assert!(crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.is_observed());
     assert_eq!(
         crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.observed_on(),
-        Some("2026-10-14")
+        Some("2026-10-20")
     );
 }
 

@@ -39,18 +39,30 @@ Six checks, each catching something the others do not:
              protected term could no longer be layered after them, nor a framed
              passport embedded in a credential.
 
-**One gap is known and listed, not hidden.** The passport context defines a term
-for every key of the passport envelope and for the product identifier, and for
-nothing beneath those: the keys inside `manufacturer`, `materials` and the rest,
-and every key of `productGroupData` except the identifier, have no term. A
-processor drops them. They are allowed below as `NESTED_UNDEFINED`, and they are
-the register row's stated deviation. The allowance is checked both ways: any
-other drop fails, and the day the context defines those terms the allowance is
-reported as stale and has to be deleted.
+**Nothing is allowed to drop.** The passport context defines a term for every key
+of the passport envelope, for every member of the envelope's own objects, and for
+everything beneath `productGroupData`: a term for every field of every embedded
+product-group schema version, at the position the field occupies. So a key that
+expands to nothing is a defect wherever it sits, and is reported by path. There
+was once a listed gap here, an allowance for the keys nested below an envelope
+key; it was deleted when the last of them was given a term.
+
+The corpus holds, for a framed passport, more than the fixture's own keys:
+
+  * for each product group, one whose `productGroupData` is the group's fixture,
+    which carries the fields a passport must have;
+  * for **every embedded schema version** of every group, one carrying every field
+    that schema declares;
+  * for each responsibility basis, one whose nested envelope objects (the
+    compliance result, the lint result, the facility, the operator, the seal, the
+    second-life references and the rest) all have every field set.
+
+Only the last two say anything about optional fields and the objects nested in
+them.
 
 **Passing this is conformance of the documents, not of the vocabulary.** It says
-a JSON-LD 1.1 processor accepts the documents and loses nothing outside the
-known gap. It says nothing about whether any IRI is the right IRI.
+a JSON-LD 1.1 processor accepts the documents and loses nothing. It says nothing
+about whether any IRI is the right IRI.
 
 Two deliberately broken inputs are run first, and the processor must reject or
 drop them. A processor upgrade that stopped checking would otherwise leave every
@@ -89,26 +101,6 @@ VENDORED = {
         "ea216ecc1cb02cd39b693dba2250141e270ba0bf95890be107dd9a9e8e43de85",
     ),
 }
-
-# What a framed passport's context does not define: any key nested below an
-# envelope key, except beneath `productGroupData.productIdentifier`, which has a
-# scoped context, and `personalData`, which is kept whole as a JSON literal.
-NESTED_UNDEFINED = (
-    "keys nested below an envelope key of a framed passport, including every key "
-    "of productGroupData except productIdentifier"
-)
-
-
-def is_nested_undefined(label: str, path: str) -> bool:
-    if not label.startswith("a framed "):
-        return False
-    parts = path.strip("/").split("/")
-    if len(parts) < 2:
-        return False
-    if parts[0] == "personalData":
-        return False
-    return not (parts[0] == "productGroupData" and parts[1] == "productIdentifier")
-
 
 ABSOLUTE_IRI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
@@ -334,7 +326,6 @@ def main() -> int:
         report("context ", label, problems)
         failed += bool(problems)
 
-    allowed_seen = 0
     for entry in corpus["documents"]:
         label = entry["label"]
         document = entry["document"]
@@ -348,10 +339,7 @@ def main() -> int:
                     f"{len(roots)}: the oracle disagrees with itself"
                 )
             for path in roots:
-                if is_nested_undefined(label, path):
-                    allowed_seen += 1
-                else:
-                    problems.append(f"{path} expands to nothing")
+                problems.append(f"{path} expands to nothing")
             for path, identifier in relative_ids(expanded):
                 problems.append(
                     f"{path} is named {identifier!r}, a relative IRI: without a base it names nothing"
@@ -362,23 +350,13 @@ def main() -> int:
         failed += bool(problems)
 
     print()
-    if allowed_seen == 0:
-        print(
-            f"error: the known gap ({NESTED_UNDEFINED}) no longer drops anything. "
-            "Delete NESTED_UNDEFINED and the register's deviation for it.",
-            file=sys.stderr,
-        )
-        failed += 1
-    else:
-        print(f"known gap, listed in the register: {allowed_seen} key paths ({NESTED_UNDEFINED})")
-
     if failed:
         print(f"error: {failed} failure(s)", file=sys.stderr)
         return 1
 
     print(
         f"{len(corpus['contexts'])} contexts and {len(corpus['documents'])} documents "
-        f"expand under PyLD {version('pyld')} with nothing lost outside the known gap."
+        f"expand under PyLD {version('pyld')} with nothing lost."
     )
     return 0
 
