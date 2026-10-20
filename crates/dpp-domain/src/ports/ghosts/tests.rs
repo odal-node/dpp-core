@@ -7,7 +7,8 @@ use uuid::Uuid;
 use crate::passport::PassportId;
 use crate::ports::registry_sync::RegistrationGranularity;
 use crate::ports::registry_sync::{
-    RegistrationRequest, RegistrySyncPort, SubmissionAcknowledgement, SubmissionLookup,
+    RegistrationRequest, RegistrySyncPort, SubmissionAcknowledgement, SubmissionConfirmation,
+    SubmissionLookup,
 };
 use crate::ports::seal::SealPort;
 use crate::seal::{
@@ -139,6 +140,15 @@ async fn ghost_register_acknowledges_under_a_placeholder_handle() {
     assert_eq!(
         sync.find_submission(&request).await.unwrap(),
         SubmissionLookup::NotFound { exhaustive: true }
+    );
+
+    // A handle someone supplies names nothing, for the same reason: the ghost
+    // holds no submission, so the handle is not shown to be the passport's.
+    assert_eq!(
+        sync.confirm_submission(&request, &correlation_id)
+            .await
+            .unwrap(),
+        SubmissionConfirmation::Unlisted { exhaustive: true }
     );
 }
 

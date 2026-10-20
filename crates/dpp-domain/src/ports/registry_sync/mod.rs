@@ -11,6 +11,7 @@
 //! development.
 
 mod acknowledgement;
+mod confirmation;
 mod granularity;
 mod lookup;
 #[cfg(test)]
@@ -27,6 +28,7 @@ mod tests;
 mod transfer_report;
 
 pub use acknowledgement::SubmissionAcknowledgement;
+pub use confirmation::SubmissionConfirmation;
 pub use granularity::RegistrationGranularity;
 pub use lookup::SubmissionLookup;
 pub use port::RegistrySyncPort;

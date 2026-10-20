@@ -85,6 +85,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   answers `Unsupported`, so an existing implementation still compiles.
   `GhostRegistrySync` answers `NotFound { exhaustive: true }`.
 
+- **`RegistrySyncPort::confirm_submission` checks a handle a person supplied.**
+  `find_submission` cannot settle every case: several submissions reporting one
+  identifier are `Ambiguous`, and a submission the lookup could not place is
+  `NotFound`, which leaves someone reading the right correlation identifier off
+  the registry's own interface. Taking their word for it is how a passport comes
+  to hold another passport's registration, and a typo is enough. The new method
+  takes the `RegistrationRequest` and the handle and reads the submission back
+  from the registry, answering with a `SubmissionConfirmation`: `Confirmed {
+  report }` when the submission reports this passport's unique product
+  identifier (with what became of it, read in the same step), `Mismatch {
+  reported }` when it was read and reports other identifiers or none,
+  `StillChecking` when the registry has not finished with it and so reports no
+  passport yet, `Unlisted { exhaustive }` when no submission with that handle was
+  found among the records read, and `Unsupported`. Only `Confirmed` licenses
+  recording the handle (`is_confirmed`). A match is by the identifier and nothing
+  else, and an identifier is not unique to a passport, so `Confirmed` says the
+  submission reports it, not that it is the only one that does. The method has a
+  default that answers `Unsupported`, so an existing implementation still
+  compiles. `GhostRegistrySync` answers `Unlisted { exhaustive: true }`.
+
 - **`authenticate_access_credential_with_reason` refuses with the reason as a
   type.** `authenticate_access_credential` reported every refusal as
   `VerificationResult::InvalidSignature` carrying prose, so a caller that wanted
