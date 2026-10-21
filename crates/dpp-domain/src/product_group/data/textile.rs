@@ -1,4 +1,4 @@
-//! Textile (EU Textile DPP, expected ~Q2 2027 adoption, compliance ~2028–2029).
+//! Textile (EU ESPR Working Plan 2025-2030, indicative adoption 2027; no delegated act yet).
 
 use serde::{Deserialize, Serialize};
 
@@ -28,9 +28,10 @@ pub struct FibreEntry {
 
 /// Textile-specific fields for EU textile DPP compliance.
 ///
-/// Based on the anticipated EU Textile DPP delegated act (~Q2 2027 adoption).
-/// Fields marked as `Option` are optional under v1.0.0 but may become mandatory
-/// once the delegated act is finalised.
+/// Based on the anticipated EU Textile DPP delegated act, for which the ESPR
+/// Working Plan 2025-2030 gives an indicative adoption year of 2027. None has
+/// been adopted. Fields marked as `Option` are optional under v1.0.0 but may
+/// become mandatory once the delegated act is finalised.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TextileData {

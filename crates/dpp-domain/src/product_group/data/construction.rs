@@ -1,4 +1,4 @@
-//! Construction Products (EU CPR 2024/3110, mandate ~2028-2032 phased).
+//! Construction Products (EU CPR 2024/3110 Art. 75; undated until its delegated act is adopted).
 
 use serde::{Deserialize, Serialize};
 

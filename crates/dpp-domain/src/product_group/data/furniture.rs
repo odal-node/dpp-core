@@ -1,4 +1,4 @@
-//! Furniture (EU ESPR Working Plan 2025-2030, mandate ~2028-2031).
+//! Furniture (EU ESPR Working Plan 2025-2030, indicative adoption 2028).
 
 use serde::{Deserialize, Serialize};
 

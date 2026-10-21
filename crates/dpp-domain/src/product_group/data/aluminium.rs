@@ -1,4 +1,4 @@
-//! Aluminium (EU ESPR ~2030, CBAM-aligned).
+//! Aluminium (EU ESPR Working Plan 2025-2030, indicative adoption 2027; CBAM-aligned).
 
 use serde::{Deserialize, Serialize};
 

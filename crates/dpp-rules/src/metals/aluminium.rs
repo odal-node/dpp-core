@@ -1,7 +1,9 @@
 //! Aluminium cross-field rules — EU ESPR + CBAM (EU Regulation 2023/956).
 //!
 //! ## Regulatory status
-//! The aluminium DPP mandate is expected around 2030. CBAM (EU 2023/956) covers
+//! No delegated act requires an aluminium passport yet; the ESPR Working Plan
+//! 2025-2030 (COM(2025) 187) gives aluminium an indicative adoption year of 2027.
+//! CBAM (EU 2023/956) covers
 //! embedded-carbon reporting for aluminium imports but does **not** set
 //! production-level CO₂e thresholds that would make a product non-compliant for
 //! DPP purposes. The thresholds below are **industry/CBAM benchmark values**

@@ -1,7 +1,9 @@
 //! Washing machines / washer-dryers — stub; ESPR delegated act expected.
 //!
-//! EU 2021/341 includes repairability requirements for washing machines. An
-//! ESPR-era repairability index delegated act is expected ~2026. Weights and
+//! EU 2021/341 includes repairability requirements for washing machines. The
+//! Commission's working plan (COM(2025) 187) lists household washing machines for
+//! ecodesign and energy-label requirements with an indicative adoption year of
+//! 2026, and does not say whether those carry a repairability index. Weights and
 //! thresholds below are placeholder pending the official annex.
 
 use super::{
@@ -25,7 +27,7 @@ static WASHING_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
 };
 
 static WASHING_BASIS: RegulatoryBasis = RegulatoryBasis {
-    regulation: "pending — ESPR washing machine repairability delegated act (expected ~2026)",
+    regulation: "pending — ESPR washing machine repairability delegated act",
     article: "TBD",
     standard: Some("EN 45554:2021"),
     technical_study: None,
