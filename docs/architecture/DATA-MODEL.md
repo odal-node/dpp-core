@@ -320,7 +320,7 @@ others are listed here rather than each getting a stub.
 | `aluminium` | `AluminiumData` | v1.1.0 | Carbon intensity, CBAM-aligned. Intermediate product |
 | `construction` | `ConstructionData` | v1.1.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
 | `detergent` | `DetergentData` | v1.1.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
-| `electronics` | `ElectronicsData` | v1.2.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
+| `electronics` | `ElectronicsData` | v1.5.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
 | `furniture` | `FurnitureData` | v1.2.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
 | `mattress` | `MattressData` | v1.0.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
 | `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
