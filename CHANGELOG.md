@@ -254,6 +254,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     The filter always has the full path and is unaffected.
   - The nesting test's list of known faults is now empty.
 
+- **Battery `criticalRawMaterial.weightGrams` and `.countryOfOrigin` were
+  `public`, and no provision makes them so.** They are the quantity and origin
+  records of Article 49(2), points (d) and (c), of Regulation (EU) 2023/1542:
+  supply-chain due diligence documentation that an operator keeps for
+  authorities and shares with its immediate downstream purchasers, with due
+  regard for business confidentiality (Article 52(1) and (2)). What is public is
+  the Article 52(3) report on the due diligence policy, which Annex XIII point
+  1(d) makes accessible and `dueDiligenceUrl` carries. Annex VI Part A point 10
+  and Annex XIII point 1(b), which make the critical raw materials present
+  public, name neither a quantity nor an origin, and neither does the
+  Commission's data-point guidance. The label was never decided: it was written
+  down as the class the filter already applied when nested properties were first
+  annotated, after the array above them became public. A public weight in grams
+  of a named material also restated what `materialComposition.weightPct`
+  withholds. **Battery schema v2.9.0** labels both `restricted`; a critical raw
+  material's `name` and `casNumber` stay public. **This changes what an anonymous
+  reader receives of a v2.9.0 battery passport:** its critical raw materials
+  carry no weight and no origin. A passport written against v2.8.0 or earlier
+  keeps its classes and the bytes its signatures cover. A consumer that rendered
+  either field from the public view will not find it on a v2.9.0 passport.
+  (#498)
+  - The doc comment on `CriticalRawMaterial` named the Critical Raw Materials Act
+    as the source of the type; it now names Article 49(2). Electronics v1.5.0
+    labels both fields `restricted` too (it already did for `weightGrams`).
+
 - **An identification link with a non-ASCII character passed validation.**
   `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
   EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing

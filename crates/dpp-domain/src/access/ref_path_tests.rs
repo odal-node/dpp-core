@@ -228,14 +228,19 @@ fn the_battery_material_definition_is_positioned() {
 /// **The relabelled members, on the schemas that ship.**
 ///
 /// Battery v2.9.0 labels `materialComposition`'s `name` and `casNumber`
-/// `restricted` while `criticalRawMaterial` keeps its own `public`, and
-/// electronics v1.5.0 labels `criticalRawMaterial`'s `name` and `countryOfOrigin`
-/// `restricted` while `repairCriterion`'s `name` stays `public`. Each pair shares
-/// a bare-leaf key that the policy merges to the stricter class, so this is the
-/// collision `the_filter_redacts_by_path_through_a_ref` states synthetically, run
-/// on real schemas. Both directions are asserted, by position and by what each
-/// audience receives: the restricted member is withheld from an anonymous reader,
-/// and its public twin is not withheld with it.
+/// `restricted` while `criticalRawMaterial` keeps its own `name` and `casNumber`
+/// `public`, and electronics v1.5.0 labels `criticalRawMaterial`'s `name` and
+/// `countryOfOrigin` `restricted` while `repairCriterion`'s `name` stays `public`.
+/// Each pair shares a bare-leaf key that the policy merges to the stricter class,
+/// so this is the collision `the_filter_redacts_by_path_through_a_ref` states
+/// synthetically, run on real schemas. Both directions are asserted, by position
+/// and by what each audience receives: the restricted member is withheld from an
+/// anonymous reader, and its public twin is not withheld with it.
+///
+/// Battery v2.9.0 also labels `criticalRawMaterial`'s `weightGrams` and
+/// `countryOfOrigin` `restricted` (Article 49(2), points (d) and (c), of
+/// Regulation (EU) 2023/1542). That is the one change here to what an anonymous
+/// reader receives, and v2.8.0 is asserted unchanged beside it.
 #[test]
 fn the_relabelled_members_are_restricted_and_their_twins_are_not() {
     let scope = DocumentScope::ProductGroupData;
@@ -251,11 +256,25 @@ fn the_relabelled_members_are_restricted_and_their_twins_are_not() {
             );
         }
     }
-    for member in ["name", "casNumber", "weightGrams", "countryOfOrigin"] {
+    for member in ["name", "casNumber"] {
         assert_eq!(
             battery.disclosure_for_path(&["criticalRawMaterials", member], scope),
             Disclosure::Public,
             "critical raw materials present are public through Annex XIII points 1(a) and 1(b): {member}"
+        );
+    }
+    for member in ["weightGrams", "countryOfOrigin"] {
+        assert_eq!(
+            battery.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Restricted,
+            "the quantity and origin records of Article 49(2)(d) and (c) are not passport content: {member}"
+        );
+        let released = ProductGroupAccessPolicy::for_schema_version("battery", "2.8.0")
+            .expect("battery 2.8.0 is registered");
+        assert_eq!(
+            released.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Public,
+            "and a record written against v2.8.0 keeps v2.8.0's class: {member}"
         );
     }
     for member in ["name", "casNumber"] {
@@ -316,8 +335,10 @@ fn the_relabelled_members_are_restricted_and_their_twins_are_not() {
         "an anonymous reader receives no electrode composition: {public}"
     );
     assert_eq!(
-        public["criticalRawMaterials"], battery_document["criticalRawMaterials"],
-        "and receives every public critical raw material member"
+        public["criticalRawMaterials"],
+        json!([{ "name": "cobalt", "casNumber": "7440-48-4" }]),
+        "and receives each critical raw material's name and CAS number, without its \
+         quantity or origin"
     );
     let interested = filter_by_audience_in_scope(
         &battery_document,

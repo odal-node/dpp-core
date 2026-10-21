@@ -235,9 +235,11 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             Version::new(2, 9, 0),
             false,
             "v2.9.0 labels the name and casNumber of materialComposition restricted, as \
-             the arrays that hold them are. It changes no shape and no audience's view, \
-             because the serving filter already withheld each array whole, so the \
-             document passes through untouched.",
+             the arrays that hold them are, and the weightGrams and countryOfOrigin of \
+             criticalRawMaterial restricted, since they are Article 49(2) due diligence \
+             records and not passport content. It changes no shape, so the document \
+             passes through untouched, and a record written against v2.8.0 keeps the \
+             classes of v2.8.0.",
             pass_through,
         ),
         Lens::new(
