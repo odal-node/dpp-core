@@ -317,15 +317,15 @@ others are listed here rather than each getting a stub.
 
 | Product group | Type | Current schema | Note |
 |---|---|---|---|
-| `aluminium` | `AluminiumData` | v1.1.0 | Carbon intensity, CBAM-aligned. Intermediate product |
-| `construction` | `ConstructionData` | v1.1.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
-| `detergent` | `DetergentData` | v1.1.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
+| `aluminium` | `AluminiumData` | v1.2.0 | Carbon intensity, CBAM-aligned. Intermediate product |
+| `construction` | `ConstructionData` | v1.2.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
+| `detergent` | `DetergentData` | v1.2.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
 | `electronics` | `ElectronicsData` | v1.5.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
-| `furniture` | `FurnitureData` | v1.2.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
-| `mattress` | `MattressData` | v1.0.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
-| `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
-| `toy` | `ToyData` | v1.1.0 | Reg. (EU) 2025/2509 |
-| `tyre` | `TyreData` | v1.0.0 | |
+| `furniture` | `FurnitureData` | v1.3.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
+| `mattress` | `MattressData` | v1.1.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
+| `steel` | `SteelData` | v1.2.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
+| `toy` | `ToyData` | v1.2.0 | Reg. (EU) 2025/2509 |
+| `tyre` | `TyreData` | v1.1.0 | |
 | `unsold-goods` | `UnsoldGoodsReport` | v2.0.0 | See §4.4 — **not a product group**; built to Impl. Reg. (EU) 2026/2 Annex I |
 
 `ProductGroupData::Other` keeps the tag and payload of a product group this build
