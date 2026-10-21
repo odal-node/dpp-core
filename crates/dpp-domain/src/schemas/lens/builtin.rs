@@ -230,6 +230,17 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             pass_through,
         ),
         Lens::new(
+            "battery",
+            Version::new(2, 8, 0),
+            Version::new(2, 9, 0),
+            false,
+            "v2.9.0 labels the name and casNumber of materialComposition restricted, as \
+             the arrays that hold them are. It changes no shape and no audience's view, \
+             because the serving filter already withheld each array whole, so the \
+             document passes through untouched.",
+            pass_through,
+        ),
+        Lens::new(
             "construction",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),
@@ -264,6 +275,17 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
              scheme 1 identifier, so this hop wraps it rather than asking for anything \
              the record does not already have. Lossless and total.",
             gtin_to_product_identifier,
+        ),
+        Lens::new(
+            "electronics",
+            Version::new(1, 4, 0),
+            Version::new(1, 5, 0),
+            false,
+            "v1.5.0 labels the name and countryOfOrigin of a critical raw material \
+             restricted, as the criticalRawMaterials array that holds them is. It \
+             changes no shape and no audience's view, because the serving filter \
+             already withheld the array whole, so the document passes through untouched.",
+            pass_through,
         ),
         Lens::new(
             "furniture",

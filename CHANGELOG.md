@@ -208,6 +208,52 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Fixed
 
+- **The members of battery `materialComposition` and electronics
+  `criticalRawMaterial` were labelled `public` inside arrays that are
+  `restricted`.** Battery's `anodeMaterial`, `cathodeMaterial` and
+  `electrolyteMaterial` are `restricted` because Annex XIII point 2(a) of
+  Regulation (EU) 2023/1542 places the detailed composition of the cathode, anode
+  and electrolyte in the tier for persons with a legitimate interest and the
+  Commission, yet the `name` and `casNumber` of the `materialComposition` they
+  share said `public`. Electronics' `criticalRawMaterials` is `restricted`, and
+  the `name` and `countryOfOrigin` of its members said `public`. No audience's
+  view changed: the serving filter drops an array whole for an audience that may
+  not see its class, so the labels disagreed without leaking. **Battery schema
+  v2.9.0** and **electronics schema v1.5.0** label those members `restricted`.
+  Each is a label-only version, and its lens passes a document through
+  untouched. A released schema is never edited, so a passport written against
+  v2.8.0 or v1.4.0 keeps its policy and the bytes its signatures cover; a new
+  passport is written against the new version. (#405, #424)
+  - **Electronics: the tier is this schema's own to set.** Regulation (EU)
+    2024/1252 Art. 28 and 29 reach permanent magnets in a closed list of
+    products, and a smartphone or tablet is neither on it nor an electric motor
+    rated at 0,12 kW or more (Art. 2(47)); no act recorded for the product group
+    makes the critical raw materials such a device contains public. `restricted`
+    is the conservative reading, and it matches the array and the `casNumber` and
+    `weightGrams` beside the two members that moved.
+  - **Why this could not be done before.** A definition's members are also
+    recorded under their bare name, as a fail-closed floor for a reference the
+    policy walk cannot follow, so two definitions that share a member name share
+    one key, which resolves to the more restrictive of their classes.
+    `every_declared_property_resolves_to_its_own_class` held that key to the
+    declared class exactly, so relabelling one definition's member failed whenever
+    another definition in the schema declared the same name more openly: battery's
+    `criticalRawMaterial` for `name` and `casNumber`, electronics' `repairCriterion`
+    for `name`. A floor key now has to be no looser than the declaration, and a
+    position is still exact. **No policy code changed.** The new test
+    `no_shipped_schema_refers_to_a_definition_from_a_construct_the_collector_skips`
+    asserts that no shipped schema has a `$ref` the walk does not follow, so the
+    floor answers for no real position, and it fails the day one does.
+    `the_relabelled_members_are_restricted_and_their_twins_are_not` runs the
+    collision on the shipped schemas, in both directions: the restricted member is
+    withheld from an anonymous reader and its public twin is not withheld with it.
+  - **One observable change.** A lookup by bare leaf name alone,
+    `ProductGroupAccessPolicy::disclosure_for_field("name")`, now answers
+    `Restricted` for these two versions where it answered `Public`: a leaf asked
+    without its parent is ambiguous, and ambiguity resolves to the stricter class.
+    The filter always has the full path and is unaffected.
+  - The nesting test's list of known faults is now empty.
+
 - **An identification link with a non-ASCII character passed validation.**
   `https://exämple.com/item` and `https://example.com/ü` were both accepted as an
   EN 18219 scheme 2 identifier: each has a host and no whitespace, and nothing
