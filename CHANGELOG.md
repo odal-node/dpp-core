@@ -15,6 +15,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The lineage rule asked for the predecessor's consent, which no instrument
+  requires, and is renamed for what it checks.** `dpp_rules::lineage::consent`
+  reported a second-life derivation edge that no transfer of responsibility
+  supports as "unconsented", on the reasoning that responsibility "must not be
+  assignable by unilateral assertion". Reg. (EU) 2023/1542 Art. 77(7) says
+  otherwise: the responsibility "shall be transferred to the economic operator
+  that has placed that battery on the market or has put it into service", by
+  operation of law, and the battery "shall have a new battery passport linked to"
+  the original. The predecessor's agreement is not a precondition, so an operator
+  asserting a derivation is assuming responsibility, not assigning it. What the
+  rule does is substantiation: it asks whether evidence that the operation took
+  place accompanies the claim. A transfer record is that evidence, and the
+  Regulation does not require one to exist. A finding called "unconsented"
+  invites a caller to go and obtain an agreement no regulation requires; one
+  called "unsubstantiated" invites them to find the evidence. (#313)
+  - **Removed, with their replacements:** `dpp_rules::lineage::consent` is now
+    `dpp_rules::lineage::substantiation`; `check_derivation_consent` is now
+    `check_derivation_substantiation`; `ConsentFinding` is now
+    `SubstantiationFinding`; `ConsentDefect` is now `SubstantiationDefect`. The
+    crate-root re-exports in `dpp_rules::lineage` move the same way, and so do the
+    paths through `dpp_plugin_sdk::rules`.
+  - **Migration:** rename the imports and the calls. Nothing else changes.
+    `DerivationEdge`, `TransferEvidence`, `StatusDefect`, the fields of the
+    finding, and the variants `NoTransfer`, `OutgoingAuthorisationMissing`,
+    `NotAccepted`, `IncomingOperatorMismatch` and `OperationMismatch` keep their
+    names and meaning, because they describe facts about the transfer record. No
+    deprecated aliases are left behind: nothing in this repository calls the old
+    names outside the rule's own tests.
+  - **The behaviour does not change.** The rule still reports an edge unless the
+    caller found a transfer record authorised by the outgoing operator, accepted,
+    and naming the same operation and the same incoming operator. A missing record
+    is an unsubstantiated claim, not a breach of Art. 77(7). Whether the rule
+    should keep demanding the outgoing operator's authorisation, which a lawful
+    second-life operator may be unable to obtain, is #499.
+  - The doc comments and the lineage design document that called an edge
+    "consented to" say "substantiated" instead.
+
 - **`RegistrySyncPort::notify_transfer` answers with a `TransferReport`, not a
   `RegistryRecord`.** A notification amends a record that already exists, so
   what the registry says about it is whether it took the notification, not where
