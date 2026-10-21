@@ -84,6 +84,7 @@ fn battery_passport() -> Passport {
                 dynamic_performance: None,
                 battery_status: None,
                 usage_history: None,
+                due_diligence_operator_scope: None,
                 expected_lifetime: None,
                 recycled_content_reporting_year: None,
                 rated_capacity_kwh: Some(0.32),

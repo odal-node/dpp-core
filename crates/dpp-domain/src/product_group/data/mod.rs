@@ -25,9 +25,10 @@ pub mod unsold_goods;
 
 pub use aluminium::AluminiumData;
 pub use battery::{
-    BatteryChemistry, BatteryData, BatteryStatus, BatteryType, DynamicPerformance,
-    EnvironmentalReading, ExpectedLifetime, HarmfulEvents, HazardSymbol, HazardousSubstance,
-    MaterialComposition, StateOfChargeReading, StateOfHealth, TemperatureRange, UsageHistory,
+    BatteryChemistry, BatteryData, BatteryStatus, BatteryType, DueDiligenceOperatorScope,
+    DynamicPerformance, EnvironmentalReading, ExpectedLifetime, HarmfulEvents, HazardSymbol,
+    HazardousSubstance, MaterialComposition, StateOfChargeReading, StateOfHealth, TemperatureRange,
+    UsageHistory,
 };
 pub use common::{CriticalRawMaterial, ProductionRoute, SvhcSubstance};
 pub use construction::ConstructionData;

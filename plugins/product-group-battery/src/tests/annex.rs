@@ -87,6 +87,85 @@ fn a_field_the_guidance_bars_is_flagged_when_present() {
     );
 }
 
+// ── Row 19: the due diligence report, by date and Art. 47 ────────────────
+
+fn message<'a>(result: &'a PluginResult, code: &str) -> Option<&'a str> {
+    result
+        .warnings
+        .iter()
+        .find(|w| w.code == code)
+        .map(|w| w.message.as_str())
+}
+
+/// Without a placing date, whether the report is owed has no answer, and the
+/// finding says which fact is missing and what waits on it.
+#[test]
+fn a_missing_placing_date_is_named_with_what_waits_on_it() {
+    let mut data = valid_battery();
+    data["batteryType"] = json!("ev");
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    let msg = message(&result, "battery.annex_xiii.placedOnMarketDate_missing")
+        .unwrap_or_else(|| panic!("got: {:?}", codes(&result)));
+    assert!(msg.contains("dueDiligenceUrl"), "{msg}");
+}
+
+#[test]
+fn from_the_date_the_report_is_owed_by_a_declared_subject() {
+    let mut data = valid_battery();
+    data["batteryType"] = json!("lmt");
+    data["placedOnMarketDate"] = json!("2027-08-18");
+
+    // Undeclared: the operator is asked, not excused.
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    assert!(
+        codes(&result).contains(&"battery.annex_xiii.dueDiligenceOperatorScope_missing"),
+        "got: {:?}",
+        codes(&result)
+    );
+
+    data["dueDiligenceOperatorScope"] = json!("subject");
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    let msg = message(&result, "battery.annex_xiii.mandatory_content_incomplete").unwrap();
+    assert!(msg.contains("dueDiligenceUrl"), "{msg}");
+
+    data["dueDiligenceOperatorScope"] = json!("belowTurnoverThreshold");
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    let msg = message(&result, "battery.annex_xiii.mandatory_content_incomplete").unwrap();
+    assert!(
+        !msg.contains("dueDiligenceUrl"),
+        "Art. 47 exempts it: {msg}"
+    );
+}
+
+/// Art. 47's second paragraph needs no date, so a second-life battery is not
+/// asked for one on this row's account.
+#[test]
+fn a_second_life_battery_is_not_asked_for_a_date() {
+    let mut data = valid_battery();
+    data["batteryType"] = json!("ev");
+    data["batteryStatus"] = json!("repurposed");
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    assert!(
+        !codes(&result).contains(&"battery.annex_xiii.placedOnMarketDate_missing"),
+        "got: {:?}",
+        codes(&result)
+    );
+}
+
+#[test]
+fn before_the_date_the_report_is_not_to_be_filled() {
+    let mut data = valid_battery();
+    data["batteryType"] = json!("ev");
+    data["placedOnMarketDate"] = json!("2027-08-17");
+    data["dueDiligenceUrl"] = json!("https://example.invalid/report");
+    let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    assert!(
+        codes(&result).contains(&"battery.annex_xiii.dueDiligenceUrl_not_applicable"),
+        "got: {:?}",
+        codes(&result)
+    );
+}
+
 // ── Annex VII state of health ────────────────────────────────────────────
 
 /// Part A's two lists are disjoint, and an EV battery reports the one-item

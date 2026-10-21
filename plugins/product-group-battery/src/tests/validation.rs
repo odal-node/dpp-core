@@ -16,7 +16,7 @@ fn meta_reports_battery_product_group() {
 fn capabilities_cover_battery_schema_range() {
     let caps = BatteryPlugin.capabilities();
     assert_eq!(caps.abi_version, AbiVersion::current());
-    assert_eq!(caps.supported_schemas[0].max_version, "2.9.0");
+    assert_eq!(caps.supported_schemas[0].max_version, "2.10.0");
     assert!(caps.capabilities.contains(&PluginCapability::Validate));
 }
 

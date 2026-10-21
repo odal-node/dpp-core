@@ -243,6 +243,17 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             pass_through,
         ),
         Lens::new(
+            "battery",
+            Version::new(2, 9, 0),
+            Version::new(2, 10, 0),
+            false,
+            "v2.10.0 adds dueDiligenceOperatorScope, the operator's declaration against \
+             Article 47, first paragraph, of Regulation (EU) 2023/1542. It is optional and \
+             nothing earlier had it, so the document passes through untouched; a record \
+             written against v2.9.0 simply has not made the declaration.",
+            pass_through,
+        ),
+        Lens::new(
             "construction",
             Version::new(1, 1, 0),
             Version::new(1, 2, 0),

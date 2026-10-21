@@ -55,7 +55,83 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   it is `None`, so a stored record reads as before and is written back with the
   same bytes, which a signed passport and a signed transfer chain need. (#494)
 
+- **The battery content table answers as of a battery's facts, not its category
+  alone, and the publish gate refuses when a fact it needs is missing.** Guidance
+  row 19, `dueDiligenceUrl` (Annex XIII point 1(d)), was `NotApplicable` for EV,
+  LMT and industrial batteries with no way to say that Art. 48(1) makes the report
+  due from 18 August 2027. It now follows the placing-on-market date, and from
+  that date it is owed unless Art. 47 takes the battery out of the due diligence
+  chapter: an operator declaring itself under the turnover threshold (first
+  paragraph), or a battery already on the market before being re-used,
+  repurposed or remanufactured (second paragraph). It is not a plain `Mandatory`
+  from that date, which is how the Commission's guidance reads: that would have
+  refused both exempt cases, including every second-life passport, since Art.
+  77(7) gives such a battery a new passport with a later placing date. The
+  turnover limb is a declaration, never a figure, so an amendment to the
+  threshold changes no code. Changes to the public API:
+  - `passport_content::annex_xiii_requirement`, `mandatory_fields` and
+    `fields_not_applicable` take a `BatteryFacts` (the placing date, the
+    second-life limb and the operator's declaration). A row with nothing
+    scheduled ignores it.
+  - `Requirement` gains `Exempt`, for a battery the law excuses from a duty its
+    category carries, and `Undetermined(MissingFact)`, for an answer that turns
+    on a fact the caller did not give. An `Exempt` field is neither required nor
+    flagged; an `Undetermined` one is never an exemption, and the gate refuses it.
+  - `Passport::check_mandatory_content` and `check_category_content` refuse an
+    EV, LMT or industrial battery that does not carry its placing date (on the
+    envelope or as `placedOnMarketDate`) unless it is second-life, and from
+    18 August 2027 one that does not carry `dueDiligenceOperatorScope`. There is
+    one error per missing fact, naming every field waiting on it, so this is one
+    rule for every such obligation rather than a side effect of one row. Nothing
+    lawful is refused: a passport has to exist once the battery is placed on the
+    market, and a draft prepared before then is not published. The gate also
+    refuses a record whose two placing dates disagree, because `transition_to`
+    does not run `validate`, which already did.
+
+  **Migration:** pass `BatteryFacts::default()` where no facts are known, and
+  expect `Undetermined` for row 19. Match the two new `Requirement` variants.
+  Publish EV, LMT and industrial batteries with their placing date, and from
+  18 August 2027 with `dueDiligenceOperatorScope`. (#404)
+
 ### Added
+
+- **`dpp_rules::batteries::due_diligence`, battery schema v2.10.0, and the facts
+  the content table reads.** `due_diligence_scope` answers Art. 47 and Art. 48(1)
+  for one battery as a `DueDiligenceScope` (`ExemptSecondLife`,
+  `PlacingDateUnknown`, `NotYetBinding`, `OperatorScopeUndeclared`,
+  `ExemptBelowTurnoverThreshold`, `Required`), from the placing date, a
+  `DueDiligenceSecondLife` and an `OperatorScope`. `DUE_DILIGENCE_REQUIRED_FROM`
+  is 18 August 2027. `battery_facts::BatteryFacts` carries the three facts, and
+  `passport_content::undetermined_fields` lists each field whose answer waits on
+  one, with the `MissingFact` it waits on. Battery schema v2.10.0 adds
+  `dueDiligenceOperatorScope` (`subject` or `belowTurnoverThreshold`, labelled
+  `conformity`), carried by `BatteryData::due_diligence_operator_scope` as a
+  `DueDiligenceOperatorScope`; a v2.9.0 record reads through unchanged. The
+  battery plugin accepts v2.10.0 and reports a missing fact at create time as
+  `battery.annex_xiii.<field>_missing`, so a draft learns what the publish gate
+  will ask before it gets there. (#404)
+
+- **`ObligationCalendar`: which dated obligations take effect between two
+  dates.** `ObligationCalendar::new().between(from, to)` returns the
+  `ObligationEvent`s in that window, both days included, ordered by date and
+  then by id. Each event has a stable `id`, its `date`, an `ObligationKind`
+  (`PassportStart`, `ContentRequirement`, `MinimumShare`, `Restriction`), the
+  citation that fixes the date, a one-line summary, the product group and
+  categories it reaches, and its `DateBasis`, so an `Assumed` date is never
+  mistaken for a deadline. It reads two sources: every act's passport start date
+  in the instrument catalog (`from_catalog` takes a caller's own), and the
+  changes the rule modules schedule. Each battery rule module that selects its
+  answer by date now lists those changes as `SCHEDULE`
+  (`dpp_rules::batteries::schedule::ScheduledChange`), built from the same
+  constants the rule applies, so the two cannot disagree: the due diligence report
+  (18 August 2027), the Art. 8(2) and 8(3) minimum shares (2031 and 2036) and
+  the two Annex I lead dates. There is no clock: the caller passes the window. A
+  change with no date is not an event, so the Art. 8(1) declaration floors, which
+  are only the earliest that duty can begin, are left out with the reason
+  recorded. A new gate in `dpp-tests` fails when a `CalendarDate` constant in
+  `dpp-rules` is on no `SCHEDULE` and not listed with a reason, when a `SCHEDULE`
+  does not reach the calendar, or when a file listing one carries no ✅
+  COMPLIANCE-PIN. (#507)
 
 - **The registry's web client was read again (2026-10-20), and the task list's
   sort is now a constant.** Both the acceptance and the production build of the

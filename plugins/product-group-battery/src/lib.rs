@@ -15,11 +15,16 @@
 //! never interchangeable as dispatch keys.
 
 use dpp_plugin_sdk::export_plugin;
+use dpp_plugin_sdk::rules::batteries::battery_facts::BatteryFacts;
 use dpp_plugin_sdk::rules::batteries::category::BATTERY_TYPES;
 use dpp_plugin_sdk::rules::batteries::degradation::{
     Annex7ParameterSet, annex_vii_parameter_set_for,
 };
-use dpp_plugin_sdk::rules::batteries::passport_content::{fields_not_applicable, mandatory_fields};
+use dpp_plugin_sdk::rules::batteries::due_diligence::{DueDiligenceSecondLife, OperatorScope};
+use dpp_plugin_sdk::rules::batteries::passport_content::{
+    MissingFact, fields_not_applicable, mandatory_fields, undetermined_fields,
+};
+use dpp_plugin_sdk::rules::common::date::CalendarDate;
 use dpp_plugin_sdk::traits::{
     DppProductGroupPlugin, METRIC_CO2E_SCORE, PluginComplianceStatus, PluginError, PluginFinding,
     PluginIdentity, PluginInput, PluginResult, SchemaVersionRange,
@@ -42,11 +47,11 @@ impl DppProductGroupPlugin for BatteryPlugin {
         }
     }
 
-    // Battery schema ships as v1.0.0 through v2.9.0 (Annex XIII + Annex VII).
+    // Battery schema ships as v1.0.0 through v2.10.0 (Annex XIII + Annex VII).
     fn schema_version_range(&self) -> SchemaVersionRange {
         SchemaVersionRange {
             min_version: "1.0.0".into(),
-            max_version: "2.9.0".into(),
+            max_version: "2.10.0".into(),
         }
     }
 
@@ -189,10 +194,16 @@ impl DppProductGroupPlugin for BatteryPlugin {
 ///
 /// Portable and SLI batteries produce nothing here: the guidance does not cover
 /// them, and `dpp-rules` answers `Unknown` rather than guessing.
+///
+/// A field whose obligation turns on a fact the payload does not state (today,
+/// `dueDiligenceUrl`, on the placing date and the Art. 47 declaration) gets one
+/// finding per missing fact, because the host refuses the publish for the same
+/// reason.
 fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<PluginFinding> {
     let mut out = Vec::new();
+    let facts = content_facts(input);
 
-    let missing: Vec<&str> = mandatory_fields(battery_type)
+    let missing: Vec<&str> = mandatory_fields(battery_type, facts)
         .filter(|f| input.get(*f).is_none_or(Value::is_null))
         .collect();
     if !missing.is_empty() {
@@ -217,7 +228,7 @@ fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<P
         .as_object()
         .map(|o| o.keys().map(String::as_str).collect())
         .unwrap_or_default();
-    for field in fields_not_applicable(&present, battery_type) {
+    for field in fields_not_applicable(&present, battery_type, facts) {
         out.push(PluginFinding::new(
             format!("battery.annex_xiii.{field}_not_applicable"),
             format!("/{field}"),
@@ -230,7 +241,50 @@ fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<P
         ));
     }
 
+    let mut waiting: Vec<(MissingFact, Vec<&str>)> = Vec::new();
+    for (field, fact) in undetermined_fields(battery_type, facts) {
+        match waiting.iter_mut().find(|(f, _)| *f == fact) {
+            Some((_, fields)) => fields.push(field),
+            None => waiting.push((fact, vec![field])),
+        }
+    }
+    for (fact, fields) in waiting {
+        let source = fact.field();
+        out.push(PluginFinding::new(
+            format!("battery.annex_xiii.{source}_missing"),
+            format!("/{source}"),
+            format!(
+                "'{source}' is absent, and whether a '{battery_type}' battery owes {} turns on \
+                 it, so publishing will be refused until it is stated.",
+                fields.join(", ")
+            ),
+        ));
+    }
+
     out
+}
+
+/// The facts the content table's scheduled rows read, off the payload.
+///
+/// Each is read strictly, and anything unreadable is absent rather than
+/// guessed: a malformed date is no date, and an unrecognised declaration is no
+/// declaration. The second-life limb reads `batteryStatus` as
+/// [`recycled_content`]'s Art. 8(4) reader does, because Art. 47's second
+/// paragraph sets the same condition: a repurposed, re-used or remanufactured
+/// battery was on the market before that operation.
+fn content_facts(input: &PluginInput) -> BatteryFacts {
+    let text = |key: &str| input.get(key).and_then(Value::as_str);
+    let second_life = match text("batteryStatus") {
+        Some("repurposed" | "re-used" | "remanufactured") => {
+            DueDiligenceSecondLife::PlacedBeforeOperations
+        }
+        _ => DueDiligenceSecondLife::None,
+    };
+    BatteryFacts {
+        placed_on_market: text("placedOnMarketDate").and_then(CalendarDate::parse_iso),
+        second_life,
+        operator_scope: text("dueDiligenceOperatorScope").and_then(OperatorScope::from_wire),
+    }
 }
 
 /// Whether the declared state-of-health block is the one Annex VII Part A asks

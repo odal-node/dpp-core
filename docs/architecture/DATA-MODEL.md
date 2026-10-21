@@ -233,22 +233,22 @@ Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each
 
 **Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Product group (`BatteryData`) — v2.9.0
+### 4.1 Battery Product group (`BatteryData`) — v2.10.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
 
 **This section deliberately does not list every field.** `BatteryData` carries
-68, and a hand-maintained copy of that list is the same drift that let four
+69, and a hand-maintained copy of that list is the same drift that let four
 Annex VI Part A fields sit in the type for seven schema versions with no schema
 property to validate against. The authoritative pair is:
 
 - `crates/dpp-domain/src/product_group/data/battery/data.rs` — the type, with a
   per-field regulatory citation on each doc comment.
-- `crates/dpp-domain/schemas/battery/v2.9.0.json` — the wire contract, with an
+- `crates/dpp-domain/schemas/battery/v2.10.0.json` — the wire contract, with an
   `x-disclosure` class on every property. `additionalProperties` is `false`, so a
   field the type emits that the schema does not declare fails validation. Both
-  carry the same 68 fields today; no test asserts that the two sets are equal.
+  carry the same 69 fields today; no test asserts that the two sets are equal.
 
 **Required** (5, and the only ones a passport cannot omit at any category):
 `productIdentifier`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
@@ -259,6 +259,19 @@ because the obligations are **per category**: a field mandatory for an
 electric-vehicle battery may be "not to be filled/displayed" for an LMT one.
 That constraint lives in `dpp_rules::batteries::passport_content`, which the
 publish gate enforces, rather than in the schema.
+
+**One row also turns on facts about the battery.** `dueDiligenceUrl` (Annex
+XIII point 1(d)) is not to be filled for a battery placed on the market before
+18 August 2027, and is owed from that date (Art. 48(1)) unless Art. 47 takes the
+battery out: `dueDiligenceOperatorScope` declares whether the operator is under
+the turnover threshold, and a repurposed, re-used or remanufactured
+`batteryStatus` is the second-life exemption. So the placing date
+(`placedOnMarketDate`, on the envelope or here) and, from that date, the
+declaration are facts the publish gate needs. When one is absent it refuses,
+naming the fact and the fields waiting on it, rather than guessing either way.
+The declaration is labelled `conformity`: it is the operator's statement of its
+own position, for authorities to verify, and no point of Annex XIII places it in
+a wider tier.
 
 **Shape.** The fields group by the Annex XIII tier that governs who may see
 them, which is also what `x-disclosure` records:
@@ -287,7 +300,7 @@ field is itself the defect.
 - `HazardousSubstance { name, cas_number, concentration_pct }`
 - `TemperatureRange { min_c, max_c }`
 
-Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.9.0}.json`. Older versions stay
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.10.0}.json`. Older versions stay
 registered so a passport validated against one remains verifiable, and each
 carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.

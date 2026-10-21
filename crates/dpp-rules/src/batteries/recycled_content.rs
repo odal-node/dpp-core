@@ -67,6 +67,7 @@
 
 use alloc::vec::Vec;
 
+use crate::batteries::schedule::{ChangeKind, ScheduledChange};
 use crate::common::date::CalendarDate;
 
 // BOUNDARY-EXCEPTION(taxonomy): "Phase 1" and "Phase 2" are the two stages of
@@ -115,6 +116,39 @@ pub const ART8_PHASE1_FROM: CalendarDate = CalendarDate::new(2031, 8, 18);
 /// First day on which the Art. 8(3) minimum shares bind a battery placed on the
 /// EU market — 18 August 2036.
 pub const ART8_PHASE2_FROM: CalendarDate = CalendarDate::new(2036, 8, 18);
+
+/// The changes [`ART8_PHASE1_FROM`] and [`ART8_PHASE2_FROM`] schedule.
+///
+/// The Art. 8(1) declaration floors ([`ART8_DECLARATION_FLOOR_2028`] and
+/// [`ART8_DECLARATION_FLOOR_2033`]) are deliberately absent: each is the earliest
+/// day that duty can begin, and the day it does begin turns on a delegated act
+/// not yet adopted. A calendar that listed one would announce a start nobody
+/// knows.
+pub const SCHEDULE: &[ScheduledChange] = &[
+    ScheduledChange {
+        id: "battery.recycled-content.minimum-shares-2031",
+        date: ART8_PHASE1_FROM,
+        kind: ChangeKind::MinimumShare,
+        citation: "Regulation (EU) 2023/1542 Art. 8(2)",
+        summary: "Minimum recycled-content shares of cobalt, lead, lithium and nickel bind \
+                  industrial batteries over 2 kWh (except those with exclusively external \
+                  storage), electric-vehicle batteries and SLI batteries placed on the \
+                  market from this date.",
+        product_group: "battery",
+        categories: &["industrial", "ev", "starting-lighting-ignition"],
+    },
+    ScheduledChange {
+        id: "battery.recycled-content.minimum-shares-2036",
+        date: ART8_PHASE2_FROM,
+        kind: ChangeKind::MinimumShare,
+        citation: "Regulation (EU) 2023/1542 Art. 8(3)",
+        summary: "Higher minimum recycled-content shares bind the same categories, and LMT \
+                  batteries for the first time, for batteries placed on the market from this \
+                  date.",
+        product_group: "battery",
+        categories: &["industrial", "ev", "starting-lighting-ignition", "lmt"],
+    },
+];
 
 /// The battery categories Art. 8(2) and 8(3) treat differently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
