@@ -255,7 +255,15 @@ fn the_relabelled_members_are_restricted_and_their_twins_are_not() {
         assert_eq!(
             battery.disclosure_for_path(&["criticalRawMaterials", member], scope),
             Disclosure::Public,
-            "Annex XIII point 1(b) puts critical raw materials on the public tier: {member}"
+            "critical raw materials present are public through Annex XIII points 1(a) and 1(b): {member}"
+        );
+    }
+    for member in ["name", "casNumber"] {
+        assert_eq!(
+            battery.disclosure_for_path(&["hazardousSubstances", member], scope),
+            Disclosure::Public,
+            "the third twin: hazardous substances are Annex VI Part A point 8, public through \
+             Annex XIII point 1(a), and the floor's merged class must not reach them: {member}"
         );
     }
 
