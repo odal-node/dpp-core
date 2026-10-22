@@ -15,6 +15,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The lineage rule asked for the predecessor's consent, which no instrument
+  requires, and is renamed for what it checks.** `dpp_rules::lineage::consent`
+  reported a second-life derivation edge that no transfer of responsibility
+  supports as "unconsented", on the reasoning that responsibility "must not be
+  assignable by unilateral assertion". Reg. (EU) 2023/1542 Art. 77(7) says
+  otherwise: the responsibility "shall be transferred to the economic operator
+  that has placed that battery on the market or has put it into service", by
+  operation of law, and the battery "shall have a new battery passport linked to"
+  the original. The predecessor's agreement is not a precondition, so an operator
+  asserting a derivation is assuming responsibility, not assigning it. What the
+  rule does is substantiation: it asks whether evidence that the operation took
+  place accompanies the claim. A transfer record is that evidence, and the
+  Regulation does not require one to exist. A finding called "unconsented"
+  invites a caller to go and obtain an agreement no regulation requires; one
+  called "unsubstantiated" invites them to find the evidence. (#313)
+  - **Removed, with their replacements:** `dpp_rules::lineage::consent` is now
+    `dpp_rules::lineage::substantiation`; `check_derivation_consent` is now
+    `check_derivation_substantiation`; `ConsentFinding` is now
+    `SubstantiationFinding`; `ConsentDefect` is now `SubstantiationDefect`. The
+    crate-root re-exports in `dpp_rules::lineage` move the same way, and so do the
+    paths through `dpp_plugin_sdk::rules`.
+  - **Migration:** rename the imports and the calls. Nothing else changes.
+    `DerivationEdge`, `TransferEvidence`, `StatusDefect`, the fields of the
+    finding, and the variants `NoTransfer`, `OutgoingAuthorisationMissing`,
+    `NotAccepted`, `IncomingOperatorMismatch` and `OperationMismatch` keep their
+    names and meaning, because they describe facts about the transfer record. No
+    deprecated aliases are left behind: nothing in this repository calls the old
+    names outside the rule's own tests.
+  - **The behaviour does not change.** The rule still reports an edge unless the
+    caller found a transfer record authorised by the outgoing operator, accepted,
+    and naming the same operation and the same incoming operator. A missing record
+    is an unsubstantiated claim, not a breach of Art. 77(7). Whether the rule
+    should keep demanding the outgoing operator's authorisation, which a lawful
+    second-life operator may be unable to obtain, is #499.
+  - The doc comments and the lineage design document that called an edge
+    "consented to" say "substantiated" instead.
+
 - **`RegistrySyncPort::notify_transfer` answers with a `TransferReport`, not a
   `RegistryRecord`.** A notification amends a record that already exists, so
   what the registry says about it is whether it took the notification, not where
@@ -207,6 +244,77 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the identifier. (#409)
 
 ### Fixed
+
+- **The members of battery `materialComposition` and electronics
+  `criticalRawMaterial` were labelled `public` inside arrays that are
+  `restricted`.** Battery's `anodeMaterial`, `cathodeMaterial` and
+  `electrolyteMaterial` are `restricted` because Annex XIII point 2(a) of
+  Regulation (EU) 2023/1542 places the detailed composition of the cathode, anode
+  and electrolyte in the tier for persons with a legitimate interest and the
+  Commission, yet the `name` and `casNumber` of the `materialComposition` they
+  share said `public`. Electronics' `criticalRawMaterials` is `restricted`, and
+  the `name` and `countryOfOrigin` of its members said `public`. No audience's
+  view changed: the serving filter drops an array whole for an audience that may
+  not see its class, so the labels disagreed without leaking. **Battery schema
+  v2.9.0** and **electronics schema v1.5.0** label those members `restricted`.
+  Each is a label-only version, and its lens passes a document through
+  untouched. A released schema is never edited, so a passport written against
+  v2.8.0 or v1.4.0 keeps its policy and the bytes its signatures cover; a new
+  passport is written against the new version. (#405, #424)
+  - **Electronics: the tier is this schema's own to set.** Regulation (EU)
+    2024/1252 Art. 28 and 29 reach permanent magnets in a closed list of
+    products, and a smartphone or tablet is neither on it nor an electric motor
+    rated at 0,12 kW or more (Art. 2(47)); no act recorded for the product group
+    makes the critical raw materials such a device contains public. `restricted`
+    is the conservative reading, and it matches the array and the `casNumber` and
+    `weightGrams` beside the two members that moved.
+  - **Why this could not be done before.** A definition's members are also
+    recorded under their bare name, as a fail-closed floor for a reference the
+    policy walk cannot follow, so two definitions that share a member name share
+    one key, which resolves to the more restrictive of their classes.
+    `every_declared_property_resolves_to_its_own_class` held that key to the
+    declared class exactly, so relabelling one definition's member failed whenever
+    another definition in the schema declared the same name more openly: battery's
+    `criticalRawMaterial` for `name` and `casNumber`, electronics' `repairCriterion`
+    for `name`. A floor key now has to be no looser than the declaration, and a
+    position is still exact. **No policy code changed.** The new test
+    `no_shipped_schema_refers_to_a_definition_from_a_construct_the_collector_skips`
+    asserts that no shipped schema has a `$ref` the walk does not follow, so the
+    floor answers for no real position, and it fails the day one does.
+    `the_relabelled_members_are_restricted_and_their_twins_are_not` runs the
+    collision on the shipped schemas, in both directions: the restricted member is
+    withheld from an anonymous reader and its public twin is not withheld with it.
+  - **One observable change.** A lookup by bare leaf name alone,
+    `ProductGroupAccessPolicy::disclosure_for_field("name")`, now answers
+    `Restricted` for these two versions where it answered `Public`: a leaf asked
+    without its parent is ambiguous, and ambiguity resolves to the stricter class.
+    The filter always has the full path and is unaffected.
+  - The nesting test's list of known faults is now empty.
+
+- **Battery `criticalRawMaterial.weightGrams` and `.countryOfOrigin` were
+  `public`, and no provision makes them so.** They are the quantity and origin
+  records of Article 49(2), points (d) and (c), of Regulation (EU) 2023/1542:
+  supply-chain due diligence documentation that an operator keeps for
+  authorities and shares with its immediate downstream purchasers, with due
+  regard for business confidentiality (Article 52(1) and (2)). What is public is
+  the Article 52(3) report on the due diligence policy, which Annex XIII point
+  1(d) makes accessible and `dueDiligenceUrl` carries. Annex VI Part A point 10
+  and Annex XIII point 1(b), which make the critical raw materials present
+  public, name neither a quantity nor an origin, and neither does the
+  Commission's data-point guidance. The label was never decided: it was written
+  down as the class the filter already applied when nested properties were first
+  annotated, after the array above them became public. A public weight in grams
+  of a named material also restated what `materialComposition.weightPct`
+  withholds. **Battery schema v2.9.0** labels both `restricted`; a critical raw
+  material's `name` and `casNumber` stay public. **This changes what an anonymous
+  reader receives of a v2.9.0 battery passport:** its critical raw materials
+  carry no weight and no origin. A passport written against v2.8.0 or earlier
+  keeps its classes and the bytes its signatures cover. A consumer that rendered
+  either field from the public view will not find it on a v2.9.0 passport.
+  (#498)
+  - The doc comment on `CriticalRawMaterial` named the Critical Raw Materials Act
+    as the source of the type; it now names Article 49(2). Electronics v1.5.0
+    labels both fields `restricted` too (it already did for `weightGrams`).
 
 - **An identification link with a non-ASCII character passed validation.**
   `https://exämple.com/item` and `https://example.com/ü` were both accepted as an

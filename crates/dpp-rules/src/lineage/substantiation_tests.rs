@@ -1,6 +1,8 @@
-//! A second-life claim is only as good as the transfer that consents to it.
+//! A second-life claim is only as good as the transfer that substantiates it.
 
-use super::{ConsentDefect, DerivationEdge, TransferEvidence, check_derivation_consent};
+use super::{
+    DerivationEdge, SubstantiationDefect, TransferEvidence, check_derivation_substantiation,
+};
 
 const OPERATOR: &str = "did:web:second-life.example";
 const OTHER: &str = "did:web:someone-else.example";
@@ -24,41 +26,41 @@ fn edge_with(transfer: TransferEvidence<'static>) -> DerivationEdge<'static> {
 #[test]
 fn a_fully_supported_edge_produces_no_finding() {
     let edges = [edge_with(good_transfer())];
-    assert!(check_derivation_consent(OPERATOR, &edges).is_empty());
+    assert!(check_derivation_substantiation(OPERATOR, &edges).is_empty());
 }
 
 #[test]
-fn a_passport_with_no_derivation_edges_is_trivially_consented() {
-    assert!(check_derivation_consent(OPERATOR, &[]).is_empty());
+fn a_passport_with_no_derivation_edges_is_trivially_substantiated() {
+    assert!(check_derivation_substantiation(OPERATOR, &[]).is_empty());
 }
 
 /// The case the rule exists for: a second-life claim asserted unilaterally.
 #[test]
-fn an_edge_with_no_transfer_is_unconsented() {
+fn an_edge_with_no_transfer_is_unsubstantiated() {
     let edges = [DerivationEdge {
         operation: "repurposing",
         transfer: None,
     }];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].edge_index, 0);
-    assert_eq!(findings[0].defect, ConsentDefect::NoTransfer);
+    assert_eq!(findings[0].defect, SubstantiationDefect::NoTransfer);
 }
 
-/// The predecessor's own authorisation is the half that carries the consent.
+/// The predecessor's own authorisation is the half that corroborates the claim.
 #[test]
-fn an_unauthorised_transfer_is_not_consent() {
+fn an_unauthorised_transfer_is_not_corroboration() {
     let edges = [edge_with(TransferEvidence {
         outgoing_authorised: false,
         ..good_transfer()
     })];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 1);
     assert_eq!(
         findings[0].defect,
-        ConsentDefect::OutgoingAuthorisationMissing
+        SubstantiationDefect::OutgoingAuthorisationMissing
     );
 }
 
@@ -69,9 +71,9 @@ fn an_abandoned_handover_does_not_support_a_live_claim() {
         ..good_transfer()
     })];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 1);
-    assert_eq!(findings[0].defect, ConsentDefect::NotAccepted);
+    assert_eq!(findings[0].defect, SubstantiationDefect::NotAccepted);
 }
 
 /// A transfer to someone else is not evidence that *this* operator took over.
@@ -82,11 +84,11 @@ fn a_transfer_to_a_third_party_is_not_evidence_for_this_passport() {
         ..good_transfer()
     })];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 1);
     assert_eq!(
         findings[0].defect,
-        ConsentDefect::IncomingOperatorMismatch {
+        SubstantiationDefect::IncomingOperatorMismatch {
             expected: OPERATOR,
             found: OTHER,
         }
@@ -102,11 +104,11 @@ fn the_operation_and_the_transfer_reason_must_agree() {
         transfer: Some(good_transfer()),
     }];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 1);
     assert_eq!(
         findings[0].defect,
-        ConsentDefect::OperationMismatch {
+        SubstantiationDefect::OperationMismatch {
             edge_operation: "remanufacturing",
             transfer_reason: "repurposing",
         }
@@ -128,12 +130,12 @@ fn each_predecessor_is_judged_on_its_own_evidence() {
         }),
     ];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(findings.len(), 2, "the supported edge must not be reported");
     assert_eq!(findings[0].edge_index, 1);
-    assert_eq!(findings[0].defect, ConsentDefect::NoTransfer);
+    assert_eq!(findings[0].defect, SubstantiationDefect::NoTransfer);
     assert_eq!(findings[1].edge_index, 2);
-    assert_eq!(findings[1].defect, ConsentDefect::NotAccepted);
+    assert_eq!(findings[1].defect, SubstantiationDefect::NotAccepted);
 }
 
 /// One finding per edge, and it names the most fundamental defect.
@@ -152,7 +154,7 @@ fn the_most_fundamental_defect_wins() {
         }),
     }];
 
-    let findings = check_derivation_consent(OPERATOR, &edges);
+    let findings = check_derivation_substantiation(OPERATOR, &edges);
     assert_eq!(
         findings.len(),
         1,
@@ -160,7 +162,7 @@ fn the_most_fundamental_defect_wins() {
     );
     assert_eq!(
         findings[0].defect,
-        ConsentDefect::OutgoingAuthorisationMissing,
+        SubstantiationDefect::OutgoingAuthorisationMissing,
         "the missing predecessor authorisation outranks the other three"
     );
 }

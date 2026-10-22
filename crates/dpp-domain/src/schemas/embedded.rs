@@ -137,6 +137,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         json: include_str!("../../schemas/battery/v2.8.0.json"),
     },
     EmbeddedSchema {
+        product_group: "battery",
+        version: "2.9.0",
+        json: include_str!("../../schemas/battery/v2.9.0.json"),
+    },
+    EmbeddedSchema {
         product_group: "textile",
         version: "1.0.0",
         json: include_str!("../../schemas/textile/v1.0.0.json"),
@@ -212,6 +217,11 @@ pub(crate) const EMBEDDED: &[EmbeddedSchema] = &[
         product_group: "electronics",
         version: "1.4.0",
         json: include_str!("../../schemas/electronics/v1.4.0.json"),
+    },
+    EmbeddedSchema {
+        product_group: "electronics",
+        version: "1.5.0",
+        json: include_str!("../../schemas/electronics/v1.5.0.json"),
     },
     EmbeddedSchema {
         product_group: "construction",

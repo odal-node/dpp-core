@@ -159,6 +159,10 @@ documents still read is answered by the frozen fixtures in
 
 **No longer required:** `co2ePerUnitKg`
 
+### v2.8.0 → v2.9.0 · additive
+
+No property or requirement changed.
+
 ## construction
 
 
@@ -245,6 +249,10 @@ documents still read is answered by the frozen fixtures in
 **Newly required:** `productIdentifier`
 
 **No longer required:** `gtin`
+
+### v1.4.0 → v1.5.0 · additive
+
+No property or requirement changed.
 
 ## furniture
 

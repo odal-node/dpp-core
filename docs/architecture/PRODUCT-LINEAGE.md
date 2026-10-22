@@ -180,8 +180,8 @@ R1 and R3 are the same event: a new passport **and** a responsibility move. An
 operator could perform either half independently and nothing detected the
 inconsistency. Two mechanisms for one event is how they drift.
 
-Closed in Phase 4: `dpp_rules::lineage::consent` requires them to agree, so the
-two mechanisms now describe one event or the passport is reported as
+Closed in Phase 4: `dpp_rules::lineage::substantiation` requires them to agree,
+so the two mechanisms now describe one event or the passport is reported as
 unsupported.
 
 ### G3 — `TransferReason` was missing one of the four operations (violated R4) — **CLOSED**
@@ -244,22 +244,25 @@ the same bypass class already closed for `operatorIdentifier` and `facility`.
 Both are in the list now (Phase 0). What that protection may and may not be read
 to mean is §4.
 
-### G7 — A lineage edge was asserted, never consented to — **CLOSED for second life**
+### G7 — A lineage edge was asserted, never substantiated — **CLOSED for second life**
 
 The hash-pin proves the *target* has not been modified. It does not prove the
-target's operator agreed to the relationship. Anyone can publish a passport
-claiming to derive from, or contain, anyone else's product.
+operation the edge names took place. Anyone can publish a passport claiming to
+derive from, or contain, anyone else's product.
 
 For BOM this is mostly benign (over-claiming a supplier is a commercial problem),
 and it stays that way on purpose — see §5.1. For second life it is not: R3 moves
-regulatory responsibility, and responsibility must not be assignable by
-unilateral assertion.
+regulatory responsibility, and a false claim purports to end the original
+operator's Art. 77(4) duty for a unit that may still be on the market under their
+name.
 
-Closed in Phase 4 for the derivation direction: `dpp_rules::lineage::consent`
+Closed in Phase 4 for the derivation direction: `dpp_rules::lineage::substantiation`
 refuses a second-life edge that no transfer of responsibility supports. The
-consent it rests on is the **outgoing** operator's authorisation — the
+corroboration it rests on is the **outgoing** operator's authorisation — the
 predecessor's own — which §5.1 explains, and which is not the reason this
-document originally gave.
+document originally gave. The rule was first named `consent`; Art. 77(7) moves
+the responsibility by operation of law and asks for nobody's agreement, so the
+rule asks for evidence, not consent.
 
 ### G8 — "Component" is undefined across product groups
 
@@ -448,8 +451,8 @@ product group does not report a product-life status", which is distinct from
 
 The synthesis worth having: **a second-life operation already *is* a transfer of
 responsibility under Art. 77(7)**, and a transfer record already carries the
-outgoing operator's own authorisation. That is the consent artefact G7 needs, and
-the responsibility move R3 requires, in one artefact that exists.
+outgoing operator's own authorisation. That is the corroborating artefact G7
+needs, and the responsibility move R3 requires, in one artefact that exists.
 
 🚨 **An earlier version of this section justified that differently, and was
 wrong.** It said a `TransferRecord` is "dual-signed by both the outgoing and
@@ -460,7 +463,7 @@ recording it. That field was renamed from `to_signature` precisely because the
 old name invited this misreading, and this document then made it anyway.
 
 The conclusion survives, for a reason worth stating because it is easy to get
-backwards. **The consent this rule needs is the predecessor's**, and in a
+backwards. **The corroboration this rule asks for is the predecessor's**, and in a
 second-life transfer the predecessor's operator is the *outgoing* party — so the
 half that is a genuine party signature is exactly the half that matters. The
 incoming half would have been this passport's own operator asserting something
@@ -476,8 +479,16 @@ So bind them rather than adding a third mechanism:
 
 That single rule closes two gaps at once — the two mechanisms become one event
 (G2), and a second-life claim carries the predecessor operator's authorisation
-(G7). It shipped in Phase 4 as `dpp_rules::lineage::consent`, a pure cross-field
-rule, which is where it belongs. It also depended on G3 being closed first: the
+(G7). It shipped in Phase 4 as `dpp_rules::lineage::consent`, since renamed
+`substantiation`, a pure cross-field rule, which is where it belongs.
+
+This is the model's rule, not the Regulation's. Art. 77(7) moves the
+responsibility by operation of law and requires no transfer record to exist, so
+a missing record is a claim that is **unsubstantiated**, not a breach. Whether
+the rule should keep demanding the outgoing operator's authorisation, which a
+lawful second-life operator may be unable to obtain, is tracked in #499.
+
+The rule also depended on G3 being closed first: the
 rule matches a `SecondLifeOperation` against a `TransferReason`, so a
 `TransferReason` that could not express `preparation for repurposing` would have
 made the rule unsatisfiable for one of the four operations.
@@ -487,13 +498,13 @@ a transfer record actually concerns the predecessor a given edge points at: an
 edge identifies its target by URI, a transfer identifies its subject by passport
 id, and resolving one to the other is a network fetch. So the **caller
 correlates and the rule checks**. An edge whose caller found no corresponding
-transfer is reported as unconsented — the correct reading of "no evidence was
+transfer is reported as unsubstantiated — the correct reading of "no evidence was
 found", rather than an assumption that none exists. The split follows from what
 core cannot do: a host resolves the URI and correlates the transfer, because core
-cannot resolve a URI, and `dpp_rules::lineage::consent` judges the evidence the
-host found.
+cannot resolve a URI, and `dpp_rules::lineage::substantiation` judges the
+evidence the host found.
 
-BOM edges deliberately get **no** consent requirement: it would demand a signature
+BOM edges deliberately get **no** substantiation requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. The
 honest position is that a `componentRef` is a *claim by the assembler*, pinned so
 it cannot be tampered with, and a walk that checks the pin already reports exactly

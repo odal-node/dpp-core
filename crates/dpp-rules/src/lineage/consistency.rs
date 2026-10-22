@@ -8,7 +8,7 @@
 //! remanufactured predecessor has no unambiguous derived status. Storing it and
 //! checking it recovers the one real advantage of deriving — a status that
 //! cannot silently contradict the lineage — without inheriting that flaw. Same
-//! shape as the derivation-consent rule next door.
+//! shape as the derivation-substantiation rule next door.
 //!
 //! # What "agrees" means, and why it is *some* rather than *every*
 //!
@@ -36,10 +36,10 @@
 //! # What this rule cannot do
 //!
 //! It cannot tell whether an edge's operation is *truthful* — only whether the
-//! status and the edges tell the same story. Whether the predecessor's operator
-//! consented to the edge at all is [`super::consent`]'s question, and the two are
-//! independent: an edge can be perfectly consented and still support a status the
-//! passport does not claim.
+//! status and the edges tell the same story. Whether evidence backs the edge at
+//! all is [`super::substantiation`]'s question, and the two are independent: an
+//! edge can be perfectly substantiated and still support a status the passport
+//! does not claim.
 
 use super::status_defect::StatusDefect;
 
