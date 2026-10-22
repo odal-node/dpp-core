@@ -107,6 +107,13 @@ fn a_missing_placing_date_is_named_with_what_waits_on_it() {
     let msg = message(&result, "battery.annex_xiii.placedOnMarketDate_missing")
         .unwrap_or_else(|| panic!("got: {:?}", codes(&result)));
     assert!(msg.contains("dueDiligenceUrl"), "{msg}");
+    // The host also takes the date from the passport itself, which this plugin
+    // never sees, so the finding must not promise a refusal the host will not
+    // make.
+    assert!(
+        msg.contains("unless the passport itself states the date"),
+        "{msg}"
+    );
 }
 
 #[test]
@@ -115,12 +122,17 @@ fn from_the_date_the_report_is_owed_by_a_declared_subject() {
     data["batteryType"] = json!("lmt");
     data["placedOnMarketDate"] = json!("2027-08-18");
 
-    // Undeclared: the operator is asked, not excused.
+    // Undeclared: the operator is asked, not excused. The declaration has no
+    // second home, so this refusal is unconditional.
     let result = BatteryPlugin.calculate_metrics(&data).unwrap();
+    let msg = message(
+        &result,
+        "battery.annex_xiii.dueDiligenceOperatorScope_missing",
+    )
+    .unwrap_or_else(|| panic!("got: {:?}", codes(&result)));
     assert!(
-        codes(&result).contains(&"battery.annex_xiii.dueDiligenceOperatorScope_missing"),
-        "got: {:?}",
-        codes(&result)
+        msg.contains("publishing will be refused until it is stated"),
+        "{msg}"
     );
 
     data["dueDiligenceOperatorScope"] = json!("subject");

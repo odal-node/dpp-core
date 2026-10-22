@@ -198,7 +198,10 @@ impl DppProductGroupPlugin for BatteryPlugin {
 /// A field whose obligation turns on a fact the payload does not state (today,
 /// `dueDiligenceUrl`, on the placing date and the Art. 47 declaration) gets one
 /// finding per missing fact, because the host refuses the publish for the same
-/// reason.
+/// reason. The placing date is the exception the finding has to admit: the
+/// host also accepts it from the passport itself, which a plugin is never
+/// shown, so its finding says the publish is refused only if the passport does
+/// not state it either.
 fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<PluginFinding> {
     let mut out = Vec::new();
     let facts = content_facts(input);
@@ -250,12 +253,19 @@ fn annex_xiii_content_findings(input: &PluginInput, battery_type: &str) -> Vec<P
     }
     for (fact, fields) in waiting {
         let source = fact.field();
+        let consequence = match fact {
+            MissingFact::PlacingDate => {
+                "publishing will be refused unless the passport itself states the date, which \
+                 this check cannot see"
+            }
+            MissingFact::OperatorScope => "publishing will be refused until it is stated",
+        };
         out.push(PluginFinding::new(
             format!("battery.annex_xiii.{source}_missing"),
             format!("/{source}"),
             format!(
                 "'{source}' is absent, and whether a '{battery_type}' battery owes {} turns on \
-                 it, so publishing will be refused until it is stated.",
+                 it, so {consequence}.",
                 fields.join(", ")
             ),
         ));

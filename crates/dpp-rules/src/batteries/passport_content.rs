@@ -69,6 +69,15 @@
 //!   been specified. `co2ePerUnitKg` is barred beside row 17: it is not the
 //!   declaration, but a figure labelled carbon footprint in a passport states one
 //!   the guidance says not to display.
+//! - **Restated elsewhere in the annex** — row 16 is Annex XIII point 1(c)
+//!   material composition, deferred, but its constituents are separately
+//!   mandatory as Annex VI Part A points 7, 8 and 10 (rows 12, 13, 15) and are
+//!   enforced there.
+//!
+//! Four omissions were found and closed by this audit's first pass: points 1,
+//! 7, 8 and 9 — the unique identifier, model identification, place of
+//! manufacture and date of manufacture — all mandatory for every covered
+//! category, and none of which any battery schema version had ever declared.
 //!
 //! # The table is a snapshot; one row moves
 //!
@@ -80,15 +89,6 @@
 //! Art. 47's two exemptions (see [`super::due_diligence`]). Every function here
 //! therefore takes the [`BatteryFacts`] such a row reads, and a row with nothing
 //! scheduled ignores them.
-//! - **Restated elsewhere in the annex** — row 16 is Annex XIII point 1(c)
-//!   material composition, deferred, but its constituents are separately
-//!   mandatory as Annex VI Part A points 7, 8 and 10 (rows 12, 13, 15) and are
-//!   enforced there.
-//!
-//! Four omissions were found and closed by this audit's first pass: points 1,
-//! 7, 8 and 9 — the unique identifier, model identification, place of
-//! manufacture and date of manufacture — all mandatory for every covered
-//! category, and none of which any battery schema version had ever declared.
 
 use super::battery_facts::BatteryFacts;
 use super::due_diligence::{DueDiligenceScope, due_diligence_scope};
