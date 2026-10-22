@@ -27,11 +27,11 @@ fn all_lists_every_variant() {
 /// The two vocabularies must stay byte-identical on the wire.
 ///
 /// The rule binding a derivation edge to the transfer of responsibility that
-/// consents to it matches a `SecondLifeOperation` against a `TransferReason`.
+/// substantiates it matches a `SecondLifeOperation` against a `TransferReason`.
 /// If the two
 /// spell an operation differently, that rule silently stops matching for the
 /// operation that drifted — and it fails open, since a non-match reads as "no
-/// consent recorded" rather than as a bug.
+/// substantiating transfer recorded" rather than as a bug.
 #[test]
 fn wire_vocabulary_agrees_with_transfer_reason() {
     let pairs = [
