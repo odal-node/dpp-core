@@ -29,6 +29,8 @@ pub mod view;
 #[cfg(test)]
 mod from_stored_tests;
 #[cfg(test)]
+mod publish_gate_scope_tests;
+#[cfg(test)]
 mod publish_gate_tests;
 #[cfg(test)]
 mod redaction_tests;

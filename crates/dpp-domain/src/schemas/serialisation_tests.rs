@@ -29,9 +29,9 @@ use super::*;
 fn a_fully_populated_battery_serialises_into_the_current_schema() {
     use crate::product_group::{
         BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprintClass,
-        CriticalRawMaterial, DynamicPerformance, EnvironmentalReading, ExpectedLifetime,
-        HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, StateOfChargeReading,
-        StateOfHealth, TemperatureRange, UsageHistory,
+        CriticalRawMaterial, DueDiligenceOperatorScope, DynamicPerformance, EnvironmentalReading,
+        ExpectedLifetime, HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition,
+        StateOfChargeReading, StateOfHealth, TemperatureRange, UsageHistory,
     };
     use chrono::{NaiveDate, TimeZone as _, Utc};
 
@@ -167,6 +167,7 @@ fn a_fully_populated_battery_serialises_into_the_current_schema() {
                 state_of_charge_pct: 78.0,
             }]),
         })),
+        due_diligence_operator_scope: Some(DueDiligenceOperatorScope::Subject),
     };
 
     let registry = VersionedSchemaRegistry::new();

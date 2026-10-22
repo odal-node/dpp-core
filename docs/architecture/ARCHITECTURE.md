@@ -81,6 +81,7 @@ what each module does.
 | Concern | Tier | What it holds |
 |---|---|---|
 | `identifier` | 1 | GS1 and customs-classification vocabulary — `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
+| `calendar` | 4 | `ObligationCalendar` — which dated obligations take effect between two dates: every act's passport start date from `instrument`, and every change a `dpp-rules` module schedules, each `ObligationEvent` carrying its `DateBasis`. Holds no clock: the caller passes the window |
 | `catalog` | 3 | `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
 | `credential` | 2 | The W3C Verifiable Credential 2.0 envelope binding a passport to its signed payload |
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
@@ -120,6 +121,7 @@ goes stale while every claim around it stays checkable.
 <!-- DOMAIN-CONCERNS:BEGIN (one module name per line; parsed by domain_concerns.rs) -->
 ```
 access
+calendar
 catalog
 compliance
 eol

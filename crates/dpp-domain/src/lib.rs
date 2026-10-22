@@ -18,6 +18,7 @@
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod access;
+pub mod calendar;
 pub mod catalog;
 pub mod compliance;
 pub mod credential;
@@ -48,6 +49,7 @@ pub mod transfer;
 pub mod trusted_list;
 pub mod validation;
 
+pub use calendar::{ObligationCalendar, ObligationEvent, ObligationKind};
 pub use catalog::{
     CatalogError, Granularity, ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus,
     RetentionBasis,
@@ -95,6 +97,7 @@ pub use crate::{
         DiscardedQuantity,
         DisclosingEntity,
         DisclosureScope,
+        DueDiligenceOperatorScope,
         DynamicPerformance,
         ElectronicsData,
         EnergyEfficiencyClass,

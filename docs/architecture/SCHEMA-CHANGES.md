@@ -163,6 +163,12 @@ documents still read is answered by the frozen fixtures in
 
 No property or requirement changed.
 
+### v2.9.0 → v2.10.0 · additive
+
+| Property | Change | Before | After |
+|---|---|---|---|
+| `dueDiligenceOperatorScope` | added | — | `string\|null` |
+
 ## construction
 
 

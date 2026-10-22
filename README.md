@@ -143,7 +143,7 @@ Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.
 
 | Product group | Versions | Key Fields |
 |---|---|---|
-| battery | v1.0.0, v2.0.0 – v2.7.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date |
+| battery | v1.0.0, v2.0.0 – v2.10.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date, Art. 47 due diligence declaration |
 | electronics | v1.0.0 – v1.5.0 | Repairability, spare parts, substances of concern |
 | textile | v1.0.0 – v1.4.0 | Fibre composition, SVHC, durability, microplastics |
 | furniture | v1.0.0 – v1.3.0 | Product group-specific delegated-act fields |

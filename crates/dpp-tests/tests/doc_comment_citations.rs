@@ -87,7 +87,6 @@ const UNPINNED_LEGACY: &[&str] = &[
     "dpp-domain/src/product_group/data/unsold_goods/financial_year.rs",
     "dpp-domain/src/product_group/data/unsold_goods/mod.rs",
     "dpp-domain/src/product_group/data/unsold_goods/reason.rs",
-    "dpp-rules/src/batteries/chemistry.rs",
     "dpp-rules/src/batteries/passport_scope.rs",
     "dpp-rules/src/metals/aluminium.rs",
     "dpp-rules/src/metals/steel.rs",

@@ -56,12 +56,14 @@ fn battery_descriptor_is_complete() {
     assert!(battery.schema_versions.contains(&"2.7.0".to_string()));
     // v2.6.0 added the Annex XIII point 4 individual-battery tier; v2.7.0
     // replaced the mandatory gtin with the EN 18219 clause 5 productIdentifier;
-    // v2.8.0 follows the battery passport guidance v2.0; v2.9.0 is current and
-    // labels the members of materialComposition as restricted as their arrays.
+    // v2.8.0 follows the battery passport guidance v2.0; v2.9.0 labels the
+    // members of materialComposition as restricted as their arrays; v2.10.0 is
+    // current and adds the operator's Art. 47 due diligence declaration.
     // Older versions stay registered so passports already validated against
     // them remain verifiable.
     assert!(battery.schema_versions.contains(&"2.8.0".to_string()));
-    assert_eq!(battery.current_schema_version, "2.9.0");
+    assert!(battery.schema_versions.contains(&"2.9.0".to_string()));
+    assert_eq!(battery.current_schema_version, "2.10.0");
     assert_eq!(battery.plugin.as_deref(), Some("product-group-battery"));
 }
 
@@ -71,7 +73,7 @@ fn resolve_schema_version_new_vs_existing() {
     // New passport (stored = None) → catalog current version.
     assert_eq!(
         catalog.resolve_schema_version("battery", None).as_deref(),
-        Some("2.9.0")
+        Some("2.10.0")
     );
     // Existing passport → its stored version is authoritative, even if old.
     assert_eq!(

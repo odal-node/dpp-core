@@ -911,18 +911,9 @@ impl Passport {
         // drive the Art. 8 phase determination, which is why promoting it here
         // costs no Annex XIII coverage.
         if let Some(ProductGroupData::Battery(battery)) = &self.product_group_data
-            && let (Some(envelope), Some(product_group)) =
-                (self.placed_on_market_date, battery.placed_on_market_date)
-            && envelope != product_group
+            && let Err(disagreement) = self.declared_placing_date(battery)
         {
-            errors.push(FieldError {
-                field: "/productGroupData/placedOnMarketDate".to_owned(),
-                message: format!(
-                    "placed_on_market_date disagrees with the passport's own \
-                     ({product_group} vs {envelope}); the date fixes which law governs \
-                     this battery, so it cannot have two values"
-                ),
-            });
+            errors.push(disagreement);
         }
 
         // An unsold-goods record is a disclosure by an undertaking over a
@@ -1164,7 +1155,9 @@ impl Passport {
     ///   `BelowThreshold`) reachable. `NotYetBinding` can never be concluded
     ///   from a date nobody stated, which is the point: a draft for a product
     ///   not yet on the market carries no date, and reading that as "before
-    ///   2027" would exempt every draft.
+    ///   2027" would exempt every draft. Once the gate runs, the missing date is
+    ///   itself a refusal, because the content it checks depends on it (see
+    ///   [`check_category_content`](Self::check_category_content)).
     /// - **A variant added to [`PassportScope`] later is not an exemption.**
     ///   The type is `#[non_exhaustive]`, so the match needs a catch-all, and
     ///   the catch-all gates. A new outcome that *should* exempt then has to say
@@ -1206,14 +1199,12 @@ impl Passport {
         // Fail closed instead: disagreement is not an exemption. The record is
         // still refused by `validate` wherever that runs, and until it does, the
         // strict content check is the safe side to be on.
-        let placed = match (self.placed_on_market_date, battery.placed_on_market_date) {
-            (Some(envelope), Some(product_group)) if envelope != product_group => return false,
-            (envelope, product_group) => envelope
-                .or(product_group)
-                .map_or(PASSPORT_REQUIRED_FROM, |d| {
-                    CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)
-                }),
+        let Ok(placed) = self.declared_placing_date(battery) else {
+            return false;
         };
+        let placed = placed.map_or(PASSPORT_REQUIRED_FROM, |d| {
+            CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)
+        });
 
         match passport_scope(
             battery.battery_type.wire_str(),
@@ -1242,8 +1233,29 @@ impl Passport {
     /// Everything `check_mandatory_content` documents about previewing, about
     /// naming every missing field at once, and about the portable/SLI hole
     /// applies here unchanged — this is the same body.
+    ///
+    /// # A missing fact is a refusal too
+    ///
+    /// Some obligations turn on facts about the battery rather than on its
+    /// category alone: today, whether `dueDiligenceUrl` is owed turns on the
+    /// placing-on-market date and, from 18 August 2027, on the operator's Art. 47
+    /// declaration. When a fact an obligation needs is absent, the obligation
+    /// has no answer, and this refuses with **one** error per missing fact,
+    /// naming every field waiting on it. That is stated once here, for every
+    /// such rule, rather than as a side effect of one row: a field whose
+    /// obligation cannot be decided has not been shown to be optional.
+    ///
+    /// This refuses nothing lawful. Art. 77(1) only requires the passport to
+    /// exist once the battery is placed on the market, and a draft prepared
+    /// before then carries no date and is not published.
+    ///
+    /// A record whose two placing dates disagree is refused for that alone,
+    /// because neither can be the one a determination uses.
     pub fn check_category_content(&self) -> Result<(), crate::error::dpp::DppError> {
         use crate::field_error::{FieldError, ValidationErrors};
+        use dpp_rules::batteries::passport_content::{
+            MissingFact, mandatory_fields, undetermined_fields,
+        };
 
         if self.product_group != crate::product_group::ProductGroup::Battery {
             return Ok(());
@@ -1267,28 +1279,148 @@ impl Passport {
             return Ok(());
         };
 
+        let facts = match self.content_facts(data) {
+            Ok(facts) => facts,
+            Err(disagreement) => {
+                return Err(crate::error::dpp::DppError::Validation(ValidationErrors {
+                    errors: vec![disagreement],
+                }));
+            }
+        };
+
         // A key present but null is absent: `skip_serializing_if` means a `None`
         // never reaches the wire, so an explicit null came from somewhere else
         // and carries no value either way.
-        let missing: Vec<FieldError> =
-            dpp_rules::batteries::passport_content::mandatory_fields(battery_type)
-                .filter(|f| value.get(*f).is_none_or(serde_json::Value::is_null))
-                .map(|f| FieldError {
-                    field: format!("/productGroupData/{f}"),
-                    message: format!(
-                        "'{f}' is mandatory for a '{battery_type}' battery and is absent; \
-                         a passport omitting it does not carry the content the Battery \
-                         Regulation requires of this category"
-                    ),
-                })
-                .collect();
+        let mut errors: Vec<FieldError> = mandatory_fields(battery_type, facts)
+            .filter(|f| value.get(*f).is_none_or(serde_json::Value::is_null))
+            .map(|f| FieldError {
+                field: format!("/productGroupData/{f}"),
+                message: format!(
+                    "'{f}' is mandatory for a '{battery_type}' battery and is absent; \
+                     a passport omitting it does not carry the content the Battery \
+                     Regulation requires of this category"
+                ),
+            })
+            .collect();
 
-        if missing.is_empty() {
+        let mut waiting: Vec<(MissingFact, Vec<&str>)> = Vec::new();
+        for (field, fact) in undetermined_fields(battery_type, facts) {
+            match waiting.iter_mut().find(|(f, _)| *f == fact) {
+                Some((_, fields)) => fields.push(field),
+                None => waiting.push((fact, vec![field])),
+            }
+        }
+        errors.extend(waiting.into_iter().map(|(fact, fields)| {
+            let (path, what) = match fact {
+                MissingFact::PlacingDate => (
+                    "/placedOnMarketDate".to_owned(),
+                    "the date this battery was placed on the market or put into service \
+                     (on the passport, or as productGroupData.placedOnMarketDate)",
+                ),
+                MissingFact::OperatorScope => (
+                    format!("/productGroupData/{}", fact.field()),
+                    "the operator's declaration against Regulation (EU) 2023/1542 Art. 47, \
+                     first paragraph ('subject' or 'belowTurnoverThreshold')",
+                ),
+            };
+            FieldError {
+                field: path,
+                message: format!(
+                    "{what} is absent, and whether a '{battery_type}' battery owes {} turns \
+                     on it; a battery passport is not published until the facts its \
+                     obligations depend on are stated",
+                    fields
+                        .iter()
+                        .map(|f| format!("'{f}'"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            }
+        }));
+
+        if errors.is_empty() {
             Ok(())
         } else {
             Err(crate::error::dpp::DppError::Validation(ValidationErrors {
-                errors: missing,
+                errors,
             }))
         }
+    }
+
+    /// The placing date a determination may use: whichever of the envelope's
+    /// and the battery's own was given, or `Err` when both were given and
+    /// disagree, since neither can then be trusted to be the one meant.
+    fn declared_placing_date(
+        &self,
+        battery: &crate::product_group::BatteryData,
+    ) -> Result<Option<NaiveDate>, crate::field_error::FieldError> {
+        match (self.placed_on_market_date, battery.placed_on_market_date) {
+            (Some(envelope), Some(product_group)) if envelope != product_group => {
+                Err(placing_date_disagreement(envelope, product_group))
+            }
+            (envelope, product_group) => Ok(envelope.or(product_group)),
+        }
+    }
+
+    /// The facts about this battery that a scheduled content rule reads.
+    ///
+    /// The second-life limb is read from `batteryStatus` exactly as the battery
+    /// plugin reads it for Art. 8(4): a repurposed, re-used or remanufactured
+    /// battery is taken to have been on the market before that operation.
+    fn content_facts(
+        &self,
+        data: &crate::product_group::ProductGroupData,
+    ) -> Result<dpp_rules::batteries::battery_facts::BatteryFacts, crate::field_error::FieldError>
+    {
+        use crate::product_group::{BatteryStatus, ProductGroupData};
+        use chrono::Datelike;
+        use dpp_rules::batteries::battery_facts::BatteryFacts;
+        use dpp_rules::batteries::due_diligence::DueDiligenceSecondLife;
+        use dpp_rules::common::date::CalendarDate;
+
+        let (placed, second_life, operator_scope) = match data {
+            ProductGroupData::Battery(battery) => {
+                let second_life = match battery.battery_status {
+                    Some(
+                        BatteryStatus::Repurposed
+                        | BatteryStatus::ReUsed
+                        | BatteryStatus::Remanufactured,
+                    ) => DueDiligenceSecondLife::PlacedBeforeOperations,
+                    _ => DueDiligenceSecondLife::None,
+                };
+                (
+                    self.declared_placing_date(battery)?,
+                    second_life,
+                    battery.due_diligence_operator_scope.map(Into::into),
+                )
+            }
+            _ => (
+                self.placed_on_market_date,
+                DueDiligenceSecondLife::None,
+                None,
+            ),
+        };
+        Ok(BatteryFacts {
+            placed_on_market: placed
+                .map(|d| CalendarDate::new(d.year(), d.month() as u8, d.day() as u8)),
+            second_life,
+            operator_scope,
+        })
+    }
+}
+
+/// The refusal for a record carrying two different placing dates: one home for
+/// the sentence, because [`Passport::validate`] and the publish gate both say it.
+fn placing_date_disagreement(
+    envelope: NaiveDate,
+    product_group: NaiveDate,
+) -> crate::field_error::FieldError {
+    crate::field_error::FieldError {
+        field: "/productGroupData/placedOnMarketDate".to_owned(),
+        message: format!(
+            "placed_on_market_date disagrees with the passport's own \
+             ({product_group} vs {envelope}); the date fixes which law governs \
+             this battery, so it cannot have two values"
+        ),
     }
 }

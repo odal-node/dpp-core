@@ -8,6 +8,7 @@ use super::dynamic_performance::DynamicPerformance;
 use super::expected_lifetime::ExpectedLifetime;
 use super::hazardous_substance::{HazardSymbol, HazardousSubstance};
 use super::material_composition::MaterialComposition;
+use super::operator_scope::DueDiligenceOperatorScope;
 use super::state_of_health::StateOfHealth;
 use super::temperature_range::TemperatureRange;
 use super::usage_history::UsageHistory;
@@ -498,6 +499,17 @@ pub struct BatteryData {
     /// [`UsageHistory`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_history: Option<Box<UsageHistory>>,
+
+    // ── v2.10.0 — Art. 47 declaration ───────────────────────────────────
+    /// The operator's declaration against Art. 47, first paragraph: whether it
+    /// is subject to the due diligence chapter or under its turnover threshold.
+    ///
+    /// Read only for a battery placed on the market from 18 August 2027 that is
+    /// not second-life, because only there does `dueDiligenceUrl` turn on it.
+    /// Absent is **not** an exemption: such a battery's first publish is refused
+    /// until it is declared. See [`DueDiligenceOperatorScope`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_diligence_operator_scope: Option<DueDiligenceOperatorScope>,
 }
 
 impl crate::product_group::payload::ProductGroupPayload for BatteryData {
