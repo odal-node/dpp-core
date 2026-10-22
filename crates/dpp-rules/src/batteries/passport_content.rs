@@ -78,6 +78,20 @@
 //! 7, 8 and 9 — the unique identifier, model identification, place of
 //! manufacture and date of manufacture — all mandatory for every covered
 //! category, and none of which any battery schema version had ever declared.
+//!
+//! # The table is a snapshot; one row moves
+//!
+//! `REQUIREMENTS` records each obligation as of February 2027, which is what the
+//! guidance states, and it stays that way so the two can still be diffed. A row
+//! whose answer changes on a date, or turns on facts about the battery, is
+//! resolved beside the table rather than in it. There is one: row 19,
+//! `dueDiligenceUrl`, which Art. 48(1) makes due from 18 August 2027, subject to
+//! Art. 47's two exemptions (see [`super::due_diligence`]). Every function here
+//! therefore takes the [`BatteryFacts`] such a row reads, and a row with nothing
+//! scheduled ignores them.
+
+use super::battery_facts::BatteryFacts;
+use super::due_diligence::{DueDiligenceScope, due_diligence_scope};
 
 /// What a category owes for one data point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,6 +110,21 @@ pub enum Requirement {
     /// Distinct from [`Self::NotApplicable`]: one is a recorded exclusion, the
     /// other is an absence of evidence.
     Unknown,
+    /// The law takes this battery out of the duty, and the field is not barred.
+    ///
+    /// Distinct from [`Self::NotApplicable`], which says the field does not
+    /// belong in a passport of this category at all. Here the duty exists for
+    /// the category and this battery is excused from it, so a value supplied
+    /// anyway is not wrong.
+    Exempt,
+    /// The answer turns on a fact about this battery that the caller did not
+    /// supply, and the variant names it.
+    ///
+    /// Distinct from [`Self::Unknown`]: that one says nobody has read the
+    /// guidance against this field; this one says the rule is known and the
+    /// input it needs is missing. **Not an exemption**, and a caller must not
+    /// treat it as one.
+    Undetermined(MissingFact),
 }
 
 impl Requirement {
@@ -103,6 +132,27 @@ impl Requirement {
     #[must_use]
     pub const fn permits_presence(self) -> bool {
         !matches!(self, Self::NotApplicable)
+    }
+}
+
+/// A fact a [`Requirement::Undetermined`] answer is waiting on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MissingFact {
+    /// The date the battery was placed on the market or put into service.
+    PlacingDate,
+    /// The operator's declaration against Art. 47, first paragraph
+    /// ([`OperatorScope`](super::due_diligence::OperatorScope)).
+    OperatorScope,
+}
+
+impl MissingFact {
+    /// The wire name of the product group-data field that supplies the fact.
+    #[must_use]
+    pub const fn field(self) -> &'static str {
+        match self {
+            Self::PlacingDate => "placedOnMarketDate",
+            Self::OperatorScope => "dueDiligenceOperatorScope",
+        }
     }
 }
 
@@ -173,8 +223,11 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     //   required from August 2027. Art. 48(1), as replaced by Reg. (EU)
     //   2025/1561, applies from 18 August 2027. v1.0 gave the implementing-act
     //   reason here too; v2.0 names the date instead. This table records the
-    //   obligation as of February 2027 and carries no dates, so the row stays
-    //   `NotApplicable` and becomes `Mandatory` on 18 August 2027.
+    //   obligation as of February 2027, so the row stays `NotApplicable`, and
+    //   `scheduled` answers for it instead: not to be filled before that date,
+    //   then owed unless Art. 47 exempts the battery. It is not a plain
+    //   `Mandatory` from that date, because Art. 47 takes two cases out of the
+    //   chapter that the guidance does not mention.
     // - Rows 20 to 23, the shares of cobalt, lithium, nickel and lead recovered
     //   from waste: to be applied in line with Article 8 and the relevant
     //   delegated act. v1.0 had them `Mandatory` for all three.
@@ -265,6 +318,35 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
     ("usageHistory", C, C, C),
 ];
 
+/// The answer for a row the table cannot give alone, or `None` for a row it can.
+///
+/// One row today: guidance row 19, `dueDiligenceUrl`, for all three categories.
+/// The answer is the same for each because Art. 48(1) names "batteries" without
+/// distinguishing them.
+fn scheduled(field: &str, facts: BatteryFacts) -> Option<Requirement> {
+    if field != "dueDiligenceUrl" {
+        return None;
+    }
+    let scope = due_diligence_scope(
+        facts.placed_on_market,
+        facts.second_life,
+        facts.operator_scope,
+    );
+    Some(match scope {
+        DueDiligenceScope::Required => Requirement::Mandatory,
+        DueDiligenceScope::NotYetBinding => Requirement::NotApplicable,
+        DueDiligenceScope::ExemptSecondLife | DueDiligenceScope::ExemptBelowTurnoverThreshold => {
+            Requirement::Exempt
+        }
+        DueDiligenceScope::PlacingDateUnknown => {
+            Requirement::Undetermined(MissingFact::PlacingDate)
+        }
+        DueDiligenceScope::OperatorScopeUndeclared => {
+            Requirement::Undetermined(MissingFact::OperatorScope)
+        }
+    })
+}
+
 /// What a battery of `battery_type` owes for the passport field `field`.
 ///
 /// `field` is the **wire** name — `expectedLifetimeCycles`, not
@@ -272,11 +354,15 @@ const REQUIREMENTS: &[(&str, Requirement, Requirement, Requirement)] = &[
 /// is consumed both by the domain types and by the Wasm product group plugins, which
 /// see JSON and never the Rust struct.
 ///
+/// `facts` is read only by a row whose answer is scheduled (see the module
+/// documentation); every other row ignores it, so a caller with no facts to give
+/// passes [`BatteryFacts::default()`] and loses nothing but those rows' answers.
+///
 /// Returns [`Requirement::Unknown`] for a category the guidance does not cover
 /// (portable, SLI) and for a field it does not name. A caller must not read
 /// that as permission or as prohibition — it means nobody has checked.
 #[must_use]
-pub fn annex_xiii_requirement(field: &str, battery_type: &str) -> Requirement {
+pub fn annex_xiii_requirement(field: &str, battery_type: &str, facts: BatteryFacts) -> Requirement {
     let Some(category) = category_of(battery_type) else {
         return Requirement::Unknown;
     };
@@ -284,6 +370,9 @@ pub fn annex_xiii_requirement(field: &str, battery_type: &str) -> Requirement {
     while i < REQUIREMENTS.len() {
         let (name, ev, lmt, ind) = REQUIREMENTS[i];
         if name.as_bytes() == field.as_bytes() {
+            if let Some(r) = scheduled(name, facts) {
+                return r;
+            }
             return match category {
                 Category::Ev => ev,
                 Category::Lmt => lmt,
@@ -295,19 +384,47 @@ pub fn annex_xiii_requirement(field: &str, battery_type: &str) -> Requirement {
     Requirement::Unknown
 }
 
-/// Every field this category must carry, in table order.
-///
-/// The publish gate's input. Iterating the table rather than exposing it keeps
-/// the rows private, so a caller cannot come to depend on their order or arity.
-pub fn mandatory_fields(battery_type: &str) -> impl Iterator<Item = &'static str> {
+/// Every row's answer for this category, in table order. Empty for a category
+/// the guidance does not cover.
+fn requirements(
+    battery_type: &str,
+    facts: BatteryFacts,
+) -> impl Iterator<Item = (&'static str, Requirement)> {
     let category = category_of(battery_type);
     REQUIREMENTS.iter().filter_map(move |(name, ev, lmt, ind)| {
-        let r = match category? {
+        let table = match category? {
             Category::Ev => *ev,
             Category::Lmt => *lmt,
             Category::Industrial => *ind,
         };
-        (r == Requirement::Mandatory).then_some(*name)
+        Some((*name, scheduled(name, facts).unwrap_or(table)))
+    })
+}
+
+/// Every field this category must carry, in table order.
+///
+/// The publish gate's input. Iterating the table rather than exposing it keeps
+/// the rows private, so a caller cannot come to depend on their order or arity.
+pub fn mandatory_fields(
+    battery_type: &str,
+    facts: BatteryFacts,
+) -> impl Iterator<Item = &'static str> {
+    requirements(battery_type, facts)
+        .filter_map(|(name, r)| (r == Requirement::Mandatory).then_some(name))
+}
+
+/// Every field whose answer is [`Requirement::Undetermined`], with the fact it
+/// is waiting on, in table order.
+///
+/// The publish gate refuses on these as well as on missing content: a field
+/// whose obligation cannot be decided has not been shown to be optional.
+pub fn undetermined_fields(
+    battery_type: &str,
+    facts: BatteryFacts,
+) -> impl Iterator<Item = (&'static str, MissingFact)> {
+    requirements(battery_type, facts).filter_map(|(name, r)| match r {
+        Requirement::Undetermined(fact) => Some((name, fact)),
+        _ => None,
     })
 }
 
@@ -320,26 +437,60 @@ pub fn mandatory_fields(battery_type: &str) -> impl Iterator<Item = &'static str
 pub fn fields_not_applicable<'a>(
     present: &'a [&'a str],
     battery_type: &str,
+    facts: BatteryFacts,
 ) -> impl Iterator<Item = &'a str> {
-    present
-        .iter()
-        .copied()
-        .filter(move |f| annex_xiii_requirement(f, battery_type) == Requirement::NotApplicable)
+    present.iter().copied().filter(move |f| {
+        annex_xiii_requirement(f, battery_type, facts) == Requirement::NotApplicable
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::due_diligence::{
+        DUE_DILIGENCE_REQUIRED_FROM, DueDiligenceSecondLife, OperatorScope,
+    };
     use super::*;
+    use crate::common::date::CalendarDate;
+
+    /// A record that has said nothing a scheduled row reads.
+    const NO_FACTS: BatteryFacts = BatteryFacts {
+        placed_on_market: None,
+        second_life: DueDiligenceSecondLife::None,
+        operator_scope: None,
+    };
+
+    /// An original battery placed on the first day of the passport duty, before
+    /// row 19 moves.
+    const PLACED_FEBRUARY_2027: BatteryFacts = BatteryFacts {
+        placed_on_market: Some(CalendarDate::new(2027, 2, 18)),
+        ..NO_FACTS
+    };
+
+    const CATEGORIES: [&str; 3] = ["ev", "lmt", "industrial"];
+
+    fn placed(date: CalendarDate, operator_scope: Option<OperatorScope>) -> BatteryFacts {
+        BatteryFacts {
+            placed_on_market: Some(date),
+            operator_scope,
+            ..NO_FACTS
+        }
+    }
 
     #[test]
     fn point_1_k_is_ev_only() {
         // The sharpest per-category split in the guidance: mandatory for EV,
         // "not to be filled/displayed" for the other two.
         let f = "capacityThresholdForExhaustionPct";
-        assert_eq!(annex_xiii_requirement(f, "ev"), Requirement::Mandatory);
-        assert_eq!(annex_xiii_requirement(f, "lmt"), Requirement::NotApplicable);
         assert_eq!(
-            annex_xiii_requirement(f, "industrial"),
+            annex_xiii_requirement(f, "ev", NO_FACTS),
+            Requirement::Mandatory
+        );
+        assert_eq!(
+            annex_xiii_requirement(f, "lmt", NO_FACTS),
+            Requirement::NotApplicable
+        );
+        assert_eq!(
+            annex_xiii_requirement(f, "industrial", NO_FACTS),
             Requirement::NotApplicable
         );
     }
@@ -347,10 +498,16 @@ mod tests {
     #[test]
     fn cycle_lifetime_is_conditional_for_industrial_only() {
         for f in ["expectedLifetimeCycles", "expectedLifetimeReferenceTest"] {
-            assert_eq!(annex_xiii_requirement(f, "ev"), Requirement::Mandatory);
-            assert_eq!(annex_xiii_requirement(f, "lmt"), Requirement::Mandatory);
             assert_eq!(
-                annex_xiii_requirement(f, "industrial"),
+                annex_xiii_requirement(f, "ev", NO_FACTS),
+                Requirement::Mandatory
+            );
+            assert_eq!(
+                annex_xiii_requirement(f, "lmt", NO_FACTS),
+                Requirement::Mandatory
+            );
+            assert_eq!(
+                annex_xiii_requirement(f, "industrial", NO_FACTS),
                 Requirement::Conditional,
                 "{f}: 'only applicable for some industrial batteries where \
                  lifetime can be expressed in cycles'"
@@ -364,11 +521,11 @@ mod tests {
         // point 6 is mandatory for every category. Two data points, one
         // quantity — the pair this table exists to keep apart.
         assert_eq!(
-            annex_xiii_requirement("ratedCapacityAh", "ev"),
+            annex_xiii_requirement("ratedCapacityAh", "ev", NO_FACTS),
             Requirement::NotApplicable
         );
         assert_eq!(
-            annex_xiii_requirement("nominalCapacityAh", "ev"),
+            annex_xiii_requirement("nominalCapacityAh", "ev", NO_FACTS),
             Requirement::Mandatory
         );
     }
@@ -384,6 +541,10 @@ mod tests {
     /// once it is filled; the two facts sit on different axes and neither cancels
     /// the other. A reader who conflates them will either publish a value the act
     /// has not defined, or withhold one the annex puts in the public tier.
+    ///
+    /// Asked of a battery placed in February 2027, because row 19 moves in
+    /// August: its answer for a later battery is
+    /// `row_19_follows_the_placing_date_in_every_category`'s question.
     #[test]
     fn the_deferred_data_points_are_barred_for_every_category() {
         for field in [
@@ -395,15 +556,15 @@ mod tests {
             "recycledContentNickelPct",
             "recycledContentLeadPct",
         ] {
-            for category in ["ev", "lmt", "industrial"] {
+            for category in CATEGORIES {
                 assert_eq!(
-                    annex_xiii_requirement(field, category),
+                    annex_xiii_requirement(field, category, PLACED_FEBRUARY_2027),
                     Requirement::NotApplicable,
                     "{field} is deferred by the guidance for {category}"
                 );
             }
             assert!(
-                !annex_xiii_requirement(field, "ev").permits_presence(),
+                !annex_xiii_requirement(field, "ev", PLACED_FEBRUARY_2027).permits_presence(),
                 "{field} must not be carried while the format is unspecified"
             );
         }
@@ -427,7 +588,7 @@ mod tests {
             "dueDiligenceUrl",
             "carbonFootprintClass",
         ];
-        let mut flagged = fields_not_applicable(&present, "ev");
+        let mut flagged = fields_not_applicable(&present, "ev", PLACED_FEBRUARY_2027);
         assert_eq!(flagged.next(), Some("dueDiligenceUrl"));
         assert_eq!(flagged.next(), Some("carbonFootprintClass"));
         assert_eq!(
@@ -436,7 +597,7 @@ mod tests {
             "productIdentifier is Unknown to this table, and Unknown is not barred"
         );
         assert_eq!(
-            annex_xiii_requirement("productIdentifier", "ev"),
+            annex_xiii_requirement("productIdentifier", "ev", NO_FACTS),
             Requirement::Unknown,
             "if the guidance is ever read against the product identifier, this \
              control stops being one and the line above needs rewriting"
@@ -449,7 +610,7 @@ mod tests {
         // the other two would turn an absence of evidence into a finding.
         for t in ["portable", "starting-lighting-ignition", "sli", ""] {
             assert_eq!(
-                annex_xiii_requirement("batteryType", t),
+                annex_xiii_requirement("batteryType", t, NO_FACTS),
                 Requirement::Unknown,
                 "{t} is outside the guidance's scope"
             );
@@ -459,7 +620,7 @@ mod tests {
     #[test]
     fn an_unnamed_field_is_unknown() {
         assert_eq!(
-            annex_xiii_requirement("somethingNobodyHasChecked", "ev"),
+            annex_xiii_requirement("somethingNobodyHasChecked", "ev", NO_FACTS),
             Requirement::Unknown
         );
     }
@@ -467,7 +628,7 @@ mod tests {
     #[test]
     fn category_matching_ignores_case_and_padding() {
         assert_eq!(
-            annex_xiii_requirement("batteryType", "  EV  "),
+            annex_xiii_requirement("batteryType", "  EV  ", NO_FACTS),
             Requirement::Mandatory
         );
     }
@@ -479,8 +640,131 @@ mod tests {
             Requirement::Mandatory,
             Requirement::Conditional,
             Requirement::Unknown,
+            Requirement::Exempt,
+            Requirement::Undetermined(MissingFact::PlacingDate),
         ] {
             assert!(r.permits_presence());
         }
+    }
+
+    #[test]
+    fn row_19_follows_the_placing_date_in_every_category() {
+        let day_before = CalendarDate::new(2027, 8, 17);
+        let subject = Some(OperatorScope::Subject);
+        for category in CATEGORIES {
+            let ask = |facts| annex_xiii_requirement("dueDiligenceUrl", category, facts);
+            assert_eq!(
+                ask(placed(day_before, subject)),
+                Requirement::NotApplicable,
+                "{category}: placed before 18 August 2027"
+            );
+            assert_eq!(
+                ask(placed(DUE_DILIGENCE_REQUIRED_FROM, subject)),
+                Requirement::Mandatory,
+                "{category}: placed on 18 August 2027 by an operator subject to Chapter VII"
+            );
+            assert_eq!(
+                ask(NO_FACTS),
+                Requirement::Undetermined(MissingFact::PlacingDate),
+                "{category}: no date"
+            );
+        }
+    }
+
+    #[test]
+    fn row_19_honours_both_art_47_exemptions() {
+        for category in CATEGORIES {
+            let ask = |facts| annex_xiii_requirement("dueDiligenceUrl", category, facts);
+            assert_eq!(
+                ask(placed(DUE_DILIGENCE_REQUIRED_FROM, None)),
+                Requirement::Undetermined(MissingFact::OperatorScope),
+                "{category}: an undeclared operator is asked, not excused"
+            );
+            assert_eq!(
+                ask(placed(
+                    DUE_DILIGENCE_REQUIRED_FROM,
+                    Some(OperatorScope::BelowTurnoverThreshold)
+                )),
+                Requirement::Exempt,
+                "{category}: Art. 47, first paragraph"
+            );
+            let second_life = BatteryFacts {
+                second_life: DueDiligenceSecondLife::PlacedBeforeOperations,
+                ..NO_FACTS
+            };
+            assert_eq!(
+                ask(second_life),
+                Requirement::Exempt,
+                "{category}: Art. 47, second paragraph, needs no date"
+            );
+        }
+    }
+
+    #[test]
+    fn a_row_with_nothing_scheduled_ignores_the_facts() {
+        // A missing date must cost exactly the rows that need one.
+        let on_the_date = placed(DUE_DILIGENCE_REQUIRED_FROM, Some(OperatorScope::Subject));
+        for field in [
+            "batteryType",
+            "capacityThresholdForExhaustionPct",
+            "carbonFootprintClass",
+            "expectedLifetimeCycles",
+        ] {
+            for category in CATEGORIES {
+                assert_eq!(
+                    annex_xiii_requirement(field, category, NO_FACTS),
+                    annex_xiii_requirement(field, category, on_the_date),
+                    "{field} for {category}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn portable_and_sli_stay_unknown_whatever_the_date() {
+        let on_the_date = placed(DUE_DILIGENCE_REQUIRED_FROM, Some(OperatorScope::Subject));
+        for t in ["portable", "starting-lighting-ignition"] {
+            for facts in [NO_FACTS, PLACED_FEBRUARY_2027, on_the_date] {
+                assert_eq!(
+                    annex_xiii_requirement("dueDiligenceUrl", t, facts),
+                    Requirement::Unknown,
+                    "{t} {facts:?}"
+                );
+            }
+            assert_eq!(undetermined_fields(t, NO_FACTS).count(), 0, "{t}");
+        }
+    }
+
+    #[test]
+    fn the_gate_inputs_see_the_scheduled_row() {
+        let on_the_date = placed(DUE_DILIGENCE_REQUIRED_FROM, Some(OperatorScope::Subject));
+        assert!(mandatory_fields("ev", on_the_date).any(|f| f == "dueDiligenceUrl"));
+        assert!(!mandatory_fields("ev", PLACED_FEBRUARY_2027).any(|f| f == "dueDiligenceUrl"));
+
+        let mut waiting = undetermined_fields("lmt", NO_FACTS);
+        assert_eq!(
+            waiting.next(),
+            Some(("dueDiligenceUrl", MissingFact::PlacingDate))
+        );
+        assert_eq!(waiting.next(), None, "only row 19 depends on a fact today");
+        assert_eq!(undetermined_fields("lmt", PLACED_FEBRUARY_2027).count(), 0);
+
+        // An exempt battery may still carry the address; it is not flagged.
+        let exempt = placed(
+            DUE_DILIGENCE_REQUIRED_FROM,
+            Some(OperatorScope::BelowTurnoverThreshold),
+        );
+        let present = ["dueDiligenceUrl"];
+        assert_eq!(fields_not_applicable(&present, "ev", exempt).count(), 0);
+        assert!(!mandatory_fields("ev", exempt).any(|f| f == "dueDiligenceUrl"));
+    }
+
+    #[test]
+    fn a_missing_fact_names_the_field_that_supplies_it() {
+        assert_eq!(MissingFact::PlacingDate.field(), "placedOnMarketDate");
+        assert_eq!(
+            MissingFact::OperatorScope.field(),
+            "dueDiligenceOperatorScope"
+        );
     }
 }

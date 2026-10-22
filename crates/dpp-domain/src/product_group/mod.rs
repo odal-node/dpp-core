@@ -46,11 +46,11 @@ pub use data::unsold_goods::{
 };
 pub use data::{
     AluminiumData, BatteryChemistry, BatteryData, BatteryStatus, BatteryType, ConstructionData,
-    CriticalRawMaterial, DetergentData, DeviceType, DynamicPerformance, ElectronicsData,
-    EnergyEfficiencyClass, EnvironmentalReading, ExpectedLifetime, FibreEntry, FurnitureData,
-    HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition, MattressData,
-    ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth, SteelData,
-    SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
+    CriticalRawMaterial, DetergentData, DeviceType, DueDiligenceOperatorScope, DynamicPerformance,
+    ElectronicsData, EnergyEfficiencyClass, EnvironmentalReading, ExpectedLifetime, FibreEntry,
+    FurnitureData, HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition,
+    MattressData, ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth,
+    SteelData, SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
     UnmodelledPayload, UnsoldGoodsReport, UsageHistory,
 };
 pub use group::ProductGroup;

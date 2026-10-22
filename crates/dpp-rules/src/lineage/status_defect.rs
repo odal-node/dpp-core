@@ -22,7 +22,7 @@ pub enum StatusDefect<'a> {
     /// Either the edges name a different operation, or there are none at all —
     /// which are the same defect from this rule's point of view, since both
     /// leave the claimed operation unrecorded. Whether the edge that *is* there
-    /// carries its predecessor's consent is [`super::consent`]'s question.
+    /// is substantiated is [`super::substantiation`]'s question.
     NoEdgeSupportsStatus {
         /// The status the passport claims, in wire form.
         status: &'a str,

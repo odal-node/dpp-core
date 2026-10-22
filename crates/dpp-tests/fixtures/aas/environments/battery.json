@@ -127,7 +127,7 @@
           "modelType": "Property",
           "idShort": "schemaVersion",
           "valueType": "xs:string",
-          "value": "2.9.0"
+          "value": "2.10.0"
         },
         {
           "modelType": "Property",

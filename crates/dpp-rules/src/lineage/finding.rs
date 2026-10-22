@@ -1,17 +1,17 @@
-//! What the lineage consent rule reports about an unsupported edge.
+//! What the lineage substantiation rule reports about an unsupported edge.
 
 /// Why one derivation edge is not supported by a transfer of responsibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ConsentDefect<'a> {
+pub enum SubstantiationDefect<'a> {
     /// No transfer record corresponds to this predecessor at all, so the claim
     /// to have taken responsibility rests on this operator's own assertion.
     NoTransfer,
-    /// The outgoing operator never authorised the handover.
+    /// The record carries no authorisation from the outgoing operator.
     ///
-    /// The defect that matters most: without it there is no predecessor consent
-    /// at all, and the edge is exactly the unilateral assertion the rule exists
-    /// to catch.
+    /// The defect that matters most: that authorisation is the one signature in
+    /// the record that is a counterparty's own, so without it the record
+    /// corroborates nothing the claiming operator could not have written itself.
     OutgoingAuthorisationMissing,
     /// The handover was never completed — still pending, or rejected, or
     /// cancelled. An abandoned transfer does not support a live claim.
@@ -38,9 +38,9 @@ pub enum ConsentDefect<'a> {
 
 /// One unsupported edge, identified by its position in the passport's list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ConsentFinding<'a> {
+pub struct SubstantiationFinding<'a> {
     /// Index into the `derived_from` list as the caller passed it.
     pub edge_index: usize,
     /// What is wrong with it.
-    pub defect: ConsentDefect<'a>,
+    pub defect: SubstantiationDefect<'a>,
 }

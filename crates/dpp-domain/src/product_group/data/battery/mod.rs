@@ -13,6 +13,9 @@ mod expected_lifetime;
 mod harmful_events;
 mod hazardous_substance;
 mod material_composition;
+mod operator_scope;
+#[cfg(test)]
+mod operator_scope_tests;
 mod state_of_charge_reading;
 mod state_of_health;
 mod status;
@@ -28,6 +31,7 @@ pub use expected_lifetime::ExpectedLifetime;
 pub use harmful_events::HarmfulEvents;
 pub use hazardous_substance::{HazardSymbol, HazardousSubstance};
 pub use material_composition::MaterialComposition;
+pub use operator_scope::DueDiligenceOperatorScope;
 pub use state_of_charge_reading::StateOfChargeReading;
 pub use state_of_health::StateOfHealth;
 pub use status::BatteryStatus;

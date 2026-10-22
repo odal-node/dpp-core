@@ -2,7 +2,9 @@
 
 This document defines the canonical data structures for all Digital Product Passports. It is the authoritative reference for domain types in `dpp-domain`, JSON Schema fields, and Verifiable Credential payloads.
 
-> **Last updated**: 2026-08-13 (aligned to `BatteryData` v2.6.0, `TextileData` v1.2.0,
+> **Last updated**: 2026-10-21 for §4.1–§4.3, re-read against `BatteryData` v2.9.0,
+> `TextileData` v1.4.0 and the current catalog; the rest of the document was last
+> aligned on 2026-08-13 (to `BatteryData` v2.6.0, `TextileData` v1.2.0,
 > `ElectronicsData` v1.2.0). Field-level detail lives in the types and schemas;
 > this document describes shape and rules, not every column.
 
@@ -231,21 +233,22 @@ Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each
 
 **Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Product group (`BatteryData`) — v2.9.0
+### 4.1 Battery Product group (`BatteryData`) — v2.10.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
 
 **This section deliberately does not list every field.** `BatteryData` carries
-68, and a hand-maintained copy of that list is the same drift that let four
+69, and a hand-maintained copy of that list is the same drift that let four
 Annex VI Part A fields sit in the type for seven schema versions with no schema
 property to validate against. The authoritative pair is:
 
-- `crates/dpp-domain/src/domain/product group/data/battery.rs` — the type, with a
+- `crates/dpp-domain/src/product_group/data/battery/data.rs` — the type, with a
   per-field regulatory citation on each doc comment.
-- `crates/dpp-domain/schemas/battery/v2.9.0.json` — the wire contract, with an
-  `x-disclosure` class on every property. `additionalProperties` is `false`, and
-  a test asserts the two agree field-for-field.
+- `crates/dpp-domain/schemas/battery/v2.10.0.json` — the wire contract, with an
+  `x-disclosure` class on every property. `additionalProperties` is `false`, so a
+  field the type emits that the schema does not declare fails validation. Both
+  carry the same 69 fields today; no test asserts that the two sets are equal.
 
 **Required** (5, and the only ones a passport cannot omit at any category):
 `productIdentifier`, `batteryChemistry`, `nominalVoltageV`, `nominalCapacityAh`,
@@ -256,6 +259,19 @@ because the obligations are **per category**: a field mandatory for an
 electric-vehicle battery may be "not to be filled/displayed" for an LMT one.
 That constraint lives in `dpp_rules::batteries::passport_content`, which the
 publish gate enforces, rather than in the schema.
+
+**One row also turns on facts about the battery.** `dueDiligenceUrl` (Annex
+XIII point 1(d)) is not to be filled for a battery placed on the market before
+18 August 2027, and is owed from that date (Art. 48(1)) unless Art. 47 takes the
+battery out: `dueDiligenceOperatorScope` declares whether the operator is under
+the turnover threshold, and a repurposed, re-used or remanufactured
+`batteryStatus` is the second-life exemption. So the placing date
+(`placedOnMarketDate`, on the envelope or here) and, from that date, the
+declaration are facts the publish gate needs. When one is absent it refuses,
+naming the fact and the fields waiting on it, rather than guessing either way.
+The declaration is labelled `conformity`: it is the operator's statement of its
+own position, for authorities to verify, and no point of Annex XIII places it in
+a wider tier.
 
 **Shape.** The fields group by the Annex XIII tier that governs who may see
 them, which is also what `x-disclosure` records:
@@ -284,30 +300,38 @@ field is itself the defect.
 - `HazardousSubstance { name, cas_number, concentration_pct }`
 - `TemperatureRange { min_c, max_c }`
 
-Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.9.0}.json`. Older versions stay
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.10.0}.json`. Older versions stay
 registered so a passport validated against one remains verifiable, and each
 carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.
 
 
-### 4.2 Textile Product group (`TextileData`) — v1.2.0
+### 4.2 Textile Product group (`TextileData`) — v1.4.0
 
-Source: ESPR Working Group on Textiles. Delegated act adoption anticipated ~Q2 2027, compliance ~2028–2029.
+Source: ESPR Art. 18 (textiles are on the priority list) and the Commission's
+*Ecodesign for Sustainable Products and Energy Labelling Working Plan 2025–2030*,
+COM(2025) 187, which gives textiles an indicative delegated-act adoption year of
+2027. No delegated act exists yet, so the fields below are provisional (see the
+manifest's notes).
 
-**Required fields**:
+**Required fields** (5):
 
 | Field | Rust Type | JSON name |
 |---|---|---|
-| `fibre_composition` | `Vec<FibreEntry>` | `"fibreComposition"` — must sum to 100% |
+| `product_identifier` | `ProductIdentifier` | `"productIdentifier"` — a union of the EN 18219:2026 clause 5 schemes; v1.3.0 replaced the mandatory `gtin` with it |
+| `fibre_composition` | `Vec<FibreEntry>` | `"fibreComposition"` — must sum to ~100% |
 | `country_of_origin` | `String` (ISO 3166-1) | `"countryOfOrigin"` |
 | `care_instructions` | `String` | `"careInstructions"` — ISO 3758 or plain text |
 | `chemical_compliance_standard` | `String` | `"chemicalComplianceStandard"` |
 
-**Optional fields**: `recycled_content_pct`, `carbon_footprint_kg_co2e`, `water_use_litres`, `microplastic_shedding_mg_per_wash`, `repair_score`, `durability_score`, `expected_wash_cycles`, `country_of_raw_material_origin`, `svhc_substances`, `disassembly_instructions`, `spare_parts_available`, `product_weight_grams`.
+**Optional fields** (21, listed here by hand, so the type in
+`crates/dpp-domain/src/product_group/data/textile.rs` and the schema are the
+authority if they disagree): `recycled_content_pct`, `carbon_footprint_kg_co2e`, `water_use_litres`, `microplastic_shedding_mg_per_wash`, `repair_score`, `durability_score`, `expected_wash_cycles`, `country_of_raw_material_origin`, `svhc_substances`, `allergens`, `substances_of_concern`, `recyclability_class`, `end_of_life_instructions`, `reuse_condition`, `prior_use_cycles`, `disassembly_instructions`, `spare_parts_available`, `product_weight_grams`, `repair_history_url`, `repair_count`, `pef_score`.
 
 `FibreEntry { fibre: String, pct: f64, country_of_origin: Option<String> }`
 
-Schemas: `schemas/textile/v1.0.0.json`, `schemas/textile/v1.1.0.json`
+Schemas: `schemas/textile/v{1.0.0 … 1.4.0}.json`. Older versions stay registered
+for the same reason as battery's.
 
 ### 4.3 The rest of the catalog
 
@@ -317,15 +341,15 @@ others are listed here rather than each getting a stub.
 
 | Product group | Type | Current schema | Note |
 |---|---|---|---|
-| `aluminium` | `AluminiumData` | v1.1.0 | Carbon intensity, CBAM-aligned. Intermediate product |
-| `construction` | `ConstructionData` | v1.1.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
-| `detergent` | `DetergentData` | v1.1.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
+| `aluminium` | `AluminiumData` | v1.2.0 | Carbon intensity, CBAM-aligned. Intermediate product |
+| `construction` | `ConstructionData` | v1.2.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
+| `detergent` | `DetergentData` | v1.2.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
 | `electronics` | `ElectronicsData` | v1.5.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
-| `furniture` | `FurnitureData` | v1.2.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
-| `mattress` | `MattressData` | v1.0.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
-| `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
-| `toy` | `ToyData` | v1.1.0 | Reg. (EU) 2025/2509 |
-| `tyre` | `TyreData` | v1.0.0 | |
+| `furniture` | `FurnitureData` | v1.3.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
+| `mattress` | `MattressData` | v1.1.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
+| `steel` | `SteelData` | v1.2.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |
+| `toy` | `ToyData` | v1.2.0 | Reg. (EU) 2025/2509 |
+| `tyre` | `TyreData` | v1.1.0 | |
 | `unsold-goods` | `UnsoldGoodsReport` | v2.0.0 | See §4.4 — **not a product group**; built to Impl. Reg. (EU) 2026/2 Annex I |
 
 `ProductGroupData::Other` keeps the tag and payload of a product group this build

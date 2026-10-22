@@ -100,11 +100,11 @@ pub const TYRE_PRODUCT_DATA: &str = "urn:odal-node:aas:submodel-template:tyre-pr
 /// Odal Node toy product data template (EU 2025/2509).
 pub const TOY_PRODUCT_DATA: &str = "urn:odal-node:aas:submodel-template:toy-product-data:1.0";
 
-/// Odal Node aluminium product data template (EU ESPR ~2030, CBAM-aligned).
+/// Odal Node aluminium product data template (EU ESPR Working Plan 2025-2030, CBAM-aligned).
 pub const ALUMINIUM_PRODUCT_DATA: &str =
     "urn:odal-node:aas:submodel-template:aluminium-product-data:1.0";
 
-/// Odal Node furniture product data template (EU ESPR ~2028-2031).
+/// Odal Node furniture product data template (EU ESPR Working Plan 2025-2030).
 pub const FURNITURE_PRODUCT_DATA: &str =
     "urn:odal-node:aas:submodel-template:furniture-product-data:1.0";
 

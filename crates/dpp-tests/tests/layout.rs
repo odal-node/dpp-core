@@ -562,6 +562,7 @@ const TIERS: &[(&str, u8)] = &[
     ("instrument", 3),
     ("schemas", 3),
     // 4 composition — the shapes that bring the tiers below into one.
+    ("calendar", 4),
     ("error", 4),
     ("passport", 4),
     ("product_group", 4),

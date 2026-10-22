@@ -15,6 +15,43 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **The lineage rule asked for the predecessor's consent, which no instrument
+  requires, and is renamed for what it checks.** `dpp_rules::lineage::consent`
+  reported a second-life derivation edge that no transfer of responsibility
+  supports as "unconsented", on the reasoning that responsibility "must not be
+  assignable by unilateral assertion". Reg. (EU) 2023/1542 Art. 77(7) says
+  otherwise: the responsibility "shall be transferred to the economic operator
+  that has placed that battery on the market or has put it into service", by
+  operation of law, and the battery "shall have a new battery passport linked to"
+  the original. The predecessor's agreement is not a precondition, so an operator
+  asserting a derivation is assuming responsibility, not assigning it. What the
+  rule does is substantiation: it asks whether evidence that the operation took
+  place accompanies the claim. A transfer record is that evidence, and the
+  Regulation does not require one to exist. A finding called "unconsented"
+  invites a caller to go and obtain an agreement no regulation requires; one
+  called "unsubstantiated" invites them to find the evidence. (#313)
+  - **Removed, with their replacements:** `dpp_rules::lineage::consent` is now
+    `dpp_rules::lineage::substantiation`; `check_derivation_consent` is now
+    `check_derivation_substantiation`; `ConsentFinding` is now
+    `SubstantiationFinding`; `ConsentDefect` is now `SubstantiationDefect`. The
+    crate-root re-exports in `dpp_rules::lineage` move the same way, and so do the
+    paths through `dpp_plugin_sdk::rules`.
+  - **Migration:** rename the imports and the calls. Nothing else changes.
+    `DerivationEdge`, `TransferEvidence`, `StatusDefect`, the fields of the
+    finding, and the variants `NoTransfer`, `OutgoingAuthorisationMissing`,
+    `NotAccepted`, `IncomingOperatorMismatch` and `OperationMismatch` keep their
+    names and meaning, because they describe facts about the transfer record. No
+    deprecated aliases are left behind: nothing in this repository calls the old
+    names outside the rule's own tests.
+  - **The behaviour does not change.** The rule still reports an edge unless the
+    caller found a transfer record authorised by the outgoing operator, accepted,
+    and naming the same operation and the same incoming operator. A missing record
+    is an unsubstantiated claim, not a breach of Art. 77(7). Whether the rule
+    should keep demanding the outgoing operator's authorisation, which a lawful
+    second-life operator may be unable to obtain, is #499.
+  - The doc comments and the lineage design document that called an edge
+    "consented to" say "substantiated" instead.
+
 - **`RegistrySyncPort::notify_transfer` answers with a `TransferReport`, not a
   `RegistryRecord`.** A notification amends a record that already exists, so
   what the registry says about it is whether it took the notification, not where
@@ -55,7 +92,83 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   it is `None`, so a stored record reads as before and is written back with the
   same bytes, which a signed passport and a signed transfer chain need. (#494)
 
+- **The battery content table answers as of a battery's facts, not its category
+  alone, and the publish gate refuses when a fact it needs is missing.** Guidance
+  row 19, `dueDiligenceUrl` (Annex XIII point 1(d)), was `NotApplicable` for EV,
+  LMT and industrial batteries with no way to say that Art. 48(1) makes the report
+  due from 18 August 2027. It now follows the placing-on-market date, and from
+  that date it is owed unless Art. 47 takes the battery out of the due diligence
+  chapter: an operator declaring itself under the turnover threshold (first
+  paragraph), or a battery already on the market before being re-used,
+  repurposed or remanufactured (second paragraph). It is not a plain `Mandatory`
+  from that date, which is how the Commission's guidance reads: that would have
+  refused both exempt cases, including every second-life passport, since Art.
+  77(7) gives such a battery a new passport with a later placing date. The
+  turnover limb is a declaration, never a figure, so an amendment to the
+  threshold changes no code. Changes to the public API:
+  - `passport_content::annex_xiii_requirement`, `mandatory_fields` and
+    `fields_not_applicable` take a `BatteryFacts` (the placing date, the
+    second-life limb and the operator's declaration). A row with nothing
+    scheduled ignores it.
+  - `Requirement` gains `Exempt`, for a battery the law excuses from a duty its
+    category carries, and `Undetermined(MissingFact)`, for an answer that turns
+    on a fact the caller did not give. An `Exempt` field is neither required nor
+    flagged; an `Undetermined` one is never an exemption, and the gate refuses it.
+  - `Passport::check_mandatory_content` and `check_category_content` refuse an
+    EV, LMT or industrial battery that does not carry its placing date (on the
+    envelope or as `placedOnMarketDate`) unless it is second-life, and from
+    18 August 2027 one that does not carry `dueDiligenceOperatorScope`. There is
+    one error per missing fact, naming every field waiting on it, so this is one
+    rule for every such obligation rather than a side effect of one row. Nothing
+    lawful is refused: a passport has to exist once the battery is placed on the
+    market, and a draft prepared before then is not published. The gate also
+    refuses a record whose two placing dates disagree, because `transition_to`
+    does not run `validate`, which already did.
+
+  **Migration:** pass `BatteryFacts::default()` where no facts are known, and
+  expect `Undetermined` for row 19. Match the two new `Requirement` variants.
+  Publish EV, LMT and industrial batteries with their placing date, and from
+  18 August 2027 with `dueDiligenceOperatorScope`. (#404)
+
 ### Added
+
+- **`dpp_rules::batteries::due_diligence`, battery schema v2.10.0, and the facts
+  the content table reads.** `due_diligence_scope` answers Art. 47 and Art. 48(1)
+  for one battery as a `DueDiligenceScope` (`ExemptSecondLife`,
+  `PlacingDateUnknown`, `NotYetBinding`, `OperatorScopeUndeclared`,
+  `ExemptBelowTurnoverThreshold`, `Required`), from the placing date, a
+  `DueDiligenceSecondLife` and an `OperatorScope`. `DUE_DILIGENCE_REQUIRED_FROM`
+  is 18 August 2027. `battery_facts::BatteryFacts` carries the three facts, and
+  `passport_content::undetermined_fields` lists each field whose answer waits on
+  one, with the `MissingFact` it waits on. Battery schema v2.10.0 adds
+  `dueDiligenceOperatorScope` (`subject` or `belowTurnoverThreshold`, labelled
+  `conformity`), carried by `BatteryData::due_diligence_operator_scope` as a
+  `DueDiligenceOperatorScope`; a v2.9.0 record reads through unchanged. The
+  battery plugin accepts v2.10.0 and reports a missing fact at create time as
+  `battery.annex_xiii.<field>_missing`, so a draft learns what the publish gate
+  will ask before it gets there. (#404)
+
+- **`ObligationCalendar`: which dated obligations take effect between two
+  dates.** `ObligationCalendar::new().between(from, to)` returns the
+  `ObligationEvent`s in that window, both days included, ordered by date and
+  then by id. Each event has a stable `id`, its `date`, an `ObligationKind`
+  (`PassportStart`, `ContentRequirement`, `MinimumShare`, `Restriction`), the
+  citation that fixes the date, a one-line summary, the product group and
+  categories it reaches, and its `DateBasis`, so an `Assumed` date is never
+  mistaken for a deadline. It reads two sources: every act's passport start date
+  in the instrument catalog (`from_catalog` takes a caller's own), and the
+  changes the rule modules schedule. Each battery rule module that selects its
+  answer by date now lists those changes as `SCHEDULE`
+  (`dpp_rules::batteries::schedule::ScheduledChange`), built from the same
+  constants the rule applies, so the two cannot disagree: the due diligence report
+  (18 August 2027), the Art. 8(2) and 8(3) minimum shares (2031 and 2036) and
+  the two Annex I lead dates. There is no clock: the caller passes the window. A
+  change with no date is not an event, so the Art. 8(1) declaration floors, which
+  are only the earliest that duty can begin, are left out with the reason
+  recorded. A new gate in `dpp-tests` fails when a `CalendarDate` constant in
+  `dpp-rules` is on no `SCHEDULE` and not listed with a reason, when a `SCHEDULE`
+  does not reach the calendar, or when a file listing one carries no ✅
+  COMPLIANCE-PIN. (#507)
 
 - **The registry's web client was read again (2026-10-20), and the task list's
   sort is now a constant.** Both the acceptance and the production build of the
@@ -390,6 +503,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - What this cannot see: an enum that carries data and gains a variant this
     test never builds. `ResponsibilityBasis` is the only one on the envelope, and
     the test builds every variant it lists.
+
+- **Doc comments, two strings a caller can see, and a regulatory document asserted
+  dates that no source in the repository backs.** Textile's "~Q2 2027 adoption,
+  compliance ~2028–2029", aluminium's "~2030", tyres' "~2029", furniture's
+  "~2028–2031", construction's "~2028–2032" and the laptop repairability act's
+  "~2027" came from no source we hold. The Commission's working plan,
+  COM(2025) 187, gives textiles, aluminium and tyres an indicative delegated-act
+  adoption year of 2027 and furniture 2028; the construction instrument record
+  leaves that passport undated, because CPR Art. 22(7) dates it at 18 months after
+  the Art. 75(1) delegated act, which is not adopted; and the plan has no laptop
+  row. Each now says what its source says, and a year appears only where the plan
+  gives one. (#503)
+  - **Two strings change.** The `regulation` of the laptop and washing-machine
+    repairability bases lose "(expected ~2027)" and "(expected ~2026)", which makes
+    them match the displays basis, which never carried a year. Nothing in this
+    repository asserts on either.
+  - The washing-machine note no longer calls its 2026 act a "repairability index
+    delegated act". The plan lists household washing machines for ecodesign and
+    energy-label requirements and does not say whether they carry one.
+  - The comment on `BatteryData::battery_passport_number` told readers to expect an
+    implementing act "~2026" and to accept a UUID v4 until then. The field has been
+    superseded since schema v2.7.0 by the passport's data carrier identifier
+    (Art. 77(3)), and the comment now says so.
+  - `docs/regulatory/REGULATORY.md` repeated the aluminium and construction claims
+    and says the same as the code now does.
 
 ## [0.22.0] - 2026-10-16
 

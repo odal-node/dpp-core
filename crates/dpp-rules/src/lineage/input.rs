@@ -1,4 +1,4 @@
-//! Borrowing views a caller supplies to the lineage consent rule.
+//! Borrowing views a caller supplies to the lineage substantiation rule.
 //!
 //! Primitive views rather than domain types, so core and the Wasm plugins each
 //! adapt their own representation — typed structs on one side, JSON fields on
@@ -18,7 +18,7 @@ pub struct TransferEvidence<'a> {
     /// Whether the **outgoing** operator's authorisation is present.
     ///
     /// This is the predecessor's own signature, and the load-bearing half — see
-    /// [`super::consent`] for why the other half is not evidence of consent.
+    /// [`super::substantiation`] for why the other half is not corroboration.
     pub outgoing_authorised: bool,
     /// Whether the handover was accepted and completed, rather than left
     /// pending, rejected or cancelled.

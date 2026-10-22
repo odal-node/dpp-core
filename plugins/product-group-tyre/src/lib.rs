@@ -1,8 +1,9 @@
 //! Tyre product group plugin — EU Regulation 2020/740 labelling + ESPR Working Plan.
 //!
 //! Validates the mandatory label fields (fuel-efficiency and wet-grip classes
-//! use the A–E scale per 2020/740). DPP mandate and thresholds are expected
-//! ~2029, so the determination is `NOT_ASSESSED`. `tyreClass` (`C1`/`C2`/`C3`)
+//! use the A–E scale per 2020/740). The DPP mandate and thresholds await a
+//! delegated act (the Working Plan's indicative adoption year is 2027; none is
+//! adopted), so the determination is `NOT_ASSESSED`. `tyreClass` (`C1`/`C2`/`C3`)
 //! is a product category, not a dispatch key.
 
 use dpp_plugin_sdk::export_plugin;

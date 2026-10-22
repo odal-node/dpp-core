@@ -43,6 +43,7 @@
 
 use alloc::{format, string::String};
 
+use crate::batteries::schedule::{ChangeKind, ScheduledChange};
 use crate::common::date::CalendarDate;
 
 // ── Annex I thresholds ────────────────────────────────────────────────────────
@@ -71,6 +72,39 @@ pub const LEAD_PORTABLE_RESTRICTION_FROM: CalendarDate = CalendarDate::new(2024,
 /// Annex I entry 3 point 2 disapplies the lead restriction to those cells
 /// *"until"* this date, so it binds them **from** it.
 pub const LEAD_ZINC_AIR_BUTTON_CELL_BOUND_FROM: CalendarDate = CalendarDate::new(2028, 8, 18);
+
+/// The changes [`LEAD_PORTABLE_RESTRICTION_FROM`] and
+/// [`LEAD_ZINC_AIR_BUTTON_CELL_BOUND_FROM`] schedule.
+///
+/// ✅ COMPLIANCE-PIN: these two dates only. Annex I entry 3 points 1 and 2 of
+/// Regulation (EU) 2023/1542, read on 2026-10-21 in the table that Regulation
+/// (EU) 2026/1738 Art. 53 and Annex XII substitute for Annex I from
+/// 13 August 2026 (OJ L, 24.7.2026): both points keep the dates quoted in this
+/// module's documentation. ⚠️ That table also adds cadmium and lead limits for
+/// electric-vehicle and SLI batteries in M1 and N1 vehicles, which the rest of
+/// this module has not been read against.
+pub const SCHEDULE: &[ScheduledChange] = &[
+    ScheduledChange {
+        id: "battery.lead.portable",
+        date: LEAD_PORTABLE_RESTRICTION_FROM,
+        kind: ChangeKind::Restriction,
+        citation: "Regulation (EU) 2023/1542 Annex I, entry 3, point 1",
+        summary: "Portable batteries placed on the market from this date may contain no \
+                  more than 0,01 % lead by weight.",
+        product_group: "battery",
+        categories: &["portable"],
+    },
+    ScheduledChange {
+        id: "battery.lead.zinc-air-button-cells",
+        date: LEAD_ZINC_AIR_BUTTON_CELL_BOUND_FROM,
+        kind: ChangeKind::Restriction,
+        citation: "Regulation (EU) 2023/1542 Annex I, entry 3, point 2",
+        summary: "The carve-out for portable zinc-air button cells ends, and the portable \
+                  lead limit binds them for cells placed on the market from this date.",
+        product_group: "battery",
+        categories: &["portable"],
+    },
+];
 
 /// Whether a declared mercury content percentage violates the Annex I entry 1
 /// prohibition. Returns `true` (prohibited) when `content_pct > 0.0005`.
