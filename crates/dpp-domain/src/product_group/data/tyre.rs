@@ -1,4 +1,4 @@
-//! Tyres (EU ESPR Working Plan 2025-2030, mandate ~2029).
+//! Tyres (EU ESPR Working Plan 2025-2030, indicative adoption 2027).
 
 use serde::{Deserialize, Serialize};
 

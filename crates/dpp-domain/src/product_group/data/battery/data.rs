@@ -297,9 +297,12 @@ pub struct BatteryData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub battery_model_id: Option<String>,
 
-    /// Unique battery passport identifier issued at commissioning.
-    /// Format: per the Commission's implementing act on the battery passport
-    /// (expected ~2026); until then a UUID v4 is accepted.
+    /// **Superseded.** The unique identifier Art. 77(3) of Regulation (EU)
+    /// 2023/1542 has the operator attribute is, from schema v2.7.0, the passport's
+    /// data carrier identifier: the `productIdentifier` with the carrier serial the
+    /// operator attributes on the passport itself. A second field holding the same
+    /// identifier could only disagree with it. Retained so that a stored record
+    /// keeps the value it was written with.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub battery_passport_number: Option<String>,
 

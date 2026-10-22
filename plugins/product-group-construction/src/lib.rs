@@ -1,8 +1,9 @@
 //! Construction products product group plugin — EU CPR 2024/3110.
 //!
 //! Validates the mandatory declaration fields and stores manufacturer-supplied
-//! carbon footprint values. Compliance thresholds are pending final delegated
-//! acts (~2028–2032), so the determination is `NOT_ASSESSED`.
+//! carbon footprint values. Compliance thresholds are pending the delegated act
+//! CPR Art. 75(1) leaves to the Commission, and none is adopted, so the
+//! determination is `NOT_ASSESSED`.
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{

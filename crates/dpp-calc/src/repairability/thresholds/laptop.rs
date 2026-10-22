@@ -1,4 +1,4 @@
-//! Laptops — reserved; product-specific delegated act expected ~2027.
+//! Laptops — reserved; no product-specific delegated act is adopted.
 
 use super::{
     DEFAULT_REPAIRABILITY_THRESHOLDS, RepairabilityRuleset, RepairabilityThresholds,
@@ -26,7 +26,7 @@ static LAPTOP_WEIGHTS: RepairabilityWeights = RepairabilityWeights {
 };
 
 static LAPTOP_BASIS: RegulatoryBasis = RegulatoryBasis {
-    regulation: "pending — ESPR laptop repairability delegated act (expected ~2027)",
+    regulation: "pending — ESPR laptop repairability delegated act",
     article: "TBD",
     standard: Some("EN 45554:2021"),
     technical_study: None,
