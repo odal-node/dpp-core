@@ -18,10 +18,17 @@ pub(super) const RULE_SCHEDULES: &[&[ScheduledChange]] = &[
 ];
 
 /// Every dated obligation this build knows: the changes the rule modules
-/// schedule, and the passport start date of every act in an instrument catalog.
+/// schedule, and the passport start date of every act in an instrument catalog
+/// that is current law.
 ///
 /// Built once and then only read. It holds no clock: [`Self::between`] takes
 /// both ends of the window, so the same question always has the same answer.
+///
+/// An act that is not [current law](Instrument::is_current_law) contributes no
+/// event, whatever date it records: a proposal is not yet law, a repealed act no
+/// longer is, and an adopted act whose currency was never checked is not
+/// assumed to be. An obligation cannot rest on any of them, so none is
+/// announced.
 ///
 /// An act's passport date that is not `YYYY-MM-DD` cannot be placed on a
 /// calendar and is left out. The embedded catalog is tested to hold none, so
@@ -47,7 +54,7 @@ impl ObligationCalendar {
             .flat_map(|schedule| schedule.iter())
             .filter_map(rule_event)
             .collect();
-        for instrument in catalog.all() {
+        for instrument in catalog.all().iter().filter(|i| i.is_current_law()) {
             events.extend(passport_starts(instrument));
         }
         events.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));

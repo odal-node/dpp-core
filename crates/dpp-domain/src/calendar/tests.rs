@@ -5,7 +5,10 @@ use chrono::NaiveDate;
 
 use super::obligation_calendar::RULE_SCHEDULES;
 use super::*;
-use crate::instrument::{DateBasis, InstrumentCatalog, ObligationDate, PassportObligation};
+use crate::instrument::currency::CurrencyState;
+use crate::instrument::{
+    DateBasis, InstrumentCatalog, InstrumentStatus, ObligationDate, PassportObligation,
+};
 
 fn day(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).unwrap()
@@ -100,8 +103,8 @@ fn the_window_includes_both_ends_and_a_reversed_one_is_empty() {
     assert!(on(date, day(2027, 8, 17)).is_empty(), "from after to");
 }
 
-/// Layer 1's date, with its citation, reaching the three categories that carry
-/// a passport.
+/// The due diligence report date, with its citation, reaching the three
+/// categories that carry a passport.
 #[test]
 fn the_due_diligence_report_is_on_the_calendar() {
     let calendar = ObligationCalendar::new();
@@ -165,6 +168,48 @@ fn an_assumed_date_carries_its_basis() {
         .unwrap();
     assert_eq!(event.date, day(2031, 1, 1));
     assert_eq!(event.basis, DateBasis::Assumed);
+}
+
+/// A dated passport obligation is announced only from an act that is current
+/// law. A proposal, a repealed act and an adopted act whose currency was never
+/// checked each keep the toy act's sourced date, and none of them reaches the
+/// calendar; the toy act itself, beside them, still does.
+#[test]
+fn an_act_that_is_not_current_law_announces_nothing() {
+    let mut catalog = InstrumentCatalog::new();
+    let toy = catalog.get("toy-safety-2025-2509").unwrap().clone();
+
+    let mut proposed = toy.clone();
+    proposed.id = "a-proposed-act".to_owned();
+    proposed.status = InstrumentStatus::Proposed;
+
+    let mut repealed = toy.clone();
+    repealed.id = "a-repealed-act".to_owned();
+    repealed.currency.as_mut().unwrap().state = CurrencyState::Repealed {
+        by: "32099R0001".to_owned(),
+        on: "2029-01-01".to_owned(),
+    };
+
+    let mut unchecked = toy;
+    unchecked.id = "an-unchecked-act".to_owned();
+    unchecked.currency = None;
+
+    for act in [proposed, repealed, unchecked] {
+        catalog.register(act).unwrap();
+    }
+
+    let calendar = ObligationCalendar::from_catalog(&catalog);
+    let on_calendar = ids(calendar.events());
+    for id in ["a-proposed-act", "a-repealed-act", "an-unchecked-act"] {
+        assert!(
+            !on_calendar.iter().any(|e| e.starts_with(id)),
+            "{id} is not current law and must announce nothing: {on_calendar:?}"
+        );
+    }
+    assert!(
+        on_calendar.contains(&"toy-safety-2025-2509.passport.toy"),
+        "{on_calendar:?}"
+    );
 }
 
 #[test]
