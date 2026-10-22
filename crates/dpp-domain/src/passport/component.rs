@@ -48,18 +48,19 @@ pub struct Quantity {
 /// granularity here would commit every product group to one product group's
 /// answer.
 ///
-/// # This edge is a claim, not a consented fact
+/// # This edge is a claim, not a substantiated fact
 ///
 /// The hash-pin proves the target has not been modified. It does not prove the
 /// target's operator agreed to being listed as a constituent, and BOM edges
-/// deliberately carry **no** consent requirement: demanding a supplier signature
-/// for every assembly is not something any real supply chain produces. A
-/// `componentRef` is therefore a *claim by the assembler*, pinned so it cannot
+/// deliberately carry **no** substantiation requirement: demanding a supplier
+/// signature for every assembly is not something any real supply chain produces.
+/// A `componentRef` is therefore a *claim by the assembler*, pinned so it cannot
 /// be tampered with, and the verification walk reports it as exactly that.
 ///
 /// This is the asymmetry with the upward direction, where
-/// [`DerivationRef`](super::DerivationRef) moves regulatory responsibility under
-/// Reg. (EU) 2023/1542 Art. 77(7) and so does need a consent artefact.
+/// [`DerivationRef`](super::DerivationRef) names an operation that moves
+/// regulatory responsibility under Reg. (EU) 2023/1542 Art. 77(7) and so is
+/// checked against the evidence that the operation took place.
 ///
 /// # Reads the shape this replaced, on purpose
 ///

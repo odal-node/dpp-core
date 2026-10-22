@@ -22,7 +22,7 @@ use super::reference::PassportRef;
 /// Mirrors the [`TransferReason`](crate::transfer::TransferReason) variants of
 /// the same names. That correspondence is load-bearing rather than incidental:
 /// the rule binding a derivation edge to the transfer of responsibility that
-/// consents to it matches one against the other, so the two vocabularies must
+/// substantiates it matches one against the other, so the two vocabularies must
 /// not drift.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,13 +94,13 @@ impl SecondLifeOperation {
 /// needs is added by the wrapper. Downward BOM edges wrap the same primitive
 /// with their own qualifiers.
 ///
-/// The edge is a *claim* until it is consented to. A hash-pin proves the target
-/// has not been modified; it does not prove the target's operator agreed to the
-/// relationship, and Art. 77(7) moves regulatory responsibility. The consent
-/// artefact is the [`TransferRecord`](crate::transfer::TransferRecord), which
-/// carries the **outgoing** operator's own authorisation — the predecessor's,
-/// which is the half that matters here. Binding the two is a cross-field rule
-/// (`dpp_rules::lineage::consent`), not a property of this type.
+/// The edge is a *claim* until it is substantiated. A hash-pin proves the target
+/// has not been modified; it does not prove the operation the edge names took
+/// place, and Art. 77(7) moves regulatory responsibility. The evidence is the
+/// [`TransferRecord`](crate::transfer::TransferRecord), which carries the
+/// **outgoing** operator's own authorisation — the predecessor's, which is the
+/// half that matters here. Binding the two is a cross-field rule
+/// (`dpp_rules::lineage::substantiation`), not a property of this type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivationRef {
