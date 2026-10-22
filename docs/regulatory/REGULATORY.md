@@ -178,7 +178,7 @@ At that point, implement `validate_spare_parts_period(years: u32, category: &str
 
 CBAM (EU 2023/956) covers embedded-carbon reporting for aluminium imports but does not set production-level CO₂e thresholds that create a DPP compliance obligation. The thresholds above are industry/CBAM reference values used by the `product-group-aluminium` plugin.
 
-The aluminium DPP mandate is expected around 2030.
+No delegated act requires an aluminium passport yet; the ESPR Working Plan 2025-2030 (COM(2025) 187) gives aluminium an indicative adoption year of 2027.
 
 `co2e_within_route_threshold` exists today so the plugin has a single source of truth and does not hardcode the values. The plugin returns `NOT_ASSESSED`. When the DPP mandate is finalized, update the constants here and update the plugin to return a real determination — the function call site stays the same.
 
@@ -210,7 +210,7 @@ The `product-group-steel` plugin exists and validates structure + records metric
 
 | Regulation | Status | DPP mandate |
 |---|---|---|
-| EU CPR 2024/3110 (Construction Products Regulation) | In force | 2028–2032 (phased by product family) |
+| EU CPR 2024/3110 (Construction Products Regulation) | In force | Undated: the delegated act under Art. 75(1) is not adopted, and Art. 22(7) sets the passport date at its entry into force plus 18 months |
 
 No cross-field rules are implementable until the delegated acts under CPR 2024/3110 specify DPP field requirements and compliance thresholds per construction product family (cement, aggregates, structural steel elements, etc.).
 
@@ -241,7 +241,7 @@ The CE marking check (one hard rule that is available today) lives in the `produ
 | `textiles/fibre.rs` | ✅ Implemented | — |
 | `textiles/care.rs` | 🔧 Schema change needed | Structured `careSymbols` field in textile schema |
 | `electronics/spare_parts.rs` | 🔧 Schema change needed | Period field in electronics schema + ESPR delegated act |
-| `metals/aluminium.rs` | ✅ Benchmarks only | Full DPP threshold: ESPR delegated act (~2030) |
+| `metals/aluminium.rs` | ✅ Benchmarks only | Full DPP threshold: ESPR delegated act (indicative adoption 2027) |
 | `metals/steel.rs` | ⏳ Pending | ESPR delegated act (timeline unknown) |
-| `construction/mod.rs` | ⏳ Not mandated yet | CPR 2024/3110 delegated acts (2028–2032) |
+| `construction/mod.rs` | ⏳ Not mandated yet | CPR 2024/3110 Art. 75(1) delegated act (none adopted; undated) |
 | `toys/mod.rs` | ⏳ Not mandated yet | EU 2025/2509 delegated act (~2030) |

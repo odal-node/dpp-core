@@ -489,6 +489,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     test never builds. `ResponsibilityBasis` is the only one on the envelope, and
     the test builds every variant it lists.
 
+- **Doc comments, two strings a caller can see, and a regulatory document asserted
+  dates that no source in the repository backs.** Textile's "~Q2 2027 adoption,
+  compliance ~2028–2029", aluminium's "~2030", tyres' "~2029", furniture's
+  "~2028–2031", construction's "~2028–2032" and the laptop repairability act's
+  "~2027" came from no source we hold. The Commission's working plan,
+  COM(2025) 187, gives textiles, aluminium and tyres an indicative delegated-act
+  adoption year of 2027 and furniture 2028; the construction instrument record
+  leaves that passport undated, because CPR Art. 22(7) dates it at 18 months after
+  the Art. 75(1) delegated act, which is not adopted; and the plan has no laptop
+  row. Each now says what its source says, and a year appears only where the plan
+  gives one. (#503)
+  - **Two strings change.** The `regulation` of the laptop and washing-machine
+    repairability bases lose "(expected ~2027)" and "(expected ~2026)", which makes
+    them match the displays basis, which never carried a year. Nothing in this
+    repository asserts on either.
+  - The washing-machine note no longer calls its 2026 act a "repairability index
+    delegated act". The plan lists household washing machines for ecodesign and
+    energy-label requirements and does not say whether they carry one.
+  - The comment on `BatteryData::battery_passport_number` told readers to expect an
+    implementing act "~2026" and to accept a UUID v4 until then. The field has been
+    superseded since schema v2.7.0 by the passport's data carrier identifier
+    (Art. 77(3)), and the comment now says so.
+  - `docs/regulatory/REGULATORY.md` repeated the aluminium and construction claims
+    and says the same as the code now does.
+
 ## [0.22.0] - 2026-10-16
 
 ### Breaking

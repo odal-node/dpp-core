@@ -1,8 +1,9 @@
 //! Furniture product group plugin — EU ESPR Working Plan 2025–2030.
 //!
 //! Validates mandatory declaration fields and stores manufacturer-supplied
-//! environmental data. Compliance thresholds are pending final delegated acts
-//! (~2028–2031), so the determination is `NOT_ASSESSED`.
+//! environmental data. Compliance thresholds are pending a delegated act (the
+//! Working Plan's indicative adoption year is 2028; none is adopted), so the
+//! determination is `NOT_ASSESSED`.
 
 use dpp_plugin_sdk::export_plugin;
 use dpp_plugin_sdk::traits::{
