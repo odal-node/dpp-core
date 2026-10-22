@@ -216,7 +216,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   property in the group's current embedded schema, and `None` for a group with
   no category axis (aluminium, mattress, textile, toy, unsold goods) and for
   `ProductGroup::Other`. An issuer can now refuse a category no passport in the
-  named groups can state, rather than sign a credential that unlocks nothing.
+  named groups can state, rather than sign it into a credential where it admits
+  nothing.
   The table moved out of the test, and the catalog drift guards read the method.
   (#510)
 

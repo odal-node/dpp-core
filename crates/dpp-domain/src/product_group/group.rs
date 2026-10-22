@@ -127,9 +127,9 @@ impl ProductGroup {
     /// lawfully be a `bed`, which the catalog does not list.
     ///
     /// A caller narrowing a credential to categories checks them against this
-    /// before issuing it. A value outside it is one no passport can state, so a
-    /// credential carrying it unlocks nothing, and nothing says so until its
-    /// holder's reads come back public.
+    /// before issuing it. A value outside it is one no passport can state, so
+    /// it admits nothing: a credential narrowed to it alone unlocks no passport,
+    /// and that surfaces only when its holder's reads come back public.
     ///
     /// `None` is a real answer, as it is for `product_category`: the group has
     /// no category a passport can state. [`ProductGroup::Other`] always answers
