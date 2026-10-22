@@ -231,7 +231,7 @@ Product group-specific data is stored in `ProductGroupData`, a tagged enum. Each
 
 **Serde**: `ProductGroupData` uses `rename_all = "camelCase"` with internally-tagged format.
 
-### 4.1 Battery Product group (`BatteryData`) — v2.8.0
+### 4.1 Battery Product group (`BatteryData`) — v2.9.0
 
 Source: EU Battery Regulation (EU) 2023/1542. Battery DPP mandatory from
 18 Feb 2027.
@@ -243,7 +243,7 @@ property to validate against. The authoritative pair is:
 
 - `crates/dpp-domain/src/domain/product group/data/battery.rs` — the type, with a
   per-field regulatory citation on each doc comment.
-- `crates/dpp-domain/schemas/battery/v2.8.0.json` — the wire contract, with an
+- `crates/dpp-domain/schemas/battery/v2.9.0.json` — the wire contract, with an
   `x-disclosure` class on every property. `additionalProperties` is `false`, and
   a test asserts the two agree field-for-field.
 
@@ -284,7 +284,7 @@ field is itself the defect.
 - `HazardousSubstance { name, cas_number, concentration_pct }`
 - `TemperatureRange { min_c, max_c }`
 
-Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.8.0}.json`. Older versions stay
+Schemas: `schemas/battery/v{1.0.0, 2.0.0 … 2.9.0}.json`. Older versions stay
 registered so a passport validated against one remains verifiable, and each
 carries its own disclosure classes — which is what stops a reclassification
 changing the bytes served for an already-published passport.
@@ -320,7 +320,7 @@ others are listed here rather than each getting a stub.
 | `aluminium` | `AluminiumData` | v1.1.0 | Carbon intensity, CBAM-aligned. Intermediate product |
 | `construction` | `ConstructionData` | v1.1.0 | CPR (EU) 2024/3110. **Wrong axis** — the CPR defines product *family* → *category* → *type* and uses "product group" zero times. Re-homing needs CPR Annex VII read first |
 | `detergent` | `DetergentData` | v1.1.0 | Reg. (EU) 2026/405. Surfactant bands per its Annex VII |
-| `electronics` | `ElectronicsData` | v1.2.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
+| `electronics` | `ElectronicsData` | v1.5.0 | Narrowed to the four device types Reg. (EU) 2023/1670 Art. 1(1) enumerates. **No passport obligation** — its instruments are EPREL-displaced |
 | `furniture` | `FurnitureData` | v1.2.0 | v1.2.0 drops `mattress` from `productType`; v1.1.0 is kept for stored documents |
 | `mattress` | `MattressData` | v1.0.0 | Split out of furniture: the working plan makes Mattresses a **separate** product group. Fields are furniture's minus `productType` and **nothing added** — no delegated act exists, so any mattress-specific field would be invented. No Wasm plugin |
 | `steel` | `SteelData` | v1.1.0 | CBAM-aligned. Intermediate product, earliest indicative act of any group |

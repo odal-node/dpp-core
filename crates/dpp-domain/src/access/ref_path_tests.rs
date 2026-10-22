@@ -8,11 +8,12 @@
 //!
 //! # Which of these bite
 //!
-//! Verified by disabling `$ref` resolution and re-running. Five of the six here
+//! Verified by disabling `$ref` resolution and re-running. Six of the seven here
 //! fail: `two_definitions_declaring_one_leaf_are_classified_apart`,
 //! `a_named_path_still_beats_the_floor`,
 //! `a_definition_lands_on_every_path_that_refers_to_it`,
-//! `the_battery_material_definition_is_positioned` and
+//! `the_battery_material_definition_is_positioned`,
+//! `the_relabelled_members_are_restricted_and_their_twins_are_not` and
 //! `the_filter_redacts_by_path_through_a_ref`.
 //!
 //! `an_unreached_position_still_gets_the_definition_class` passes either way, by
@@ -224,6 +225,163 @@ fn the_battery_material_definition_is_positioned() {
     );
 }
 
+/// **The relabelled members, on the schemas that ship.**
+///
+/// Battery v2.9.0 labels `materialComposition`'s `name` and `casNumber`
+/// `restricted` while `criticalRawMaterial` keeps its own `name` and `casNumber`
+/// `public`, and electronics v1.5.0 labels `criticalRawMaterial`'s `name` and
+/// `countryOfOrigin` `restricted` while `repairCriterion`'s `name` stays `public`.
+/// Each pair shares a bare-leaf key that the policy merges to the stricter class,
+/// so this is the collision `the_filter_redacts_by_path_through_a_ref` states
+/// synthetically, run on real schemas. Both directions are asserted, by position
+/// and by what each audience receives: the restricted member is withheld from an
+/// anonymous reader, and its public twin is not withheld with it.
+///
+/// Battery v2.9.0 also labels `criticalRawMaterial`'s `weightGrams` and
+/// `countryOfOrigin` `restricted` (Article 49(2), points (d) and (c), of
+/// Regulation (EU) 2023/1542). That is the one change here to what an anonymous
+/// reader receives, and v2.8.0 is asserted unchanged beside it.
+#[test]
+fn the_relabelled_members_are_restricted_and_their_twins_are_not() {
+    let scope = DocumentScope::ProductGroupData;
+
+    let battery = ProductGroupAccessPolicy::for_schema_version("battery", "2.9.0")
+        .expect("battery 2.9.0 is registered");
+    for parent in ["anodeMaterial", "cathodeMaterial", "electrolyteMaterial"] {
+        for member in ["name", "casNumber", "weightPct"] {
+            assert_eq!(
+                battery.disclosure_for_path(&[parent, member], scope),
+                Disclosure::Restricted,
+                "{parent}.{member}"
+            );
+        }
+    }
+    for member in ["name", "casNumber"] {
+        assert_eq!(
+            battery.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Public,
+            "critical raw materials present are public through Annex XIII points 1(a) and 1(b): {member}"
+        );
+    }
+    for member in ["weightGrams", "countryOfOrigin"] {
+        assert_eq!(
+            battery.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Restricted,
+            "the quantity and origin records of Article 49(2)(d) and (c) are not passport content: {member}"
+        );
+        let released = ProductGroupAccessPolicy::for_schema_version("battery", "2.8.0")
+            .expect("battery 2.8.0 is registered");
+        assert_eq!(
+            released.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Public,
+            "and a record written against v2.8.0 keeps v2.8.0's class: {member}"
+        );
+    }
+    for member in ["name", "casNumber"] {
+        assert_eq!(
+            battery.disclosure_for_path(&["hazardousSubstances", member], scope),
+            Disclosure::Public,
+            "the third twin: hazardous substances are Annex VI Part A point 8, public through \
+             Annex XIII point 1(a), and the floor's merged class must not reach them: {member}"
+        );
+    }
+
+    let electronics = ProductGroupAccessPolicy::for_schema_version("electronics", "1.5.0")
+        .expect("electronics 1.5.0 is registered");
+    for member in ["name", "casNumber", "weightGrams", "countryOfOrigin"] {
+        assert_eq!(
+            electronics.disclosure_for_path(&["criticalRawMaterials", member], scope),
+            Disclosure::Restricted,
+            "criticalRawMaterials.{member}"
+        );
+    }
+    assert_eq!(
+        electronics.disclosure_for_path(&["repairabilityScore", "criteria", "name"], scope),
+        Disclosure::Public,
+        "a criterion's name is not dragged under by the critical raw material's"
+    );
+
+    // The one change a caller can see without a path: a bare leaf asked without
+    // its parent is ambiguous across the definitions that share it, and the
+    // policy answers the stricter class. The released versions are untouched.
+    for (group, released, current) in [
+        ("battery", "2.8.0", &battery),
+        ("electronics", "1.4.0", &electronics),
+    ] {
+        let before = ProductGroupAccessPolicy::for_schema_version(group, released)
+            .expect("the released version is registered");
+        assert_eq!(
+            before.disclosure_for_field("name"),
+            Disclosure::Public,
+            "{group} {released}"
+        );
+        assert_eq!(
+            current.disclosure_for_field("name"),
+            Disclosure::Restricted,
+            "{group}"
+        );
+    }
+
+    let battery_document = json!({
+        "anodeMaterial": [{ "name": "graphite", "weightPct": 42.5, "casNumber": "7782-42-5" }],
+        "criticalRawMaterials": [{
+            "name": "cobalt", "casNumber": "7440-48-4", "weightGrams": 12.0, "countryOfOrigin": "CD"
+        }]
+    });
+    let public = filter_by_audience_in_scope(&battery_document, &battery, Audience::Public, scope)
+        .filtered_data;
+    assert!(
+        public.get("anodeMaterial").is_none(),
+        "an anonymous reader receives no electrode composition: {public}"
+    );
+    assert_eq!(
+        public["criticalRawMaterials"],
+        json!([{ "name": "cobalt", "casNumber": "7440-48-4" }]),
+        "and receives each critical raw material's name and CAS number, without its \
+         quantity or origin"
+    );
+    let interested = filter_by_audience_in_scope(
+        &battery_document,
+        &battery,
+        Audience::LegitimateInterest,
+        scope,
+    )
+    .filtered_data;
+    assert_eq!(
+        interested, battery_document,
+        "a legitimate-interest reader receives the whole document"
+    );
+
+    let electronics_document = json!({
+        "criticalRawMaterials": [{
+            "name": "cobalt", "casNumber": "7440-48-4", "weightGrams": 12.0, "countryOfOrigin": "CD"
+        }],
+        "repairabilityScore": { "overall": 7.0, "criteria": [{ "name": "disassembly" }] }
+    });
+    let public =
+        filter_by_audience_in_scope(&electronics_document, &electronics, Audience::Public, scope)
+            .filtered_data;
+    assert!(
+        public.get("criticalRawMaterials").is_none(),
+        "an anonymous reader receives no critical raw materials: {public}"
+    );
+    assert_eq!(
+        public["repairabilityScore"], electronics_document["repairabilityScore"],
+        "and still receives the repairability score, criterion names included"
+    );
+    let interested = filter_by_audience_in_scope(
+        &electronics_document,
+        &electronics,
+        Audience::LegitimateInterest,
+        scope,
+    )
+    .filtered_data;
+    assert_eq!(
+        interested, electronics_document,
+        "a legitimate-interest reader receives the whole document"
+    );
+}
+
 /// **The filter agrees with the collector**, checked by redacting a document
 /// rather than by querying the policy.
 ///
@@ -237,12 +395,10 @@ fn the_battery_material_definition_is_positioned() {
 ///
 /// The document is shaped like the battery payload — two arrays of objects
 /// sharing leaf names, one reached through a restricted definition — because
-/// that is the shape the schemas use. It is synthetic because the shipped
-/// schemas have no live collision: battery declares `name` and `casNumber`
-/// `Public` in both definitions, and `anodeMaterial` carries a `Restricted`
-/// class on the array itself, so the whole subtree leaves at `Public` before any
-/// per-leaf class is reached. A real payload cannot demonstrate a capability no
-/// shipped schema exercises yet.
+/// that is the shape the schemas use. It is synthetic so that the collision is
+/// stated in the test itself; battery v2.9.0 and electronics v1.5.0 now carry the
+/// same one, and `the_relabelled_members_are_restricted_and_their_twins_are_not`
+/// runs it on those schemas.
 #[test]
 fn the_filter_redacts_by_path_through_a_ref() {
     let policy = policy_from(&json!({

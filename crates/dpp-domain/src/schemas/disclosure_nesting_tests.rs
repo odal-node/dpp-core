@@ -108,72 +108,8 @@ fn faults(json: &str) -> Vec<String> {
 
 /// Faults left in a current schema on purpose, as (product group, version,
 /// member path, why). Each must still be a fault, so the list cannot outlive what
-/// it excuses.
-const KNOWN_FAULTS: &[(&str, &str, &str, &str)] = &[
-    // The three Annex XIII point 2(a) arrays share `materialComposition`, whose
-    // `name` and `casNumber` are public. They cannot simply be relabelled
-    // restricted: a definition's members are also recorded under their bare
-    // name as a fail-closed floor, and `criticalRawMaterial` declares a public
-    // `name` and `casNumber` in the same schema, so the two would collide and
-    // the public pair would resolve to restricted. The fix renames the members
-    // or changes that floor, which is its own change.
-    (
-        "battery",
-        "2.8.0",
-        "anodeMaterial[].name",
-        "shared-definition floor",
-    ),
-    (
-        "battery",
-        "2.8.0",
-        "anodeMaterial[].casNumber",
-        "shared-definition floor",
-    ),
-    (
-        "battery",
-        "2.8.0",
-        "cathodeMaterial[].name",
-        "shared-definition floor",
-    ),
-    (
-        "battery",
-        "2.8.0",
-        "cathodeMaterial[].casNumber",
-        "shared-definition floor",
-    ),
-    (
-        "battery",
-        "2.8.0",
-        "electrolyteMaterial[].name",
-        "shared-definition floor",
-    ),
-    (
-        "battery",
-        "2.8.0",
-        "electrolyteMaterial[].casNumber",
-        "shared-definition floor",
-    ),
-    (
-        "electronics",
-        "1.4.0",
-        "criticalRawMaterials[].name",
-        "the array is restricted and these members are public. Regulation (EU) \
-         2024/1252 does not decide it: its Art. 28 and 29 reach permanent \
-         magnets in a closed list of products, where an electric motor is one \
-         rated at 0,12 kW or more (Art. 2(47)), and a smartphone or tablet is \
-         neither on the list nor such a motor. The tier is this schema's own \
-         to set. Relabelling needs a new \
-         electronics schema version, and the members come from a definition \
-         shared with battery, where they are public (the shared-definition \
-         floor above)",
-    ),
-    (
-        "electronics",
-        "1.4.0",
-        "criticalRawMaterials[].countryOfOrigin",
-        "as above",
-    ),
-];
+/// it excuses. Empty today.
+const KNOWN_FAULTS: &[(&str, &str, &str, &str)] = &[];
 
 /// The rule binds the schema a new passport is written against. A released
 /// version is never edited, so what an earlier one got wrong stays wrong in it,

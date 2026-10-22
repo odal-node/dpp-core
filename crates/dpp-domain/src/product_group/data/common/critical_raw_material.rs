@@ -2,7 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Critical raw material declaration per EU CRM Act 2024/1252.
+/// A critical raw material declared in a payload.
+///
+/// `name` and `cas_number` identify the material, which is what Annex VI Part A
+/// point 10 of Regulation (EU) 2023/1542 makes public for a battery.
+/// `weight_grams` and `country_of_origin` are the quantity and origin records of
+/// Article 49(2), points (d) and (c), of the same Regulation: supply-chain due
+/// diligence documentation an operator keeps for authorities and shares with its
+/// immediate downstream purchasers (Article 52(1) and (2)), not passport content,
+/// so a schema labels them `restricted`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CriticalRawMaterial {
