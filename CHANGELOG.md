@@ -206,6 +206,20 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that scans `list()`, so no implementation breaks; a real store should index
   the identifier. (#409)
 
+- **`ProductGroup::product_category_values` lists the categories a passport in
+  a group may state.** A credential may narrow itself to product categories,
+  and since 0.20.0 `ProductGroupData::product_category` reads the one a passport
+  states, so the scope is enforceable on a read. Nothing could check a category
+  list before a credential was signed: the catalog's `productCategories` is a
+  curated subset, not the legal domain, and the table naming each group's
+  category property lived inside a test. The method answers the `enum` of that
+  property in the group's current embedded schema, and `None` for a group with
+  no category axis (aluminium, mattress, textile, toy, unsold goods) and for
+  `ProductGroup::Other`. An issuer can now refuse a category no passport in the
+  named groups can state, rather than sign a credential that unlocks nothing.
+  The table moved out of the test, and the catalog drift guards read the method.
+  (#510)
+
 ### Fixed
 
 - **The members of battery `materialComposition` and electronics

@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::catalog::{ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus};
+use crate::product_group::ProductGroup;
 
 /// Guards the assumption that ESPR is the only source of a DPP obligation.
 /// Battery, toy, detergent, construction and electronics each derive from their
@@ -87,47 +88,13 @@ fn every_manifest_round_trips() {
     }
 }
 
-/// ProductGroups whose catalog `productCategories` mirror a schema enum, and the
-/// property that enumerates them.
-///
-/// The correspondence is **not derivable** from the data — depending on product group
-/// the categories live under `productCategory`, `productType`, `batteryType`,
-/// `productFamily` or `tyreClass` — so it is declared here.
-///
-/// # Absence is no longer an exemption
-///
-/// This table used to say that a product group absent from it "is simply not
-/// cross-checked", and named `textile` as the example. That made absence a
-/// silent opt-out from the only guard on this axis, and textile spent that
-/// exemption declaring three categories no schema defines anywhere.
-/// `every_product_group_declaring_categories_is_cross_checked` closes it: a
-/// group that declares categories must appear here, so the only way out is to
-/// declare none.
-///
-/// # `aluminium` is not here, and that is the correction
-///
-/// It used to carry `("aluminium", "productionRoute")`. That row made this guard
-/// certify a **production route** as a product category — the two are different
-/// axes, and pointing a drift guard at the wrong property is worse than having
-/// none, because it reports the axis as verified. The catalog no longer declares
-/// aluminium categories, so there is nothing left for a row to check.
-///
-/// `unsold-goods`, `mattress` and `toy` are absent for the plain reason: they
-/// declare no categories. Impl. Reg. (EU) 2026/2 Art. 3 delimits an unsold-goods
-/// disclosure by CN code rather than a category name, so its lines carry
-/// `cnCategories` and its descriptor list is empty.
-const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
-    ("battery", "batteryType"),
-    ("construction", "productFamily"),
-    ("detergent", "productType"),
-    ("electronics", "productCategory"),
-    ("furniture", "productType"),
-    ("steel", "productCategory"),
-    ("tyre", "tyreClass"),
-];
-
 /// Drift guard: a catalog product category that is not a legal value of the
 /// corresponding schema enum is a value nothing can ever validate against.
+///
+/// The legal values are [`ProductGroup::product_category_values`], read from
+/// the enum of the group's category property in its current schema. Which
+/// property that is per group, and why some groups have none, is declared
+/// beside it.
 ///
 /// This existed as two spellings of one concept — the catalog said `sli` and
 /// `clothing_accessories` where the schemas said `starting-lighting-ignition`
@@ -136,39 +103,18 @@ const CATEGORY_ENUM_PROPERTY: &[(&str, &str)] = &[
 /// would have become load-bearing the moment one appeared.
 #[test]
 fn product_categories_are_legal_values_of_their_schema_enum() {
-    use crate::schemas::VersionedSchemaRegistry;
-
-    let catalog = ProductGroupCatalog::new();
-    let registry = VersionedSchemaRegistry::new();
-
-    for (product_group_key, property) in CATEGORY_ENUM_PROPERTY {
-        let descriptor = catalog.get(product_group_key).unwrap_or_else(|| {
-            panic!("product_group '{product_group_key}' is in the table but not the catalog")
-        });
-        let version: semver::Version = descriptor
-            .current_schema_version
-            .parse()
-            .expect("currentSchemaVersion is valid semver");
-        let schema_json = registry
-            .get(product_group_key, &version)
-            .unwrap_or_else(|| panic!("no schema for '{product_group_key}' v{version}"));
-        let schema: serde_json::Value =
-            serde_json::from_str(schema_json).expect("schema is valid JSON");
-
-        let allowed: Vec<&str> = schema["properties"][property]["enum"]
-            .as_array()
-            .unwrap_or_else(|| {
-                panic!("'{product_group_key}' schema property '{property}' has no enum — stale table row")
-            })
-            .iter()
-            .filter_map(serde_json::Value::as_str)
-            .collect();
-
+    for descriptor in ProductGroupCatalog::new().all() {
+        // A group with no category axis is the completeness guard's to report.
+        let Some(allowed) = ProductGroup::from_wire_tag(&descriptor.key).product_category_values()
+        else {
+            continue;
+        };
         for category in &descriptor.product_categories {
             assert!(
-                allowed.contains(&category.as_str()),
-                "product_group '{product_group_key}' lists product category '{category}', which is not a legal \
-                 value of schema property '{property}' ({allowed:?})"
+                allowed.contains(category),
+                "product_group '{}' lists product category '{category}', which is not a legal \
+                 value of its category property ({allowed:?})",
+                descriptor.key
             );
         }
     }
@@ -176,13 +122,19 @@ fn product_categories_are_legal_values_of_their_schema_enum() {
 
 /// Completeness guard: the direction the check above cannot run.
 ///
-/// `product_categories_are_legal_values_of_their_schema_enum` iterates
-/// `CATEGORY_ENUM_PROPERTY`, so a product group missing from that table is not
+/// `product_categories_are_legal_values_of_their_schema_enum` skips a product
+/// group with no category values, so a group the category table misses is not
 /// checked — and nothing said the table had to be complete. Absence was a
 /// silent exemption, and it was spent: `textile` declared `apparel`, `footwear`
 /// and `home_textile` while its schema carried no enum-valued property at any
 /// version, so all three were values nothing could set and nothing could
 /// validate.
+///
+/// The table used to say that a product group absent from it "is simply not
+/// cross-checked", and named `textile` as the example. That made absence a
+/// silent opt-out from the only guard on this axis. This guard closes it: a
+/// group that declares categories must have category values, so the only way
+/// out is to declare none.
 ///
 /// The two directions catch different things and neither subsumes the other.
 /// The first says a declared category is a legal value of the property it is
@@ -197,15 +149,19 @@ fn every_product_group_declaring_categories_is_cross_checked() {
         .all()
         .iter()
         .filter(|d| !d.product_categories.is_empty())
-        .filter(|d| !CATEGORY_ENUM_PROPERTY.iter().any(|(key, _)| *key == d.key))
+        .filter(|d| {
+            ProductGroup::from_wire_tag(&d.key)
+                .product_category_values()
+                .is_none()
+        })
         .map(|d| d.key.as_str())
         .collect();
 
     assert!(
         unchecked.is_empty(),
-        "these product groups declare `productCategories` and have no row in \
-         CATEGORY_ENUM_PROPERTY, so nothing checks their values against a schema: \
-         {unchecked:?} — either add a row naming the schema property that enumerates \
-         them, or, if the group's act defines no category axis, declare none"
+        "these product groups declare `productCategories` and have no category values, \
+         so nothing checks their values against a schema: {unchecked:?} — either name \
+         the schema property that enumerates them in `ProductGroup`'s category table, \
+         or, if the group's act defines no category axis, declare none"
     );
 }

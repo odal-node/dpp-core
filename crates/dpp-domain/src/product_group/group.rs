@@ -1,12 +1,18 @@
 //! [`ProductGroup`] — the EU ESPR dispatch discriminant.
 
+use std::collections::BTreeMap;
+use std::sync::OnceLock;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::catalog::ProductGroupCatalog;
+use crate::schemas::VersionedSchemaRegistry;
 
 /// The regulated product group a passport belongs to.
 ///
 /// # The enum is an optimisation, not the source of truth
 ///
-/// ProductGroup identity is **data**: the [`ProductGroupCatalog`](crate::catalog::ProductGroupCatalog)
+/// ProductGroup identity is **data**: the [`ProductGroupCatalog`]
 /// manifests, the schema registry and the plugin manifests are all keyed by
 /// string. These variants exist so code that genuinely branches per product
 /// group — an in-force act with its own typed data — can do so without a
@@ -108,6 +114,99 @@ impl ProductGroup {
             Self::Other(tag) => tag,
         }
     }
+
+    /// The values a new passport in this product group may state as its
+    /// category: the domain of
+    /// [`ProductGroupData::product_category`](crate::product_group::ProductGroupData::product_category),
+    /// or `None` where the group has no category axis.
+    ///
+    /// Read from the `enum` of the group's category property in its **current**
+    /// embedded schema, the version every new passport is validated against. So
+    /// this is the legal domain, and it is wider than the catalog's
+    /// `productCategories`, which is a curated subset: a furniture passport may
+    /// lawfully be a `bed`, which the catalog does not list.
+    ///
+    /// A caller narrowing a credential to categories checks them against this
+    /// before issuing it. A value outside it is one no passport can state, so a
+    /// credential carrying it unlocks nothing, and nothing says so until its
+    /// holder's reads come back public.
+    ///
+    /// `None` is a real answer, as it is for `product_category`: the group has
+    /// no category a passport can state. [`ProductGroup::Other`] always answers
+    /// `None`, because nothing in this build knows which of an untyped
+    /// payload's keys is a category.
+    ///
+    /// A passport stored under an earlier schema version is re-validated
+    /// against that version, so it may state a value since withdrawn: a
+    /// furniture passport from before `v1.2.0` may say `mattress`.
+    #[must_use]
+    pub fn product_category_values(&self) -> Option<&'static [String]> {
+        static VALUES: OnceLock<BTreeMap<&'static str, Vec<String>>> = OnceLock::new();
+        if matches!(self, Self::Other(_)) {
+            return None;
+        }
+        VALUES
+            .get_or_init(read_category_values)
+            .get(self.catalog_key())
+            .map(Vec::as_slice)
+    }
+}
+
+/// Each product group's category axis: the property of its data that
+/// [`ProductGroupPayload::product_category`](crate::product_group::ProductGroupPayload::product_category)
+/// answers with, by catalog key.
+///
+/// The correspondence is **not derivable** from the data — depending on product
+/// group the category lives under `productCategory`, `productType`,
+/// `batteryType`, `productFamily` or `tyreClass` — so it is declared here.
+///
+/// # A group absent from this table has no category axis
+///
+/// `mattress`, `textile`, `toy` and `unsold-goods` define none. Impl. Reg. (EU)
+/// 2026/2 Art. 3 delimits an unsold-goods disclosure by CN code rather than a
+/// category name, so its lines carry `cnCategories` instead.
+///
+/// `aluminium` is absent, and that is a correction. It used to be listed with
+/// `productionRoute`, which certified a **production route** as a product
+/// category. The two are different axes: one says how the metal was made, the
+/// other what the product is. Pointing a drift guard at the wrong property was
+/// worse than having none, because it reported the axis as verified.
+const CATEGORY_PROPERTY: &[(&str, &str)] = &[
+    ("battery", "batteryType"),
+    ("construction", "productFamily"),
+    ("detergent", "productType"),
+    ("electronics", "productCategory"),
+    ("furniture", "productType"),
+    ("steel", "productCategory"),
+    ("tyre", "tyreClass"),
+];
+
+/// Every row of [`CATEGORY_PROPERTY`], resolved against its group's current
+/// embedded schema. Built once: the schemas are compiled in, so the answer
+/// cannot change while the process runs.
+///
+/// A row that does not resolve is left out, which reads as "no category axis".
+/// That direction fails closed for a caller checking a credential, and
+/// `every_product_group_reports_the_category_it_states` keeps it from happening
+/// at all: a group that states a category must answer a list holding it.
+fn read_category_values() -> BTreeMap<&'static str, Vec<String>> {
+    let catalog = ProductGroupCatalog::new();
+    let registry = VersionedSchemaRegistry::new();
+    CATEGORY_PROPERTY
+        .iter()
+        .filter_map(|&(key, property)| {
+            let version = catalog.current_schema_version(key)?.parse().ok()?;
+            let schema: serde_json::Value =
+                serde_json::from_str(registry.get(key, &version)?).ok()?;
+            let values = schema["properties"][property]["enum"]
+                .as_array()?
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            Some((key, values))
+        })
+        .collect()
 }
 
 /// Serialises to the wire tag — including an unknown product group's own tag, so a

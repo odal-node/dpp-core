@@ -300,6 +300,24 @@ fn every_product_group_reports_the_category_it_states() {
             "product group '{tag}' reports a different category than this table pins"
         );
 
+        // The domain a caller checks a credential's categories against must
+        // be the one this accessor draws from: a group that states a category
+        // answers a list holding it, and a group that states none answers no
+        // list. Either half failing means a credential is refused for a value
+        // a passport can state, or accepted for a group that can state none.
+        let values = sample.product_group().product_category_values();
+        match *expected {
+            Some(category) => assert!(
+                values.is_some_and(|v| v.iter().any(|value| value == category)),
+                "product group '{tag}' states '{category}', which its category values \
+                 {values:?} do not hold"
+            ),
+            None => assert_eq!(
+                values, None,
+                "product group '{tag}' states no category but answers category values"
+            ),
+        }
+
         // The answer has to be something the record *says*, not a constant the
         // accessor holds. Checking it against the serialised form is what
         // separates "reads the category field" from "returns a string that
