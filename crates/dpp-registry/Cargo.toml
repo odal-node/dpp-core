@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-registry"
-description = "EU EUDPP Central Registry ghost connector — interface-only until EU API is published"
+description = "EU Digital Product Passport registry interface types: registration payloads, identifiers, endpoints and responses (ESPR Art. 13)"
 keywords    = ["dpp", "eu-registry", "espr", "eudpp", "compliance"]
 categories  = ["data-structures"]
 version.workspace     = true

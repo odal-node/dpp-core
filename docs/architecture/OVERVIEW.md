@@ -1,162 +1,197 @@
-# Domain Architecture Overview
+# Domain architecture overview
 
-This document describes the Odal DPP domain: what a Digital Product Passport is, how it flows through creation, signing, and resolution, and what trust guarantees the system provides.
+What a Digital Product Passport is in this library, how it moves through creation,
+signing and resolution, and what a signature does and does not guarantee.
 
-This is the domain model — infrastructure-agnostic. Any implementation that correctly implements the port traits in `dpp-domain::ports` produces a compliant DPP system.
-
----
-
-## 1. Architectural Philosophy
-
-Odal is built on **Hexagonal Architecture** (Ports & Adapters). The domain logic — schema validation, lifecycle transitions, signing orchestration — is isolated from all external concerns.
-
-The domain is a set of pure Rust functions and trait definitions. Every external dependency (database, cache, event bus, file storage) is behind a trait. This means:
-
-- The domain can be tested with in-memory stubs — no containers, no network calls
-- Any infrastructure component can be replaced without touching regulatory business logic
-- The same domain code compiles to native, `wasm32-unknown-unknown`, and `wasm32-wasip1`
+This is the domain model, independent of infrastructure. Any application that
+implements the port traits in `dpp_domain::ports` correctly has a working passport
+system.
 
 ---
 
-## 2. DPP Lifecycle
+## 1. Ports and adapters
 
-Every passport follows this state machine:
+The library follows hexagonal architecture (ports and adapters). Domain logic (schema
+validation, lifecycle transitions, signing orchestration) is isolated from everything
+external.
 
+The domain is pure Rust functions and trait definitions. Every external dependency
+(database, cache, event bus, file storage) sits behind a trait, so:
+
+- the domain is tested with in-memory implementations, without containers or network
+  calls;
+- any infrastructure component can be replaced without touching regulatory logic;
+- the same domain code compiles to native targets, `wasm32-unknown-unknown` and
+  `wasm32-wasip1`.
+
+---
+
+## 2. Passport lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> active: publish (signs)
+    draft --> retired
+    active --> suspended
+    active --> retired
+    active --> superseded: amend or supersede
+    active --> deactivated: end of life
+    suspended --> active: re-validate and publish
+    suspended --> retired
+    suspended --> deactivated
 ```
-Draft  -->  Active (Published)  -->  Suspended  -->  Retired
-  |                                      |
-  +--------------------------------------+
-                  (can also retire directly)
-```
 
-| Transition | Precondition | Side Effect |
+| Transition | Precondition | Effect |
 |---|---|---|
-| Draft -> Active | All mandatory fields present and valid | Signed with issuer's Ed25519 key; JWS produced |
-| Active -> Suspended | Reason required (recall, investigation, etc.) | Signature retained; resolver returns 410 |
-| Draft \| Active \| Suspended -> Retired | Irreversible; the three terminal states accept no transition at all | Retained until `retentionUntil`, computed at publish from the instrument bindings (see below) |
+| `draft` to `active` | Every mandatory field present and valid | Signed with the issuer's Ed25519 key; JWS produced |
+| `active` to `suspended` | A stated reason (recall, investigation and so on) | Signature kept; a resolver answers 410 |
+| `active` to `superseded` | A published successor whose `supersedes_id` points back | The old record stays readable |
+| `active` or `suspended` to `deactivated` | End of life (recycled, destroyed under a derogation, exported, lost) | Terminal; the record is kept |
+| `draft`, `active` or `suspended` to `retired` | Irreversible | Kept until `retentionUntil`, computed at publish from the instrument bindings |
 
-Every transition is recorded by a host layer (audit logging is a platform concern, not a domain concern).
+`retired`, `superseded` and `deactivated` are terminal. The host records every
+transition; audit storage is the host's concern, not the domain's.
+[DATA-MODEL.md §2](DATA-MODEL.md#2-passport-lifecycle) has the full table.
 
-**On retention.** The period is not a constant in this document or anywhere else
-in prose. It is the **maximum** across every recorded `InstrumentBinding` that
-reaches the product group — periods are floors, so a record kept long enough for
-the longest satisfies them all — and it carries the provenance of the figure that
-produced it: the fold is `Sourced` only when *every* contributing figure is.
-Every figure recorded today happens to be 10 years, several of them `Assumed`
-rather than read from an adopted text, which is exactly why the number is not
-written down here as though it were settled.
+**Retention.** The period is not a constant in this document or anywhere else in prose.
+It is the **maximum** across every recorded `InstrumentBinding` that reaches the product
+group (periods are floors, so a record kept for the longest satisfies them all), and it
+carries the provenance of the figure that produced it: the fold is `Sourced` only when
+*every* contributing figure is. Every figure recorded today happens to be 10 years,
+several of them `Assumed` rather than read from an adopted text, which is why the number
+is not written here as though it were settled.
 
 ---
 
-## 3. Data Flow (Conceptual)
+## 3. Data flow
 
-```
+```text
 WRITE PATH
-----------
 1. Manufacturer submits product data (JSON or CSV)
-2. Data validated against product group JSON Schema (VersionedSchemaRegistry)
-3. Compliance checks run via ComplianceRegistry (Wasm plugin or passthrough)
-4. Validated data persisted via PassportRepository
-5. On publish: signed with Ed25519 via IdentityPort -> JWS compact serialisation
-6. EU bridge notified (currently no-op)
+2. Data validated against the product group's JSON Schema (VersionedSchemaRegistry)
+3. Compliance checks run through ComplianceRegistry (Wasm plugin or passthrough)
+4. Validated data persisted through PassportRepository
+5. On publish: canonical JSON signed with Ed25519 through IdentityPort (compact JWS)
+6. Registration queued for the EU registry through RegistrySyncPort
 
 READ PATH
----------
-1. Consumer scans QR code on product
-2. Resolver fetches passport via PassportRepository
-3. JWS signature verified against manufacturer's did:web DID document
-4. Passport served with verification status
+1. Consumer scans the QR code on the product
+2. Resolver fetches the passport through PassportRepository
+3. JWS verified against the manufacturer's did:web DID document
+4. Passport served with its verification status
 ```
 
 ---
 
-## 4. Trust Anchor
+## 4. Trust anchor
 
-**Problem:** When a consumer scans a QR code, how do they know the DPP data is authentic?
+**Question:** when someone scans a QR code, how do they know the passport data is
+authentic?
 
-**Solution: JWS-Signed QR URL with did:web Verification**
+**Answer: a JWS checked against a `did:web` document.** Every published passport carries
+a compact JWS made with the manufacturer's Ed25519 private key. The matching public key
+is published in the manufacturer's `did:web` DID document at `/.well-known/did.json`.
 
-Every published passport carries a JWS compact serialisation signed with the manufacturer's Ed25519 private key. The corresponding public key is published in the manufacturer's `did:web` DID document at `/.well-known/did.json`.
+To verify:
 
-Verification:
-1. Fetch the manufacturer's DID document
-2. Extract the Ed25519 public key for the verification method referenced in the JWS header
-3. Verify the JWS signature over the payload
-4. If valid: the data is byte-for-byte what the manufacturer signed
+1. Fetch the manufacturer's DID document.
+2. Take the Ed25519 public key of the verification method named in the JWS header.
+3. Verify the JWS signature over the payload.
+4. If it is valid, the data is byte for byte what the manufacturer signed.
 
-**Trust root**: DNS + HTTPS (`did:web`) — the same infrastructure that secures the manufacturer's own website.
+**Trust root:** DNS and HTTPS (`did:web`), the same infrastructure that secures the
+manufacturer's own website.
 
-**What this does NOT guarantee**: That the manufacturer's data is accurate. They may have entered incorrect values. Odal provides the pipe, not the truth.
-
----
-
-## 5. Key Rotation
-
-Key rotation is a first-class operation:
-
-1. The current Ed25519 key is archived with a timestamp
-2. A new key pair is generated and listed first in the DID document (primary, authentication)
-3. Archived keys are retained under `assertionMethod`, each keeping its identifier: the DID and the key's own thumbprint, which no rotation changes
-4. All past JWS signatures remain verifiable against their corresponding archived key
-
-This means a manufacturer can rotate keys without invalidating any previously published passports.
+**What a signature does not guarantee:** that the data is accurate. It proves who
+published the data and that nothing changed since. Whether the values are correct
+remains the manufacturer's responsibility.
 
 ---
 
-## 6. Compliance Model
+## 5. Key rotation
 
-The `ComplianceRegistry` trait is the determination seam. The library ships the product group-agnostic `PassthroughRegistry`:
+Key rotation is a normal operation:
 
-```
+1. The current Ed25519 key is archived with a timestamp.
+2. A new key pair is generated and listed first in the DID document (primary,
+   authentication).
+3. Archived keys stay under `assertionMethod`, each keeping its identifier: the DID and
+   the key's own thumbprint, which no rotation changes.
+4. Every earlier JWS stays verifiable against its archived key.
+
+A manufacturer can rotate keys without invalidating any published passport.
+
+---
+
+## 6. Compliance model
+
+`ComplianceRegistry` is where a compliance determination is made. The library ships the
+product-group-agnostic `PassthroughRegistry`:
+
+```text
 ComplianceRegistry
-  |
-  +-- PassthroughRegistry (dpp-core, Apache) -> PassthroughNoValidation for every product group
-  +-- plugin-backed registry (platform)      -> Wasm product group plugins (real metrics)
-  +-- maintained-ruleset registry (Compliance Current) -> warranted, methodology-current rulesets
+  +-- PassthroughRegistry (this library)      -> PassthroughNoValidation for every product group
+  +-- plugin-backed registry (in a host)      -> Wasm product group plugins compute real metrics
+  +-- registry fed by signed ruleset bundles  -> format in dpp_rules::bundle; no implementation yet
 ```
 
-`PassthroughRegistry` computes nothing — it accepts manufacturer-supplied values verbatim and returns `PassthroughNoValidation` for every product group. Real compliance validation (CBAM thresholds, ESPR Arts. 24/25 unsold-goods rules, Battery Regulation checks) comes from the Wasm product group plugins via a plugin-backed registry in a host. A computed determination is passed through `gate_determination(catalog.is_in_force(product group), …)` so a provisional product group can never surface a binding `Compliant`/`NonCompliant`. See `PLUGIN-HOST.md`.
+`PassthroughRegistry` computes nothing: it accepts manufacturer-supplied values verbatim
+and returns `PassthroughNoValidation` for every product group. Real validation (CBAM
+thresholds, the ESPR Arts. 24 and 25 unsold-goods rules, Battery Regulation checks)
+comes from the Wasm product group plugins, through a plugin-backed registry in a host. A
+computed determination passes through
+`gate_determination(catalog.is_in_force(product_group), …)`, so a provisional product
+group can never produce a binding `Compliant` or `NonCompliant`. See
+[PLUGIN-HOST.md](PLUGIN-HOST.md).
 
-This trait is the extension seam. Any implementation — open Wasm plugins, a host's calculators, or third-party modules — can replace or extend it without touching any other code. It is a technical boundary, not a commercial one.
+The trait is a technical extension point. Open Wasm plugins, a host's calculators or
+third-party modules can implement or extend it without touching any other code.
 
 ---
 
-## 7. Schema Versioning
+## 7. Schema versioning
 
-Schemas follow semver. The `VersionedSchemaRegistry` supports n+1 versioning:
+Schemas follow semver. `VersionedSchemaRegistry` holds every version listed in
+`crates/dpp-domain/src/schemas/embedded.rs`, one file per version:
 
+```text
+crates/dpp-domain/schemas/
+  battery/v1.0.0.json … v2.10.0.json
+  textile/v1.0.0.json … v1.4.0.json
+  unsold-goods/v2.0.0.json
+  …
 ```
-schemas/
-  battery/v1.0.0.json
-  textile/v1.0.0.json
-  textile/v1.1.0.json      # minor version adds optional fields
-  unsold-goods/v1.0.0.json
-  steel/v1.0.0.json
-```
 
-Adding a new schema version is a single file addition. The registry discovers all embedded versions at compile time. Validation callers specify which version to validate against, or request the latest.
+A new version is a new file plus one entry in that table (see
+[CONTRIBUTING.md §6](../../CONTRIBUTING.md#6-changing-a-schema)). Callers validate
+against the version a passport declares, or ask for the latest.
 
 ---
 
-## 8. Issuer Model
+## 8. Issuer model
 
-The core library is single-issuer and stateless — it has no concept of tenants, authentication, or API keys. Each issuer is identified by a `key_id` that maps to an Ed25519 key pair in the `KeyStore`, and by a `did:web` DID derived from the issuer's domain.
+The library is single-issuer and stateless: it has no concept of tenants,
+authentication or API keys. An issuer is identified by a `key_id` that maps to an
+Ed25519 key pair in the `KeyStore`, and by a `did:web` DID derived from the issuer's
+domain.
 
-Multi-tenancy, authentication, and access control are platform concerns — they live in a host that consumes this crate, not in the core.
+Multi-tenancy, authentication and access control belong to the host that consumes this
+library.
 
 ---
 
-## 9. Port Traits — The Extension Contract
+## 9. Port traits
 
-These traits define the boundary between the standard and any implementation:
+These traits are the boundary between the library and any implementation:
 
 ```rust
 // Persistence
-trait PassportRepository    // CRUD for DPP records
+trait PassportRepository    // CRUD for passport records
 
 // Compliance
-trait ComplianceRegistry    // Route to product group strategy
-trait ComplianceStrategy    // Product group-specific validation
+trait ComplianceRegistry    // Route to a product group strategy
+trait ComplianceStrategy    // Product-group-specific validation
 
 // Identity
 trait IdentityPort          // Sign and verify JWS
@@ -164,14 +199,19 @@ trait IdentityPort          // Sign and verify JWS
 // Plugins
 trait PluginHost            // Dispatch to Wasm plugins
 
-// Back-up copy & archive & personal data & registry & sealing
+// Back-up copy, archive, personal data, registry and sealing
 trait BackupCopyPort        // The ESPR Art. 10(4) third-party back-up copy
 trait ArchivedVersionPort   // The EN 18221 clause 4.2 archive of historical versions
 trait PersonalDataPort      // Erasable records of personal data held outside a passport
-trait RegistrySyncPort      // EU Central Registry registration / status sync
+trait RegistrySyncPort      // EU registry registration and status sync
 trait SealPort              // eIDAS qualified electronic seal (ESPR Art. 13)
 ```
 
-`PassportRepository`, `IdentityPort`, `BackupCopyPort`, `ArchivedVersionPort`, `PersonalDataPort`, `RegistrySyncPort`, and `SealPort` are `async`. The compliance and plugin traits are sync — they must work in `no_std` and `wasm32` contexts.
+`PassportRepository`, `IdentityPort`, `BackupCopyPort`, `ArchivedVersionPort`,
+`PersonalDataPort`, `RegistrySyncPort` and `SealPort` are `async`. The compliance and
+plugin traits are synchronous, because they must work in `no_std` and `wasm32` contexts.
 
-`dpp-vc` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by `dpp-crypto`'s local `KeyStore`. Anyone who implements the remaining traits against their own infrastructure has a complete, standard-compliant DPP system.
+`dpp-vc` provides `LocalIdentityService`, an `IdentityPort` implementation backed by
+`dpp-crypto`'s local `KeyStore`. Implementing the remaining traits against your own
+infrastructure gives a complete passport system. [PORTS.md](PORTS.md) lists each trait
+and its implementations.

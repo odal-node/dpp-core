@@ -2,7 +2,7 @@
 
 `aas-3.0.json`, `aas-3.1.json` and `aas-3.2.json` are not our files. Each is a
 verbatim copy of IDTA's published JSON Schema for the Asset Administration Shell
-metamodel, at the revision named below, vendored so CI is hermetic — upstream
+metamodel, at the revision named below, vendored so CI is hermetic. Upstream
 remains authoritative, and these copies exist only so the test suite does not
 depend on network access or on a URL staying up.
 
@@ -24,7 +24,7 @@ Common to all three: source `https://github.com/admin-shell-io/aas-specs`, path
 
 All three are pinned `-text` in `.gitattributes`: line-ending translation would
 change the bytes on disk without changing the blob, and the recorded hash would
-then fail to verify on any checkout that normalises — the default on Windows.
+then fail to verify on any checkout that normalises, which is the default on Windows.
 
 ## Why all three, rather than a chosen one
 
@@ -64,7 +64,7 @@ enforces the stricter no-hyphen name rule.
 
 ## What passing this proves, and what it does not
 
-Validating against these files establishes **metamodel validity** — the document
+Validating against these files establishes **metamodel validity**: the document
 is shaped the way the AAS metamodel says a document is shaped.
 
 It is **not** a conformance claim on its own, and it says nothing about whether a
@@ -91,8 +91,8 @@ Both pins, and everything they install, are hash-locked in
 `.github/oracle/aas/requirements.txt`, generated from `requirements.in`.
 
 **They cover metamodel 3.0 only.** We validate documents against the 3.0/3.1/3.2
-schemas but load them through 3.0 implementations, so the loader-level check —
-the one that catches members no schema sees — is 3.0-scoped. Do not round that
+schemas but load them through 3.0 implementations, so the loader-level check,
+the one that catches members no schema sees, is 3.0-scoped. Do not round that
 claim up. The test tooling's own file check ignores its version argument, and
 aas-core-works publishes Python packages for 3.0 (`aas-core3.0`) and 3.1
 (`aas-core3.1`) and none for 3.2 on PyPI, so a 3.2 constraint check becomes
@@ -110,7 +110,7 @@ red build on code that did not change.
 
 **A lenient implementation is worth nothing here.** Eclipse BaSyx accepts unknown
 members and reported success on the `unit` defect that made every Environment
-unloadable. An oracle has to be strict to be an oracle — which is also why
+unloadable. An oracle has to be strict to be an oracle, which is also why
 "opens in a GUI tool" is not evidence.
 
 Public wording: "passes `aas-core3.0` 1.1.4 and IDTA's `aas-test-engines` 1.0.3
@@ -121,8 +121,8 @@ an AAS file, and neither tool says anything about submodel-template conformance.
 
 **None of these schemas sets `additionalProperties` anywhere.** A member that is
 not part of a class therefore validates in silence, in every revision. We emitted
-`kind` on `AssetAdministrationShell` — a member of `HasKind`, which `Submodel`
-composes and the shell does not — for several releases, and no schema gate could
+`kind` on `AssetAdministrationShell` (a member of `HasKind`, which `Submodel`
+composes and the shell does not) for several releases, and no schema gate could
 ever have reported it. What rejects such a document is a strict AAS loader, not a
 validator.
 
@@ -136,12 +136,12 @@ member equally.
 
 Re-download from the tag, record the new tag, commit date, retrieval date, size
 and hash above, and state why the revision moved. Update the per-revision
-UTF-16 pattern count in `VENDORED_SCHEMAS` (`tests/all_product_groups_aas.rs`) — the
+UTF-16 pattern count in `VENDORED_SCHEMAS` (`tests/all_product_groups_aas.rs`): the
 suite asserts each count exactly, so a changed schema fails loudly rather than
 dropping more constraints than intended.
 
 Adding a revision means adding a row here, a file, and an entry in
 `VENDORED_SCHEMAS`; the `.gitattributes` pin is a glob and needs no change.
 
-Do not edit these files — a locally modified copy of someone else's schema is no
+Do not edit these files: a locally modified copy of someone else's schema is no
 longer evidence of anything.

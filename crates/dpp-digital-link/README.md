@@ -4,23 +4,22 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-digital-link)](https://docs.rs/dpp-digital-link)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-GS1 Digital Link URL parsing and building, and GS1 link-type content negotiation,
-for the [Odal Node](https://odal-node.io) Digital Product Passport system.
+GS1 Digital Link URL parsing and building, and GS1 link-type content negotiation, for
+EU Digital Product Passports. Part of [dpp-core](https://github.com/odal-node/dpp-core)
+by [Odal Node](https://odal-node.io).
 
-Pure Rust, no I/O, no network calls. `wasm32-unknown-unknown` safe.
+Pure Rust, no I/O, no network calls. Builds for `wasm32-unknown-unknown`.
 
-> **Scope note.** This crate previously also carried AAS submodel mapping and a
-> JSON-LD context. Those are now [`dpp-aas`](../dpp-aas) and
-> [`dpp-vc`](../dpp-vc) respectively — a consumer that wants a GS1 parser no
-> longer compiles an AAS mapper to get one.
+AAS submodel mapping and the JSON-LD context used to live here and are now in
+[`dpp-aas`](../dpp-aas) and [`dpp-vc`](../dpp-vc), so a consumer that wants a GS1 parser
+does not compile an AAS mapper with it.
 
 ## When to use this crate
 
 - You need to parse or build GS1 Digital Link URLs (GTIN, serial, batch).
-- You are resolving DPP links and need to negotiate by link type, media type or
+- You resolve passport links and need to negotiate by link type, media type or
   requesting audience.
-- You need GS1 check-digit validation, or a QR-ready canonical URL for a
-  passport.
+- You need GS1 check-digit validation, or a QR-ready canonical URL for a passport.
 
 ## Example
 
@@ -72,33 +71,32 @@ A runnable version is in [`examples/parse_and_negotiate.rs`](examples/parse_and_
 
 ## Which revision of the URI syntax
 
-The path grammar this crate is read against is **GS1 Digital Link URI Syntax
-1.7.0**, section 4. The register at
-[`docs/architecture/STANDARDS.md`](../../docs/architecture/STANDARDS.md) records
-the revision, what was run against it and every deviation, which are also listed
-in this crate's API documentation.
+The path grammar is read against **GS1 Digital Link URI Syntax 1.7.0**, section 4. The
+register at [`docs/architecture/STANDARDS.md`](../../docs/architecture/STANDARDS.md)
+records the revision, what was run against it and every deviation; the deviations are
+also listed in this crate's API documentation.
 
-EN 18219:2026 clause 6.3.2 names 1.6.0 for its identifier scheme 1. Whether a
-1.7.0 claim carries over to that clause depends on how the two revisions differ,
-and is not decided here.
+EN 18219:2026 clause 6.3.2 names revision 1.6.0 for its identifier scheme 1. Whether a
+1.7.0 claim carries over to that clause depends on how the two revisions differ, and is
+not decided here.
 
-## Scope boundary
+## Scope
 
-Syntax is not semantics. This crate proves a link is well-formed GS1; it does
-not prove the GTIN is allocated to you, nor that a resolver will find anything
-at the other end. Nothing here supports the phrase "GS1-certified".
+Syntax is not semantics. This crate proves that a link is well-formed GS1. It does not
+prove that the GTIN is allocated to you, or that a resolver will find anything at the
+other end. Nothing here supports the phrase "GS1-certified".
 
 ## Relationship to other crates
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides `Audience` and `Disclosure` — required by this crate |
+| `dpp-domain` | Provides `Audience` and `Disclosure`; required |
 | `dpp-aas` | The AAS projection that used to live here; no dependency in either direction |
 
 ## Minimum Rust version
 
-1.96 (MSRV is enforced in CI)
+1.96, enforced in CI.
 
-## License
+## Licence
 
-Apache-2.0 — see [LICENSE](../../LICENSE)
+Apache-2.0. See [LICENSE](../../LICENSE).

@@ -1,6 +1,8 @@
-# Wasm Plugin System
+# Wasm plugin system
 
-Product group compliance validation is implemented as Wasm plugins compiled to `wasm32-wasip1`. This document covers the plugin ABI (defined in `dpp-plugin-traits`), how to build plugins, and how the compliance dispatch model works.
+Product-group compliance logic runs as Wasm plugins compiled to `wasm32-wasip1`. This
+document covers the plugin ABI (defined in `dpp-plugin-traits`), how to build plugins,
+and how compliance dispatch works.
 
 ---
 
@@ -8,73 +10,88 @@ Product group compliance validation is implemented as Wasm plugins compiled to `
 
 The plugin system has three layers:
 
-**dpp-plugin-traits** (dpp-core) — types defining the host/guest contract: the `DppProductGroupPlugin` trait, `PluginCapabilities` (ABI + schema-version negotiation), `PluginResult`, `PluginError`, and the `AbiResult` envelope.
+- **`dpp-plugin-traits`:** the types of the host and guest contract: the
+  `DppProductGroupPlugin` trait, `PluginCapabilities` (ABI and schema-version
+  negotiation), `PluginResult`, `PluginError` and the `AbiResult` envelope.
+- **`dpp-plugin-sdk`:** the guest-side SDK plugin authors depend on. A plugin implements
+  `DppProductGroupPlugin` and calls `export_plugin!(MyPlugin)` once; the macro generates
+  the whole Wasm ABI and wires each export to a trait method.
+- **`PluginHost`:** the port trait in `dpp_domain::ports` that a runtime host implements to
+  load and run plugins. The implementation lives in the application.
 
-**dpp-plugin-sdk** (dpp-core) — the guest-side SDK plugin authors depend on. A plugin implements `DppProductGroupPlugin` and calls `export_plugin!(MyPlugin)` once; the macro generates the entire Wasm ABI and wires each export to a trait method. Plugins no longer hand-roll the ABI or redefine output structs.
+> **Dispatch is by product group, never by product category.** The host selects a plugin
+> from the `ProductGroup` of the passport data. A product category (battery `portable`
+> or `ev`, electronics `smartphone`) is data the plugin may branch on internally; it never
+> changes which plugin runs. See [DATA-MODEL.md](DATA-MODEL.md) §3.4.
 
-**PluginHost** (port trait in `dpp-domain::ports`) — the trait that a runtime host implements to load and execute plugins. The host implementation lives downstream.
-
-> **Dispatch is by product group, never by product category.** The host selects a plugin from the `ProductGroup` of the passport data. A product category (e.g. battery `portable` vs `ev`, electronics `smartphone`) is *product group data* the plugin may branch on internally — it never changes which plugin runs. See `DATA-MODEL.md` §3.4.
-
-```
-ComplianceRegistry::compute(product group, data)
+```text
+ComplianceRegistry::compute(product_group, data)
     |
-    +-- has plugin? --> PluginHost::compute(product group, data)
+    +-- has plugin? --> PluginHost::compute(product_group, data)
     |                       |
-    |                       +-- JSON in via linear memory
+    |                       +-- JSON in through linear memory
     |                       +-- calculate_metrics()
-    |                       +-- JSON out via linear memory
+    |                       +-- JSON out through linear memory
     |
     +-- no plugin --> PassthroughNoValidation
 ```
 
 ### Determination path
 
-`ComplianceRegistry` is the **determination port** (the open-core extension seam). It has several implementations, which are *not* redundant:
+`ComplianceRegistry` is the **determination port**, the extension point for compliance
+logic. Its implementations do different jobs:
 
 | Implementation | Where | Role |
 |---|---|---|
-| `PassthroughRegistry` | dpp-core (Apache) | Computes nothing — `PassthroughNoValidation` for every product group. The no-infra default. |
-| Plugin-backed registry | platform (Apache) | Delegates to `PluginHost` → the Wasm product group plugins. **The canonical OSS determination path.** |
-| `PremiumComplianceRegistry` | proprietary | Paid calculators. |
+| `PassthroughRegistry` | this library | Computes nothing and reports `PassthroughNoValidation` for every product group. The default that needs no infrastructure |
+| Plugin-backed registry | a host application | Delegates to `PluginHost` and the Wasm product group plugins. **The standard open determination path** |
+| Any other implementation | a host application | For example, calculators from `dpp-calc` wired in by the host |
 
-A computed determination is passed through `gate_determination(catalog.is_in_force(product group), …)` (dpp-core) so a **provisional** product group can never surface a binding `Compliant`/`NonCompliant` — it is downgraded to `NotAssessed`.
+A computed determination passes through `gate_determination(catalog.is_in_force(product_group), …)`
+so that a **provisional** product group can never produce a binding `Compliant` or
+`NonCompliant`; it is downgraded to `NotAssessed`.
 
-**Validation is independent of all of this.** `validate_product_group_data` (JSON Schema via the registry + cross-field `dpp-rules`) runs in pure core with no Wasm host. A self-hoster who disables plugins still gets full structural and cross-field validation; they only forgo a *computed determination*. A no-Wasm determination path is intentionally not offered (it would re-introduce closed per-product group logic into core).
+**Validation is independent of all this.** `validate_product_group_data` (JSON Schema
+through the registry plus the cross-field rules in `dpp-rules`) runs in the library with
+no Wasm host. An application that disables plugins still gets full structural and
+cross-field validation and only gives up a *computed determination*. A determination path
+without Wasm is intentionally not offered: it would bring closed per-group logic back into
+the library.
 
 ### Emitting findings (ABI 1.1)
 
-A plugin's `calculate_metrics` returns, in addition to metrics + status, two
-finding lists on `PluginResult` (ABI 1.1, backward-compatible):
+Besides metrics and status, a plugin's `calculate_metrics` returns two finding lists on
+`PluginResult` (ABI 1.1, backward-compatible):
 
-- `violations` — **binding**. The host blocks publish when the product group's DPP
+- `violations`: **binding**. The host blocks publish when the product group's passport
   obligation `is_in_force` and `violations` is non-empty.
-- `warnings` — **advisory / experimental**. Surfaced on the determination but
-  never block (e.g. a recycled-content target that is not yet in force).
+- `warnings`: **advisory or experimental**. Shown on the determination but never blocking
+  (for example, a recycled-content target that is not yet in force).
 
-The plugin produces these by calling the shared regulatory rules the SDK
-re-exports as `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each
-`PluginFinding` to a `ComplianceFinding` on the core `ComplianceResult`
-(`plugin_result_to_compliance`), which the host persists on the passport
-(`compliance_result`, part of the signed payload) and gates publish on.
+The plugin produces them by calling the shared rules the SDK re-exports as
+`dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each `PluginFinding` to a
+`ComplianceFinding` on the core `ComplianceResult` (`plugin_result_to_compliance`), stores
+it on the passport (`compliance_result`, part of the signed payload) and gates publish on
+it.
 
-`product-group-battery` is the reference: it scopes EU 2023/1542 Art. 8(2) recycled-content
-checks to the declared chemistry and emits them as **advisory** warnings (the
-Art. 8(2) minima are not binding until 18 Aug 2031), while data-integrity
-contradictions (cobalt declared on an LFP cell; inverted operating-temperature
-range) are hard **validation** errors raised in core `cross_field_errors`.
+`product-group-battery` is the reference. It scopes the Regulation (EU) 2023/1542 Art. 8(2)
+recycled-content checks to the declared chemistry and emits them as **advisory** warnings
+(the Art. 8(2) minimums are not binding until 18 August 2031). Data-integrity
+contradictions, such as cobalt declared on an LFP cell or an inverted operating
+temperature range, are hard **validation** errors raised in the core `cross_field_errors`.
 
-**Recipe — add determination to a product group:** in that product group's plugin
-`calculate_metrics`, call the relevant `dpp_plugin_sdk::rules::<product group>` checks,
-push `PluginFinding`s onto `warnings` (not-yet-in-force / advisory) or
-`violations` (binding, in force), rebuild the `.wasm`. No host change is
-required — the host routes by product group, then persists and gates the result.
+**Recipe for adding a determination to a product group:** in that group's plugin
+`calculate_metrics`, call the relevant `dpp_plugin_sdk::rules::<product group>` checks, push
+`PluginFinding`s onto `warnings` (not yet in force, or advisory) or `violations` (binding
+and in force), and rebuild the `.wasm`. No host change is needed: the host routes by
+product group, then stores and gates the result.
 
 ---
 
-## 2. ABI Contract
+## 2. ABI contract
 
-`export_plugin!` generates the following exports over Wasm linear memory. Authors do not write these by hand.
+`export_plugin!` generates these exports over Wasm linear memory. Authors do not write
+them by hand.
 
 ```rust
 extern "C" fn alloc(len: u32) -> u32;          // allocate len bytes, return ptr
@@ -87,88 +104,113 @@ extern "C" fn calculate_metrics(ptr: u32, len: u32) -> u64;   // -> AbiResult (o
 extern "C" fn generate_passport(ptr: u32, len: u32) -> u64;   // -> AbiResult (ok: payload)
 ```
 
-Every `-> u64` packs the output buffer as `(out_ptr << 32) | out_len`. Input/output is UTF-8 JSON over linear memory: the host writes input JSON at the pointer from `alloc`, calls the entry point, reads the JSON from the returned packed pointer, then `dealloc`s the buffers.
+Every `-> u64` packs the output buffer as `(out_ptr << 32) | out_len`. Input and output are
+UTF-8 JSON in linear memory: the host writes the input JSON at the pointer `alloc`
+returned, calls the entry point, reads the JSON from the returned packed pointer, then
+`dealloc`s both buffers.
 
-**Version negotiation.** Immediately after loading a plugin the host calls `describe()` to read its `PluginCapabilities` (declared ABI version, supported schema-version ranges, feature capabilities) and runs `dpp_plugin_traits::check_compatibility` **before** dispatching any work. A plugin whose ABI major version or schema range does not match is refused. This is what makes the `VersionedSchemaRegistry` enforceable at the Wasm boundary rather than aspirational.
+**Version negotiation.** Right after loading a plugin, the host calls `describe()` to read
+its `PluginCapabilities` (declared ABI version, supported schema-version ranges, feature
+capabilities) and runs `dpp_plugin_traits::check_compatibility` **before** dispatching any
+work. A plugin whose ABI major version or schema range does not match is refused. This is
+what makes `VersionedSchemaRegistry` enforceable at the Wasm boundary.
 
-**Fallible calls.** `validate`, `calculate_metrics`, and `generate_passport` return an `AbiResult` envelope — `{ "ok": <value> }` on success or `{ "error": <PluginError> }` on failure — since a Rust `Result` cannot cross the C ABI. The host deserialises this back into the typed contract.
+**Fallible calls.** `validate`, `calculate_metrics` and `generate_passport` return an
+`AbiResult` envelope (`{ "ok": <value> }` on success, `{ "error": <PluginError> }` on
+failure), because a Rust `Result` cannot cross the C ABI. The host deserialises it back
+into the typed contract.
 
-Future: WIT interface definitions will replace this low-level ABI as the Wasm Component Model matures.
-
----
-
-## 3. Available Plugins
-
-All eleven plugins run on the SDK (`dpp-plugin-sdk` + `export_plugin!`):
-
-| Plugin | Product group | Schema | ABI |
-|---|---|---|---|
-| `product-group-battery` | battery | `schemas/battery/v{1.0.0, 2.0.0 … 2.6.0}.json` | SDK (`DppProductGroupPlugin`) |
-| `product-group-textile` | textile, unsold-goods | `schemas/textile/*`, `unsold-goods/*` | SDK (`DppProductGroupPlugin`) |
-| `product-group-steel` | steel | `schemas/steel/*` | SDK (`DppProductGroupPlugin`) |
-| `product-group-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-mattress`, `-detergent` | resp. | `schemas/{product-group}/*` | SDK (`DppProductGroupPlugin`) |
-
-Schema versions are deliberately not enumerated here — several of these groups
-are past v1.0.0 and the list went stale the first time one moved. A plugin
-validates against whatever versions its product group has registered in
-`dpp-domain::schemas::embedded`; that file is the authority.
-
-Twelve product groups, eleven plugins: `unsold-goods` has no plugin of its own
-and runs on `product-group-textile`, which dispatches on the payload's
-`productGroup`. `mattress` was split out of `furniture` because the ESPR working
-plan makes Mattresses a separate product group. Furniture's plugin cannot serve
-it — it requires a `productType` that a mattress payload does not carry — so
-mattress has a plugin of its own, with furniture's checks minus that field.
-
-Plugins are standalone Rust crates excluded from the workspace. Each depends on `dpp-plugin-sdk` (which re-exports `dpp-plugin-traits`), implements `DppProductGroupPlugin`, and calls `export_plugin!` once — none hand-roll the ABI. **`product-group-battery` is the reference implementation.**
+WIT interface definitions may replace this low-level ABI as the Wasm Component Model
+matures. That is not planned work yet.
 
 ---
 
-## 4. Building Plugins
+## 3. Available plugins
+
+All eleven plugins use the SDK (`dpp-plugin-sdk` and `export_plugin!`):
+
+| Plugin | Product group |
+|---|---|
+| `product-group-battery` | battery (the reference implementation) |
+| `product-group-textile` | textile, unsold-goods |
+| `product-group-steel` | steel |
+| `product-group-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-mattress`, `-detergent` | the group of the same name |
+
+Schema versions are not listed here: several groups are past v1.0.0, and a list went stale
+the first time one moved. A plugin validates against whatever versions its product group
+has registered in `dpp_domain::schemas::embedded`, which is the authority.
+
+Twelve product groups, eleven plugins: `unsold-goods` has no plugin of its own and runs on
+`product-group-textile`, which dispatches on the payload's `productGroup`. `mattress` was
+split out of `furniture` because the ESPR working plan makes mattresses a separate product
+group. Furniture's plugin cannot serve it (it requires a `productType` a mattress payload
+does not carry), so mattress has its own plugin, with furniture's checks minus that field.
+
+---
+
+## 4. Building plugins
 
 ```bash
 rustup target add wasm32-wasip1
+just build-plugins
+```
+
+The plugins share one workspace, `plugins/Cargo.toml`, separate from the library
+workspace. To build one plugin, run from `plugins/`:
+
+```bash
 cargo build -p product-group-textile --target wasm32-wasip1 --release
 ```
 
-Output: `target/wasm32-wasip1/release/product_group_textile.wasm`
-
-Target size: < 2 MB per plugin. Strip is enabled via `profile.release.strip = true`.
-
-The `just build-plugins` recipe builds all product group plugins in one command.
+Output: `plugins/target/wasm32-wasip1/release/product_group_textile.wasm`. The release
+profile strips symbols and optimises for size; aim for under 2 MB per plugin.
 
 ---
 
-## 5. Writing a New Plugin
+## 5. Writing a new plugin
 
-1. Create a new crate in `plugins/product group-{name}/` (`crate-type = ["cdylib"]`, empty `[workspace]` to detach).
-2. Add `dpp-plugin-sdk = { path = "../../crates/dpp-plugin-sdk" }`.
-3. Define a unit struct, implement `DppProductGroupPlugin` (`plugin_identity`, `schema_version_range`, `validate_input`, `calculate_metrics`, `generate_passport`), and call `export_plugin!(MyPlugin)` once. Do **not** hand-write `alloc`/`dealloc`/etc. `meta()`/`capabilities()` default from these; override directly only if a plugin needs non-default values.
-4. `capabilities()`'s default declares the ABI version (`AbiVersion::current()`) and the `SchemaVersionRange`(s) returned by `schema_version_range()` — the host enforces these via `describe()`.
-5. Add the JSON schema at `schemas/{product-group}/v1.0.0.json`; the `VersionedSchemaRegistry` picks it up automatically.
-6. Add unit tests for the trait impl (they run on the host target with `cargo test`).
+1. Create `plugins/product-group-<name>/` with a copy of
+   `plugins/product-group-battery/Cargo.toml` (it inherits version, edition, licence and
+   dependencies from the plugin workspace), and add the directory to `members` in
+   `plugins/Cargo.toml`.
+2. Define a unit struct, implement `DppProductGroupPlugin` (`plugin_identity`,
+   `schema_version_range`, `validate_input`, `calculate_metrics`, `generate_passport`),
+   and call `export_plugin!(MyPlugin)` once. Do **not** hand-write `alloc`, `dealloc` or
+   the other exports. `meta()` and `capabilities()` derive from these; override them only
+   if the plugin needs other values.
+3. The default `capabilities()` declares the ABI version (`AbiVersion::current()`) and the
+   `SchemaVersionRange` values from `schema_version_range()`. The host enforces them
+   through `describe()`.
+4. For a new product group, add its manifest and first schema under `crates/dpp-domain/`
+   as [CONTRIBUTING.md §6](../../CONTRIBUTING.md#6-changing-a-schema) describes.
+5. Add unit tests for the trait implementation. They run on the host target with
+   `cargo test`.
 
-`product-group-battery` is the canonical reference. The plugin receives product-group-specific passport data as JSON, validates regulatory fields, performs compliance calculations, and returns a typed `PluginResult`.
+The plugin receives the product-group data as JSON, validates the regulatory fields, runs
+the compliance calculations, and returns a typed `PluginResult`.
 
 ---
 
-## 6. Security Model
+## 6. Security model
 
 Plugins run in a sandboxed Wasm environment with no access to the host system:
 
 | Capability | Status |
 |---|---|
-| Filesystem | DENIED |
-| Network | DENIED |
-| System random | DENIED |
-| Threads | DENIED (single-threaded) |
-| CPU | Capped via fuel metering |
+| Filesystem | Denied |
+| Network | Denied |
+| System random | Denied |
+| Threads | Denied (single-threaded) |
+| CPU | Capped by fuel metering |
 | Memory | Capped per instance |
 
-The specific fuel and memory limits are configured by the host implementation.
+The host sets the specific fuel and memory limits.
 
 ---
 
-## 7. Signature Verification (Roadmap)
+## 7. Signed plugins
 
-Each `.wasm` file should be accompanied by a `.wasm.sig` Ed25519 signature file, created with a plugin signing key. The host loader will verify the signature before compilation. This ensures only trusted plugins are loaded in production.
+A `.wasm` file is code a host will run, so a host should verify a detached Ed25519
+signature over it, made with a plugin signing key the operator trusts, before compiling it.
+This library defines no signature format and does no verification: signing, key
+distribution and the refusal policy belong to the host.

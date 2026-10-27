@@ -15,7 +15,7 @@ records:
 status is a fact about the Official Journal, are covered in
 [`regulatory/CONFORMITY.md`](../regulatory/CONFORMITY.md).
 
-## How this register is kept true
+## How this register is checked
 
 - **IETF rows are machine-checked.** `crates/dpp-tests/tests/standard_citations.rs`
   finds every `RFC NNNN` and `draft-ietf-…` cited in the repository. It fails

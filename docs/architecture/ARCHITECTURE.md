@@ -1,20 +1,25 @@
-# Odal Node Core — Architecture
+# dpp-core architecture
 
 ## Overview
 
-Odal Node Core is a pure Rust library for EU ESPR Digital Product Passport compliance. It defines domain types, cryptographic primitives, schema validation, and port traits — the complete standard for what a DPP is, how it is signed, and how compliance is verified.
+`dpp-core` is a Rust library for EU Digital Product Passports under the ESPR and the
+Battery Regulation. It defines the domain types, cryptographic primitives, schema
+validation and port traits: what a passport is, how it is signed, and how compliance is
+checked.
 
-No HTTP framework. No database. No async runtime (except where port traits require it for downstream implementors). The entire workspace compiles with nothing running.
+No HTTP framework, no database, and no async runtime, except where a port trait needs
+one for the application implementing it. The whole workspace compiles with nothing
+running.
 
 ---
 
-## Module Architecture
+## Module architecture
 
-```
+```text
 +--------------------------------------------------+
 |                  dpp-domain                       |
 |  Domain types, port traits, schema validation     |
-|  VersionedSchemaRegistry, ProductGroupCatalog,          |
+|  VersionedSchemaRegistry, ProductGroupCatalog,    |
 |  ComplianceRegistry                               |
 +--------------------------------------------------+
         ^            ^             ^
@@ -34,9 +39,9 @@ No HTTP framework. No database. No async runtime (except where port traits requi
 +-------------------+ |
                       v
             +-------------------+
-            |     dpp-rules     |   (no_std, zero-dep
-            | cross-field rules |    cross-field rules;
-            +-------------------+    dpp-domain depends on it)
+            |     dpp-rules     |   (no_std, no dependencies;
+            | cross-field rules |    dpp-domain depends on it)
+            +-------------------+
                       ^
                       | re-exported by
 +------------------+  |  +------------------+   +---------------------+
@@ -51,72 +56,75 @@ No HTTP framework. No database. No async runtime (except where port traits requi
 +---------------------+
 |      dpp-calc       |  EU-methodology determinations (Art. 8 recycled
 | pure, FactorProvider|  content, CO2e, repairability); ruleset identity,
-+---------------------+  effective periods, receipts; pure.
-          |              Depends on dpp-rules for thresholds — never the
++---------------------+  effective periods, receipts.
+          |              Depends on dpp-rules for thresholds, never the
           +-> dpp-rules  reverse, since the plugins reach dpp-rules too.
 
-dpp-tests — cross-crate integration tests (not published)
+dpp-tests: cross-crate integration tests (not published)
 ```
+
+The authoritative dependency graph is the one in [CONTRIBUTING.md](../../CONTRIBUTING.md#dependency-rules),
+which a test compares with the manifests.
 
 ---
 
-## dpp-domain — The Domain
+## dpp-domain: the domain
 
-The dependency root. Every other crate may depend on it; it depends on nothing
-internal but `dpp-rules`. Six of them do not — see [VERSIONING.md](../governance/VERSIONING.md).
+The dependency root. Every other crate may depend on it, and it depends on nothing
+internal except `dpp-rules`. Six crates do not depend on it; see
+[VERSIONING.md](../governance/VERSIONING.md).
 
 ### Top-level concerns
 
 This is the largest crate in the workspace and the one most able to absorb a new
-capability without anyone noticing, so what it contains is inventoried rather
-than described. A module added here is a deliberate act: `domain_concerns.rs`
-compares this list against `lib.rs` and fails the build in either direction.
+capability unnoticed, so its contents are inventoried rather than described. Adding a
+module is a deliberate act: `domain_concerns.rs` compares this list with `lib.rs` and
+fails the build in either direction.
 
-The **tier** column is the scope law in [CODE-LAYOUT.md](CODE-LAYOUT.md) §1:
-imports may only point up the eight-tier ladder, and two tripwires hold them to
-it — one for direction, one for cycles. The table below is ordered by tier, and
-that order is a measurement of the import graph rather than a judgement about
-what each module does.
+The **tier** column is the scope rule in [CODE-LAYOUT.md](CODE-LAYOUT.md) §1: imports may
+only point up the eight-tier ladder, and two tests hold them to it, one for direction
+and one for cycles. The table is ordered by tier, and that order is a measurement of the
+import graph, not a judgement about what each module does.
 
 | Concern | Tier | What it holds |
 |---|---|---|
-| `identifier` | 1 | GS1 and customs-classification vocabulary — `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
-| `calendar` | 4 | `ObligationCalendar` — which dated obligations take effect between two dates: every act's passport start date from `instrument`, and every change a `dpp-rules` module schedules, each `ObligationEvent` carrying its `DateBasis`. Holds no clock: the caller passes the window |
-| `catalog` | 3 | `ProductGroupCatalog` — identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
-| `credential` | 2 | The W3C Verifiable Credential 2.0 envelope binding a passport to its signed payload |
+| `identifier` | 1 | GS1 and customs-classification vocabulary: `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
+| `calendar` | 4 | `ObligationCalendar`: which dated obligations take effect between two dates, combining every act's passport start date from `instrument` and every change a `dpp-rules` module schedules, each `ObligationEvent` carrying its `DateBasis`. Holds no clock: the caller passes the window |
+| `catalog` | 3 | `ProductGroupCatalog`: identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
+| `credential` | 2 | The W3C Verifiable Credential 2.0 envelope that binds a passport to its signed payload |
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
-| `disclosure` | 2 | The Art. 77(2) lattice — `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3: `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
+| `disclosure` | 2 | The Art. 77(2) lattice: `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3 because `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
 | `eol` | 5 | End-of-life declarations, and the derogation a destruction claim must cite |
-| `field_error` | 2 | `FieldError` and `ValidationErrors` — the per-field detail a validation failure carries. Split from `error` because the two sit at different levels, and holding them together was a cycle |
-| `facility` | 2 | `FacilitySnapshot` — where a product was made, as recorded at issuance |
+| `field_error` | 2 | `FieldError` and `ValidationErrors`: the per-field detail of a validation failure. Split from `error` because the two sit at different levels, and holding them together was a cycle |
+| `facility` | 2 | `FacilitySnapshot`: where a product was made, as recorded at issuance |
 | `graph` | 5 | The bill-of-materials graph a passport sits in |
 | `instrument` | 3 | The legal acts, their `PassportObligation`, and one `InstrumentBinding` per (act, product group) pair. **This is where the law lives** |
-| `manufacturer` | 2 | `ManufacturerInfo` — the economic operator that placed the product on the market |
-| `material` | 2 | `MaterialEntry` — one declared constituent material |
-| `operator` | 2 | `ResponsibleOperator` and the `ResponsibilityBasis` that makes it answerable — Annex III(k). Shared by `passport` and `transfer`, so owned by neither |
+| `manufacturer` | 2 | `ManufacturerInfo`: the economic operator that placed the product on the market |
+| `material` | 2 | `MaterialEntry`: one declared constituent material |
+| `operator` | 2 | `ResponsibleOperator` and the `ResponsibilityBasis` that makes it answerable (Annex III(k)). Shared by `passport` and `transfer`, so owned by neither |
 | `personal_data` | 2 | The operator's statement about personal data for a field its schema marks as able to hold it, and the GDPR Art. 6(1) basis a record held outside the passport rests on. Tier 2 because `Passport` carries the statement |
 | `passport` | 4 | The aggregate root, its id, reference and audience-filtered view |
-| `product` | 5 | `ProductIdentity` — what identifies a product, independent of its passport |
+| `product` | 5 | `ProductIdentity`: what identifies a product, independent of its passport |
 | `product_group` | 4 | The typed per-group payloads and the `ProductGroupData` union |
-| `seal` | 2 | eIDAS seal value objects — format, mode, envelope, verification |
+| `seal` | 2 | eIDAS seal value objects: format, mode, envelope, verification |
 | `status` | 2 | `PassportStatus`, the lifecycle state machine |
-| `trusted_list` | 2 | EU Trusted List vocabulary (ETSI TS 119 612) — service types, statuses, and status at a past moment |
+| `trusted_list` | 2 | EU Trusted List vocabulary (ETSI TS 119 612): service types, statuses, and status at a past moment |
 | `transfer` | 5 | Transfer of responsibility between operators |
-| `access` | 6 | The per-field disclosure contract — `ProductGroupAccessPolicy`, `filter_by_audience` |
+| `access` | 6 | The per-field disclosure contract: `ProductGroupAccessPolicy`, `filter_by_audience` |
 | `lint` | 6 | Non-binding plausibility findings. Never gates publish |
 | `schemas` | 3 | `VersionedSchemaRegistry`, the embedded JSON Schemas, and the version lenses |
-| `validation` | 6 | Schema conformance and cross-field rules — the pass `Passport::validate` deliberately does not run |
-| `ports` | 7 | The core↔platform trait boundary (see [PORTS.md](PORTS.md)). **Nothing may import it** |
-| `passthrough` | 8 | The Apache-2.0 default `ComplianceRegistry` and its per-group strategies — an adapter, wired by the open-source binary |
-| `error` | 4 | `DppError`, the one error every fallible entry point returns. Sits at the level of the deepest thing it wraps — a lens error from `schemas` |
+| `validation` | 6 | Schema conformance and cross-field rules, the pass `Passport::validate` deliberately does not run |
+| `ports` | 7 | The boundary between the library and its hosts (see [PORTS.md](PORTS.md)). **Nothing may import it** |
+| `passthrough` | 8 | The Apache-2.0 default `ComplianceRegistry` and its per-group strategies: an adapter |
+| `error` | 4 | `DppError`, the one error every fallible entry point returns. It sits at the level of the deepest thing it wraps, a lens error from `schemas` |
 
-Prefer naming the concerns over asserting a count — a count is the part that
-goes stale while every claim around it stays checkable.
+The concerns are named rather than counted, because a count is what goes stale while
+every claim around it stays checkable.
 
-> **There was a `domain` module here until 2026-08-26.** It held 52% of the crate
-> and its name said nothing, so nothing in it had been *chosen* to be there. It
-> was dissolved and its children given real homes, which is most of why this
-> table is long: the concerns were always this many, they were just not visible.
+> **A `domain` module existed here until 2026-08-26.** It held 52% of the crate and its
+> name said nothing, so nothing in it had been chosen to be there. It was dissolved and
+> its children given real homes, which is most of why this table is long: the concerns
+> were always this many, they were just not visible.
 
 <!-- DOMAIN-CONCERNS:BEGIN (one module name per line; parsed by domain_concerns.rs) -->
 ```
@@ -152,182 +160,218 @@ validation
 ```
 <!-- DOMAIN-CONCERNS:END -->
 
-### Domain Types
+### Domain types
 
-Canonical DPP types: `Passport`, `PassportId`, `ManufacturerInfo`, `MaterialEntry`, `BatteryData`, `TextileData`, `SignedCredential`. All types derive `Serialize` + `Deserialize` and are `wasm32`-safe.
+The canonical passport types: `Passport`, `PassportId`, `ManufacturerInfo`,
+`MaterialEntry`, `BatteryData`, `TextileData`, `SignedCredential`. All derive `Serialize`
+and `Deserialize` and are `wasm32`-safe.
 
-### Port Traits
+### Port traits
 
-Trait definitions that downstream projects implement against their own infrastructure:
+Traits an application implements against its own infrastructure:
 
 | Trait | Async | Purpose |
 |---|---|---|
-| `PassportRepository` | yes | CRUD for DPP records |
-| `ComplianceRegistry` | no | Route product group data to the correct compliance strategy |
+| `PassportRepository` | yes | CRUD for passport records |
+| `ComplianceRegistry` | no | Route product group data to the right compliance strategy |
 | `ComplianceStrategy` | no | Validate product-group-specific compliance rules |
 | `IdentityPort` | yes | Sign and verify passport JWS |
 | `PluginHost` | no | Dispatch to Wasm product group plugins |
 | `BackupCopyPort` | yes | The ESPR Art. 10(4) third-party back-up copy |
 | `ArchivedVersionPort` | yes | The EN 18221 clause 4.2 archive of a passport's historical versions |
 | `PersonalDataPort` | yes | Erasable records of personal data held outside a passport |
-| `RegistrySyncPort` | yes | EU Central Registry registration and status sync |
-| `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
+| `RegistrySyncPort` | yes | EU registry registration and status sync |
+| `SealPort` | yes | eIDAS qualified electronic seal (ESPR Art. 13, eIDAS 910/2014) |
 
-The async traits use `async-trait`. The sync traits are plain Rust traits — compatible with `no_std` and `wasm32`.
+The async traits use `async-trait`. The sync traits are plain Rust traits, compatible
+with `no_std` and `wasm32`.
 
-`dpp-vc` provides `LocalIdentityService`, a concrete `IdentityPort` implementation backed by `dpp-crypto`'s local `KeyStore`.
+`dpp-vc` provides `LocalIdentityService`, an `IdentityPort` implementation backed by
+`dpp-crypto`'s local `KeyStore`.
 
 ### VersionedSchemaRegistry
 
-Embeds all JSON schemas from `crates/dpp-domain/schemas/{product-group}/v{version}.json` via `include_str!()` (inside the crate so they publish with it). Provides:
+Embeds every JSON Schema in `crates/dpp-domain/schemas/{product-group}/v{version}.json`
+with `include_str!()` (inside the crate, so they publish with it). It provides:
 
-- `get(product group, version)` — retrieve a specific schema
-- `latest(product group)` — retrieve the newest version for a product group
-- `validate(product group, version, data)` — validate passport data against a schema
-- `list()` — enumerate all available (product group, version) pairs
+- `get(product_group, version)`: one schema
+- `latest(product_group)`: the newest version for a product group
+- `validate(product_group, version, data)`: validate data against a schema
+- `list()`: every available (product group, version) pair
 
-Schema validation is gated behind `#[cfg(not(target_arch = "wasm32"))]` because the `jsonschema` crate is not wasm32-compatible.
+Schema validation is gated behind `#[cfg(not(target_arch = "wasm32"))]`, because the
+`jsonschema` crate does not support `wasm32`.
 
 ---
 
-## dpp-crypto — Cryptographic Primitives
+## dpp-crypto: cryptographic primitives
 
-Pure signing and key management. No HTTP, no database, and **no workspace
-dependencies** — the credential and DID layer that used to sit here is
-[`dpp-vc`](#dpp-vc--trust), and the per-field disclosure policy is
-`dpp_domain::access`. Signing bytes, deciding whose signature means what, and
-deciding which fields a role may see are three jobs, and this crate does the
-first.
+Signing and key management. No HTTP, no database and **no workspace dependencies**. The
+credential and DID layer lives in [`dpp-vc`](#vc-trust), and the per-field
+disclosure policy is `dpp_domain::access`. Signing bytes, deciding whose signature means
+what, and deciding which fields a role may see are three jobs; this crate does the first.
 
 ### KeyStore
 
-AES-256-GCM encrypted Ed25519 key storage. Keys are persisted as JSON files on the local filesystem. The path is injected, making it testable with temp directories.
+Ed25519 key storage encrypted with AES-256-GCM, persisted as a JSON file on the local
+filesystem. The path is injected, so tests use temporary directories.
 
-- `open(path, passphrase)` — open or create a key store
-- `generate_key(key_id)` — generate a new Ed25519 keypair
-- `load_key(key_id)` — load an existing key
-- `archive_key(key_id)` — archive current key (for rotation)
-- `load_archived_keys(key_id)` — load all archived keys
+- `open(path, passphrase)`: open or create a key store
+- `generate_key(key_id)`: generate a new Ed25519 key pair
+- `load_key(key_id)`: load an existing key
+- `archive_key(key_id)` and `rotate_key(key_id)`: archive the current key, or archive it
+  and generate a replacement
+- `load_archived_keys(key_id)`: load every archived key
 
 ### Signer
 
-JWS compact signing (EdDSA with Ed25519):
+Compact JWS signing (EdDSA with Ed25519):
 
-- `sign(store, key_id, payload, kid)` — produce a JWS compact serialisation whose header names the signing key by `kid`
-- `verify(jws, public_key)` — verify a JWS signature
+- `sign(store, key_id, payload, kid)`: a compact JWS whose header names the signing key
+  by `kid`
+- `verify(store, key_id, jws)`: verify a JWS against a key in the store
 
-### JWS Verifier
+### JWS verifier
 
-Single source of truth for JWS verification:
+The single place JWS verification lives:
 
-- `verify_jws(jws, public_key_b64)` — verify a JWS against a base64-encoded public key
-- `resolve_verification_key(did_document, jws)` — the Ed25519 public key of the verification method the JWS `kid` names, after the Controlled Identifiers v1.0 binding checks. No `kid`, no key
-
-## dpp-registry — EU Registry Interface
-
-Data types for the EU Central DPP Registry (ESPR Article 13). `wasm32`-safe — no I/O, no HTTP, no async runtime. Contains only wire-format types: `RegistrationPayload`, `EuRegistryEnvelope`, `EuRegistryResponse`, `StatusResponse`, `TransferNotification`, identifier structs (`ProductIdentifier`, `OperatorIdentifier`, `FacilityIdentifier`, `ProductItemIdentifier`), error types, and `RegistryEndpoint` with sandbox/production presets.
-
-The port trait (`RegistrySyncPort`) and its ghost implementation (`GhostRegistrySync`) live in `dpp-domain::ports::registry_sync`, not here. A host adapter (`EuRegistrySync`) implements the port using `reqwest` and these bridge types.
+- `verify_jws(jws, public_key_b64)`: verify a JWS against a base64-encoded public key
+- `resolve_verification_key(did_document, jws)`: the Ed25519 public key of the
+  verification method the JWS `kid` names, after the Controlled Identifiers v1.0 binding
+  checks. No `kid`, no key
 
 ---
 
-<a id="dpp-vc--trust"></a>
-## dpp-vc — Trust
+## dpp-registry: EU registry interface
 
-Who may read a passport, and how that is proven. W3C Verifiable Credentials,
-`did:web` documents, Bitstring Status List revocation, `LocalIdentityService`
-(the `IdentityPort` implementation), and the JSON-LD context those are expressed
-in. Depends on `dpp-crypto` for JWS and the keystore.
+Data types for the EU Digital Product Passport registry (ESPR Article 13).
+`wasm32`-safe: no I/O, no HTTP, no async runtime. It contains wire-format types
+(`RegistrationPayload`, `EuRegistryEnvelope`, `EuRegistryResponse`, `StatusResponse`,
+`TransferNotification`), the identifier structs (`ProductIdentifier`,
+`OperatorIdentifier`, `FacilityIdentifier`, `ProductItemIdentifier`), error types, and
+`RegistryEndpoint` with sandbox and production presets.
 
-A credential establishes *which* `Audience` a caller holds; `dpp_domain::access`
-maps that audience to fields. Two questions, two crates.
+The port trait (`RegistrySyncPort`) and its stub implementation (`GhostRegistrySync`)
+live in `dpp_domain::ports::registry_sync`, not here. A host implements the port with an
+HTTP client and these types.
 
-Not a `wasm32-unknown-unknown` target — it inherits `dpp-crypto`'s need for a
-platform entropy source.
+---
 
-### DID Builder
+<a id="vc-trust"></a>
+## dpp-vc: trust
 
-Constructs `did:web` DID documents from the KeyStore state:
+Who may read a passport, and how that is proven: W3C Verifiable Credentials, `did:web`
+documents, Bitstring Status List revocation, `LocalIdentityService` (the `IdentityPort`
+implementation), and the JSON-LD context these are expressed in. Depends on
+`dpp-crypto` for JWS and the keystore.
 
-- `build_did_document(store, base_url, key_id)` — builds the full DID document: one `JsonWebKey` verification method per key, identified by the DID and the key's RFC 9278 thumbprint URI. The current key comes first and alone in `authentication`; it and every non-revoked archived key are in `assertionMethod`
+A credential establishes *which* `Audience` a caller holds; `dpp_domain::access` maps that
+audience to fields. Two questions, two crates.
+
+It does not build for `wasm32-unknown-unknown`, because it inherits `dpp-crypto`'s need
+for a platform entropy source.
+
+### DID builder
+
+Builds `did:web` documents from the KeyStore state:
+
+- `build_did_document(store, base_url, key_id)`: the full DID document, with one
+  `JsonWebKey` verification method per key, identified by the DID and the key's RFC 9278
+  thumbprint URI. The current key comes first and alone in `authentication`; it and every
+  non-revoked archived key are in `assertionMethod`.
 
 ### LocalIdentityService
 
-Concrete implementation of `dpp-domain::ports::IdentityPort` backed by the local `KeyStore`. Wires together the signer, DID builder, and JWS verifier into the port trait interface:
+An implementation of `dpp_domain::ports::IdentityPort` backed by the local `KeyStore`,
+combining the signer, DID builder and JWS verifier:
 
-- `sign_passport(passport_id, payload)` — signs the payload with the issuer's Ed25519 key, builds the DID document, and returns a `SignedCredential`
-- `verify_signature(jws, payload)` — resolves the issuer's DID document from the `KeyStore` and verifies the JWS
-
-
----
-
-## dpp-digital-link — GS1
-
-Pure, stateless — no I/O or network dependencies. Compiles to `std` and
-`wasm32`. Two submodules:
-
-- `digital_link` — GS1 Digital Link URI parsing and building (`DigitalLink::parse`/`build`), the GTIN/serial/batch application-identifier table, and QR URL construction.
-- `linktype` — GS1 link-type vocabulary and content-negotiation (`negotiate`) between a client's `Accept` header and a passport's available link descriptors.
+- `sign_passport(passport_id, payload)`: signs the payload with the issuer's Ed25519 key,
+  builds the DID document and returns a `SignedCredential`
+- `verify_signature(jws, payload)`: resolves the issuer's DID document from the
+  `KeyStore` and verifies the JWS
 
 ---
 
-## dpp-aas — Asset Administration Shell
+## dpp-digital-link: GS1
 
-Maps a `Passport` to AAS shells and submodels (`build_aas_from_passport`) —
-the product group-agnostic core submodels (identification, manufacturer,
-environmental, materials, repairability) plus one product group submodel.
+Stateless, with no I/O or network dependencies. Compiles to `std` and `wasm32`. Two
+submodules:
 
-**Masked before mapping.** The builder takes an `Audience` and filters the
-passport through the same disclosure seam the public view uses, at the entry
-point, before any mapper runs. There is deliberately no unmasked entry point: a
-filter applied *after* mapping would match on `idShort`, so a mapper that
-misspelled one would emit a restricted field the filter could not recognise.
-
-**Typed mappers only where an act is in force** — `battery`, `electronics`,
-`unsold_goods`, plus `textile` as a named carve-out. Every other product group
-renders through the generic product group projection, because a hand-written mapper
-asserts an AAS submodel template that no standards body has ratified. A CI gate
-asserts this directly: a provisional product group gaining a typed mapper fails the
-build.
-
-**AAS-shaped output carrying our own semantics.** Every emitted `semanticId` is
-either `urn:odal-node:*` or carries a provenance record naming who verified it
-against the authority's published source — enforced by a test. The crate
-currently emits no third-party identifiers, so no IDTA conformance is claimed.
+- `digital_link`: GS1 Digital Link URI parsing and building (`DigitalLink::parse` and
+  `build`), the GTIN, serial and batch application-identifier table, and QR URL
+  construction.
+- `linktype`: the GS1 link-type vocabulary and content negotiation (`negotiate`) between
+  a client's `Accept` header and a passport's available link descriptors.
 
 ---
 
-## dpp-plugin-traits — Wasm Plugin ABI
+## dpp-aas: Asset Administration Shell
 
-Types for the host/guest contract. Uses `std` types (`String`, `Vec`, `HashMap`) — not `no_std`. Product group plugins compiled to `wasm32-wasip1` implement this ABI (generated by `dpp-plugin-sdk`'s `export_plugin!` macro — authors do not hand-write it):
+Maps a `Passport` to an AAS shell and submodels (`build_aas_from_passport`): the
+product-group-agnostic core submodels (identification, manufacturer, environmental,
+materials, repairability) plus one product group submodel.
 
-- `alloc(len: u32) -> u32` — allocate `len` bytes, return ptr
-- `dealloc(ptr: u32, len: u32)` — matching dealloc
-- `metadata() -> u64` — returns `PluginMeta` JSON
-- `describe() -> u64` — returns `PluginCapabilities` JSON (host runs `check_compatibility` before dispatch)
-- `validate(ptr, len) -> u64` — returns the `AbiResult` envelope
-- `calculate_metrics(ptr, len) -> u64` — returns `AbiResult` (`ok: PluginResult`)
-- `generate_passport(ptr, len) -> u64` — returns `AbiResult` (`ok: payload`)
+**Masked before mapping.** The builder takes an `Audience` and filters the passport
+through the same disclosure seam the public view uses, at the entry point, before any
+mapper runs. There is no unmasked entry point: a filter applied *after* mapping would
+match on `idShort`, so a mapper that misspelled one would emit a restricted field the
+filter could not recognise.
 
-Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is UTF-8 JSON over Wasm linear memory.
+**Typed mappers only where an act is in force:** `battery`, `electronics`,
+`unsold_goods`, and `textile` as a named exception. Every other product group renders
+through the generic projection, because a hand-written mapper asserts an AAS submodel
+template that no standards body has ratified. A CI test fails the build if a provisional
+product group gains a typed mapper.
+
+**AAS-shaped output with our own semantics.** Every emitted `semanticId` is either
+`urn:odal-node:*` or carries a provenance record naming who verified it against the
+authority's published source, and a test enforces this. The crate emits no third-party
+identifiers today, so no IDTA conformance is claimed.
 
 ---
 
-## Proof-Bound Architecture
+## dpp-plugin-traits: Wasm plugin ABI
 
-Odal never stores raw production data. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
+Types for the host and guest contract. Uses `std` types (`String`, `Vec`, `HashMap`), so
+it is not `no_std`. Product group plugins compiled to `wasm32-wasip1` implement this ABI,
+which `dpp-plugin-sdk`'s `export_plugin!` macro generates:
 
-Personal data has a rule of its own. A field a schema marks as able to hold it is refused unless the operator states what is held, and personal data the passport is not required to carry is kept outside the signed record, where it can be erased when consent is withdrawn. The `personal_data` module in `dpp-domain` states the rule and the law behind it, and [PERSONAL-DATA.md](PERSONAL-DATA.md) records the alternatives it was chosen over.
+- `alloc(len: u32) -> u32`: allocate `len` bytes, return the pointer
+- `dealloc(ptr: u32, len: u32)`: the matching deallocation
+- `metadata() -> u64`: `PluginMeta` JSON
+- `describe() -> u64`: `PluginCapabilities` JSON (the host runs `check_compatibility`
+  before dispatch)
+- `validate(ptr, len) -> u64`: the `AbiResult` envelope
+- `calculate_metrics(ptr, len) -> u64`: `AbiResult` (`ok: PluginResult`)
+- `generate_passport(ptr, len) -> u64`: `AbiResult` (`ok: payload`)
+
+Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input and output are UTF-8
+JSON in Wasm linear memory.
 
 ---
 
-## Wasm Targets
+## What is signed and kept
 
-Two wasm32 targets are supported:
+The library validates product data against the product group schema and signs it with
+the manufacturer's Ed25519 key. What a host stores and serves is the signed passport: the
+product data the operator chose to publish, bound to its signatures. The source files the
+data came from (spreadsheets, ERP exports) are not part of it.
+
+Personal data has its own rule. A field a schema marks as able to hold personal data is
+refused unless the operator states what is held, and personal data the passport is not
+required to carry is kept outside the signed record, where it can be erased when consent
+is withdrawn. The `personal_data` module in `dpp-domain` states the rule and the law
+behind it, and [PERSONAL-DATA.md](PERSONAL-DATA.md) records the alternatives it was
+chosen over.
+
+---
+
+## Wasm targets
 
 | Target | Crates | Purpose |
 |---|---|---|
-| `wasm32-unknown-unknown` | dpp-registry, dpp-digital-link, dpp-aas | Browser/Cloudflare Workers (JS-hosted). Not `dpp-crypto`/`dpp-vc` — the RNG needs a platform entropy source |
-| `wasm32-wasip1` | product group plugins | wasmtime sandbox (WASI Preview 1 syscall interface) |
+| `wasm32-unknown-unknown` | dpp-domain, dpp-registry, dpp-digital-link, dpp-aas | Browser and edge runtimes hosted by JavaScript. Not `dpp-crypto` or `dpp-vc`: the RNG needs a platform entropy source |
+| `wasm32-wasip1` | product group plugins | The wasmtime sandbox (WASI Preview 1) |
 
-`getrandom` uses the JS backend for `wasm32-unknown-unknown` (configured in `.cargo/config.toml`).
+`getrandom` uses its JavaScript backend for `wasm32-unknown-unknown`, configured in
+`.cargo/config.toml`.

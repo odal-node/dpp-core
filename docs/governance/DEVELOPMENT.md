@@ -1,141 +1,129 @@
-# Development Guide
+# Development guide
 
-This document covers the development workflow, branching strategy, CI
-requirements, and code review expectations for dpp-core.
+The development workflow, CI requirements and code review expectations for `dpp-core`.
+[CONTRIBUTING.md](../../CONTRIBUTING.md) is the entry point; this document adds detail.
 
 ## Prerequisites
 
-- **Rust** — stable toolchain (see `rust-version` in root `Cargo.toml` for MSRV).
-- **just** — command runner ([casey/just](https://github.com/casey/just)).
-- **cargo-nextest** — test runner (`cargo install cargo-nextest`).
-- **wasm32-wasip1 target** — only needed for plugin builds
-  (`rustup target add wasm32-wasip1`).
+- **Rust:** the toolchain pinned in `rust-toolchain.toml` (the MSRV is `rust-version` in
+  the root `Cargo.toml`).
+- **just:** the command runner ([casey/just](https://github.com/casey/just)).
+- **cargo-nextest:** the test runner (`cargo install cargo-nextest`).
+- **`wasm32-wasip1` target:** only for plugin builds (`rustup target add wasm32-wasip1`).
 
-Optional but recommended:
+Optional:
 
-- `cargo-semver-checks` — API compatibility checking.
-- `cargo-audit` — dependency vulnerability scanning.
-- `cargo-release` — release automation.
+- `cargo-semver-checks` for API compatibility checks.
+- `cargo-audit` for dependency advisories.
+- `cargo-release` for releases.
 
 ## Building
 
-```sh
-just build          # Release build, all workspace crates
-just build-plugins  # Compile Wasm product group plugins (wasm32-wasip1)
+```bash
+just build          # release build of every workspace crate
+just build-plugins  # build the Wasm product group plugins (wasm32-wasip1)
 ```
 
-The build must succeed with **zero infrastructure running** — no database, no
-Redis, no environment variables. This is the golden rule of dpp-core: it is a
-pure domain library.
+The build must succeed with **nothing running**: no database, no Redis, no environment
+variables. This is a library with no infrastructure.
 
 ## Testing
 
-```sh
-just test   # Runs cargo nextest run --workspace
+```bash
+just test   # cargo nextest run --workspace
 ```
 
-All tests are deterministic and require no I/O. Tests that need randomness use
-seeded RNGs. The full suite should complete in under 30 seconds.
+Tests need no network and no services.
 
-## Quality Gate
+## Quality gate
 
-Before pushing, run the full gate:
+Before pushing, run:
 
-```sh
-just check  # fmt-check → lint → test → audit
+```bash
+just check
 ```
 
-This is the same sequence CI runs. A PR will not be merged unless `just check`
-passes.
+It runs formatting, clippy (workspace and plugins), tests, doctests, plugin tests, the
+plugin gate self-test, the doc build, the lockfile check and `cargo audit`. CI runs the
+same steps as separate jobs and adds the Wasm cross-compiles and the oracle suites, so
+`just ci` is the closer match before a push. A pull request is not merged unless CI passes.
 
 Individual steps:
 
 | Command | What it does |
 |---|---|
 | `just fmt` | Format all code with `rustfmt` |
-| `just lint` | `cargo clippy --workspace --all-targets -- -D warnings` |
+| `just lint` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` |
 | `just test` | `cargo nextest run --workspace` |
-| `cargo audit` | Check for known vulnerabilities in dependencies |
+| `just audit` | Check dependencies for known vulnerabilities |
 
-Run `just --list` for the full recipe menu (`build`, `build-plugins`, `bench`, `doc`, …).
+`just --list` shows every recipe.
 
-## Branching Strategy
+## Branching
 
-Trunk-based: short-lived `feat/*` / `fix/*` / `chore/*` branches merge to `main`
-via PR; no long-lived branches; tags are cut from `main`. Branch protection,
-commit conventions, and release tagging are detailed in
-[GIT-STRATEGY.md](GIT-STRATEGY.md) — not repeated here.
+Trunk-based: short-lived `feat/*`, `fix/*` and `chore/*` branches merge to `main` through a
+pull request; no long-lived branches; tags are cut from `main`. Branch protection, commit
+conventions and release tagging are in [GIT-STRATEGY.md](GIT-STRATEGY.md).
 
-## Pull Request Process
+## Pull request process
 
-1. **Open an issue first** for non-trivial changes. This avoids wasted effort
-   on changes that conflict with the project direction.
-2. **One logical change per PR.** Split unrelated changes into separate PRs.
-3. **DCO sign-off required.** Every commit must include a `Signed-off-by:`
-   line. Use `git commit -s` to add it automatically.
-4. **CI must pass.** The PR cannot be merged until all status checks are green.
-5. **Respond to review feedback** or explain why you disagree. Silence is not
-   consent — unresolved threads block merging.
+1. **Open an issue first** for anything non-trivial, so effort is not spent on a change
+   that conflicts with the project's direction.
+2. **One logical change per pull request.** Split unrelated changes.
+3. **Sign off every commit** with a `Signed-off-by:` line (`git commit -s`).
+4. **CI passes** before merge.
+5. **Respond to review feedback**, or explain why you disagree. Unresolved threads block
+   merging.
 
-### PR Title Convention
+### Pull request titles
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) prefixes in
-the PR title:
+The title is a [Conventional Commit](https://www.conventionalcommits.org/), checked by
+`.github/workflows/pr-title.yml`. Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`,
+`perf`, `chore`, `ci`, `build`, `style`, `revert`. Mark a breaking change with `!` after
+the type or scope (`feat(domain)!: …`) and file the CHANGELOG entry under the breaking
+heading. The scope is a functional area, never `core` or `dpp-core`.
 
-- `feat:` — new functionality
-- `fix:` — bug fix
-- `docs:` — documentation only
-- `refactor:` — code restructuring, no behaviour change
-- `test:` — adding or updating tests
-- `chore:` — build, CI, tooling changes
-- `breaking:` — API-breaking change (also requires CHANGELOG entry)
+### Review expectations
 
-### Review Expectations
-
-- The maintainer reviews all PRs.
-- Reviewers check for correctness, clarity, test coverage, and adherence to
-  the project's architectural patterns (hexagonal architecture, port traits).
-- Nit-level feedback (formatting, naming) is prefixed with `nit:` and is
-  non-blocking.
-- Security-sensitive changes require explicit security-focused review (see
+- The maintainer reviews every pull request.
+- Reviews check correctness, clarity, test coverage, and the project's architectural
+  patterns (ports and adapters, port traits).
+- Minor feedback (formatting, naming) is prefixed `nit:` and does not block.
+- Security-sensitive changes need a review focused on security (see
   [GOVERNANCE.md](../../GOVERNANCE.md)).
 
-## Code Style
+## Code style
 
-- Follow `rustfmt` defaults. Do not override `rustfmt.toml` without
-  discussion.
+- `rustfmt` defaults. Do not change `rustfmt.toml` without discussion.
 - Prefer explicit types over `impl Trait` in public API signatures.
-- Public items must have doc comments (`///`). The `missing_docs` lint will be
-  enabled before 1.0.
-- Error types use `thiserror` for derivation. Do not use `anyhow` in library
-  code.
-- No `unwrap()` or `expect()` in library code. Use `Result` propagation.
-- No `unsafe` unless absolutely necessary, with a `// SAFETY:` comment
-  explaining the invariant.
+- Public items have doc comments (`///`). The `missing_docs` lint will be enabled before
+  1.0.
+- Library error types derive with `thiserror`. A few functions in `dpp-crypto` and `dpp-vc`
+  still return `anyhow::Result`; new library code uses typed errors.
+- No `unwrap()` or `expect()` on library code paths; propagate `Result`.
+- No `unsafe` unless necessary, with a `// SAFETY:` comment stating the invariant.
 
-## Adding a New Schema
+## Adding a schema
 
-1. Create `schemas/{product-group}/v{N}.json` with the JSON Schema.
-2. Register it in `VersionedSchemaRegistry` (the `include_str!()` macro
-   embeds it at compile time).
-3. Add a test in `dpp-domain` that validates a sample document against the
-   new schema.
-4. Update CHANGELOG.md under `[Unreleased]`.
+Follow [CONTRIBUTING.md §6](../../CONTRIBUTING.md#6-changing-a-schema): a new file under
+`crates/dpp-domain/schemas/`, an entry in the embedded table, the manifest's
+`currentSchemaVersion` if it becomes current, `just schema-changes`, and a CHANGELOG entry
+under `[Unreleased]`.
 
-## Adding a New Port Trait
+## Adding a port trait
 
-1. Define the trait in `dpp-domain::ports`.
-2. Add it to the re-exports in `dpp-domain::lib.rs`.
-3. Document the trait's contract, error semantics, and concurrency
-   expectations.
-4. Do NOT provide an implementation — implementations live in a host
-   repo.
-5. Update the architecture docs if the new port changes the core/platform
-   boundary.
+1. Define the trait in `dpp_domain::ports`, in its own module.
+2. Add the module to the machine block in [PORTS.md](../architecture/PORTS.md);
+   `ports_inventory.rs` fails until you do.
+3. Document the trait's contract, error semantics and concurrency expectations.
+4. Ship no production implementation: implementations live in the application. A stub for
+   development may go under `ports::ghosts`, marked as a placeholder in its output.
+5. Update the architecture documents if the port changes the boundary between the library
+   and its hosts.
 
 ## References
 
-- [just command runner](https://github.com/casey/just)
+- [just](https://github.com/casey/just)
 - [cargo-nextest](https://nexte.st/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Versioning policy](VERSIONING.md)

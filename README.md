@@ -1,285 +1,266 @@
-# Odal Node Core
+# dpp-core
 
-**EU Digital Product Passport Standard Library**
+An open-source Rust library for EU Digital Product Passports (DPPs), under the
+Apache License 2.0. It holds the passport data model, versioned JSON Schemas per
+product group, regulatory validation rules, Ed25519/JWS signing, W3C Verifiable
+Credentials, GS1 Digital Link parsing and Asset Administration Shell export. It is
+stateless: no database, no HTTP server, no network I/O.
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![crates.io](https://img.shields.io/crates/v/dpp-domain.svg)](https://crates.io/crates/dpp-domain)
+[![docs.rs](https://img.shields.io/docsrs/dpp-domain)](https://docs.rs/dpp-domain)
 [![CI](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml/badge.svg)](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.96+](https://img.shields.io/badge/Rust-1.96%2B-orange.svg)](https://www.rust-lang.org/)
-[![Status: Active Development](https://img.shields.io/badge/Status-Active%20Development-green.svg)]()
 
-Pure, stateless Rust library for EU ESPR Digital Product Passport compliance. Domain types, cryptographic signing (Ed25519 + JWS), W3C Verifiable Credentials, GS1 Digital Link resolution, schema validation, and AAS submodel mapping. No database, no HTTP framework, no infrastructure dependencies.
+> [!NOTE]
+> **Status: pre-production.** Published on crates.io and tested in CI, but not yet
+> used in production. Before 1.0, a minor version may change public APIs; every
+> change is listed in [CHANGELOG.md](CHANGELOG.md).
 
-Anyone building DPP tooling can use this library as the foundation. It is the standard, not the product.
+## Quick start
 
-> Note: This project is in active development.
+Validate product data against its regulatory schema, sign it, and verify the
+signature. This uses only the published crates.
 
-> *"We provide the pipe, not the truth."* Odal Node uses a **proof-bound architecture**: product data is validated locally, signed with your key, and published as a verifiable passport. The transient import files are discarded after signing; the signed passport itself — the full product data, every field bound to a proof and gated by its disclosure class — is what the node retains and serves. What the world verifies is a cryptographic proof over real, tiered data, not a bare hash standing in for it.
-
----
-
-## Why This Exists
-
-EU law is switching on machine-readable Digital Product Passports product group by product group: battery passports become mandatory on **18 February 2027** (Reg. 2023/1542), the unsold-goods rules are in force **now** (ESPR Art. 24/25), detergents follow on 23 September 2029 (Reg. 2026/405), and the ESPR working plan queues textiles, steel and more behind them. Six European DPP system standards were cited in the Official Journal on **15 July 2026** by Commission Implementing Decision (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222 and 18223. No affordable, developer-friendly infrastructure exists for the millions of SMEs who need to comply.
-
-**Odal is that infrastructure**: sovereign, standards-compliant, self-hostable. No vendor lock-in, no black-box algorithms, no enterprise-tier licensing.
-
----
-
-## The Compilation Test
-
-```
-cargo build --workspace
+```bash
+cargo new hello-dpp && cd hello-dpp
+cargo add dpp-domain dpp-crypto serde_json anyhow
 ```
 
-Succeeds with zero infrastructure running. No DB, no Redis, no env vars. If it needs infrastructure, it doesn't belong here.
-
----
-
-## Crate Architecture
-
-```
-dpp-core/
-  crates/
-    dpp-domain .......... Domain types, port traits, VersionedSchemaRegistry, JSON Schema validation
-      schemas/ .......... Versioned JSON Schemas for 12 product groups (battery, textile, electronics, …), embedded via include_str!
-    dpp-crypto .......... Ed25519 keys, AES-256-GCM, JWS sign/verify, JAdES
-    dpp-digital-link .... GS1 Digital Link parser and link-type negotiation
-    dpp-aas ............. Asset Administration Shell (AAS) shells and submodels
-    dpp-vc .............. W3C Verifiable Credentials, did:web, JSON-LD context
-    dpp-plugin-traits ... Wasm product group plugin ABI (no_std compatible, capability negotiation)
-    dpp-plugin-sdk ...... Guest-side plugin SDK: export_plugin! macro + Validator
-    dpp-rules ........... Pure no_std cross-field regulatory rules, shared by dpp-domain and plugins
-    dpp-registry ........ EU Central Registry interface types (wasm32-safe)
-    dpp-calc ............ EU-methodology calculators (CO2e, repairability), pure functions
-    dpp-vocab ........... External vocabulary authorities, one file per authority, with what we verified
-    dpp-tests ........... Cross-crate integration tests and the structural tripwires
-  plugins/ .............. 11 Wasm product group plugins (wasm32-wasip1, excluded from workspace)
-```
-
----
-
-## Regulatory Coverage
-
-| Regulation | Status | dpp-core Implementation |
-|---|---|---|
-| **ESPR** (EU 2024/1781) | In force; unsold-goods rules (Art. 24/25) apply since Jul 2026 | Core data model (Art. 9-13, Annex III), access rights per Art. 11(b), unsold-goods product group, transfer-of-responsibility design (not a distinct ESPR article — see below) |
-| **Battery Regulation** (EU 2023/1542) | In force — passport mandatory **18 Feb 2027** | `BatteryData` struct, Annex XIII fields, product group schema |
-| **Textile DPP Delegated Act** | Pending (ESPR working-plan priority) | `TextileData` with SVHC disclosure, per-fibre traceability, durability metrics — provisional until the act finalises |
-| **CEN/CLC JTC 24 system standards** | Six cited in the OJ on 15 Jul 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it requires an assessment we have not published — not merely a citation, which now exists |
-
-**Technical specifications** are not listed here: IETF, W3C, GS1 Digital Link,
-IDTA AAS and ETSI. Each one is recorded once, in
-[`docs/architecture/STANDARDS.md`](docs/architecture/STANDARDS.md), with the
-revision cited, its status as last read, where the code uses it, and the
-evidence behind that use. A test fails when the code cites an IETF document the
-register does not list.
-
----
-
-## Key Features
-
-### Access Control — an Art. 77(2) lattice, not a ranking
-
-Regulation (EU) 2023/1542 Art. 77(2) assigns three audiences to four Annex XIII
-data sets. Crucially it is **not an ordering**: conformity test reports (point 3)
-go to authorities only, and individual-battery use data (point 4) goes to
-legitimate-interest holders only — so neither audience contains the other, and no
-integer "tier" comparison can express the assignment.
-
-| Audience | Annex XIII | Sees |
-|---|---|---|
-| **Public** | point 1 | Public battery-model information. No credential. |
-| **Legitimate interest** | points 2 and 4 | Detailed composition, dismantling and safety, **plus** individual-item data: state of health, use history, status. Requires a VC proving the interest (repairer, remanufacturer, second-life operator, recycler). |
-| **Authority** | points 2 and 3 | The same point-2 data, **plus** conformity test reports — but **not** point-4 individual data. Notified bodies, market surveillance, customs, the Commission. |
-
-`Audience::may_see(Disclosure)` is the whole assignment in one table. ESPR itself
-(Art. 9(2)(f), Art. 11(b)) requires per-actor access rights to be set by each
-product group's delegated act rather than mandating a fixed set, so non-battery
-product groups reuse the same vocabulary via each product group manifest's `disclosure` map.
-
-### Transfer of Responsibility
-
-When a product undergoes remanufacturing, repurposing, or preparation for reuse, DPP responsibility transfers to the new economic operator. ESPR has no distinct "transfer of responsibility" article by that name — this design follows from the general data-accuracy duty (Art. 9(1): DPP data "shall be accurate, complete and up to date") and the registry-upload duty (Art. 13(4)). The `TransferChain` provides:
-
-- Append-only provenance log with state machine validation
-- DID-identified economic operators with typed roles
-- Dual-signature transfer records (JWS from both parties)
-- Rejection of invalid transfers (wrong operator, duplicate pending)
-
-### Evidence Dossiers
-
-A self-contained, signed **evidence dossier** — passport, both JWS proofs, the issuer's DID document, the hash-chained audit trail, and the transfer chain in one canonical document — and its verification engine (independent checks: manifest signature, content integrity, both JWS, audit-chain linkage, transfer signatures) are a hosting-side feature, not part of this library: generating a dossier needs persistence and an audit trail, and checking one needs to fetch. What this crate contributes are the primitives that make either possible — `dpp-crypto`'s Ed25519/JWS, `dpp-vc`'s credentials and DID documents, and the domain types a dossier snapshots.
-
-### Product Identity — EN 18219 clause 5, not GS1 only
-
-A passport identifies its product under **one of three schemes**, which clause 5
-offers as alternatives rather than a hierarchy:
-
-| Scheme | Carries | Who can issue one |
-|---|---|---|
-| 1 — GS1 Digital Link | a 14-digit GTIN, check-digit validated | needs a GS1 Company Identification Number |
-| 2 — Identification Link (EN IEC 61406) | an absolute `https` URL | self-issuing: a registered web domain is enough |
-| 3 — DID (W3C DID v1.0) | a `did:web`, `did:ethr` or `did:ebsi` URI | self-issuing, same |
-
-`ProductIdentifier` is the typed home for all three. Deserialisation is routed
-through the constructors, so an identifier that could not have been built cannot
-be read back either.
-
-**Why this matters beyond tidiness:** requiring a GTIN is requiring GS1
-membership. Schemes 2 and 3 exist so a manufacturer without one can still issue a
-conformant passport, and modelling only scheme 1 quietly excludes them.
-
-The identifier travels on `RegistrationRequest` rather than being re-derived from
-the data carrier. 🚨 **A carrier is not an identifier** — a Digital Link happens
-to contain a scheme 1 GTIN, a scheme 2 or 3 carrier contains no such thing, and
-reading one out of the other is where an invented value gets submitted to a
-public authority. `ProductIdentifier: TryFrom<&identifier::ProductIdentifier>` in
-`dpp-registry` maps the three schemes and **refuses** an unmapped one rather than
-inventing a scheme string.
-
-### Schema Validation
-
-Versioned JSON schemas at `crates/dpp-domain/schemas/{product-group}/v{version}.json` (embedded into the crate so they ship with it on publish):
-
-| Product group | Versions | Key Fields |
-|---|---|---|
-| battery | v1.0.0, v2.0.0 – v2.10.0 | Chemistry, capacity, Art. 8 recycled content, Annex VII state of health and expected lifetime, placing-on-market date, Art. 47 due diligence declaration |
-| electronics | v1.0.0 – v1.5.0 | Repairability, spare parts, substances of concern |
-| textile | v1.0.0 – v1.4.0 | Fibre composition, SVHC, durability, microplastics |
-| furniture | v1.0.0 – v1.3.0 | Product group-specific delegated-act fields |
-| aluminium, construction, detergent, steel, toy | v1.0.0 – v1.2.0 each | Product group-specific delegated-act fields; steel adds CO2 intensity, scrap content, production method |
-| mattress, tyre | v1.0.0 – v1.1.0 each | Product group-specific delegated-act fields |
-| unsold-goods | v2.0.0 | Art. 25 destruction ban compliance |
-
-The current version per group is the one the catalog serves
-(`product-groups/*.json`, `currentSchemaVersion`) — read it there rather than
-from this table, which is hand-maintained and has been behind before.
-
-Twelve product groups. `unsold-goods` starts at v2.0.0: its v1 shape was
-replaced outright when the disclosure was rebuilt to Impl. Reg. (EU) 2026/2
-Annex I, so there is no v1 left to compare against.
-
-The `VersionedSchemaRegistry` embeds schemas at compile time and supports runtime hot-reload for new versions. Read-time **upcast lenses** (`schemas::lens`) transform an old record's product group data to a newer schema version on read, so signed passports stay byte-identical yet remain consumable as delegated acts evolve the schema (upcast only).
-
-### GS1 & Industry 4.0 Interoperability
-
-- **Digital Link** — Full AI 01/21/10 parsing and building. No GS1 URI Syntax revision is claimed, deliberately: see the note in the Regulatory Coverage table
-- **Link-type Negotiation** — Content negotiation returning JSON, JSON-LD, HTML, or AAS representations
-- **AAS Submodel Mapping** — Passport-to-AAS shells and submodels for Industry 4.0 data spaces, carrying `urn:odal-node:*` semantics rather than a standards body's
-
-### Wasm Product group Plugins
-
-Compliance logic ships as sandboxed Wasm modules (`wasm32-wasip1`). Eleven product group
-plugins live under `plugins/` — battery (the reference implementation), textile,
-electronics, steel, aluminium, construction, detergent, furniture, mattress, toy, and tyre.
-Highlights:
-
-| Plugin | Product groups | Key Rule |
-|---|---|---|
-| `product-group-battery.wasm` | battery | Battery Regulation 2023/1542 (reference implementation) |
-| `product-group-textile.wasm` | textile, unsoldGoods | ESPR Art. 25 destruction ban (July 19, 2026) |
-| `product-group-steel.wasm` | steel | CBAM CO2e/tonne thresholds |
-
-Plugin ABI supports capability negotiation and semantic versioning with compatibility checking.
-
-**Writing a plugin's `validate_input`.** `dpp-plugin-sdk`'s `Validator` is a
-fluent collector that reports *every* failure rather than stopping at the first.
-For the product identifier, use `require_product_identifier` — it picks which
-field to check from the declared scheme, so a scheme 2 or 3 record is not asked
-for a GTIN it cannot have:
+Replace `src/main.rs` with:
 
 ```rust
-Validator::new(input)
-    .require_product_identifier("productIdentifier")
-    .require_str("batteryChemistry")
-    .require_positive("nominalVoltageV")
-    .finish()
+use dpp_crypto::{jws::signer, keystore::KeyStore};
+use dpp_domain::schemas::VersionedSchemaRegistry;
+use serde_json::json;
+
+fn main() -> anyhow::Result<()> {
+    // 1. Validate product data against the embedded, versioned JSON Schema.
+    let schemas = VersionedSchemaRegistry::new();
+    let (version, _) = schemas.latest("textile").expect("textile schema is embedded");
+
+    let data = json!({
+        "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
+        "fibreComposition": [{ "fibre": "organic cotton", "pct": 100.0 }],
+        "countryOfOrigin": "PT",
+        "careInstructions": "Machine wash 30°C",
+        "chemicalComplianceStandard": "OEKO-TEX Standard 100"
+    });
+
+    if let Err(e) = schemas.validate("textile", version, &data) {
+        for err in &e.errors {
+            println!("invalid at '{}': {}", err.field, err.message);
+        }
+        anyhow::bail!("validation failed");
+    }
+    println!("valid against textile schema v{version}");
+
+    // 2. Sign it as a compact JWS with an Ed25519 key from an encrypted keystore.
+    let store = KeyStore::open(std::env::temp_dir().join("hello-keys.json"), "change-me")?;
+    if store.public_key("issuer").is_none() {
+        store.generate_key("issuer")?;
+    }
+    let kid = store.public_key("issuer").expect("generated above").thumbprint_uri()?;
+    let jws = signer::sign(&store, "issuer", &data, &kid)?;
+
+    // 3. Verify the signature.
+    println!("signature verifies: {}", signer::verify(&store, "issuer", &jws)?);
+    Ok(())
+}
 ```
 
-🚨 **`require_gtin` is not the field-level equivalent.** It reads a flat
-top-level `gtin` key, which product group data no longer carries — the GTIN now
-lives *inside* `productIdentifier`, and only under scheme 1. A plugin still
-asking for the bare field reports *"gtin is required"* against a record that
-identifies itself perfectly well. `require_gtin` remains correct for a genuinely
-bare GS1 field, and is what `require_product_identifier` uses internally for the
-scheme 1 branch.
+```bash
+cargo run
+```
 
-An unrecognised scheme is **refused rather than skipped**: a scheme string nobody
-has mapped is exactly where an invented identifier otherwise passes unexamined.
+```text
+valid against textile schema v1.4.0
+signature verifies: true
+```
 
----
+The first build compiles the dependency tree, which takes about a minute. Remove
+`"countryOfOrigin"` from the data and the run stops with
+`invalid at '': "countryOfOrigin" is a required property`.
 
-## Port Traits
+More runnable examples, one per crate:
 
-The port traits define the core/platform boundary. Any downstream project implements these against its own infrastructure:
+```bash
+git clone https://github.com/odal-node/dpp-core && cd dpp-core
+cargo run -p dpp-domain --example create_passport          # build and validate a textile passport
+cargo run -p dpp-crypto --example sign_and_verify          # keystore, Ed25519 key, JWS
+cargo run -p dpp-vc --example credential_and_transfer      # issue a credential, transfer responsibility
+cargo run -p dpp-digital-link --example parse_and_negotiate # parse a GS1 Digital Link, pick a link type
+cargo run -p dpp-aas --example passport_to_aas             # map a passport to an AAS shell
+cargo run -p dpp-rules --example regulatory_rules          # cross-field regulatory rules
+cargo run -p dpp-calc --example calculate_metrics          # CO2e and repairability calculators
+cargo run -p dpp-registry --example registry_identifiers   # EU registry identifiers
+```
 
-| Trait | Kind | Purpose |
+## Crates
+
+| Crate | What it does |
+|---|---|
+| [`dpp-domain`](crates/dpp-domain) | Passport data model, port traits, the instrument catalog (which act applies to which product group, from when), per-field disclosure policy, and the versioned JSON Schemas |
+| [`dpp-crypto`](crates/dpp-crypto) | Ed25519 keys, compact JWS, JCS canonicalisation, JAdES baseline construction, SD-JWT selective disclosure, and an AES-256-GCM keystore with Argon2id key derivation |
+| [`dpp-vc`](crates/dpp-vc) | W3C Verifiable Credentials, `did:web` documents, Bitstring Status List revocation, SD-JWT VC, and the JSON-LD context |
+| [`dpp-digital-link`](crates/dpp-digital-link) | GS1 Digital Link parsing and building, and link-type negotiation |
+| [`dpp-aas`](crates/dpp-aas) | Asset Administration Shell projection of a passport: shells and per-product-group submodels |
+| [`dpp-rules`](crates/dpp-rules) | Cross-field regulatory rules, `no_std` with no dependencies, shared by `dpp-domain` and the Wasm plugins |
+| [`dpp-calc`](crates/dpp-calc) | CO2e and repairability calculators following EU methodologies, as pure functions; licensed factor data is injected, never bundled |
+| [`dpp-registry`](crates/dpp-registry) | EU DPP registry request and response types, and the identifier mapping |
+| [`dpp-plugin-traits`](crates/dpp-plugin-traits) | Host and guest contract for Wasm product group plugins |
+| [`dpp-plugin-sdk`](crates/dpp-plugin-sdk) | Guest-side SDK: the `export_plugin!` macro and a field `Validator` |
+| [`dpp-vocab`](crates/dpp-vocab) | Register of external vocabularies: who publishes a term, under which licence, and what was verified |
+| `dpp-tests` | Cross-crate integration tests and structural checks (not published) |
+
+[`plugins/`](plugins) holds eleven product group plugins, built separately for
+`wasm32-wasip1`. `dpp-domain`, `dpp-registry`, `dpp-digital-link` and `dpp-aas` also
+build for `wasm32-unknown-unknown`.
+
+## How it fits together
+
+The library does no I/O. Anything that stores a passport, signs with a remote key,
+seals, or talks to the EU registry is a **port trait** that the application
+implements.
+
+```mermaid
+flowchart TB
+    app["Your application<br/>(HTTP service, CLI, batch job)"]
+    subgraph core["dpp-core"]
+        domain["dpp-domain<br/>model, schemas, catalog, ports"]
+        rules["dpp-rules"]
+        crypto["dpp-crypto"]
+        vc["dpp-vc"]
+        dl["dpp-digital-link"]
+        aas["dpp-aas"]
+        reg["dpp-registry"]
+    end
+    plugins["product group plugins<br/>(wasm32-wasip1)"]
+    app --> domain & vc & dl & aas & reg
+    app -. "implements ports" .-> domain
+    domain --> rules
+    plugins --> rules
+    vc --> crypto & domain
+    dl & aas & reg --> domain
+```
+
+| Port trait | Kind | Implement it to |
 |---|---|---|
-| `PassportRepository` | async | CRUD for DPP records |
-| `ComplianceRegistry` + `ComplianceStrategy` | sync | Product group-specific compliance dispatch |
+| `PassportRepository` | async | Store and load passports |
+| `ComplianceRegistry` + `ComplianceStrategy` | sync | Dispatch product-group-specific compliance checks |
 | `IdentityPort` | async | Sign and verify passport JWS |
-| `PluginHost` | sync | Wasm plugin dispatch |
-| `BackupCopyPort` | async | The ESPR Art. 10(4) third-party back-up copy |
-| `ArchivedVersionPort` | async | The EN 18221 clause 4.2 archive of a passport's historical versions |
-| `PersonalDataPort` | async | Erasable records of personal data held outside a passport |
-| `RegistrySyncPort` | async | EU Central Registry registration and status sync |
-| `SealPort` | async | eIDAS qualified electronic seal (ESPR Art. 13 / eIDAS 910/2014) |
+| `PluginHost` | sync | Run Wasm product group plugins |
+| `BackupCopyPort` | async | Hold the independent back-up copy required by ESPR Art. 10(4) |
+| `ArchivedVersionPort` | async | Keep a passport's historical versions (EN 18221 clause 4.2) |
+| `PersonalDataPort` | async | Keep erasable personal data outside the signed passport |
+| `RegistrySyncPort` | async | Register passports with the EU registry and track their status |
+| `SealPort` | async | Apply an eIDAS qualified electronic seal |
 
----
+The crate ships defaults and test doubles: `PassthroughRegistry`,
+`LocalIdentityService` in `dpp-vc`, the in-memory implementations behind the
+`test-utils` feature, and stub implementations of the backup, registry and seal
+ports (`GhostBackup`, `GhostRegistrySync`, `GhostSeal`). A stub reports itself as
+one, so an application can refuse to run on it in production.
 
-## Quick Start
+## What the library models
+
+**Product groups as data.** Each product group (battery, textile, electronics, steel,
+aluminium, construction, detergent, furniture, mattress, toy, tyre, and the
+unsold-goods disclosure) is an embedded manifest in
+[`crates/dpp-domain/product-groups/`](crates/dpp-domain/product-groups) with
+versioned schemas under [`crates/dpp-domain/schemas/`](crates/dpp-domain/schemas).
+The manifest's `currentSchemaVersion` is the source of truth for the current
+version. Old passports stay readable: read-time lenses upcast older product data to
+newer schema versions without touching the signed bytes.
+
+**Applicable law as a set.** `InstrumentCatalog` records, per act and product group,
+whether a passport is required and from when. Several acts can apply to one product
+group at once (ESPR Art. 5(7) sets no precedence), so a determination is always made
+under a named act.
+
+**Per-field disclosure.** Battery Regulation Art. 77(2) assigns Annex XIII data to
+three audiences, and the assignment is not a ranking: conformity test reports go to
+authorities only, and individual-battery use data goes to legitimate-interest holders
+only. `Audience::may_see(Disclosure)` encodes the table. Other product groups use the
+same vocabulary through their manifest's `disclosure` map.
+
+| Audience | Battery Annex XIII | Sees |
+|---|---|---|
+| Public | point 1 | Battery-model information. No credential. |
+| Legitimate interest | points 2 and 4 | Composition, dismantling, safety, and individual-battery data (state of health, use history). Needs a Verifiable Credential proving the interest. |
+| Authority | points 2 and 3 | Point 2 data and conformity test reports, but not point 4 individual data. |
+
+**Product identifiers under EN 18219 clause 5.** `ProductIdentifier` covers the
+three schemes the standard offers as alternatives: a GS1 GTIN, an Identification
+Link (EN IEC 61406 URL), and a DID. Schemes 2 and 3 need no GS1 membership.
+Deserialisation goes through the constructors, so an invalid identifier cannot be
+read back. A data carrier is not an identifier: `dpp-registry` maps a
+`ProductIdentifier` to the registry's form and refuses an unmapped scheme instead
+of deriving one from a carrier URL.
+
+**Transfer of responsibility.** `TransferChain` is an append-only state machine of
+handovers between economic operators. The outgoing operator signs the handover; the
+hosting node records an attestation that the incoming operator accepted it. That
+attestation is not the incoming operator's signature. The authoritative record of
+who holds the obligations is the EU registry (Implementing Regulation (EU)
+2026/1778, Art. 6a).
+
+**Wasm plugins.** Product-group compliance checks can ship as sandboxed Wasm modules.
+The ABI negotiates capabilities and a supported schema-version range;
+`product-group-battery` is the reference implementation. See
+[`plugins/README.md`](plugins/README.md) and
+[`crates/dpp-plugin-sdk`](crates/dpp-plugin-sdk).
+
+## Develop
 
 ```bash
-git clone https://github.com/odal-node/dpp-core.git
-cd dpp-core
-
-cargo build --workspace          # zero infrastructure needed
-cargo nextest run --workspace    # full unit + integration suite
-just check                       # fmt + clippy + test + doctests + plugins + doc + lockfiles + audit
+cargo build --workspace          # needs no database, no services, no environment variables
+cargo nextest run --workspace    # unit and integration tests
+just check                       # the CI gate: fmt, clippy, tests, doctests, plugins, docs, lockfiles, audit
 ```
 
-No Docker, no database, no env vars.
-
-### Runnable Examples
-
-```bash
-cargo run -p dpp-domain --example create_passport                # Create & validate a textile DPP
-cargo run -p dpp-crypto --example sign_and_verify                # Keystore, Ed25519 key, JWS sign
-cargo run -p dpp-vc --example credential_and_transfer            # Issue a VC, transfer responsibility
-cargo run -p dpp-digital-link --example parse_and_negotiate      # Parse GS1 links, negotiate a link type
-cargo run -p dpp-aas --example passport_to_aas                   # Map a passport to an AAS shell
-```
-
----
-
+`just check` compiles in parallel and can exhaust memory on a 16 GB machine; set
+`CARGO_BUILD_JOBS=3` if it does. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup,
+conventions and the pull request flow.
 
 ## Documentation
 
-**Start with the guided index: [docs/README.md](docs/README.md)** — grouped by question, with a three-document reading path for newcomers.
+- **API reference:** [docs.rs](https://docs.rs/dpp-domain), one page per crate.
+- **Guided index:** [docs/README.md](docs/README.md), grouped by question.
+- **Architecture:** [OVERVIEW.md](docs/architecture/OVERVIEW.md),
+  [DATA-MODEL.md](docs/architecture/DATA-MODEL.md),
+  [IDENTITY.md](docs/architecture/IDENTITY.md),
+  [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md).
+- **Regulation:** [COMPLIANCE.md](docs/regulatory/COMPLIANCE.md) maps code to law,
+  article by article; [CONFORMITY.md](docs/regulatory/CONFORMITY.md) is the
+  alignment statement for assessment bodies.
+- **Standards:** [STANDARDS.md](docs/architecture/STANDARDS.md) records each IETF,
+  W3C, GS1, IDTA and ETSI specification the code uses, at which revision. A test
+  fails when code cites an IETF document the register does not list.
 
-| Document | Description |
+## Regulatory scope
+
+| Act | What the library implements |
 |---|---|
-| [BLUEPRINT.md](docs/project/BLUEPRINT.md) | Project vision, guiding principles, non-goals |
-| [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) | Core library architecture and module design |
-| [DATA-MODEL.md](docs/architecture/DATA-MODEL.md) | DPP canonical schema (ESPR / Battery Regulation aligned) |
-| [IDENTITY.md](docs/architecture/IDENTITY.md) | `did:web` and Verifiable Credential deep dive |
-| [PLUGIN-HOST.md](docs/architecture/PLUGIN-HOST.md) | Wasm plugin sandbox design and ABI contract |
-| [DESIGN-PATTERNS.md](docs/architecture/DESIGN-PATTERNS.md) | Hexagonal architecture, open-core boundary patterns |
-| [CONFORMITY.md](docs/regulatory/CONFORMITY.md) | Regulatory alignment statement for assessment bodies |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor guide: setup, conventions, PR workflow |
-| [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
-| [GOVERNANCE.md](GOVERNANCE.md) | Decision-making structure and maintainer authority |
-| [CHANGELOG.md](CHANGELOG.md) | Release history, one entry per version |
+| ESPR, Regulation (EU) 2024/1781 | Passport data model (Arts. 9 to 13, Annex III), per-actor access rights, the unsold-goods disclosure (Arts. 24 and 25) |
+| Battery Regulation, Regulation (EU) 2023/1542 | Battery passport content (Annex XIII), per-category mandatory fields, the Art. 77(2) access assignment |
+| Detergents, toys, construction products, phones and tablets | Product group manifests and schemas, each bound to its act in the instrument catalog |
+| Delegated acts not yet adopted (textiles, steel and others) | Provisional schemas, marked as such, that follow the act as it is adopted |
+| Other acts (end-of-life vehicles, packaging, critical raw materials) | Recorded in the instrument catalog; no product group is bound to them yet |
 
+Passport start dates are in the instrument catalog, not in this README, so they are
+never copied out of date.
 
-## License
+**Harmonised standards.** Commission Implementing Decision (EU) 2026/1736 cites six
+DPP system standards (EN 18216, 18219, 18220, 18221, 18222 and 18223). The code
+follows parts of them, but **no conformance is claimed**: the ESPR Art. 41(2)
+presumption requires a clause-by-clause assessment, and none has been published.
 
-[Apache License 2.0](LICENSE)
+## Licence
+
+[Apache License 2.0](LICENSE).
 
 ## Security
 
-Do **not** open public issues for security vulnerabilities. Report privately to **security@odal-node.io** — see [SECURITY.md](SECURITY.md) for full disclosure policy.
-
----
-
-*Built by [Odal Node](https://odal-node.io)*
+Report vulnerabilities privately to **security@odal-node.io**, never in a public
+issue. See [SECURITY.md](SECURITY.md).

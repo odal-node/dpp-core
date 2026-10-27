@@ -1,30 +1,35 @@
-# Odal Node Product group Plugins
+# Product group plugins
 
-Wasm product group plugins implementing the EU ESPR compliance logic per **product group**.
+Wasm plugins that implement product-group-specific compliance logic for EU Digital
+Product Passports. There is one plugin per **product group**, and all eleven are built
+with `dpp-plugin-sdk`. `product-group-battery` is the reference implementation.
 
-## Product group vs. product category
+## Product group and product category
 
-A **product group** is the EU delegated-act bucket the host dispatches on (`battery`, `textile`, `steel`, …) — it selects both the schema version and the plugin. A **product category** (e.g. `ev`/`portable` for batteries, `smartphone` for electronics) is *product group data* a plugin may branch on internally; it is **never** a dispatch key. One product group → one plugin → many product categories. See `docs/architecture/DATA-MODEL.md` §3.4.
+A **product group** is the EU delegated-act bucket a host dispatches on (`battery`,
+`textile`, `steel` and so on). It selects both the schema version and the plugin. A
+**product category** (`ev` or `portable` for batteries, `smartphone` for electronics) is
+data inside the product group that a plugin may branch on; it is **never** a dispatch
+key. One product group, one plugin, many product categories. See
+`docs/architecture/DATA-MODEL.md` §3.4.
 
-## Building
+## Build
 
 ```bash
-# Requires the wasm32-wasip1 target:
 rustup target add wasm32-wasip1
-
-# Build one plugin:
-cd plugins/product-group-battery && cargo build --target wasm32-wasip1 --release
-# Output: target/wasm32-wasip1/release/product_group_battery.wasm
-
-# Or build all at once from the repo root:
 just build-plugins
 ```
 
-Copy the `.wasm` into the node's `PLUGINS_DIR` (default: `./plugins/`). The product group key is the filename stem stripped of the `product group-` prefix.
+The plugins share one workspace (`plugins/Cargo.toml`), separate from the library
+workspace because they compile to `wasm32-wasip1`. Cargo writes the artifacts to
+`plugins/target/wasm32-wasip1/release/product_group_<name>.wasm`. How a host locates and
+loads them is up to the host; check its documentation for the file name it expects.
 
-## Writing a plugin (SDK)
+## Write a plugin
 
-Plugins implement the `DppProductGroupPlugin` trait from `dpp-plugin-traits` and call `export_plugin!` once. The `dpp-plugin-sdk` macro generates the entire Wasm ABI — authors never hand-roll `alloc`/`dealloc` or output structs.
+A plugin implements `DppProductGroupPlugin` from `dpp-plugin-traits` and calls
+`export_plugin!` once. The macro generates the whole Wasm ABI, so you never write
+`alloc`, `dealloc` or output structs by hand.
 
 ```rust
 use dpp_plugin_sdk::{export_plugin, traits::*};
@@ -39,20 +44,25 @@ impl DppProductGroupPlugin for MyPlugin {
     fn validate_input(&self, input: &PluginInput) -> Result<(), PluginError> { /* field checks */ }
     fn calculate_metrics(&self, input: &PluginInput) -> Result<PluginResult, PluginError> { /* metrics */ }
     fn generate_passport(&self, input: PluginInput) -> Result<Value, PluginError> { /* normalise */ }
-    // meta()/capabilities() default to PluginIdentity + schema_version_range() above —
-    // override only if this plugin needs non-default values.
+    // meta()/capabilities() default to PluginIdentity + schema_version_range() above.
+    // Override them only if this plugin needs other values.
 }
 
 export_plugin!(MyPlugin);
 ```
 
-`Cargo.toml`:
+**Inside this repository:** add `plugins/product-group-<name>/`, copy
+`product-group-battery/Cargo.toml` (it inherits version, edition, licence and
+dependencies from the plugin workspace), and add the directory to `members` in
+`plugins/Cargo.toml`. If the product group is new, add its manifest and its first schema
+under `crates/dpp-domain/` as described in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+**In your own repository:** create a `cdylib` crate and depend on `dpp-plugin-sdk` and
+`serde_json` from crates.io:
 
 ```toml
-[workspace]            # detach from the dpp-core workspace
-
 [package]
-name = "product group-myname"
+name = "product-group-myname"
 version = "0.1.0"
 edition = "2024"
 
@@ -60,26 +70,30 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-dpp-plugin-sdk = { path = "../../crates/dpp-plugin-sdk" }
+dpp-plugin-sdk = "0.22"
 serde_json     = "1"
 ```
 
-Add the JSON schema at `crates/dpp-domain/schemas/{product-group}/v1.0.0.json` — the `VersionedSchemaRegistry` embeds it at compile time. **`product-group-battery` is the reference implementation.**
+Plugins must stay free of I/O and async runtimes: no `tokio`, `reqwest`, `sqlx` or
+similar anywhere in the dependency tree, including for tests.
 
 ## Generated ABI
 
 | Symbol | Signature | Returns (JSON) |
 |--------|-----------|----------------|
 | `alloc` | `(len: u32) -> u32` | pointer to `len` bytes |
-| `dealloc` | `(ptr: u32, len: u32)` | — |
+| `dealloc` | `(ptr: u32, len: u32)` | nothing |
 | `metadata` | `() -> u64` | `PluginMeta` |
-| `describe` | `() -> u64` | `PluginCapabilities` (host runs `check_compatibility` before dispatch) |
-| `validate` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": null }` / `{ "error": … }`) |
+| `describe` | `() -> u64` | `PluginCapabilities` (the host runs `check_compatibility` before dispatch) |
+| `validate` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": null }` or `{ "error": … }`) |
 | `calculate_metrics` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": PluginResult }`) |
 | `generate_passport` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": payload }`) |
 
-Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input/output is UTF-8 JSON over linear memory.
+Each `-> u64` packs the output as `(out_ptr << 32) | out_len`. Input and output are UTF-8
+JSON in linear memory.
 
-## SDK status
+## Plugins in this directory
 
-All eleven plugins run on the SDK: each depends on `dpp-plugin-sdk`, implements `DppProductGroupPlugin`, and calls `export_plugin!` once — `product-group-battery`, `textile`, `steel`, `electronics`, `construction`, `tyre`, `toy`, `aluminium`, `furniture`, `mattress`, and `detergent`. None hand-roll the legacy 3-symbol ABI. `product-group-battery` is the reference implementation.
+`product-group-aluminium`, `-battery`, `-construction`, `-detergent`, `-electronics`,
+`-furniture`, `-mattress`, `-steel`, `-textile`, `-toy` and `-tyre`. Every one uses the
+SDK; none uses the older hand-written ABI.

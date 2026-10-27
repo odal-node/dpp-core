@@ -1,32 +1,32 @@
 # dpp-core fuzz targets
 
-libFuzzer targets for the pure byte-level parsers. Requires **nightly + Linux**
-(libFuzzer is not available on the Windows dev box), so these run in the nightly
-CI job — not in the stable `just check` gate.
+libFuzzer targets for the byte-level parsers. They need **nightly Rust on Linux**
+(libFuzzer does not support Windows), so they run in the nightly CI job rather than in
+`just check`.
 
 ## Targets
 
 | Target | Fuzzes |
 |---|---|
-| `digital_link_parse` | `DigitalLink::parse` — GS1 Digital Link URI bytes |
+| `digital_link_parse` | `DigitalLink::parse` on GS1 Digital Link URI bytes |
 
 ## Run locally (Linux)
 
-```sh
+```bash
 cargo install cargo-fuzz
-cargo +nightly fuzz run digital_link_parse            # runs until a crash or Ctrl-C
-cargo +nightly fuzz run digital_link_parse -- -max_total_time=60   # 60s smoke
+cargo +nightly fuzz run digital_link_parse                          # until a crash or Ctrl-C
+cargo +nightly fuzz run digital_link_parse -- -max_total_time=60   # 60-second smoke run
 ```
 
-## Corpus & regressions
+## Corpus and regressions
 
 Seed the corpus from known-good vectors:
 
-```sh
+```bash
 mkdir -p corpus/digital_link_parse
 printf 'https://id.odal-node.io/01/09506000134352/21/ABC123' > corpus/digital_link_parse/seed1
 ```
 
-When a crash is found, cargo-fuzz writes a reproducer to `artifacts/`. Minimize it
-(`cargo +nightly fuzz cmin`, `tmin`) and commit the input as a named regression
-**unit test** in the crate it broke — the corpus feeds the ordinary test suite.
+When cargo-fuzz finds a crash, it writes a reproducer to `artifacts/`. Minimise it
+(`cargo +nightly fuzz cmin`, `tmin`) and commit the input as a named regression **unit
+test** in the crate it broke, so the ordinary test suite keeps checking it.

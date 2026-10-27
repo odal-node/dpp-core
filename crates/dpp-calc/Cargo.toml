@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-calc"
-description = "EU-methodology compliance calculators (CO2e, repairability) for Odal Node — pure, stateless"
+description = "EU-methodology compliance calculators (recycled content, repairability, CO2e) for Odal Node: pure and stateless"
 keywords    = ["dpp", "co2e", "pef", "repairability", "espr"]
 categories  = ["science", "mathematics"]
 version.workspace     = true

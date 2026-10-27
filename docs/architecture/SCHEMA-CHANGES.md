@@ -1,13 +1,13 @@
 # Schema changes
 
-**Generated — do not edit.** Regenerate with `just schema-changes`;
+**Generated: do not edit.** Regenerate with `just schema-changes`;
 `cargo test -p dpp-tests --test schema_changes` fails if this file has
 drifted from the schemas under `crates/dpp-domain/schemas/`.
 
 One section per product group, one table per version bump: what each
 version changed relative to the one before it.
 
-`additive` means the bump only adds properties — no removal, no type
+`additive` means the bump only adds properties: no removal, no type
 change, no altered constraint, no newly required property. It is a
 statement about *shape* and not a compatibility verdict; whether stored
 documents still read is answered by the frozen fixtures in
@@ -20,8 +20,8 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfOrigin` | added | — | `string` |
-| `countryOfProduction` | removed | `string` | — |
+| `countryOfOrigin` | added | absent | `string` |
+| `countryOfProduction` | removed | `string` | absent |
 
 **Newly required:** `countryOfOrigin`
 
@@ -31,8 +31,8 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -45,50 +45,50 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `anodeMaterial` | added | — | `array\|null` |
-| `batteryType` | added | — | `string\|null` |
-| `batteryWeightKg` | added | — | `number\|null` |
-| `carbonFootprintClass` | added | — | `string\|null` |
-| `cathodeMaterial` | added | — | `array\|null` |
-| `criticalRawMaterials` | added | — | `array\|null` |
-| `disassemblyInstructionsUrl` | added | — | `string\|null` |
-| `dueDiligenceUrl` | added | — | `string\|null` |
-| `electrolyteMaterial` | added | — | `array\|null` |
-| `internalResistanceMohm` | added | — | `number\|null` |
-| `operatingTempMaxC` | added | — | `number\|null` |
-| `operatingTempMinC` | added | — | `number\|null` |
-| `ratedEnergyWh` | added | — | `number\|null` |
-| `recycledContentLeadPct` | added | — | `number\|null` |
-| `roundTripEfficiencyPct` | added | — | `number\|null` |
-| `sohMethodology` | added | — | `string\|null` |
+| `anodeMaterial` | added | absent | `array\|null` |
+| `batteryType` | added | absent | `string\|null` |
+| `batteryWeightKg` | added | absent | `number\|null` |
+| `carbonFootprintClass` | added | absent | `string\|null` |
+| `cathodeMaterial` | added | absent | `array\|null` |
+| `criticalRawMaterials` | added | absent | `array\|null` |
+| `disassemblyInstructionsUrl` | added | absent | `string\|null` |
+| `dueDiligenceUrl` | added | absent | `string\|null` |
+| `electrolyteMaterial` | added | absent | `array\|null` |
+| `internalResistanceMohm` | added | absent | `number\|null` |
+| `operatingTempMaxC` | added | absent | `number\|null` |
+| `operatingTempMinC` | added | absent | `number\|null` |
+| `ratedEnergyWh` | added | absent | `number\|null` |
+| `recycledContentLeadPct` | added | absent | `number\|null` |
+| `roundTripEfficiencyPct` | added | absent | `number\|null` |
+| `sohMethodology` | added | absent | `string\|null` |
 
 ### v2.0.0 → v2.1.0
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `carbonFootprintClass` | constraint changed | `enum=["A","B","C","D","E",null]` | — |
-| `carbonFootprintClass` | constraint changed | — | `maxLength=8` |
-| `carbonFootprintClassRulesetId` | added | — | `string\|null` |
-| `carbonFootprintClassRulesetVersion` | added | — | `string\|null` |
-| `placedOnMarketDate` | added | — | `string\|null` |
+| `carbonFootprintClass` | constraint changed | `enum=["A","B","C","D","E",null]` | absent |
+| `carbonFootprintClass` | constraint changed | absent | `maxLength=8` |
+| `carbonFootprintClassRulesetId` | added | absent | `string\|null` |
+| `carbonFootprintClassRulesetVersion` | added | absent | `string\|null` |
+| `placedOnMarketDate` | added | absent | `string\|null` |
 
 ### v2.1.0 → v2.2.0 · additive
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `stateOfHealth` | added | — | — |
+| `stateOfHealth` | added | absent | absent |
 
 ### v2.2.0 → v2.3.0 · additive
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `recycledContentReportingYear` | added | — | `integer\|null` |
+| `recycledContentReportingYear` | added | absent | `integer\|null` |
 
 ### v2.3.0 → v2.4.0 · additive
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `expectedLifetime` | added | — | `object\|null` |
+| `expectedLifetime` | added | absent | `object\|null` |
 
 ### v2.4.0 → v2.5.0
 
@@ -103,43 +103,43 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `batteryModelId` | added | — | `string\|null` |
-| `batteryPassportNumber` | added | — | `string\|null` |
-| `batteryStatus` | added | — | `string\|null` |
-| `capacityThresholdForExhaustionPct` | added | — | `number\|null` |
-| `commercialWarrantyPeriodMonths` | added | — | `integer\|null` |
-| `componentPartNumbers` | added | — | `array\|null` |
-| `cycleLifeTestCRate` | added | — | `number\|null` |
-| `dynamicPerformance` | added | — | `object\|null` |
-| `euDeclarationOfConformity` | added | — | `string\|null` |
+| `batteryModelId` | added | absent | `string\|null` |
+| `batteryPassportNumber` | added | absent | `string\|null` |
+| `batteryStatus` | added | absent | `string\|null` |
+| `capacityThresholdForExhaustionPct` | added | absent | `number\|null` |
+| `commercialWarrantyPeriodMonths` | added | absent | `integer\|null` |
+| `componentPartNumbers` | added | absent | `array\|null` |
+| `cycleLifeTestCRate` | added | absent | `number\|null` |
+| `dynamicPerformance` | added | absent | `object\|null` |
+| `euDeclarationOfConformity` | added | absent | `string\|null` |
 | `expectedLifetimeCycles` | type changed | `integer` | `integer\|null` |
-| `expectedLifetimeReferenceTest` | added | — | `string\|null` |
-| `hazardSymbol` | added | — | `string\|null` |
-| `hazardousSubstances` | added | — | `array\|null` |
-| `initialRoundTripEfficiencyPct` | added | — | `number\|null` |
-| `internalCellResistanceMohm` | added | — | `number\|null` |
-| `internalPackResistanceMohm` | added | — | `number\|null` |
-| `manufacturingDate` | added | — | `string\|null` |
-| `manufacturingPlace` | added | — | `string\|null` |
-| `markingInformation` | added | — | `string\|null` |
-| `maximumVoltageV` | added | — | `number\|null` |
-| `minimalVoltageV` | added | — | `number\|null` |
-| `notInUseTemperatureRange` | added | — | `object\|null` |
-| `notInUseTemperatureReferenceTest` | added | — | `string\|null` |
-| `originalPowerCapabilityW` | added | — | `number\|null` |
-| `powerLimitMaxW` | added | — | `number\|null` |
-| `powerLimitMinW` | added | — | `number\|null` |
-| `powerTemperatureRange` | added | — | `object\|null` |
-| `renewableContentPct` | added | — | `number\|null` |
-| `roundTripEfficiencyAtHalfCycleLifePct` | added | — | `number\|null` |
-| `roundTripEfficiencyPct` | constraint changed | `maximum=100` | — |
-| `safetyMeasures` | added | — | `string\|null` |
-| `sparePartsContacts` | added | — | `string\|null` |
-| `testReportResults` | added | — | `string\|null` |
-| `usableExtinguishingAgent` | added | — | `string\|null` |
-| `usageHistory` | added | — | `object\|null` |
-| `voltageTemperatureRange` | added | — | `object\|null` |
-| `wasteBatteryInformation` | added | — | `string\|null` |
+| `expectedLifetimeReferenceTest` | added | absent | `string\|null` |
+| `hazardSymbol` | added | absent | `string\|null` |
+| `hazardousSubstances` | added | absent | `array\|null` |
+| `initialRoundTripEfficiencyPct` | added | absent | `number\|null` |
+| `internalCellResistanceMohm` | added | absent | `number\|null` |
+| `internalPackResistanceMohm` | added | absent | `number\|null` |
+| `manufacturingDate` | added | absent | `string\|null` |
+| `manufacturingPlace` | added | absent | `string\|null` |
+| `markingInformation` | added | absent | `string\|null` |
+| `maximumVoltageV` | added | absent | `number\|null` |
+| `minimalVoltageV` | added | absent | `number\|null` |
+| `notInUseTemperatureRange` | added | absent | `object\|null` |
+| `notInUseTemperatureReferenceTest` | added | absent | `string\|null` |
+| `originalPowerCapabilityW` | added | absent | `number\|null` |
+| `powerLimitMaxW` | added | absent | `number\|null` |
+| `powerLimitMinW` | added | absent | `number\|null` |
+| `powerTemperatureRange` | added | absent | `object\|null` |
+| `renewableContentPct` | added | absent | `number\|null` |
+| `roundTripEfficiencyAtHalfCycleLifePct` | added | absent | `number\|null` |
+| `roundTripEfficiencyPct` | constraint changed | `maximum=100` | absent |
+| `safetyMeasures` | added | absent | `string\|null` |
+| `sparePartsContacts` | added | absent | `string\|null` |
+| `testReportResults` | added | absent | `string\|null` |
+| `usableExtinguishingAgent` | added | absent | `string\|null` |
+| `usageHistory` | added | absent | `object\|null` |
+| `voltageTemperatureRange` | added | absent | `object\|null` |
+| `wasteBatteryInformation` | added | absent | `string\|null` |
 
 **No longer required:** `expectedLifetimeCycles`
 
@@ -147,8 +147,8 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -167,7 +167,7 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `dueDiligenceOperatorScope` | added | — | `string\|null` |
+| `dueDiligenceOperatorScope` | added | absent | `string\|null` |
 
 ## construction
 
@@ -176,8 +176,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfManufacture` | removed | `string` | — |
-| `countryOfOrigin` | added | — | `string` |
+| `countryOfManufacture` | removed | `string` | absent |
+| `countryOfOrigin` | added | absent | `string` |
 
 **Newly required:** `countryOfOrigin`
 
@@ -187,8 +187,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -201,8 +201,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfManufacture` | removed | `string` | — |
-| `countryOfOrigin` | added | — | `string` |
+| `countryOfManufacture` | removed | `string` | absent |
+| `countryOfOrigin` | added | absent | `string` |
 
 **Newly required:** `countryOfOrigin`
 
@@ -212,8 +212,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -227,10 +227,10 @@ No property or requirement changed.
 | Property | Change | Before | After |
 |---|---|---|---|
 | `repairabilityScore` | type changed | `number\|null` | `object\|null` |
-| `repairabilityScore` | constraint changed | `maximum=10` | — |
-| `repairabilityScore` | constraint changed | `minimum=0` | — |
-| `repairabilityScore/criteria` | added | — | `array` |
-| `repairabilityScore/overall` | added | — | `number` |
+| `repairabilityScore` | constraint changed | `maximum=10` | absent |
+| `repairabilityScore` | constraint changed | `minimum=0` | absent |
+| `repairabilityScore/criteria` | added | absent | `array` |
+| `repairabilityScore/overall` | added | absent | `number` |
 
 ### v1.1.0 → v1.2.0
 
@@ -242,15 +242,15 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `indexScopeExclusion` | added | — | `string\|null` |
-| `repairabilityIndexInputs` | added | — | `object\|null` |
+| `indexScopeExclusion` | added | absent | `string\|null` |
+| `repairabilityIndexInputs` | added | absent | `object\|null` |
 
 ### v1.3.0 → v1.4.0
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -267,8 +267,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfManufacture` | removed | `string` | — |
-| `countryOfOrigin` | added | — | `string` |
+| `countryOfManufacture` | removed | `string` | absent |
+| `countryOfOrigin` | added | absent | `string` |
 
 **Newly required:** `countryOfOrigin`
 
@@ -284,8 +284,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -298,8 +298,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -312,8 +312,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfOrigin` | added | — | `string` |
-| `countryOfProduction` | removed | `string` | — |
+| `countryOfOrigin` | added | absent | `string` |
+| `countryOfProduction` | removed | `string` | absent |
 
 **Newly required:** `countryOfOrigin`
 
@@ -323,8 +323,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -337,30 +337,30 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `allergens` | added | — | `array\|null` |
-| `disassemblyInstructions` | added | — | `string\|null` |
-| `durabilityScore` | added | — | `number\|null` |
-| `endOfLifeInstructions` | added | — | `string\|null` |
-| `expectedWashCycles` | added | — | `integer\|null` |
-| `fibreComposition/[]/countryOfOrigin` | added | — | `string` |
-| `microplasticSheddingMgPerWash` | added | — | `number\|null` |
-| `pefScore` | added | — | `number\|null` |
-| `priorUseCycles` | added | — | `integer\|null` |
-| `productWeightGrams` | added | — | `number\|null` |
-| `recyclabilityClass` | added | — | `string\|null` |
-| `repairCount` | added | — | `integer\|null` |
-| `repairHistoryUrl` | added | — | `string\|null` |
-| `reuseCondition` | added | — | `string\|null` |
-| `sparePartsAvailable` | added | — | `boolean\|null` |
-| `substancesOfConcern` | added | — | `array\|null` |
-| `svhcSubstances` | added | — | `array\|null` |
+| `allergens` | added | absent | `array\|null` |
+| `disassemblyInstructions` | added | absent | `string\|null` |
+| `durabilityScore` | added | absent | `number\|null` |
+| `endOfLifeInstructions` | added | absent | `string\|null` |
+| `expectedWashCycles` | added | absent | `integer\|null` |
+| `fibreComposition/[]/countryOfOrigin` | added | absent | `string` |
+| `microplasticSheddingMgPerWash` | added | absent | `number\|null` |
+| `pefScore` | added | absent | `number\|null` |
+| `priorUseCycles` | added | absent | `integer\|null` |
+| `productWeightGrams` | added | absent | `number\|null` |
+| `recyclabilityClass` | added | absent | `string\|null` |
+| `repairCount` | added | absent | `integer\|null` |
+| `repairHistoryUrl` | added | absent | `string\|null` |
+| `reuseCondition` | added | absent | `string\|null` |
+| `sparePartsAvailable` | added | absent | `boolean\|null` |
+| `substancesOfConcern` | added | absent | `array\|null` |
+| `svhcSubstances` | added | absent | `array\|null` |
 
 ### v1.1.0 → v1.2.0
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfManufacturing` | removed | `string` | — |
-| `countryOfOrigin` | added | — | `string` |
+| `countryOfManufacturing` | removed | `string` | absent |
+| `countryOfOrigin` | added | absent | `string` |
 
 **Newly required:** `countryOfOrigin`
 
@@ -370,8 +370,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -388,8 +388,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `countryOfManufacture` | removed | `string` | — |
-| `countryOfOrigin` | added | — | `string` |
+| `countryOfManufacture` | removed | `string` | absent |
+| `countryOfOrigin` | added | absent | `string` |
 
 **Newly required:** `countryOfOrigin`
 
@@ -399,8 +399,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -413,8 +413,8 @@ No property or requirement changed.
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `gtin` | removed | `string` | — |
-| `productIdentifier` | added | — | `object` |
+| `gtin` | removed | `string` | absent |
+| `productIdentifier` | added | absent | `object` |
 
 **Newly required:** `productIdentifier`
 
@@ -422,4 +422,4 @@ No property or requirement changed.
 
 ## unsold-goods
 
-Only one version (v2.0.0) — nothing to compare against yet.
+Only one version (v2.0.0), so there is nothing to compare against yet.

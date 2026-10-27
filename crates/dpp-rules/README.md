@@ -4,24 +4,25 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-rules)](https://docs.rs/dpp-rules)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Pure `#![no_std]`, zero-dependency EU ESPR cross-field regulatory rules for the [Odal Node](https://odal-node.io) Digital Product Passport system.
+Cross-field regulatory rules for EU Digital Product Passports, as pure `#![no_std]`
+functions with no dependencies by default. Part of
+[dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
 
-These are rules that JSON Schema cannot express — "fibre percentages must sum to ~100%", "SVHC concentration > 0.1% triggers disclosure", "surfactant band must be one of the four EU-standard labels". They live here, **once**, and are consumed by both `dpp-domain` (standalone validation, no Wasm host) and the Wasm product group plugins (via `dpp-plugin-sdk::rules`). Every regulatory rule has exactly one implementation.
-
-Keeping them in a standalone `no_std`, zero-dependency crate is what makes that
-possible: `dpp-domain` and the Wasm plugins can both depend on it without either
-depending on the other.
-
----
+These are the rules JSON Schema cannot express: fibre percentages summing to about
+100%, an SVHC concentration above 0.1% triggering disclosure, a surfactant band being
+one of the four EU labels. Each rule is implemented **once** here and used by both
+`dpp-domain` (validation without a Wasm host) and the Wasm product group plugins
+(through `dpp-plugin-sdk::rules`). Because this crate is `no_std` with no dependencies,
+both can depend on it without depending on each other.
 
 ## When to use this crate
 
-- You need a cross-field regulatory check that JSON Schema cannot express — a
-  sum constraint, a conditional disclosure trigger, an enumerated band.
-- You are writing a Wasm product group plugin and need the same rule the host applies,
+- You need a cross-field regulatory check that JSON Schema cannot express: a sum
+  constraint, a conditional disclosure trigger, an enumerated band.
+- You write a Wasm product group plugin and need the same rule the host applies,
   compiled into the guest.
-- You are adding a rule and need it to exist exactly once, reachable from both
-  `dpp-domain` and the plugins.
+- You add a rule and need it to exist exactly once, reachable from `dpp-domain` and
+  from the plugins.
 
 ## Example
 
@@ -40,93 +41,74 @@ let fibres = [
 assert!(validate_fibre_composition(&fibres).is_ok());
 ```
 
----
+## `no_std` and dependencies
 
-## No-std constraint
+The default build is `#![no_std]` plus `alloc`, with no dependencies. Product group
+plugins compile to `wasm32-wasip1` and must not pull in the heavier domain crate, which
+is why these rules live in their own crate. If a rule needs `std` or an external crate,
+it belongs somewhere else. CI checks this.
 
-This crate **must remain `#![no_std]` + `alloc` with zero dependencies.** That is the whole reason C1 extracted it from `dpp-domain`: product group plugins compile to `wasm32-wasip1` and cannot pull in the heavier domain crate. If a rule needs `std` or an external crate, the rule is in the wrong place.
+The one exception is the opt-in `bundle` feature: the signed ruleset-bundle format and
+its verification. It enables `std` and brings in `serde`, `serde_json`, `serde_jcs`,
+`chrono`, `sha2`, `base64`, `hex` and `thiserror`. Plugins never enable it.
 
-The CI `cargo check` target verifies this. Do not break it.
+## Modules
 
----
+| Module | Covers |
+|---|---|
+| `common` | Country codes, dates, numeric helpers, and the single home of identifier syntax (GTIN check digits, GS1 CSET 82) |
+| `chemicals` | REACH Art. 33 SVHC concentrations, CAS numbers, Regulation (EU) 2026/405 surfactant bands. Cross-product-group, so never under one group |
+| `batteries` | Regulation (EU) 2023/1542: chemistry, degradation, recycled content, passport scope and per-category mandatory content, due-diligence scope, schedules |
+| `textiles` | Fibre composition |
+| `electronics` | Repairability-index scope |
+| `metals` | Aluminium and steel production routes and CBAM-related fields |
+| `unsold_goods` | The ESPR Art. 25 destruction ban (Annex VII) and the Art. 24 disclosure |
+| `lineage` | Checks that bind one passport to another: consistency, status defects, substantiation |
+| `lint` | Non-binding plausibility findings for battery, textile, SVHC and unsold-goods data |
+| `canonical` | RFC 8785 (JCS) content hashing, the single content hasher |
+| `bundle` | Signed, versioned ruleset bundles (feature `bundle`) |
+| `construction`, `toys` | Module scaffolding with field documentation; no rules yet |
 
-## Module structure
-
-```text
-src/
-├── lib.rs                    re-exports everything at the crate root (backward compat)
-│
-├── common/
-│   ├── country.rs            ISO 3166-1 alpha-2 validation ✅
-│   ├── numeric.rs            percentage helpers, sum checks      (placeholder)
-│   └── units.rs              unit conversion helpers              (placeholder)
-│
-├── chemicals/                REACH / RoHS / EU 2026/405  (cross-product group — never under one product group)
-│   ├── svhc.rs               REACH Art. 33 concentration validation ✅
-│   └── surfactants.rs        EU 2026/405 band validation ✅
-│
-├── textiles/                 EU ESPR textile product group
-│   ├── fibre.rs              fibre_sum_ok, validate_fibre_composition ✅
-│   └── care.rs               ISO 3758 care symbols                (placeholder)
-│
-├── batteries/                EU Regulation 2023/1542, Annex XIII
-│   ├── chemistry.rs          allowed chemistries, voltage ranges  (placeholder)
-│   ├── degradation.rs        SOH estimation, cycle life           (placeholder)
-│   └── recycled_content.rs   Co / Li / Ni split thresholds       (placeholder)
-│
-├── electronics/              EU Ecodesign Regulation (ESPR)
-│   └── spare_parts.rs        availability periods                 (placeholder)
-│                             NOTE: repairability scoring → dpp-calc, not here
-│
-├── metals/                   CBAM (EU Regulation 2023/956)
-│   ├── aluminium.rs          alloy grade, CO₂e per route          (placeholder)
-│   └── steel.rs              BF-BOF / EAF / DRI-EAF, scrap ratio (placeholder)
-│
-├── construction/             EU CPR 2024/3110                     (placeholder)
-└── toys/                     EN 71 / REACH / EU 2025/2509         (placeholder)
-```
-
-Active product groups are batteries, textiles, and electronics. All others have placeholder modules with field documentation; rules will be added as the delegated acts finalise and the product group plugins mature.
-
----
+A few files are scaffolding without rules yet (`common::units`, `textiles::care`,
+`electronics::spare_parts`). Rules are added as each delegated act is adopted.
+[docs.rs](https://docs.rs/dpp-rules) lists every public function.
 
 ## Adding a rule
 
-1. Find the right module (product group + sub-concern). If the rule applies to more than one product group, it belongs in `chemicals/` or `common/`, not under any single product group.
-2. Write a pure function with primitive borrowing inputs (`&str`, `f64`, `&[T]`). No owned allocations in function arguments.
-3. Return `Result<(), String>` for validators, `bool` for predicates.
-4. Add a `#[cfg(test)] mod tests` block in the same file.
-5. If the symbol needs to be accessible from `dpp-domain` or `dpp-plugin-sdk` callers without the module path, add a `pub use` line in `lib.rs`.
-6. Run `cargo test -p dpp-rules` and then `cargo test --workspace` before committing.
-
----
+1. Pick the module by product group and concern. A rule that applies to more than one
+   product group goes in `chemicals` or `common`.
+2. Write a pure function with borrowed primitive inputs (`&str`, `f64`, `&[T]`), no
+   owned allocations in its arguments.
+3. Return `Result<(), String>` from a validator and `bool` from a predicate.
+4. Add tests in a sibling test file.
+5. If callers in `dpp-domain` or `dpp-plugin-sdk` need it without the module path, add a
+   `pub use` in `lib.rs`.
+6. Run `cargo test -p dpp-rules`, then `just check`.
 
 ## Invariants
 
-| Rule | Rationale |
+| Rule | Why |
 |---|---|
-| `#![no_std]` + `alloc` only | Wasm product group plugins consume this crate; std is unavailable in `wasm32-wasip1` |
-| Zero `[dependencies]` in `Cargo.toml` | Keeps the plugin graph lean; any dep here becomes a dep of every plugin |
-| Primitive borrowing inputs | Callers adapt their own types; this crate depends on neither `dpp-domain` structs nor `serde_json::Value` |
+| `#![no_std]` + `alloc` in the default build | Wasm plugins use this crate, and `std` is unavailable to them |
+| No non-optional `[dependencies]` | Any dependency here becomes a dependency of every plugin |
+| Borrowed primitive inputs | Callers adapt their own types; this crate depends on neither `dpp-domain` structs nor `serde_json::Value` |
 | One implementation per rule | The only acceptable duplication is a `pub use` re-export in `lib.rs` |
-| Repairability scoring → `dpp-calc` | EN 45554 A–E grade calculation belongs to the calculator crate; only field-level validations live here |
-| SVHC → `chemicals/` | REACH Art. 33 is cross-product group; it must never be placed under a single product group module |
-| `common/` threshold | A helper belongs in `common/` only if it is used by ≥ 2 product group modules and has no product-group-specific meaning |
-
----
+| Repairability scoring lives in `dpp-calc` | EN 45554 grade calculation is a calculator; only field-level validation lives here |
+| SVHC lives in `chemicals` | REACH Art. 33 applies across product groups |
+| `common` is for shared helpers | A helper goes there only if at least two product group modules use it and it has no group-specific meaning |
 
 ## Relationship to other crates
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Consumes these rules for standalone validation; this crate does **not** depend on it |
-| `dpp-plugin-sdk` | Re-exports these rules to Wasm product group plugins via `dpp_plugin_sdk::rules` |
-| `dpp-calc` | Holds scoring and calculation; field-level validation belongs here, not there |
+| `dpp-domain` | Uses these rules for validation; this crate does **not** depend on it |
+| `dpp-plugin-sdk` | Re-exports these rules to plugins as `dpp_plugin_sdk::rules` |
+| `dpp-calc` | Holds scoring and calculation; field-level validation stays here |
 
 ## Minimum Rust version
 
-1.96 (MSRV is enforced in CI)
+1.96, enforced in CI.
 
-## License
+## Licence
 
-Apache-2.0 — see [LICENSE](../../LICENSE)
+Apache-2.0. See [LICENSE](../../LICENSE).
