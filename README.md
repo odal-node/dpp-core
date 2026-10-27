@@ -93,7 +93,7 @@ cargo run
 ```
 
 ```text
-valid against battery schema v2.8.0
+valid against battery schema v2.10.0
 signature verifies: true
 ```
 
