@@ -160,8 +160,10 @@ The verifier:
 
 ## 6. The QR code as trust anchor
 
-The carrier (QR or Data Matrix) on a physical product encodes a **GS1 Digital Link** URI,
-not a proprietary path:
+The carrier (QR or Data Matrix) on a physical product encodes the product's digital link.
+For a product identified by a GTIN, that is a **GS1 Digital Link** URI, not a proprietary
+path. A product identified by an identification link or a DID has no GTIN to build one
+from: `build_qr_url` returns `None` for it, and the caller chooses the carrier.
 
 ```text
 {resolver_base}/01/{gtin}                        model level

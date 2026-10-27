@@ -6,8 +6,9 @@
 and the Battery Regulation. Anyone building passport tooling can use it as a foundation.
 
 The aim is one well-reviewed implementation of the regulatory model in Rust: domain types,
-cryptographic signing, schema validation, GS1 Digital Link, W3C Verifiable Credentials, and
-the port traits that separate the model from any infrastructure.
+cryptographic signing, schema validation, product identifiers and GS1 Digital Link, W3C
+Verifiable Credentials, and the port traits that separate the model from any
+infrastructure.
 
 ---
 
@@ -26,7 +27,8 @@ except its public `did:web` document.
 Every technical decision starts from an open standard. No proprietary formats or invented
 protocols. The library implements:
 
-- GS1 Digital Link: product identification and QR resolution
+- EN 18219 product identifiers: a GS1 Digital Link, an IEC 61406 identification link or
+  a decentralised identifier (DID), with GS1 Digital Link parsing and QR resolution
 - W3C Verifiable Credentials: access control and manufacturer identity
 - IDTA Asset Administration Shell: AAS-shaped output for Industry 4.0 tooling
 - CEN/CENELEC JTC 24: the EU passport data model, tracked as it evolves

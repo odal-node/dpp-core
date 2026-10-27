@@ -3,14 +3,29 @@
 An open-source Rust library for EU Digital Product Passports (DPPs), under the
 Apache License 2.0. It holds the passport data model, versioned JSON Schemas per
 product group, regulatory validation rules, Ed25519/JWS signing, W3C Verifiable
-Credentials, GS1 Digital Link parsing and Asset Administration Shell export. It is
-stateless: no database, no HTTP server, no network I/O.
+Credentials, product identifiers under three EN 18219 schemes (GS1, identification
+link, DID) with GS1 Digital Link parsing and building, and Asset Administration Shell
+export. It is stateless: no database, no HTTP server, no network I/O.
 
 [![crates.io](https://img.shields.io/crates/v/dpp-domain.svg)](https://crates.io/crates/dpp-domain)
 [![docs.rs](https://img.shields.io/docsrs/dpp-domain)](https://docs.rs/dpp-domain)
 [![CI](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml/badge.svg)](https://github.com/odal-node/dpp-core/actions/workflows/ci.yml)
+[![Advisories](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/advisories.yml?branch=main&label=advisories)](https://github.com/odal-node/dpp-core/actions/workflows/advisories.yml)
+[![Fuzzing](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/fuzz.yml?branch=main&label=fuzzing)](https://github.com/odal-node/dpp-core/actions/workflows/fuzz.yml)
+[![wasm32 build](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/wasm-build.yml?branch=main&label=wasm32%20build&logo=webassembly)](https://github.com/odal-node/dpp-core/actions/workflows/wasm-build.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.96+](https://img.shields.io/badge/Rust-1.96%2B-orange.svg)](https://www.rust-lang.org/)
+[![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fodal-node%2Fdpp-core%2Fmain%2FCargo.toml&query=%24.workspace.package%5B'rust-version'%5D&label=MSRV&prefix=Rust%20&logo=rust)](Cargo.toml)
+[![Docs](https://img.shields.io/badge/docs-docs.odal--node.io-blue)](https://docs.odal-node.io/core/overview/)
+[![Status: pre-production](https://img.shields.io/badge/status-pre--production-yellow)](#dpp-core)
+
+Checked in CI against independent implementations of the standards it follows:
+
+[![GS1 Digital Link syntax](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/gs1-oracle.yml?branch=main&label=GS1%20Digital%20Link%20syntax)](https://github.com/odal-node/dpp-core/actions/workflows/gs1-oracle.yml)
+[![W3C DID test suite](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/did-oracle.yml?branch=main&label=W3C%20DID%20test%20suite)](https://github.com/odal-node/dpp-core/actions/workflows/did-oracle.yml)
+[![JSON-LD 1.1](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/jsonld-oracle.yml?branch=main&label=JSON-LD%201.1)](https://github.com/odal-node/dpp-core/actions/workflows/jsonld-oracle.yml)
+[![SD-JWT](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/sdjwt-oracle.yml?branch=main&label=SD-JWT)](https://github.com/odal-node/dpp-core/actions/workflows/sdjwt-oracle.yml)
+[![JAdES (EU DSS)](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/jades-oracle.yml?branch=main&label=JAdES%20%28EU%20DSS%29)](https://github.com/odal-node/dpp-core/actions/workflows/jades-oracle.yml)
+[![AAS (IDTA)](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/aas-oracle.yml?branch=main&label=AAS%20%28IDTA%29)](https://github.com/odal-node/dpp-core/actions/workflows/aas-oracle.yml)
 
 > [!NOTE]
 > **Status: pre-production.** Published on crates.io and tested in CI, but not yet
@@ -37,23 +52,27 @@ use serde_json::json;
 fn main() -> anyhow::Result<()> {
     // 1. Validate product data against the embedded, versioned JSON Schema.
     let schemas = VersionedSchemaRegistry::new();
-    let (version, _) = schemas.latest("textile").expect("textile schema is embedded");
+    let (version, _) = schemas.latest("battery").expect("battery schema is embedded");
 
+    // An industrial LFP battery of 4.8 kWh: over the 2 kWh line above which the
+    // Battery Regulation requires a passport for an industrial battery.
     let data = json!({
         "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
-        "fibreComposition": [{ "fibre": "organic cotton", "pct": 100.0 }],
-        "countryOfOrigin": "PT",
-        "careInstructions": "Machine wash 30°C",
-        "chemicalComplianceStandard": "OEKO-TEX Standard 100"
+        "batteryType": "industrial",
+        "batteryChemistry": "LFP",
+        "nominalVoltageV": 48.0,
+        "nominalCapacityAh": 100.0,
+        "ratedCapacityKwh": 4.8,
+        "expectedLifetimeCycles": 3000
     });
 
-    if let Err(e) = schemas.validate("textile", version, &data) {
+    if let Err(e) = schemas.validate("battery", version, &data) {
         for err in &e.errors {
             println!("invalid at '{}': {}", err.field, err.message);
         }
         anyhow::bail!("validation failed");
     }
-    println!("valid against textile schema v{version}");
+    println!("valid against battery schema v{version}");
 
     // 2. Sign it as a compact JWS with an Ed25519 key from an encrypted keystore.
     let store = KeyStore::open(std::env::temp_dir().join("hello-keys.json"), "change-me")?;
@@ -74,19 +93,20 @@ cargo run
 ```
 
 ```text
-valid against textile schema v1.4.0
+valid against battery schema v2.8.0
 signature verifies: true
 ```
 
-The first build compiles the dependency tree, which takes about a minute. Remove
-`"countryOfOrigin"` from the data and the run stops with
-`invalid at '': "countryOfOrigin" is a required property`.
+The schema version is the newest one the installed `dpp-domain` embeds. The first build
+compiles the dependency tree, which takes about a minute. Remove `"batteryType"` from
+the data and the run stops with
+`invalid at '': "batteryType" is a required property`.
 
 More runnable examples, one per crate:
 
 ```bash
 git clone https://github.com/odal-node/dpp-core && cd dpp-core
-cargo run -p dpp-domain --example create_passport          # build and validate a textile passport
+cargo run -p dpp-domain --example create_passport          # build, validate and publish a battery passport
 cargo run -p dpp-crypto --example sign_and_verify          # keystore, Ed25519 key, JWS
 cargo run -p dpp-vc --example credential_and_transfer      # issue a credential, transfer responsibility
 cargo run -p dpp-digital-link --example parse_and_negotiate # parse a GS1 Digital Link, pick a link type

@@ -51,7 +51,7 @@ let subject = DppCredentialSubject {
     name: "Example Repair GmbH".into(),
     role: CredentialRole::AuthorisedRepairer,
     country: "DE".into(),
-    product_groups: vec!["textile".into()],
+    product_groups: vec!["battery".into()],
     product_categories: vec![],
 };
 
