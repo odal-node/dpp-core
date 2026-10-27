@@ -217,7 +217,7 @@ To add a version to an existing product group:
 ```text
 feat(crypto): verify JWS against an archived key
 fix(domain): handle an empty product group in VersionedSchemaRegistry
-docs(schemas): add textile v1.5.0
+docs(schemas): add battery v2.11.0
 chore(deps): upgrade ed25519-dalek to 2.2.1
 ```
 

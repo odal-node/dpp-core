@@ -159,10 +159,10 @@ The plugins share one workspace, `plugins/Cargo.toml`, separate from the library
 workspace. To build one plugin, run from `plugins/`:
 
 ```bash
-cargo build -p product-group-textile --target wasm32-wasip1 --release
+cargo build -p product-group-battery --target wasm32-wasip1 --release
 ```
 
-Output: `plugins/target/wasm32-wasip1/release/product_group_textile.wasm`. The release
+Output: `plugins/target/wasm32-wasip1/release/product_group_battery.wasm`. The release
 profile strips symbols and optimises for size; aim for under 2 MB per plugin.
 
 ---

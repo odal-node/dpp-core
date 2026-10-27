@@ -39,7 +39,7 @@ request.
 - **Breaking change:** `!` before the colon.
 
 ```text
-feat(domain): add textile SVHC substance disclosure fields
+feat(domain): add battery recycled-content disclosure fields
 fix(digital-link): add a lifetime annotation to negotiate
 test(crypto): audience gatekeeping integration tests
 docs: update the README regulatory scope table
