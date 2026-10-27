@@ -231,8 +231,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
     // stop the passport emitting that key at all — and anything reasoning over
     // this instance's JSON would then pass while never having seen the field.
     passport.serial_number = Some("SN-2026-00042".to_owned());
-    passport.manufacturer.registered_trade_name = Some("GreenCell".to_owned());
-    passport.manufacturer.electronic_address = Some("contact@greencell.example".to_owned());
+    passport.manufacturer.registered_trade_name = Some("Example Batteries".to_owned());
+    passport.manufacturer.electronic_address = Some("contact@batteries.example".to_owned());
     passport.derived_from = vec![DerivationRef {
         reference: reference.clone(),
         operation: SecondLifeOperation::Repurposing,
