@@ -5,7 +5,7 @@ use super::ManufacturerInfo;
 
 fn manufacturer(country: Option<&str>) -> ManufacturerInfo {
     ManufacturerInfo {
-        name: "GreenCell GmbH".to_owned(),
+        name: "Example Batteries GmbH".to_owned(),
         address: "Alexanderplatz 1, Berlin".to_owned(),
         country: country.map(str::to_owned),
         did_web_url: None,
@@ -19,13 +19,13 @@ fn manufacturer(country: Option<&str>) -> ManufacturerInfo {
 #[test]
 fn a_document_written_before_the_field_existed_reads_with_no_country() {
     let stored = serde_json::json!({
-        "name": "GreenCell GmbH",
+        "name": "Example Batteries GmbH",
         "address": "Alexanderplatz 1, Berlin",
         "didWebUrl": null,
     });
     let info: ManufacturerInfo = serde_json::from_value(stored).expect("pre-field document reads");
     assert_eq!(info.country, None);
-    assert_eq!(info.name, "GreenCell GmbH");
+    assert_eq!(info.name, "Example Batteries GmbH");
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn a_country_name_or_an_address_is_refused_where_a_code_belongs() {
 #[test]
 fn a_document_written_before_the_contact_fields_existed_reads_with_neither() {
     let stored = serde_json::json!({
-        "name": "GreenCell GmbH",
+        "name": "Example Batteries GmbH",
         "address": "Alexanderplatz 1, Berlin",
         "country": "DE",
     });
@@ -94,19 +94,22 @@ fn a_document_written_before_the_contact_fields_existed_reads_with_neither() {
 #[test]
 fn a_trade_name_distinct_from_the_legal_name_round_trips() {
     let mut info = manufacturer(Some("DE"));
-    info.registered_trade_name = Some("GreenCell".to_owned());
-    info.electronic_address = Some("contact@greencell.example".to_owned());
+    info.registered_trade_name = Some("Example Batteries".to_owned());
+    info.electronic_address = Some("contact@batteries.example".to_owned());
 
     let json = serde_json::to_value(&info).expect("serialises");
-    assert_eq!(json["name"], "GreenCell GmbH");
-    assert_eq!(json["registeredTradeName"], "GreenCell");
-    assert_eq!(json["electronicAddress"], "contact@greencell.example");
+    assert_eq!(json["name"], "Example Batteries GmbH");
+    assert_eq!(json["registeredTradeName"], "Example Batteries");
+    assert_eq!(json["electronicAddress"], "contact@batteries.example");
 
     let back: ManufacturerInfo = serde_json::from_value(json).expect("deserialises");
-    assert_eq!(back.registered_trade_name.as_deref(), Some("GreenCell"));
+    assert_eq!(
+        back.registered_trade_name.as_deref(),
+        Some("Example Batteries")
+    );
     assert_eq!(
         back.electronic_address.as_deref(),
-        Some("contact@greencell.example")
+        Some("contact@batteries.example")
     );
 }
 
@@ -134,15 +137,18 @@ fn the_public_view_keeps_the_contact_details() {
     use crate::disclosure::Audience;
 
     let mut passport = crate::test_support::fully_populated_passport();
-    passport.manufacturer.registered_trade_name = Some("GreenCell".to_owned());
-    passport.manufacturer.electronic_address = Some("contact@greencell.example".to_owned());
+    passport.manufacturer.registered_trade_name = Some("Example Batteries".to_owned());
+    passport.manufacturer.electronic_address = Some("contact@batteries.example".to_owned());
 
     let public = redact_passport(&passport, Audience::Public);
     let json = serde_json::to_value(&public).expect("serialises");
 
-    assert_eq!(json["manufacturer"]["registeredTradeName"], "GreenCell");
+    assert_eq!(
+        json["manufacturer"]["registeredTradeName"],
+        "Example Batteries"
+    );
     assert_eq!(
         json["manufacturer"]["electronicAddress"],
-        "contact@greencell.example"
+        "contact@batteries.example"
     );
 }
