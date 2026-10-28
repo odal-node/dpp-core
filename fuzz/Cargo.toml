@@ -12,8 +12,12 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+dpp-crypto = { path = "../crates/dpp-crypto" }
 dpp-digital-link = { path = "../crates/dpp-digital-link" }
+dpp-domain = { path = "../crates/dpp-domain" }
 dpp-plugin-traits = { path = "../crates/dpp-plugin-traits" }
+dpp-rules = { path = "../crates/dpp-rules" }
+dpp-vc = { path = "../crates/dpp-vc" }
 serde_json = "1"
 
 [[bin]]
@@ -26,6 +30,48 @@ bench = false
 [[bin]]
 name = "plugin_abi_envelope"
 path = "fuzz_targets/plugin_abi_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jws_verify"
+path = "fuzz_targets/jws_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sd_jwt_parse"
+path = "fuzz_targets/sd_jwt_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "status_list_decode"
+path = "fuzz_targets/status_list_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "passport_from_stored"
+path = "fuzz_targets/passport_from_stored.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "identifier_parse"
+path = "fuzz_targets/identifier_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "schema_validate"
+path = "fuzz_targets/schema_validate.rs"
 test = false
 doc = false
 bench = false

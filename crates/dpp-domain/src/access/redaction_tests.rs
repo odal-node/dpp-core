@@ -128,7 +128,7 @@ fn passport_default_keeps_facility_and_manufacturer_public() {
     let policy = ProductGroupAccessPolicy::passport_default();
     let data = json!({
         "id": "x",
-        "manufacturer": { "name": "GreenCell GmbH", "address": "Berlin, DE" },
+        "manufacturer": { "name": "Example Batteries GmbH", "address": "Berlin, DE" },
         "facility": { "scheme": "gln", "value": "4012345000009",
                       "name": "Default Plant", "country": "DE", "address": "1 Allee, Berlin" },
         "operatorIdentifier": "DE123456789"
