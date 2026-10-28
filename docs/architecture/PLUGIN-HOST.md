@@ -17,7 +17,11 @@ The plugin system has three layers:
   `DppProductGroupPlugin` and calls `export_plugin!(MyPlugin)` once; the macro generates
   the whole Wasm ABI and wires each export to a trait method.
 - **`PluginHost`:** the port trait in `dpp_domain::ports` that a runtime host implements to
-  load and run plugins. The implementation lives in the application.
+  load and run plugins. This library ships no implementation; yours lives in your
+  application.
+
+In this document, **the host** means whatever program implements `PluginHost` and runs the
+plugins, and **the guest** is the plugin.
 
 > **Dispatch is by product group, never by product category.** The host selects a plugin
 > from the `ProductGroup` of the passport data. A product category (battery `portable`
@@ -45,7 +49,7 @@ logic. Its implementations do different jobs:
 |---|---|---|
 | `PassthroughRegistry` | this library | Computes nothing and reports `PassthroughNoValidation` for every product group. The default that needs no infrastructure |
 | Plugin-backed registry | a host application | Delegates to `PluginHost` and the Wasm product group plugins. **The standard open determination path** |
-| Any other implementation | a host application | For example, calculators from `dpp-calc` wired in by the host |
+| Any other implementation | a host application | For example, calculators from `dpp-calc` wired in by your application |
 
 A computed determination passes through `gate_determination(catalog.is_in_force(product_group), …)`
 so that a **provisional** product group can never produce a binding `Compliant` or

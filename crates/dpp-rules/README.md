@@ -19,7 +19,7 @@ both can depend on it without depending on each other.
 
 - You need a cross-field regulatory check that JSON Schema cannot express: a sum
   constraint, a conditional disclosure trigger, an enumerated band.
-- You write a Wasm product group plugin and need the same rule the host applies,
+- You write a Wasm product group plugin and need the same rule `dpp-domain` applies,
   compiled into the guest.
 - You add a rule and need it to exist exactly once, reachable from `dpp-domain` and
   from the plugins.
@@ -65,7 +65,7 @@ its verification. It enables `std` and brings in `serde`, `serde_json`, `serde_j
 | `unsold_goods` | The ESPR Art. 25 destruction ban (Annex VII) and the Art. 24 disclosure |
 | `lineage` | Checks that bind one passport to another: consistency, status defects, substantiation |
 | `lint` | Non-binding plausibility findings for battery, textile, SVHC and unsold-goods data |
-| `canonical` | RFC 8785 (JCS) content hashing, the single content hasher |
+| `canonical` | RFC 8785 (JCS) content hashing, the single content hasher (feature `bundle`) |
 | `bundle` | Signed, versioned ruleset bundles (feature `bundle`) |
 | `construction`, `toys` | Module scaffolding with field documentation; no rules yet |
 

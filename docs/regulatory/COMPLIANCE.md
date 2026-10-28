@@ -20,7 +20,7 @@ required by:
 > before relying on it.
 
 `dpp-core` does **not** implement infrastructure (HTTP APIs, databases, registry
-connectivity). That belongs to the application using the library.
+connectivity). That belongs to your application.
 
 ## Standards alignment
 

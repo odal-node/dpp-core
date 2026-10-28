@@ -10,14 +10,14 @@ Guest-side SDK and ABI export macro for Wasm product group plugins. Part of
 One `export_plugin!` call generates the linear-memory ABI (`alloc`, `dealloc`) and the
 standard exports (`metadata`, `describe`, `validate`, `calculate_metrics`,
 `generate_passport`). The crate also provides a field `Validator` and re-exports the
-`dpp-rules` implementations, so a plugin applies the same rules as the host.
+`dpp-rules` implementations, so a plugin applies the same rules as `dpp-domain`.
 
 ## When to use this crate
 
 - You write a Wasm product group plugin and want the standard host and guest wiring
   without hand-written `alloc`/`dealloc` and JSON packing.
 - You need helpers that serialise and deserialise the `Plugin*` types from
-  `dpp-plugin-traits`, and the same `dpp_rules` implementations the host uses.
+  `dpp-plugin-traits`, and the same `dpp_rules` implementations `dpp-domain` uses.
 
 ## Example
 
@@ -79,7 +79,7 @@ write a new plugin.
 | Crate | Role |
 |---|---|
 | `dpp-plugin-traits` | Defines the host and guest contract (`PluginMeta`, `PluginCapabilities`, `DppProductGroupPlugin`) |
-| `dpp-rules` | Re-exported rule implementations, so plugins share the host's rules |
+| `dpp-rules` | Re-exported rule implementations, so plugins share the rules `dpp-domain` applies |
 
 ## Minimum Rust version
 

@@ -83,7 +83,8 @@ Journal text of Regulation (EU) 2024/1781). This design follows from the general
 data-accuracy duty (Art. 9(1)) and the registry-upload duty (Art. 13(4)). An earlier
 "Art. 12" citation was wrong: Art. 12 is "Unique identifiers" (identifier issuance
 mechanics). For batteries, Regulation (EU) 2023/1542 Art. 77(7) moves responsibility to the
-operator placing a re-used, repurposed or remanufactured battery on the market. The
+operator placing on the market a battery that has undergone preparation for re-use,
+preparation for repurposing, repurposing or remanufacturing. The
 authoritative record of who holds the obligations is the EU registry, under Implementing
 Regulation (EU) 2026/1778 Art. 6a; see [COMPLIANCE.md](COMPLIANCE.md).
 
@@ -141,8 +142,10 @@ identifier shall comply with ISO/IEC standards 15459-1:2014, 15459-2:2015, 15459
 batch or lot (AI 10) for a batch, and a serial (AI 21) for an item or where no level is
 stated, which makes it a serialised GTIN. **Unverified:** GS1 is a registered Issuing
 Agency under ISO/IEC 15459, so identifiers issued under GS1 keys carry a registered Issuing
-Agency Code and inherit the scheme's global-uniqueness guarantees. Conformance is therefore
-claimed **through GS1**, not by an independent implementation of the ISO parts.
+Agency Code and inherit the scheme's global-uniqueness guarantees. The ISO/IEC 15459 parts
+have not been read here, so **no conformance to them is claimed**, through GS1 or otherwise.
+A claim waits for a review of their text and for evidence that does not rest on GS1's own
+statement, both recorded in [STANDARDS.md](../architecture/STANDARDS.md).
 
 **What is verified.** A printed serial or lot is one to twenty GS1 CSET 82 characters (the
 default serial is twenty characters from `[0-9a-f]`). `Passport::validate` and the builder
@@ -206,10 +209,10 @@ per-variant counts, with no IP address, user agent or session identifier, becaus
 schema has no column for one. That design predates this section; Art. 78(d) is the article
 it answers to.
 
-**Remaining with the host.** `dpp-core` is stateless and holds no data, so it can only state
-the constraint and place it at the port. Enforcement (log retention, backup handling, what
-whoever runs the infrastructure may read) belongs to the host and its infrastructure, and is
-not evidenced here.
+**Remaining with your application.** `dpp-core` is stateless and holds no data, so it can
+only state the constraint and place it at the port. Enforcement (log retention, backup
+handling, what whoever runs the infrastructure may read) belongs to your application and its
+infrastructure, and is not evidenced here.
 
 ## Personal data: ESPR Art. 10(1)(e)
 
@@ -248,12 +251,13 @@ its passport, and none does yet. The toys and detergents passports apply from 1 
 and 23 September 2029. GDPR applies now, to any personal data a passport or a draft holds,
 whichever act governs it.
 
-**Remaining with the host.** The check is a function, and the host decides when it runs.
+**Remaining with your application.** The check is a function, and your application decides
+when it runs.
 Where one of those acts applies, the prohibition is on *storing*, and a stored draft is
 storage, so the check belongs on every write, not only at publish. Running it on every write
 today costs nothing and keeps the passport within GDPR's minimisation principle before any of
 those acts applies. Holding the records, erasing them on withdrawal, and keeping them out of
-every served view are the host's job, through the port.
+every served view are your application's job, through the port.
 
 ## Cryptographic foundations
 
@@ -299,12 +303,13 @@ oracle suites in their own workflows.
 
 1. **DID resolution.** `dpp_crypto::jws` verifies an EdDSA signature against a public key
    the caller supplies. Fetching a `did:web` document to obtain that key needs an HTTP
-   client, which the library does not have, so the host does it.
+   client, which the library does not have, so your application does it.
 2. **Status list fetching.** Revocation is decided against a W3C Bitstring Status List v1.0:
    `dpp_vc::status_list` decodes the list and `check_revocation` reads the credential's bit,
    failing closed on an index the list cannot answer. Fetching the status list credential
-   needs an HTTP client, so the host supplies the list.
-3. **Schema hot-reload** is implemented, but the file-watching trigger lives in the host.
+   needs an HTTP client, so your application supplies the list.
+3. **Schema hot-reload** is implemented, but the file-watching trigger lives in your
+   application.
 4. **Wasm plugins** are outside the Cargo workspace. `just check` still formats, lints and
    tests them through their own recipes, and the `wasm-build.yml` workflow cross-compiles
    every plugin to `wasm32-wasip1`.

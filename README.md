@@ -140,7 +140,7 @@ build for `wasm32-unknown-unknown`.
 ## How it fits together
 
 The library does no I/O. Anything that stores a passport, signs with a remote key,
-seals, or talks to the EU registry is a **port trait** that the application
+seals, or talks to the EU registry is a **port trait** that your application
 implements.
 
 ```mermaid

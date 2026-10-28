@@ -23,7 +23,7 @@ just build-plugins
 The plugins share one workspace (`plugins/Cargo.toml`), separate from the library
 workspace because they compile to `wasm32-wasip1`. Cargo writes the artifacts to
 `plugins/target/wasm32-wasip1/release/product_group_<name>.wasm`. How a host locates and
-loads them is up to the host; check its documentation for the file name it expects.
+loads them is up to that host; check its documentation for the file name it expects.
 
 ## Write a plugin
 
@@ -84,7 +84,7 @@ similar anywhere in the dependency tree, including for tests.
 | `alloc` | `(len: u32) -> u32` | pointer to `len` bytes |
 | `dealloc` | `(ptr: u32, len: u32)` | nothing |
 | `metadata` | `() -> u64` | `PluginMeta` |
-| `describe` | `() -> u64` | `PluginCapabilities` (the host runs `check_compatibility` before dispatch) |
+| `describe` | `() -> u64` | `PluginCapabilities` (a host runs `check_compatibility` before dispatch) |
 | `validate` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": null }` or `{ "error": … }`) |
 | `calculate_metrics` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": PluginResult }`) |
 | `generate_passport` | `(ptr, len) -> u64` | `AbiResult` (`{ "ok": payload }`) |

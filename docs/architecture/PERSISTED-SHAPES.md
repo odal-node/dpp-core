@@ -21,8 +21,8 @@ data, discovered per request, with no compile-time signal**.
 This has happened, and the cost is recorded:
 
 - `TextileData.gtin` became required and `countryOfManufacturing` was renamed to
-  `countryOfOrigin`. Downstream, that broke reads for **244 of 276 passports** the moment
-  the deployment upgraded.
+  `countryOfOrigin`. Downstream, that broke reads for **244 of 276 stored passports** on
+  upgrade.
 - `sector` to `productGroup` and `sectorData` to `productGroupData` renamed envelope keys.
   `product_group` is required, so every document written before the rename stopped
   deserialising, and the list endpoint returned 500 for any page containing one.

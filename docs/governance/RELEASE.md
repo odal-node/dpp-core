@@ -4,12 +4,17 @@ How `dpp-core` releases are prepared, checked and published to crates.io.
 
 ## Tooling
 
-- [`cargo-release`](https://github.com/crate-ci/cargo-release): version bumps, git tags and
+- [`cargo-release`](https://crates.io/crates/cargo-release): version bumps, git tags and
   crates.io publishing.
-- [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks): detects
+- [`cargo-semver-checks`](https://crates.io/crates/cargo-semver-checks): detects
   unintended breaking changes before release.
 - [`cargo-audit`](https://rustsec.org/): checks dependencies against the RustSec advisory
   database.
+- [`cargo-deny`](https://crates.io/crates/cargo-deny): checks dependency licences, bans and
+  sources. `just check` runs it with `cargo-audit`, for every lockfile.
+
+Install all four with
+`cargo install cargo-release cargo-semver-checks cargo-audit cargo-deny`.
 
 ## Cadence
 
@@ -20,7 +25,9 @@ accumulated and every check passes. A security fix is released as soon as it is 
 
 Before running `cargo release`:
 
-1. **CI is green:** `just check` passes locally.
+1. **CI is green:** the hosted CI run on the release commit passed. `just check` is the
+   local preflight and does not replace it: it skips the Wasm cross-compiles, the plugin
+   builds and the oracle suites.
 2. **CHANGELOG.md is updated:** move the items from `[Unreleased]` to a new version heading
    with today's date, following Keep a Changelog.
 3. **Breaking changes are reconciled:** run `just semver`. It lists every public API removal
@@ -36,7 +43,7 @@ Before running `cargo release`:
    0.16.0 to 0.17.0 on this workspace: 0 checks run.
 4. **No `TODO` or `FIXME` in public API docs:** `grep -rn 'TODO\|FIXME' crates/` returns
    nothing in public doc comments.
-5. **Doctests pass:** `cargo test --doc --workspace`.
+5. **Doctests pass:** `just test-doc` (`cargo test --doc --workspace --all-features`).
 6. **READMEs are accurate:** the root README and each crate README match the current API
    and features.
 7. **Dependencies reviewed:** no new dependency brings a problematic licence. Every
@@ -84,10 +91,10 @@ Because of inter-crate dependencies, crates are published in topological order:
 4. `dpp-calc` (depends on `dpp-rules`)
 5. `dpp-vocab` (no workspace dependencies, by design)
 6. `dpp-domain` (depends on `dpp-rules`)
-7. `dpp-registry` (depends on `dpp-domain`)
-8. `dpp-digital-link` (depends on `dpp-domain`)
+7. `dpp-registry` (depends on `dpp-domain` and `dpp-rules`)
+8. `dpp-digital-link` (depends on `dpp-domain` and `dpp-rules`)
 9. `dpp-aas` (depends on `dpp-domain` and `dpp-vocab`)
-10. `dpp-vc` (depends on `dpp-domain` and `dpp-crypto`)
+10. `dpp-vc` (depends on `dpp-domain`, `dpp-crypto` and `dpp-vocab`)
 11. `dpp-plugin-sdk` (depends on `dpp-plugin-traits` and `dpp-rules`)
 
 `dpp-vocab` was first published in 0.17.0. Until then `just semver` excluded it, because a
@@ -155,7 +162,8 @@ downstream `Cargo.lock` files.
 ## Product group plugins
 
 The Wasm product group plugins (`plugins/product-group-*`) are outside the workspace and
-are not published to crates.io. Nothing in this repository attaches them to a release.
+are not published to crates.io, and no release ships their `.wasm` files. Their version and
+lockfile are still part of every release:
 
 **Their version is the workspace version, in lockstep.** `plugins/Cargo.toml` is a separate
 workspace, so cargo does not move it. Whoever moves the workspace version moves
@@ -173,6 +181,6 @@ describes different artefacts with one string, as it did for nine releases.
 
 ## References
 
-- [cargo-release](https://github.com/crate-ci/cargo-release)
+- [cargo-release](https://crates.io/crates/cargo-release)
 - [Publishing on crates.io](https://doc.rust-lang.org/cargo/reference/publishing.html)
 - [Versioning policy](VERSIONING.md)

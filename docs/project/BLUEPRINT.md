@@ -68,7 +68,7 @@ passport system. The library has no opinion on the database, cache or HTTP frame
 
 ## Out of scope
 
-- HTTP frameworks, databases and async runtimes (they belong to the application)
+- HTTP frameworks, databases and async runtimes (they belong to your application)
 - Multi-tenancy, authentication and API key management
 - Audit log storage (the library enforces lifecycle rules, not storage)
 - Blockchain anchoring

@@ -44,7 +44,7 @@ pub trait PassportRepository: Send + Sync {
 }
 ```
 
-Adapter implementations live in the application. The domain is tested with in-memory
+Adapter implementations live in your application. The domain is tested with in-memory
 implementations, without containers or network calls.
 
 ---
@@ -78,7 +78,7 @@ pub trait ComplianceStrategy: Send + Sync {
 
 The default is `PassthroughRegistry`, which accepts manufacturer-supplied values verbatim
 and reports `PassthroughNoValidation`. Wasm product group plugins, or calculators wired in
-by the application, provide real validation. Any implementation can be injected at
+by your application, provide real validation. Any implementation can be injected at
 startup as an `Arc<dyn ComplianceRegistry>`, with no change to domain code.
 
 `law_in_force_on` is the date whose law governs the product, normally its placing-on-market
@@ -135,6 +135,5 @@ code.
 
 Implementing these traits against your own infrastructure gives a complete passport
 system. The library has no opinion on the database, cache or HTTP framework.
-Authentication and API keys belong to the application, and isolation between operators
-belongs to the deployment (one instance per operator); none of them belong in the
-library.
+Authentication, API keys and isolation between operators belong to your application and
+how it is deployed; none of them belong in the library.

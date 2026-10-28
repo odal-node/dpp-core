@@ -13,7 +13,8 @@ fn main() {
     // 1. Build product group-specific data (Battery DPP). An industrial battery
     //    of 4.8 kWh: over 2 kWh, Regulation (EU) 2023/1542 Art. 77(1) requires a
     //    passport for it, and publishing checks the content its category owes.
-    //    Remove any field below and step 4 names it as missing.
+    //    Remove a field the schema requires (`batteryType`, say) and step 3
+    //    rejects the data; remove one only the category owes and step 4 names it.
     let battery_data: BatteryData = serde_json::from_value(serde_json::json!({
         "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
         "batteryType": "industrial",

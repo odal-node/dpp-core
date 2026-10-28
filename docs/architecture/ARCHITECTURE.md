@@ -8,7 +8,7 @@ validation and port traits: what a passport is, how it is signed, and how compli
 checked.
 
 No HTTP framework, no database, and no async runtime, except where a port trait needs
-one for the application implementing it. The whole workspace compiles with nothing
+one for your implementation of it. The whole workspace compiles with nothing
 running.
 
 ---
@@ -339,7 +339,7 @@ which `dpp-plugin-sdk`'s `export_plugin!` macro generates:
 - `alloc(len: u32) -> u32`: allocate `len` bytes, return the pointer
 - `dealloc(ptr: u32, len: u32)`: the matching deallocation
 - `metadata() -> u64`: `PluginMeta` JSON
-- `describe() -> u64`: `PluginCapabilities` JSON (the host runs `check_compatibility`
+- `describe() -> u64`: `PluginCapabilities` JSON (a host runs `check_compatibility`
   before dispatch)
 - `validate(ptr, len) -> u64`: the `AbiResult` envelope
 - `calculate_metrics(ptr, len) -> u64`: `AbiResult` (`ok: PluginResult`)

@@ -7,14 +7,16 @@ The development workflow, CI requirements and code review expectations for `dpp-
 
 - **Rust:** the toolchain pinned in `rust-toolchain.toml` (the MSRV is `rust-version` in
   the root `Cargo.toml`).
-- **just:** the command runner ([casey/just](https://github.com/casey/just)).
+- **just:** the command runner ([manual](https://just.systems/man/en/),
+  `cargo install just`).
 - **cargo-nextest:** the test runner (`cargo install cargo-nextest`).
+- **cargo-audit** and **cargo-deny:** dependency advisories, licences, bans and sources.
+  `just check` runs both (`cargo install cargo-audit cargo-deny`).
 - **`wasm32-wasip1` target:** only for plugin builds (`rustup target add wasm32-wasip1`).
 
 Optional:
 
 - `cargo-semver-checks` for API compatibility checks.
-- `cargo-audit` for dependency advisories.
 - `cargo-release` for releases.
 
 ## Building
@@ -30,7 +32,7 @@ variables. This is a library with no infrastructure.
 ## Testing
 
 ```bash
-just test   # cargo nextest run --workspace
+just test   # cargo nextest run --workspace --all-features
 ```
 
 Tests need no network and no services.
@@ -44,7 +46,7 @@ just check
 ```
 
 It runs formatting, clippy (workspace and plugins), tests, doctests, plugin tests, the
-plugin gate self-test, the doc build, the lockfile check and `cargo audit`. CI runs the
+plugin gate self-test, the doc build, the lockfile check, `cargo audit` and `cargo deny`. CI runs the
 same steps as separate jobs and adds the Wasm cross-compiles and the oracle suites, so
 `just ci` is the closer match before a push. A pull request is not merged unless CI passes.
 
@@ -54,14 +56,14 @@ Individual steps:
 |---|---|
 | `just fmt` | Format all code with `rustfmt` |
 | `just lint` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` |
-| `just test` | `cargo nextest run --workspace` |
+| `just test` | `cargo nextest run --workspace --all-features` |
 | `just audit` | Check dependencies for known vulnerabilities |
 
 `just --list` shows every recipe.
 
 ## Branching
 
-Trunk-based: short-lived `feat/*`, `fix/*` and `chore/*` branches merge to `main` through a
+Trunk-based: short-lived `feat/*`, `fix/*`, `docs/*` and `chore/*` branches merge to `main` through a
 pull request; no long-lived branches; tags are cut from `main`. Branch protection, commit
 conventions and release tagging are in [GIT-STRATEGY.md](GIT-STRATEGY.md).
 
@@ -101,7 +103,8 @@ heading. The scope is a functional area, never `core` or `dpp-core`.
 - Library error types derive with `thiserror`. A few functions in `dpp-crypto` and `dpp-vc`
   still return `anyhow::Result`; new library code uses typed errors.
 - No `unwrap()` or `expect()` on library code paths; propagate `Result`.
-- No `unsafe` unless necessary, with a `// SAFETY:` comment stating the invariant.
+- No `unsafe` unless necessary. Where it is, it needs a recorded architecture decision and
+  a `// SAFETY:` comment stating the invariant.
 
 ## Adding a schema
 
@@ -116,14 +119,14 @@ under `[Unreleased]`.
 2. Add the module to the machine block in [PORTS.md](../architecture/PORTS.md);
    `ports_inventory.rs` fails until you do.
 3. Document the trait's contract, error semantics and concurrency expectations.
-4. Ship no production implementation: implementations live in the application. A stub for
+4. Ship no production implementation: implementations live in your application. A stub for
    development may go under `ports::ghosts`, marked as a placeholder in its output.
 5. Update the architecture documents if the port changes the boundary between the library
    and its hosts.
 
 ## References
 
-- [just](https://github.com/casey/just)
+- [just manual](https://just.systems/man/en/)
 - [cargo-nextest](https://nexte.st/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Versioning policy](VERSIONING.md)

@@ -26,13 +26,15 @@ While a crate is below 1.0.0:
   stability guarantee.
 
 The aim is to reach 1.0.0 once the EU delegated acts for the first product group
-(batteries, February 2027) are final and the public API has been validated against real
-integrations.
+(batteries) are final and the public API has been validated against real integrations.
+This is a project target, not a legal deadline. The date the battery passport applies
+from is in the instrument catalog in `dpp-domain`.
 
 ## One version for the whole workspace
 
-All workspace crates share one version, set in the root `Cargo.toml` through
-`workspace.package.version`, so every release bumps every crate. The reasons:
+Every workspace crate except `dpp-benches` shares one version, set in the root
+`Cargo.toml` through `workspace.package.version`, so every release bumps each of them.
+`dpp-benches` is unpublished and keeps its own `0.0.0`. The reasons:
 
 1. The crates that depend on each other are tightly coupled, and `dpp-domain` is their
    hub: `dpp-aas`, `dpp-digital-link`, `dpp-registry`, `dpp-vc` and `dpp-tests` all build on
@@ -49,7 +51,7 @@ version bump.
 
 ## Detecting breaking changes
 
-[`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks) runs twice, for
+[`cargo-semver-checks`](https://crates.io/crates/cargo-semver-checks) runs twice, for
 two different questions. Neither run fails the build: below 1.0 a minor release is allowed
 to break, and a check that is red by design is one nobody reads.
 
@@ -81,7 +83,7 @@ author either:
 
 ## Schema versions
 
-The JSON Schemas under `schemas/{product-group}/v{N}.json` are versioned independently of
+The JSON Schemas under `crates/dpp-domain/schemas/{product-group}/v{N}.json` are versioned independently of
 the crates. Adding a schema version is always a minor crate change. Removing or altering an
 existing schema version is a breaking change. See
 [COMPLIANCE.md](../regulatory/COMPLIANCE.md) for the mapping from schemas to regulations.
@@ -90,5 +92,5 @@ existing schema version is a breaking change. See
 
 - [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html)
 - [Cargo SemVer compatibility](https://doc.rust-lang.org/cargo/reference/semver.html)
-- [cargo-semver-checks](https://github.com/obi1kenobi/cargo-semver-checks)
-- [cargo-release](https://github.com/crate-ci/cargo-release)
+- [cargo-semver-checks](https://crates.io/crates/cargo-semver-checks)
+- [cargo-release](https://crates.io/crates/cargo-release)

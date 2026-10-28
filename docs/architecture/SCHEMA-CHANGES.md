@@ -66,8 +66,8 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `carbonFootprintClass` | constraint changed | `enum=["A","B","C","D","E",null]` | absent |
-| `carbonFootprintClass` | constraint changed | absent | `maxLength=8` |
+| `carbonFootprintClass` | constraint changed | `enum=["A","B","C","D","E",null]` | none |
+| `carbonFootprintClass` | constraint changed | none | `maxLength=8` |
 | `carbonFootprintClassRulesetId` | added | absent | `string\|null` |
 | `carbonFootprintClassRulesetVersion` | added | absent | `string\|null` |
 | `placedOnMarketDate` | added | absent | `string\|null` |
@@ -76,7 +76,7 @@ documents still read is answered by the frozen fixtures in
 
 | Property | Change | Before | After |
 |---|---|---|---|
-| `stateOfHealth` | added | absent | absent |
+| `stateOfHealth` | added | absent | none |
 
 ### v2.2.0 → v2.3.0 · additive
 
@@ -132,7 +132,7 @@ documents still read is answered by the frozen fixtures in
 | `powerTemperatureRange` | added | absent | `object\|null` |
 | `renewableContentPct` | added | absent | `number\|null` |
 | `roundTripEfficiencyAtHalfCycleLifePct` | added | absent | `number\|null` |
-| `roundTripEfficiencyPct` | constraint changed | `maximum=100` | absent |
+| `roundTripEfficiencyPct` | constraint changed | `maximum=100` | none |
 | `safetyMeasures` | added | absent | `string\|null` |
 | `sparePartsContacts` | added | absent | `string\|null` |
 | `testReportResults` | added | absent | `string\|null` |
@@ -227,8 +227,8 @@ No property or requirement changed.
 | Property | Change | Before | After |
 |---|---|---|---|
 | `repairabilityScore` | type changed | `number\|null` | `object\|null` |
-| `repairabilityScore` | constraint changed | `maximum=10` | absent |
-| `repairabilityScore` | constraint changed | `minimum=0` | absent |
+| `repairabilityScore` | constraint changed | `maximum=10` | none |
+| `repairabilityScore` | constraint changed | `minimum=0` | none |
 | `repairabilityScore/criteria` | added | absent | `array` |
 | `repairabilityScore/overall` | added | absent | `number` |
 

@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] Tests added or updated for the new behaviour
+- [ ] Tests added or updated for the new behaviour, or no behaviour changed (say so in the summary)
 - [ ] `just check` passes locally (format, clippy, tests, doctests, plugins, docs, lockfiles, audit)
 - [ ] No secrets, credentials or `.env` files in the diff
 - [ ] Documentation updated if the public API changed, following the [style guide](https://github.com/odal-node/.github/blob/main/DOCS-STYLE.md)

@@ -49,8 +49,9 @@ was filed under *policy* because it decides whether data conforms, but it import
 one module and sits second from the bottom of the graph. The measurement decides; the
 name follows.
 
-**Nothing may import tier 7.** The one tier-8 module is the open-source default adapter.
-Every other `impl …Port for` lives in the application that uses this crate.
+**Only tier 8 may import tier 7.** No module in tiers 1 to 7 imports `ports`. The one
+tier-8 module is the open-source default adapter. Every other `impl …Port for` lives in
+your application.
 
 ### The graph must also be acyclic
 
@@ -217,9 +218,9 @@ its subject needs; the fixed names exist so that the *rest* of the listing is th
 *beside* them is `check_digit.rs`: `Gtin` and `Gln` both use it, so rule 15 puts it at
 their nearest common parent, not in either.
 
-`regex-automata/src/meta/` and `tokio/src/sync/` use the same shape. It makes a module
-skimmable without opening it: the same four names appear in every directory, so anything
-else in the listing is the subject.
+The shape makes a module skimmable without opening it. Every directory draws on the same
+three fixed names, `mod.rs`, `error.rs` and `tests.rs`, so anything else in the listing is
+a `<part>.rs`, and the parts are the subject.
 
 ### Rule 12: a file never repeats the name of its directory
 
@@ -252,8 +253,9 @@ it owns the error, the nearest shared parent's if it does not.
 `error.rs` is therefore **optional per module**. A module with no errors of its own gets
 no empty one, and a module whose error is shared gets no duplicate.
 
-The crate-wide `error/` sits above the tiers (§1) and holds `DppError` and the field-error
-types.
+The crate-wide `error/` is a tier-4 module (§1) and holds `DppError`. The field-error
+types, `FieldError` and `ValidationErrors`, are a module of their own, `field_error/`, in
+tier 2.
 
 ### Rule 15: a shared thing lives at the nearest common parent of its users
 
@@ -397,14 +399,14 @@ A move within a module is internal, and `pub use` in `lib.rs` keeps the public p
 stable. That holds for rules 1 to 14 and is the normal case.
 
 **§1 is the exception, on purpose.** Placing a module in its tier can mean it stops being
-where it was: dissolving a wrapper module renames every path beneath it, and a consuming
-application reaches 98 distinct paths into this crate, most of them deep. Those break.
+where it was: dissolving a wrapper module renames every path beneath it, and every caller
+that imports one of those paths breaks.
 
 That cost is accepted, not hidden. Compatibility re-exports would keep it quiet, and they
 are refused on purpose: two ways to reach the same type is the condition this standard
-exists to end, and a shim outlives its migration by years. The crate has no external
-users, so the break is paid once, mechanically, with the consumer updated in the same
-change.
+exists to end, and a shim outlives its migration by years. The migration path is the
+CHANGELOG instead: the move is listed under **Breaking** with each old path and its new
+one, so downstream code updates its imports once, mechanically.
 
 **A tier move is therefore a breaking change and is versioned as one.** A layout change
 that alters the public API for any *other* reason is not a layout change.

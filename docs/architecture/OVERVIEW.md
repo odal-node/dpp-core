@@ -50,8 +50,8 @@ stateDiagram-v2
 | `active` or `suspended` to `deactivated` | End of life (recycled, destroyed under a derogation, exported, lost) | Terminal; the record is kept |
 | `draft`, `active` or `suspended` to `retired` | Irreversible | Kept until `retentionUntil`, computed at publish from the instrument bindings |
 
-`retired`, `superseded` and `deactivated` are terminal. The host records every
-transition; audit storage is the host's concern, not the domain's.
+`retired`, `superseded` and `deactivated` are terminal. Your application records every
+transition; audit storage is its concern, not the domain's.
 [DATA-MODEL.md §2](DATA-MODEL.md#2-passport-lifecycle) has the full table.
 
 **Retention.** The period is not a constant in this document or anywhere else in prose.
@@ -176,7 +176,7 @@ authentication or API keys. An issuer is identified by a `key_id` that maps to a
 Ed25519 key pair in the `KeyStore`, and by a `did:web` DID derived from the issuer's
 domain.
 
-Multi-tenancy, authentication and access control belong to the host that consumes this
+Multi-tenancy, authentication and access control belong to your application, not to this
 library.
 
 ---

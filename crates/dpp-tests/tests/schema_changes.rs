@@ -137,12 +137,23 @@ fn render() -> String {
                 md.push_str("| Property | Change | Before | After |\n");
                 md.push_str("|---|---|---|---|\n");
                 for c in &diff.properties {
+                    // Only the change kind says the property is missing on a side.
+                    // An empty value alone can also be a property that declares no
+                    // `type`, or a constraint that is not set.
+                    let before = if c.kind == ChangeKind::Added {
+                        "absent".to_owned()
+                    } else {
+                        cell(&c.before)
+                    };
+                    let after = if c.kind == ChangeKind::Removed {
+                        "absent".to_owned()
+                    } else {
+                        cell(&c.after)
+                    };
                     md.push_str(&format!(
-                        "| `{}` | {} | {} | {} |\n",
+                        "| `{}` | {} | {before} | {after} |\n",
                         c.path,
                         c.kind.label(),
-                        cell(&c.before),
-                        cell(&c.after),
                     ));
                 }
             }
@@ -172,10 +183,11 @@ fn render() -> String {
     md
 }
 
-/// Render a before/after cell: `absent` when there is no value, escaped for the table.
+/// Render a before/after cell: `none` when that side declares no value, escaped for the
+/// table.
 fn cell(value: &str) -> String {
     if value.is_empty() {
-        "absent".to_owned()
+        "none".to_owned()
     } else {
         format!("`{}`", value.replace('|', "\\|"))
     }

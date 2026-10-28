@@ -63,8 +63,28 @@ the agreement of every copyright holder.
 
 ## Code of conduct
 
-The organization's [Code of Conduct](https://github.com/odal-node/.github/blob/main/CODE_OF_CONDUCT.md)
-applies to every interaction in this repository.
+It applies to every space this repository runs: issues, pull requests, discussions,
+code review, commit messages, and email to the project's addresses.
+
+Be direct and be decent. Criticise the work, not the person. Say what you think and why;
+blunt technical disagreement is welcome. Not acceptable, in any tone: harassment, personal
+attacks, discrimination or slurs on any basis, publishing someone's private information
+without their permission, sexualised language or unwelcome sexual attention, and sustained
+disruption such as reopening settled decisions to wear people down.
+
+This software is used for regulatory compliance, and operators may act on what it says.
+**Knowingly stating something false about EU law, about what the software does, or about
+its production readiness is a conduct problem here,** and so is describing a plan as a
+shipped feature. Honest mistakes are not.
+
+Report to **contact@odal-node.io**: what happened, where and when. A link is enough. You
+get an acknowledgement within 72 hours, and your report is not shared with the person you
+report without telling you first. If it concerns the maintainer, say so in the report.
+GitHub's abuse reporting is available to you independently of this project.
+
+Depending on severity, the outcome is a private correction, a public correction, removal
+of the content, a temporary block or a permanent ban. The maintainer is bound by this
+section too.
 
 ## References
 

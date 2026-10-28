@@ -240,8 +240,9 @@ Minimum availability periods from earlier ecodesign implementing regulations, fo
 1. The electronics schema gains a `sparePartsAvailabilityYears` field or equivalent.
 2. An ESPR delegated act sets minimum periods per product category.
 
-Then implement `validate_spare_parts_period(years: u32, category: &str) -> Result<(), String>`
-here, keyed by the `productCategory` values in the schema.
+Then implement a spare-parts period check here, keyed by the `productCategory` values in
+the schema. It returns a typed error enum, not a `String`, so callers can match on the
+reason.
 
 ---
 

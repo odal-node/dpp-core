@@ -28,7 +28,7 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   This crate does not *resolve* those keys, and nothing here does I/O.
   `build_issuer_metadata` produces the document an issuer publishes, and `verify` takes
   the key the caller has already chosen. Fetching the metadata, deciding whether to
-  trust it, and picking the key are the application's job, and so is the network policy.
+  trust it, and picking the key are your application's job, and so is the network policy.
 
 ## What this crate does not cover
 
@@ -74,7 +74,7 @@ A runnable version covering issuance and transfer is in
 | `dpp-crypto` | Provides JWS signing and verification and the keystore; required |
 
 The HTTP surface that issues and verifies these credentials is not part of this
-workspace; it belongs to the application using this crate. Everything below that
+workspace; it belongs to your application. Everything below that
 boundary (credential shapes, signing, status lists) is here and works without one.
 
 ## Minimum Rust version

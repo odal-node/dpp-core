@@ -210,7 +210,9 @@ library does not support it yet. An issuer can move to it later without re-issui
 existing passports:
 
 1. Register the issuer on EBSI, which creates a `did:ebsi` DID.
-2. Add the EBSI DID to the `did:web` document as a `sameAs` service endpoint.
+2. List the EBSI DID in the `did:web` document's `alsoKnownAs` property, the DID Core
+   property for another identifier of the same subject. The `did:web` builder in
+   `dpp-vc` does not write that property, so the issuer adds it.
 3. Issue new passports with `did:ebsi` as the issuer.
 4. Old passports keep `did:web` and remain verifiable through it.
 5. Both DIDs are valid during the transition.

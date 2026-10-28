@@ -8,8 +8,10 @@ Stateless compliance calculators that follow EU methodologies: recycled content,
 repairability and cradle-to-gate CO2e. Part of
 [dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
 
-Every function is deterministic and side-effect free: no I/O, no infrastructure, no
-`async`. The methodology is open source (Apache-2.0). Licensed life-cycle inventory
+Every calculation is reproducible: the same inputs, parameters and factors give the same
+values. The receipt around them is not byte-identical between calls, because each one
+gets a fresh UUIDv7 `receipt_id` and a `computed_at` timestamp. No function does I/O, needs
+infrastructure or is `async`. The methodology is open source (Apache-2.0). Licensed life-cycle inventory
 (LCI) data is injected at runtime through the `FactorProvider` trait and never bundled
 here, so the operator supplies licensed data to an open method.
 
@@ -256,10 +258,13 @@ pub struct CalculationReceipt {
 }
 ```
 
-A host stores the receipt with the passport record. A notified body can re-run any
-calculation from it: the same inputs (checked with `input_hash`), the same parameters
-(checked with `ruleset_content_sha256`) and the same factor dataset version must give
-the same output.
+Store the receipt with the passport record, and keep the materials it points at: the
+original inputs, the ruleset version and the factor dataset. The receipt holds hashes and
+versions, not the materials, so it cannot reconstruct them. With them, a notified body can
+re-run the calculation and check each one against the receipt: the inputs against
+`input_hash`, the parameters against `ruleset_content_sha256`, and the factor table against
+`factor_dataset_version` and `factor_set_hash`. The same materials must give the same
+output.
 
 The parameter hash makes that a check rather than a claim. A version string is
 maintained by hand, so two receipts citing the same `ruleset_version` from builds with
@@ -336,7 +341,7 @@ guide. In short:
 | `dpp-plugin-sdk` | Does **not** re-export this crate and is not planned to; see "When not to use it". Plugins reach thresholds through `dpp-rules` |
 
 Storing a `CalculationReceipt`, serving an endpoint that verifies one, and managing the
-`FactorProvider` lifecycle are the application's job. `dpp-calc` computes and returns
+`FactorProvider` lifecycle are your application's job. `dpp-calc` computes and returns
 the receipt.
 
 ## Minimum Rust version

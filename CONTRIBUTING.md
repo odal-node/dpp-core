@@ -1,10 +1,17 @@
 # Contributing
 
-How to build, test and change `dpp-core`. For the organization-wide rules (issues
-first, primary sources, conduct), see the
-[organization guide](https://github.com/odal-node/.github/blob/main/CONTRIBUTING.md).
-Documentation follows the
-[documentation style guide](https://github.com/odal-node/.github/blob/main/DOCS-STYLE.md).
+How to build, test and change `dpp-core`.
+
+**Open an issue first for anything larger than a typo.** This code encodes EU
+regulation, and a change that looks like a refactor can move a rule to a place where no
+test checks it. If the change touches a regulatory constant, threshold, date, product
+scope or disclosure class, name the **primary source** you read in the issue: the
+Official Journal text, the standard, or the regulator's own published guidance. A blog
+post, summary or secondary tracker is not a source, and a change without a primary
+source is not merged.
+
+Documentation follows §10. The code of conduct is in
+[GOVERNANCE.md](GOVERNANCE.md#code-of-conduct).
 
 ## 1. Prerequisites
 
@@ -14,6 +21,7 @@ Documentation follows the
 | just | latest | `cargo install just` |
 | cargo-nextest | latest | `cargo install cargo-nextest` |
 | cargo-audit | latest | `cargo install cargo-audit` |
+| cargo-deny | latest | `cargo install cargo-deny` |
 
 The Wasm targets (`wasm32-wasip1` for plugins, `wasm32-unknown-unknown` for the
 wasm-safe crates) are only needed to build plugins or run `just wasm-build`.
@@ -32,9 +40,9 @@ just check
 
 | Command | What it runs |
 |---|---|
-| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` |
-| `just ci` | Everything CI runs, plus docs. Run it before pushing |
-| `just test` | `cargo nextest run --workspace` (no doctests) |
+| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny` |
+| `just ci` | `just check` plus the Wasm cross-compiles (`wasm-build`), the plugin builds (`build-plugins`) and the test-count check (`test-count`). Run it before pushing. Hosted CI also runs jobs no recipe runs, such as the oracle suites |
+| `just test` | `cargo nextest run --workspace --all-features` (no doctests) |
 | `just test-doc` | Doctests, including the crate READMEs |
 | `just lint` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` |
 | `just fmt` | `cargo fmt --all` |
@@ -136,7 +144,7 @@ mark it with a `// LAYOUT-DEVIATION: <reason>` comment that states why.
 ### No I/O in library code
 
 Every crate compiles without I/O crates. Code that imports `axum`, `sqlx` or
-`async-nats` belongs in the application that uses the library.
+`async-nats` belongs in your application.
 
 `KeyStore` in `dpp-crypto` reads and writes its key file with `std::fs`. That is
 configuration I/O (a local file the operator chose), not a call to a database or a
@@ -251,3 +259,24 @@ git commit -s -m "feat(domain): add a port trait"
 
 Report vulnerabilities privately to **security@odal-node.io**, never in a public issue.
 See [SECURITY.md](SECURITY.md).
+
+## 10. Documentation
+
+- **Show, then explain.** Put the command or the code first and the reasoning after it.
+- **Describe mechanisms, not virtues.** Say what the code does and when it refuses, not
+  that it is safe or robust.
+- **One fact, one home.** A version, date, count or list that already lives in code or
+  in a generated file is linked, not copied into prose, where it would go stale without
+  failing a test. Passport dates live in the instrument catalog in `dpp-domain`.
+- **Say what is not done.** Planned behaviour is never written in the present tense.
+  Describe it in the future tense and say what would make it true.
+- **Cite EU acts by number and article**, for example "Regulation (EU) 2023/1542,
+  Art. 77(2)". Official Journal text may be quoted. Any other regulatory date is written
+  beside the article that sets it.
+- **Never quote a CEN, CENELEC or ISO standard.** They are sold per reader. Cite the
+  clause and describe what it requires in your own words.
+- **Name no product built on this workspace and no path into another repository.** A
+  reader who vendored a crate from crates.io can follow neither. Write what an
+  implementation must do instead.
+- **No em dashes and no double hyphens in prose.** Headings use sentence case, and code
+  blocks carry a language tag.

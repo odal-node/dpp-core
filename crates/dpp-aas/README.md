@@ -21,9 +21,10 @@ Pure Rust, no I/O, no network calls. Builds for `wasm32-unknown-unknown`.
   industrial data space.
 - You submit to a registry that speaks AAS rather than raw DPP JSON.
 - You want per-product-group submodels rather than a flat key-value dump. Typed
-  submodels exist for the product groups whose act is in force. Every other catalogued
-  group is projected generically, because naming a submodel template that no standards
-  body has ratified would be an unsupported claim.
+  submodels exist for `battery`, `electronics` and `unsold_goods`, whose acts are in
+  force, and for `textile` as a named exception. Every other catalogued group is projected
+  generically, because naming a submodel template that no standards body has ratified
+  would be an unsupported claim.
 
 ## Example
 

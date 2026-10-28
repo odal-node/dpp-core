@@ -3,8 +3,9 @@
 The canonical data structures for every Digital Product Passport: the reference for the
 domain types in `dpp-domain`, the JSON Schema fields, and the signed payload.
 
-> **Last updated:** 2026-10-21 for §4.1 to §4.3, re-read against `BatteryData` v2.9.0,
-> `TextileData` v1.4.0 and the current catalog. The rest of the document was last
+> **Last updated:** 2026-10-28 for §4.1, re-read against `BatteryData` v2.10.0, and
+> 2026-10-21 for §4.2 and §4.3, re-read against `TextileData` v1.4.0 and the current
+> catalog. The rest of the document was last
 > aligned on 2026-08-13 (to `BatteryData` v2.6.0, `TextileData` v1.2.0,
 > `ElectronicsData` v1.2.0), except §2 and §6, re-read against the code on 2026-10-23.
 > Field-level detail lives in the types and schemas; this document describes shape and
@@ -184,7 +185,7 @@ them would be worth more than another list.
 
 **Rules:**
 
-1. The host dispatches compliance **only** on `ProductGroup`. A plugin is selected by
+1. A plugin host dispatches compliance **only** on `ProductGroup`. A plugin is selected by
    product group, never by a field inside the group's data.
 2. These fields are plain product group data. A plugin *may* read one to choose an
    internal rule path, but it never changes which plugin runs.

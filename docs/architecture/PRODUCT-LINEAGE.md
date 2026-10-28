@@ -30,15 +30,15 @@ earlier model fell short, and the model adopted instead.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `PassportRef` | `dpp-domain::passport::reference` | `uri` plus `public_jws_hash`: where to fetch a passport, and a SHA-256 pinning its exact signed public view. Plain data; fetching and checking belong to the host. |
+| `PassportRef` | `dpp-domain::passport::reference` | `uri` plus `public_jws_hash`: where to fetch a passport, and a SHA-256 pinning its exact signed public view. Plain data; fetching and checking belong to your application. |
 | `derived_from: Vec<DerivationRef>` | `dpp-domain::passport::record` | Upward second-life links, each typed with its Art. 77(7) operation. Plural since Phase 2; was `parent_passport_ref: Option<PassportRef>`, at most one. |
 | `component_refs: Vec<ComponentRef>` | `dpp-domain::passport::record` | Downward bill-of-materials links, each with an optional quantity and role. Objects since Phase 3; was `Vec<PassportRef>`. |
 | `life_status: Option<LifeStatus>` | `dpp-domain::passport::record` | The Annex XIII point 4(c) product-life status. Phase 5. |
 | `TransferRecord` / `TransferChain` | `dpp-domain::transfer` | Responsibility handover on **one** passport, with a typed `TransferReason`. Carries the **outgoing** operator's authorisation plus the hosting node's attestation that acceptance ran, *not* a signature by the incoming operator. See §5.1. |
-| Bill-of-materials walk | the host | Recursive walk: per-node pin check, depth cap, node cap, path-based cycle detection. Fails closed. |
+| Bill-of-materials walk | your application | Not in this library, because a walk fetches. A walk checks each node's pin, caps the depth and the node count, detects cycles by path, and fails closed. |
 
 The primitives are sound. `PassportRef`'s hash pin is the right idea, and bounding the
-walk and handling cycles belong to the host. The gaps below are about *what the edges
+walk and handling cycles belong to your application. The gaps below are about *what the edges
 mean*, not how they are fetched or checked.
 
 ---
@@ -88,8 +88,9 @@ answers §6 question 4 directly:
 > waste management operator selected in accordance with Article 57(8).
 
 - **R5: the waste transition moves responsibility again**, to one of three named
-  recipients, and, unlike the first subparagraph, it requires **no new passport**.
-  Responsibility moves while the record stays. See §4.
+  recipients, and, unlike the first subparagraph, it requires **no new passport**: the
+  battery keeps its passport, and the status change is recorded as a new *version* of it.
+  Responsibility moves while the passport stays. See §4.2.
 
 **Art. 77(8)** gives the only termination the article states: "A battery passport shall
 cease to exist after the battery has been recycled." Recycling, not consumption by a
@@ -323,7 +324,7 @@ analogy.
 
 Per §2.2 it is `Disclosure::Individual`, so it is not in the signed *public* view, and per
 the second subparagraph of Art. 77(7) the **waste transition requires no new passport**. A
-battery whose status changes to waste moves responsibility while keeping its record, and
+battery whose status changes to waste moves responsibility while keeping its passport, and
 Annex XIII point 4(a) expects values reported "when it is subject to changes in its
 status". A `life_status` fixed at creation could never reach `'waste'`, one of the five
 values the law lists.
@@ -338,6 +339,13 @@ draft expected the path to be an alternative *to* `PROTECTED_PATCH_FIELDS`. It i
 opposite: the path is `supersedes_id` plus `version`, which is §4's existing answer to "a
 signed field must change", and being in `PROTECTED_PATCH_FIELDS` is what forces a caller
 onto it. `life_status` is therefore in that list with the other signed fields.
+
+**A version is not a new passport in the Art. 77(7) sense.** The two terms describe
+different things. A new passport (R1) is issued for a different unit and links to its
+predecessor through a derivation edge. A new version is the same passport for the same
+unit: a successor record whose `supersedes_id` points at the version before it, with the
+next `version` number, and no derivation edge. The waste transition is a version, so the
+battery's passport continues, as §2.1 and §6 say.
 
 The alternative was a dedicated port method. It does not fit the rest of the design: it
 would break the served body's signature and have to re-sign, which is a version bump in
@@ -475,8 +483,8 @@ identifies its subject by passport id, and resolving one to the other is a netwo
 So **the caller correlates and the rule checks**. An edge for which the caller found no
 transfer is reported as unsubstantiated, the correct reading of "no evidence was found",
 rather than an assumption that none exists. The split follows from what the library cannot
-do: the host resolves the URI and correlates the transfer, and
-`dpp_rules::lineage::substantiation` judges the evidence the host found.
+do: your application resolves the URI and correlates the transfer, and
+`dpp_rules::lineage::substantiation` judges the evidence it found.
 
 Bill-of-materials edges get **no** substantiation requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. A
@@ -486,7 +494,7 @@ walk that checks the pin already reports exactly that.
 ### 5.2 What stays out of the library
 
 - Any product group's definition of "component", or its granularity (G8).
-- Fetching, resolving and walking edges: the host's job.
+- Fetching, resolving and walking edges: your application's job.
 - Any status value beyond the five Annex XIII point 4(c) lists. The list is pinned (§2.2)
   and closed: a sixth value would be an invention, which is what the unpinned draft of this
   document produced.
@@ -523,8 +531,8 @@ were design decisions and are recorded as decided.
    of three named recipients: the producer, the producer responsibility organisation where
    appointed under Art. 57(1), or the waste management operator selected under Art. 57(8).
    Two consequences:
-   - It requires **no new passport**, so the record continues and its `life_status`
-     becomes `'waste'`. §4.2 explains how that change is made.
+   - It requires **no new passport**, so the passport continues and its `life_status`
+     becomes `'waste'` in a new version of it. §4.2 explains how that change is made.
    - It is a genuine transfer of responsibility under that subparagraph, so it needed a
      `TransferReason` of its own. Phase 5 added `TransferReason::WasteHandover`, because the
      recipients are the waste-operator vocabulary rather than the second-life one.
@@ -540,8 +548,8 @@ were design decisions and are recorded as decided.
 | **0** | Add `parentPassportRef` and `componentRefs` to `PROTECTED_PATCH_FIELDS` (G6). One line; closes the live bypass and rules nothing out. | no | **landed** |
 | **1** | Pin Art. 77(7), Art. 3(29) to (32) and the Annex XIII point 4(c) status list against the Official Journal; reconcile §4; resolve the §6 questions; add the `TransferReason` variant (G3). | no | **landed** |
 | **2** | `DerivationRef`, `SecondLifeOperation` and plural `derived_from` (G1, G4 upward). | **yes** | **landed** |
-| **3** | `ComponentRef` with quantity and role (G4 downward). The host's verification walk and evidence component graph follow the new shape. | **yes** | **landed** |
-| **4** | The rule binding lineage to transfers, in `dpp-rules` (G2, G7). The host correlates an edge to a transfer, since that needs a URI resolved; the rule judges the result. | no | **landed** |
+| **3** | `ComponentRef` with quantity and role (G4 downward). A bill-of-materials walk reads the new shape. | **yes** | **landed** |
+| **4** | The rule binding lineage to transfers, in `dpp-rules` (G2, G7). The caller correlates an edge to a transfer, since that needs a URI resolved; the rule judges the result. | no | **landed** |
 | **5** | `life_status` (G5) with the §2.2 value list and `Disclosure::Individual`; its change path per §4.2; `TransferReason::WasteHandover` (§6 question 4). | no | **landed** |
 
 Phase 0 could land on its own and did not wait for the rest. Phase 1 also carried G3: the
@@ -557,9 +565,8 @@ Phase 1's pin.
 
 Phases 2 and 3 changed published field names and types (`parentPassportRef` to
 `derivedFrom`; `componentRefs` elements became objects). Both are done, and under the
-lockstep versioning policy they form one coordinated minor bump across all core crates,
-with the host following. **They had to ship in the same release**, which is why they were
-sequenced together.
+lockstep versioning policy they form one coordinated minor bump across all core crates.
+**They had to ship in the same release**, which is why they were sequenced together.
 
 **Correction: an earlier version of this section named a mechanism that does not exist.** It
 said the read-time upcast lens (`?schema_view`) "is the existing seam" and "should carry the
