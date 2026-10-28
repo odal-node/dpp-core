@@ -202,7 +202,8 @@ To add a version to an existing product group:
    [`docs/architecture/SCHEMA-CHANGES.md`](docs/architecture/SCHEMA-CHANGES.md).
 5. If the change is not purely additive, read
    [`docs/architecture/PERSISTED-SHAPES.md`](docs/architecture/PERSISTED-SHAPES.md)
-   first. Stored passports must still deserialise.
+   first. Every stored passport must still deserialise, or be refused on purpose by a
+   version lens that has no safe bridge for it, with the reason documented there.
 
 `just check` reports any document or table that has drifted from the schemas.
 

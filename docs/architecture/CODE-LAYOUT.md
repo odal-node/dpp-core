@@ -147,8 +147,8 @@ parent's field may stay in the parent's file.
 
 ### Rule 6: only `lib.rs` at the `src/` root
 
-Everything else lives in a directory module. `test_support.rs` is the single permitted
-exception (rule 9).
+Everything else lives in a directory module. The permitted exceptions are `main.rs`, for a
+binary target, and `test_support.rs` (rule 9).
 
 ### Rule 7: tests live in a sibling file, never inline
 
@@ -315,7 +315,7 @@ the rest.
 | 3 | none | *guidance only* |
 | 4 | `layout::rule_4_tests_files_are_navigable` | a `tests.rs` exceeds 500 lines (400 target plus 100 tolerance) |
 | 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
-| 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline `#[cfg(test)] mod tests {` |
+| 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline test module: `mod tests {` or `mod <name>_tests {`, `pub` or not |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
 | 10 | none | *guidance only* |
 | 0 | `layout::rule_0_tier_imports_point_up` | a module imports a higher tier, or is missing from the tier table |

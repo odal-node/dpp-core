@@ -55,7 +55,8 @@ fn main() -> anyhow::Result<()> {
     let (version, _) = schemas.latest("battery").expect("battery schema is embedded");
 
     // An industrial LFP battery of 4.8 kWh: over the 2 kWh line above which the
-    // Battery Regulation requires a passport for an industrial battery.
+    // Battery Regulation requires a passport for an industrial battery placed on the
+    // market or put into service.
     let data = json!({
         "productIdentifier": { "scheme": "gs1", "gtin": "09506000134352" },
         "batteryType": "industrial",
@@ -74,8 +75,11 @@ fn main() -> anyhow::Result<()> {
     }
     println!("valid against battery schema v{version}");
 
-    // 2. Sign it as a compact JWS with an Ed25519 key from an encrypted keystore.
-    let store = KeyStore::open(std::env::temp_dir().join("hello-keys.json"), "change-me")?;
+    // 2. Sign it as a compact JWS with an Ed25519 key from an encrypted keystore: a new
+    //    file each run, under the passphrase you typed.
+    let passphrase = std::env::var("KEYSTORE_PASSPHRASE")?;
+    let path = std::env::temp_dir().join(format!("hello-keys-{}.json", std::process::id()));
+    let store = KeyStore::open(path, &passphrase)?;
     if store.public_key("issuer").is_none() {
         store.generate_key("issuer")?;
     }
@@ -89,6 +93,7 @@ fn main() -> anyhow::Result<()> {
 ```
 
 ```bash
+read -rsp 'Keystore passphrase: ' KEYSTORE_PASSPHRASE && echo && export KEYSTORE_PASSPHRASE
 cargo run
 ```
 
@@ -139,7 +144,8 @@ build for `wasm32-unknown-unknown`.
 
 ## How it fits together
 
-The library does no I/O. Anything that stores a passport, signs with a remote key,
+The library does no network or database I/O; the one file it touches is the key file
+`dpp_crypto::keystore::KeyStore` reads and writes. Anything that stores a passport, signs with a remote key,
 seals, or talks to the EU registry is a **port trait** that your application
 implements.
 
@@ -178,7 +184,7 @@ flowchart TB
 
 The crate ships defaults and test doubles: `PassthroughRegistry`,
 `LocalIdentityService` in `dpp-vc`, the in-memory implementations behind the
-`test-utils` feature, and stub implementations of the backup, registry and seal
+`test-utils` feature, and stub implementations of the back-up, registry and seal
 ports (`GhostBackup`, `GhostRegistrySync`, `GhostSeal`). A stub reports itself as
 one, so an application can refuse to run on it in production.
 

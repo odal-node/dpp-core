@@ -12,7 +12,7 @@ against those texts.
 | Reference | Status | `dpp-core` alignment |
 |---|---|---|
 | ESPR (EU) 2024/1781 | In force | The core data model follows Arts. 8 to 13 |
-| CEN/CLC JTC 24 system standards | Six cited in the Official Journal on 15 July 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. The ESPR Art. 41(2) presumption attaches to the cited standards, and claiming it needs a published assessment, not only a citation (which now exists) |
+| CEN/CLC JTC 24 system standards | Six cited in the Official Journal on 15 July 2026 by CID (EU) 2026/1736: EN 18216, 18219, 18220, 18221, 18222, 18223 | **No conformance claimed.** No clause-by-clause assessment is published here. Under ESPR Art. 41(2), a digital product passport that conforms to a cited standard, or a cited part of one, is presumed to meet Arts. 10 and 11 to the extent the standard covers them. Claiming that presumption needs a published assessment, not only a citation (which now exists) |
 | EU Battery Regulation 2023/1542 | In force | `BatteryData` implements the Annex XIII fields (Art. 77 battery passport) |
 | Textile delegated act | Pending; an ESPR working-plan priority | `TextileData` is held provisional and validated structurally until the act is adopted |
 
@@ -83,8 +83,8 @@ Journal text of Regulation (EU) 2024/1781). This design follows from the general
 data-accuracy duty (Art. 9(1)) and the registry-upload duty (Art. 13(4)). An earlier
 "Art. 12" citation was wrong: Art. 12 is "Unique identifiers" (identifier issuance
 mechanics). For batteries, Regulation (EU) 2023/1542 Art. 77(7) moves responsibility to the
-operator placing on the market a battery that has undergone preparation for re-use,
-preparation for repurposing, repurposing or remanufacturing. The
+operator that places on the market, or puts into service, a battery that has undergone
+preparation for re-use, preparation for repurposing, repurposing or remanufacturing. The
 authoritative record of who holds the obligations is the EU registry, under Implementing
 Regulation (EU) 2026/1778 Art. 6a; see [COMPLIANCE.md](COMPLIANCE.md).
 
@@ -105,9 +105,10 @@ The `dpp_domain::transfer` module implements:
 
 All product group schemas are in `crates/dpp-domain/schemas/{product-group}/v{version}.json`
 and follow JSON Schema Draft-07. `VersionedSchemaRegistry` embeds them at compile time with
-`include_str!()`. That directory is the list of product groups and versions; it is not
-repeated here, because the copy this section used to carry had stopped at four product
-groups and their first versions.
+`include_str!()`. Its embedded table, in `crates/dpp-domain/src/schemas/embedded.rs`, is
+the list of product groups and versions available at runtime; a file in the directory with
+no entry there is not served. The list is not repeated here, because the copy this section
+used to carry had stopped at four product groups and their first versions.
 
 ### Textile field set
 
@@ -190,10 +191,12 @@ Art. 78(d) of Regulation (EU) 2023/1542 forbids an operator acting on behalf of 
 responsible economic operator from selling, re-using or processing passport data *"beyond
 what is necessary for the provision of the relevant storing or processing services"*.
 
-**It is met by architecture, not by a policy statement.** Every deployment serves a single
-operator, with no shared cluster, so there is no surface on which one operator's passport
-data and another's can be seen together. A cross-customer benchmark is not something the
-system declines to build; it has nowhere to compute one.
+**`dpp-core` cannot meet it alone.** It is stateless and holds no passport data, so it
+neither shares nor isolates anything, and cross-customer processing is outside what it can
+guarantee. Keeping one operator's data apart from another's is a requirement on your
+application and its infrastructure. A deployment that serves one operator per instance has
+no surface on which two operators' passport data can be seen together, and so nowhere to
+compute a cross-customer benchmark.
 
 **Where the constraint lives in code.** `PassportRepository` is the main persistence
 surface (resolver scan telemetry is processed data too), and its `list` and `count` methods

@@ -202,8 +202,9 @@ them would be worth more than another list.
 A product group does **not** determine the law that governs it, and the model does not
 pretend otherwise. `ProductGroupDescriptor` carries identity, scope, schema versions,
 disclosure classes and a plugin binding, and no legal fields at all. Status, legal
-basis, passport obligation, dates, retention and granularity are properties of an
-**(act, product group) pair** and live on `InstrumentBinding` in the second catalog. See
+basis, dates, retention and granularity are properties of an **(act, product group)
+pair** and live on `InstrumentBinding` in the second catalog. The passport obligation is
+set per act on `Instrument`, and a binding may override it for one product group. See
 [ARCHITECTURE.md](ARCHITECTURE.md) §`dpp-domain`.
 
 Three records replace what used to be one:
@@ -455,8 +456,9 @@ domain enforces lifecycle rules and retention locks but does not define audit st
 ## 6. Signatures on a published passport
 
 On publish, the passport is serialised to canonical JSON (RFC 8785) and signed with the
-operator's Ed25519 key as a compact JWS. Three signatures result, each over a different
-view, so none can stand in for another:
+operator's Ed25519 key as a compact JWS. The result is one signature over the full
+passport, one over the public view and one per audience view, each over a different view,
+so none can stand in for another:
 
 | Field | Signs |
 |---|---|

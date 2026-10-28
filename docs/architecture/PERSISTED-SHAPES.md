@@ -14,9 +14,10 @@ exists because two of the types do not work that way.
 
 `Passport` and the `ProductGroupData` variants are the literal on-disk shape of every
 passport ever stored. A non-additive change to one of them does not break a consumer at
-compile time. It makes every already-written document of that shape fail to deserialise
-the moment a deployment upgrades its `dpp-domain` version: a **runtime failure against
-data, discovered per request, with no compile-time signal**.
+compile time. The moment a deployment upgrades its `dpp-domain` version, it either makes
+already-written documents of that shape fail to deserialise or, where serde ignores or
+defaults the old field, silently drops their data: a **runtime failure against data,
+discovered per request, with no compile-time signal**.
 
 This has happened, and the cost is recorded:
 

@@ -48,7 +48,7 @@ stateDiagram-v2
 | `active` to `suspended` | A stated reason (recall, investigation and so on) | Signature kept; a resolver answers 410 |
 | `active` to `superseded` | A published successor whose `supersedes_id` points back | The old record stays readable |
 | `active` or `suspended` to `deactivated` | End of life (recycled, destroyed under a derogation, exported, lost) | Terminal; the record is kept |
-| `draft`, `active` or `suspended` to `retired` | Irreversible | Kept until `retentionUntil`, computed at publish from the instrument bindings |
+| `draft`, `active` or `suspended` to `retired` | Irreversible | A published record is kept until `retentionUntil`, computed at publish from the instrument bindings. A draft retired before publishing has no `retentionUntil` |
 
 `retired`, `superseded` and `deactivated` are terminal. Your application records every
 transition; audit storage is its concern, not the domain's.
@@ -90,15 +90,18 @@ READ PATH
 authentic?
 
 **Answer: a JWS checked against a `did:web` document.** Every published passport carries
-a compact JWS made with the manufacturer's Ed25519 private key. The matching public key
-is published in the manufacturer's `did:web` DID document at `/.well-known/did.json`.
+a compact JWS made with the signing operator's Ed25519 private key. The matching public
+key is published in that operator's `did:web` DID document at `/.well-known/did.json`.
 
 To verify:
 
-1. Fetch the manufacturer's DID document.
-2. Take the Ed25519 public key of the verification method named in the JWS header.
-3. Verify the JWS signature over the payload.
-4. If it is valid, the data is byte for byte what the manufacturer signed.
+1. Fetch the operator's DID document.
+2. Resolve the verification method the JWS `kid` names, with the binding checks in
+   [IDENTITY.md](IDENTITY.md): the document is the one the `kid` names, the method belongs
+   to it and is listed under `assertionMethod`, a thumbprint `kid` is the key's own, and a
+   declared `alg` matches the header.
+3. Verify the JWS signature over the payload with that key.
+4. If it is valid, the data is byte for byte what the operator signed.
 
 **Trust root:** DNS and HTTPS (`did:web`), the same infrastructure that secures the
 manufacturer's own website.

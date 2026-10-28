@@ -35,8 +35,8 @@ Nothing merges without maintainer approval. Force-pushes to `main` are blocked.
 
 ## Security-sensitive changes
 
-A change to `dpp-crypto`, to schema validation, or to audience and disclosure
-enforcement needs:
+A change to `dpp-crypto`, to credential, DID or status-list verification in `dpp-vc`, to
+schema validation, or to audience and disclosure enforcement needs:
 
 1. A review focused on cryptographic and access-control correctness.
 2. A statement of the security implications in the pull request description.

@@ -29,9 +29,9 @@ plugins, and **the guest** is the plugin.
 > changes which plugin runs. See [DATA-MODEL.md](DATA-MODEL.md) §3.4.
 
 ```text
-ComplianceRegistry::compute(product_group, data)
+ComplianceRegistry::compute(product_group_key, data, law_in_force_on)
     |
-    +-- has plugin? --> PluginHost::compute(product_group, data)
+    +-- has plugin? --> PluginHost::compute(product_group_key, data)
     |                       |
     |                       +-- JSON in through linear memory
     |                       +-- calculate_metrics()
@@ -51,8 +51,10 @@ logic. Its implementations do different jobs:
 | Plugin-backed registry | a host application | Delegates to `PluginHost` and the Wasm product group plugins. **The standard open determination path** |
 | Any other implementation | a host application | For example, calculators from `dpp-calc` wired in by your application |
 
-A computed determination passes through `gate_determination(catalog.is_in_force(product_group), …)`
-so that a **provisional** product group can never produce a binding `Compliant` or
+A computed determination passes through `gate_determination(in_force, …)`, where
+`in_force` is whether `InstrumentCatalog::determinable_for(product_group)` returns any
+(act, binding) pair. Record that act with the determination. The gate means a
+**provisional** product group can never produce a binding `Compliant` or
 `NonCompliant`; it is downgraded to `NotAssessed`.
 
 **Validation is independent of all this.** `validate_product_group_data` (JSON Schema
@@ -67,8 +69,9 @@ the library.
 Besides metrics and status, a plugin's `calculate_metrics` returns two finding lists on
 `PluginResult` (ABI 1.1, backward-compatible):
 
-- `violations`: **binding**. The host blocks publish when the product group's passport
-  obligation `is_in_force` and `violations` is non-empty.
+- `violations`: **binding**. The host blocks publish when an in-force act reaches the
+  product group (`InstrumentCatalog::determinable_for` returns a pair) and `violations`
+  is non-empty. Whether the act also requires a passport does not enter into it.
 - `warnings`: **advisory or experimental**. Shown on the determination but never blocking
   (for example, a recycled-content target that is not yet in force).
 
@@ -197,7 +200,9 @@ the compliance calculations, and returns a typed `PluginResult`.
 
 ## 6. Security model
 
-Plugins run in a sandboxed Wasm environment with no access to the host system:
+A host must run plugins in a Wasm sandbox with no access to the system it runs on. This
+library ships no host, so the table states what a host must enforce, not what the library
+guarantees:
 
 | Capability | Status |
 |---|---|
@@ -208,7 +213,7 @@ Plugins run in a sandboxed Wasm environment with no access to the host system:
 | CPU | Capped by fuel metering |
 | Memory | Capped per instance |
 
-The host sets the specific fuel and memory limits.
+The host must set the fuel and memory limits; this library does not choose them.
 
 ---
 

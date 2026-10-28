@@ -13,6 +13,8 @@ The development workflow, CI requirements and code review expectations for `dpp-
 - **cargo-audit** and **cargo-deny:** dependency advisories, licences, bans and sources.
   `just check` runs both (`cargo install cargo-audit cargo-deny`).
 - **`wasm32-wasip1` target:** only for plugin builds (`rustup target add wasm32-wasip1`).
+- **`wasm32-unknown-unknown` target:** only for `just wasm-build`, which `just ci` runs on
+  `dpp-domain` and `dpp-registry` (`rustup target add wasm32-unknown-unknown`).
 
 Optional:
 

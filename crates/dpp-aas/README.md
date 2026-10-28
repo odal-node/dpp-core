@@ -104,9 +104,9 @@ identical to a published concept. It is a claim about another organisation's
 vocabulary, in a format most likely to be consumed without a person reading it. So
 this crate follows one rule:
 
-> Every emitted `semanticId` is either in the `urn:odal-node:` namespace, or carries a
-> provenance record naming who verified it against the authority's own published
-> source, and when.
+> Every emitted `semanticId` is either in the `urn:odal-node:` namespace, or is backed by a
+> provenance record in `dpp-vocab` naming who verified it against the authority's own
+> published source, and when. The record is not carried on the wire.
 
 **A test enforces the rule.** CI fails on any identifier that is neither in our own
 namespace nor a verified vocabulary.
@@ -116,7 +116,8 @@ class of claim has one home whichever projection carries it. `dpp_vocab::is_own`
 answers the namespace question and `VocabularyRegister` answers the rest. Identifiers
 evaluated and not adopted are recorded there too, under the authority that publishes
 them (`idta`, `eclass`, `catena-x-battery-pass`), each with the finding and what would
-change it. **No vocabulary is verified yet, so this crate emits none.**
+change it. **No third-party vocabulary is verified for this crate yet, so it emits only
+`urn:odal-node:` identifiers.**
 
 Adopting a third-party identifier means a person reads the authority's own source and
 the vocabulary record moves to `verified`. A status field is never edited on faith.

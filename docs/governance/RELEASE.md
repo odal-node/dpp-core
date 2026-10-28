@@ -30,9 +30,10 @@ Before running `cargo release`:
    builds and the oracle suites.
 2. **CHANGELOG.md is updated:** move the items from `[Unreleased]` to a new version heading
    with today's date, following Keep a Changelog.
-3. **Breaking changes are reconciled:** run `just semver`. It lists every public API removal
-   since the last published release, and **every entry must already appear under
-   `### Breaking` in the CHANGELOG**. An entry that does not is the finding: a break nobody
+3. **Breaking changes are reconciled:** run `just semver`. It lists the public API breaks it
+   detects since the last published release, and **every entry must already appear under
+   `### Breaking` in the CHANGELOG**. It misses some, such as a changed parameter type, so
+   also read the diff of public signatures and record any break it finds the same way. An entry that does not is the finding: a break nobody
    recorded, which is how 0.13.0 withdrew public constants without announcing it.
 
    Do **not** read a red result as "change the bump level". Under the pre-1.0 rules in

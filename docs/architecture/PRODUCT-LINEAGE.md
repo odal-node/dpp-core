@@ -68,7 +68,8 @@ Four requirements follow directly from that text:
   predecessors. This is not a corner case: a stationary storage pack assembled from
   several retired EV packs is the typical second-life product.
 - **R3: responsibility transfers** to the operator placing the second-life unit on the
-  market. The link and the responsibility move are one event, not two.
+  market or putting it into service. The link and the responsibility move are one event,
+  not two.
 - **R4: four distinct operations** are named: *preparation for re-use*, *preparation for
   repurposing*, *repurposing* and *remanufacturing*.
 

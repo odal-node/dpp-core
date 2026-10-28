@@ -110,17 +110,23 @@ ComplianceRegistry (port trait)
 law_in_force_on: Option<NaiveDate>)` routes to a per-group `ComplianceStrategy`, whose
 `compute(&self, data, law_in_force_on)` returns a `ComplianceResult`. The Apache-2.0
 default (`PassthroughRegistry`) computes nothing and returns `PassthroughNoValidation` for
-every product group; real determinations come from the Wasm product group plugins. A
-computed determination passes through
-`gate_determination(catalog.is_in_force(product_group), …)`, so a provisional product
-group can never produce a binding result. This separation means:
+every product group, including one with no registered strategy, which gets
+`ComplianceResult::passthrough()` rather than an error. `UnknownProductGroup` is for an
+implementation that genuinely cannot serve a group; an implementation may return it, and
+this one never does. Real determinations come from the Wasm product group plugins. A
+computed determination passes through `gate_determination(in_force, …)`, where `in_force`
+is whether `InstrumentCatalog::determinable_for(product_group)` returns any (act,
+binding) pair, so a provisional product group can never produce a binding result. This
+separation means:
 
 - **The library stays generic:** no product-group-specific determination logic in the
   workspace crates.
 - **Regulations are isolated:** a Battery Regulation change touches only
   `product-group-battery` and the shared rules in `dpp-rules`.
-- **New product groups are additive:** a new delegated act means a new schema file, a
-  catalog manifest and a plugin.
+- **New product groups are additive:** a new delegated act means a new versioned schema
+  file, a catalog manifest and a plugin. A typed data struct and its `ProductGroupData`
+  variant follow; until they exist, the group's data is carried as
+  `ProductGroupData::Other`.
 
 ## Cryptography
 
@@ -171,8 +177,8 @@ published 17 July 2026, in force on the twentieth day after publication, **Art. 
   mandatory data, conformity with the required granularity level and, *where relevant*,
   validity of the commodity code. `RegistrationPayload::check_coherence` runs the coherence
   and level checks (points (b) and (c)) against the passport, over the fields this crate
-  registers. Which data the registry treats as mandatory is not yet published for any
-  product group.
+  registers. No binding specification of which data the registry treats as mandatory has
+  been published for any product group yet.
 - **Transfer of registered passports** (**Art. 6a**): a registered passport "may be
   transferred to another verified economic operator or, where applicable, to a verified
   value chain actor that takes over the obligations from the previous actor ... from the

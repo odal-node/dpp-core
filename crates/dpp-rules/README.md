@@ -12,8 +12,8 @@ These are the rules JSON Schema cannot express: fibre percentages summing to abo
 100%, an SVHC concentration above 0.1% triggering disclosure, a surfactant band being
 one of the four EU labels. Each rule is implemented **once** here and used by both
 `dpp-domain` (validation without a Wasm host) and the Wasm product group plugins
-(through `dpp-plugin-sdk::rules`). Because this crate is `no_std` with no dependencies,
-both can depend on it without depending on each other.
+(through `dpp-plugin-sdk::rules`). Because the default build is `no_std` with no
+dependencies, both can depend on it without depending on each other.
 
 ## When to use this crate
 

@@ -170,8 +170,10 @@ minimum values here, keyed by battery category, and switch the battery plugin fr
 ### Battery carbon footprint class: pending delegated act
 
 The battery schema carries `carbonFootprintClass`. Art. 7(2) defines **no class labels**: it
-defers both the classes and the methodology to a **Commission Delegated Regulation under
-Art. 7(2)** that has not been adopted, and requires the Commission to "review the number of
+defers the classes to a **Commission Delegated Regulation under Art. 7(2)** that has not
+been adopted. The calculation methodology the classes are read against is a separate
+delegated act, under Art. 7(1), fourth subparagraph, point (a). Art. 7(2) also requires the
+Commission to "review the number of
 performance classes and the thresholds between them, every three years". The schema's `A–E`
 enumeration was therefore never sourced from the regulation, and is due for removal. Treat
 the class label as an opaque string carried with the ruleset id and version that produced

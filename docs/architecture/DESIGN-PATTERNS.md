@@ -106,8 +106,9 @@ per port is simpler to use, and the runtime markers do the job either way.
 
 `RegistrySyncPort` itself reflects the registry as published: `register` returns an
 acknowledgement, not a registration, and `check_submission`, `find_submission`,
-`confirm_submission` and `check_status` follow the asynchronous validation Implementing
-Regulation (EU) 2026/1778 describes.
+`confirm_submission` and `check_status` follow the asynchronous validation that
+[Implementing Regulation (EU) 2026/1778](https://eur-lex.europa.eu/eli/reg_impl/2026/1778/oj)
+describes.
 
 ---
 

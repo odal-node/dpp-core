@@ -148,7 +148,8 @@ verify_jws(jws_compact, &key)?;
 
 The verifier:
 
-1. Fetches the issuer's DID document (by the `did:web` resolution rule).
+1. Takes the issuer's DID document as an argument. This library does no network I/O, so
+   your application fetches it first, by the `did:web` resolution rule.
 2. Resolves the verification method the JWS `kid` names, with the binding checks of
    Controlled Identifiers v1.0 §3.3: the document is the one the `kid` names, the method
    belongs to that document, and `assertionMethod` references it. A `kid` that is a
@@ -195,9 +196,9 @@ from: `build_qr_url` returns `None` for it, and the caller chooses the carrier.
   CSET 82 characters. Below batch level the serial alone resolves the label, and the lot
   stays operator free text that no carrier prints.
 
-The carrier **fails closed**: if the passport does not verify, no URI is produced, and if
-the product group data has no GTIN (an unsold-goods report, for example), resolution
-returns `422` rather than a misleading code. Because the carrier is standard GS1 Digital
+`build_qr_url` does **not** verify the passport: verify it before you build its carrier.
+If the product group data has no GTIN (an unsold-goods report, for example), the builder
+returns `Ok(None)`, because there is no GS1 Digital Link to print. Because the carrier is standard GS1 Digital
 Link, any conformant resolver serving the same path answers the same scan, so moving a
 passport is a DNS or registry change, not a reprint.
 
