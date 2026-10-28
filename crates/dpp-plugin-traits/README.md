@@ -4,20 +4,21 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-plugin-traits)](https://docs.rs/dpp-plugin-traits)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Host/guest ABI contract for [Odal Node](https://odal-node.io) Wasm product group plugins.
+The host and guest contract for Wasm product group plugins in EU Digital Product
+Passport systems. Part of [dpp-core](https://github.com/odal-node/dpp-core) by
+[Odal Node](https://odal-node.io).
 
-Uses `std` types (`String`, `Vec`, `HashMap`) — **not** `no_std`. Defines the
-interface between a host runtime (a Wasmtime host) and
-product-group-specific compliance rules compiled to `wasm32-wasip1`. This crate
-contains no business logic — only the shared types that both sides of the
-boundary agree on.
+It defines the interface between a host runtime (a wasmtime host, for example) and
+product-group-specific compliance rules compiled to `wasm32-wasip1`. It holds no
+business logic, only the types both sides of the boundary agree on. It uses `std` types
+(`String`, `Vec`, `HashMap`) and is **not** `no_std`.
 
 ## When to use this crate
 
-- You are authoring a new product group plugin (a Rust crate compiled to Wasm) and need
-  the `DppProductGroupPlugin` trait.
-- You are building a Wasmtime host that loads product group plugins and need the ABI types
-  for capability negotiation and field error reporting.
+- You write a product group plugin (a Rust crate compiled to Wasm) and need the
+  `DppProductGroupPlugin` trait.
+- You build a host that loads product group plugins and need the ABI types for
+  capability negotiation and field error reporting.
 
 ## Example
 
@@ -30,8 +31,8 @@ use serde_json::Value;
 struct BatteryPlugin;
 
 impl DppProductGroupPlugin for BatteryPlugin {
-    // `meta()` and `capabilities()` are built from these two for you —
-    // override them directly only if a plugin needs different values.
+    // `meta()` and `capabilities()` are built from these two for you.
+    // Override them directly only if a plugin needs different values.
     fn plugin_identity(&self) -> PluginIdentity {
         PluginIdentity {
             product_group: "battery",
@@ -66,13 +67,13 @@ impl DppProductGroupPlugin for BatteryPlugin {
 
 ## Relationship to other crates
 
-This crate has **no workspace dependencies** — it is self-contained by design so
-that plugin authors have a minimal, stable dependency.
+This crate has **no workspace dependencies**, so plugin authors get a small, stable
+dependency. `dpp-plugin-sdk` builds the guest-side ABI on top of it.
 
 ## Minimum Rust version
 
-1.96 (MSRV is enforced in CI)
+1.96, enforced in CI.
 
-## License
+## Licence
 
-Apache-2.0 — see [LICENSE](../../LICENSE)
+Apache-2.0. See [LICENSE](../../LICENSE).

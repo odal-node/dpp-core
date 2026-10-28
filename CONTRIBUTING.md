@@ -1,91 +1,90 @@
-# Contributing Guide
+# Contributing
 
-This document is for anyone contributing to `dpp-core` — the Odal Node standard library workspace. It covers setup, coding conventions, testing strategy, commit format, and the PR workflow.
+How to build, test and change `dpp-core`.
 
----
+**Open an issue first for anything larger than a typo.** This code encodes EU
+regulation, and a change that looks like a refactor can move a rule to a place where no
+test checks it. If the change touches a regulatory constant, threshold, date, product
+scope or disclosure class, name the **primary source** you read in the issue: the
+Official Journal text, the standard, or the regulator's own published guidance. A blog
+post, summary or secondary tracker is not a source, and a change without a primary
+source is not merged.
+
+Documentation follows §10. The code of conduct is in
+[GOVERNANCE.md](GOVERNANCE.md#code-of-conduct).
 
 ## 1. Prerequisites
 
-| Tool | Minimum Version | Install |
+| Tool | Version | Install |
 |---|---|---|
-| Rust | see `rust-toolchain.toml` | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| Rust | pinned in `rust-toolchain.toml` | [rustup.rs](https://rustup.rs) |
 | just | latest | `cargo install just` |
+| cargo-nextest | latest | `cargo install cargo-nextest` |
+| cargo-audit | latest | `cargo install cargo-audit` |
+| cargo-deny | latest | `cargo install cargo-deny` |
 
-Optional but recommended:
+The Wasm targets (`wasm32-wasip1` for plugins, `wasm32-unknown-unknown` for the
+wasm-safe crates) are only needed to build plugins or run `just wasm-build`.
 
-| Tool | Purpose |
-|---|---|
-| `cargo-nextest` | Fast parallel test runner: `cargo install cargo-nextest` |
-| `cargo-audit` | Security advisory check: `cargo install cargo-audit` |
-| `cargo-watch` | Auto-recompile on file change: `cargo install cargo-watch` |
+No Docker, database or external service is needed.
 
-No Docker, no database, no external services required. This is a pure library.
-
----
-
-## 2. Local Setup
+## 2. Build and test
 
 ```bash
 git clone https://github.com/odal-node/dpp-core.git
 cd dpp-core
-
 cargo build --workspace
 cargo nextest run --workspace
-just check    # fmt-check + lint + test + audit
+just check
 ```
 
-That's it. Everything compiles and tests with nothing else running.
-
-### `just` Commands
-
-| Command | Description |
+| Command | What it runs |
 |---|---|
-| `just check` | Full gate: `fmt-check` + `lint` + `test` + `audit` |
-| `just build` | `cargo build --workspace --release` |
-| `just test` | `cargo nextest run --workspace` |
-| `just lint` | `cargo clippy --workspace --all-targets -- -D warnings` |
+| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny` |
+| `just ci` | `just check` plus the Wasm cross-compiles (`wasm-build`), the plugin builds (`build-plugins`) and the test-count check (`test-count`). Run it before pushing. Hosted CI also runs jobs no recipe runs, such as the oracle suites |
+| `just test` | `cargo nextest run --workspace --all-features` (no doctests) |
+| `just test-doc` | Doctests, including the crate READMEs |
+| `just lint` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` |
 | `just fmt` | `cargo fmt --all` |
-| `just fmt-check` | CI-safe format check |
-| `just audit` | `cargo audit` |
-| `just build-plugins` | Compile all Wasm product group plugins (`wasm32-wasip1`) |
-| `just clean` | `cargo clean` |
+| `just build-plugins` | Build every Wasm product group plugin for `wasm32-wasip1` |
+| `just wasm-build` | Cross-compile the crates that must stay wasm-safe |
+| `just schema-changes` | Regenerate `docs/architecture/SCHEMA-CHANGES.md` from the schemas |
 
----
+`just --list` shows every recipe. `just check` does not cross-compile, so the Wasm
+jobs can still fail in CI after it passes locally.
 
-## 3. Workspace Structure
+On a 16 GB machine, `just check` can run out of memory at full parallelism. Set
+`CARGO_BUILD_JOBS=3` if it does.
 
-```
+## 3. Workspace layout
+
+```text
 dpp-core/
-  Cargo.toml              # Workspace root — 12 member crates + benches
-  LICENSE                  # Apache-2.0
+  Cargo.toml            workspace root: 12 member crates and benches
   crates/
-    dpp-domain/           # Domain types, port traits, ProductGroupCatalog, VersionedSchemaRegistry
-      schemas/            # Versioned JSON schemas, embedded via include_str! (the product):
-                          #   aluminium, battery, construction, detergent, electronics,
-                          #   furniture, mattress, steel, textile, toy, tyre,
-                          #   unsold-goods  — 12 product groups, 30 versions
-    dpp-rules/            # Pure no_std, zero-dep cross-field regulatory rules
-    dpp-crypto/           # Ed25519, AES-GCM, JWS, encrypted keystore
-    dpp-vc/               # W3C VCs, did:web, status lists, LocalIdentityService, JSON-LD
-    dpp-digital-link/     # GS1 Digital Link parser, link-type negotiation
-    dpp-aas/              # Asset Administration Shell shells and submodels
-    dpp-calc/             # EU-methodology calculators (CO2e, repairability)
-    dpp-plugin-traits/    # Wasm plugin ABI (no_std)
-    dpp-plugin-sdk/       # Guest-side SDK: export_plugin! macro + Validator
-    dpp-registry/         # EU registry interface types (wasm32-safe)
-    dpp-vocab/            # External vocabulary authorities, one file per authority
-    dpp-tests/            # Cross-crate integration tests and structural tripwires (publish = false)
-  benches/                 # Criterion benchmarks (workspace member)
-  plugins/                 # 11 product group Wasm plugins (excluded from workspace)
-    product-group-battery/  product-group-textile/  product-group-steel/  product-group-electronics/
-    product-group-aluminium/  product-group-construction/  product-group-detergent/
-    product-group-furniture/  product-group-mattress/  product-group-toy/  product-group-tyre/
-  docs/                    # Architecture and design documentation
+    dpp-domain/         domain types, port traits, catalogs, VersionedSchemaRegistry
+      product-groups/   one manifest per product group
+      instruments/      one manifest per EU act
+      schemas/          versioned JSON Schemas, embedded with include_str!
+    dpp-rules/          no_std, zero-dependency cross-field regulatory rules
+    dpp-crypto/         Ed25519, AES-GCM, JWS, JAdES, SD-JWT, encrypted keystore
+    dpp-vc/             W3C VCs, did:web, status lists, LocalIdentityService, JSON-LD
+    dpp-digital-link/   GS1 Digital Link parser, link-type negotiation
+    dpp-aas/            Asset Administration Shell shells and submodels
+    dpp-calc/           EU-methodology calculators (CO2e, repairability)
+    dpp-plugin-traits/  Wasm plugin ABI
+    dpp-plugin-sdk/     guest-side SDK: export_plugin! macro and Validator
+    dpp-registry/       EU registry types (wasm32-safe)
+    dpp-vocab/          external vocabulary register, one file per authority
+    dpp-tests/          cross-crate integration tests and structural checks (not published)
+  benches/              Criterion benchmarks
+  plugins/              11 product group plugins (wasm32-wasip1, outside the workspace)
+  docs/                 architecture, regulatory and governance documents
 ```
 
 ### Dependency Rules
 
-The dependency graph is strictly acyclic:
+The dependency graph is acyclic:
 
 ```
 dpp-rules         -> (standalone, no internal deps; no_std, zero-dep)
@@ -104,60 +103,57 @@ dpp-tests         -> dpp-domain, dpp-crypto, dpp-vc
 dpp-benches       -> dev only: dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas, dpp-calc, dpp-tests
 ```
 
-`dpp-rules` is the one home for identifier syntax — GTIN check digits, GS1
-CSET 82 — so anything that has to agree with the domain about whether an
-identifier is well formed depends on it directly rather than restating the
-table. It is `no_std` and zero-dependency, which is what makes that edge free
-to add.
+`crates/dpp-tests/tests/crate_graph.rs` parses the block above and compares it with
+the manifests, so update both together.
 
-`dpp-tests` keeps three of its edges as real dependencies rather than dev ones
-because `src/fixtures.rs` is a library consumed by the integration tests. The
-crate is `publish = false`, so none of its edges reach a vendored graph.
+`dpp-rules` is the single home for identifier syntax (GTIN check digits, GS1 CSET 82).
+Anything that must agree with the domain about whether an identifier is well formed
+depends on it directly instead of restating the table. Because `dpp-rules` is `no_std`
+with no dependencies, that edge costs nothing.
 
-**No crate's `[dependencies]` may name**: axum, tokio, tower, sqlx, redis,
-reqwest, or any other HTTP/database/infrastructure crate. If a runtime
-dependency pulls in an async runtime or network I/O, it does not belong here.
+`dpp-tests` keeps three edges as normal dependencies because `src/fixtures.rs` is a
+library used by the integration tests. The crate is `publish = false`, so none of these
+edges reach a published graph.
 
-`[dev-dependencies]` are the exception, and only for a test runtime: `tokio`
-with `rt` and `macros` appears in `dpp-crypto`, `dpp-domain`, `dpp-vc` and
-`dpp-tests` so that `#[tokio::test]` can drive the async port traits. A test
-runtime is never compiled into the published library and never reaches anyone
-who vendors it. Nothing else on that list is permitted in either table.
+**No crate's `[dependencies]` may name** axum, tokio, tower, sqlx, redis, reqwest, or
+any other HTTP, database or infrastructure crate. A dependency that brings in an async
+runtime or network I/O does not belong in this workspace.
 
-The product group plugins are held to the same list, and more strictly: a plugin
-is deterministic and free of I/O by contract, and is loaded into a host as Wasm,
-so none of those crates may appear anywhere in `plugins/Cargo.lock`, directly or
-transitively. Not even `tokio` as a test runtime.
+The one exception is a test runtime in `[dev-dependencies]`: `tokio` with `rt` and
+`macros` in `dpp-crypto`, `dpp-domain`, `dpp-vc` and `dpp-tests`, so `#[tokio::test]`
+can drive the async port traits. It is never compiled into a published crate.
 
-`crates/dpp-tests/tests/crate_graph.rs` checks the graph above and these rules
-against the manifests.
+Plugins are held to a stricter rule. A plugin is deterministic and does no I/O, and it
+runs inside a host as Wasm, so none of those crates may appear anywhere in
+`plugins/Cargo.lock`, directly or transitively, not even `tokio` for tests.
 
----
-
-## 4. Coding Conventions
+## 4. Code conventions
 
 ### Where a file goes
 
-[`docs/architecture/CODE-LAYOUT.md`](docs/architecture/CODE-LAYOUT.md) is the
-standard: one public type per file, `mod.rs` is a pure index, tests are siblings
-rather than inline, every file opens with a `//!` doc, only `lib.rs` sits at a
+[`docs/architecture/CODE-LAYOUT.md`](docs/architecture/CODE-LAYOUT.md) is the standard:
+one public type per file, `mod.rs` is a pure index, tests live in sibling files rather
+than inline, every file opens with a `//!` doc comment, and only `lib.rs` sits at a
 crate's `src/` root.
 
-Most of those rules are enforced by tripwires in `crates/dpp-tests/tests/`, so
-`just check` will tell you before a reviewer does. Each carries a baseline of
-files that already violate it; those are being worked through. **Do not add to a
-baseline to go green** — fix the file, or mark it with a
-`// LAYOUT-DEVIATION: <reason>` comment, which is greppable and has to state why.
+Tests in `crates/dpp-tests/tests/` enforce most of these rules, so `just check` reports
+a violation before a reviewer does. Each test carries a baseline of files that already
+violate it. **Do not add a file to a baseline to make the check pass.** Fix the file, or
+mark it with a `// LAYOUT-DEVIATION: <reason>` comment that states why.
 
-### Pure Domain Code
+### No I/O in library code
 
-Every module in this workspace must compile without I/O crates. If you are importing `axum`, `sqlx`, or `async-nats`, that code belongs downstream, not here.
+Every crate compiles without I/O crates. Code that imports `axum`, `sqlx` or
+`async-nats` belongs in your application.
 
-The `KeyStore` in `dpp-crypto` uses `std::fs` for key file persistence — this is accepted as "configuration I/O" (reading a local file the operator placed there), not "business I/O" (calling a database or network service).
+`KeyStore` in `dpp-crypto` reads and writes its key file with `std::fs`. That is
+configuration I/O (a local file the operator chose), not a call to a database or a
+network service, and it is the only exception.
 
-### Error Types
+### Errors
 
-Library crates define typed error enums using `thiserror`. No `String` errors in domain code — always use typed variants so callers can pattern-match.
+Library crates define typed error enums with `thiserror`, so callers can match on
+variants. No `String` errors in domain code.
 
 ```rust
 #[derive(Debug, thiserror::Error)]
@@ -172,117 +168,116 @@ pub enum CryptoError {
 
 ### Logging
 
-All crates use `tracing`. Never log secrets — API keys, private keys, and passphrases must never appear in log output.
+All crates use `tracing`. API keys, private keys and passphrases never appear in log
+output.
 
-### Clippy and Formatting
+### Lints and formatting
 
-All code must pass:
-- `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo fmt --all --check`
+Code passes `cargo clippy --workspace --all-targets --all-features -- -D warnings` and
+`cargo fmt --all --check`.
 
----
+## 5. Tests
 
-## 5. Testing Strategy
-
-| Test type | Location | Scope |
+| Kind | Where | Scope |
 |---|---|---|
-| Unit test | `src/*.rs` (inline `#[cfg(test)]`) | Pure logic, no I/O |
-| Integration test | `tests/` directory per crate | Crypto operations with temp files |
+| Unit tests | a sibling `tests.rs` (or `<name>_tests.rs`) next to the code | Pure logic |
+| Crate integration tests | `crates/<crate>/tests/` | One crate's public API |
+| Cross-crate and structural tests | `crates/dpp-tests/tests/` | Behaviour across crates, layout rules, documentation drift |
+| Doctests | each crate's README and doc comments | The examples readers copy |
 
-All tests run without Docker, without a database, without network access. If a test needs infrastructure, it belongs downstream.
+No test needs Docker, a database or network access.
 
-### The `#[cfg(test)]` Fixture Pattern
+## 6. Changing a schema
 
-Domain entities provide `_fixture()` associated functions for test setup, gated behind `#[cfg(test)]` so they never appear in production builds.
+A published schema version is never edited: a passport validated against it must stay
+valid against it. Every change is a new version.
 
----
+To add a version to an existing product group:
 
-## 6. Schema Contribution
+1. Add `crates/dpp-domain/schemas/<product-group>/v<version>.json`.
+2. Add an `EmbeddedSchema` entry for it in `crates/dpp-domain/src/schemas/embedded.rs`.
+3. If it becomes the current version, update `currentSchemaVersion` in
+   `crates/dpp-domain/product-groups/<product-group>.json`.
+4. Run `just schema-changes` to regenerate
+   [`docs/architecture/SCHEMA-CHANGES.md`](docs/architecture/SCHEMA-CHANGES.md).
+5. If the change is not purely additive, read
+   [`docs/architecture/PERSISTED-SHAPES.md`](docs/architecture/PERSISTED-SHAPES.md)
+   first. Every stored passport must still deserialise, or be refused on purpose by a
+   version lens that has no safe bridge for it, with the reason documented there.
 
-To add a new schema version for an existing product group:
+`just check` reports any document or table that has drifted from the schemas.
 
-1. Add `schemas/{product-group}/v{new_version}.json`
-2. The `VersionedSchemaRegistry` picks it up automatically via `include_str!()`
-3. No code changes required — the registry discovers all embedded versions at compile time
+## 7. Commits
 
-To add a new product group:
+[Conventional Commits](https://www.conventionalcommits.org/) v1.0.0:
 
-1. Add `schemas/{product-group}/v1.0.0.json`
-2. Register the `include_str!()` call in `dpp-core/src/schemas/mod.rs`
-3. Add the corresponding validation entry in `dpp-core/src/domain/validation.rs`
-
----
-
-## 7. Commit Format
-
-All commits follow [Conventional Commits](https://www.conventionalcommits.org/) v1.0.0:
-
-```
+```text
 <type>(<scope>): <subject>
 ```
 
-**Types:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `security`
+- **Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `chore`, `ci`, `build`, `style`, `revert`. CI rejects any other type.
+- **Scopes:** the crate or area touched, for example `domain`, `rules`, `crypto`, `vc`,
+  `digital-link`, `aas`, `calc`, `registry`, `vocab`, `schemas`, `plugins`, `deps`,
+  `ci`, `docs`. Never the repository's own name.
+- **Subject:** imperative mood, under 50 characters.
+- **Breaking change:** `!` after the scope, for example
+  `feat(domain)!: remove deprecated field from Passport`.
 
-**Scopes:** `domain`, `rules`, `crypto`, `digital-link`, `calc`, `plugin-traits`, `plugin-sdk`, `registry`, `schemas`, `ci`, `docs`
-
-**Examples:**
-```
-feat(crypto): add JWS verification for archived key rotation
-fix(core): handle empty product group string in VersionedSchemaRegistry
-docs(schemas): add textile v1.1.0 schema for ESPR amendment
+```text
+feat(crypto): verify JWS against an archived key
+fix(domain): handle an empty product group in VersionedSchemaRegistry
+docs(schemas): add battery v2.11.0
 chore(deps): upgrade ed25519-dalek to 2.2.1
 ```
 
-Breaking changes use `!` after the scope: `feat(domain)!: remove deprecated field from Passport`.
+### Sign-off
 
-### Developer Certificate of Origin (DCO)
-
-All commits must be signed off under the
-[Developer Certificate of Origin v1.1](https://developercertificate.org/).
-By adding a `Signed-off-by:` line, you certify that you wrote or have the
-right to submit the contribution under the project's Apache-2.0 license.
-
-Add it automatically with the `-s` flag:
+Sign off every commit under the
+[Developer Certificate of Origin v1.1](https://developercertificate.org/). The
+`Signed-off-by:` line certifies that you wrote the contribution, or have the right to
+submit it under Apache-2.0.
 
 ```bash
-git commit -s -m "feat(domain): add new port trait"
+git commit -s -m "feat(domain): add a port trait"
 ```
 
-This produces:
+## 8. Pull requests
 
-```
-feat(domain): add new port trait
+- Every change goes through a pull request. Nobody pushes directly to `main`.
+- CI passes: build, tests, clippy, audit, format, Wasm builds.
+- A change to a port trait explains its effect on implementers.
+- A new dependency is justified in the description.
+- The pull request title is a Conventional Commit.
+- Branch names follow the type: `feat/schema-registry-versioning`,
+  `fix/crypto-key-rotation-archive`, `docs/wasm-target-guide`.
 
-Signed-off-by: Your Name <your.email@example.com>
-```
+## 9. Security practices
 
-CI will reject commits missing the sign-off line.
+- **No hard-coded secrets**, including in tests. Use temporary files with random names.
+- **No `unsafe` code** without a recorded architecture decision.
+- **No `unwrap()` or `expect()` on library code paths.** Tests and examples may use them.
+- **`cargo audit` passes** in CI.
 
----
+Report vulnerabilities privately to **security@odal-node.io**, never in a public issue.
+See [SECURITY.md](SECURITY.md).
 
-## 9. Pull Request Workflow
+## 10. Documentation
 
-- Every change goes through a PR. No direct pushes to `main`.
-- All CI checks must pass: build, test, clippy, audit, fmt.
-- PRs that modify port traits must explain the downstream impact.
-- PRs that add a new dependency must state why in the PR description.
-- PR titles follow the same Conventional Commits format.
-
-### Branch Names
-
-```
-feat/schema-registry-versioning
-fix/crypto-key-rotation-archive
-docs/wasm-target-guide
-```
-
----
-
-## 10. Security Practices
-
-- **No hardcoded secrets** anywhere, including tests. Use temp files with random names.
-- **No `unsafe` code** without an explicit ADR.
-- **No `unwrap()` or `expect()` in library code paths.** Only in tests.
-- **`cargo audit`** must pass in CI.
-
-Report security vulnerabilities to **security@odal-node.io** — do not open public issues.
+- **Show, then explain.** Put the command or the code first and the reasoning after it.
+- **Describe mechanisms, not virtues.** Say what the code does and when it refuses, not
+  that it is safe or robust.
+- **One fact, one home.** A version, date, count or list that already lives in code or
+  in a generated file is linked, not copied into prose, where it would go stale without
+  failing a test. Passport dates live in the instrument catalog in `dpp-domain`.
+- **Say what is not done.** Planned behaviour is never written in the present tense.
+  Describe it in the future tense and say what would make it true.
+- **Cite EU acts by number and article**, for example "Regulation (EU) 2023/1542,
+  Art. 77(2)". Official Journal text may be quoted. Any other regulatory date is written
+  beside the article that sets it.
+- **Never quote a CEN, CENELEC or ISO standard.** They are sold per reader. Cite the
+  clause and describe what it requires in your own words.
+- **Name no product built on this workspace and no path into another repository.** A
+  reader who vendored a crate from crates.io can follow neither. Write what an
+  implementation must do instead.
+- **No em dashes and no double hyphens in prose.** Headings use sentence case, and code
+  blocks carry a language tag.

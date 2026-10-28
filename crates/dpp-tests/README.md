@@ -2,28 +2,26 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Cross-crate integration tests for Odal Node core. This crate contains
-integration tests in `tests/` that exercise multiple core crates together
-(`dpp-domain`, `dpp-crypto`, `dpp-digital-link`, `dpp-aas`, `dpp-vc`) and is intentionally not
-published to crates.io (`publish = false`). Moving integration tests into a
-real workspace member ensures they run as part of `cargo test --workspace` and
-CI.
+Cross-crate integration tests and structural checks for `dpp-core`. Not published to
+crates.io (`publish = false`). As a workspace member it runs with every
+`cargo test --workspace` and in CI.
 
-## When to use this crate
+The tests in `tests/` cover two things:
 
-- To run the cross-crate integration test suite locally or in CI.
-- If you need examples of how core crates interact (credential issuance,
-  passport generation, digital link handling), check the tests in `tests/`.
+- **Behaviour across crates:** credential issuance, passport generation, transfer of
+  responsibility, audience gatekeeping, Digital Link handling, AAS mapping, schema
+  conformance.
+- **Drift and layout checks:** the crate graph in `CONTRIBUTING.md`, the schema table and
+  headings in `DATA-MODEL.md`, the port inventory in `PORTS.md`, the standards register,
+  the publication boundary, file layout rules, and the generated `SCHEMA-CHANGES.md`.
 
 ## Run the tests
-
-From the repository root run:
 
 ```bash
 cargo test -p dpp-tests
 ```
 
-Or run the full workspace test suite:
+Or the whole workspace:
 
 ```bash
 cargo test --workspace
@@ -33,16 +31,17 @@ cargo test --workspace
 
 | Crate | Role |
 |---|---|
-| `dpp-domain` | Provides domain objects used by the integration tests |
-| `dpp-crypto` | Provides crypto primitives used in tests |
-| `dpp-digital-link` | Used by tests that exercise GS1 / digital link interactions |
-| `dpp-aas` | Used by tests that exercise AAS submodel mapping |
-| `dpp-vc` | Used by tests that exercise credentials and access gatekeeping |
+| `dpp-domain` | Domain objects used by the tests |
+| `dpp-crypto` | Crypto primitives used by the tests |
+| `dpp-vc` | Credentials and access gatekeeping |
+| `dpp-digital-link` | GS1 Digital Link tests (dev dependency) |
+| `dpp-aas` | AAS submodel mapping tests (dev dependency) |
+| `dpp-registry`, `dpp-vocab`, `dpp-rules` | Registry, vocabulary and rule tests (dev dependencies) |
 
 ## Minimum Rust version
 
-1.96 (MSRV is enforced in CI)
+1.96, enforced in CI.
 
-## License
+## Licence
 
-Apache-2.0 — see [LICENSE](../../LICENSE)
+Apache-2.0. See [LICENSE](../../LICENSE).

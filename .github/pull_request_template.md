@@ -1,20 +1,19 @@
 ## Summary
 
-<!-- What does this PR do? One paragraph. -->
+<!-- What this change does and why, in one paragraph. -->
 
 ## Related issue
 
-<!-- e.g. Closes #123, or a gaps-register ID like A-04 -->
+<!-- "Closes #123", or "none" and the reason. -->
 
 ## Changes
 
-<!-- Bullet list of the main changes. -->
+<!-- The main changes, as bullets. -->
 
 ## Checklist
 
-- [ ] Tests added or updated for new behaviour
-- [ ] `just lint` passes locally (`cargo clippy --workspace -- -D warnings`)
-- [ ] `just fmt` applied (`cargo fmt --all`)
-- [ ] `just test` passes (`cargo nextest run --workspace`)
-- [ ] No secrets, credentials, or `.env` files in the diff
-- [ ] Documentation updated if public API changed
+- [ ] Tests added or updated for the new behaviour, or no behaviour changed (say so in the summary)
+- [ ] `just check` passes locally (format, clippy, tests, doctests, plugins, docs, lockfiles, audit)
+- [ ] No secrets, credentials or `.env` files in the diff
+- [ ] Documentation updated if the public API changed, following the [style guide](https://github.com/odal-node/.github/blob/main/DOCS-STYLE.md)
+- [ ] CHANGELOG entry under the right heading (a breaking change is never `Added`)

@@ -1,83 +1,99 @@
-# Security Policy
+# Security policy
 
-## Reporting a Vulnerability
+## Report a vulnerability
 
-**Do NOT open a public GitHub issue for security vulnerabilities.**
+**Do not open a public issue.** Report privately through **Report a vulnerability** on
+this repository's **Security** tab, or by email to **security@odal-node.io**, with:
 
-Report vulnerabilities privately to **security@odal-node.io** with:
+1. What the vulnerability is and what it allows.
+2. Steps to reproduce, or a minimal proof of concept.
+3. The affected crates and versions.
+4. A suggested fix or mitigation, if you have one.
 
-1. A description of the vulnerability and its potential impact
-2. Steps to reproduce or a minimal proof of concept
-3. The affected crate(s) and version(s)
-4. Any suggested fix or mitigation, if you have one
+## Response times
 
-## What to Expect
+| Step | Target |
+|---|---|
+| Acknowledgement | 48 hours |
+| Initial assessment and severity | 5 business days |
+| Fix or mitigation, critical or high severity | 14 days |
+| Fix or mitigation, medium or low severity | 30 days |
+| Public disclosure | After the fix is released, coordinated with you |
 
-| Step | Timeframe |
-|------|-----------|
-| Acknowledgement of your report | Within 48 hours |
-| Initial assessment and severity classification | Within 5 business days |
-| Fix or mitigation for critical/high severity | Within 14 days |
-| Fix or mitigation for medium/low severity | Within 30 days |
-| Public disclosure (coordinated with reporter) | After fix is released |
-
-We follow coordinated vulnerability disclosure (CVD) as recommended by the [OpenSSF Vulnerability Disclosure Working Group](https://github.com/ossf/wg-vulnerability-disclosures). We will work with you on timing and credit.
+We follow coordinated disclosure as described by the
+[OpenSSF Vulnerability Disclosure Working Group](https://github.com/ossf/wg-vulnerability-disclosures)
+and agree timing and credit with you.
 
 ## Scope
 
-This policy covers all crates in the dpp-core workspace:
+This policy covers every crate published from this repository.
 
-| Crate | Security-Relevant Surface |
-|-------|---------------------------|
-| **dpp-crypto** | Ed25519 key management, AES-256-GCM encryption, JWS signing/verification, Verifiable Credential issuance |
-| **dpp-domain** | Disclosure classification and redaction, schema validation, transfer chain integrity |
-| **dpp-digital-link** | GS1 Digital Link URI parsing (input validation) |
-| **dpp-plugin-traits** | Wasm plugin ABI boundary |
-| **dpp-registry** | EU Registry interface types |
+| Crate | Security-relevant surface |
+|---|---|
+| `dpp-crypto` | Ed25519 keys, JWS signing and verification, the encrypted keystore, JAdES construction, SD-JWT selective disclosure |
+| `dpp-vc` | Verifiable Credential issuance and verification, `did:web` documents, status lists |
+| `dpp-domain` | Disclosure classes and redaction, schema validation, transfer-chain integrity |
+| `dpp-digital-link` | GS1 Digital Link parsing (untrusted input) |
+| `dpp-aas` | Audience filtering of the AAS projection |
+| `dpp-plugin-traits`, `dpp-plugin-sdk` | The Wasm plugin ABI boundary |
+| `dpp-registry` | EU registry request and response types |
+| `dpp-rules`, `dpp-calc`, `dpp-vocab` | Rule and calculation correctness, vocabulary records |
 
-Issues in the following areas are particularly important:
+Findings that matter most:
 
-- Cryptographic key leakage or weak randomness
-- JWS signature bypass or forgery
-- Audience escalation (e.g. a public caller reading `Restricted`, `Conformity`
-  or `Individual` data, or an authority credential reaching Annex XIII point 4
-  individual-item data it is not entitled to)
-- Schema validation bypass allowing non-compliant passports
-- Transfer chain integrity violations (skipping states, forging history)
+- Key leakage or weak randomness.
+- JWS signature bypass or forgery.
+- **Audience escalation:** a public caller reading `Restricted`, `Conformity` or
+  `Individual` data, or an authority credential reaching Annex XIII point 4
+  individual-battery data it is not entitled to.
+- Schema validation bypass that lets a non-compliant passport through.
+- Transfer-chain integrity violations: skipped states or forged history.
 
-## Out of Scope
+## Out of scope
 
-- Issues in software that consumes these crates — this policy covers the crates published from this repository only, so report those to that project's own security contact
-- **Vulnerabilities in upstream dependencies** — report these to the dependency maintainer and to [RustSec](https://rustsec.org/). We monitor advisories via `cargo audit`, both in CI and on a daily schedule, and will publish a patched release once a fix is available upstream. We cannot fix them ourselves, which is why they are out of scope for this policy rather than out of mind.
-- Feature requests or non-security bugs (use GitHub Issues)
+- **Software that uses these crates.** This policy covers only the crates published from
+  this repository. Report issues in an application to that application's security contact.
+- **Vulnerabilities in upstream dependencies.** Report them to the dependency's
+  maintainers and to [RustSec](https://rustsec.org/). `cargo audit` runs in CI and on a
+  daily schedule, and a patched release follows once an upstream fix exists.
+- **Feature requests and ordinary bugs.** Use GitHub Issues.
 
-## Supported Versions
+## Supported versions
 
-Security patches are issued for the **latest tagged release**. When a new minor or major version is released, the previous minor continues to receive security patches for **90 days**, after which support for it ends.
+Security fixes go into the **latest release**. After a new minor or major version, the
+previous minor version receives security fixes for **90 days**.
 
-The current version is on the [tags page](https://github.com/odal-node/dpp-core/tags), and on crates.io, where every crate in the workspace is published in lockstep under one version — [`dpp-domain`](https://crates.io/crates/dpp-domain) names it. (There is no `dpp-core` crate: that is the workspace, not a published artifact. GitHub Releases is not the pointer either — this repository tags its releases and does not publish release objects, so `/releases/latest` resolves to an empty page.) This section names no version number on purpose: the previous wording hardcoded one, and it went on asserting `0.1.x` across the nineteen minor releases from 0.2 to 0.20, because nothing breaks when a policy document goes stale.
+Every crate in the workspace is published to crates.io in lockstep under one version;
+[`dpp-domain`](https://crates.io/crates/dpp-domain) shows the current one. There is no
+`dpp-core` crate (that is the workspace name). Each release is a `vX.Y.Z` git tag with a
+matching entry on the [Releases page](https://github.com/odal-node/dpp-core/releases).
 
-## Recognition
+## Credit
 
-We credit security researchers in the CHANGELOG and release notes (unless you prefer to remain anonymous). We do not currently operate a bug bounty programme.
+Reporters are credited in the CHANGELOG and release notes unless they prefer to stay
+anonymous. There is no bug bounty.
 
-## Security Tooling in CI
+## Security checks in CI
 
-The following automated checks run on every push and pull request:
+On every push and pull request:
 
-- `cargo audit` — checks all dependencies against the [RustSec Advisory Database](https://rustsec.org/)
-- `cargo clippy -- -D warnings` — catches common correctness issues
-- `cargo nextest run` — runs the full test suite including cryptographic verification tests
+- `cargo audit` against the [RustSec Advisory Database](https://rustsec.org/), and again
+  daily on a schedule.
+- `cargo clippy` with warnings as errors.
+- The full test suite, including RFC test vectors for Ed25519 (RFC 8032), JOSE (RFC 8037),
+  JCS (RFC 8785) and Argon2 (RFC 9106).
 
-## Cryptographic Design Decisions
+## Cryptographic primitives
 
-dpp-core uses the following cryptographic primitives:
+| Purpose | Algorithm | Crate |
+|---|---|---|
+| Passport and credential signatures | Ed25519 (`alg: EdDSA`) | `ed25519-dalek` |
+| Keystore encryption of private keys at rest | AES-256-GCM | `aes-gcm` |
+| Keystore key derivation from the passphrase | Argon2id | `argon2` |
+| Keystore record integrity | HMAC-SHA256 | `hmac`, `sha2` |
+| Hashing (JWK thumbprints, content digests, hash chains) | SHA-256 | `sha2` |
+| Canonical JSON before signing | JCS (RFC 8785) | `serde_jcs` |
+| Signing key generation | OS entropy | `rand` |
 
-| Purpose | Algorithm | Crate | Rationale |
-|---------|-----------|-------|-----------|
-| Passport signing | Ed25519 | `ed25519-dalek` | ESPR-aligned, deterministic, fast, 128-bit security level |
-| Field encryption | AES-256-GCM | `aes-gcm` | Authenticated encryption for confidential passport fields |
-| Hashing | SHA-256 | `sha2` | Content-addressable passport identifiers |
-| Key derivation | N/A (direct key generation) | `rand` (OS entropy) | Keys are generated, not derived from passwords |
-
-No custom cryptography is implemented. All primitives are from audited, widely-used Rust crates.
+No primitive is implemented here. All of them come from widely used Rust crates. The
+keystore design has not been externally audited.

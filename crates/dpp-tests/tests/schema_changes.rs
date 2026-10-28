@@ -89,12 +89,12 @@ fn render() -> String {
     let mut md = String::new();
     md.push_str(
         "# Schema changes\n\n\
-         **Generated — do not edit.** Regenerate with `just schema-changes`;\n\
+         **Generated: do not edit.** Regenerate with `just schema-changes`;\n\
          `cargo test -p dpp-tests --test schema_changes` fails if this file has\n\
          drifted from the schemas under `crates/dpp-domain/schemas/`.\n\n\
          One section per product group, one table per version bump: what each\n\
          version changed relative to the one before it.\n\n\
-         `additive` means the bump only adds properties — no removal, no type\n\
+         `additive` means the bump only adds properties: no removal, no type\n\
          change, no altered constraint, no newly required property. It is a\n\
          statement about *shape* and not a compatibility verdict; whether stored\n\
          documents still read is answered by the frozen fixtures in\n\
@@ -109,7 +109,7 @@ fn render() -> String {
                 .first()
                 .map_or_else(|| "none".to_owned(), |(v, _)| format!("v{v}"));
             md.push_str(&format!(
-                "Only one version ({only}) — nothing to compare against yet.\n"
+                "Only one version ({only}), so there is nothing to compare against yet.\n"
             ));
             continue;
         }
@@ -137,12 +137,23 @@ fn render() -> String {
                 md.push_str("| Property | Change | Before | After |\n");
                 md.push_str("|---|---|---|---|\n");
                 for c in &diff.properties {
+                    // Only the change kind says the property is missing on a side.
+                    // An empty value alone can also be a property that declares no
+                    // `type`, or a constraint that is not set.
+                    let before = if c.kind == ChangeKind::Added {
+                        "absent".to_owned()
+                    } else {
+                        cell(&c.before)
+                    };
+                    let after = if c.kind == ChangeKind::Removed {
+                        "absent".to_owned()
+                    } else {
+                        cell(&c.after)
+                    };
                     md.push_str(&format!(
-                        "| `{}` | {} | {} | {} |\n",
+                        "| `{}` | {} | {before} | {after} |\n",
                         c.path,
                         c.kind.label(),
-                        cell(&c.before),
-                        cell(&c.after),
                     ));
                 }
             }
@@ -172,10 +183,11 @@ fn render() -> String {
     md
 }
 
-/// Render a before/after cell: em dash for absent, escaped for the table.
+/// Render a before/after cell: `none` when that side declares no value, escaped for the
+/// table.
 fn cell(value: &str) -> String {
     if value.is_empty() {
-        "—".to_owned()
+        "none".to_owned()
     } else {
         format!("`{}`", value.replace('|', "\\|"))
     }
