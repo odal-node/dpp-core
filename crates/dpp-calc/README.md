@@ -4,35 +4,36 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-calc)](https://docs.rs/dpp-calc)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Pure, stateless EU-methodology compliance calculators for [Odal Node](https://odal-node.io).
+Stateless compliance calculators that follow EU methodologies: recycled content,
+repairability and cradle-to-gate CO2e. Part of
+[dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
 
-Every function in this crate is deterministic and side-effect free — no I/O, no infrastructure, no `async`.
-The math is open-source (Apache-2.0). Licensed lifecycle-inventory (LCI) data is injected at runtime
-through the `FactorProvider` trait and never bundled here — open methodology, licensed data supplied
-by the operator. That split is the licensing rationale for this crate.
-
----
+Every calculation is reproducible: the same inputs, parameters and factors give the same
+values. The receipt around them is not byte-identical between calls, because each one
+gets a fresh UUIDv7 `receipt_id` and a `computed_at` timestamp. No function does I/O, needs
+infrastructure or is `async`. The methodology is open source (Apache-2.0). Licensed life-cycle inventory
+(LCI) data is injected at runtime through the `FactorProvider` trait and never bundled
+here, so the operator supplies licensed data to an open method.
 
 ## When to use this crate
 
-- You are a **host** running a determination for a product group and need it to carry a ruleset id,
-  an effective period, a legal citation and a receipt.
-- You are writing an integration test and need golden-vector inputs and expected outputs.
-- You are adding a new EU methodology or product category (see [Adding a product group calculator](#adding-a-product group-calculator) below).
+- You run a determination for a product group in a host application, and it must
+  carry a ruleset id, an effective period, a legal citation and a receipt.
+- You write an integration test and need golden-vector inputs and expected outputs.
+- You add an EU methodology or a product category (see
+  [Adding a product group calculator](#adding-a-product-group-calculator)).
 
-## When NOT to use this crate
+## When not to use it
 
-- You are a **Wasm product group plugin**. This crate is not reachable from one, deliberately:
-  the plugins are a separate workspace targeting `wasm32-wasip1`, and pulling `chrono`,
-  `uuid`, `sha2` and `serde_jcs` into every plugin binary to mint a receipt inside a
-  sandbox — one that would have to be recompiled and re-signed for every threshold
-  change — is the arrangement the signed ruleset channel exists to avoid. Plugins reach
-  thresholds through `dpp-rules`, which is `no_std` and re-exported by `dpp-plugin-sdk`.
-- You need the DPP data model or port traits → `dpp-domain`.
-- You need the Wasm plugin ABI → `dpp-plugin-traits` / `dpp-plugin-sdk`.
-- You need field-level validation rules (REACH, fibre percentages, voltage ranges) → `dpp-rules`.
-
----
+- **In a Wasm product group plugin.** Plugins cannot reach this crate, by design. They
+  are a separate workspace targeting `wasm32-wasip1`, and pulling `chrono`, `uuid`,
+  `sha2` and `serde_jcs` into every plugin binary to mint a receipt inside a sandbox
+  (which would then need recompiling and re-signing for every threshold change) is what
+  the signed ruleset channel exists to avoid. Plugins reach thresholds through
+  `dpp-rules`, which is `no_std` and re-exported by `dpp-plugin-sdk`.
+- For the passport data model or port traits, use `dpp-domain`.
+- For the Wasm plugin ABI, use `dpp-plugin-traits` and `dpp-plugin-sdk`.
+- For field-level validation (REACH, fibre percentages, voltage ranges), use `dpp-rules`.
 
 ## Module structure
 
@@ -42,15 +43,15 @@ src/
 │
 ├── kernel/                   machinery shared by every methodology
 │   ├── error.rs              CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
-│   ├── receipt.rs            CalculationReceipt — proof-of-calculation envelope
+│   ├── receipt.rs            CalculationReceipt: proof-of-calculation envelope
 │   ├── ruleset.rs            RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
-│   │                         ParameterBasis — are these numbers law, or ours?
-│   │                         Ruleset trait — every methodology trait extends this
+│   │                         ParameterBasis: are these numbers law, or ours?
+│   │                         Ruleset trait: every methodology trait extends this
 │   ├── parameters.rs         RulesetParameters + fill(): a signed bundle may fill
 │   │                         an Assumed ruleset's numbers, never a Sourced one's
-│   ├── clock.rs              AssessmentClock — the governing-law date; there is no now()
+│   ├── clock.rs              AssessmentClock: the governing-law date; there is no now()
 │   ├── assessability.rs      Assessability<T>: Assessed | NotYetInForce | Undetermined
-│   │                         | Expired | OutOfScope — none of which is non-compliance
+│   │                         | Expired | OutOfScope, none of which is non-compliance
 │   ├── factor.rs             FactorProvider trait
 │   ├── synthetic_factor.rs   SyntheticFactorProvider (test/CI only)
 │   └── hashing.rs            canonical input hashing behind input_hash
@@ -59,23 +60,23 @@ src/
 │
 ├── recycled_content/         EU 2023/1542 Art. 8 minimum recycled shares
 │   ├── calculator.rs         calculate(inputs, ruleset, clock) → RecycledContentResult
-│   ├── parameters.rs         RecycledContentInputs — the four declared shares
+│   ├── parameters.rs         RecycledContentInputs: the four declared shares
 │   ├── thresholds.rs         RecycledContentRuleset + Art8Phase1Ruleset / Art8Phase2Ruleset
 │   └── golden_vectors.rs     #[cfg(test)], incl. a guard that this agrees with dpp-rules
 │
 ├── repairability_index/      The enacted EU 2023/1669 Annex IV index
 │   ├── calculator.rs         calculate(inputs, ruleset) → RepairabilityIndexResult
-│   ├── parameters.rs         RepairabilityIndexInputs — 3 part-level parameters over the
-│   │                         10 Annex IV priority parts + 3 product-level, each scored 1–5
+│   ├── parameters.rs         RepairabilityIndexInputs: 3 part-level parameters over the
+│   │                         10 Annex IV priority parts + 3 product-level, each scored 1 to 5
 │   ├── thresholds.rs         RepairabilityIndexRuleset + Eu2023_1669Ruleset
 │   └── golden_vectors.rs     #[cfg(test)]
 │
-├── repairability/            Simplified, non-regulatory six-parameter A–E heuristic
+├── repairability/            Simplified, non-regulatory six-parameter A to E heuristic
 │   ├── calculator.rs         calculate(inputs, ruleset, clock) → RepairabilityResult
-│   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0–2)
+│   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0 to 2)
 │   ├── thresholds/           RepairabilityRuleset trait + SimplifiedRepairabilityHeuristic,
 │   │                         LaptopRuleset, DisplaysRuleset, WashingMachineRuleset
-│   └── golden_vectors.rs     #[cfg(test)] — A–E coverage, regulatory-basis non-empty CI check
+│   └── golden_vectors.rs     #[cfg(test)]: A to E coverage, regulatory-basis non-empty CI check
 │
 └── co2e/
     ├── calculator.rs         calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate,
@@ -83,37 +84,34 @@ src/
     ├── parameters.rs         Co2eInputs, MaterialFootprint
     ├── thresholds.rs         Co2eRuleset trait + CradleToGateRuleset
     ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB
-    ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6 — free)
+    ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6, free)
     └── golden_vectors.rs     #[cfg(test)]
 ```
 
-**Phase status:**
+### Status
 
 | Module | Status |
 |---|---|
-| `recycled_content` | ✅ Enacted — Reg. (EU) 2023/1542 Art. 8(2) (from 2031-08-18) and Art. 8(3) (from 2036-08-18); both resolve as `NotYetInForce` for a battery placed on the market today, which is the correct answer, not a gap |
-| `repairability_index` | ✅ Enacted — Reg. (EU) 2023/1669 Annex IV point 5, smartphones and slate tablets |
-| `repairability` | ✅ Available — non-regulatory six-parameter heuristic; **not** the enacted index |
-| `co2e::calculate` | ✅ Baseline — operator-supplied emission factors |
-| `co2e::cfb` | 🔒 Stub — the Art. 7 delegated act defining the methodology is not adopted |
-| `pef/` (future) | 📋 Not yet — awaits per-product group PEFCR finalisation (2026–2030) |
+| `recycled_content` | **Enacted.** Reg. (EU) 2023/1542 Art. 8(2) (from 2031-08-18) and Art. 8(3) (from 2036-08-18). Both resolve as `NotYetInForce` for a battery placed on the market today, which is the correct answer |
+| `repairability_index` | **Enacted.** Reg. (EU) 2023/1669 Annex IV point 5, smartphones and slate tablets |
+| `repairability` | **Available.** A non-regulatory six-parameter heuristic, **not** the enacted index |
+| `co2e::calculate` | **Available.** Baseline with operator-supplied emission factors |
+| `co2e::cfb` | **Stub.** The Art. 7 delegated act that defines the methodology is not adopted |
+| `pef` | **Not started.** Waits for each product group's PEFCR (expected 2026 to 2030) |
 
-### Which repairability module do I want?
+### Which repairability module?
 
-`repairability_index` implements the scoring a delegated act actually prescribes,
-and is what belongs in a passport field that claims to be *the* repairability
-index. `repairability` is an internal six-factor heuristic that predates it and
-covers product categories the regulation does not reach (laptops, displays,
-washing machines). They are separate modules, not versions of each other: the
-inputs, the scale and the legal standing all differ. Note that only the
-heuristic takes an `AssessmentClock` — the index has a single ruleset, so there
-is no date-dependent choice to make.
+`repairability_index` implements the scoring a delegated act prescribes, and belongs in
+a passport field that claims to be *the* repairability index. `repairability` is an
+internal six-factor heuristic that predates it and covers product categories the
+regulation does not reach (laptops, displays, washing machines). They are separate
+modules, not versions of each other: the inputs, the scale and the legal standing all
+differ. Only the heuristic takes an `AssessmentClock`; the index has a single ruleset,
+so there is no date-dependent choice to make.
 
----
+## Examples
 
-## Example
-
-### Repairability index (enacted — EU 2023/1669 Annex IV)
+### Repairability index (enacted, EU 2023/1669 Annex IV)
 
 ```rust
 use chrono::NaiveDate;
@@ -163,10 +161,10 @@ Ok(())
 ```
 
 `resolve_repairability_index` returns an `Assessability`, not an `Option`:
-`NotYetInForce`, `Undetermined`, `Expired` and `OutOfScope` are distinct answers,
-and **none of them means non-compliant**.
+`NotYetInForce`, `Undetermined`, `Expired` and `OutOfScope` are distinct answers, and
+**none of them means non-compliant**.
 
-### Repairability (simplified non-regulatory heuristic, A–E)
+### Repairability (simplified non-regulatory heuristic, A to E)
 
 ```rust
 use chrono::NaiveDate;
@@ -177,7 +175,7 @@ use dpp_calc::repairability::{
 use dpp_calc::ruleset_registry;
 
 fn assess() -> Result<(), Box<dyn std::error::Error>> {
-// The date the governing law attached to this product — read from the product's
+// The date the governing law attached to this product, read from the product's
 // own record (`placedOnMarketDate`), never from the wall clock. There is
 // deliberately no `AssessmentClock::now()`.
 let placed_on_market = NaiveDate::from_ymd_opt(2026, 3, 14).unwrap();
@@ -206,7 +204,7 @@ Ok(())
 }
 ```
 
-### Cradle-to-gate CO₂e
+### Cradle-to-gate CO2e
 
 ```rust
 use chrono::NaiveDate;
@@ -233,20 +231,18 @@ Ok(())
 }
 ```
 
----
-
 ## CalculationReceipt
 
-Every calculator returns a `CalculationReceipt` alongside the computed value.
-Shape shown for orientation; the definition is in `kernel::receipt`:
+Every calculator returns a `CalculationReceipt` with the computed value. The shape is
+shown here for orientation; the definition is in `kernel::receipt`:
 
 ```rust,ignore
 pub struct CalculationReceipt {
-    pub receipt_id:             Uuid,          // UUIDv7 — time-sortable
+    pub receipt_id:             Uuid,          // UUIDv7, time-sortable
     pub input_hash:             String,        // SHA-256 of canonical JSON inputs
     pub ruleset_id:             String,        // e.g. "repairability-heuristic-v1"
     pub ruleset_version:        String,        // e.g. "1.0.0"
-    /// SHA-256 of the parameter set actually used — which *numbers*, where
+    /// SHA-256 of the parameter set actually used: which *numbers*, where
     /// `ruleset_id` + `ruleset_version` say which *rule*.
     pub ruleset_content_sha256: String,
     /// The signed bundle that filled those parameters, if any. Both `None` for
@@ -262,16 +258,17 @@ pub struct CalculationReceipt {
 }
 ```
 
-A host stores this alongside the passport record. A notified body can re-run
-any calculation from the receipt: same inputs (verify via `input_hash`) + same
-parameters (verify via `ruleset_content_sha256`) + same factor dataset version →
-must produce the same output.
+Store the receipt with the passport record, and keep the materials it points at: the
+original inputs, the ruleset version and the factor dataset. The receipt holds hashes and
+versions, not the materials, so it cannot reconstruct them. With them, a notified body can
+re-run the calculation and check each one against the receipt: the inputs against
+`input_hash`, the parameters against `ruleset_content_sha256`, and the factor table against
+`factor_dataset_version` and `factor_set_hash`. The same materials must give the same
+output.
 
-The parameter hash is what makes that a check rather than a claim. A version
-string is maintained by hand, so two receipts citing the same `ruleset_version`
-from builds carrying different thresholds used to be indistinguishable.
-
----
+The parameter hash makes that a check rather than a claim. A version string is
+maintained by hand, so two receipts citing the same `ruleset_version` from builds with
+different thresholds used to be indistinguishable.
 
 ## RegulatoryBasis
 
@@ -291,74 +288,66 @@ let _basis = Eu2023_1669Ruleset.regulatory_basis();
 // }
 ```
 
-A non-regulatory ruleset says so in the same field rather than leaving it blank —
+A non-regulatory ruleset says so in the same field instead of leaving it blank.
 `SimplifiedRepairabilityHeuristic` reports its `regulation` as
-`"Non-regulatory: simplified repairability heuristic (NOT EU 2023/1669 Annex IV)"`,
-so a receipt can never imply legal standing the calculation does not have.
+`"Non-regulatory: simplified repairability heuristic (NOT EU 2023/1669 Annex IV)"`, so
+a receipt never implies legal standing the calculation does not have.
 
 A CI test (`expired_rulesets_have_superseded_by`) asserts that any ruleset with
-`Effectivity::InForce.until < today` has a non-empty `superseded_by`. This keeps the audit chain intact as regulations evolve.
-
----
+`Effectivity::InForce.until < today` has a non-empty `superseded_by`, so the audit
+chain stays intact as regulations change.
 
 ## Feature flags
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `synthetic-factors` | off | Exposes `SyntheticFactorProvider` outside `#[cfg(test)]`. Enable in integration test harnesses only. Values are **not** real LCI data. |
-| `real-factors` | off | Gates implementations backed by licensed LCI datasets. Enable only where the dataset licence you hold permits redistribution in the form your build ships. This crate bundles no such data and takes no position on whose licence applies. |
-
----
+| `synthetic-factors` | off | Exposes `SyntheticFactorProvider` outside `#[cfg(test)]`. For integration test harnesses only. The values are **not** real LCI data. |
+| `real-factors` | off | Gates implementations backed by licensed LCI datasets. Enable it only where your dataset licence permits redistribution in the form your build ships. This crate bundles no such data and takes no position on whose licence applies. |
 
 ## Adding a product group calculator
 
-See the `# Adding a new product group calculator` section in `src/lib.rs` for the full
-step-by-step guide. Short version:
+The `# Adding a new product group calculator` section in `src/lib.rs` has the full
+guide. In short:
 
-1. **New methodology** → add `src/{methodology}/` with `mod.rs`, `calculator.rs`,
-   `parameters.rs`, `thresholds.rs` (trait extends `Ruleset`), `golden_vectors.rs`.
-   Register in `src/ruleset_registry/resolve.rs`.
-2. **New product category on an existing methodology** → add `impl Ruleset + impl {Methodology}Ruleset`
-   in that methodology's `thresholds` module (a file, or a directory with one
-   file per category as in `repairability/thresholds/`), add a row to the
-   registry, add golden vectors.
-3. **Pending delegated act** → use `Effectivity::pending(empowerment, adoption_deadline)`. There is no date sentinel: a pending ruleset has no application date and resolves for no date at all.
-4. **Superseded ruleset** → set `until`, set `superseded_by`. Never delete rows.
-
----
+1. **A new methodology:** add `src/{methodology}/` with `mod.rs`, `calculator.rs`,
+   `parameters.rs`, `thresholds.rs` (its trait extends `Ruleset`) and
+   `golden_vectors.rs`. Register it in `src/ruleset_registry/resolve.rs`.
+2. **A new product category for an existing methodology:** add
+   `impl Ruleset + impl {Methodology}Ruleset` in that methodology's `thresholds` module
+   (a file, or a directory with one file per category as in `repairability/thresholds/`),
+   add a row to the registry, and add golden vectors.
+3. **A pending delegated act:** use `Effectivity::pending(empowerment, adoption_deadline)`.
+   There is no date sentinel: a pending ruleset has no application date and resolves for
+   no date at all.
+4. **A superseded ruleset:** set `until` and `superseded_by`. Never delete rows.
 
 ## Invariants
 
-| Rule | Rationale |
+| Rule | Why |
 |---|---|
-| `#![forbid(unsafe_code)]` | Calculators run in the hot path; no unsafe allowed |
-| Every `{Methodology}Ruleset` extends `Ruleset` | Forces a legal citation on every ruleset; compiler-enforced |
-| `FactorProvider::table_hash()` is pre-computed | Called once per receipt, not per `gwp100()` lookup |
-| Never bundle LCI secondary data | ecoinvent / EF inventory datasets are licensed; `FactorProvider` injects them at runtime |
-| `real-factors` feature off by default | Open-source builds must never include licensed data |
-| `all_rulesets()` must list every concrete ruleset | Required for the CI expiry check to cover new additions |
-
----
+| `#![forbid(unsafe_code)]` | Calculators run in the hot path |
+| Every `{Methodology}Ruleset` extends `Ruleset` | The compiler forces a legal citation on every ruleset |
+| `FactorProvider::table_hash()` is precomputed | It is called once per receipt, not per `gwp100()` lookup |
+| Never bundle secondary LCI data | ecoinvent and EF inventory datasets are licensed; `FactorProvider` injects them at runtime |
+| `real-factors` is off by default | Open-source builds never include licensed data |
+| `all_rulesets()` lists every concrete ruleset | The CI expiry check must cover new additions |
 
 ## Relationship to other crates
 
 | Crate | Role |
 |---|---|
 | `dpp-domain` | Domain types and port traits; `dpp-calc` does not depend on it |
-| `dpp-rules` | Field-level validation rules and regulatory thresholds (`no_std`, zero-dep). **`dpp-calc` depends on it**, never the reverse: a threshold like the Art. 8 minimum shares has one home, and it is there, because the Wasm product group plugins reach it too and cannot reach this crate. What `dpp-calc` adds on top is the ruleset identity, the effective period and the receipt — none of which a `no_std` crate can produce |
-| `dpp-plugin-sdk` | Does **not** re-export this crate, and is not planned to — see "When NOT to use this crate". Plugins reach regulatory thresholds through `dpp-rules` |
+| `dpp-rules` | Field-level validation and regulatory thresholds (`no_std`, no dependencies). **`dpp-calc` depends on it**, never the reverse. A threshold such as the Art. 8 minimum shares has one home there, because the Wasm plugins need it too and cannot reach this crate. `dpp-calc` adds the ruleset identity, the effective period and the receipt, which a `no_std` crate cannot produce |
+| `dpp-plugin-sdk` | Does **not** re-export this crate and is not planned to; see "When not to use it". Plugins reach thresholds through `dpp-rules` |
 
-Storing a `CalculationReceipt`, serving an endpoint that verifies one, and
-managing `FactorProvider` lifecycle are all the consuming application's job, not
-this crate's. `dpp-calc` computes and returns the receipt; what happens to it
-afterwards is outside this workspace.
-
----
+Storing a `CalculationReceipt`, serving an endpoint that verifies one, and managing the
+`FactorProvider` lifecycle are your application's job. `dpp-calc` computes and returns
+the receipt.
 
 ## Minimum Rust version
 
-1.96 (MSRV is enforced in CI)
+1.96, enforced in CI.
 
-## License
+## Licence
 
-Apache-2.0 — see [LICENSE](../../LICENSE)
+Apache-2.0. See [LICENSE](../../LICENSE).

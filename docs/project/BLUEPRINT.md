@@ -1,68 +1,80 @@
-# Odal Node Core — Blueprint
+# dpp-core blueprint
 
-## Vision
+## Purpose
 
-dpp-core is the open-source standard library for EU ESPR Digital Product Passport compliance. It is the standard, not the product. Anyone building DPP tooling can use it as the foundation.
+`dpp-core` is an open-source Rust library for EU Digital Product Passports under the ESPR
+and the Battery Regulation. Anyone building passport tooling can use it as a foundation.
 
-The goal is a single, well-audited implementation of the regulatory standard in Rust — domain types, cryptographic signing, schema validation, GS1 resolution, W3C Verifiable Credentials, and the port traits that define the boundary between the standard and any infrastructure.
-
----
-
-## Guiding Principles
-
-### 1. Proof-Bound Architecture
-
-Raw production data never enters Odal's systems. The library validates product data against the product group schema, signs it with the manufacturer's Ed25519 key, and produces a cryptographically verifiable proof. The raw data is the manufacturer's responsibility. The signed proof is what gets persisted and served.
-
-This is an architectural constraint, not a feature.
-
-### 2. Standards-First
-
-Every technical decision starts from an open standard. No proprietary formats, no invented protocols. The standards the library implements:
-
-- GS1 Digital Link — product identification and QR resolution
-- W3C Verifiable Credentials — access control and manufacturer identity
-- IDTA Asset Administration Shell — AAS-shaped output for Industry 4.0 tooling
-- CEN/CENELEC JTC 24 — EU DPP data model (tracked as it evolves)
-- did:web — decentralised manufacturer identity over DNS + HTTPS
-
-This list does not record which revision of each is cited, what status each has,
-or what evidence backs the implementation. Those are recorded once, in
-[`docs/architecture/STANDARDS.md`](../architecture/STANDARDS.md), along with
-whether conformance is claimed.
-
-### 3. The Compilation Test
-
-`cargo build --workspace` must succeed with zero infrastructure running — no database, no Redis, no environment variables. If code changes because infrastructure changed, it does not belong here.
-
-### 4. The Golden Rule
-
-> If code changes because an EU regulation changed → it belongs in **dpp-core**.
-> If code changes because of how the system is deployed or operated → it belongs in **a platform that deploys it**.
-
-This separation keeps the regulatory implementation open, auditable, and free to use.
-
-### 5. Open-Core Boundary
-
-The boundary is a Rust trait (`ComplianceRegistry`). It is a **technical extension seam** — compliance calculation is open (Apache-2.0 Wasm plugins and a host's calculators). Every piece of code that implements an EU regulation or open standard is Apache-2.0.
-
-### 6. Port Traits as the Extension Contract
-
-The port traits in `dpp-domain::ports` define the complete interface between the standard and any implementation. Anyone who implements these traits against their own infrastructure has a complete, standard-compliant DPP system. The core has no opinion on database, cache, or HTTP framework.
+The aim is one well-reviewed implementation of the regulatory model in Rust: domain types,
+cryptographic signing, schema validation, product identifiers and GS1 Digital Link, W3C
+Verifiable Credentials, and the port traits that separate the model from any
+infrastructure.
 
 ---
 
-## Non-Goals For Now
+## Design rules
 
-The following are explicitly out of scope for dpp-core:
+### 1. Sign at the source
 
-- HTTP framework, database, or async runtime (belongs in a host)
-- Multi-tenancy, authentication, or API key management (platform concerns)
-- Audit log storage (platform concern — the core enforces lifecycle rules, not storage)
+The library validates product data against the product group schema and signs it with the
+manufacturer's Ed25519 key. What an application stores and serves is the signed passport:
+the data the operator chose to publish, bound to its signatures. Source files (spreadsheets,
+ERP exports) are not part of it, and a verifier needs nothing from the issuer's systems
+except its public `did:web` document.
+
+### 2. Open standards first
+
+Every technical decision starts from an open standard. No proprietary formats or invented
+protocols. The library implements:
+
+- EN 18219 product identifiers: a GS1 Digital Link, an IEC 61406 identification link or
+  a decentralised identifier (DID), with GS1 Digital Link parsing and QR resolution
+- W3C Verifiable Credentials: access control and manufacturer identity
+- IDTA Asset Administration Shell: AAS-shaped output for Industry 4.0 tooling
+- CEN/CENELEC JTC 24: the EU passport data model, tracked as it evolves
+- `did:web`: manufacturer identity over DNS and HTTPS
+
+This list does not record which revision of each is cited, its status, or the evidence
+behind the implementation. That is recorded once, in
+[`docs/architecture/STANDARDS.md`](../architecture/STANDARDS.md), with whether conformance
+is claimed.
+
+### 3. Builds with nothing running
+
+`cargo build --workspace` must succeed with no infrastructure: no database, no Redis, no
+environment variables.
+
+### 4. Regulation here, operation elsewhere
+
+> If code changes because an EU regulation changed, it belongs in `dpp-core`.
+> If code changes because of how a system is deployed or operated, it belongs in the
+> application that deploys it.
+
+This keeps the regulatory implementation open, reviewable and free to use.
+
+### 5. One extension point for compliance
+
+The boundary is a Rust trait, `ComplianceRegistry`. It is a technical extension point:
+compliance calculation is open (Apache-2.0 Wasm plugins and the `dpp-calc` calculators).
+Every piece of code that implements an EU regulation or open standard is Apache-2.0.
+
+### 6. Port traits as the contract
+
+The port traits in `dpp_domain::ports` define the whole interface between the library and
+any implementation. Implementing them against your own infrastructure gives a complete
+passport system. The library has no opinion on the database, cache or HTTP framework.
+
+---
+
+## Out of scope
+
+- HTTP frameworks, databases and async runtimes (they belong to your application)
+- Multi-tenancy, authentication and API key management
+- Audit log storage (the library enforces lifecycle rules, not storage)
 - Blockchain anchoring
-- Native mobile app
+- Native mobile apps
 - IoT sensor integration
-- AI/ML features
-- Direct ERP connectors (CSV import is the integration strategy)
+- AI and machine-learning features
+- Direct ERP connectors (structured import is the integration path)
 - Consumer tracking analytics
-- Any code that requires infrastructure to compile
+- Any code that needs infrastructure to compile

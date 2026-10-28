@@ -1,190 +1,97 @@
-# Git Strategy — dpp-core
+# Git strategy
 
-**Model:** Trunk-based development
+**Model:** trunk-based development
 **Remote:** `git@github.com:odal-node/dpp-core.git`
 **Primary branch:** `main`
 
 ---
 
-## Branch Structure
+## Branches
 
-```
-main                    ← always deployable, tagged releases
-  └── feat/*            ← feature branches (short-lived, <1 week)
-  └── fix/*             ← bug fixes
-  └── chore/*           ← CI, docs, formatting, dependency bumps
-  └── release/v*        ← optional: release prep branch if needed
+```text
+main         always releasable; releases are tagged here
+  feat/*     features (short-lived)
+  fix/*      bug fixes
+  docs/*     documentation
+  chore/*    CI, formatting, dependency bumps
 ```
 
-No `develop` branch. No long-lived branches. Everything merges to `main` via PR.
+No `develop` branch and no long-lived branches. Everything reaches `main` through a pull
+request.
 
 ---
 
-## Recommended Initial Commit Sequence
+## Commits and pull request titles
 
-When you're ready to push, structure the history into clean logical commits:
+[Conventional Commits](https://www.conventionalcommits.org/):
 
-```
-1. feat: foundation — workspace, Cargo.toml, schemas, justfile, CI
-2. feat(dpp-domain): domain types, passport, product group data, port traits
-3. feat(dpp-domain): transfer of responsibility model
-4. feat(dpp-domain): versioned schema registry with hot-reload
-5. feat(dpp-crypto): Ed25519 key management, JWS, encrypted keystore
-6. feat(dpp-vc): verifiable credentials, did:web builder, status lists
-7. feat(dpp-domain): per-field disclosure policy and audience filter
-8. feat(dpp-digital-link): digital link parser, link-type negotiation
-9. feat(dpp-registry): EU Central Registry interface types
-10. feat(dpp-plugin-traits): wasm plugin ABI with capability negotiation
-11. test: integration tests (textile e2e, transfer, audience access, schema conformity)
-12. docs: architecture docs, conformity statement, README
+```text
+<type>(<scope>): <subject>
 ```
 
-Or if you prefer fewer commits:
+- **Types** (checked on the pull request title by `.github/workflows/pr-title.yml`):
+  `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `chore`, `ci`, `build`, `style`,
+  `revert`.
+- **Scope:** the functional area, usually the crate without its `dpp-` prefix: `domain`,
+  `crypto`, `vc`, `digital-link`, `aas`, `rules`, `calc`, `registry`, `vocab`, `plugins`,
+  `schemas`, `deps`, `ci`, `docs`. Several may be comma-separated. Never `core` or
+  `dpp-core`; the check rejects them.
+- **Breaking change:** `!` before the colon.
 
-```
-1. Initial commit — workspace foundation, schemas, CI
-2. feat: core crates (domain, rules, crypto, digital-link, calc, plugin-traits, plugin-sdk, registry)
-3. test: unit and integration tests
-4. docs: architecture, conformity, README
-```
-
----
-
-## Commit Convention
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<scope>): <description>
-
-Types: feat, fix, test, docs, chore, refactor, ci
-Scopes: dpp-domain, dpp-crypto, dpp-vc, dpp-digital-link, dpp-aas, dpp-rules, dpp-calc, dpp-plugin-traits, dpp-plugin-sdk, dpp-registry, dpp-tests
-```
-
-Examples:
-```
-feat(dpp-domain): add textile SVHC substance disclosure fields
-fix(dpp-digital-link): add lifetime annotation to negotiate function
-test(dpp-crypto): access tier gatekeeping integration tests
-docs: update README with regulatory coverage table
-chore: bump chrono to 0.4.39
+```text
+feat(domain): add battery recycled-content disclosure fields
+fix(digital-link): add a lifetime annotation to negotiate
+test(crypto): audience gatekeeping integration tests
+docs: update the README regulatory scope table
+chore(deps): bump chrono to 0.4.39
 ci: split unit and integration test steps
 ```
 
----
-
-## Release Tagging
-
-```
-v0.1.0    ← first public release (current state)
-v0.1.1    ← patch: bug fixes, formatting
-v0.2.0    ← minor: new product group schemas, additional port traits
-v1.0.0    ← major: stable API after textile delegated act is finalised
-```
-
-Tag format: `v{MAJOR}.{MINOR}.{PATCH}`
-
-Create tags on `main` only:
-```bash
-git tag -a v0.1.0 -m "Initial public release — core DPP library"
-git push origin v0.1.0
-```
+The pull request title becomes the squash commit subject on `main`, and cannot be
+corrected after a release is published from that commit.
 
 ---
 
-## PR Workflow
+## Pull request flow
 
-1. Create a feature branch: `git checkout -b feat/battery-soh-tracking`
-2. Make changes, commit with conventional format
-3. Push and open PR against `main`
-4. CI runs: `fmt-check → clippy → test → audit`
-5. Squash-merge to `main` (keeps history clean)
-6. Delete the feature branch
-
----
-
-## Branch Protection (set up on GitHub)
-
-For `main`:
-- Require PR reviews (1 reviewer minimum)
-- Require CI status checks to pass
-- Require linear history (squash merges)
-- No force pushes
-- No direct commits (everything via PR)
+1. Create a branch: `git checkout -b feat/battery-soh-tracking`.
+2. Commit in conventional format, signed off (`git commit -s`).
+3. Push and open a pull request against `main`.
+4. CI runs the required checks (below).
+5. Squash-merge to `main`.
+6. Delete the branch.
 
 ---
 
-## First Push Checklist
+## Protection on `main`
 
-```bash
-# 1. Make sure everything passes
-just fmt
-just check
+Enforced by the `main` repository ruleset:
 
-# 2. Create the GitHub repo (via CLI or web UI)
-gh repo create odal-node/dpp-core --private --description "EU Digital Product Passport Standard Library"
+- Changes arrive only through a pull request; squash is the only merge method.
+- The required status checks must pass on a branch that is up to date with `main`:
+  format, clippy, tests, security audit, docs and doctests, product group plugin tests,
+  the pull request title check, and the oracle suites (AAS, SD-JWT, DID, JSON-LD, GS1,
+  JAdES).
+- No force pushes and no deletion.
 
-# 3. Set remote and push
-cd dpp-core
-git remote add origin git@github.com:odal-node/dpp-core.git
-git branch -M main
-git push -u origin main
+With one maintainer, no approving review is required; the checks are the gate.
 
-# 4. Tag the initial release
-git tag -a v0.1.0 -m "Initial release — core DPP library"
-git push origin v0.1.0
-
-# 5. Set branch protection rules on GitHub
-# Settings → Branches → Add rule for 'main'
-
-# 6. When ready to go public
-gh repo edit odal-node/dpp-core --visibility public
-```
+Because the branch must be up to date before merging, merges are serial: after one pull
+request merges, the next must be updated and its checks run again.
 
 ---
 
-## Visibility Strategy
+## Releases and tags
 
-| Phase | Visibility | Reason |
-|---|---|---|
-| **Now** | Private | Polish, fix remaining clippy/fmt issues, verify CI green |
-| **After CI green** | Private | Tag v0.1.0, review README one more time |
-| **When ready** | Public | Announce on LinkedIn, submit to GS1 Solution Partner |
-
-Start private. Going public is a one-way door for first impressions. Make sure `just check` is fully green, the README renders well on GitHub, and the license file is correct before flipping the switch.
+Tags are `vX.Y.Z`, one per release for the whole workspace, cut from `main` by
+`cargo release` (see [RELEASE.md](RELEASE.md)). The `release tags` ruleset protects `v*`
+tags from deletion, update and force push, so a published tag never moves.
 
 ---
 
-## .gitignore Additions
+## crates.io
 
-Make sure these are in `.gitignore` before pushing:
-
-```
-/target/
-*.swp
-*.swo
-.DS_Store
-.idea/
-.vscode/
-```
-
----
-
-## Crates.io Publishing (Future)
-
-When the API stabilises (post-v1.0.0):
-
-```bash
-cargo publish -p dpp-rules          # no internal deps
-cargo publish -p dpp-plugin-traits  # no internal deps
-cargo publish -p dpp-domain         # depends on dpp-rules
-cargo publish -p dpp-crypto         # depends on dpp-domain
-cargo publish -p dpp-digital-link            # depends on dpp-domain
-cargo publish -p dpp-aas            # depends on dpp-domain
-cargo publish -p dpp-vc             # depends on dpp-domain + dpp-crypto
-cargo publish -p dpp-registry       # depends on dpp-domain
-cargo publish -p dpp-calc           # depends on dpp-domain
-cargo publish -p dpp-plugin-sdk     # depends on dpp-plugin-traits + dpp-rules
-```
-
-Publish order matters — dependencies first. `dpp-tests` is `publish = false` and is never published. Product group plugins are released as `.wasm` artefacts, not to crates.io.
+Every crate except `dpp-tests` (`publish = false`) and `dpp-benches` is published to
+crates.io in lockstep. [RELEASE.md](RELEASE.md) has the publishing order and the release
+command; product group plugins are built as `.wasm` artefacts and never published to
+crates.io.

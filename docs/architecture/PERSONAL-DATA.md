@@ -1,4 +1,4 @@
-# Personal data in a passport — the design, and what it was chosen over
+# Personal data in a passport: the design, and what it was chosen over
 
 **Status:** standard. The rule, and the law behind it, are stated once, in the
 `personal_data` module of `dpp-domain`. This document records the alternatives

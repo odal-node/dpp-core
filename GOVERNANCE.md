@@ -1,86 +1,94 @@
-# Project Governance
+# Governance
 
-This document describes the decision-making structure for dpp-core and how it
-is expected to evolve.
+How decisions are made for `dpp-core`, and how that is expected to change.
 
-## Current Model: BDFL (Benevolent Dictator For Life)
+## Current model: single maintainer
 
-dpp-core is maintained by a single author and the project is in its early
-pre-1.0 phase. All design decisions, release approvals, and merge authority
-rest with:
+The project is pre-1.0 and has one maintainer, who holds all design, release and merge
+authority:
 
-- **Maintainer**: Aleksandar Temelkov (LKSNDRTMLKV)
-- **Organisation**: Odal Node
-- **Contact**: https://github.com/LKSNDRTMLKV
+- **Maintainer:** Aleksandar Temelkov ([@LKSNDRTMLKV](https://github.com/LKSNDRTMLKV))
+- **Organisation:** Odal Node
 
-This model is appropriate for the current stage. It allows fast iteration on
-API design while the EU regulatory landscape (ESPR delegated acts, EU Registry
-specification) is still evolving.
+One decision-maker keeps API iteration fast while the regulation it encodes (ESPR
+delegated acts, the EU registry specification) is still moving.
 
-## Decision Records
+## Where decisions are recorded
 
-Significant technical decisions are recorded in the architecture and design
-docs under `docs/architecture/`, and summarised in
-`CHANGELOG.md`. Each decision captures the context, what was chosen, the
-alternatives considered, and the consequences. Superseded decisions are marked
-as such with a link to the replacement.
+Significant technical decisions are recorded in the documents under
+[`docs/architecture/`](docs/architecture/) and summarised in
+[CHANGELOG.md](CHANGELOG.md). Each records the context, the choice, the alternatives
+considered and the consequences. A superseded decision links to its replacement.
 
-## Contribution Governance
+## Contributions
 
-All contributions follow the process described in [CONTRIBUTING.md](CONTRIBUTING.md):
+Every contribution follows [CONTRIBUTING.md](CONTRIBUTING.md):
 
-1. Open an issue describing the proposed change.
-2. Fork, implement, and submit a pull request.
-3. All commits must carry a DCO sign-off (`Signed-off-by:` line).
-4. CI must pass (fmt, clippy, nextest, audit). The semver-checks report is read
-   but does not block; see [VERSIONING.md](docs/governance/VERSIONING.md).
+1. Open an issue describing the change.
+2. Fork, implement, and open a pull request.
+3. Sign off every commit under the DCO (`Signed-off-by:` line).
+4. CI passes (format, clippy, tests, audit). The semver-checks report is read but does
+   not block; see [VERSIONING.md](docs/governance/VERSIONING.md).
 5. The maintainer reviews and merges.
 
-No pull request is merged without maintainer approval. Force-pushes to `main`
-are prohibited.
+Nothing merges without maintainer approval. Force-pushes to `main` are blocked.
 
-## Security Decisions
+## Security-sensitive changes
 
-Security-sensitive changes (anything touching `dpp-crypto`, schema validation
-logic, or audience/disclosure enforcement) require:
+A change to `dpp-crypto`, to credential, DID or status-list verification in `dpp-vc`, to
+schema validation, or to audience and disclosure enforcement needs:
 
-1. A dedicated review focusing on cryptographic correctness.
-2. Explicit sign-off in the PR description noting the security implications.
-3. An update to [SECURITY.md](SECURITY.md) if the change affects the
-   threat model or supported cryptographic primitives.
+1. A review focused on cryptographic and access-control correctness.
+2. A statement of the security implications in the pull request description.
+3. An update to [SECURITY.md](SECURITY.md) if it changes the threat model or the
+   cryptographic primitives.
 
-## Evolution Path
+## How the model will change
 
-As the contributor base grows, governance will evolve:
-
-| Contributors | Model | Change |
+| Contributors | Model | What changes |
 |---|---|---|
-| 1 (current) | BDFL | All authority with maintainer |
-| 2 - 5 | BDFL + Trusted Committers | Named individuals gain merge rights for specific crates |
-| 5+ | Maintainer Council | Decisions by lazy consensus, formal RFC process for breaking changes |
+| 1 (today) | Single maintainer | All authority with the maintainer |
+| 2 to 5 | Maintainer and trusted committers | Named people gain merge rights for specific crates |
+| More than 5 | Maintainer council | Lazy consensus, and a written RFC process for breaking changes |
 
-Any governance transition will be proposed as a PR updating this document,
-discussed publicly, and recorded here.
+Any change of model is proposed as a pull request to this document and discussed in
+public.
 
-## Licensing Authority
+## Licensing
 
-dpp-core is licensed under Apache-2.0. The maintainer holds copyright over the
-original work. Contributors retain copyright over their contributions and
-grant the license via the DCO sign-off. No Contributor License Agreement (CLA)
-is required.
+`dpp-core` is licensed under Apache-2.0. The maintainer holds copyright in the original
+work. Contributors keep copyright in their contributions and license them through the DCO
+sign-off; there is no Contributor License Agreement. Changing the project's licence needs
+the agreement of every copyright holder.
 
-Decisions to change the project license require agreement from all copyright
-holders.
+## Code of conduct
 
-## Code of Conduct
+It applies to every space this repository runs: issues, pull requests, discussions,
+code review, commit messages, and email to the project's addresses.
 
-All participants are expected to behave professionally and respectfully.
-A formal Code of Conduct will be adopted before the project actively solicits
-external contributions.
+Be direct and be decent. Criticise the work, not the person. Say what you think and why;
+blunt technical disagreement is welcome. Not acceptable, in any tone: harassment, personal
+attacks, discrimination or slurs on any basis, publishing someone's private information
+without their permission, sexualised language or unwelcome sexual attention, and sustained
+disruption such as reopening settled decisions to wear people down.
+
+This software is used for regulatory compliance, and operators may act on what it says.
+**Knowingly stating something false about EU law, about what the software does, or about
+its production readiness is a conduct problem here,** and so is describing a plan as a
+shipped feature. Honest mistakes are not.
+
+Report to **contact@odal-node.io**: what happened, where and when. A link is enough. You
+get an acknowledgement within 72 hours, and your report is not shared with the person you
+report without telling you first. If it concerns the maintainer, say so in the report.
+GitHub's abuse reporting is available to you independently of this project.
+
+Depending on severity, the outcome is a private correction, a public correction, removal
+of the content, a temporary block or a permanent ban. The maintainer is bound by this
+section too.
 
 ## References
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)
-- [Architecture docs](docs/architecture/)
+- [Architecture documents](docs/architecture/)
 - [Developer Certificate of Origin](https://developercertificate.org/)

@@ -34,7 +34,7 @@ use dpp_domain::catalog::ProductGroupCatalog;
 
 /// Product groups documented in a section of their own above the table, with the
 /// Rust type the section's heading names: `### 4.1 Battery Product group
-/// (`BatteryData`) — v2.9.0`.
+/// (`BatteryData`), schema v2.9.0`.
 const GROUPS_WITH_THEIR_OWN_SECTION: &[(&str, &str)] =
     &[("battery", "BatteryData"), ("textile", "TextileData")];
 
@@ -112,8 +112,8 @@ fn drift(
 
 /// Everything wrong with the version each own-section heading states, one
 /// sentence each. A heading reads `### 4.1 Battery Product group
-/// (`BatteryData`) — v2.9.0`; the type in backticks finds it and the text after
-/// the dash is the version.
+/// (`BatteryData`), schema v2.9.0`; the type in backticks finds it and the text after
+/// `, schema ` is the version.
 fn heading_drift(
     doc: &str,
     sections: &[(&str, &str)],
@@ -140,7 +140,10 @@ fn heading_drift(
             problems.push(format!("`{group}` has a section but is not in the catalog"));
             continue;
         };
-        match heading.rsplit_once('—').map(|(_, stated)| stated.trim()) {
+        match heading
+            .rsplit_once(", schema ")
+            .map(|(_, stated)| stated.trim())
+        {
             None => problems.push(format!(
                 "`{group}`: the heading states no version: {heading}"
             )),
@@ -277,11 +280,11 @@ fn the_heading_check_catches_what_it_is_for() {
     ];
 
     let doc = "\
-### 4.1 Alpha Product group (`AlphaData`) — v1.1.0
+### 4.1 Alpha Product group (`AlphaData`), schema v1.1.0
 
 prose
 
-### 4.2 Beta Product group (`BetaData`) — v2.0.0
+### 4.2 Beta Product group (`BetaData`), schema v2.0.0
 
 prose
 
@@ -289,7 +292,7 @@ prose
 
 prose
 
-### 4.4 Ghost Product group (`GhostData`) — v1.0.0
+### 4.4 Ghost Product group (`GhostData`), schema v1.0.0
 
 Gamma has no heading at all, and a heading that merely mentions (`BetaData`) in
 prose is not one.
@@ -315,7 +318,8 @@ prose is not one.
     );
 
     // Two headings for one type is as wrong as none.
-    let twice = "### 1 A (`AlphaData`) — v1.2.0\n### 2 A again (`AlphaData`) — v1.2.0\n";
+    let twice =
+        "### 1 A (`AlphaData`), schema v1.2.0\n### 2 A again (`AlphaData`), schema v1.2.0\n";
     let found = heading_drift(twice, &[("alpha", "AlphaData")], &current);
     assert!(
         found.iter().any(|p| p.contains("found 2")),
@@ -323,7 +327,7 @@ prose is not one.
     );
 
     // And a right heading is passed.
-    let right = "### 4.1 Alpha Product group (`AlphaData`) — v1.2.0\n";
+    let right = "### 4.1 Alpha Product group (`AlphaData`), schema v1.2.0\n";
     assert!(heading_drift(right, &[("alpha", "AlphaData")], &current).is_empty());
 }
 

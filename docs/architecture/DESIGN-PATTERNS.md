@@ -1,116 +1,140 @@
-# Design Patterns
+# Design patterns
 
-This document describes the architectural patterns used in dpp-core and the reasoning behind each choice.
+The architectural patterns `dpp-core` uses, and the reason for each.
 
 ---
 
-## 1. Hexagonal Architecture (Ports & Adapters)
+## 1. Hexagonal architecture (ports and adapters)
 
-The domain logic is isolated from all external concerns. Every external dependency is behind a trait.
+Domain logic is isolated from everything external. Every external dependency sits
+behind a trait.
 
-```
+```text
          +---------------------------------------------+
-         |             Driving Adapters                 |
-         |  (HTTP handlers, CLI, test stubs)            |
-         +---------------------+------------------------+
-                               |  <- Driving Ports (Rust traits)
+         |             Driving adapters                |
+         |  (HTTP handlers, CLI, test doubles)         |
+         +---------------------+-----------------------+
+                               |  <- driving ports (Rust traits)
                    +-----------v-----------+
-                   |    Domain / Core      |
-                   |  (dpp-core)          |
-                   |  - DPP validation     |
-                   |  - Lifecycle rules    |
-                   |  - Signing logic      |
-                   |  - Audit records      |
+                   |    Domain             |
+                   |  (dpp-core)           |
+                   |  - passport validation|
+                   |  - lifecycle rules    |
+                   |  - signing logic      |
                    +-----------+-----------+
-                               |  <- Driven Ports (Rust traits)
-         +---------------------v------------------------+
-         |             Driven Adapters                  |
-         |  (Database, cache, event bus, file storage)  |
+                               |  <- driven ports (Rust traits)
+         +---------------------v-----------------------+
+         |             Driven adapters                 |
+         |  (database, cache, event bus, file storage) |
          +---------------------------------------------+
 ```
 
-**Domain** = pure structs, enums, and functions in `dpp-domain`. Zero async, zero I/O.
+**The domain** is plain structs, enums and functions in `dpp-domain`, with no I/O.
 
-**Driven Ports** = Rust `trait`s in `dpp-domain::ports` that the domain uses to reach infrastructure:
+**Driven ports** are the traits in `dpp_domain::ports` that the domain uses to reach
+infrastructure. An excerpt of `PassportRepository`:
+
 ```rust
+#[async_trait]
 pub trait PassportRepository: Send + Sync {
     async fn create(&self, passport: Passport) -> Result<Passport, DppError>;
     async fn find_by_id(&self, id: PassportId) -> Result<Option<Passport>, DppError>;
     async fn update(&self, passport: Passport) -> Result<Passport, DppError>;
+    // … lookups by identifier, carrier, identity and successor
 }
 ```
 
-All adapter implementations live downstream. The domain is testable with in-memory stubs — no containers, no network calls.
+Adapter implementations live in your application. The domain is tested with in-memory
+implementations, without containers or network calls.
 
 ---
 
-## 2. Open-Core Boundary
+## 2. The compliance extension point
 
-The `ComplianceRegistry` trait in `dpp-domain::ports` is the **extension seam** — the single point where product-group-specific compliance logic plugs in. It is a *technical* boundary: compliance calculation is open (Apache-2.0 Wasm plugins and a host's calculators).
+`ComplianceRegistry` in `dpp_domain::ports` is the single point where
+product-group-specific compliance logic plugs in. It is a technical boundary: the
+compliance logic itself is open (Apache-2.0 Wasm plugins and the calculators in
+`dpp-calc`).
 
 ```rust
 pub trait ComplianceRegistry: Send + Sync {
-    fn get_strategy(&self, product_group: &str) -> Option<&dyn ComplianceStrategy>;
+    fn compute(
+        &self,
+        product_group_key: &str,
+        data: &ProductGroupData,
+        law_in_force_on: Option<NaiveDate>,
+    ) -> Result<ComplianceResult, ComplianceError>;
 }
 
 pub trait ComplianceStrategy: Send + Sync {
-    fn validate(&self, data: &serde_json::Value) -> Result<(), ComplianceError>;
+    fn product_group_key(&self) -> &str;
+    fn compute(
+        &self,
+        data: &ProductGroupData,
+        law_in_force_on: Option<NaiveDate>,
+    ) -> Result<ComplianceResult, ComplianceError>;
 }
 ```
 
-dpp-domain ships with `PassthroughNoValidation` — it accepts manufacturer-supplied compliance values verbatim. Wasm product group plugins or a host's calculators provide real compliance validation.
+The default is `PassthroughRegistry`, which accepts manufacturer-supplied values verbatim
+and reports `PassthroughNoValidation`. Wasm product group plugins, or calculators wired in
+by your application, provide real validation. Any implementation can be injected at
+startup as an `Arc<dyn ComplianceRegistry>`, with no change to domain code.
 
-Any compliance engine implementing this trait can be injected at startup via dynamic dispatch without any changes to the domain code.
-
----
-
-## 3. Ghost Bridge
-
-The `dpp-registry` crate represents a dependency on a future external system (the EU EUDPP Central Registry) that does not yet exist. The pattern: **define the interface now; implement it when the dependency arrives.**
-
-```rust
-pub trait EudppBridge: Send + Sync {
-    async fn register_passport(&self, dpp_id: &PassportId, vc: &VerifiableCredential)
-        -> Result<BridgeResult, BridgeError>;
-    async fn update_passport(&self, dpp_id: &PassportId, vc: &VerifiableCredential)
-        -> Result<BridgeResult, BridgeError>;
-    async fn revoke_passport(&self, dpp_id: &PassportId, reason: &str)
-        -> Result<BridgeResult, BridgeError>;
-}
-
-pub struct GhostRegistrySync;  // Returns Ok(Pending) for all calls
-```
-
-When the EU publishes the EUDPP API specification, `dpp-registry` gets a real implementation. Zero other crates change — the bridge call is already wired downstream.
+`law_in_force_on` is the date whose law governs the product, normally its placing-on-market
+date, never the wall clock. `None` means the date is unknown, and a strategy that needs it
+says so rather than guessing.
 
 ---
 
-## 4. Schema-as-Code
+## 3. Stub implementations behind real ports
 
-Versioned JSON schemas are embedded at compile time via `include_str!()`. The `VersionedSchemaRegistry` discovers all schemas in `schemas/{product-group}/v{version}.json` and provides:
+Some ports front external services that an operator may not have configured yet, or that
+cannot have legal effect yet: the EU registry, a qualified seal provider, an independent
+back-up host. For each, the port is fully specified now, and the library ships a stub:
 
-- `get(product group, version)` — retrieve a specific schema
-- `latest(product group)` — retrieve the newest version for a product group
-- `validate(product group, version, data)` — validate passport data
-
-Adding a new schema version is a single file addition. No code changes required — the registry discovers all embedded versions automatically.
-
-This means schema changes are tracked in version control, reviewed in PRs, and tested in CI like any other code change.
-
----
-
-## 5. Port Traits as Extension Contract
-
-The port traits in `dpp-domain::ports` form the complete contract between the standard and any implementation:
-
-| Trait | Async | Purpose |
+| Port | Stub | Behaviour |
 |---|---|---|
-| `PassportRepository` | yes | CRUD for DPP records |
-| `ComplianceRegistry` | no | Route to product group strategy |
-| `ComplianceStrategy` | no | Product group-specific validation |
-| `IdentityPort` | yes | Sign and verify JWS |
-| `PluginHost` | no | Dispatch to Wasm plugins |
+| `RegistrySyncPort` | `GhostRegistrySync` | Accepts every submission under a `GHOST-CORR-` correlation id, sends nothing, and knows of no submission afterwards |
+| `SealPort` | `GhostSeal` | Returns an unsigned envelope marked `placeholder: true`, whose verification is indeterminate |
+| `BackupCopyPort` | `GhostBackup` | Returns a receipt with a `GHOST-` id and an empty content hash, and stores nothing |
 
-`PassportRepository` and `IdentityPort` use `async-trait`. Non-async traits are plain Rust traits — compatible with `no_std` and `wasm32`.
+Each stub marks its output as a placeholder (a `placeholder: true` flag or a synthetic
+`GHOST-` identifier), so a host can detect it at runtime and refuse to run on it in
+production. The stubs are always compiled in rather than feature-gated: one public path
+per port is simpler to use, and the runtime markers do the job either way.
 
-Anyone who implements these traits against their own infrastructure has a complete, standard-compliant DPP system. The core library has no opinion on what database, cache, or HTTP framework is used. Authentication and API key management are platform concerns, and multi-operator isolation is an infrastructure concern (one node per operator) — none belong in the core.
+`RegistrySyncPort` itself reflects the registry as published: `register` returns an
+acknowledgement, not a registration, and `check_submission`, `find_submission`,
+`confirm_submission` and `check_status` follow the asynchronous validation that
+[Implementing Regulation (EU) 2026/1778](https://eur-lex.europa.eu/eli/reg_impl/2026/1778/oj)
+describes.
+
+---
+
+## 4. Schemas as code
+
+Versioned JSON Schemas are embedded at compile time with `include_str!()`, from
+`crates/dpp-domain/schemas/{product-group}/v{version}.json`, through the table in
+`crates/dpp-domain/src/schemas/embedded.rs`. `VersionedSchemaRegistry` provides:
+
+- `get(product_group, version)`: one schema
+- `latest(product_group)`: the newest version for a product group
+- `validate(product_group, version, data)`: validate data against a schema
+
+A new version is a new file and one entry in the embedded table. Schema changes are
+version-controlled, reviewed and tested like any other code, and
+[SCHEMA-CHANGES.md](SCHEMA-CHANGES.md) is regenerated from the schemas themselves.
+
+---
+
+## 5. Port traits as the contract
+
+The port traits in `dpp_domain::ports` are the full contract between the library and any
+application. [PORTS.md](PORTS.md) lists each one, and a test keeps that list equal to the
+code.
+
+Implementing these traits against your own infrastructure gives a complete passport
+system. The library has no opinion on the database, cache or HTTP framework.
+Authentication, API keys and isolation between operators belong to your application and
+how it is deployed; none of them belong in the library.

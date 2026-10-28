@@ -189,7 +189,7 @@ fn join(prefix: &str, name: &str) -> String {
     }
 }
 
-/// A property's declared type, rendered. `"—"` where the subschema declares
+/// A property's declared type, rendered. Empty where the subschema declares
 /// none, which a `$ref` or a bare `enum` legitimately does.
 fn type_of(prop: &Value) -> String {
     match prop.get("type") {
