@@ -14,6 +14,12 @@ updates:
   # bump of a version in a `Cargo.toml` leaves the lockfile unsatisfiable under
   # `--locked`, where a bump of the lockfile alone does not. `lock-check` then
   # fails and names `just lock-regen`, which is the repair.
+  #
+  # `group-by: dependency-name` below makes one pull request per crate across all
+  # three workspaces. Without it Dependabot opened one per directory, and each
+  # failed `lock-check` for the lockfile the other carried: #539 (root) and #542
+  # (`/fuzz`) were both jsonschema 0.59. Dependabot still splits a crate whose
+  # version requirements differ between workspaces.
   - package-ecosystem: cargo
     directories:
       - "/"
@@ -27,6 +33,11 @@ updates:
     labels:
       - dependencies
       - rust
+    groups:
+      per-crate:
+        group-by: dependency-name
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: "/"
