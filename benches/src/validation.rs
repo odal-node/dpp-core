@@ -12,6 +12,7 @@ use dpp_domain::validation::{
 #[path = "fixtures.rs"]
 mod fixtures;
 
+/// Battery data that passes validation.
 fn valid_battery() -> ProductGroupData {
     ProductGroupData::Battery(Box::new(BatteryData {
         product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
@@ -86,6 +87,7 @@ fn valid_battery() -> ProductGroupData {
     }))
 }
 
+/// Textile data that passes validation.
 fn valid_textile() -> ProductGroupData {
     ProductGroupData::Textile(Box::new(TextileData {
         product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
@@ -128,6 +130,8 @@ fn valid_textile() -> ProductGroupData {
     }))
 }
 
+/// Schema validation of one battery and one textile, batches of them at several
+/// sizes, and the whole-passport publish gate.
 fn validation_benchmarks(c: &mut Criterion) {
     // Warm the OnceLock validators so compilation cost isn't measured.
     let _ = validate_product_group_data(&valid_battery());
@@ -171,6 +175,14 @@ fn validation_benchmarks(c: &mut Criterion) {
                 }
             })
             .collect();
+        // A batch with a refusal in it still prints a figure, and it would be the
+        // figure for the refusals.
+        assert!(
+            validate_product_group_data_batch(&items)
+                .iter()
+                .all(|item| item.result.is_ok()),
+            "every item in the {size}-item batch should validate"
+        );
         ladder.throughput(Throughput::Elements(size as u64));
         ladder.bench_with_input(BenchmarkId::from_parameter(size), &items, |b, items| {
             b.iter(|| validate_product_group_data_batch(items));

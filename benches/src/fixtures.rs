@@ -12,15 +12,21 @@ use dpp_domain::identifier::{Gtin, ProductIdentifier};
 use dpp_domain::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroupData};
 use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, ProductGroup};
 use dpp_tests::fixtures::base_passport;
+use tempfile::TempDir;
 
 pub const GTIN: &str = "09506000134352";
 
-/// An open key store with one generated key, in a file of its own.
-pub fn keystore(key_id: &str) -> KeyStore {
-    let path = std::env::temp_dir().join(format!("bench-keystore-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "bench-pass").expect("open store");
+/// An open key store with one generated key, in a directory of its own.
+///
+/// The file holds a private key, so it goes in a `tempfile` directory, which is
+/// created with restrictive permissions and removed when the `TempDir` is
+/// dropped. `std::env::temp_dir` does neither. The caller keeps the `TempDir`
+/// for as long as it uses the store.
+pub fn keystore(key_id: &str) -> (KeyStore, TempDir) {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let store = KeyStore::open(dir.path().join("keystore.json"), "bench-pass").expect("open store");
     store.generate_key(key_id).expect("generate key");
-    store
+    (store, dir)
 }
 
 /// A battery passport with the Annex XIII fields the benches care about filled

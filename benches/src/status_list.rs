@@ -23,6 +23,8 @@ fn bitstring(bits: usize) -> Vec<u8> {
     raw
 }
 
+/// A bitstring in the form a status list is published in: gzipped, then base64url
+/// with the multibase `u` prefix.
 fn encode(raw: &[u8]) -> String {
     let mut gz = GzEncoder::new(Vec::new(), Compression::default());
     gz.write_all(raw).unwrap();
@@ -32,6 +34,7 @@ fn encode(raw: &[u8]) -> String {
     )
 }
 
+/// Decoding a published list, and testing one bit of it.
 fn status_list_benchmarks(c: &mut Criterion) {
     let mut decode = c.benchmark_group("status_list_decode");
     for bits in [131_072_usize, 1_048_576] {

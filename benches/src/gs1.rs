@@ -5,17 +5,16 @@ use dpp_digital_link::{DigitalLink, build_qr_url};
 mod fixtures;
 use fixtures::battery_passport;
 
+/// Parsing a Digital Link that carries a serial, and one that carries a batch and
+/// a serial.
 fn gs1_benchmarks(c: &mut Criterion) {
     c.bench_function("gs1_parse_with_serial", |b| {
-        b.iter(|| {
-            DigitalLink::parse("https://id.odal-node.io/01/09506000134352/21/ABC123").unwrap()
-        });
+        b.iter(|| DigitalLink::parse("https://example.com/01/09506000134352/21/ABC123").unwrap());
     });
 
     c.bench_function("gs1_parse_full", |b| {
         b.iter(|| {
-            DigitalLink::parse("https://id.odal-node.io/01/09506000134352/10/BATCH01/21/SN001")
-                .unwrap()
+            DigitalLink::parse("https://example.com/01/09506000134352/10/BATCH01/21/SN001").unwrap()
         });
     });
 }
@@ -24,10 +23,10 @@ fn gs1_benchmarks(c: &mut Criterion) {
 /// prefix, an escaped value, and the two refusals.
 fn gs1_forms(c: &mut Criterion) {
     let accepted = [
-        ("gtin_only", "https://id.odal-node.io/01/09506000134352"),
+        ("gtin_only", "https://example.com/01/09506000134352"),
         (
             "with_query",
-            "https://id.odal-node.io/01/09506000134352?linkType=gs1:pip",
+            "https://example.com/01/09506000134352?linkType=gs1:pip",
         ),
         (
             "path_prefix",
@@ -35,15 +34,12 @@ fn gs1_forms(c: &mut Criterion) {
         ),
         (
             "escaped_serial",
-            "https://id.odal-node.io/01/09506000134352/21/AB%2FC",
+            "https://example.com/01/09506000134352/21/AB%2FC",
         ),
     ];
     let refused = [
-        (
-            "bad_check_digit",
-            "https://id.odal-node.io/01/09506000134353",
-        ),
-        ("bad_scheme", "ftp://id.odal-node.io/01/09506000134352"),
+        ("bad_check_digit", "https://example.com/01/09506000134353"),
+        ("bad_scheme", "ftp://example.com/01/09506000134352"),
     ];
 
     // A refusal is a fast path and a different one; make sure each case is the
@@ -70,21 +66,18 @@ fn gs1_forms(c: &mut Criterion) {
     }
     refuse.finish();
 
-    let link = DigitalLink::parse("https://id.odal-node.io/01/09506000134352/10/BATCH01/21/SN001")
-        .unwrap();
+    let link =
+        DigitalLink::parse("https://example.com/01/09506000134352/10/BATCH01/21/SN001").unwrap();
     c.bench_function("gs1_build_full", |b| b.iter(|| link.build()));
 
     // Minting the carrier URL printed on a label, from a passport.
     let passport = battery_passport();
     assert!(
-        matches!(
-            build_qr_url("https://id.odal-node.io", &passport),
-            Ok(Some(_))
-        ),
+        matches!(build_qr_url("https://example.com", &passport), Ok(Some(_))),
         "the fixture should yield a carrier URL"
     );
     c.bench_function("gs1_build_qr_url_battery", |b| {
-        b.iter(|| build_qr_url("https://id.odal-node.io", &passport).unwrap());
+        b.iter(|| build_qr_url("https://example.com", &passport).unwrap());
     });
 }
 

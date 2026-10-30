@@ -24,6 +24,8 @@ fn view_len(passport: &dpp_domain::Passport, audience: Audience) -> usize {
         .len()
 }
 
+/// `redact_passport` per audience, its fail-closed path, and its growth with the
+/// bill of materials.
 fn access_benchmarks(c: &mut Criterion) {
     let passport = battery_passport();
 

@@ -22,12 +22,14 @@ const KEY_ID: &str = "bench";
 const ISSUER: &str = "https://passports.operator.example";
 const ISSUED_AT: i64 = 1_789_000_000;
 
+/// A JSON object of `members` claims.
 fn object_of(members: usize) -> Map<String, Value> {
     (0..members)
         .map(|i| (format!("claim-{i:03}"), json!({"value": i, "unit": "kg"})))
         .collect()
 }
 
+/// Concealing the members of an object and the elements of an array.
 fn concealment(c: &mut Criterion) {
     let mut objects = c.benchmark_group("sd_jwt_conceal_object");
     for members in [10_usize, 100] {
@@ -48,8 +50,10 @@ fn concealment(c: &mut Criterion) {
     });
 }
 
+/// Issuing and verifying a battery passport as an SD-JWT VC, and the wire format:
+/// serialising, parsing, and disclosing all or half of the claims.
 fn credential(c: &mut Criterion) {
-    let store = keystore(KEY_ID);
+    let (store, _dir) = keystore(KEY_ID);
     let passport: Passport = battery_passport();
     let payload = serde_json::to_value(&passport).unwrap();
     let policy = ProductGroupAccessPolicy::for_passport("battery", &passport.schema_version)

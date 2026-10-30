@@ -9,6 +9,7 @@ use dpp_domain::Passport;
 mod fixtures;
 use fixtures::battery_passport_with_materials;
 
+/// `Passport` to and from JSON text and a `Value`, at 1 and at 500 materials.
 fn serde_benchmarks(c: &mut Criterion) {
     // One line is the record as it is usually found; 500 is a deep bill of
     // materials. The throughput is the document's size in bytes, so the report

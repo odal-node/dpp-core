@@ -10,6 +10,7 @@ use serde_json::json;
 mod fixtures;
 use fixtures::battery_passport_with_materials;
 
+/// RFC 8785 canonicalisation of a small payload and of whole passports.
 fn canonical_benchmarks(c: &mut Criterion) {
     // The payload the `crypto` target signs, so the two reports can be read side
     // by side.

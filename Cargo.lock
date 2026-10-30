@@ -750,7 +750,7 @@ dependencies = [
  "dpp-vc",
  "flate2",
  "serde_json",
- "uuid",
+ "tempfile",
 ]
 
 [[package]]

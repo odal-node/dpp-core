@@ -14,6 +14,7 @@ use dpp_calc::repairability::{
     self, SimplifiedRepairabilityHeuristic, parameters::RepairabilityInputs,
 };
 
+/// The small bill of materials the CO2e benches start from.
 fn small_co2e_inputs() -> Co2eInputs {
     Co2eInputs {
         materials: vec![
@@ -31,6 +32,8 @@ fn small_co2e_inputs() -> Co2eInputs {
     }
 }
 
+/// A bill of `n` materials whose masses and emission factors vary, so no two are
+/// alike.
 fn bill_of_materials(n: usize) -> Co2eInputs {
     Co2eInputs {
         materials: (0..n)
@@ -44,6 +47,7 @@ fn bill_of_materials(n: usize) -> Co2eInputs {
     }
 }
 
+/// A fixed set of repairability scores.
 fn repairability_inputs() -> RepairabilityInputs {
     RepairabilityInputs {
         disassembly: 2,
@@ -55,6 +59,8 @@ fn repairability_inputs() -> RepairabilityInputs {
     }
 }
 
+/// Cradle-to-gate CO2e from a small bill and up a ladder of materials, and the
+/// simplified repairability heuristic.
 fn calc_benchmarks(c: &mut Criterion) {
     let clock = dpp_calc::clock::AssessmentClock::placed_on(
         chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"),

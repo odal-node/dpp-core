@@ -7,12 +7,14 @@ use serde_json::json;
 
 #[path = "fixtures.rs"]
 mod fixtures;
-use fixtures::battery_passport_with_materials;
+use fixtures::{battery_passport_with_materials, keystore};
+use tempfile::TempDir;
 
-fn setup() -> (KeyStore, String, serde_json::Value, String, String) {
-    let path = std::env::temp_dir().join(format!("bench-crypto-{}.json", uuid::Uuid::now_v7()));
-    let store = KeyStore::open(&path, "bench-pass").expect("open store");
-    store.generate_key("bench").expect("generate key");
+/// A key store with one key, and what the sign and verify benches share: the
+/// payload, its signature, and the key's public half. The `TempDir` holds the
+/// store's file and must outlive the store.
+fn setup() -> (KeyStore, TempDir, String, serde_json::Value, String, String) {
+    let (store, dir) = keystore("bench");
 
     let payload = json!({"passport_id": "bench-001", "status": "draft"});
     let jws = signer::sign(&store, "bench", &payload, "bench-kid").expect("sign");
@@ -21,11 +23,13 @@ fn setup() -> (KeyStore, String, serde_json::Value, String, String) {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let pub_key_b64 = b64.encode(entry.verifying_key.as_bytes());
 
-    (store, "bench".to_owned(), payload, jws, pub_key_b64)
+    (store, dir, "bench".to_owned(), payload, jws, pub_key_b64)
 }
 
+/// Signing and verifying a small payload, then whole passports of 1, 50 and 500
+/// materials.
 fn crypto_benchmarks(c: &mut Criterion) {
-    let (store, key_id, payload, jws, pub_key_b64) = setup();
+    let (store, _dir, key_id, payload, jws, pub_key_b64) = setup();
 
     c.bench_function("jws_sign", |b| {
         b.iter(|| signer::sign(&store, &key_id, &payload, "bench-kid").unwrap());
@@ -80,7 +84,8 @@ fn crypto_benchmarks(c: &mut Criterion) {
 /// here is a weaker store, not an optimisation, so this is here to make a change
 /// to the parameters visible, not to be driven down.
 fn keystore_benchmarks(c: &mut Criterion) {
-    let path = std::env::temp_dir().join(format!("bench-open-{}.json", uuid::Uuid::now_v7()));
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let path = dir.path().join("keystore.json");
     KeyStore::open(&path, "bench-pass")
         .expect("create store")
         .generate_key("bench")

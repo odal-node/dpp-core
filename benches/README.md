@@ -61,7 +61,9 @@ When you add a hot path to `dpp-core`, add a bench target: a new `src/<name>.rs`
 
 [`bench.yml`](../.github/workflows/bench.yml) runs everything weekly and on demand. It
 is a measurement, not a gate: a shared runner is too noisy to fail a build on a timing.
-It restores the previous run's `target/criterion` from a cache, so Criterion's own
-comparison is against the last run, and it writes the benches Criterion judges slower to
-the run summary. The two runs may not be on alike machines, so a flagged bench is a
-reason to run it again, not a finding.
+It downloads the previous run's `target/criterion` from that run's `criterion-reports`
+artifact, so Criterion's own comparison is against the last run, and it writes the
+benches Criterion judges slower to the run summary. The summary says so when there was
+nothing to compare with (the first run, or an artifact that had expired) and when the
+bench step did not finish, so neither reads as a clean result. The two runs may not be
+on alike machines, so a flagged bench is a reason to run it again, not a finding.

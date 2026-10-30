@@ -16,6 +16,8 @@ fn identity_of(p: &Passport) -> AssetIdentity<'_> {
     AssetIdentity::from_passport(p).expect("the benchmark fixture carries an identifier")
 }
 
+/// AAS submodel mapping and the build-and-serialise path used for export, per
+/// audience and across bills of materials.
 fn aas_benchmarks(c: &mut Criterion) {
     let passport = battery_passport();
 

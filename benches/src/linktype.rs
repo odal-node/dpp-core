@@ -43,6 +43,8 @@ fn linkset(n: usize) -> Vec<LinkDescriptor> {
         .collect()
 }
 
+/// Content negotiation over a linkset of 5 and of 50 representations: a request
+/// with no hints, one naming a link type for an authority, and one nothing matches.
 fn negotiation(c: &mut Criterion) {
     let mut group = c.benchmark_group("linktype_negotiate");
     for n in [5_usize, 50] {
@@ -97,6 +99,7 @@ fn negotiation(c: &mut Criterion) {
     group.finish();
 }
 
+/// Parsing `Accept` headers, from a single type to a browser's list.
 fn accept_header(c: &mut Criterion) {
     let mut group = c.benchmark_group("accept_header");
     for (label, header) in [
