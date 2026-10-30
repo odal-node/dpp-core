@@ -12,11 +12,13 @@ dpp-crypto  = { workspace = true }
 dpp-domain  = { workspace = true }
 dpp-digital-link     = { workspace = true }
 dpp-aas              = { workspace = true }
+dpp-vc      = { workspace = true }
 dpp-tests   = { workspace = true }
 chrono      = { workspace = true }
 serde_json  = { workspace = true }
 uuid        = { workspace = true }
 base64      = { workspace = true }
+flate2      = { workspace = true }
 
 [[bench]]
 name    = "crypto"
@@ -42,3 +44,33 @@ path    = "src/calc.rs"
 name    = "aas"
 harness = false
 path    = "src/aas.rs"
+
+[[bench]]
+name    = "access"
+harness = false
+path    = "src/access.rs"
+
+[[bench]]
+name    = "passport_serde"
+harness = false
+path    = "src/passport_serde.rs"
+
+[[bench]]
+name    = "canonical"
+harness = false
+path    = "src/canonical.rs"
+
+[[bench]]
+name    = "sd_jwt"
+harness = false
+path    = "src/sd_jwt.rs"
+
+[[bench]]
+name    = "status_list"
+harness = false
+path    = "src/status_list.rs"
+
+[[bench]]
+name    = "linktype"
+harness = false
+path    = "src/linktype.rs"

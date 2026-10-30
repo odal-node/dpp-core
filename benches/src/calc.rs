@@ -8,7 +8,7 @@
 //! keeping: they bound the cost of a bill-of-materials walk before a caller
 //! commits to one on a publish path.
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use dpp_calc::co2e::{self, Co2eInputs, CradleToGateRuleset, MaterialFootprint};
 use dpp_calc::repairability::{
     self, SimplifiedRepairabilityHeuristic, parameters::RepairabilityInputs,
@@ -69,6 +69,20 @@ fn calc_benchmarks(c: &mut Criterion) {
     c.bench_function("co2e_cradle_to_gate_50_materials", |b| {
         b.iter(|| co2e::calculate(&big, &CradleToGateRuleset, clock).unwrap());
     });
+
+    // The two points above, extended into a ladder. Throughput is materials per
+    // second, so a change in how the cost grows shows as a change in slope.
+    let mut ladder = c.benchmark_group("co2e_cradle_to_gate_by_materials");
+    for materials in [10_usize, 100, 1_000, 10_000] {
+        let inputs = bill_of_materials(materials);
+        ladder.throughput(Throughput::Elements(materials as u64));
+        ladder.bench_with_input(
+            BenchmarkId::from_parameter(materials),
+            &inputs,
+            |b, inputs| b.iter(|| co2e::calculate(inputs, &CradleToGateRuleset, clock).unwrap()),
+        );
+    }
+    ladder.finish();
 
     let rep = repairability_inputs();
     c.bench_function("repairability_heuristic_smartphone", |b| {
