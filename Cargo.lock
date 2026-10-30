@@ -747,8 +747,10 @@ dependencies = [
  "dpp-digital-link",
  "dpp-domain",
  "dpp-tests",
+ "dpp-vc",
+ "flate2",
  "serde_json",
- "uuid",
+ "tempfile",
 ]
 
 [[package]]

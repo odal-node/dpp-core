@@ -2,14 +2,13 @@
 //! `build_aas_from_passport` — for registry / data-space interoperability.
 //! This runs on every passport export to a Catena-X / IDTA consumer.
 
-use chrono::Utc;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use dpp_aas::{AssetIdentity, build_aas_from_passport};
-use dpp_domain::Audience;
-use dpp_domain::identifier::{Gtin, ProductIdentifier};
-use dpp_domain::product_group::{BatteryChemistry, BatteryData, BatteryType, ProductGroupData};
-use dpp_domain::{CarbonFootprint, ManufacturerInfo, MaterialEntry, Passport, ProductGroup};
-use dpp_tests::fixtures::base_passport;
+use dpp_domain::{Audience, Passport};
+
+#[path = "fixtures.rs"]
+mod fixtures;
+use fixtures::{battery_passport, battery_passport_with_materials};
 
 /// The identity the projection is asked for. Benchmarked on the real path: the
 /// shell names the asset after the scheme that issued its identifier.
@@ -17,110 +16,8 @@ fn identity_of(p: &Passport) -> AssetIdentity<'_> {
     AssetIdentity::from_passport(p).expect("the benchmark fixture carries an identifier")
 }
 
-const GTIN: &str = "09506000134352";
-
-fn battery_passport() -> Passport {
-    let now = Utc::now();
-    Passport {
-        batch_id: Some("LOT-BENCH-1".into()),
-        serial_number: None,
-        product_name: "Bench Battery".into(),
-        manufacturer: ManufacturerInfo {
-            name: "Bench Manufacturing".into(),
-            address: "1 Bench Way, Berlin, DE".into(),
-            country: None,
-            did_web_url: Some("https://bench.example.com/.well-known/did.json".into()),
-            registered_trade_name: None,
-            electronic_address: None,
-        },
-        materials: vec![MaterialEntry {
-            name: "LFP".into(),
-            weight_kg: 12.0,
-            recycled_pct: Some(15.0),
-            country_of_origin: Some("CN".into()),
-        }],
-        co2e_per_unit: Some(CarbonFootprint::from_kg(73.0)),
-        repairability_score: None,
-        created_at: now,
-        updated_at: now,
-        ..base_passport(
-            ProductGroup::Battery,
-            ProductGroupData::Battery(Box::new(BatteryData {
-                product_identifier: ProductIdentifier::gs1(Gtin::parse(GTIN).unwrap()),
-                battery_chemistry: BatteryChemistry::Lfp,
-                nominal_voltage_v: 3.2,
-                nominal_capacity_ah: 100.0,
-                expected_lifetime_cycles: Some(6000),
-                co2e_per_unit_kg: Some(73.0),
-                recycled_content_cobalt_pct: Some(12.0),
-                recycled_content_lithium_pct: Some(6.0),
-                recycled_content_nickel_pct: Some(9.0),
-                state_of_health_pct: Some(100.0),
-                state_of_health: None,
-                hazardous_substances: None,
-                usable_extinguishing_agent: None,
-                renewable_content_pct: None,
-                minimal_voltage_v: None,
-                maximum_voltage_v: None,
-                voltage_temperature_range: None,
-                original_power_capability_w: None,
-                power_limit_min_w: None,
-                power_limit_max_w: None,
-                power_temperature_range: None,
-                expected_lifetime_reference_test: None,
-                capacity_threshold_for_exhaustion_pct: None,
-                not_in_use_temperature_range: None,
-                not_in_use_temperature_reference_test: None,
-                commercial_warranty_period_months: None,
-                cycle_life_test_c_rate: None,
-                marking_information: None,
-                hazard_symbol: None,
-                eu_declaration_of_conformity: None,
-                waste_battery_information: None,
-                component_part_numbers: None,
-                spare_parts_contacts: None,
-                safety_measures: None,
-                test_report_results: None,
-                dynamic_performance: None,
-                battery_status: None,
-                usage_history: None,
-                due_diligence_operator_scope: None,
-                expected_lifetime: None,
-                recycled_content_reporting_year: None,
-                rated_capacity_kwh: Some(0.32),
-                carbon_footprint_class: None,
-                carbon_footprint_class_ruleset_id: None,
-                carbon_footprint_class_ruleset_version: None,
-                due_diligence_url: Some("https://bench.example.com/dd".into()),
-                cathode_material: None,
-                anode_material: None,
-                electrolyte_material: None,
-                critical_raw_materials: None,
-                disassembly_instructions_url: Some("https://bench.example.com/dis".into()),
-                soh_methodology: Some("IEC 62660-1:2018".into()),
-                operating_temp_min_c: Some(-20.0),
-                operating_temp_max_c: Some(60.0),
-                rated_energy_wh: Some(320.0),
-                recycled_content_lead_pct: None,
-                battery_weight_kg: Some(15.5),
-                battery_type: BatteryType::Ev,
-                initial_round_trip_efficiency_pct: None,
-                round_trip_efficiency_at_half_cycle_life_pct: Some(94.5),
-                round_trip_efficiency_pct: None,
-                internal_resistance_mohm: None,
-                internal_cell_resistance_mohm: Some(0.8),
-                internal_pack_resistance_mohm: None,
-                placed_on_market_date: chrono::NaiveDate::from_ymd_opt(2026, 3, 15),
-                manufacturing_date: Some(now),
-                manufacturing_place: Some("DE".into()),
-                battery_model_id: Some("BM-1".into()),
-                battery_passport_number: None,
-            })),
-            "2.0.0",
-        )
-    }
-}
-
+/// AAS submodel mapping and the build-and-serialise path used for export, per
+/// audience and across bills of materials.
 fn aas_benchmarks(c: &mut Criterion) {
     let passport = battery_passport();
 
@@ -142,6 +39,54 @@ fn aas_benchmarks(c: &mut Criterion) {
             )
         });
     });
+
+    // The projection masks per audience, and the output differs: public keeps
+    // the fewest fields, and the other two audiences see different classes
+    // rather than more of the same. Whether that shows in the time is what this
+    // group is for.
+    let projected_len = |audience: Audience| {
+        let (_, submodels) =
+            build_aas_from_passport(&passport, identity_of(&passport), audience).expect("masking");
+        serde_json::to_string(&submodels).unwrap().len()
+    };
+    let public_len = projected_len(Audience::Public);
+    assert!(
+        public_len < projected_len(Audience::LegitimateInterest)
+            && public_len < projected_len(Audience::Authority),
+        "the public projection should carry less than either credentialed one"
+    );
+    let mut by_audience = c.benchmark_group("aas_build_by_audience");
+    for (label, audience) in [
+        ("public", Audience::Public),
+        ("legitimate_interest", Audience::LegitimateInterest),
+        ("authority", Audience::Authority),
+    ] {
+        by_audience.bench_function(label, |b| {
+            b.iter(|| {
+                build_aas_from_passport(&passport, identity_of(&passport), audience)
+                    .expect("masking")
+            });
+        });
+    }
+    by_audience.finish();
+
+    // How the projection grows with the bill of materials, which is the one
+    // repeating part of the envelope the materials submodel maps line by line.
+    let mut by_materials = c.benchmark_group("aas_build_by_materials");
+    for materials in [1_usize, 50, 500] {
+        let passport = battery_passport_with_materials(materials);
+        by_materials.bench_with_input(
+            BenchmarkId::from_parameter(materials),
+            &passport,
+            |b, passport| {
+                b.iter(|| {
+                    build_aas_from_passport(passport, identity_of(passport), Audience::Public)
+                        .expect("masking")
+                });
+            },
+        );
+    }
+    by_materials.finish();
 }
 
 criterion_group!(benches, aas_benchmarks);

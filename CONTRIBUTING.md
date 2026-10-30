@@ -100,7 +100,7 @@ dpp-calc          -> dpp-rules
 dpp-plugin-sdk    -> dpp-plugin-traits, dpp-rules
 dpp-tests         -> dpp-domain, dpp-crypto, dpp-vc
                      + dev: dpp-digital-link, dpp-aas, dpp-registry, dpp-vocab, dpp-rules
-dpp-benches       -> dev only: dpp-domain, dpp-crypto, dpp-digital-link, dpp-aas, dpp-calc, dpp-tests
+dpp-benches       -> dev only: dpp-domain, dpp-crypto, dpp-vc, dpp-digital-link, dpp-aas, dpp-calc, dpp-tests
 ```
 
 `crates/dpp-tests/tests/crate_graph.rs` parses the block above and compares it with

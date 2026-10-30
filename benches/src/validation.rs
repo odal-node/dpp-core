@@ -1,10 +1,18 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use dpp_domain::ProductGroupCatalog;
 use dpp_domain::identifier::{Gtin, ProductIdentifier};
 use dpp_domain::product_group::{
     BatteryChemistry, BatteryData, BatteryType, FibreEntry, ProductGroupData, TextileData,
 };
-use dpp_domain::validation::{validate_product_group_data, validate_product_group_data_batch};
+use dpp_domain::validation::{
+    ProductGroupValidatorRegistry, validate_passport, validate_product_group_data,
+    validate_product_group_data_batch, validate_raw_product_group_data,
+};
 
+#[path = "fixtures.rs"]
+mod fixtures;
+
+/// Battery data that passes validation.
 fn valid_battery() -> ProductGroupData {
     ProductGroupData::Battery(Box::new(BatteryData {
         product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
@@ -79,6 +87,7 @@ fn valid_battery() -> ProductGroupData {
     }))
 }
 
+/// Textile data that passes validation.
 fn valid_textile() -> ProductGroupData {
     ProductGroupData::Textile(Box::new(TextileData {
         product_identifier: ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap()),
@@ -121,6 +130,8 @@ fn valid_textile() -> ProductGroupData {
     }))
 }
 
+/// Schema validation of one battery and one textile, batches of them at several
+/// sizes, and the whole-passport publish gate.
 fn validation_benchmarks(c: &mut Criterion) {
     // Warm the OnceLock validators so compilation cost isn't measured.
     let _ = validate_product_group_data(&valid_battery());
@@ -150,7 +161,108 @@ fn validation_benchmarks(c: &mut Criterion) {
     c.bench_function("validate_batch_100", |b| {
         b.iter(|| validate_product_group_data_batch(&batch));
     });
+
+    // The batch above, as a ladder. The 100 point repeats the one above by design,
+    // so the three sit on one curve.
+    let mut ladder = c.benchmark_group("validate_batch_by_size");
+    for size in [10_usize, 100, 1_000] {
+        let items: Vec<ProductGroupData> = (0..size)
+            .map(|i| {
+                if i % 2 == 0 {
+                    valid_battery()
+                } else {
+                    valid_textile()
+                }
+            })
+            .collect();
+        // A batch with a refusal in it still prints a figure, and it would be the
+        // figure for the refusals.
+        assert!(
+            validate_product_group_data_batch(&items)
+                .iter()
+                .all(|item| item.result.is_ok()),
+            "every item in the {size}-item batch should validate"
+        );
+        ladder.throughput(Throughput::Elements(size as u64));
+        ladder.bench_with_input(BenchmarkId::from_parameter(size), &items, |b, items| {
+            b.iter(|| validate_product_group_data_batch(items));
+        });
+    }
+    ladder.finish();
+
+    // The publish gate: the envelope, the product group data and the cross-field
+    // rules together, on a whole passport rather than its payload alone.
+    //
+    // The shared fixture declares cobalt and nickel recycled content on an LFP
+    // battery, which the cross-field rules refuse, so those two are cleared.
+    let mut passport = fixtures::battery_passport();
+    if let Some(ProductGroupData::Battery(data)) = &mut passport.product_group_data {
+        data.recycled_content_cobalt_pct = None;
+        data.recycled_content_nickel_pct = None;
+    }
+    validate_passport(&passport).unwrap_or_else(|e| {
+        panic!("the fixture passport should pass the gate, or this times the failure path: {e:?}")
+    });
+    c.bench_function("validate_passport_battery", |b| {
+        b.iter(|| validate_passport(&passport).unwrap());
+    });
 }
 
-criterion_group!(benches, validation_benchmarks);
+/// A frozen, schema-valid document for `product_group` at `version`. These are
+/// the compatibility fixtures kept beside `dpp-domain`'s tests; each holds the
+/// required fields only.
+fn frozen_fixture(product_group: &str, version: &str) -> serde_json::Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../crates/dpp-domain/tests/fixtures/schema-compat")
+        .join(product_group)
+        .join(format!("v{version}.json"));
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("no frozen fixture at {}: {e}", path.display()));
+    serde_json::from_str(&raw).expect("a frozen fixture is valid JSON")
+}
+
+/// Schema validation for every product group the catalog knows, at the version
+/// it marks current. The typed benches above are realistic documents for two
+/// groups; this is the schema cost across all of them. Because each fixture
+/// holds only the required fields, the figures are a floor for that group: a
+/// fully populated passport validates more slowly.
+fn validation_by_product_group(c: &mut Criterion) {
+    let catalog = ProductGroupCatalog::new();
+    let registry = ProductGroupValidatorRegistry::default();
+
+    let mut group = c.benchmark_group("validate_raw_by_product_group");
+    for key in catalog.keys() {
+        let version = catalog
+            .current_schema_version(key)
+            .expect("a catalog key has a current version");
+        let document = frozen_fixture(key, version);
+
+        // Compile the schema outside the measurement, and prove the fixture is
+        // valid so the timed path is the success path.
+        validate_raw_product_group_data(key, &document, &registry)
+            .unwrap_or_else(|e| panic!("{key} v{version} fixture should validate: {e:?}"));
+        // These figures are small enough to be a no-op. Show the validator is live:
+        // a document that is not the group's, and says so, is refused.
+        assert!(
+            validate_raw_product_group_data(
+                key,
+                &serde_json::json!({"benchStrayProperty": true}),
+                &registry
+            )
+            .is_err(),
+            "{key} should refuse a document that is not its own"
+        );
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(key),
+            &document,
+            |b, document| {
+                b.iter(|| validate_raw_product_group_data(key, document, &registry).unwrap());
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(benches, validation_benchmarks, validation_by_product_group);
 criterion_main!(benches);
