@@ -334,6 +334,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   The table moved out of the test, and the catalog drift guards read the method.
   (#510)
 
+### Changed
+
+- **The minimum supported Rust version is 1.99, from 1.96.** The toolchain this
+  repository builds and tests with moves to 1.99.1, the latest stable release,
+  and `rust-version` follows it, so CI still enforces the floor every crate's
+  README states. Every dependency is at its newest compatible release, and
+  `jsonschema` moves to 0.60, which this workspace uses internally only.
+
 ### Fixed
 
 - **The members of battery `materialComposition` and electronics

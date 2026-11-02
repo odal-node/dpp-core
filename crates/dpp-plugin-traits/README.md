@@ -72,7 +72,7 @@ dependency. `dpp-plugin-sdk` builds the guest-side ABI on top of it.
 
 ## Minimum Rust version
 
-1.96, enforced in CI.
+1.99, enforced in CI.
 
 ## Licence
 

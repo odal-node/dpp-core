@@ -346,7 +346,7 @@ the receipt.
 
 ## Minimum Rust version
 
-1.96, enforced in CI.
+1.99, enforced in CI.
 
 ## Licence
 
