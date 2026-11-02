@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-crypto"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-digital-link"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "dpp-domain",
  "dpp-rules",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-domain"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-plugin-traits"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "semver",
  "serde",
@@ -540,11 +540,11 @@ dependencies = [
 
 [[package]]
 name = "dpp-rules"
-version = "0.22.0"
+version = "0.23.0"
 
 [[package]]
 name = "dpp-vc"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-vocab"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "serde",
  "serde_json",

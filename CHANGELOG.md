@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-02
+
 ### Breaking
 
 - **The lineage rule asked for the predecessor's consent, which no instrument
@@ -114,6 +116,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     category carries, and `Undetermined(MissingFact)`, for an answer that turns
     on a fact the caller did not give. An `Exempt` field is neither required nor
     flagged; an `Undetermined` one is never an exemption, and the gate refuses it.
+    Because `Undetermined` carries a value, `Requirement` is no longer a
+    fieldless enum, and a cast of one with `as` no longer compiles.
+  - `BatteryData` gains `due_diligence_operator_scope`, so a struct literal of it
+    needs `due_diligence_operator_scope: None`. Documents do not change: the
+    field is optional and is not written when it is `None`.
   - `Passport::check_mandatory_content` and `check_category_content` refuse an
     EV, LMT or industrial battery that does not carry its placing date (on the
     envelope or as `placedOnMarketDate`) unless it is second-life, and from
