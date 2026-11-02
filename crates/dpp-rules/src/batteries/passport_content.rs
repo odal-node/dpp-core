@@ -19,6 +19,14 @@
 //! category, which is the shape of the `REQUIREMENTS` table below — so a
 //! reviewer can diff the two directly rather than reconstructing the mapping.
 //!
+//! Version 3.2 (19 October 2026) was compared with this table on 2 November 2026
+//! and changes none of its obligations. It splits the C-rate of the cycle-life
+//! test, point 1(p), into a mandatory charge C-rate, whose obligations
+//! `cycleLifeTestCRate` carries, and a discharge C-rate that is optional for every
+//! category and has no field. That renumbers rows between 40 and 50, so the row
+//! numbers cited here are 2.0's. It also adds a column for the type of
+//! information, which agrees with the battery schema's disclosure classes.
+//!
 //! v2.0 also states its industrial scope as batteries with a capacity greater
 //! than 2 kWh. This module does not see capacity, so it answers for the
 //! `industrial` category as a whole.
