@@ -30,6 +30,15 @@ Before running `cargo release`:
    builds and the oracle suites.
 2. **CHANGELOG.md is updated:** move the items from `[Unreleased]` to a new version heading
    with today's date, following Keep a Changelog.
+
+   **And verified,** in `docs/governance/releases/vX.Y.Z.md`, merged with any CHANGELOG
+   corrections it makes before the release pull request. It traces every pull request
+   merged since the last tag to the entry that describes it, or says why it needs none;
+   checks each entry's claims against the code at the release commit, citing the source,
+   the test that pins it, or a measurement; and checks every issue those pull requests
+   closed against what it asked for. The pull request template asks for an entry; only
+   this step proves the entry is still true at release, after the rest of the release
+   has merged around it. [`v0.23.0.md`](releases/v0.23.0.md) is the shape to copy.
 3. **Breaking changes are reconciled:** run `just semver`. It lists the public API breaks it
    detects since the last published release, and **every entry must already appear under
    `### Breaking` in the CHANGELOG**. It misses some, such as a changed parameter type, so
@@ -81,6 +90,15 @@ Before running `cargo release`:
    `plugins/Cargo.lock` and `fuzz/Cargo.lock`. When the version bump comes in on a feature
    pull request, that pull request does the same by hand: edit the line and run
    `just relock`.
+10. **A consumer passes against this commit.** A published crate cannot be taken back: a
+    yank only stops new lockfiles resolving to it. And this repository's suites cannot
+    see how a consumer stores what it returns. A lens every suite here passes can still
+    leave a consumer unable to change a passport it published before upgrading
+    ([PERSISTED-SHAPES.md](../architecture/PERSISTED-SHAPES.md) §4). So before
+    `--execute`, at least one consumer that stores passports builds against this exact
+    commit, through a `[patch.crates-io]`, and runs its persisted-data and upgrade tests,
+    including an upgrade from a database its own previous release wrote. A red run stops
+    the release, and the fix lands here first.
 
 ## Publishing order
 

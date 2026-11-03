@@ -16,4 +16,4 @@
 - [ ] `just check` passes locally (format, clippy, tests, doctests, plugins, docs, lockfiles, audit)
 - [ ] No secrets, credentials or `.env` files in the diff
 - [ ] Documentation updated if the public API changed, following the [style guide](https://github.com/odal-node/.github/blob/main/DOCS-STYLE.md)
-- [ ] CHANGELOG entry under the right heading (a breaking change is never `Added`)
+- [ ] CHANGELOG entry under `[Unreleased]` and the right heading (a breaking change is never `Added`), citing this pull request or the issue it closes; or the `no-changelog` label and a `No changelog: <reason>` line here

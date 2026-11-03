@@ -139,6 +139,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **Every pull request records itself in this file, or says why it does not.**
+  Of the 23 pull requests merged between 0.22.0 and 0.23.0 that Dependabot did
+  not open, 10 were cited here by number, so nothing could show that every
+  merged change was described, or that every entry described a change that
+  merged. A pull request now adds an entry under `[Unreleased]` citing its own
+  number or an issue its body closes. A change that needs none carries the
+  `no-changelog` label and a `No changelog: <reason>` line in its body.
+  `.github/workflows/changelog.yml` enforces this and re-runs when a label
+  changes, and `scripts/changelog-check.test.sh` proves each refusal in
+  `just check`. (#558)
 - **`dpp_rules::batteries::due_diligence`, battery schema v2.10.0, and the facts
   the content table reads.** `due_diligence_scope` answers Art. 47 and Art. 48(1)
   for one battery as a `DueDiligenceScope` (`ExemptSecondLife`,
@@ -476,8 +486,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     position its key occupies and not beneath it. `productIdentifier`, whose terms
     are written by hand because `gtin` names GS1's vocabulary, is unchanged.
   - **The context is larger.** It is inline in every framed passport and grows
-    from about 1.6 KB to about 21.6 KB, or 0.6 KB to 3.6 KB compressed. Hosting it
-    at a URL would avoid that, and is a commitment this crate does not make.
+    from about 1.6 KB to about 26.3 KB, or 0.6 KB to 4.3 KB compressed, with the
+    envelope's terms in the next entry. Hosting it at a URL would avoid that, and
+    is a commitment this crate does not make.
   - `jsonld_product_group_terms.rs` holds the context to the schemas without the
     generator's help: every field of every schema version has a term at its
     position, and every term is a field of some schema. The PyLD oracle now also
