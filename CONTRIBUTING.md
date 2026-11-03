@@ -248,8 +248,22 @@ git commit -s -m "feat(domain): add a port trait"
 - A change to a port trait explains its effect on implementers.
 - A new dependency is justified in the description.
 - The pull request title is a Conventional Commit.
+- The pull request records itself in `CHANGELOG.md` (see below).
 - Branch names follow the type: `feat/schema-registry-versioning`,
   `fix/crypto-key-rotation-archive`, `docs/wasm-target-guide`.
+
+### The changelog entry
+
+Every pull request adds an entry under `## [Unreleased]` that cites it: its own
+number, or the number of an issue its body closes (`Closes #123`), which is known
+before the pull request exists. A change that needs no entry, such as a test-only
+change or a CI pin, carries the `no-changelog` label and says why in its body, on a
+line `No changelog: <reason>`. Dependabot's pull requests are exempt; a release
+checks their bumps.
+
+`.github/workflows/changelog.yml` enforces this (`scripts/changelog-check.sh`).
+The citation is what lets a release be verified: every merged change maps to an
+entry, and every entry to the change that made it true.
 
 ## 9. Security practices
 
