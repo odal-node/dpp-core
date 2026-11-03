@@ -252,6 +252,12 @@ fmt-plugins prefix=PLUGIN_PREFIX:
         (cd "$plugin" && cargo fmt)
     done
 
+# The gate itself needs a pull request's number, labels and body, so only CI
+# (`.github/workflows/changelog.yml`) runs it.
+# Prove changelog-check still refuses a pull request with no entry of its own.
+changelog-check-self-test:
+    bash scripts/changelog-check.test.sh
+
 # Prove the vacuous-pass guards actually bite.
 #
 # Every looping gate above asserts it did some work, because the failure that
@@ -334,7 +340,7 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test doc lock-check audit
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test doc lock-check audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
