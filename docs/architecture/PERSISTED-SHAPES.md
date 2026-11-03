@@ -108,6 +108,24 @@ requirement. Refusing is correct; inventing a value would be a fabricated regula
 **None of this reaches the envelope.** There is no envelope lens, so an envelope change
 has exactly one allowed form: additive, per §3.
 
+**A reading is not a migration.** `from_stored` returns a document as the current types
+describe it, and stops there: what is stored does not change. Two things make that
+reading differ from the stored bytes when nobody has edited anything:
+
+- a lens hop: 0.22.0 rewrote every product group's `gtin` as a scheme 1
+  `productIdentifier`;
+- an additive field, which reads as its default and is serialised back as that default
+  unless it is `skip_serializing_if`.
+
+For a draft, writing the reading back is how a record reaches the current shape. For a
+published passport it is not. Its stored bytes are what its signatures commit to, so a
+consumer that writes the whole reading back over one changes signed content, and a store
+that guards that content refuses the write, although the only change the consumer meant
+to make was, say, the status. A consumer that changes a published passport writes back
+only what it changed. Nothing in this repository can see a consumer get this wrong, which
+is why the release checklist runs one before publishing ([RELEASE.md](../governance/RELEASE.md),
+step 10).
+
 ---
 
 ## 5. The second surface: stored is not the only one

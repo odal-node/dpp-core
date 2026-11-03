@@ -81,6 +81,15 @@ Before running `cargo release`:
    `plugins/Cargo.lock` and `fuzz/Cargo.lock`. When the version bump comes in on a feature
    pull request, that pull request does the same by hand: edit the line and run
    `just relock`.
+10. **A consumer passes against this commit.** A published crate cannot be taken back: a
+    yank only stops new lockfiles resolving to it. And this repository's suites cannot
+    see how a consumer stores what it returns. A lens every suite here passes can still
+    leave a consumer unable to change a passport it published before upgrading
+    ([PERSISTED-SHAPES.md](../architecture/PERSISTED-SHAPES.md) §4). So before
+    `--execute`, at least one consumer that stores passports builds against this exact
+    commit, through a `[patch.crates-io]`, and runs its persisted-data and upgrade tests,
+    including an upgrade from a database its own previous release wrote. A red run stops
+    the release, and the fix lands here first.
 
 ## Publishing order
 
