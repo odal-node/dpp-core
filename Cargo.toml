@@ -26,7 +26,7 @@ authors     = ["Odal Node <dev@odal-node.io>"]
 license     = "Apache-2.0"
 repository  = "https://github.com/odal-node/dpp-core"
 homepage    = "https://odal-node.io"
-rust-version = "1.96"
+rust-version = "1.99"
 
 # ---------------------------------------------------------------------------
 # cargo-release: all members share one lockstep version, so cut one tag for
@@ -106,7 +106,7 @@ rand         = "0.10"
 # dropping the feature would silently downgrade both formats to "unknown" for
 # those rather than fail, which is a validator quietly accepting what it was
 # asked to reject.
-jsonschema   = { version = "0.59", default-features = false, features = ["idna"] }
+jsonschema   = { version = "0.60", default-features = false, features = ["idna"] }
 semver       = "1"
 
 # Property-based testing (dev-only)
