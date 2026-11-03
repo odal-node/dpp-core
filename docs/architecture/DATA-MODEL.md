@@ -179,9 +179,12 @@ its own regulation:
 | `aluminium` · `textile` · `mattress` · `toy` | *(none)* | No act defines a category axis for these. `aluminium` and `textile` declared one in the catalog until it was removed: aluminium's values were its `productionRoute` enum, and textile's were defined by no schema at all |
 
 This table is the third place the same fact is written down, after each group's
-`productCategories` and `CATEGORY_ENUM_PROPERTY`. Three hand-maintained lists of one fact
-had drifted apart in both directions before this was reconciled; a check that compares
-them would be worth more than another list.
+`productCategories` and `CATEGORY_PROPERTY` in `crates/dpp-domain/src/product_group/group.rs`.
+Three hand-maintained lists of one fact had drifted apart in both directions before this
+was reconciled. The first two are now checked against each other:
+`product_categories_are_legal_values_of_their_schema_enum` holds every catalog category to
+the schema enum that `ProductGroup::product_category_values` reads through
+`CATEGORY_PROPERTY`. Nothing checks this table.
 
 **Rules:**
 

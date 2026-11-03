@@ -479,8 +479,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     position its key occupies and not beneath it. `productIdentifier`, whose terms
     are written by hand because `gtin` names GS1's vocabulary, is unchanged.
   - **The context is larger.** It is inline in every framed passport and grows
-    from about 1.6 KB to about 21.6 KB, or 0.6 KB to 3.6 KB compressed. Hosting it
-    at a URL would avoid that, and is a commitment this crate does not make.
+    from about 1.6 KB to about 26.3 KB, or 0.6 KB to 4.3 KB compressed, with the
+    envelope's terms in the next entry. Hosting it at a URL would avoid that, and
+    is a commitment this crate does not make.
   - `jsonld_product_group_terms.rs` holds the context to the schemas without the
     generator's help: every field of every schema version has a term at its
     position, and every term is a field of some schema. The PyLD oracle now also

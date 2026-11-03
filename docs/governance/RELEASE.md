@@ -30,6 +30,15 @@ Before running `cargo release`:
    builds and the oracle suites.
 2. **CHANGELOG.md is updated:** move the items from `[Unreleased]` to a new version heading
    with today's date, following Keep a Changelog.
+
+   **And verified,** in `docs/governance/releases/vX.Y.Z.md`, merged with any CHANGELOG
+   corrections it makes before the release pull request. It traces every pull request
+   merged since the last tag to the entry that describes it, or says why it needs none;
+   checks each entry's claims against the code at the release commit, citing the source,
+   the test that pins it, or a measurement; and checks every issue those pull requests
+   closed against what it asked for. The pull request template asks for an entry; only
+   this step proves the entry is still true at release, after the rest of the release
+   has merged around it. [`v0.23.0.md`](releases/v0.23.0.md) is the shape to copy.
 3. **Breaking changes are reconciled:** run `just semver`. It lists the public API breaks it
    detects since the last published release, and **every entry must already appear under
    `### Breaking` in the CHANGELOG**. It misses some, such as a changed parameter type, so
