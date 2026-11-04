@@ -142,27 +142,37 @@ fn a_bundle_adds_a_date_this_build_does_not_hold() {
     );
 }
 
-/// A rule's date is the one the publish gate applies. A bundle moving it earlier
-/// is recorded and not announced.
+/// A rule's date is the one the publish gate applies. A bundle moving it, earlier
+/// or later, is recorded and not announced.
 #[test]
-fn a_bundle_cannot_move_a_rule_date_earlier() {
-    let acceptance = schedule(vec![entry(
-        "battery.due-diligence-report",
-        "2027-02-18",
-        "sourced",
-    )]);
-    let calendar = ObligationCalendar::with_bundle(&InstrumentCatalog::new(), &acceptance).unwrap();
+fn a_bundle_cannot_move_a_rule_date_either_way() {
+    for (moved_to, bundle_date) in [
+        ("2027-02-18", day(2027, 2, 18)),
+        ("2028-08-18", day(2028, 8, 18)),
+    ] {
+        let acceptance = schedule(vec![entry(
+            "battery.due-diligence-report",
+            moved_to,
+            "sourced",
+        )]);
+        let calendar =
+            ObligationCalendar::with_bundle(&InstrumentCatalog::new(), &acceptance).unwrap();
 
-    assert_eq!(calendar.events(), ObligationCalendar::new().events());
-    assert_eq!(
-        calendar.conflicts(),
-        [ScheduleConflict {
-            id: "battery.due-diligence-report".to_owned(),
-            build_date: day(2027, 8, 18),
-            bundle_date: day(2027, 2, 18),
-            bundle: origin(&acceptance),
-        }]
-    );
+        assert_eq!(
+            calendar.events(),
+            ObligationCalendar::new().events(),
+            "moved to {moved_to}"
+        );
+        assert_eq!(
+            calendar.conflicts(),
+            [ScheduleConflict {
+                id: "battery.due-diligence-report".to_owned(),
+                build_date: day(2027, 8, 18),
+                bundle_date,
+                bundle: origin(&acceptance),
+            }]
+        );
+    }
 }
 
 /// The same for an act's sourced passport start date, moved later.
