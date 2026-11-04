@@ -144,7 +144,7 @@ fn conceal_object(
     // Classify first, so the predicate handed to `conceal` is a lookup rather
     // than a policy call — `conceal` decides nothing about disclosure, and this
     // keeps it that way.
-    let mut hide = Vec::new();
+    let mut hide = std::collections::HashSet::new();
     for key in object.keys() {
         segments.push(key.clone());
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
@@ -152,11 +152,11 @@ fn conceal_object(
         drop(borrowed);
         segments.pop();
         if class != DisclosureClass::Public {
-            hide.push(key.clone());
+            hide.insert(key.clone());
         }
     }
 
-    let (mut kept, mut produced) = conceal(object, |name| hide.iter().any(|h| h == name))?;
+    let (mut kept, mut produced) = conceal(object, |name| hide.contains(name))?;
     disclosures.append(&mut produced);
 
     // Descend into the members that stayed in cleartext.
