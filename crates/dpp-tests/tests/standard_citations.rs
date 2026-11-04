@@ -134,7 +134,9 @@ fn citations(line: &str) -> Vec<String> {
         let rest = rest.strip_prefix(' ').unwrap_or(rest);
         let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
         let ends_cleanly = !rest[digits..].chars().next().is_some_and(is_word_char);
-        if (3..=4).contains(&digits) && ends_cleanly {
+        // No ceiling: RFC numbers have no fixed width, and a series that
+        // passed 9999 shows what a fixed one costs.
+        if digits >= 3 && ends_cleanly {
             found.push(format!("RFC {}", &rest[..digits]));
         }
     }
@@ -573,6 +575,9 @@ fn the_detector_catches_what_it_is_for() {
         ("`RFC 9901`'s clause 4", vec!["RFC 9901"]),
         ("RFC1918 ranges", vec!["RFC 1918"]),
         ("RFC 3339 / RFC 9557", vec!["RFC 3339", "RFC 9557"]),
+        ("per RFC 10007 §3", vec!["RFC 10007"]),
+        ("RFC10007", vec!["RFC 10007"]),
+        ("RFC 99999", vec!["RFC 99999"]),
         (
             "profile draft-ietf-oauth-sd-jwt-vc-19, read",
             vec!["draft-ietf-oauth-sd-jwt-vc-19"],
@@ -594,7 +599,7 @@ fn the_detector_catches_what_it_is_for() {
         "mod rfc9901_vector_tests;",
         "\"$schema\": \"http://json-schema.org/draft-07/schema#\"",
         "several RFCs apply",
-        "RFC 12345 is not a number the series has reached",
+        "RFC 12345abc is a longer identifier, not an RFC number",
         "a draft-19 profile",
         "XRFC 7515",
     ] {
