@@ -107,11 +107,22 @@ impl KeyStore {
             let mut map = self.records.write().expect("key store write lock poisoned");
             // Archive the existing current key (if any), marking it revoked when
             // this is a compromise rotation.
-            if let Some(record) = map.get(key_id) {
+            if let Some(record) = map.get(key_id).cloned() {
+                if revoke_old {
+                    // Earlier archives made by `archive_key` hold this same key
+                    // material. A compromise must revoke every copy in the same
+                    // write, or the compromised key stays in the published DID
+                    // document and its signatures keep verifying.
+                    for stored in map.values_mut() {
+                        if stored.fingerprint == record.fingerprint {
+                            stored.revoked = true;
+                        }
+                    }
+                }
                 let archive_name = archived_key_name(key_id);
                 let archived = KeyRecord {
                     revoked: revoke_old,
-                    ..record.clone()
+                    ..record
                 };
                 map.insert(archive_name, archived);
             }

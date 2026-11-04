@@ -316,6 +316,14 @@ impl KeyStore {
                     if !records_bound {
                         upgrade_needed = Some(UpgradeNeeded::UnboundRecords);
                     }
+                } else if records_bound {
+                    // Every current-format store is written with a tag, so a missing
+                    // one is tampering. An upgrade must not authenticate revocation
+                    // flags and public keys that were never checked.
+                    anyhow::bail!(
+                        "key store is in the current format but carries no integrity tag; \
+                         refusing to open it"
+                    );
                 } else {
                     upgrade_needed = Some(UpgradeNeeded::MissingIntegrityTag);
                 }
