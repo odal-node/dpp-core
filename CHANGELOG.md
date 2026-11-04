@@ -19,7 +19,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   event came from, as a `BundleOrigin` (bundle version and content hash), and is
   `None` for every date the build holds itself. `None` is left out of the JSON,
   so every event a calendar returns today serialises as it did. Code that builds
-  an `ObligationEvent` with a struct literal adds `bundle: None`. (#508)
+  an `ObligationEvent` with a struct literal adds `bundle: None`. (#508, #565)
 
 ### Added
 
@@ -40,7 +40,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   repeated id or an entry that does not parse is refused whole with
   `ScheduleBundleError::Malformed`. A bundle carries the whole schedule, not a
   change to the previous one. Without a bundle, or with one carrying no
-  `obligations` section, the calendar is what it was. (#508)
+  `obligations` section, the calendar is what it was. (#508, #565)
 
 ## [0.23.0] - 2026-11-03
 
