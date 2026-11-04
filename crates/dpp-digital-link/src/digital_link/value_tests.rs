@@ -297,6 +297,23 @@ fn a_primary_key_value_is_escaped_when_built() {
 
 /// The pair is the GS1 General Specifications' calculation for alphanumeric keys;
 /// GS1's engine agrees on this value, and on every GMN in the oracle corpus.
+/// A value of only dots is a dot segment once a link is normalized: `..` takes away
+/// the segment before it, so the printed or parsed link would name another resource.
+/// Refused on read and on build alike, since both go through `check_value`.
+#[test]
+fn a_qualifier_of_only_dots_is_refused_as_a_dot_segment() {
+    for value in [".", ".."] {
+        assert!(
+            matches!(
+                parse(&format!("/01/{GTIN}/21/{value}")),
+                Err(DigitalLinkError::DotSegmentValue { .. })
+            ),
+            "{value}"
+        );
+    }
+    assert!(parse(&format!("/01/{GTIN}/21/a..b")).is_ok());
+}
+
 #[test]
 fn a_gmn_is_held_to_its_check_character_pair() {
     assert!(parse("/8013/1987654Ad4X4bL5ttr2310c2K").is_ok());

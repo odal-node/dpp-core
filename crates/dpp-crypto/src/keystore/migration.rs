@@ -3,7 +3,9 @@ use aes_gcm::{
     aead::{Aead, KeyInit, consts::U12},
 };
 use anyhow::{Context, Result};
+use ed25519_dalek::SigningKey;
 use rand::Rng;
+use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 use super::crypto::derive_aes_key_argon2;
@@ -88,6 +90,24 @@ impl KeyStore {
             let mut raw = opened.map_err(|_| {
                 anyhow::anyhow!("AES-GCM decrypt failed during migration for key {id}")
             })?;
+
+            // The decrypted private key is the authenticated value; the public key
+            // and fingerprint beside it are plaintext metadata. Check them against
+            // the private key before they are written under a fresh integrity tag.
+            let mut seed: [u8; 32] = raw
+                .as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("stored signing key for {id} is not 32 bytes"))?;
+            let verifying_key = SigningKey::from_bytes(&seed).verifying_key();
+            seed.zeroize();
+            let derived_hex = hex::encode(verifying_key.as_bytes());
+            let derived_fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
+            anyhow::ensure!(
+                record.verifying_key_hex == derived_hex
+                    && record.fingerprint == derived_fingerprint,
+                "stored public key for {id} does not match its private key; \
+                 refusing to migrate the store"
+            );
 
             // Re-encrypt with new cipher + fresh nonce.
             let mut nonce_bytes = [0u8; 12];

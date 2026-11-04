@@ -221,11 +221,66 @@ fn parse_disclosure(token: &str) -> Option<Disclosure> {
     }
 }
 
-/// Record `class` for `key`, keeping the more restrictive of two declarations.
-fn record_disclosure(out: &mut HashMap<String, Disclosure>, key: String, class: Disclosure) {
-    out.entry(key)
-        .and_modify(|existing| *existing = existing.most_restrictive(class))
-        .or_insert(class);
+/// What [`collect_disclosures`] recorded, and whether the schema was read in full.
+#[derive(Default)]
+struct Collected {
+    classes: HashMap<String, Disclosure>,
+    visits: usize,
+    refused: bool,
+}
+
+/// Node visits the walk may make before it gives up. A compact schema can reach one
+/// definition through many `$ref`s, so the work is bounded explicitly rather than by
+/// whatever the schema's shape happens to cost.
+const MAX_SCHEMA_VISITS: usize = 100_000;
+
+/// Record `class` for `key`, keeping the more restrictive of two declarations. Two
+/// declarations that conflict refuse the schema: no single class is safe for both.
+fn record_disclosure(out: &mut Collected, key: String, class: Disclosure) {
+    match out.classes.entry(key) {
+        std::collections::hash_map::Entry::Occupied(mut existing) => {
+            if conflicting(*existing.get(), class) {
+                out.refused = true;
+            }
+            let merged = existing.get().most_restrictive(class);
+            existing.insert(merged);
+        }
+        std::collections::hash_map::Entry::Vacant(slot) => {
+            slot.insert(class);
+        }
+    }
+}
+
+/// Conformity (authorities) and Individual (the individual) are the one pair of
+/// classes neither of which contains the other.
+fn conflicting(a: Disclosure, b: Disclosure) -> bool {
+    matches!(
+        (a, b),
+        (Disclosure::Conformity, Disclosure::Individual)
+            | (Disclosure::Individual, Disclosure::Conformity)
+    )
+}
+
+/// Subschema keywords [`collect_disclosures`] does not descend into.
+const UNREAD_SUBSCHEMA_KEYWORDS: &[&str] = &[
+    "patternProperties",
+    "dependentSchemas",
+    "not",
+    "prefixItems",
+    "contains",
+    "propertyNames",
+    "unevaluatedProperties",
+    "unevaluatedItems",
+];
+
+fn contains_disclosure_annotation(node: &serde_json::Value) -> bool {
+    match node {
+        serde_json::Value::Object(map) => {
+            map.contains_key("x-disclosure") || map.values().any(contains_disclosure_annotation)
+        }
+        serde_json::Value::Array(items) => items.iter().any(contains_disclosure_annotation),
+        _ => false,
+    }
 }
 
 /// Resolve a local `$ref` — `#/definitions/x`, `#/$defs/x` — against the schema
@@ -303,11 +358,16 @@ fn collect_disclosures(
     path: &str,
     root: &serde_json::Value,
     active_refs: &mut Vec<String>,
-    out: &mut HashMap<String, Disclosure>,
+    out: &mut Collected,
 ) {
     let Some(object) = node.as_object() else {
         return;
     };
+    out.visits += 1;
+    if out.refused || out.visits > MAX_SCHEMA_VISITS {
+        out.refused = true;
+        return;
+    }
 
     // A `$ref` describes the position its holder occupies, so the target is
     // walked at `path` unchanged — the same rule `items` follows, and why
@@ -322,6 +382,13 @@ fn collect_disclosures(
 
     if let Some(properties) = object.get("properties").and_then(|p| p.as_object()) {
         for (name, prop) in properties {
+            // A dot is the segment separator in a policy path. A property whose name
+            // contains one would be read as two segments, and its own rule could
+            // never match it.
+            if name.contains('.') {
+                out.refused = true;
+                continue;
+            }
             let child_path = if path.is_empty() {
                 name.clone()
             } else {
@@ -360,6 +427,23 @@ fn collect_disclosures(
             for definition in block.values() {
                 collect_disclosures(definition, "", root, active_refs, out);
             }
+        }
+    }
+
+    // A conditional branch describes the object its parent does. Its rules are
+    // collected unconditionally: a restriction that applies only sometimes is
+    // applied always, which is the safe error.
+    for key in ["if", "then", "else"] {
+        if let Some(child) = object.get(key) {
+            collect_disclosures(child, path, root, active_refs, out);
+        }
+    }
+
+    // A disclosure annotation beneath a keyword this walk does not read could never
+    // reach the policy, so the schema is refused rather than read as Public.
+    for key in UNREAD_SUBSCHEMA_KEYWORDS {
+        if object.get(*key).is_some_and(contains_disclosure_annotation) {
+            out.refused = true;
         }
     }
 
@@ -515,15 +599,15 @@ impl ProductGroupAccessPolicy {
         // unparseable product group ends up all-public.
         schema.get("properties")?.as_object()?;
 
-        let mut field_disclosure: HashMap<String, Disclosure> = HashMap::new();
+        let mut collected = Collected::default();
         let mut active_refs: Vec<String> = Vec::new();
-        collect_disclosures(
-            &schema,
-            "",
-            &schema,
-            &mut active_refs,
-            &mut field_disclosure,
-        );
+        collect_disclosures(&schema, "", &schema, &mut active_refs, &mut collected);
+        // A schema that cannot be read in full yields no policy. A partial one would
+        // leave the fields it missed to the Public default.
+        if collected.refused {
+            return None;
+        }
+        let field_disclosure = collected.classes;
 
         // An opening outside the allow-list refuses the whole policy rather
         // than being skipped: skipping would leave the schema reading as though
@@ -683,7 +767,13 @@ impl ProductGroupAccessPolicy {
             });
         }
 
-        best.map_or(self.default_disclosure, |(_, class)| class)
+        // The universal conformity fields are a floor. A product rule that names one
+        // of them more openly does not make it visible to a wider audience.
+        let class = best.map_or(self.default_disclosure, |(_, class)| class);
+        self.envelope_disclosure
+            .iter()
+            .filter(|(policy_key, _)| path_suffix_depth(policy_key, path).is_some())
+            .fold(class, |acc, (_, floor)| acc.most_restrictive(*floor))
     }
 
     /// Get the disclosure class for a field, matched by normalized key name

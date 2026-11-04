@@ -28,24 +28,29 @@ use dpp_plugin_sdk::traits::{PluginComplianceStatus, PluginResult};
 use dpp_plugin_sdk::validate::str_of;
 use serde_json::{Value, json};
 
-/// Sum of one line's five treatment shares, widened so a malformed record
-/// cannot wrap into a plausible number.
-fn treatment_total(line: &Value) -> u32 {
-    [
-        "preparingForReusePct",
-        "recyclingPct",
-        "otherRecoveryPct",
-        "disposalPct",
-        "unknownPct",
-    ]
-    .iter()
-    .map(|k| {
-        line.get("treatment")
-            .and_then(|t| t.get(*k))
+const TREATMENT_SHARES: [&str; 5] = [
+    "preparingForReusePct",
+    "recyclingPct",
+    "otherRecoveryPct",
+    "disposalPct",
+    "unknownPct",
+];
+
+/// Sum of one line's five treatment shares. Each share must be an integer from
+/// 0 to 100: a value that is missing, fractional, negative or out of range is an
+/// error, never a zero or a truncated number that happens to total 100.
+fn treatment_total(line: &Value) -> Result<u64, String> {
+    let mut total = 0;
+    for key in TREATMENT_SHARES {
+        let share = line
+            .get("treatment")
+            .and_then(|t| t.get(key))
             .and_then(Value::as_u64)
-            .unwrap_or(0) as u32
-    })
-    .sum()
+            .filter(|share| *share <= 100)
+            .ok_or_else(|| format!("{key} is not an integer from 0 to 100"))?;
+        total += share;
+    }
+    Ok(total)
 }
 
 /// The Art. 2 point letter a reason maps to, for the point (h) subordination
@@ -85,11 +90,12 @@ pub fn calculate(input: &Value) -> PluginResult {
     let mut problems: Vec<String> = Vec::new();
 
     for (i, line) in lines.iter().enumerate() {
-        let total = treatment_total(line);
-        if total != 100 {
-            problems.push(format!(
+        match treatment_total(line) {
+            Ok(100) => {}
+            Ok(total) => problems.push(format!(
                 "line {i}: waste treatment shares total {total}%, not 100%"
-            ));
+            )),
+            Err(detail) => problems.push(format!("line {i}: {detail}")),
         }
     }
 
@@ -150,3 +156,6 @@ pub fn calculate(input: &Value) -> PluginResult {
         "passportObligation": "none — ESPR Arts. 24-25 impose no digital product passport",
     }))
 }
+
+#[cfg(test)]
+mod tests;

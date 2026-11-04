@@ -74,6 +74,10 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     // mis-recorded set is corrected by superseding the passport, never by
     // patching a published record's legal basis.
     "applicableInstruments",
+    // The host computes the compliance determination from the passport's
+    // content. A field patch that could set it would record a verdict nobody
+    // calculated, so the result is written through the host's own path only.
+    "complianceResult",
     // ── Added after an audit found the deny-list default had let ten modelled
     // envelope fields through. None was ever reachable via `PUT /dpp/{id}` on
     // the only consumer that ships — it builds its delta from an allow-list —

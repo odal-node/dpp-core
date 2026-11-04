@@ -55,9 +55,19 @@ impl TransferChain {
     /// Append a new transfer record to the chain.
     ///
     /// Validates that:
+    /// - The record belongs to this chain's passport.
     /// - The `from_operator` matches the current responsible operator.
     /// - No other transfer is currently pending (initiated but not completed/cancelled).
     pub fn initiate_transfer(&mut self, record: TransferRecord) -> Result<(), TransferError> {
+        // A record for another passport would change this chain's answer to
+        // `current_operator` while leaving its own passport untouched.
+        if record.passport_id != self.passport_id {
+            return Err(TransferError::PassportMismatch {
+                expected: self.passport_id.to_string(),
+                got: record.passport_id.to_string(),
+            });
+        }
+
         // Check that from_operator matches current
         let current = self.current_operator();
         if record.from_operator.did != current.did {

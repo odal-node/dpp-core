@@ -219,6 +219,26 @@ fn rotate_key_archives_old_and_installs_new() {
     );
 }
 
+/// An archive taken before a compromise rotation holds the same key material, so
+/// the rotation must revoke it in the same write. Left unrevoked, it stays in the
+/// published DID document and the compromised key keeps verifying.
+#[test]
+fn compromise_rotation_revokes_earlier_archives_of_the_same_key() {
+    let store = temp_store();
+    let k1 = store.generate_key("iss").expect("gen");
+    store.archive_key("iss").expect("archive");
+    store.revoke_and_rotate("iss").expect("revoke+rotate");
+
+    let archived = store.load_archived_keys("iss");
+    assert_eq!(archived.len(), 2);
+    assert!(
+        archived
+            .iter()
+            .all(|a| a.fingerprint == k1.fingerprint && a.revoked),
+        "every archived copy of the compromised key is revoked"
+    );
+}
+
 #[test]
 fn revoke_and_rotate_marks_old_key_revoked() {
     let store = temp_store();
@@ -431,15 +451,15 @@ fn strip_field(path: &PathBuf, field: &str) {
     std::fs::write(path, serde_json::to_vec(&envelope).expect("serialize")).expect("write");
 }
 
-/// A store with no integrity tag is refused, not opened quietly.
+/// A current-format store with its integrity tag removed is refused by both doors.
 ///
-/// This is the one that mattered most. Without the tag, every plaintext field is
-/// unauthenticated — including `revoked`, which `dpp-vc`'s `did:web` builder
-/// reads to drop a compromised key from the published DID document. An attacker
-/// with write access and no passphrase could flip it back and republish a
-/// revoked key, and the old `open` accepted that file with an `info!` log.
+/// Without the tag, every plaintext field is unauthenticated — including
+/// `revoked`, which `dpp-vc`'s `did:web` builder reads to drop a compromised key
+/// from the published DID document. Every store this code writes carries a tag,
+/// so a current-format store without one has been tampered with, and the
+/// migration door must not be a way to authenticate what was changed.
 #[test]
-fn a_store_with_no_integrity_tag_is_refused() {
+fn a_current_store_with_no_integrity_tag_is_refused_by_both_doors() {
     let (store, path) = temp_store_at("nohmac", "pw");
     store.generate_key("iss").expect("generate");
     drop(store);
@@ -449,13 +469,69 @@ fn a_store_with_no_integrity_tag_is_refused() {
     let Err(refused) = KeyStore::open(&path, "pw") else {
         panic!("a store with no integrity tag must not open");
     };
-    let message = refused.to_string();
-    assert!(message.contains("integrity tag"), "{message}");
-    assert!(message.contains("open_and_migrate"), "{message}");
+    assert!(refused.to_string().contains("integrity tag"), "{refused}");
 
-    // Repairable through the migration door, and strictly openable afterwards.
-    KeyStore::open_and_migrate(&path, "pw").expect("upgrade restores the tag");
-    KeyStore::open(&path, "pw").expect("and it opens strictly once repaired");
+    let Err(refused) = KeyStore::open_and_migrate(&path, "pw") else {
+        panic!("migration must not authenticate a store with no integrity tag");
+    };
+    assert!(refused.to_string().contains("integrity tag"), "{refused}");
+}
+
+/// A migrated record's public key must be the one its private key derives.
+///
+/// The public key and fingerprint sit beside the encrypted private key in
+/// plaintext. Migration re-authenticates whatever it carries, so it checks them
+/// against the decrypted key first and refuses a store where they disagree.
+#[test]
+fn migration_refuses_a_public_key_that_does_not_match_its_private_key() {
+    // An unbound store with a valid tag over records that carry another key's
+    // public half: migration reads it, and must refuse it before re-tagging.
+    let path = temp_path("mismatch");
+    let passphrase = "pw";
+    let mut salt = [0u8; 16];
+    crate::os_rng().fill_bytes(&mut salt);
+    let cipher = Aes256Gcm::new(
+        &super::crypto::derive_aes_key_argon2(passphrase, &salt).expect("derive aes key"),
+    );
+
+    let signing_key = SigningKey::generate(&mut crate::os_rng());
+    let other = SigningKey::generate(&mut crate::os_rng()).verifying_key();
+    let mut nonce_bytes = [0u8; 12];
+    crate::os_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = <&Nonce<U12>>::from(&nonce_bytes);
+    let mut raw = signing_key.to_bytes();
+    let encrypted = cipher.encrypt(nonce, raw.as_ref()).expect("encrypt");
+    raw.zeroize();
+
+    let mut keys: KeyRecordMap = HashMap::new();
+    keys.insert(
+        "iss".to_owned(),
+        KeyRecord {
+            encrypted_signing_key: encrypted,
+            nonce: nonce_bytes.to_vec(),
+            fingerprint: hex::encode(Sha256::digest(other.as_bytes())),
+            verifying_key_hex: hex::encode(other.as_bytes()),
+            revoked: false,
+            algorithm: default_algorithm(),
+        },
+    );
+
+    let salt_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, salt);
+    let integrity_key =
+        super::crypto::derive_integrity_key(passphrase, &salt).expect("integrity key");
+    let hmac = compute_envelope_hmac(&integrity_key, "argon2id", &salt_b64, &keys).expect("hmac");
+    let envelope = serde_json::json!({
+        "kdf": "argon2id",
+        "salt": salt_b64,
+        "hmac": hmac,
+        "keys": keys,
+    });
+    std::fs::write(&path, serde_json::to_vec(&envelope).expect("serialize")).expect("write");
+
+    let Err(refused) = KeyStore::open_and_migrate(&path, passphrase) else {
+        panic!("a mismatched public key must not be migrated");
+    };
+    assert!(refused.to_string().contains("does not match"), "{refused}");
 }
 
 /// A genuine pre-binding (V3) store is refused, then upgraded.

@@ -1055,9 +1055,15 @@ impl Passport {
 
         let now = chrono::Utc::now();
 
-        // First publish: gate on mandatory content, then lock retention and
-        // record the timestamp.
-        if next == PassportStatus::Published && self.published_at.is_none() {
+        // First publish is identified by the source state. `published_at` is a
+        // writable field, so a Draft that already carries a timestamp is
+        // inconsistent and must not reach the mandatory-content gate by a side door.
+        if next == PassportStatus::Published && self.status == PassportStatus::Draft {
+            if self.published_at.is_some() {
+                return Err(crate::error::dpp::DppError::Validation(
+                    "a draft passport must not carry published_at".into(),
+                ));
+            }
             self.check_mandatory_content()?;
             self.retention_locked = true;
             self.published_at = Some(now);

@@ -114,6 +114,8 @@ pub enum DigitalLinkError {
     },
     #[error("Application Identifier '{0}' has an empty value")]
     EmptyValue(String),
+    #[error("Application Identifier '{code}' is a dot segment, which URI normalization removes")]
+    DotSegmentValue { code: String },
 }
 
 impl From<GtinError> for DigitalLinkError {

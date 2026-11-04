@@ -37,6 +37,14 @@ use super::syntax_dictionary::AiSpec;
 /// One function for reading and for building, so the carrier this crate prints
 /// is held to exactly the rule its own parser applies.
 pub(super) fn check_value(code: &str, spec: &AiSpec, value: &str) -> Result<(), DigitalLinkError> {
+    // Dots are unreserved, so the encoder leaves them bare, and a value that is
+    // only dots is a dot segment under URI normalization: `..` takes away the
+    // segment before it, and the printed link would name another resource.
+    if matches!(value, "." | "..") {
+        return Err(DigitalLinkError::DotSegmentValue {
+            code: code.to_owned(),
+        });
+    }
     let chars: Vec<char> = value.chars().collect();
     let len = chars.len();
     if len > spec.max_len {

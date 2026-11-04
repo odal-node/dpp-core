@@ -166,6 +166,18 @@ fn transition_draft_to_published_sets_retention_lock() {
     assert!(p.published_at.is_some());
 }
 
+/// `published_at` is writable, so a draft that already carries one must not reach
+/// the mandatory-content gate by skipping it.
+#[test]
+fn a_draft_that_already_carries_a_publication_timestamp_is_refused() {
+    let mut p = make_passport();
+    p.published_at = Some(chrono::Utc::now());
+
+    assert!(p.transition_to(PassportStatus::Published).is_err());
+    assert_eq!(p.status, PassportStatus::Draft);
+    assert!(!p.retention_locked);
+}
+
 #[test]
 fn transition_invalid_returns_error() {
     let mut p = make_passport();
