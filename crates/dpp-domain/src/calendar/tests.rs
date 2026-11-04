@@ -239,4 +239,12 @@ fn an_event_serialises_with_its_basis_and_a_plain_date() {
     // rather than inventing one.
     assert!(wire.get("productGroup").is_none());
     assert!(wire.get("categories").is_none());
+    // The build's own date names no bundle, so a node with no bundle channel
+    // sends what it sent before bundles could carry dates.
+    assert!(wire.get("bundle").is_none());
+}
+
+#[test]
+fn a_calendar_built_without_a_bundle_has_no_conflicts() {
+    assert!(ObligationCalendar::new().conflicts().is_empty());
 }
