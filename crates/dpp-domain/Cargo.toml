@@ -36,6 +36,10 @@ semver      = "1"
 jsonschema  = { workspace = true }
 
 [features]
+# The obligation calendar reads dated schedule entries out of a verified signed
+# ruleset bundle. Off by default: a caller with no bundle channel needs none of
+# the bundle format's dependencies.
+bundle = ["dpp-rules/bundle"]
 # The in-memory back-up and archive hash a document the way both ports define it,
 # over its RFC 8785 canonical form, which `dpp-rules` supplies behind `bundle`.
 test-utils = ["dpp-rules/bundle"]
@@ -45,6 +49,9 @@ test-utils = ["dpp-rules/bundle"]
 # the `test-utils` feature.
 dpp-rules  = { workspace = true, features = ["bundle"] }
 serde_json = { workspace = true }
+# Builds the payload segment of a JWS-shaped manifest, so the calendar's bundle
+# tests drive the real `verify_bundle`.
+base64     = { workspace = true }
 tokio      = { version = "1", features = ["macros", "rt"] }
 sha2       = { workspace = true }
 hex        = { workspace = true }

@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use super::ObligationKind;
+use super::{BundleOrigin, ObligationKind};
 use crate::instrument::DateBasis;
 
 /// One dated obligation taking effect.
@@ -46,4 +46,12 @@ pub struct ObligationEvent {
     pub categories: Vec<String>,
     /// Whether [`Self::date`] traces to an adopted text.
     pub basis: DateBasis,
+    /// The signed bundle this event came from, or `None` when it is this
+    /// build's own.
+    ///
+    /// An event from a bundle is announced and nothing more. A bundle delivers
+    /// dates, never the rule logic that would make a publish gate apply one, so
+    /// no rule in this build selects its answer by such a date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<BundleOrigin>,
 }
