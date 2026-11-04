@@ -13,6 +13,42 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Integers beyond ±(2^53 − 1) are refused by canonicalization.** `canonicalize`
+  and the `dpp-rules` content hash used to write such an integer as the nearest
+  double, so two different integers shared one signed form. Represent larger
+  exact values as strings. Migration: a document that carried one no longer
+  signs or verifies until its value is a string. (#563)
+- **`complianceResult` is no longer a patchable field.** `patch_fields` refuses
+  it, since it is a host-computed determination. `lintResult` stays patchable. (#563)
+- **A current-format key store with no integrity tag is refused by both open
+  doors.** Only a store written before the tag existed can be migrated.
+  Migration also refuses a stored public key that does not match its private key. (#563)
+- **Policy schemas that cannot be read in full are refused.** A property name
+  containing a dot, two declarations of one path with conflicting classes
+  (`conformity` and `individual`), a disclosure annotation under an unread keyword,
+  or a reference graph past the walk budget yields no policy. (#563)
+- **`TransferError` has a `PassportMismatch` variant,** returned when a record for
+  another passport is appended to a chain. (#563)
+
+### Fixed
+
+- The status-list decoder enforces a decompressed-size budget
+  (`MAX_DECODED_BYTES`, with `from_encoded_list_within` for stricter callers). (#563)
+- Textile unsold-goods disclosures refuse a treatment share that is missing,
+  fractional or out of range, rather than reading it as zero or truncating it. (#563)
+- Whole-passport filtering drops the root proofs for every audience, and a
+  personal-data statement is withheld with the field it describes. (#563)
+- The default `patch_fields` refuses content changes once retention is locked. (#563)
+- A draft that carries a publication timestamp cannot be published by skipping the
+  mandatory-content gate. (#563)
+- Compromise rotation revokes every archived copy of the compromised key, not only
+  the newest archive. (#563)
+- Qualifier values of only dots are refused, since URI normalization removes them. (#563)
+- Schema-driven policy classification treats a universal conformity field as a
+  floor that a product rule cannot lower. (#563)
+
 ## [0.23.0] - 2026-11-03
 
 ### Breaking
