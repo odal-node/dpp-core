@@ -72,6 +72,24 @@ fn completed_transfer_changes_current_operator() {
     assert_eq!(chain.transfer_count(), 1);
 }
 
+/// A completed transfer for another passport must not reach this chain: it would
+/// change what `current_operator` answers here, while its own passport kept none
+/// of the record.
+#[test]
+fn a_record_for_another_passport_is_refused_even_from_the_current_operator() {
+    let pid = PassportId::new();
+    let original = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
+    let target = make_operator("did:web:target.com", "Target", OperatorRole::Distributor);
+    let mut chain = TransferChain::new(pid, original.clone());
+
+    let elsewhere = make_transfer(PassportId::new(), &original, &target, TransferReason::Sale);
+    assert!(matches!(
+        chain.initiate_transfer(elsewhere),
+        Err(TransferError::PassportMismatch { .. })
+    ));
+    assert_eq!(chain.current_operator().did, original.did);
+}
+
 #[test]
 fn operator_mismatch_rejected() {
     let pid = PassportId::new();

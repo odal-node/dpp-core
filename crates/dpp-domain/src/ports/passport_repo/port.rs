@@ -495,6 +495,20 @@ pub trait PassportRepository: Send + Sync {
         let Some(mut passport) = self.find_by_id(id).await? else {
             return Err(DppError::NotFound(id.to_string()));
         };
+        // Once retention is locked, only the fields that stay writable after
+        // publication may change. Checking the loaded record here, rather than
+        // leaving it to the backend, keeps this default honest for every store.
+        if passport.retention_locked
+            && let Some(obj) = delta.as_object()
+            && let Some(key) = obj
+                .keys()
+                .find(|k| !crate::passport::RETENTION_MUTABLE_FIELDS.contains(&k.as_str()))
+        {
+            return Err(DppError::Validation(
+                format!("passport is retention-locked: {key} cannot change after publication")
+                    .into(),
+            ));
+        }
         let mut p_val = serde_json::to_value(&passport)
             .map_err(|e| DppError::Internal(format!("serialize: {e}")))?;
         if let (serde_json::Value::Object(pm), serde_json::Value::Object(dm)) = (&mut p_val, delta)

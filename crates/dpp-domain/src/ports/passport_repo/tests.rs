@@ -234,6 +234,48 @@ async fn default_patch_fields_rejects_lineage_edges() {
     assert!(stored.component_refs.is_empty());
 }
 
+/// A compliance determination is computed by the host. A free-form field patch
+/// must not be able to record one that nobody calculated.
+#[tokio::test]
+async fn default_patch_fields_refuses_a_caller_supplied_compliance_result() {
+    let repo = InMemoryRepo::default();
+    let p = repo.create(draft_passport("Original")).await.unwrap();
+
+    let err = repo
+        .patch_fields(
+            p.id,
+            serde_json::json!({ "complianceResult": { "status": "compliant" } }),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, DppError::Validation(_)), "got: {err:?}");
+}
+
+/// Once retention is locked, a free-form patch may touch only the fields that stay
+/// writable after publication. Content such as the product name is frozen with
+/// the signed body.
+#[tokio::test]
+async fn default_patch_fields_refuses_content_once_retention_is_locked() {
+    let repo = InMemoryRepo::default();
+    let mut published = draft_passport("Original");
+    published.status = PassportStatus::Published;
+    published.retention_locked = true;
+    let p = repo.create(published).await.unwrap();
+
+    let err = repo
+        .patch_fields(p.id, serde_json::json!({ "productName": "Changed" }))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, DppError::Validation(_)), "got: {err:?}");
+
+    let stored = repo.find_by_id(p.id).await.unwrap().unwrap();
+    assert_eq!(stored.product_name, "Original");
+
+    repo.patch_fields(p.id, serde_json::json!({ "lintResult": null }))
+        .await
+        .expect("a field that stays writable after publication is patched");
+}
+
 #[tokio::test]
 async fn default_patch_fields_unknown_id_is_not_found() {
     let repo = InMemoryRepo::default();

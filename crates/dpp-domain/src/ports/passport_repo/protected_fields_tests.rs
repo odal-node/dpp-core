@@ -56,19 +56,18 @@ fn protected_keys_are_unique() {
 /// neither — which is what
 /// [`every_wire_key_is_classified`] enforces.
 ///
-/// Seven entries, and each earns its place:
+/// Six entries, and each earns its place:
 ///
 /// - `productName`, `co2ePerUnit`, `repairabilityScore` and `productGroupData`
 ///   are content an operator supplies and may legitimately correct.
 /// - `personalData` travels with `productGroupData`: a marked field and its
 ///   statement are written together, and a draft that could change one but not
 ///   the other could never pass the personal-data check.
-/// - `complianceResult` and `lintResult` are *recomputed* and written back by
-///   the same path, not supplied by a caller. They are patchable because that
-///   is the mechanism, not because a user edits them.
+/// - `lintResult` is advisory plausibility output, recomputable after publish
+///   by design, so it stays patchable. `complianceResult` is not: it is a
+///   host-computed determination and is protected above.
 const DELIBERATELY_PATCHABLE: &[&str] = &[
     "co2ePerUnit",
-    "complianceResult",
     "lintResult",
     "personalData",
     "productGroupData",
