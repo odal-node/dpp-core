@@ -126,19 +126,16 @@ impl ProductGroup {
     /// `productCategories`, which is a curated subset: a furniture passport may
     /// lawfully be a `bed`, which the catalog does not list.
     ///
-    /// A caller narrowing a credential to categories checks them against this
-    /// before issuing it. A value outside it is one no passport can state, so
-    /// it admits nothing: a credential narrowed to it alone unlocks no passport,
-    /// and that surfaces only when its holder's reads come back public.
+    /// A value outside it is one no new passport can state. A stored passport is
+    /// re-validated against the version it was written under, so it may state a
+    /// value since withdrawn. A caller checking a value against stored passports,
+    /// such as one narrowing a credential to categories, wants
+    /// [`Self::product_category_values_any_version`] instead.
     ///
     /// `None` is a real answer, as it is for `product_category`: the group has
     /// no category a passport can state. [`ProductGroup::Other`] always answers
     /// `None`, because nothing in this build knows which of an untyped
     /// payload's keys is a category.
-    ///
-    /// A passport stored under an earlier schema version is re-validated
-    /// against that version, so it may state a value since withdrawn: a
-    /// furniture passport from before `v1.2.0` may say `mattress`.
     #[must_use]
     pub fn product_category_values(&self) -> Option<&'static [String]> {
         static VALUES: OnceLock<BTreeMap<&'static str, Vec<String>>> = OnceLock::new();
@@ -147,6 +144,34 @@ impl ProductGroup {
         }
         VALUES
             .get_or_init(read_category_values)
+            .get(self.catalog_key())
+            .map(Vec::as_slice)
+    }
+
+    /// Every value a stored passport in this product group may state as its
+    /// category, under any embedded schema version, or `None` where the group
+    /// has no category axis.
+    ///
+    /// [`Self::product_category_values`] answers for a new passport. A stored
+    /// one is re-validated against the version it was written under, so it may
+    /// state a value since withdrawn: an electronics passport from before
+    /// `v1.2.0` may say `laptop`, and a furniture one `mattress`. A caller
+    /// checking a value against stored passports needs this answer. A
+    /// credential narrowed to a withdrawn category still covers every passport
+    /// that states it, so refusing to issue one would refuse a credential that
+    /// works.
+    ///
+    /// The current version's values come first, in its order, then each value
+    /// only an earlier version allows, newest version first. It is `None`
+    /// exactly where [`Self::product_category_values`] is.
+    #[must_use]
+    pub fn product_category_values_any_version(&self) -> Option<&'static [String]> {
+        static VALUES: OnceLock<BTreeMap<&'static str, Vec<String>>> = OnceLock::new();
+        if matches!(self, Self::Other(_)) {
+            return None;
+        }
+        VALUES
+            .get_or_init(read_category_values_any_version)
             .get(self.catalog_key())
             .map(Vec::as_slice)
     }
@@ -204,6 +229,41 @@ fn read_category_values() -> BTreeMap<&'static str, Vec<String>> {
                 .filter_map(serde_json::Value::as_str)
                 .map(str::to_owned)
                 .collect();
+            Some((key, values))
+        })
+        .collect()
+}
+
+/// Every row of [`CATEGORY_PROPERTY`], widened by every embedded schema version
+/// of its group: the current values, then each value only an earlier version
+/// allows, newest version first.
+///
+/// A row is present exactly where [`read_category_values`] has it. A version
+/// whose schema has no `enum` for the property adds nothing.
+fn read_category_values_any_version() -> BTreeMap<&'static str, Vec<String>> {
+    let registry = VersionedSchemaRegistry::new();
+    CATEGORY_PROPERTY
+        .iter()
+        .filter_map(|&(key, property)| {
+            let mut values = ProductGroup::from_wire_tag(key)
+                .product_category_values()?
+                .to_vec();
+            for version in registry.versions_for(key).into_iter().rev() {
+                let Some(schema) = registry
+                    .get(key, version)
+                    .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
+                else {
+                    continue;
+                };
+                let Some(listed) = schema["properties"][property]["enum"].as_array() else {
+                    continue;
+                };
+                for value in listed.iter().filter_map(serde_json::Value::as_str) {
+                    if !values.iter().any(|known| known == value) {
+                        values.push(value.to_owned());
+                    }
+                }
+            }
             Some((key, values))
         })
         .collect()

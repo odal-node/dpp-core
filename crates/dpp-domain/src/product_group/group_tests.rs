@@ -61,3 +61,66 @@ fn category_values_are_the_schema_domain_not_the_catalog_list() {
         "the catalog now lists `bed`; pin a value the schema allows and the catalog does not"
     );
 }
+
+/// A stored passport may state a category its group's current schema has
+/// withdrawn, and only the any-version list carries it: electronics before
+/// `v1.2.0` allowed `laptop`, and furniture `mattress`. Checked against the
+/// current list, a value such a passport states would read as one no passport
+/// can state.
+#[test]
+fn a_withdrawn_category_is_a_value_in_any_version_only() {
+    for (group, withdrawn) in [
+        (ProductGroup::Electronics, "laptop"),
+        (ProductGroup::Furniture, "mattress"),
+    ] {
+        let current = group.product_category_values().expect("a category axis");
+        let any = group
+            .product_category_values_any_version()
+            .expect("a category axis");
+        assert!(
+            !current.iter().any(|v| v == withdrawn),
+            "{group:?} allows `{withdrawn}` again; pin a value it has withdrawn: {current:?}"
+        );
+        assert!(
+            any.iter().any(|v| v == withdrawn),
+            "{group:?} under any version: {any:?}"
+        );
+    }
+}
+
+/// The any-version list begins with the current one, holds each value once,
+/// and is absent for exactly the groups the current list is absent for.
+#[test]
+fn the_any_version_list_extends_the_current_one() {
+    for group in [
+        ProductGroup::Battery,
+        ProductGroup::Textile,
+        ProductGroup::UnsoldGoods,
+        ProductGroup::Steel,
+        ProductGroup::Electronics,
+        ProductGroup::Construction,
+        ProductGroup::Tyre,
+        ProductGroup::Toy,
+        ProductGroup::Aluminium,
+        ProductGroup::Furniture,
+        ProductGroup::Mattress,
+        ProductGroup::Detergent,
+        ProductGroup::Other("packaging".into()),
+    ] {
+        match (
+            group.product_category_values(),
+            group.product_category_values_any_version(),
+        ) {
+            (None, None) => {}
+            (Some(current), Some(any)) => {
+                assert_eq!(any.get(..current.len()), Some(current), "{group:?}");
+                let mut seen = std::collections::BTreeSet::new();
+                assert!(
+                    any.iter().all(|v| seen.insert(v)),
+                    "{group:?} lists a value twice: {any:?}"
+                );
+            }
+            (current, any) => panic!("{group:?}: current {current:?}, any version {any:?}"),
+        }
+    }
+}
