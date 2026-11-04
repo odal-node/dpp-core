@@ -13,19 +13,63 @@
 
 use serde_json::Value;
 
+/// Largest integer magnitude every JSON number model holds exactly: 2^53 - 1,
+/// the bound that RFC 8785 takes from the I-JSON profile of JSON.
+const MAX_EXACT_INTEGER: u64 = (1 << 53) - 1;
+
 /// Canonicalize a JSON value to its RFC 8785 (JCS) byte form.
 ///
 /// Guarantees: object keys sorted by UTF-16 code unit, no insignificant
 /// whitespace, numbers in the ECMAScript `Number::toString` form (so `1.0`
 /// serializes as `1`), and consistent string escaping.
+///
+/// Integers beyond ±(2^53 − 1) are refused. The serializer writes every integer
+/// as an IEEE 754 double, so two different integers can share one canonical form
+/// and a signature over one would verify against the other.
 pub fn canonicalize(value: &Value) -> anyhow::Result<Vec<u8>> {
+    reject_inexact_integers(value)?;
     serde_jcs::to_vec(value).map_err(|e| anyhow::anyhow!("JCS canonicalization: {e}"))
+}
+
+fn reject_inexact_integers(value: &Value) -> anyhow::Result<()> {
+    match value {
+        Value::Number(n) => {
+            let magnitude = n.as_u64().or_else(|| n.as_i64().map(i64::unsigned_abs));
+            anyhow::ensure!(
+                magnitude.is_none_or(|m| m <= MAX_EXACT_INTEGER),
+                "integer {n} is outside ±(2^53 - 1) and cannot be canonicalized exactly"
+            );
+            Ok(())
+        }
+        Value::Array(items) => items.iter().try_for_each(reject_inexact_integers),
+        Value::Object(map) => map.values().try_for_each(reject_inexact_integers),
+        Value::Null | Value::Bool(_) | Value::String(_) => Ok(()),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_largest_exact_integer_is_canonicalized_as_written() {
+        let out = canonicalize(&json!({"n": 9_007_199_254_740_991_u64})).unwrap();
+        assert_eq!(out, br#"{"n":9007199254740991}"#);
+    }
+
+    #[test]
+    fn an_integer_that_a_double_cannot_hold_is_refused() {
+        // 2^53 + 1 is written as 2^53 by an f64; a signature over one must not
+        // verify against the other.
+        assert!(canonicalize(&json!(9_007_199_254_740_993_u64)).is_err());
+        assert!(canonicalize(&json!(-9_007_199_254_740_993_i64)).is_err());
+    }
+
+    #[test]
+    fn an_inexact_integer_nested_anywhere_is_refused() {
+        assert!(canonicalize(&json!({"a": [{"b": 9_007_199_254_740_993_u64}]})).is_err());
+    }
 
     #[test]
     fn object_keys_are_sorted_and_compact() {
