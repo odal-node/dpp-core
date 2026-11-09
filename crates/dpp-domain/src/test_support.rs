@@ -314,7 +314,7 @@ pub(crate) fn sample_unsold_goods_report() -> crate::unsold_goods::UnsoldGoodsRe
             units_discarded: DiscardedQuantity::measured(1_200),
             weight_kg: DiscardedQuantity::estimated(430),
             packaging_included: false,
-            reason: DiscardReason::DamagedOrContaminated,
+            reason: Some(DiscardReason::DamagedOrContaminated),
             reason_detail: None,
             treatment: WasteTreatmentSplit {
                 preparing_for_reuse_pct: 20,
@@ -326,5 +326,34 @@ pub(crate) fn sample_unsold_goods_report() -> crate::unsold_goods::UnsoldGoodsRe
         }],
         measures_taken: "Introduced pre-season demand forecasting across all lines.".to_owned(),
         measures_planned: "Extending the donation offer window to twelve weeks.".to_owned(),
+    }
+}
+
+/// A minimal, well-formed discard of apparel for a derogation.
+///
+/// 120 units weighing 36 kg, recycled, with point (f) relied on. Tests reach in
+/// and change the one thing they are about.
+pub(crate) fn sample_discard_record() -> crate::unsold_goods::DiscardRecord {
+    use crate::identifier::CommodityCode;
+    use crate::unsold_goods::{DiscardReason, DiscardedQuantity};
+    use crate::unsold_goods::{
+        DiscardRecord, DiscardedWeight, ReceivingOperator, WasteTreatmentOperation,
+    };
+    use chrono::NaiveDate;
+
+    DiscardRecord {
+        discarded_on: NaiveDate::from_ymd_opt(2027, 3, 14).expect("valid date"),
+        cn_codes: vec![CommodityCode::parse("62034231").expect("valid CN code")],
+        description: "Men's cotton trousers".to_owned(),
+        units: DiscardedQuantity::measured(120),
+        weight: DiscardedWeight::measured(36_000),
+        packaging_included: false,
+        reason: Some(DiscardReason::DamagedOrContaminated),
+        reason_detail: None,
+        treatment: WasteTreatmentOperation::Recycling,
+        receiver: ReceivingOperator {
+            name: "Example Textile Recovery BV".to_owned(),
+            identifier: None,
+        },
     }
 }

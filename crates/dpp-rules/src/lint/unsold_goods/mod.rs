@@ -6,8 +6,10 @@
 //! are baselined; this one is new, so it follows the rule.
 
 pub mod lints;
+pub mod records;
 
 #[cfg(test)]
 mod tests;
 
 pub use lints::{DisclosureLineInput, UnsoldGoodsLintInput, lint_unsold_goods};
+pub use records::{DiscardRecordLintInput, lint_discard_record};

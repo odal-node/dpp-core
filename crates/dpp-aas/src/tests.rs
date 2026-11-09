@@ -51,7 +51,7 @@ fn sample_unsold_goods_report() -> UnsoldGoodsReport {
             units_discarded: DiscardedQuantity::measured(1_200),
             weight_kg: DiscardedQuantity::estimated(430),
             packaging_included: false,
-            reason: DiscardReason::DamagedOrContaminated,
+            reason: Some(DiscardReason::DamagedOrContaminated),
             reason_detail: None,
             treatment: WasteTreatmentSplit {
                 preparing_for_reuse_pct: 20,
@@ -967,6 +967,34 @@ fn build_aas_unsold_goods_produces_the_disclosure_submodel() {
             "{expected} missing from {id_shorts:?}"
         );
     }
+}
+
+/// A line with no derogation projects no `Reason` element: an empty string
+/// would read as a reason that is blank, and a made-up word as one that exists.
+#[test]
+fn a_line_with_no_derogation_projects_no_reason_element() {
+    let mut report = sample_unsold_goods_report();
+    report.lines[0].reason = None;
+    let environment =
+        build_unsold_goods_environment(&report, "assetKey", "urn:odal-node:test-asset:1")
+            .expect("a valid caller-chosen asset key");
+    let sub = environment
+        .submodels
+        .iter()
+        .find(|s| s.id_short == "UnsoldGoods")
+        .expect("UnsoldGoods submodel");
+
+    let id_shorts: Vec<&str> = sub
+        .submodel_elements
+        .iter()
+        .filter_map(|e| match e {
+            AasSubmodelElement::Property(p) => Some(p.id_short.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    assert!(id_shorts.contains(&"line0Description"));
+    assert!(!id_shorts.contains(&"line0Reason"), "{id_shorts:?}");
 }
 
 /// A product group whose typed mapper was removed still ships its data — the

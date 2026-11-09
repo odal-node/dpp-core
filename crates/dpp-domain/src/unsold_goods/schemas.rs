@@ -22,6 +22,11 @@
 //! version is never modified, so it is neither renumbered nor republished as a
 //! first version. The key is kept for the same reason.
 //!
+//! v2.0.0 is the format Impl. Reg. (EU) 2026/2 Annex I prescribes. v2.1.0 stops
+//! requiring a reason on a line, since Annex I note (h) asks for one only where a
+//! derogation applies; dropping a requirement only widens what validates, so a
+//! v2.0.0 disclosure reaches it unchanged.
+//!
 //! There is no v1.0.0. It predated Impl. Reg. (EU) 2026/2 and nothing can carry a
 //! document forward from it: a financial year is not derivable from a quarter, a
 //! CN code is not derivable from the word "apparel", a six-way treatment split is
@@ -39,10 +44,16 @@ pub const DISCLOSURE_SCHEMA_KEY: &str = "unsold-goods";
 
 /// Every version of the disclosure schema, compiled into the crate so that a
 /// published crate carries its own schemas.
-const EMBEDDED: &[(&str, &str)] = &[(
-    "2.0.0",
-    include_str!("../../document-schemas/unsold-goods/v2.0.0.json"),
-)];
+const EMBEDDED: &[(&str, &str)] = &[
+    (
+        "2.0.0",
+        include_str!("../../document-schemas/unsold-goods/v2.0.0.json"),
+    ),
+    (
+        "2.1.0",
+        include_str!("../../document-schemas/unsold-goods/v2.1.0.json"),
+    ),
+];
 
 /// A registry holding the disclosure's schema versions, and nothing else.
 #[must_use]

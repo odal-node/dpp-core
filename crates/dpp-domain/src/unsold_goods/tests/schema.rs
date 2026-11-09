@@ -12,6 +12,10 @@ fn v2_0() -> Version {
     "2.0.0".parse().unwrap()
 }
 
+fn v2_1() -> Version {
+    "2.1.0".parse().unwrap()
+}
+
 /// A disclosure that validates, for a test to break one thing in.
 fn disclosure() -> Value {
     json!({
@@ -39,14 +43,44 @@ fn disclosure() -> Value {
 }
 
 fn validates(body: &Value) -> bool {
+    validates_as(&v2_0(), body)
+}
+
+fn validates_as(version: &Version, body: &Value) -> bool {
     document_schemas()
-        .validate(DISCLOSURE_SCHEMA_KEY, &v2_0(), body)
+        .validate(DISCLOSURE_SCHEMA_KEY, version, body)
         .is_ok()
+}
+
+/// A disclosure whose one line carries no `reason`, as a discard outside the
+/// destruction ban's reach has none.
+fn disclosure_without_a_reason() -> Value {
+    let mut data = disclosure();
+    data["lines"][0]
+        .as_object_mut()
+        .expect("object")
+        .remove("reason");
+    data
 }
 
 #[test]
 fn conformance_unsold_goods_v2_valid() {
     assert!(validates(&disclosure()));
+}
+
+/// Annex I note (h) asks for the reason "where applicable", and the derogations
+/// reach only the destruction of Annex VII products, so a line for any other
+/// discard has no Art. 2 point. v2.1.0 stops requiring one.
+#[test]
+fn conformance_unsold_goods_v2_1_accepts_a_line_with_no_derogation() {
+    assert!(validates_as(&v2_1(), &disclosure_without_a_reason()));
+}
+
+/// v2.0.0 is published and stays as it was: a document stored under it was
+/// validated against a required reason.
+#[test]
+fn conformance_unsold_goods_v2_0_still_requires_a_reason() {
+    assert!(!validates_as(&v2_0(), &disclosure_without_a_reason()));
 }
 
 /// The reason vocabulary is Del. Reg. (EU) 2026/296 Art. 2's derogation list.
@@ -125,7 +159,10 @@ fn the_disclosure_is_not_a_product_group() {
 fn the_disclosure_registry_holds_the_disclosure_schema_and_nothing_else() {
     let schemas = document_schemas();
     assert_eq!(schemas.product_groups(), [DISCLOSURE_SCHEMA_KEY]);
-    assert_eq!(schemas.versions_for(DISCLOSURE_SCHEMA_KEY), [&v2_0()]);
+    assert_eq!(
+        schemas.versions_for(DISCLOSURE_SCHEMA_KEY),
+        [&v2_0(), &v2_1()]
+    );
 }
 
 fn fixture(version: &str) -> Option<Value> {
