@@ -13,6 +13,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`ObligationEvent` gains a `bundle` field.** It names the signed bundle an
+  event came from, as a `BundleOrigin` (bundle version and content hash), and is
+  `None` for every date the build holds itself. `None` is left out of the JSON,
+  so every event a calendar returns today serialises as it did. Code that builds
+  an `ObligationEvent` with a struct literal adds `bundle: None`. (#508, #565)
+
+### Added
+
+- **The obligation calendar reads dates out of a signed ruleset bundle.** With
+  `dpp-domain`'s new `bundle` feature, `ObligationCalendar::with_bundle(catalog,
+  acceptance)` lays the schedule in a verified bundle's `obligations` section
+  over the built-in calendar, so a node learns a new or amended date without a
+  crate release. Each entry has an `ObligationEvent`'s wire shape without
+  `bundle`, which is filled from the verified manifest, so an entry cannot claim
+  an origin. Precedence is by id: a date the build does not hold is added, one it
+  holds as `Assumed` is replaced, and any other is kept, because the build's
+  rules select their answers by those dates and a calendar announcing another
+  would contradict its own publish gate. A bundle date that disagrees with one,
+  earlier or later, is recorded as a `ScheduleConflict` in
+  `ObligationCalendar::conflicts` instead of being announced. Only a bundle that
+  passed `verify_bundle` is read: a compiled-in baseline is refused with
+  `ScheduleBundleError::Unverified`, and a schedule with an unknown field, a
+  repeated id or an entry that does not parse is refused whole with
+  `ScheduleBundleError::Malformed`. A bundle carries the whole schedule, not a
+  change to the previous one. Without a bundle, or with one carrying no
+  `obligations` section, the calendar is what it was. (#508, #565)
+
 ## [0.23.0] - 2026-11-03
 
 ### Breaking

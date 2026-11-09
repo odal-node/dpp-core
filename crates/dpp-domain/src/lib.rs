@@ -49,7 +49,11 @@ pub mod transfer;
 pub mod trusted_list;
 pub mod validation;
 
-pub use calendar::{ObligationCalendar, ObligationEvent, ObligationKind};
+#[cfg(feature = "bundle")]
+pub use calendar::ScheduleBundleError;
+pub use calendar::{
+    BundleOrigin, ObligationCalendar, ObligationEvent, ObligationKind, ScheduleConflict,
+};
 pub use catalog::{
     CatalogError, Granularity, ProductGroupCatalog, ProductGroupDescriptor, RegulatoryStatus,
     RetentionBasis,

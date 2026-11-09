@@ -89,7 +89,7 @@ import graph, not a judgement about what each module does.
 | Concern | Tier | What it holds |
 |---|---|---|
 | `identifier` | 1 | GS1 and customs-classification vocabulary: `Gtin`, `Gln`, `CommodityCode`, `CnCategory`, and the shared mod-10 check digit. Depends on nothing in this crate |
-| `calendar` | 4 | `ObligationCalendar`: which dated obligations take effect between two dates, combining every act's passport start date from `instrument` and every change a `dpp-rules` module schedules, each `ObligationEvent` carrying its `DateBasis`. Holds no clock: the caller passes the window |
+| `calendar` | 4 | `ObligationCalendar`: which dated obligations take effect between two dates, combining every act's passport start date from `instrument` and every change a `dpp-rules` module schedules, each `ObligationEvent` carrying its `DateBasis`. Holds no clock: the caller passes the window. With the `bundle` feature it also reads the dates a verified signed ruleset bundle carries: it adds what the build lacks, replaces what the build only assumes, and records a `ScheduleConflict` instead of moving a sourced date |
 | `catalog` | 3 | `ProductGroupCatalog`: identity, scope, schema versions, disclosure classes, plugin binding. It carries **no law** |
 | `credential` | 2 | The W3C Verifiable Credential 2.0 envelope that binds a passport to its signed payload |
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
