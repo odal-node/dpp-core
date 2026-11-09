@@ -84,7 +84,7 @@ fn an_unsold_goods_disclosure_with_lines_validates() {
 /// Art. 24's disclosure duty reaches discarded unsold **consumer products**
 /// generally; Art. 25's destruction ban reaches Annex VII's apparel and
 /// footwear. An earlier check required Annex VII scope here and so rejected
-/// every lawful disclosure outside those two, which is most of Annex II's 45
+/// every lawful disclosure outside those two, which is most of Annex II's 44
 /// headings.
 #[test]
 fn a_disclosure_outside_annex_vii_scope_is_not_rejected() {

@@ -925,7 +925,7 @@ impl Passport {
         // (disclosure) and Art. 25 (destruction ban) have different scopes** —
         // the ban reaches Annex VII's apparel and footwear, while the disclosure
         // reaches discarded unsold *consumer products* generally, which Impl.
-        // Reg. (EU) 2026/2 Annex II illustrates across 45 CN headings from soap
+        // Reg. (EU) 2026/2 Annex II illustrates across 44 CN headings from soap
         // to refrigerators. Requiring Annex VII here rejected every lawful
         // disclosure outside apparel and footwear.
         if self.product_group == ProductGroup::UnsoldGoods

@@ -8,7 +8,7 @@
 //!
 //! ESPR **Art. 24** imposes a *disclosure* duty on discarded unsold **consumer
 //! products** generally, and Impl. Reg. (EU) 2026/2 implements it. Its own
-//! Annex II — the list this module carries — runs to 45 CN headings covering
+//! Annex II — the list this module carries — runs to 44 CN headings covering
 //! soap, tyres, luggage, bed linen, air conditioners, refrigerators, computers,
 //! batteries, lamps, furniture, toys and sanitary articles.
 //!
@@ -21,7 +21,10 @@ use alloc::vec::Vec;
 /// The CN headings of Annex II to Impl. Reg. (EU) 2026/2 — the consumer products
 /// a disclosure must delimit at **four** digits rather than two.
 ///
-/// Read from the OJ text (OJ L, 10.2.2026). Annex II's own preamble narrows it:
+/// Read from the OJ text (OJ L, 10.2.2026): 44 headings. `8527` is not one of
+/// them — it is named only in the description of 8517 — and an earlier version of
+/// this list carried it. The `annex_ii_headings` test holds the list to the act.
+/// Annex II's own preamble narrows it:
 /// "Products listed in this Annex that are **components, intermediate products
 /// or products that are not primarily intended for consumers** are not covered
 /// by the obligation" — a limit on the *goods*, not on the code, and one no
@@ -30,8 +33,8 @@ use alloc::vec::Vec;
 const ANNEX_II_HEADINGS: &[&str] = &[
     "3401", "3402", "4011", "4202", "4203", "4303", "4818", "6301", "6302", "6303", "6304", "6306",
     "6307", "8415", "8418", "8421", "8422", "8423", "8443", "8450", "8467", "8471", "8506", "8507",
-    "8508", "8509", "8510", "8513", "8516", "8517", "8518", "8519", "8521", "8523", "8524", "8527",
-    "8528", "8539", "9006", "9401", "9403", "9404", "9503", "9504", "9619",
+    "8508", "8509", "8510", "8513", "8516", "8517", "8518", "8519", "8521", "8523", "8524", "8528",
+    "8539", "9006", "9401", "9403", "9404", "9503", "9504", "9619",
 ];
 
 /// Whether a CN heading is listed in Annex II, and so must be disclosed at
