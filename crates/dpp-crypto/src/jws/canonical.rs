@@ -34,6 +34,10 @@ pub fn canonicalize(value: &Value) -> anyhow::Result<Vec<u8>> {
 fn reject_inexact_integers(value: &Value) -> anyhow::Result<()> {
     match value {
         Value::Number(n) => {
+            // Only an integer is checked. A number `serde_json` holds as a double
+            // (`1e21`, or `9007199254740993.0`, which it reads as 2^53) is written
+            // as that same double, so the canonical form is the value the caller
+            // holds, and RFC 8785 Appendix B prints such doubles.
             let magnitude = n.as_u64().or_else(|| n.as_i64().map(i64::unsigned_abs));
             anyhow::ensure!(
                 magnitude.is_none_or(|m| m <= MAX_EXACT_INTEGER),

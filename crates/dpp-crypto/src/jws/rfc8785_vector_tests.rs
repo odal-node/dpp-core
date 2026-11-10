@@ -114,11 +114,12 @@ fn every_appendix_b_number_serialises_as_the_rfc_prints_it() {
 
 /// The table above is run from IEEE 754 bit patterns. A passport reaches the
 /// canonicaliser from JSON text, where an integer is an integer to `serde_json`
-/// and not a double, so the same rows are run from their text. Clause 3.1 wants
-/// every input number to be expressible as a double, and an integer beyond
-/// 2^53 - 1 is not: `serde_json` holds 2^53 + 1 exactly, and writing it as a
-/// double would make it the same bytes as 2^53. Such an integer is refused, so
-/// no two distinct integers share a canonical form.
+/// and not a double, so the same rows are run from their text. `serde_json`
+/// holds 2^53 + 1 exactly, and writing it as a double would make it the same
+/// bytes as 2^53. Appendix B note (1) says a value meant as a true integer
+/// SHOULD lie within ±(2^53 - 1), so anything past that, the table's own 2^53
+/// rows included, is refused, and no two distinct integers share a canonical
+/// form.
 #[test]
 fn integers_beyond_the_exact_range_are_refused_when_read_from_text() {
     for text in [

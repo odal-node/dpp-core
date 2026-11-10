@@ -136,6 +136,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   or a reference graph past the walk budget yields no policy. (#563)
 - **`TransferError` has a `PassportMismatch` variant,** returned when a record for
   another passport is appended to a chain. (#563)
+- **The status-list decoder refuses a bitstring past 16 MiB decompressed**
+  (`MAX_DECODED_BYTES`). A larger list read before. Migration: a caller that needs
+  one passes its own budget to `from_encoded_list_within`. (#563)
 
 ### Added
 
@@ -275,13 +278,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   table.
   The heading had been in the list since v0.19.0. (#570)
 
-- The status-list decoder enforces a decompressed-size budget
-  (`MAX_DECODED_BYTES`, with `from_encoded_list_within` for stricter callers). (#563)
 - Whole-passport filtering drops the root proofs for every audience, and a
   personal-data statement is withheld with the field it describes. (#563)
 - The default `patch_fields` refuses content changes once retention is locked. (#563)
-- A draft that carries a publication timestamp cannot be published by skipping the
-  mandatory-content gate. (#563)
+- A draft that carries a publication timestamp, or a suspended passport that
+  carries none, cannot be published by skipping the mandatory-content gate. (#563)
 - Compromise rotation revokes every archived copy of the compromised key, not only
   the newest archive. (#563)
 - Qualifier values of only dots are refused, since URI normalization removes them. (#563)

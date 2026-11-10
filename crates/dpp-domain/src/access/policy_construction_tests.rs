@@ -45,6 +45,26 @@ fn a_dotted_property_name_refuses_the_whole_schema() {
     );
 }
 
+/// The schemas are draft-07, so its own spellings of the unread keywords, and the
+/// tuple form of `items`, refuse a schema that hides an annotation in them.
+#[test]
+fn an_annotation_under_a_draft_07_keyword_the_walk_does_not_read_refuses_the_schema() {
+    let hidden = json!({ "type": "string", "x-disclosure": "restricted" });
+    for schema in [
+        json!({ "properties": { "a": { "type": "object" } },
+                "dependencies": { "a": { "properties": { "secret": hidden } } } }),
+        json!({ "properties": { "a": { "type": "array", "items": [{ "type": "string" }],
+                                       "additionalItems": hidden } } }),
+        json!({ "properties": { "a": { "type": "array", "items": [hidden] } } }),
+    ] {
+        assert!(
+            ProductGroupAccessPolicy::from_schema("battery", "9.9.9", &schema.to_string())
+                .is_none(),
+            "{schema}"
+        );
+    }
+}
+
 /// Conformity (authorities) and Individual (the individual) declared for one path
 /// have no class that is safe for both, so the schema is refused.
 #[test]

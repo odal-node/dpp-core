@@ -261,10 +261,13 @@ fn conflicting(a: Disclosure, b: Disclosure) -> bool {
     )
 }
 
-/// Subschema keywords [`collect_disclosures`] does not descend into.
+/// Subschema keywords [`collect_disclosures`] does not descend into, under both
+/// their draft-07 names (`dependencies`, `additionalItems`) and the later ones.
 const UNREAD_SUBSCHEMA_KEYWORDS: &[&str] = &[
     "patternProperties",
+    "dependencies",
     "dependentSchemas",
+    "additionalItems",
     "not",
     "prefixItems",
     "contains",
@@ -407,8 +410,16 @@ fn collect_disclosures(
 
     // An array element sits at the same path its key does — the filter does not
     // treat an index as a segment either — so `items` carries `path` unchanged.
+    // The draft-07 tuple form, an array of schemas, is not read, so an annotation
+    // in it refuses the schema like one under an unread keyword.
     if let Some(child) = object.get("items") {
-        collect_disclosures(child, path, root, active_refs, out);
+        if child.is_array() {
+            if contains_disclosure_annotation(child) {
+                out.refused = true;
+            }
+        } else {
+            collect_disclosures(child, path, root, active_refs, out);
+        }
     }
 
     // A map's values sit one segment deeper than the map, under a key chosen by

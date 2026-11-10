@@ -1042,6 +1042,18 @@ impl Passport {
             self.published_at = Some(now);
         }
 
+        // Suspended is reached only from Published, so a suspended passport with no
+        // `published_at` was never published, and republishing it would skip the
+        // gate above.
+        if next == PassportStatus::Published
+            && self.status == PassportStatus::Suspended
+            && self.published_at.is_none()
+        {
+            return Err(crate::error::dpp::DppError::Validation(
+                "a suspended passport must carry published_at".into(),
+            ));
+        }
+
         self.status = next;
         self.updated_at = now;
         Ok(())

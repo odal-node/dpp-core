@@ -37,6 +37,9 @@ const MAX_EXACT_INTEGER: u64 = (1 << 53) - 1;
 fn reject_inexact_integers(value: &serde_json::Value) -> Result<(), serde_json::Error> {
     match value {
         serde_json::Value::Number(n) => {
+            // Only an integer is checked. A number `serde_json` holds as a double
+            // is hashed as that same double, so the digest covers the value the
+            // caller holds.
             let magnitude = n.as_u64().or_else(|| n.as_i64().map(i64::unsigned_abs));
             if magnitude.is_some_and(|m| m > MAX_EXACT_INTEGER) {
                 return Err(serde::ser::Error::custom(format!(

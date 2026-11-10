@@ -126,6 +126,18 @@ fn a_draft_that_already_carries_a_publication_timestamp_is_refused() {
     assert!(!p.retention_locked);
 }
 
+/// `status` is writable too, so a passport set to Suspended without ever being
+/// published must not reach Published unlocked and unchecked.
+#[test]
+fn a_suspended_passport_that_was_never_published_is_refused() {
+    let mut p = make_passport();
+    p.status = PassportStatus::Suspended;
+
+    assert!(p.transition_to(PassportStatus::Published).is_err());
+    assert_eq!(p.status, PassportStatus::Suspended);
+    assert!(!p.retention_locked);
+}
+
 #[test]
 fn transition_invalid_returns_error() {
     let mut p = make_passport();

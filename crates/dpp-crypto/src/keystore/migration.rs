@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use ed25519_dalek::SigningKey;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use super::crypto::derive_aes_key_argon2;
 use super::store::{KeyRecord, KeyRecordMap, KeyStore};
@@ -87,9 +87,10 @@ impl KeyStore {
                 self.cipher
                     .decrypt(nonce, record.encrypted_signing_key.as_ref())
             };
-            let mut raw = opened.map_err(|_| {
+            // Cleared on every exit, the refusals below included.
+            let raw = Zeroizing::new(opened.map_err(|_| {
                 anyhow::anyhow!("AES-GCM decrypt failed during migration for key {id}")
-            })?;
+            })?);
 
             // The decrypted private key is the authenticated value; the public key
             // and fingerprint beside it are plaintext metadata. Check them against
@@ -117,12 +118,11 @@ impl KeyStore {
                 .encrypt(
                     new_nonce,
                     aes_gcm::aead::Payload {
-                        msg: raw.as_ref(),
+                        msg: raw.as_slice(),
                         aad: record.fingerprint.as_bytes(),
                     },
                 )
                 .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed during migration"))?;
-            raw.zeroize();
 
             migrated.insert(
                 id.clone(),

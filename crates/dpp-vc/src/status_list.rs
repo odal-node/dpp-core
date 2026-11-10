@@ -18,8 +18,9 @@ use flate2::read::GzDecoder;
 
 /// Largest decompressed bitstring [`StatusList::from_encoded_list`] accepts:
 /// 16 MiB, about 134 million entries. The W3C minimum list is 16 KiB, so this
-/// leaves room for very large lists while bounding what one encoded string can
-/// make the caller allocate.
+/// leaves room for very large lists while bounding the bitstring one encoded
+/// string can make the caller allocate. The base64 decode before it is bounded by
+/// the encoded string, which the caller already holds.
 pub const MAX_DECODED_BYTES: usize = 16 * 1024 * 1024;
 
 /// A decoded Bitstring Status List — the GZIP-decompressed bitstring.
@@ -53,7 +54,7 @@ impl StatusList {
             .map_err(|e| anyhow::anyhow!("status list base64url: {e}"))?;
         let mut bits = Vec::new();
         GzDecoder::new(&compressed[..])
-            .take(max_bytes as u64 + 1)
+            .take((max_bytes as u64).saturating_add(1))
             .read_to_end(&mut bits)
             .map_err(|e| anyhow::anyhow!("status list gunzip: {e}"))?;
         anyhow::ensure!(
@@ -109,6 +110,14 @@ mod tests {
     fn a_list_exactly_at_the_budget_is_accepted() {
         let encoded = encode_list(&vec![0u8; 1024]);
         let list = StatusList::from_encoded_list_within(&encoded, 1024).unwrap();
+        assert_eq!(list.len_bits(), 1024 * 8);
+    }
+
+    /// The largest budget a caller can pass must not overflow the reader's limit.
+    #[test]
+    fn the_largest_budget_reads_the_whole_list() {
+        let encoded = encode_list(&vec![0u8; 1024]);
+        let list = StatusList::from_encoded_list_within(&encoded, usize::MAX).unwrap();
         assert_eq!(list.len_bits(), 1024 * 8);
     }
 
