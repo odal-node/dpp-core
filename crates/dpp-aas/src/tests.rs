@@ -927,6 +927,7 @@ fn non_object_input_produces_empty_submodel() {
 
 // ── New product group builder tests ──────────────────────────────────────────────
 
+/// The export is one shell and one `UnsoldGoods` submodel carrying the Annex I rows.
 #[test]
 fn build_aas_unsold_goods_produces_the_disclosure_submodel() {
     let environment = build_unsold_goods_environment(
@@ -1266,6 +1267,7 @@ fn an_unsold_goods_export_refuses_an_asset_name_a_scheme_derives() {
     }
 }
 
+/// An asset value with whitespace or a control character cannot appear in a URI, so the export refuses it.
 #[test]
 fn an_unsold_goods_export_refuses_an_asset_value_that_cannot_appear_in_a_uri() {
     let refused =

@@ -8,6 +8,7 @@ use crate::catalog::ProductGroupCatalog;
 use crate::schemas::VersionedSchemaRegistry;
 use crate::unsold_goods::{DISCLOSURE_SCHEMA_KEY, UnsoldGoodsReport, document_schemas};
 
+/// The first version of the disclosure schema.
 fn v2_0() -> Version {
     "2.0.0".parse().unwrap()
 }
@@ -38,12 +39,14 @@ fn disclosure() -> Value {
     })
 }
 
+/// Whether `body` validates against the disclosure schema at v2.0.0.
 fn validates(body: &Value) -> bool {
     document_schemas()
         .validate(DISCLOSURE_SCHEMA_KEY, &v2_0(), body)
         .is_ok()
 }
 
+/// A well-formed disclosure validates.
 #[test]
 fn conformance_unsold_goods_v2_valid() {
     assert!(validates(&disclosure()));
@@ -128,6 +131,7 @@ fn the_disclosure_registry_holds_the_disclosure_schema_and_nothing_else() {
     assert_eq!(schemas.versions_for(DISCLOSURE_SCHEMA_KEY), [&v2_0()]);
 }
 
+/// The frozen document for a version of the disclosure schema, if there is one.
 fn fixture(version: &str) -> Option<Value> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/document-schemas")

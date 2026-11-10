@@ -1482,6 +1482,7 @@ fn unsold_goods_environment() -> dpp_aas::AasEnvironment {
     .expect("a disclosure is exportable under a caller-chosen asset key")
 }
 
+/// The unsold-goods export is a schema-valid Environment.
 #[test]
 fn the_unsold_goods_export_is_schema_valid() {
     let document = serde_json::to_value(unsold_goods_environment()).expect("serialises");

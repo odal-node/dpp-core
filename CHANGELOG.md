@@ -58,7 +58,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **Failure mode for a stored or fetched document.** One tagged `unsoldGoods`
     or `unsold-goods` no longer has a typed variant. It reads as an unknown
     product group, with its payload carried verbatim, and is neither refused nor
-    rewritten.
+    rewritten. A passport that spells the tag the same way in its envelope and its
+    payload is unaffected. One that spells it differently (`unsold-goods` in one,
+    `unsoldGoods` in the other) reads the same way, but `Passport::validate` now
+    reports the mismatch, because the two spellings used to resolve to one typed
+    variant and are now two different unknown tags.
   - **Replaced:** `lint_product_group_data` no longer lints a disclosure; call
     `lint::lint_unsold_goods_report`. The AAS projection is no longer reached by
     a passport: `dpp_aas::build_unsold_goods_environment(report, name, value)`
