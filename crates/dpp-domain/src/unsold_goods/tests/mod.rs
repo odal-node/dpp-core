@@ -3,6 +3,7 @@
 
 mod aggregation;
 mod apportion;
+mod ban;
 mod evidence;
 mod record;
 mod report;
