@@ -4,7 +4,7 @@
 use super::Passport;
 use crate::compliance::ComplianceResult;
 use crate::error::dpp::DppError;
-use crate::product_group::ProductGroupData;
+use crate::product_group::{ProductGroup, ProductGroupData};
 use crate::status::PassportStatus;
 use crate::test_support::{sample_passport, sample_textile_data};
 
@@ -64,6 +64,39 @@ fn a_determination_that_was_never_bound_is_refused() {
         .transition_to(PassportStatus::Published)
         .unwrap_err();
     assert!(refused_on_compliance_result(&err));
+}
+
+#[test]
+fn a_determination_for_another_product_group_is_refused() {
+    let mut passport = draft_with_data();
+    passport
+        .attach_compliance_result(ComplianceResult::default())
+        .unwrap();
+
+    passport.product_group = ProductGroup::Electronics;
+
+    let err = passport
+        .transition_to(PassportStatus::Published)
+        .unwrap_err();
+    assert!(refused_on_compliance_result(&err));
+    assert_eq!(passport.status, PassportStatus::Draft);
+}
+
+#[test]
+fn republishing_a_suspended_passport_is_not_regated() {
+    let mut passport = draft_with_data();
+    passport
+        .attach_compliance_result(ComplianceResult::default())
+        .unwrap();
+    passport.transition_to(PassportStatus::Published).unwrap();
+    passport.transition_to(PassportStatus::Suspended).unwrap();
+
+    let mut edited = sample_textile_data();
+    edited.country_of_origin = "DE".into();
+    passport.product_group_data = Some(ProductGroupData::Textile(Box::new(edited)));
+
+    passport.transition_to(PassportStatus::Published).unwrap();
+    assert_eq!(passport.status, PassportStatus::Published);
 }
 
 #[test]

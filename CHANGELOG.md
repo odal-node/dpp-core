@@ -147,7 +147,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   under a verdict on the old content. Migration: a draft carrying a determination
   from before this change is reassessed and attached again before it can publish. A
   determination from before this change still reads, and a passport with none still
-  publishes. A struct literal of `ComplianceResult` adds `input_hash: None`.
+  publishes. A struct literal of `ComplianceResult` adds `input_hash: None`. (#580)
 
 ### Added
 

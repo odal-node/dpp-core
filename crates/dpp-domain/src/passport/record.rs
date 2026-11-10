@@ -1005,6 +1005,28 @@ impl Passport {
         }
     }
 
+    /// The content hash a determination binds to: the product group key and the
+    /// `productGroupData` the passport holds now. Data that cannot be hashed is refused
+    /// on `/productGroupData`, since the cause is the data, not the server.
+    fn bound_input_hash(&self) -> Result<String, crate::error::dpp::DppError> {
+        use crate::field_error::{FieldError, ValidationErrors};
+
+        compliance_input_hash(
+            self.product_group.catalog_key(),
+            self.product_group_data.as_ref(),
+        )
+        .map_err(|e| {
+            crate::error::dpp::DppError::Validation(ValidationErrors {
+                errors: vec![FieldError {
+                    field: "/productGroupData".to_owned(),
+                    message: format!(
+                        "productGroupData cannot be hashed for a compliance determination: {e}"
+                    ),
+                }],
+            })
+        })
+    }
+
     /// Attach a determination to this passport, bound to the `productGroupData` it
     /// was computed over.
     ///
@@ -1015,17 +1037,13 @@ impl Passport {
     /// been computed from that data.
     ///
     /// # Errors
-    /// Returns [`DppError::Serialisation`](crate::error::dpp::DppError::Serialisation)
-    /// when the content cannot be hashed.
+    /// Returns a [`DppError::Validation`](crate::error::dpp::DppError::Validation) on
+    /// `/productGroupData` when the content cannot be hashed.
     pub fn attach_compliance_result(
         &mut self,
         result: ComplianceResult,
     ) -> Result<(), crate::error::dpp::DppError> {
-        let input_hash = compliance_input_hash(
-            self.product_group.catalog_key(),
-            self.product_group_data.as_ref(),
-        )
-        .map_err(|e| crate::error::dpp::DppError::Serialisation(e.to_string()))?;
+        let input_hash = self.bound_input_hash()?;
         self.compliance_result = Some(ComplianceResult {
             input_hash: Some(input_hash),
             ..result
@@ -1170,11 +1188,7 @@ impl Passport {
         let Some(result) = self.compliance_result.as_ref() else {
             return Ok(());
         };
-        let current = compliance_input_hash(
-            self.product_group.catalog_key(),
-            self.product_group_data.as_ref(),
-        )
-        .map_err(|e| crate::error::dpp::DppError::Serialisation(e.to_string()))?;
+        let current = self.bound_input_hash()?;
         if result.input_hash.as_deref() == Some(current.as_str()) {
             return Ok(());
         }
