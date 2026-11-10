@@ -288,6 +288,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - Qualifier values of only dots are refused, since URI normalization removes them. (#563)
 - Schema-driven policy classification treats a universal conformity field as a
   floor that a product rule cannot lower. (#563)
+- `Passport::co2e_per_unit` and `Passport::repairability_score` are documented as
+  the operator's declared values, not as calculated ones, so a host no longer has
+  a reason to copy a calculated figure into them. The calculated values are
+  `ComplianceResult::co2e_score` and `ComplianceResult::repairability_index`, beside
+  the ruleset that produced them. Documentation only. (#581)
 
 ## [0.23.0] - 2026-11-03
 
