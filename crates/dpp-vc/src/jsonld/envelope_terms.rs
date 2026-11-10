@@ -40,8 +40,8 @@
 //! A member whose value is a JSON document of the caller's own shape, with keys
 //! no schema fixes, is typed `@json` and carried whole, as `personalData` is. That
 //! is the compliance result's `receipt`, which holds whatever a calculation
-//! recorded, and `disclosureSignatures`, which is keyed by the dotted path of the
-//! field each signature covers. Neither's keys are terms or IRIs, so as plain
+//! recorded, and `disclosureSignatures`, which is keyed by disclosure set (for
+//! example `public+restricted`). Neither's keys are terms or IRIs, so as plain
 //! terms they would be dropped.
 //!
 //! An operator's and a facility's `identifier` is a literal for a different

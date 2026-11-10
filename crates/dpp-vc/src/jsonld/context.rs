@@ -156,7 +156,8 @@ pub const REMOTE_CONTEXTS: &[&str] = &[];
 /// `personalData` and `disclosureSignatures`. `productGroupData`'s term carries a
 /// scoped context holding a term for every field of every product group,
 /// generated from the schemas rather than listed. The other two are typed
-/// `@json`, because their keys are paths. All three are defined in
+/// `@json`, because their keys are not terms: `personalData` is keyed by field
+/// path and `disclosureSignatures` by disclosure set. All three are defined in
 /// [`passport_context`] beside the product identifier's.
 ///
 /// A key in this table that holds an object of its own is still defined here by
@@ -297,8 +298,8 @@ pub fn passport_context() -> Value {
                 json!({ "@id": "dpp:personalData", "@type": "@json" }),
             );
 
-            // 🚨 `disclosureSignatures` is keyed by the dotted path of the field
-            // each signature covers, so like `personalData` its keys are neither
+            // 🚨 `disclosureSignatures` is keyed by disclosure set, e.g.
+            // `public+restricted`, so like `personalData` its keys are neither
             // terms nor IRIs, and as a plain term a processor dropped every
             // signature and left an empty node. Carried whole as a literal.
             terms.insert(
