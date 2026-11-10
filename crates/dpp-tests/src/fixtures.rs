@@ -168,7 +168,7 @@ pub fn unsold_goods_report() -> dpp_domain::UnsoldGoodsReport {
             units_discarded: DiscardedQuantity::measured(1_200),
             weight_kg: DiscardedQuantity::estimated(430),
             packaging_included: false,
-            reason: DiscardReason::DamagedOrContaminated,
+            reason: Some(DiscardReason::DamagedOrContaminated),
             reason_detail: None,
             treatment: WasteTreatmentSplit {
                 preparing_for_reuse_pct: 20,

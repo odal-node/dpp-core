@@ -72,6 +72,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     five passport submodels the old route added described a manufacturer and a
     material composition that a disclosure does not have. (#572)
 
+- **A disclosure line's reason is optional, and `unsold-goods` moves to schema
+  v2.1.0.** `DiscardedProductLine::reason` is now `Option<DiscardReason>`, and
+  `dpp_rules::lint::unsold_goods::DisclosureLineInput::reason_point` an
+  `Option<char>`. Annex I note (h) of Impl. Reg. (EU) 2026/2 asks for the reason
+  "where applicable", and the Del. Reg. (EU) 2026/296 Art. 2 derogations except
+  only the destruction of Annex VII products from the ESPR Art. 25(1)
+  prohibition. A line for any other discard, or for one made to prepare products
+  for reuse, has no point to cite, and requiring one made it claim a derogation
+  that does not exist. `None` is left out of the JSON, so every line written
+  before reads as it did, and `reasonDetail` can still say why. Code that builds
+  a line wraps the reason in `Some`. The AAS projection leaves out
+  `line{n}Reason` for a line without one. Schema v2.1.0 stops requiring `reason`
+  on a line; v2.0.0 is unchanged, and a lens carries a v2.0.0 disclosure to
+  v2.1.0 as it is. `UnsoldGoodsLintInput` gains `financial_year_start` and
+  `financial_year_end`, which the new ordering lint reads (see Fixed). (#568)
+
 ### Added
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
@@ -98,7 +114,93 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   that is not a product group's. The prose gates read it as well as the product
   groups' registry. (#572)
 
+- **Discards of unsold consumer products are modelled, with the documents the
+  acts have an operator keep and the yearly disclosure computed from them.**
+  `UnsoldGoodsReport` models the table ESPR Art. 24 has an operator publish;
+  nothing modelled what the table summarises, or the documentation Art. 24(2) and
+  Del. Reg. (EU) 2026/296 Art. 3 require, which since 19 July 2026 conditions
+  destroying an Annex VII product under a derogation. The new
+  `dpp_domain::unsold_goods` holds:
+  - `DiscardRecord`: the date, CN codes, description, units and weight (in
+    grams, so the rounding Annex I asks for happens once, on the line), each with
+    the estimate marker, whether packaging is included, the derogation relied on
+    if any, the operator's short `reason_label`, the `WasteTreatmentOperation`
+    delivered to and the `ReceivingOperator`. Every discard is a record, not only a
+    destruction under a derogation. A label is chosen from a short list the
+    operator keeps, because records share a line of the disclosure when it
+    matches (whitespace aside), and a sentence per record would make a line per
+    record. Reading is lenient: a malformed record is reported by
+    `lint_discard_record`, not made unreadable.
+  - A schema for a record offered for storage: `discard-record` v1.0.0 in
+    `unsold_goods::document_schemas()` (key `RECORD_SCHEMA_KEY`), beside the
+    disclosure's. It is where a CN code that is not 6, 8 or 10 digits, a zero
+    weight, a reason outside Del. Reg. (EU) 2026/296 Art. 2, a label over 120
+    characters and a misspelt property are turned away; the type itself still
+    reads such a record back.
+  - `EnterpriseSize` and `EnterpriseSize::is_exempt_on`: ESPR Arts. 24(1) and 25(1)
+    end alike, "shall not apply to micro and small enterprises" and "shall apply to
+    medium-sized enterprises from 19 July 2030" (`MEDIUM_ENTERPRISES_FROM`). The
+    host says which class an operator is; this crate does not hold the headcount
+    and turnover that decide it.
+  - `EvidenceKind` and `DiscardRecord::required_evidence(size)` /
+    `missing_evidence(size, held)`: the delivery and reception documentation of
+    ESPR Art. 24(2) and Impl. Reg. (EU) 2026/2 Art. 4 for every record, a
+    statement on the treatment where one is stated, and for a derogation the
+    Art. 3 documentation. An operator outside Arts. 24(1) and 25(1) on the day of
+    the discard is required to show nothing: it discloses nothing for the
+    documentation to demonstrate, and the ban a derogation excepts does not bind
+    it. That documentation is not one document per point: points (a), (c), (f) and
+    (g) accept alternatives and point (d) needs a licence **and** a justification,
+    so a requirement is "any of these", and a record's requirements are all of
+    them. The statement the operator gives the waste treatment operator (Art. 4) is
+    a kind a record may carry and is never required, because the duty is to
+    provide it. Art. 3 excepts information the competent authority already holds
+    under another act, which this crate cannot know, so a gap is a document the
+    act lists, not a breach.
+  - `keep_until`, `KeepUntil` and `Disclosure`: the later of five years after the
+    discard and five years after the disclosure covering it, with the disclosure
+    in one of three states. `Pending` gives `Open`, which never permits deletion,
+    so a late discloser's documents are not released early. `NotOwed` (an exempt
+    operator, or a year before the first one the Regulation covers) gives five
+    years after the discard, where reading it as pending held the documents for
+    ever. `MadeOn` gives the later of the two. `DiscardRecord::keep_until(size,
+    disclosed_on)` works the state out from the operator's size.
+  - `aggregate`: a financial year's records into `DiscardedProductLine`s under
+    Annex I. Categories follow Art. 3 (two digits, four for Annex II, via the new
+    `dpp_rules::unsold_goods::disclosure::category_of_cn_code`); items sold
+    together are filed under every category they name; a line is made per
+    category, derogation, label and packaging answer (note (h)); weights are
+    summed in grams and rounded once; a total is marked an estimate if any figure
+    in it is; and the treatment split is each operation's share of the line's
+    weight, in whole percentages that total exactly 100. A line is described in
+    the discloser's words (a `LineDescriptions` map from the line's categories to
+    its wording, or `CN 6203` where there is none), not by joining the records'
+    descriptions, which made a line as long as the year. A record outside the
+    year, without a readable CN code or without a weight is returned in
+    `Aggregation::excluded` rather than dropped. The disclosing entity and the two
+    measures rows stay the discloser's to supply.
+
+  Storing records and documents, enforcing retention and exporting for an
+  authority are left to the host. `dpp_rules::lint::unsold_goods` gains
+  `lint_discard_record` (an Annex VII discard with no derogation, a derogation on
+  a discard that is not an Annex VII destruction, an unreadable CN code, a record
+  without weight), and the lint pack is 1.2.0. (#568)
+
 ### Fixed
+
+- **`FinancialYear` leaves a start after its end unrefused on the footing that it
+  is reported, and nothing reported it.** Its documentation says the check lives
+  in `dpp-rules`; there was none. `lint_unsold_goods` now flags a financial year
+  that ends before it starts. (#568)
+
+- **The schema diff compared only the root's `required`, so a requirement dropped
+  or added below it was reported as no change, and the bump as additive.**
+  `diff_schemas` now compares `required` at every level and names a nested one by
+  its path (`lines/[]/reason`), so `SchemaDiff::required_added` and
+  `required_removed` can hold such paths. The generated `SCHEMA-CHANGES.md` now
+  also reads `document-schemas/`, so it shows the disclosure's v2.0.0 → v2.1.0 as
+  dropping `lines/[]/reason`, and electronics v1.0.0 → v1.1.0 as requiring
+  `repairabilityScore/overall`, which it had not mentioned. (#568)
 
 - **The Annex II heading list had one heading the act does not.**
   `dpp_rules::unsold_goods::disclosure` carried `8527` among the CN headings of

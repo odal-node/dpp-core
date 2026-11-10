@@ -72,6 +72,30 @@ pub fn cn_depth_is_correct(cn_category: &str) -> bool {
     }
 }
 
+/// The category **Art. 3** files a product under, read from its own CN code.
+///
+/// Art. 3 delimits on "the first two digits of the relevant combined nomenclature
+/// (CN) codes", except that the products of Annex II "shall be delimited based on
+/// the first four digits". So a code whose heading is listed in Annex II is filed
+/// at its heading, and every other code at its chapter.
+///
+/// `cn_code` is the product's own classification — 6, 8 or 10 digits, as
+/// `CommodityCode` holds it. `None` for anything else, including a value that
+/// reached here without being parsed: the caller reports it rather than guessing
+/// a category.
+#[must_use]
+pub fn category_of_cn_code(cn_code: &str) -> Option<&str> {
+    if !matches!(cn_code.len(), 6 | 8 | 10) || !cn_code.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let heading = &cn_code[..4];
+    Some(if is_annex_ii_heading(heading) {
+        heading
+    } else {
+        &cn_code[..2]
+    })
+}
+
 /// Whether any Annex II heading sits inside this CN chapter.
 #[must_use]
 pub fn chapter_contains_annex_ii_heading(chapter: &str) -> bool {
