@@ -29,6 +29,21 @@ homepage    = "https://odal-node.io"
 rust-version = "1.99"
 
 # ---------------------------------------------------------------------------
+# Debug-build profile
+#
+# `line-tables-only` keeps what this workspace debugs with, function names and
+# file and line numbers in backtraces and panic messages, and drops the
+# variable-level DWARF that makes up most of a debug build's size and of the
+# memory its links need. The cost is variable inspection under a step debugger.
+# `test` inherits from `dev`, so this covers the test binaries too.
+#
+# Only this workspace's own builds read it: a crate depending on these from
+# crates.io builds them under its own profile.
+# ---------------------------------------------------------------------------
+[profile.dev]
+debug = "line-tables-only"
+
+# ---------------------------------------------------------------------------
 # cargo-release: all members share one lockstep version, so cut one tag for
 # the whole release instead of cargo-release's default per-crate tag scheme
 # (crate-name-v0.4.1 for every publishable member).
