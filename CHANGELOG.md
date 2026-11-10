@@ -58,7 +58,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **Failure mode for a stored or fetched document.** One tagged `unsoldGoods`
     or `unsold-goods` no longer has a typed variant. It reads as an unknown
     product group, with its payload carried verbatim, and is neither refused nor
-    rewritten.
+    rewritten. A passport that spells the tag the same way in its envelope and its
+    payload is unaffected. One that spells it differently (`unsold-goods` in one,
+    `unsoldGoods` in the other) reads the same way, but `Passport::validate` now
+    reports the mismatch, because the two spellings used to resolve to one typed
+    variant and are now two different unknown tags.
   - **Replaced:** `lint_product_group_data` no longer lints a disclosure; call
     `lint::lint_unsold_goods_report`. The AAS projection is no longer reached by
     a passport: `dpp_aas::build_unsold_goods_environment(report, name, value)`
@@ -83,21 +87,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   on a line; v2.0.0 is unchanged, and a lens carries a v2.0.0 disclosure to
   v2.1.0 as it is. `UnsoldGoodsLintInput` gains `financial_year_start` and
   `financial_year_end`, which the new ordering lint reads (see Fixed). (#568)
-
-- **An end-of-life destruction cites a point of the closed derogation list, and
-  only where ESPR Art. 25(1) bars it.** `DeactivationReason::Destroyed` carried a
-  `DerogationRef { category: String }` that nothing in this crate checked, and
-  every destruction had to have one, although the ban reaches only the
-  destruction of unsold Annex VII products by an operator it applies to. It now
-  carries `derogation: Option<Derogation>`, where `Derogation::Point` is a
-  `DiscardReason`, a point of Del. Reg. (EU) 2026/296 Art. 2.
-  `EolEvent::requires_derogation()` is replaced by
-  `EolEvent::missing_derogation(ban_applies)`, which is true for a destruction the
-  ban reaches that cites no point. An event written
-  with the free-text citation still reads and writes back byte for byte, as
-  `Derogation::Legacy`; it is never taken as a derogation, since the text cannot
-  be mapped to a point without inventing one. `DerogationRef` stays as that
-  read-only history. (#573, #574)
 
 - **`CommodityCode` is valid on read, and what a document declares is a
   `DeclaredCommodityCode`.** `CommodityCode` is documented as validated and
@@ -214,13 +203,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a discard that is not an Annex VII destruction, an unreadable CN code, a record
   without weight), and the lint pack is 1.2.0. (#568)
 
-- **`destruction_ban_applies`**, which says whether ESPR Art. 25(1) bars a
-  destruction: the product is unsold, a CN code of it is in Annex VII, the day is
-  on or after `DESTRUCTION_BAN_FROM` (19 July 2026), and the operator is not exempt
-  on it (`EnterpriseSize::is_exempt_on`). A passport says neither whether its
-  product was ever sold nor how large the operator is, so the caller supplies
-  both. Its answer is what `EolEvent::missing_derogation` takes. (#573, #574)
-
 ### Fixed
 
 - **`FinancialYear` leaves a start after its end unrefused on the footing that it
@@ -236,6 +218,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   also reads `document-schemas/`, so it shows the disclosure's v2.0.0 → v2.1.0 as
   dropping `lines/[]/reason`, and electronics v1.0.0 → v1.1.0 as requiring
   `repairabilityScore/overall`, which it had not mentioned. (#568)
+
+- **The Annex II heading list had one heading the act does not.**
+  `dpp_rules::unsold_goods::disclosure` carried `8527` among the CN headings of
+  Annex II to Impl. Reg. (EU) 2026/2, which Art. 3 has filed at four digits instead
+  of two. The Annex has 44 headings and no `8527`: the string appears only inside
+  the description of 8517 ("other than transmission or reception apparatus of
+  heading 8443, 8525, 8527 or 8528"), and the table runs from 8524 to 8528. A
+  product with a CN code under 8527 was filed at `8527` where the act has it at
+  `85`, and `is_annex_ii_heading`, `chapter_contains_annex_ii_heading`,
+  `annex_ii_headings_in_chapter` and `cn_depth_is_correct` answered for a heading
+  the act does not list. `8527` is removed, the "45 headings" said in the
+  `unsold-goods-format-2026-2` instrument notes and in the module documentation
+  is now 44, and a test holds the list to a transcription of the Official Journal
+  table.
+  The heading had been in the list since v0.19.0. (#570)
 
 ## [0.23.0] - 2026-11-03
 

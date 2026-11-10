@@ -114,6 +114,7 @@ fn known_product_groups_still_deserialize_to_their_typed_variants() {
     assert_eq!(data.product_group(), ProductGroup::Battery);
 }
 
+/// Both spellings in circulation, the catalog's key and the wire tag, resolve to the typed variant.
 #[test]
 fn the_catalog_spelling_and_the_wire_tag_both_resolve_to_the_typed_variant() {
     // Two spellings are in circulation — the catalog's key and the camelCase wire

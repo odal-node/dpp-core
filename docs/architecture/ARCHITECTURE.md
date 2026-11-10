@@ -94,7 +94,7 @@ import graph, not a judgement about what each module does.
 | `credential` | 2 | The W3C Verifiable Credential 2.0 envelope that binds a passport to its signed payload |
 | `compliance` | 2 | The determination value objects: `ComplianceResult`, its findings, status and error |
 | `disclosure` | 2 | The Art. 77(2) lattice: `Audience`, `Disclosure`, and the per-field classification. Tier 2 rather than 3 because `Passport::redact` takes an `Audience`, so the vocabulary cannot sit with the policy that filters by it |
-| `eol` | 5 | End-of-life declarations, and the derogation a destruction the Art. 25 ban reaches must cite |
+| `eol` | 5 | End-of-life declarations, and the derogation a destruction claim must cite |
 | `field_error` | 2 | `FieldError` and `ValidationErrors`: the per-field detail of a validation failure. Split from `error` because the two sit at different levels, and holding them together was a cycle |
 | `facility` | 2 | `FacilitySnapshot`: where a product was made, as recorded at issuance |
 | `graph` | 5 | The bill-of-materials graph a passport sits in |

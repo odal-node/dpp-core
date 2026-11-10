@@ -61,7 +61,9 @@ so stored passports remain valid against the version they declare.
 | `detergent` | v1.2.0 | Regulation (EU) 2026/405 | provisional | Surfactant bands per its Annex VII |
 | `toy` | v1.2.0 | Regulation (EU) 2025/2509 | provisional | |
 
-The unsold-goods disclosure (ESPR Arts. 24 and 25; Regulations (EU) 2026/2 and 2026/296, in force) is not a product group. It is a yearly disclosure, not a passport, that binds an operator over every product group; its schema (v2.0.0) is held apart from the product groups' in `dpp_domain::unsold_goods`.
+The unsold-goods disclosure (ESPR Arts. 24 and 25) is not a product group. It is a yearly disclosure, not a passport, that binds an operator over every product group; its schema (v2.0.0) is held apart from the product groups' in `dpp_domain::unsold_goods`.
+
+Its two acts are in force but apply from different dates. Implementing Regulation (EU) 2026/2, which sets the disclosure's format, applies from 2 March 2027 and to products discarded from the first full financial year after that date (its Art. 1). Delegated Regulation (EU) 2026/296, which lists the derogations from the destruction ban, applies from 19 July 2026. ESPR Art. 24(1) itself can reach earlier years, for which the Implementing Regulation's format is not yet in application, so the v2.0.0 schema is not a claim about those.
 
 The current version per product group is resolved by `ProductGroupCatalog`, not
 hard-coded at call sites. [REGULATORY.md](REGULATORY.md) says which product groups carry

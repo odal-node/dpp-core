@@ -11,6 +11,7 @@ use crate::unsold_goods::{
     DISCLOSURE_SCHEMA_KEY, DiscardRecord, RECORD_SCHEMA_KEY, UnsoldGoodsReport, document_schemas,
 };
 
+/// The first version of the disclosure schema.
 fn v2_0() -> Version {
     "2.0.0".parse().unwrap()
 }
@@ -46,6 +47,7 @@ fn disclosure() -> Value {
     })
 }
 
+/// Whether `body` validates against the disclosure schema at v2.0.0.
 fn validates(body: &Value) -> bool {
     validates_as(&v2_0(), body)
 }
@@ -68,6 +70,7 @@ fn disclosure_without_a_reason() -> Value {
     data
 }
 
+/// A well-formed disclosure validates.
 #[test]
 fn conformance_unsold_goods_v2_valid() {
     assert!(validates(&disclosure()));

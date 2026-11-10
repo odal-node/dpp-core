@@ -56,7 +56,6 @@
 //!   [`receiver`] are the parts of it that are their own types.
 //! - [`evidence`] — [`EvidenceKind`] and what each record must be able to show.
 //! - [`exemption`] — [`EnterpriseSize`], and who Arts. 24(1) and 25(1) do not reach.
-//! - [`ban`] — [`destruction_ban_applies`], when Art. 25(1) bars a destruction.
 //! - [`retention`] — [`KeepUntil`], the later of the two five-year periods, and
 //!   [`Disclosure`], the three states the second one can be in.
 //! - [`aggregation`] — [`aggregate`], a year's records into the lines of the
@@ -77,7 +76,6 @@
 
 pub mod aggregation;
 mod apportion;
-pub mod ban;
 pub mod entity;
 pub mod evidence;
 pub mod exclusion;
@@ -101,7 +99,6 @@ mod tests;
 
 pub use crate::identifier::{CnCategory, CnCategoryError};
 pub use aggregation::{Aggregation, LineDescriptions, aggregate};
-pub use ban::{DESTRUCTION_BAN_FROM, destruction_ban_applies};
 pub use entity::DisclosingEntity;
 pub use evidence::{EvidenceKind, EvidenceRequirement, derogation_evidence};
 pub use exclusion::{ExcludedRecord, ExclusionReason};

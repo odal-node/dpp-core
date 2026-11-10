@@ -4,7 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::deactivation_reason::DeactivationReason;
-use super::derogation::Derogation;
 use crate::passport::PassportId;
 
 /// The end-of-life event attached to a passport when it is deactivated.
@@ -47,25 +46,9 @@ impl EolEvent {
         }
     }
 
-    /// True when this is a destruction the ESPR Art. 25(1) ban reaches that cites no
-    /// derogation.
-    ///
-    /// `ban_applies` is the caller's answer to
-    /// [`destruction_ban_applies`](crate::unsold_goods::destruction_ban_applies),
-    /// which needs what a passport does not hold: whether the product was unsold and
-    /// the operator's size. Only a [`Point`](super::Derogation::Point) counts as a
-    /// derogation; a legacy free-text citation is not one, so an old event for a
-    /// destruction the ban reaches is reported rather than taken on trust.
-    ///
-    /// False for any other end of life, and for a destruction the ban does not reach,
-    /// whatever it cites.
+    /// True when this EOL is a destruction — which must carry a derogation.
     #[must_use]
-    pub fn missing_derogation(&self, ban_applies: bool) -> bool {
-        ban_applies
-            && matches!(
-                &self.reason,
-                DeactivationReason::Destroyed { derogation }
-                    if derogation.as_ref().and_then(Derogation::point).is_none()
-            )
+    pub fn requires_derogation(&self) -> bool {
+        matches!(self.reason, DeactivationReason::Destroyed { .. })
     }
 }

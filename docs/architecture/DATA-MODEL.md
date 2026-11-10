@@ -60,7 +60,7 @@ stateDiagram-v2
 | `Suspended` | `"suspended"` | No | Temporarily hidden: recall, regulatory hold or dispute. The JWS is kept |
 | `Retired` | `"retired"` | Read-only | Publication life over; kept for regulatory record-keeping; immutable. **Not EN 18221 clause 4.2 archiving**, which keeps the historical versions of a passport that is still live |
 | `Superseded` | `"superseded"` | Read-only | Replaced by a newer passport whose `supersedes_id` points back here |
-| `Deactivated` | `"deactivated"` | Read-only | End of life: the product was recycled, destroyed (citing a derogation where ESPR Art. 25(1) bars it), exported or lost. The typed reason is on the end-of-life event (`dpp_domain::eol`) |
+| `Deactivated` | `"deactivated"` | Read-only | End of life: the product was recycled, destroyed under a derogation, exported or lost. The typed reason is on the end-of-life event (`dpp_domain::eol`) |
 
 **Transition rules:**
 

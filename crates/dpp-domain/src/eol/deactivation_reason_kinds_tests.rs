@@ -1,6 +1,6 @@
 //! Every [`DeactivationReason`] kind is reachable and round-trips.
 
-use super::DeactivationReason;
+use super::{DeactivationReason, DerogationRef};
 
 /// `KINDS` must list every discriminator.
 ///
@@ -10,7 +10,12 @@ use super::DeactivationReason;
 fn kinds_lists_every_discriminator() {
     let all = [
         DeactivationReason::Recycled,
-        DeactivationReason::Destroyed { derogation: None },
+        DeactivationReason::Destroyed {
+            derogation: DerogationRef {
+                category: "safety".to_owned(),
+                act_citation: None,
+            },
+        },
         DeactivationReason::Exported,
         DeactivationReason::Lost,
     ];
