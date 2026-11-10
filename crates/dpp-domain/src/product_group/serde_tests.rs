@@ -213,7 +213,6 @@ fn every_product_group_declares_a_catalog_key() {
     let all = [
         (ProductGroup::Battery, "battery"),
         (ProductGroup::Textile, "textile"),
-        (ProductGroup::UnsoldGoods, "unsold-goods"),
         (ProductGroup::Steel, "steel"),
         (ProductGroup::Electronics, "electronics"),
         (ProductGroup::Construction, "construction"),

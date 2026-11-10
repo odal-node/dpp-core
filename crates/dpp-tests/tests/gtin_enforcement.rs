@@ -164,8 +164,7 @@ fn every_payload_identifier_field_is_the_validating_type() {
     );
 
     // A count, so deleting every declaration cannot pass this test by vacuum.
-    // Eleven of the twelve typed payloads carry a product identifier; unsold
-    // goods is a disclosure over a financial year and identifies no trade item.
+    // Every one of the eleven typed payloads carries a product identifier.
     //
     // 🚨 "Carries a product identifier" is not "carries a GTIN". Only scheme 1
     // has one; schemes 2 and 3 are self-issuing and have none, so a count of

@@ -266,12 +266,6 @@ impl RegistrationRequest {
         // standards — EN 18219 clause 5. A node-local UUID under an invented
         // `"passport_id"` scheme satisfies neither.
         //
-        // `UnsoldGoods` is the known case and is not a defect: an Art. 24–25
-        // discard disclosure covers a financial year across many products and
-        // identifies no single one, so it has no identifier to give. A
-        // disclosure is not a product registration, and refusing it here says
-        // so — rather than an `Option` that lets it through unnamed.
-        //
         // A product group this build has no typed variant for registers like
         // any other: its untyped payload is read for a `productIdentifier`
         // through the same EN 18219 clause 5 parser the typed variants use, so
@@ -287,9 +281,9 @@ impl RegistrationRequest {
             product_identifier.is_some(),
             "/productGroupData/productIdentifier",
             "Art. 9(2)(a) requires the unique product identifier in a proof of \
-             registration; a product group that identifies no single product — \
-             an unsold-goods disclosure — is not a product registration, and an \
-             untyped product group must carry a valid EN 18219 `productIdentifier`",
+             registration; a product group that identifies no single product is \
+             not a product registration, and an untyped product group must carry \
+             a valid EN 18219 `productIdentifier`",
         );
         if !missing.is_empty() {
             return Err(crate::field_error::ValidationErrors { errors: missing });

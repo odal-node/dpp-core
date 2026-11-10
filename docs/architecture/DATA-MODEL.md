@@ -173,7 +173,6 @@ its own regulation:
 | `detergent` | `product_type` | `"laundry"`, `"dishwashing"` and so on. Not `format`, which is the physical presentation of the same type |
 | `steel` | `product_category` | `"flat"`, `"long"` and so on |
 | `electronics` | `product_category` | `"smartphone"`, `"other-mobile-phone"`, `"cordless-phone"`, `"tablet"`: closed, Reg. (EU) 2023/1670 Art. 1(1) |
-| `unsold-goods` | *(none)* | Removed in schema v2.0.0. Impl. Reg. (EU) 2026/2 Art. 3 delimits a disclosure by **CN code**, so its lines carry `cnCategories`, not a category word of ours. See §4.4 |
 | `furniture` | `product_type` | No regulatory source yet |
 | `tyre` | `tyre_class` | `"C1"` and so on |
 | `aluminium` · `textile` · `mattress` · `toy` | *(none)* | No act defines a category axis for these. `aluminium` and `textile` declared one in the catalog until it was removed: aluminium's values were its `productionRoute` enum, and textile's were defined by no schema at all |
@@ -393,21 +392,29 @@ Every product group has a typed variant and at least one schema. Only `battery` 
 | `steel` | `SteelData` | v1.2.0 | CBAM-aligned. Intermediate product; the earliest indicative act of any group |
 | `toy` | `ToyData` | v1.2.0 | Reg. (EU) 2025/2509 |
 | `tyre` | `TyreData` | v1.1.0 | |
-| `unsold-goods` | `UnsoldGoodsReport` | v2.0.0 | See §4.4. **Not a product group**; built to Impl. Reg. (EU) 2026/2 Annex I |
 
 `ProductGroupData::Other` keeps the tag and payload of a product group this build has no
 typed variant for, verbatim, so an unknown group round-trips instead of being dropped.
 
-### 4.4 Unsold goods is not a product group, and its model predates its law
+### 4.4 Unsold goods is a duty over every product group
 
-ESPR Arts. 24 and 25, Annex VII. It occupies a catalog slot for implementation
-convenience and borrows textile's plugin, but it is a **horizontal obligation on an
-operator over a financial year**, not a product placed on the market. It carries
+ESPR Arts. 24 and 25, Annex VII. Art. 24 reaches discarded unsold consumer products
+generally, and only Art. 25's destruction ban is limited to the products of Annex VII, so
+this is a **horizontal obligation on an operator over a financial year**, layered over
+every product group, not a product placed on the market and not a product group of its
+own. It was once held in a product-group slot, with a signed passport of its own and a
+plugin borrowed from textile; that made a sibling of what is a duty over all of them. It
+is `dpp_domain::unsold_goods` now: no `ProductGroup` variant, no catalog manifest, no
+passport, and a schema family of its own under `crates/dpp-domain/document-schemas/`
+(key `unsold-goods`, validated through `unsold_goods::document_schemas()`).
+
+The instruments that carry the duty, `unsold-goods-format-2026-2` and
+`unsold-goods-derogations-2026-296`, are bound to no product group and carry
 `PassportObligation::NotRequired`: the duty is real and binding today, and there is no
 passport anywhere in Arts. 24 and 25.
 
-Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` v2.0.0 is built
-to them:
+Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` is built to
+them (schema v2.0.0):
 
 - **Commission Implementing Regulation (EU) 2026/2** (CELEX `32026R0002`), under
   Art. 24(3). Art. 2(1) binds the disclosure to the format in its **Annex I**, and Art. 3

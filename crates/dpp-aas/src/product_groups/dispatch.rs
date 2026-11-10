@@ -38,9 +38,6 @@ pub(crate) fn build_product_group_submodel(
         ProductGroupData::Electronics(e) => {
             super::electronics::build_electronics_submodel(e, passport_id)
         }
-        ProductGroupData::UnsoldGoods(r) => {
-            super::unsold_goods::build_unsold_goods_submodel(r, passport_id)
-        }
         ProductGroupData::Other(unmodelled) => {
             generic_product_group_submodel(passport_id, unmodelled.data())
         }

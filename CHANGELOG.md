@@ -21,6 +21,57 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   so every event a calendar returns today serialises as it did. Code that builds
   an `ObligationEvent` with a struct literal adds `bundle: None`. (#508, #565)
 
+- **Unsold goods is no longer a product group.** ESPR Art. 24 reaches discarded
+  unsold consumer products generally, and only the Art. 25 destruction ban is
+  limited to the products of Annex VII, so the duty is an operator's, over a
+  financial year, layered over every product group. Holding it in a product-group
+  slot made a sibling of it: it had a variant of its own, a catalog manifest, a
+  plugin borrowed from textile and a signed passport carrying a disclosure that
+  no act asks anyone to carry in one. It is now `dpp_domain::unsold_goods`, a
+  module of its own.
+  - **Removed:** `ProductGroup::UnsoldGoods` and `ProductGroupData::UnsoldGoods`
+    (and `UnsoldGoodsReport`'s `ProductGroupPayload` impl); the `unsold-goods`
+    catalog manifest, so the catalog holds eleven groups; the `unsold-goods`
+    entry in `VersionedSchemaRegistry::new()`; the check in `Passport::validate`
+    that such a passport has a line; the `unsold-goods` AAS submodel template and
+    its place in the product-group dispatch; the textile plugin's unsold-goods
+    path, which gave the plugin a second product group it could not name; and the
+    `unsoldGoods` row of the calculator registry. The instruments
+    `unsold-goods-format-2026-2` and `unsold-goods-derogations-2026-296` stay, and
+    so does the framework's record of Arts. 24 and 25, but none is bound to a
+    product group any longer: their bindings are gone, their substance is in
+    their notes, and `determinable_for("unsold-goods")` answers nothing, as it
+    does for any key that is not a group.
+  - **Moved, unchanged:** `UnsoldGoodsReport`, `DisclosingEntity`,
+    `DisclosureScope`, `FinancialYear`, `LegalEntityIdentifier`,
+    `DiscardedProductLine`, `DiscardedQuantity`, `DiscardReason` and
+    `WasteTreatmentSplit` from `dpp_domain::product_group` to
+    `dpp_domain::unsold_goods`. The crate-root re-exports are where they were.
+  - **The schema is a family of its own, with its version numbers kept.**
+    `unsold-goods` v2.0.0 moved byte for byte from `schemas/unsold-goods/` to
+    `document-schemas/unsold-goods/`, and is validated through
+    `unsold_goods::document_schemas()`, a registry that holds nothing else. The
+    shape is the same, the `$id` is the one already published, and a published
+    schema version is never modified, so it was neither renumbered nor republished
+    as a first version. A product-group registry listing it would also have had it
+    linted and given a JSON-LD scope as a product's.
+  - **Failure mode for a stored or fetched document.** One tagged `unsoldGoods`
+    or `unsold-goods` no longer has a typed variant. It reads as an unknown
+    product group, with its payload carried verbatim, and is neither refused nor
+    rewritten. A passport that spells the tag the same way in its envelope and its
+    payload is unaffected. One that spells it differently (`unsold-goods` in one,
+    `unsoldGoods` in the other) reads the same way, but `Passport::validate` now
+    reports the mismatch, because the two spellings used to resolve to one typed
+    variant and are now two different unknown tags.
+  - **Replaced:** `lint_product_group_data` no longer lints a disclosure; call
+    `lint::lint_unsold_goods_report`. The AAS projection is no longer reached by
+    a passport: `dpp_aas::build_unsold_goods_environment(report, name, value)`
+    builds an Environment for a file or an AASX package under an asset key the
+    caller chooses (an `AssetIdentity::Named`), with no masking, since a
+    disclosure is published in full. It carries the one disclosure submodel; the
+    five passport submodels the old route added described a manufacturer and a
+    material composition that a disclosure does not have. (#572)
+
 ### Added
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
@@ -42,6 +93,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   change to the previous one. Without a bundle, or with one carrying no
   `obligations` section, the calendar is what it was. (#508, #565)
 
+- **`VersionedSchemaRegistry::from_entries`**, a registry holding exactly the
+  schemas it is given and none of the product groups', for a family of schemas
+  that is not a product group's. The prose gates read it as well as the product
+  groups' registry. (#572)
+
 ### Fixed
 
 - **The Annex II heading list had one heading the act does not.**
@@ -54,8 +110,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `85`, and `is_annex_ii_heading`, `chapter_contains_annex_ii_heading`,
   `annex_ii_headings_in_chapter` and `cn_depth_is_correct` answered for a heading
   the act does not list. `8527` is removed, the "45 headings" said in the
-  `unsold-goods-format-2026-2` instrument notes and in three doc comments is now
-  44, and a test holds the list to a transcription of the Official Journal table.
+  `unsold-goods-format-2026-2` instrument notes and in the module documentation
+  is now 44, and a test holds the list to a transcription of the Official Journal
+  table.
   The heading had been in the list since v0.19.0. (#570)
 
 ## [0.23.0] - 2026-11-03

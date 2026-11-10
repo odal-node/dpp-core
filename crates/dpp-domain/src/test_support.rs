@@ -292,9 +292,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
 /// One line, a treatment split totalling 100, and a CN heading outside Annex II
 /// so the depth lint stays quiet — tests that want a finding should reach in and
 /// break one thing rather than build a whole second fixture.
-pub(crate) fn sample_unsold_goods_report()
--> crate::product_group::data::unsold_goods::UnsoldGoodsReport {
-    use crate::product_group::data::unsold_goods::*;
+pub(crate) fn sample_unsold_goods_report() -> crate::unsold_goods::UnsoldGoodsReport {
+    use crate::unsold_goods::*;
     use chrono::NaiveDate;
 
     UnsoldGoodsReport {

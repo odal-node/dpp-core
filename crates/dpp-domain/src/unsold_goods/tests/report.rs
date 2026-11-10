@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use serde_json::json;
 
-use super::*;
+use crate::unsold_goods::*;
 
 fn line() -> DiscardedProductLine {
     DiscardedProductLine {

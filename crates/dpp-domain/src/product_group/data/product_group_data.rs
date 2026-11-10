@@ -14,7 +14,6 @@ use super::textile::TextileData;
 use super::toy::ToyData;
 use super::tyre::TyreData;
 use super::unmodelled::UnmodelledPayload;
-use super::unsold_goods::UnsoldGoodsReport;
 use crate::product_group::ProductGroup;
 use crate::product_group::payload::ProductGroupPayload;
 
@@ -48,7 +47,6 @@ pub enum ProductGroupData {
     /// payload's size, not the product group — a stub that grows a body gets boxed
     /// when it does.
     Textile(Box<TextileData>),
-    UnsoldGoods(UnsoldGoodsReport),
     Steel(SteelData),
     Electronics(ElectronicsData),
     Construction(ConstructionData),
@@ -90,7 +88,6 @@ impl Serialize for ProductGroupData {
         let mut value = match self {
             Self::Battery(d) => serde_json::to_value(d),
             Self::Textile(d) => serde_json::to_value(d),
-            Self::UnsoldGoods(d) => serde_json::to_value(d),
             Self::Steel(d) => serde_json::to_value(d),
             Self::Electronics(d) => serde_json::to_value(d),
             Self::Construction(d) => serde_json::to_value(d),
@@ -139,7 +136,6 @@ impl<'de> Deserialize<'de> for ProductGroupData {
         match ProductGroup::from_wire_tag(&tag) {
             ProductGroup::Battery => typed!(Battery),
             ProductGroup::Textile => typed!(Textile),
-            ProductGroup::UnsoldGoods => typed!(UnsoldGoods),
             ProductGroup::Steel => typed!(Steel),
             ProductGroup::Electronics => typed!(Electronics),
             ProductGroup::Construction => typed!(Construction),
@@ -229,7 +225,6 @@ impl ProductGroupData {
         match self {
             ProductGroupData::Battery(_) => ProductGroup::Battery,
             ProductGroupData::Textile(_) => ProductGroup::Textile,
-            ProductGroupData::UnsoldGoods(_) => ProductGroup::UnsoldGoods,
             ProductGroupData::Steel(_) => ProductGroup::Steel,
             ProductGroupData::Electronics(_) => ProductGroup::Electronics,
             ProductGroupData::Construction(_) => ProductGroup::Construction,
@@ -282,7 +277,6 @@ impl ProductGroupData {
         match self {
             Self::Battery(d) => &**d,
             Self::Textile(d) => &**d,
-            Self::UnsoldGoods(d) => d,
             Self::Steel(d) => d,
             Self::Electronics(d) => d,
             Self::Construction(d) => d,
@@ -299,11 +293,9 @@ impl ProductGroupData {
     /// The unique product identifier this product group's data carries, if
     /// any — in whichever EN 18219 clause 5 scheme issued it.
     ///
-    /// `UnsoldGoods` answers `None`: a discard-event report identifies no
-    /// single product the way every other product group does. That is the
-    /// **only** reason this answers `None` for a well-formed record, which is
-    /// what makes it usable as a presence check where [`Self::gtin`] no longer
-    /// is.
+    /// Every typed variant carries one, so a `None` for a well-formed record is
+    /// a record that does not identify its product — which is what makes this
+    /// usable as a presence check where [`Self::gtin`] no longer is.
     ///
     /// `Other` answers with the `productIdentifier` its untyped payload
     /// carries. An identifier is keyed and shaped by EN 18219 clause 5 rather

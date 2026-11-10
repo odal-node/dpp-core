@@ -40,17 +40,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Product groups that ship schemas and have no plugin, each for a stated
-/// reason. Asserted as an exact set so a thirteenth group cannot appear
-/// unplugged without someone deciding that it should.
+/// reason. Asserted as an exact set so a new group cannot appear unplugged
+/// without someone deciding that it should.
 ///
 /// `mattress` was on this list with the reason "no plugin yet", and that was a
 /// gap, not a decision: it was split out of furniture and the plugin was simply
 /// not written. It has one now. A group can leave this list; it should not sit
-/// on it unexplained.
-///
-/// - `unsold-goods` is a disclosure over a reporting period rather than a
-///   product, and has no compliance determination to make.
-const GROUPS_WITHOUT_A_PLUGIN: &[&str] = &["unsold-goods"];
+/// on it unexplained. `unsold-goods` was on it too, as a disclosure rather than a
+/// product; it is not a product group at all now, so it is on no list.
+const GROUPS_WITHOUT_A_PLUGIN: &[&str] = &[];
 
 fn workspace_root() -> PathBuf {
     // CARGO_MANIFEST_DIR is crates/dpp-tests.

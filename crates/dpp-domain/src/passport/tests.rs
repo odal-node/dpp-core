@@ -1,9 +1,7 @@
 //! Serde round-trips, the typed product-group payload, and the status machine.
 
 use super::*;
-use crate::product_group::{
-    CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore, UnsoldGoodsReport,
-};
+use crate::product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore};
 use crate::status::PassportStatus;
 
 pub(crate) fn make_passport() -> Passport {
@@ -62,62 +60,12 @@ fn product_group_data_mismatch_fails_validation() {
     assert!(err.contains("product_group must match"), "got: {err}");
 }
 
+/// A passport with no commodity code validates: the regulation asks for one only where relevant.
 #[test]
-fn missing_commodity_code_is_fine_outside_unsold_goods() {
+fn missing_commodity_code_is_fine() {
     let mut p = make_passport(); // product_group = Electronics
     p.commodity_code = None;
     assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-fn unsold_goods_report() -> UnsoldGoodsReport {
-    crate::test_support::sample_unsold_goods_report()
-}
-
-#[test]
-fn an_unsold_goods_disclosure_with_lines_validates() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(unsold_goods_report()));
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-/// Art. 24's disclosure duty reaches discarded unsold **consumer products**
-/// generally; Art. 25's destruction ban reaches Annex VII's apparel and
-/// footwear. An earlier check required Annex VII scope here and so rejected
-/// every lawful disclosure outside those two, which is most of Annex II's 44
-/// headings.
-#[test]
-fn a_disclosure_outside_annex_vii_scope_is_not_rejected() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    let mut report = unsold_goods_report();
-    // Refrigerators — Annex II heading 8418, nowhere near Annex VII.
-    report.lines[0].cn_categories =
-        vec![crate::product_group::CnCategory::parse("8418").expect("valid heading")];
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(report));
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-/// The envelope's `commodity_code` describes a product; a disclosure has none,
-/// so it must not be required here.
-#[test]
-fn an_unsold_goods_disclosure_needs_no_envelope_commodity_code() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(unsold_goods_report()));
-    p.commodity_code = None;
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-#[test]
-fn an_unsold_goods_disclosure_with_no_lines_fails() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    let mut report = unsold_goods_report();
-    report.lines.clear();
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(report));
-    let err = p.validate().unwrap_err().to_string();
-    assert!(err.contains("at least one product line"), "got: {err}");
 }
 
 #[test]

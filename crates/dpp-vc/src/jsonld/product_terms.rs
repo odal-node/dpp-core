@@ -5,7 +5,7 @@
 //! A JSON-LD term is reachable only at the position its key occupies, and a key
 //! with no term is dropped on expansion together with everything inside it. The
 //! envelope's terms are a table a test compares against `Passport`. A product
-//! group's fields are another matter: there are twelve groups, each with several
+//! group's fields are another matter: there are eleven groups, each with several
 //! schema versions and a long list of fields, and a field is added by editing a
 //! JSON file that nothing in this crate reads. A table kept by hand would be
 //! missed by the next schema, and the first sign would be a consumer of the

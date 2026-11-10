@@ -110,6 +110,7 @@ import graph, not a judgement about what each module does.
 | `status` | 2 | `PassportStatus`, the lifecycle state machine |
 | `trusted_list` | 2 | EU Trusted List vocabulary (ETSI TS 119 612): service types, statuses, and status at a past moment |
 | `transfer` | 5 | Transfer of responsibility between operators |
+| `unsold_goods` | 5 | The ESPR Art. 24 disclosure of discarded unsold consumer products in the format of Impl. Reg. (EU) 2026/2 Annex I, and its versioned schemas. A duty over every product group, not a product group |
 | `access` | 6 | The per-field disclosure contract: `ProductGroupAccessPolicy`, `filter_by_audience` |
 | `lint` | 6 | Non-binding plausibility findings. Never gates publish |
 | `schemas` | 3 | `VersionedSchemaRegistry`, the embedded JSON Schemas, and the version lenses |
@@ -156,6 +157,7 @@ seal
 status
 transfer
 trusted_list
+unsold_goods
 validation
 ```
 <!-- DOMAIN-CONCERNS:END -->
