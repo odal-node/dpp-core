@@ -105,9 +105,13 @@ pub struct Passport {
     pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
-    /// CO₂ equivalent per unit — manufacturer-supplied or calculated.
+    /// CO₂ equivalent per unit, as the operator declared it. Never copy a calculated
+    /// figure in here: the calculated value is [`ComplianceResult::co2e_score`],
+    /// beside the ruleset that produced it.
     pub co2e_per_unit: Option<CarbonFootprint>,
-    /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
+    /// Repairability score, as the operator declared it (non-regulatory heuristic —
+    /// not EN 45554 / EU 2023/1669). Never copy a calculated index in here: the
+    /// calculated value is [`ComplianceResult::repairability_index`].
     pub repairability_score: Option<RepairabilityScore>,
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a

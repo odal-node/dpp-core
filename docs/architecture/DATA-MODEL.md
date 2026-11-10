@@ -97,7 +97,7 @@ as its last edit; if the two disagree, the constant is right.
 | `granularity` | `Option<Granularity>` | `"granularity"` | Model, batch or item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one, which is every ESPR product group today. Also decides what the carrier prints after the GTIN: nothing at model level, the batch at batch level, the carrier serial at item level or when `None`. A stated level must agree with `batch_id` and `serial_number` |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill-of-materials entries |
-| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit; may be set by a compliance engine |
+| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit, as the operator declared it; the calculated figure is `ComplianceResult::co2e_score` |
 | `repairability_score` | `Option<RepairabilityScore>` | `"repairabilityScore"` | Structured `{overall, criteria}`, not a bare number |
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
