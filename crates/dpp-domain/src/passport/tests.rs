@@ -60,6 +60,7 @@ fn product_group_data_mismatch_fails_validation() {
     assert!(err.contains("product_group must match"), "got: {err}");
 }
 
+/// A passport with no commodity code validates: the regulation asks for one only where relevant.
 #[test]
 fn missing_commodity_code_is_fine() {
     let mut p = make_passport(); // product_group = Electronics
