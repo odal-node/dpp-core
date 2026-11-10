@@ -8,6 +8,8 @@
 use chrono::NaiveDate;
 use dpp_rules::unsold_goods::annex_vii::is_within_annex_vii_scope;
 
+use crate::identifier::CommodityCode;
+
 use super::exemption::EnterpriseSize;
 
 /// The day the destruction of the unsold products of Annex VII became prohibited
@@ -25,23 +27,29 @@ pub const DESTRUCTION_BAN_FROM: NaiveDate = match NaiveDate::from_ymd_opt(2026, 
 /// - the product is an unsold consumer product, which a passport does not say and
 ///   the caller therefore does: a product destroyed after use is outside Art. 25;
 /// - a CN code of the product is in Annex VII (apparel, clothing accessories or
-///   footwear), by prefix, as `cn_codes` are 6, 8 or 10 digits;
+///   footwear), by prefix, as a [`CommodityCode`] is 6, 8 or 10 digits;
 /// - the day is on or after [`DESTRUCTION_BAN_FROM`];
 /// - the operator is not exempt on that day ([`EnterpriseSize::is_exempt_on`]).
 ///
-/// Anything else may be destroyed without citing a derogation. A code that is not
-/// readable is not in Annex VII, so a caller with a malformed one is told the ban
-/// does not apply: this answers what the data say, and reporting the malformed code
-/// is the lints' work.
+/// Anything else may be destroyed without citing a derogation. The codes are
+/// [`CommodityCode`]s, so the caller has already parsed them: a padded code is
+/// trimmed and a malformed one never gets here, where a raw string would have been
+/// matched as it stood.
+///
+/// ESPR Art. 25(2) is not modelled. It forbids an exempt operator to destroy
+/// products supplied to it in order to circumvent the ban, and an intent is not in
+/// the data, so this rule cannot decide it.
 #[must_use]
 pub fn destruction_ban_applies(
     unsold: bool,
-    cn_codes: &[&str],
+    cn_codes: &[CommodityCode],
     size: EnterpriseSize,
     on: NaiveDate,
 ) -> bool {
     unsold
         && on >= DESTRUCTION_BAN_FROM
         && !size.is_exempt_on(on)
-        && cn_codes.iter().any(|code| is_within_annex_vii_scope(code))
+        && cn_codes
+            .iter()
+            .any(|code| is_within_annex_vii_scope(code.as_str()))
 }

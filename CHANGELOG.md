@@ -101,7 +101,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   with the free-text citation still reads and writes back byte for byte, as
   `Derogation::Legacy`; it is never taken as a derogation, since the text cannot
   be mapped to a point without inventing one. `DerogationRef` stays as that
-  read-only history. (#573, #574)
+  read-only history. A build older than this one refuses a `Destroyed` event
+  written without `derogation`, since the key is left out then. (#573, #574)
 
 ### Added
 
@@ -206,7 +207,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   on or after `DESTRUCTION_BAN_FROM` (19 July 2026), and the operator is not exempt
   on it (`EnterpriseSize::is_exempt_on`). A passport says neither whether its
   product was ever sold nor how large the operator is, so the caller supplies
-  both. Its answer is what `EolEvent::missing_derogation` takes. (#573, #574)
+  both. It takes `CommodityCode`s, so a padded code is trimmed and a malformed one
+  cannot reach it. Its answer is what `EolEvent::missing_derogation` takes.
+  (#573, #574)
 
 ### Fixed
 

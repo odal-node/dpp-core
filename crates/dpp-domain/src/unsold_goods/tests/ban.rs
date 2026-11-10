@@ -2,6 +2,7 @@
 
 use chrono::NaiveDate;
 
+use crate::identifier::CommodityCode;
 use crate::unsold_goods::{DESTRUCTION_BAN_FROM, EnterpriseSize, destruction_ban_applies};
 
 /// A calendar date, for readability.
@@ -12,7 +13,15 @@ fn date(y: i32, m: u32, d: u32) -> NaiveDate {
 /// Unsold apparel destroyed by a large enterprise after the ban began: the case the
 /// ban exists for, and the one every test below changes one thing of.
 fn bars(cn_codes: &[&str], size: EnterpriseSize, on: NaiveDate) -> bool {
-    destruction_ban_applies(true, cn_codes, size, on)
+    destruction_ban_applies(true, &codes(cn_codes), size, on)
+}
+
+/// Parsed codes, as the rule takes them.
+fn codes(cn_codes: &[&str]) -> Vec<CommodityCode> {
+    cn_codes
+        .iter()
+        .map(|code| CommodityCode::parse(code).expect("a readable code"))
+        .collect()
 }
 
 /// The ban is for the destruction of unsold products, and a passport does not say
@@ -23,7 +32,7 @@ fn a_product_that_was_not_unsold_is_outside_the_ban() {
     assert!(bars(&["62034231"], EnterpriseSize::Large, on));
     assert!(!destruction_ban_applies(
         false,
-        &["62034231"],
+        &codes(&["62034231"]),
         EnterpriseSize::Large,
         on
     ));
@@ -47,10 +56,17 @@ fn only_a_product_in_annex_vii_is_barred() {
         !bars(&[], large, on),
         "no code, nothing to place in Annex VII"
     );
-    assert!(
-        !bars(&["abc"], large, on),
-        "an unreadable code places nothing"
-    );
+}
+
+/// A padded code is the same code to `CommodityCode::parse`, so it is barred like
+/// the trimmed one; a raw prefix match would have let it escape.
+#[test]
+fn a_padded_code_is_barred_like_the_trimmed_one() {
+    assert!(bars(
+        &[" 62034231 "],
+        EnterpriseSize::Large,
+        date(2027, 3, 14)
+    ));
 }
 
 /// Items sold together can carry several codes (Annex I note (f)); one in Annex VII
