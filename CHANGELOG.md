@@ -84,6 +84,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   v2.1.0 as it is. `UnsoldGoodsLintInput` gains `financial_year_start` and
   `financial_year_end`, which the new ordering lint reads (see Fixed). (#568)
 
+- **An end-of-life destruction cites a point of the closed derogation list, and
+  only where ESPR Art. 25(1) bars it.** `DeactivationReason::Destroyed` carried a
+  `DerogationRef { category: String }` that nothing in this crate checked, and
+  every destruction had to have one, although the ban reaches only the
+  destruction of unsold Annex VII products by an operator it applies to. It now
+  carries `derogation: Option<Derogation>`, where `Derogation::Point` is a
+  `DiscardReason`, a point of Del. Reg. (EU) 2026/296 Art. 2.
+  `EolEvent::requires_derogation()` is replaced by
+  `EolEvent::missing_derogation(ban_applies)`, which is true for a destruction the
+  ban reaches that cites no point. An event written
+  with the free-text citation still reads and writes back byte for byte, as
+  `Derogation::Legacy`; it is never taken as a derogation, since the text cannot
+  be mapped to a point without inventing one. `DerogationRef` stays as that
+  read-only history. (#573, #574)
+
 ### Added
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
@@ -181,6 +196,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `lint_discard_record` (an Annex VII discard with no derogation, a derogation on
   a discard that is not an Annex VII destruction, an unreadable CN code, a record
   without weight), and the lint pack is 1.2.0. (#568)
+
+- **`destruction_ban_applies`**, which says whether ESPR Art. 25(1) bars a
+  destruction: the product is unsold, a CN code of it is in Annex VII, the day is
+  on or after `DESTRUCTION_BAN_FROM` (19 July 2026), and the operator is not exempt
+  on it (`EnterpriseSize::is_exempt_on`). A passport says neither whether its
+  product was ever sold nor how large the operator is, so the caller supplies
+  both. Its answer is what `EolEvent::missing_derogation` takes. (#573, #574)
 
 ### Fixed
 

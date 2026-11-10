@@ -28,8 +28,8 @@ it does (see below).
 | 7 | boundary | States what the outside must provide. `ports` | tiers 1 to 6 |
 | 8 | adapter | An implementation of a port, shipped as the open-source default. `passthrough` | tiers 1 to 7 |
 
-Imports within a tier are allowed but must stay acyclic. Three exist today
-(`instrument → catalog`, `passport → error`, `passport → product_group`), and a second
+Imports within a tier are allowed but must stay acyclic. Four exist today
+(`eol → unsold_goods`, `instrument → catalog`, `passport → error`, `passport → product_group`), and a second
 test holds the whole graph acyclic.
 
 ### Eight tiers, because the graph has eight
