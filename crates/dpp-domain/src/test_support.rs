@@ -207,7 +207,10 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.batch_id = Some("LOT-2026-001".to_owned());
     passport.co2e_per_unit = Some(CarbonFootprint::from_kg(45.2));
     passport.repairability_score = Some(RepairabilityScore::from_scalar(7.5));
-    passport.compliance_result = Some(ComplianceResult::default());
+    passport.compliance_result = Some(ComplianceResult {
+        input_hash: Some("0".repeat(64)),
+        ..ComplianceResult::default()
+    });
     passport.lint_result = Some(LintResult {
         pack_version: "1.0.0".to_owned(),
         findings: Vec::new(),

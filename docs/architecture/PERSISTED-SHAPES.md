@@ -96,6 +96,13 @@ unchanged.
 *present* in a shape the type no longer accepts, which is why a changed element type fails
 where an added field does not.
 
+**Worked example:** `ComplianceResult::input_hash` (`inputHash`) is an `Option` with
+`#[serde(default)]` and `skip_serializing_if`. A determination written before it reads
+with `None`, and a build older than it ignores the key, since `ComplianceResult` does not
+deny unknown fields. The key is written only on a determination attached after the change,
+so nothing already signed changes bytes. The change is in behaviour, not shape: a draft
+carrying an unbound determination is refused at first publish.
+
 ---
 
 ## 4. The escape hatch, and its exact reach

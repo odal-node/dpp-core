@@ -102,6 +102,7 @@ const NESTED: &[(&str, &[(&str, Member)])] = &[
             ("rulesetVersion", Leaf),
             ("assessedAt", Leaf),
             ("receipt", Json),
+            ("inputHash", Leaf),
         ],
     ),
     (

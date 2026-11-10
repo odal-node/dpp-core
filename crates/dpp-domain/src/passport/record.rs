@@ -11,7 +11,7 @@ use super::{
     PassportId,
 };
 use crate::catalog::Granularity;
-use crate::compliance::ComplianceResult;
+use crate::compliance::{ComplianceResult, compliance_input_hash};
 use crate::instrument::InstrumentRef;
 use crate::personal_data::PersonalDataStatement;
 use crate::seal::SealedEnvelope;
@@ -112,7 +112,12 @@ pub struct Passport {
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
     /// receipt. Attached by the host at create/update, after it runs the
-    /// product group's compliance strategy.
+    /// product group's compliance strategy, through
+    /// [`attach_compliance_result`](Self::attach_compliance_result), which binds it
+    /// to the `productGroupData` it was computed over. The first publish refuses a
+    /// determination whose binding no longer matches the passport's content.
+    /// A host that computes one at publish to gate on it stores that one, so it
+    /// always matches by construction.
     /// Part of the signed payload and immutable after retention lock. `None`
     /// until a determination is computed (e.g. a product group with no plugin loaded).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1000,6 +1005,34 @@ impl Passport {
         }
     }
 
+    /// Attach a determination to this passport, bound to the `productGroupData` it
+    /// was computed over.
+    ///
+    /// This is the one way to bind a determination, so a host never computes the hash
+    /// itself. The host runs the [`ComplianceRegistry`](crate::ports::compliance::ComplianceRegistry)
+    /// over [`Self::product_group_data`] and attaches the result here: the binding is
+    /// over the data the passport holds when this is called, so `result` must have
+    /// been computed from that data.
+    ///
+    /// # Errors
+    /// Returns [`DppError::Serialisation`](crate::error::dpp::DppError::Serialisation)
+    /// when the content cannot be hashed.
+    pub fn attach_compliance_result(
+        &mut self,
+        result: ComplianceResult,
+    ) -> Result<(), crate::error::dpp::DppError> {
+        let input_hash = compliance_input_hash(
+            self.product_group.catalog_key(),
+            self.product_group_data.as_ref(),
+        )
+        .map_err(|e| crate::error::dpp::DppError::Serialisation(e.to_string()))?;
+        self.compliance_result = Some(ComplianceResult {
+            input_hash: Some(input_hash),
+            ..result
+        });
+        Ok(())
+    }
+
     /// Transition the passport to a new status, enforcing the state machine.
     ///
     /// Valid transitions — the whole table, since this method decides nothing
@@ -1012,6 +1045,7 @@ impl Passport {
     /// `Retired`, `Superseded` and `Deactivated` are terminal.
     ///
     /// On the first `Draft → Published` transition this method also:
+    /// - Refuses a compliance determination not bound to the current `productGroupData`.
     /// - Sets `retention_locked = true` (ESPR retention obligation).
     /// - Sets `published_at` to the current timestamp.
     /// - Updates `updated_at`.
@@ -1038,6 +1072,7 @@ impl Passport {
                 ));
             }
             self.check_mandatory_content()?;
+            self.check_compliance_binding()?;
             self.retention_locked = true;
             self.published_at = Some(now);
         }
@@ -1124,6 +1159,31 @@ impl Passport {
             return Ok(());
         }
         self.check_category_content()
+    }
+
+    /// Refuse a first publish whose compliance determination is not bound to the
+    /// `productGroupData` the passport holds now: a binding that is missing, or one
+    /// computed over other data. A passport with no determination publishes as before.
+    fn check_compliance_binding(&self) -> Result<(), crate::error::dpp::DppError> {
+        use crate::field_error::{FieldError, ValidationErrors};
+
+        let Some(result) = self.compliance_result.as_ref() else {
+            return Ok(());
+        };
+        let current = compliance_input_hash(
+            self.product_group.catalog_key(),
+            self.product_group_data.as_ref(),
+        )
+        .map_err(|e| crate::error::dpp::DppError::Serialisation(e.to_string()))?;
+        if result.input_hash.as_deref() == Some(current.as_str()) {
+            return Ok(());
+        }
+        Err(crate::error::dpp::DppError::Validation(ValidationErrors {
+            errors: vec![FieldError {
+                field: "/complianceResult".to_owned(),
+                message: "the compliance determination is not bound to the current productGroupData; reassess it and attach it again before publishing".to_owned(),
+            }],
+        }))
     }
 
     /// Whether Art. 77(1) can be shown **not** to reach this record.
