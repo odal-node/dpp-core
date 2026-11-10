@@ -414,7 +414,7 @@ The instruments that carry the duty, `unsold-goods-format-2026-2` and
 passport anywhere in Arts. 24 and 25.
 
 Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` is built to
-them (schema v2.0.0):
+them (schema v2.1.0):
 
 - **Commission Implementing Regulation (EU) 2026/2** (CELEX `32026R0002`), under
   Art. 24(3). Art. 2(1) binds the disclosure to the format in its **Annex I**, and Art. 3
@@ -429,10 +429,16 @@ consolidated with its undertakings listed), a `financialYear` with both endpoint
 repeating body of `lines`, and the two narrative rows `measuresTaken` and
 `measuresPlanned`. Each line carries its CN categories (plural, because note (f) allows
 several where items sold together count as one unit), a description, unit and weight
-quantities each flagged `estimated` or not, a packaging-included flag, one `reason`, and
-a `treatment` split.
+quantities each flagged `estimated` or not, a packaging-included flag, an optional
+`reason`, and a `treatment` split.
 
-Three points that are easy to get wrong:
+Four points that are easy to get wrong:
+
+- **A line's `reason` is optional.** Note (h) asks for it "where applicable", and the
+  derogations except only the destruction of Annex VII products from the Art. 25(1)
+  prohibition. A discard of anything else, or of an Annex VII product for the sole purpose
+  of preparing it for reuse (ESPR Art. 2(34)), has no point to cite, and v2.0.0 required
+  one anyway. v2.1.0 does not; `reasonDetail` can still say why.
 
 - **Total destruction is derived, never stored.** Note (i) defines it as recycling plus
   other recovery plus disposal. Preparing for reuse and unknown sit outside it, which is
@@ -444,6 +450,24 @@ Three points that are easy to get wrong:
 - **`CnCategory` is not `CommodityCode`.** Two digits or four, against six, eight or ten.
   A product's own classification is a different level of the same nomenclature, and
   substituting it files a whole chapter's goods under one article.
+
+**What the disclosure summarises is a separate model.** `UnsoldGoodsReport` is the yearly
+table; `dpp_domain::unsold_goods` models each discard in it (`DiscardRecord`), the
+documents the acts have an operator keep for one (`EvidenceKind`, per derogation point
+under Del. Reg. (EU) 2026/296 Art. 3, plus the delivery and reception documentation of
+ESPR Art. 24(2) and Impl. Reg. (EU) 2026/2 Art. 4), how long (`KeepUntil`: the later of
+five years after the discard and five years after the disclosure covering it, with that
+disclosure `Pending`, `MadeOn` a date, or `NotOwed`) and `aggregate`, which turns a
+financial year's records into the lines of the table. A line takes the discloser's
+wording (`LineDescriptions`) and is keyed by the record's `reason_label`, a short label
+the operator keeps, not a sentence per record. Whether any of it binds an operator
+depends on its size: `EnterpriseSize::is_exempt_on` follows ESPR Arts. 24(1) and 25(1),
+which both leave out micro and small enterprises and reach medium-sized ones from
+19 July 2030, and an exempt operator is required to show nothing. A record offered for
+storage is held to the `discard-record` schema (in `document_schemas()` beside the
+disclosure's); the type reads a malformed one back all the same, so it can be reported.
+The records know what is required and never what is held; storing them and their
+documents is a host's concern.
 
 **There is no v1.0.0.** It predated both acts and nothing could carry a document forward
 from it: a financial year cannot be derived from `"2026-Q2"`, a CN code cannot be

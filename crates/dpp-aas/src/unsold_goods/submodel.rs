@@ -9,7 +9,7 @@
 use dpp_domain::unsold_goods::{DisclosureScope, UnsoldGoodsReport};
 
 use crate::model::{AasSemId, AasSubmodel};
-use crate::property::{double_property, enum_wire_str, string_property};
+use crate::property::{double_property, opt_enum_wire_str, string_property};
 use crate::semantic_ids;
 
 /// One submodel per disclosure, carrying the Annex I header and a flattened
@@ -46,7 +46,7 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, id: &str) -> Aa
     ];
 
     for (i, line) in r.lines.iter().enumerate() {
-        let reason_str = enum_wire_str(&line.reason);
+        let reason_str = opt_enum_wire_str(&line.reason);
         elements.push(string_property(
             &format!("line{i}CnCategories"),
             &line
@@ -72,11 +72,15 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, id: &str) -> Aa
             line.units_discarded.value as f64,
             None,
         ));
-        elements.push(string_property(
-            &format!("line{i}Reason"),
-            &reason_str,
-            None,
-        ));
+        // Absent, not empty, where no derogation applies (Annex I note (h):
+        // "where applicable").
+        if let Some(reason_str) = reason_str {
+            elements.push(string_property(
+                &format!("line{i}Reason"),
+                &reason_str,
+                None,
+            ));
+        }
         // Derived, per Annex I note (i) — never a stored field, but a reader of
         // the projection needs it without recomputing.
         elements.push(double_property(

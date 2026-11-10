@@ -3,12 +3,13 @@
 use alloc::vec::Vec;
 
 use super::lints::{DisclosureLineInput, UnsoldGoodsLintInput, lint_unsold_goods};
+use super::records::{DiscardRecordLintInput, lint_discard_record};
 
 /// A line that breaks nothing: CN heading outside Annex II, split totalling 100.
 fn clean_line() -> DisclosureLineInput<'static> {
     DisclosureLineInput {
         cn_category: "6203",
-        reason_point: 'f',
+        reason_point: Some('f'),
         units: 1_200,
         weight_kg: 430,
         preparing_for_reuse_pct: 20,
@@ -22,6 +23,8 @@ fn clean_line() -> DisclosureLineInput<'static> {
 fn input<'a>(lines: &'a [DisclosureLineInput<'a>]) -> UnsoldGoodsLintInput<'a> {
     UnsoldGoodsLintInput {
         lines,
+        financial_year_start: (2028, 1, 1),
+        financial_year_end: (2028, 12, 31),
         consolidated_undertaking_count: None,
         measures_taken_len: 60,
         measures_planned_len: 60,
@@ -84,7 +87,7 @@ fn a_malformed_cn_category_is_flagged_separately() {
 #[test]
 fn point_h_beside_a_stronger_reason_for_the_same_category_is_flagged() {
     let mut donation = clean_line();
-    donation.reason_point = 'h';
+    donation.reason_point = Some('h');
     let lines = [clean_line(), donation];
     let findings = lint_unsold_goods(&input(&lines));
     assert!(codes(&findings).contains(&"unsold_goods.donation_reason_alongside_stronger_reason"));
@@ -95,7 +98,7 @@ fn point_h_beside_a_stronger_reason_for_the_same_category_is_flagged() {
 #[test]
 fn point_h_for_a_different_category_is_not_flagged() {
     let mut donation = clean_line();
-    donation.reason_point = 'h';
+    donation.reason_point = Some('h');
     donation.cn_category = "6204";
     let lines = [clean_line(), donation];
     let findings = lint_unsold_goods(&input(&lines));
@@ -131,4 +134,149 @@ fn weight_with_no_units_is_flagged() {
     let lines = [line];
     let findings = lint_unsold_goods(&input(&lines));
     assert!(codes(&findings).contains(&"unsold_goods.weight_without_units"));
+}
+
+/// A line with no derogation is a real answer for a product no derogation
+/// reaches, so it must not trip the point (h) check that reads reasons.
+#[test]
+fn a_line_with_no_derogation_is_not_read_as_a_donation_reason() {
+    let mut none = clean_line();
+    none.reason_point = None;
+    let lines = [clean_line(), none];
+    assert!(lint_unsold_goods(&input(&lines)).is_empty());
+}
+
+/// `FinancialYear` leaves a start after its end unrefused, on the promise that
+/// it is reported here.
+#[test]
+fn a_financial_year_ending_before_it_starts_is_flagged() {
+    let lines = [clean_line()];
+    let mut i = input(&lines);
+    i.financial_year_start = (2028, 12, 31);
+    i.financial_year_end = (2028, 1, 1);
+    let findings = lint_unsold_goods(&i);
+    assert!(codes(&findings).contains(&"unsold_goods.financial_year_ends_before_it_starts"));
+}
+
+/// A one-day year is odd but not backwards.
+#[test]
+fn a_financial_year_that_starts_and_ends_on_one_day_is_not_flagged() {
+    let lines = [clean_line()];
+    let mut i = input(&lines);
+    i.financial_year_start = (2028, 6, 30);
+    i.financial_year_end = (2028, 6, 30);
+    assert!(lint_unsold_goods(&i).is_empty());
+}
+
+/// A destruction of apparel with a derogation, weighed, with a readable code.
+fn clean_record() -> DiscardRecordLintInput<'static> {
+    DiscardRecordLintInput {
+        cn_codes: &["62034200"],
+        reason_point: Some('f'),
+        prepared_for_reuse: false,
+        weight_grams: 12_000,
+    }
+}
+
+/// A record that is complete and consistent produces no findings.
+#[test]
+fn a_clean_record_produces_no_findings() {
+    assert!(lint_discard_record(&clean_record()).is_empty());
+}
+
+/// ESPR Art. 25(1) prohibits destroying Annex VII goods and DR 2026/296 Art. 2
+/// permits it only under a point.
+#[test]
+fn an_annex_vii_discard_with_no_derogation_is_flagged() {
+    let mut record = clean_record();
+    record.reason_point = None;
+    let findings = lint_discard_record(&record);
+    assert_eq!(
+        codes(&findings),
+        ["unsold_goods.annex_vii_discard_without_derogation"]
+    );
+}
+
+/// Soap is not in Annex VII; no prohibition, so no derogation is owed.
+#[test]
+fn a_discard_outside_annex_vii_needs_no_derogation() {
+    let mut record = clean_record();
+    record.cn_codes = &["34011100"];
+    record.reason_point = None;
+    assert!(lint_discard_record(&record).is_empty());
+}
+
+/// ESPR Art. 2(34): discarding for the sole purpose of preparing for reuse is
+/// not destruction, so the prohibition does not reach it.
+#[test]
+fn an_annex_vii_discard_for_reuse_needs_no_derogation() {
+    let mut record = clean_record();
+    record.reason_point = None;
+    record.prepared_for_reuse = true;
+    assert!(lint_discard_record(&record).is_empty());
+}
+
+/// A derogation on a discard made for reuse is noticed.
+#[test]
+fn a_derogation_on_a_discard_for_reuse_is_noticed() {
+    let mut record = clean_record();
+    record.prepared_for_reuse = true;
+    let findings = lint_discard_record(&record);
+    assert_eq!(
+        codes(&findings),
+        ["unsold_goods.derogation_without_annex_vii_destruction"]
+    );
+}
+
+/// A derogation on a good outside Annex VII is noticed.
+#[test]
+fn a_derogation_on_a_good_outside_annex_vii_is_noticed() {
+    let mut record = clean_record();
+    record.cn_codes = &["34011100"];
+    let findings = lint_discard_record(&record);
+    assert_eq!(
+        codes(&findings),
+        ["unsold_goods.derogation_without_annex_vii_destruction"]
+    );
+}
+
+/// A kit may carry several CN codes (note (f)); one in Annex VII is enough.
+#[test]
+fn one_annex_vii_code_among_several_puts_a_kit_in_scope() {
+    let mut record = clean_record();
+    record.cn_codes = &["34011100", "62034200"];
+    record.reason_point = None;
+    let findings = lint_discard_record(&record);
+    assert_eq!(
+        codes(&findings),
+        ["unsold_goods.annex_vii_discard_without_derogation"]
+    );
+}
+
+/// A record with no CN code is flagged.
+#[test]
+fn a_record_with_no_cn_code_is_flagged() {
+    let mut record = clean_record();
+    record.cn_codes = &[];
+    let findings = lint_discard_record(&record);
+    assert_eq!(codes(&findings), ["unsold_goods.record_cn_code_unreadable"]);
+}
+
+/// A CN code of the wrong length is flagged.
+#[test]
+fn a_record_with_a_cn_code_of_the_wrong_length_is_flagged() {
+    let mut record = clean_record();
+    record.cn_codes = &["6203"];
+    let findings = lint_discard_record(&record);
+    assert_eq!(codes(&findings), ["unsold_goods.record_cn_code_unreadable"]);
+}
+
+/// Note (g) lets the weight be estimated from the count, so zero means the
+/// figure was left out, not that nothing weighed anything.
+#[test]
+fn a_record_without_weight_is_flagged() {
+    let mut record = clean_record();
+    record.weight_grams = 0;
+    let findings = lint_discard_record(&record);
+    assert_eq!(codes(&findings), ["unsold_goods.record_without_weight"]);
 }
