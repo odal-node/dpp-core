@@ -57,8 +57,11 @@ ENVIRONMENTS = ROOT / "crates" / "dpp-tests" / "fixtures" / "aas" / "environment
 SCHEMAS = ROOT / "crates" / "dpp-domain" / "schemas"
 
 # The Environments that belong to no product group on their own. See the comment
-# on `MINIMUM_EXPECTED` in `aas_loader_oracle.py` for why this one exists.
-SCENARIOS = {"scenario-model-level-did"}
+# on `MINIMUM_EXPECTED` in `aas_loader_oracle.py` for why the first exists. The
+# second is the unsold-goods disclosure, which is a document an operator
+# publishes and not a product group's passport, so no schema directory names it;
+# it is exported through `dpp_aas::build_unsold_goods_environment`.
+SCENARIOS = {"scenario-model-level-did", "unsold-goods"}
 
 # The one revision the tool implements. If it ever lists another, the claim in
 # docs/architecture/STANDARDS.md needs a decision, not a silent pin bump.
