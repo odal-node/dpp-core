@@ -60,6 +60,15 @@ so at the method and `Passport::schema_version` at the field.
 The consequence people get wrong: **the envelope has no escape hatch, so for the envelope,
 "additive only" is the entire protection.**
 
+**A field's type decides what a read refuses.** A type that is valid by construction and
+valid on read, such as `CommodityCode`, refuses on read whatever it refuses to build. In an
+envelope field that would make a stored document unreadable, per request, after an upgrade,
+if it holds a value that was accepted before, and a fetched one unreadable for good. So an
+envelope field that holds a value another type validates holds the *declared* form of it,
+which keeps any string as written and answers validity separately:
+`Passport::commodity_code` is a `DeclaredCommodityCode`. It writes the same JSON a
+`CommodityCode` does, so the wire is unchanged.
+
 ---
 
 ## 3. What additive means

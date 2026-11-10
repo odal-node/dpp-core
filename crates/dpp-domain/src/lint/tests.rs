@@ -3,7 +3,7 @@
 use super::*;
 use crate::product_group::BatteryData;
 use crate::product_group::ProductGroupData;
-use crate::product_group::data::unsold_goods::{CnCategory, DiscardReason};
+use crate::unsold_goods::{CnCategory, DiscardReason};
 use chrono::Utc;
 
 fn battery() -> BatteryData {
@@ -36,8 +36,8 @@ fn battery_energy_mismatch_surfaces_as_domain_finding() {
 
 #[test]
 fn a_well_formed_disclosure_produces_no_findings() {
-    let data = ProductGroupData::UnsoldGoods(crate::test_support::sample_unsold_goods_report());
-    assert_eq!(lint_product_group_data(&data, Utc::now()), Vec::new());
+    let report = crate::test_support::sample_unsold_goods_report();
+    assert_eq!(lint_unsold_goods_report(&report), Vec::new());
 }
 
 /// Annex I note (i) provides `unknown` for the share that could not be
@@ -47,8 +47,7 @@ fn a_well_formed_disclosure_produces_no_findings() {
 fn a_treatment_split_that_misses_100_is_flagged() {
     let mut report = crate::test_support::sample_unsold_goods_report();
     report.lines[0].treatment.disposal_pct = 1;
-    let data = ProductGroupData::UnsoldGoods(report);
-    let findings = lint_product_group_data(&data, Utc::now());
+    let findings = lint_unsold_goods_report(&report);
     assert!(
         findings
             .iter()
@@ -63,8 +62,7 @@ fn a_treatment_split_that_misses_100_is_flagged() {
 fn a_chapter_holding_annex_ii_headings_is_flagged() {
     let mut report = crate::test_support::sample_unsold_goods_report();
     report.lines[0].cn_categories = vec![CnCategory::parse("85").expect("valid chapter")];
-    let data = ProductGroupData::UnsoldGoods(report);
-    let findings = lint_product_group_data(&data, Utc::now());
+    let findings = lint_unsold_goods_report(&report);
     assert!(
         findings
             .iter()
@@ -80,10 +78,9 @@ fn a_chapter_holding_annex_ii_headings_is_flagged() {
 fn donation_claimed_beside_a_stronger_reason_is_flagged() {
     let mut report = crate::test_support::sample_unsold_goods_report();
     let mut second = report.lines[0].clone();
-    second.reason = DiscardReason::OfferedForDonationNotAccepted;
+    second.reason = Some(DiscardReason::OfferedForDonationNotAccepted);
     report.lines.push(second);
-    let data = ProductGroupData::UnsoldGoods(report);
-    let findings = lint_product_group_data(&data, Utc::now());
+    let findings = lint_unsold_goods_report(&report);
     assert!(
         findings
             .iter()
@@ -209,5 +206,64 @@ fn the_partial_list_caveat_is_attached_when_anything_was_checked() {
         caveat.message.contains("2026-02-04"),
         "the caveat must name the revision it checked against: {}",
         caveat.message
+    );
+}
+
+// ── Discard records ─────────────────────────────────────────────────────────
+
+/// The codes of the findings a record produces, for a test to compare.
+fn record_codes(record: &crate::unsold_goods::DiscardRecord) -> Vec<String> {
+    lint_discard_record(record)
+        .into_iter()
+        .map(|f| f.code)
+        .collect()
+}
+
+/// A record that is complete and consistent is not flagged.
+#[test]
+fn a_well_formed_discard_record_produces_no_findings() {
+    assert!(record_codes(&crate::test_support::sample_discard_record()).is_empty());
+}
+
+/// ESPR Art. 25(1): the destruction of Annex VII products is prohibited, and a
+/// derogation is how it is permitted.
+#[test]
+fn an_annex_vii_discard_with_no_derogation_surfaces_as_a_domain_finding() {
+    let record = crate::unsold_goods::DiscardRecord {
+        reason: None,
+        ..crate::test_support::sample_discard_record()
+    };
+    let findings = lint_discard_record(&record);
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(
+        findings[0].code,
+        "unsold_goods.annex_vii_discard_without_derogation"
+    );
+    assert_eq!(findings[0].severity, LintSeverity::Warning);
+}
+
+/// ESPR Art. 2(34): discarding for the sole purpose of preparing for reuse is not
+/// destruction, so no derogation is owed.
+#[test]
+fn a_discard_for_reuse_needs_no_derogation() {
+    let record = crate::unsold_goods::DiscardRecord {
+        reason: None,
+        treatment: crate::unsold_goods::WasteTreatmentOperation::PreparingForReuse,
+        ..crate::test_support::sample_discard_record()
+    };
+    assert!(record_codes(&record).is_empty());
+}
+
+/// A record with no weight reaches a caller of `lint_discard_record` as a finding.
+#[test]
+fn a_record_without_weight_surfaces_as_a_domain_finding() {
+    let record = crate::unsold_goods::DiscardRecord {
+        weight: crate::unsold_goods::DiscardedWeight::measured(0),
+        ..crate::test_support::sample_discard_record()
+    };
+    assert_eq!(
+        record_codes(&record),
+        ["unsold_goods.record_without_weight"]
     );
 }

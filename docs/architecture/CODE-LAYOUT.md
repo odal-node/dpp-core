@@ -23,13 +23,13 @@ it does (see below).
 | 2 | value | Value objects with no aggregate of their own. `compliance` `credential` `disclosure` `facility` `field_error` `manufacturer` `material` `operator` `seal` `status` | tier 1 |
 | 3 | reference | The embedded, data-driven registries. `catalog` `instrument` `schemas` | tiers 1 to 2 |
 | 4 | composition | The shapes that bring the tiers below together: the passport aggregate, the product-group union, the crate-wide error that wraps any of them, and the calendar that joins the instrument catalog's passport dates to the rules' scheduled changes. `calendar` `error` `passport` `product_group` | tiers 1 to 3 |
-| 5 | satellite | Records that hang off an aggregate. `eol` `graph` `product` `transfer` | tiers 1 to 4 |
+| 5 | satellite | Records that hang off an aggregate. `eol` `graph` `product` `transfer` `unsold_goods` | tiers 1 to 4 |
 | 6 | policy | Decides something. `access` `lint` `validation` | tiers 1 to 5 |
 | 7 | boundary | States what the outside must provide. `ports` | tiers 1 to 6 |
 | 8 | adapter | An implementation of a port, shipped as the open-source default. `passthrough` | tiers 1 to 7 |
 
-Imports within a tier are allowed but must stay acyclic. Three exist today
-(`instrument → catalog`, `passport → error`, `passport → product_group`), and a second
+Imports within a tier are allowed but must stay acyclic. Four exist today
+(`eol → unsold_goods`, `instrument → catalog`, `passport → error`, `passport → product_group`), and a second
 test holds the whole graph acyclic.
 
 ### Eight tiers, because the graph has eight

@@ -162,9 +162,13 @@ Schemas follow semver. `VersionedSchemaRegistry` holds every version listed in
 crates/dpp-domain/schemas/
   battery/v1.0.0.json … v2.10.0.json
   textile/v1.0.0.json … v1.4.0.json
-  unsold-goods/v2.0.0.json
   …
+crates/dpp-domain/document-schemas/
+  unsold-goods/v2.0.0.json
 ```
+
+The second directory holds schemas that are not a product group's: the unsold-goods
+disclosure, validated through `dpp_domain::unsold_goods::document_schemas()`.
 
 A new version is a new file plus one entry in that table (see
 [CONTRIBUTING.md §6](../../CONTRIBUTING.md#6-changing-a-schema)). Callers validate

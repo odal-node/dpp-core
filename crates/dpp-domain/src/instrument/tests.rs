@@ -100,9 +100,17 @@ fn determinability_and_passport_duty_are_independent() {
         "no passport obligation exists for electronics"
     );
 
-    // Framework obligation: binds now, has no passport article at all.
-    assert!(!catalog.determinable_for("unsold-goods").is_empty());
-    assert!(!catalog.passport_required_for("unsold-goods"));
+    // A duty over every product group: in force, no passport article at all, and
+    // bound to no one group, so no group is determinable because of it.
+    for id in [
+        "unsold-goods-format-2026-2",
+        "unsold-goods-derogations-2026-296",
+    ] {
+        let act = catalog.get(id).expect("an unsold-goods instrument");
+        assert!(act.is_current_law(), "{id} is law and binds today");
+        assert!(!act.passport.is_required(), "{id} asks for no passport");
+        assert!(act.product_groups.is_empty(), "{id} is bound to no group");
+    }
 
     // Direct instrument: binds now *and* owes a passport, on a sourced date.
     assert!(!catalog.determinable_for("battery").is_empty());
@@ -248,7 +256,8 @@ fn an_instrument_id_cannot_be_registered_twice() {
 /// passport obligation that does not exist: `electronics` had Reg. (EU)
 /// 2023/1670's *ecodesign* application date, and `unsold-goods` had the ESPR Art.
 /// 25 destruction-ban date, from a pair of articles containing no passport at
-/// all. Neither field has a home any more, which is the fix.
+/// all. Neither field has a home any more, which is the fix. `unsold-goods` is no
+/// longer a product group at all.
 ///
 /// What is left to guard is that a date cannot reappear without an act behind it.
 #[test]
@@ -275,16 +284,15 @@ fn every_passport_date_comes_from_an_act_that_requires_a_passport() {
         }
     }
 
-    // The two that used to over-claim: an act binds them, and no act asks them
-    // for a passport, so there is no date to report for either.
-    for key in ["electronics", "unsold-goods"] {
-        assert!(!instruments.determinable_for(key).is_empty(), "{key} binds");
-        assert!(
-            !instruments.passport_required_for(key),
-            "{key} has no passport obligation under any recorded act"
-        );
-        assert!(instruments.passport_due_for(key).is_none(), "{key}");
-    }
+    // The one that used to over-claim: an act binds it, and no act asks it for a
+    // passport, so there is no date to report.
+    let key = "electronics";
+    assert!(!instruments.determinable_for(key).is_empty(), "{key} binds");
+    assert!(
+        !instruments.passport_required_for(key),
+        "{key} has no passport obligation under any recorded act"
+    );
+    assert!(instruments.passport_due_for(key).is_none(), "{key}");
 }
 
 /// The live-obligation fold answers correctly in all four quadrants of its two
@@ -297,11 +305,10 @@ fn every_passport_date_comes_from_an_act_that_requires_a_passport() {
 /// |---|---|---|---|
 /// | `battery`      | yes | yes | **yes** |
 /// | `electronics`  | yes | no — discharged through another system | no |
-/// | `unsold-goods` | yes | no — the act has no passport article | no |
 /// | `toy`          | no — adopted but not yet applying | yes | no |
 ///
 /// A caller using `determinable_for` alone would enforce a passport for
-/// `electronics` and `unsold-goods`, which owe none. One using
+/// `electronics`, which owes none. One using
 /// `passport_required_for` alone would enforce one for `toy`, where nothing is
 /// bindingly determinable yet.
 #[test]
@@ -313,16 +320,15 @@ fn a_live_passport_obligation_needs_both_halves() {
         "battery binds today and owes a passport"
     );
 
-    for group in ["electronics", "unsold-goods"] {
-        assert!(
-            !catalog.determinable_for(group).is_empty(),
-            "{group} is determinable, so only the passport half can exclude it"
-        );
-        assert!(
-            !catalog.passport_obligation_live(group),
-            "{group} owes no passport, so no obligation is live"
-        );
-    }
+    let group = "electronics";
+    assert!(
+        !catalog.determinable_for(group).is_empty(),
+        "{group} is determinable, so only the passport half can exclude it"
+    );
+    assert!(
+        !catalog.passport_obligation_live(group),
+        "{group} owes no passport, so no obligation is live"
+    );
 
     assert!(
         catalog.passport_required_for("toy"),

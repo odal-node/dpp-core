@@ -1,9 +1,7 @@
 //! Serde round-trips, the typed product-group payload, and the status machine.
 
 use super::*;
-use crate::product_group::{
-    CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore, UnsoldGoodsReport,
-};
+use crate::product_group::{CarbonFootprint, ProductGroup, ProductGroupData, RepairabilityScore};
 use crate::status::PassportStatus;
 
 pub(crate) fn make_passport() -> Passport {
@@ -62,62 +60,12 @@ fn product_group_data_mismatch_fails_validation() {
     assert!(err.contains("product_group must match"), "got: {err}");
 }
 
+/// A passport with no commodity code validates: the regulation asks for one only where relevant.
 #[test]
-fn missing_commodity_code_is_fine_outside_unsold_goods() {
+fn missing_commodity_code_is_fine() {
     let mut p = make_passport(); // product_group = Electronics
     p.commodity_code = None;
     assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-fn unsold_goods_report() -> UnsoldGoodsReport {
-    crate::test_support::sample_unsold_goods_report()
-}
-
-#[test]
-fn an_unsold_goods_disclosure_with_lines_validates() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(unsold_goods_report()));
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-/// Art. 24's disclosure duty reaches discarded unsold **consumer products**
-/// generally; Art. 25's destruction ban reaches Annex VII's apparel and
-/// footwear. An earlier check required Annex VII scope here and so rejected
-/// every lawful disclosure outside those two, which is most of Annex II's 45
-/// headings.
-#[test]
-fn a_disclosure_outside_annex_vii_scope_is_not_rejected() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    let mut report = unsold_goods_report();
-    // Refrigerators — Annex II heading 8418, nowhere near Annex VII.
-    report.lines[0].cn_categories =
-        vec![crate::product_group::CnCategory::parse("8418").expect("valid heading")];
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(report));
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-/// The envelope's `commodity_code` describes a product; a disclosure has none,
-/// so it must not be required here.
-#[test]
-fn an_unsold_goods_disclosure_needs_no_envelope_commodity_code() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(unsold_goods_report()));
-    p.commodity_code = None;
-    assert!(p.validate().is_ok(), "{:?}", p.validate());
-}
-
-#[test]
-fn an_unsold_goods_disclosure_with_no_lines_fails() {
-    let mut p = make_passport();
-    p.product_group = ProductGroup::UnsoldGoods;
-    let mut report = unsold_goods_report();
-    report.lines.clear();
-    p.product_group_data = Some(ProductGroupData::UnsoldGoods(report));
-    let err = p.validate().unwrap_err().to_string();
-    assert!(err.contains("at least one product line"), "got: {err}");
 }
 
 #[test]
@@ -229,6 +177,30 @@ fn a_passport_stored_before_the_serial_existed_reads_with_none() {
 
     let back: Passport = serde_json::from_value(json).expect("pre-field document reads");
     assert_eq!(back.serial_number, None);
+}
+
+/// A passport that declares a commodity code which is not a valid one reads, and
+/// writes back as the same JSON. Such a document is accepted when it is stored and
+/// signed by someone else when it is fetched, and the envelope has no lens to
+/// correct either, so the code is kept as written and is reported where it is used.
+#[test]
+fn a_passport_declaring_a_malformed_commodity_code_still_reads_and_writes_back_unchanged() {
+    for declared in ["not-a-code", " 85076000 ", "8507 60 00"] {
+        let mut json = serde_json::to_value(make_passport()).expect("serialises");
+        json["commodityCode"] = serde_json::json!(declared);
+
+        let back: Passport =
+            serde_json::from_value(json.clone()).expect("a declared code never refuses a read");
+        assert_eq!(
+            back.commodity_code.as_ref().map(|c| c.as_str()),
+            Some(declared)
+        );
+        assert_eq!(
+            serde_json::to_value(&back).unwrap(),
+            json,
+            "{declared:?} did not write back as it was read"
+        );
+    }
 }
 
 #[test]

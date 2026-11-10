@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use dpp_rules::batteries::schedule::ScheduledChange;
 
-use super::{ObligationEvent, ObligationKind};
+use super::{ObligationEvent, ObligationKind, ScheduleConflict};
 use crate::instrument::{DateBasis, Instrument, InstrumentCatalog, PassportObligation};
 
 /// Every rule module that schedules a dated change.
@@ -19,7 +19,8 @@ pub(super) const RULE_SCHEDULES: &[&[ScheduledChange]] = &[
 
 /// Every dated obligation this build knows: the changes the rule modules
 /// schedule, and the passport start date of every act in an instrument catalog
-/// that is current law.
+/// that is current law. Built with `with_bundle` (behind the `bundle`
+/// feature), it also holds the dates a verified signed bundle adds.
 ///
 /// Built once and then only read. It holds no clock: [`Self::between`] takes
 /// both ends of the window, so the same question always has the same answer.
@@ -36,6 +37,7 @@ pub(super) const RULE_SCHEDULES: &[&[ScheduledChange]] = &[
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObligationCalendar {
     events: Vec<ObligationEvent>,
+    conflicts: Vec<ScheduleConflict>,
 }
 
 impl ObligationCalendar {
@@ -57,14 +59,81 @@ impl ObligationCalendar {
         for instrument in catalog.all().iter().filter(|i| i.is_current_law()) {
             events.extend(passport_starts(instrument));
         }
-        events.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
-        Self { events }
+        sort_events(&mut events);
+        Self {
+            events,
+            conflicts: Vec::new(),
+        }
+    }
+
+    /// The calendar over `catalog`, with the schedule a verified signed ruleset
+    /// bundle carries laid over it.
+    ///
+    /// # Precedence, by event id
+    ///
+    /// - **An id this build has no dated event for** is added. That is how a
+    ///   node learns a date its build does not hold: an act adopted after the
+    ///   release, or one that has since fixed a date it lacked.
+    /// - **An id whose date this build holds as [`DateBasis::Assumed`]** takes
+    ///   the bundle's entry. A bundle fills an assumption.
+    /// - **Any other id** keeps this build's event, whatever the bundle says.
+    ///   This build's rules select their answers by those dates, so a calendar
+    ///   announcing another would contradict its own publish gate. Where the
+    ///   bundle's date differs, earlier or later, the disagreement is recorded in
+    ///   [`Self::conflicts`]: it usually means the law moved and the build has
+    ///   not, which a new build fixes and a bundle cannot.
+    ///
+    /// An event the bundle supplied carries its origin in
+    /// [`ObligationEvent::bundle`]. A bundle with no schedule gives the same
+    /// calendar as [`Self::from_catalog`].
+    ///
+    /// # Errors
+    ///
+    /// [`ScheduleBundleError::Unverified`](super::ScheduleBundleError::Unverified)
+    /// for a bundle adopted without verification, such as a node's compiled-in
+    /// baseline, and
+    /// [`ScheduleBundleError::Malformed`](super::ScheduleBundleError::Malformed)
+    /// for a schedule that is not a list of well-formed entries with distinct
+    /// ids. Nothing of a refused bundle is applied.
+    #[cfg(feature = "bundle")]
+    pub fn with_bundle(
+        catalog: &InstrumentCatalog,
+        acceptance: &dpp_rules::bundle::RulesetAcceptance,
+    ) -> Result<Self, super::ScheduleBundleError> {
+        let (origin, offered) = super::bundle_schedule::read(acceptance)?;
+        let mut calendar = Self::from_catalog(catalog);
+        for entry in offered {
+            match calendar.events.iter_mut().find(|e| e.id == entry.id) {
+                None => calendar.events.push(entry),
+                Some(built) if built.basis == DateBasis::Assumed => *built = entry,
+                Some(built) => {
+                    if built.date != entry.date {
+                        calendar.conflicts.push(ScheduleConflict {
+                            id: entry.id,
+                            build_date: built.date,
+                            bundle_date: entry.date,
+                            bundle: origin.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        sort_events(&mut calendar.events);
+        calendar.conflicts.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(calendar)
     }
 
     /// Every event, ordered by date and then by id.
     #[must_use]
     pub fn events(&self) -> &[ObligationEvent] {
         &self.events
+    }
+
+    /// The dates a bundle offered that this build's own dates overruled,
+    /// ordered by id. Empty for a calendar built without a bundle.
+    #[must_use]
+    pub fn conflicts(&self) -> &[ScheduleConflict] {
+        &self.conflicts
     }
 
     /// The events taking effect from `from` to `to`, both days included, in the
@@ -84,6 +153,12 @@ impl Default for ObligationCalendar {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Order `events` by date and then by id, the order [`ObligationCalendar::events`]
+/// promises.
+fn sort_events(events: &mut [ObligationEvent]) {
+    events.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
 }
 
 /// A rule module's change as an event.
@@ -106,6 +181,7 @@ fn rule_event(change: &ScheduledChange) -> Option<ObligationEvent> {
         product_group: Some(change.product_group.to_owned()),
         categories: change.categories.iter().map(|c| (*c).to_owned()).collect(),
         basis: DateBasis::Sourced,
+        bundle: None,
     })
 }
 
@@ -133,6 +209,7 @@ fn passport_starts(instrument: &Instrument) -> Vec<ObligationEvent> {
             product_group: product_group.map(str::to_owned),
             categories: Vec::new(),
             basis: from.basis,
+            bundle: None,
         })
     };
 

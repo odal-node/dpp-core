@@ -7,3 +7,6 @@
 //! is collapsed.
 pub mod annex_vii;
 pub mod disclosure;
+
+#[cfg(test)]
+mod tests;

@@ -1,0 +1,15 @@
+{
+  "discardedOn": "2027-03-14",
+  "cnCodes": ["62034231"],
+  "description": "Men's trousers, wool, returned damaged",
+  "units": { "value": 120, "estimated": false },
+  "weight": { "grams": 36000, "estimated": true },
+  "packagingIncluded": false,
+  "reason": "damagedOrContaminated",
+  "reasonLabel": "Returns, water damage",
+  "treatment": "recycling",
+  "receiver": {
+    "name": "Example Textile Recovery BV",
+    "identifier": { "type": "euid", "value": "NL.KVK.12345678" }
+  }
+}

@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductGroupDescriptor {
-    /// Canonical product-group key, e.g. `"battery"`, `"unsold-goods"`. Matches
+    /// Canonical product-group key, e.g. `"battery"`, `"electronics"`. Matches
     /// the schema-registry key and the plugin's `meta().product_group`.
     pub key: String,
     /// Human-readable title.

@@ -24,7 +24,7 @@ mod tests;
 pub use actor::{ActorIdentifier, ActorIdentifierError, ActorPosition, GlnAi, Icd};
 pub use check_digit::gs1_check_digit;
 pub use cn_category::{CnCategory, CnCategoryError};
-pub use commodity_code::{CommodityCode, CommodityCodeError};
+pub use commodity_code::{CommodityCode, CommodityCodeError, DeclaredCommodityCode};
 pub use gln::{Gln, GlnError};
 pub use gtin::{Gtin, GtinError};
 pub use product_identifier::{ProductIdentifier, ProductIdentifierError};

@@ -366,25 +366,23 @@ fn every_clause_5_scheme_reaches_the_request() {
 
 /// A product group that identifies no single product cannot be registered.
 ///
-/// `UnsoldGoods` is the known case and is not a defect: an Art. 24–25 discard
-/// disclosure covers a financial year across many products. Refused here rather
-/// than allowed through with nothing in the field, so the case is named instead
-/// of arriving at an adapter that has to invent something.
+/// Refused here rather than allowed through with nothing in the field, so the
+/// case is named instead of arriving at an adapter that has to invent something.
 #[test]
 fn a_product_group_that_identifies_nothing_is_refused() {
-    use crate::product_group::ProductGroupData;
+    use crate::product_group::{ProductGroup, ProductGroupData};
 
     let mut passport = make_published_passport();
-    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(
-        crate::test_support::sample_unsold_goods_report(),
-    ));
+    passport.product_group = ProductGroup::Other("photovoltaic".into());
+    passport.product_group_data =
+        ProductGroupData::other(serde_json::json!({ "productGroup": "photovoltaic" }));
 
     let refused = RegistrationRequest::from_published_passport(
         &passport,
         acme(),
         RegistrationGranularity::Item,
     )
-    .expect_err("a discard disclosure is not a product registration");
+    .expect_err("a payload with no productIdentifier is not a product registration");
 
     assert_eq!(refused.errors.len(), 1);
     assert_eq!(

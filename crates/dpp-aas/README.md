@@ -21,10 +21,13 @@ Pure Rust, no I/O, no network calls. Builds for `wasm32-unknown-unknown`.
   industrial data space.
 - You submit to a registry that speaks AAS rather than raw DPP JSON.
 - You want per-product-group submodels rather than a flat key-value dump. Typed
-  submodels exist for `battery`, `electronics` and `unsold_goods`, whose acts are in
-  force, and for `textile` as a named exception. Every other catalogued group is projected
+  submodels exist for `battery` and `electronics`, whose acts are in force, and for
+  `textile` as a named exception. Every other catalogued group is projected
   generically, because naming a submodel template that no standards body has ratified
   would be an unsupported claim.
+- You export an unsold-goods disclosure, which is not a passport and has no product
+  identifier: `build_unsold_goods_environment` builds its Environment for a file or an
+  AASX package, under an asset key you choose.
 
 ## Example
 
@@ -40,8 +43,8 @@ fn render_aas(passport: &Passport) {
     // own EN 18219 identifier and names the `specificAssetId` after the scheme
     // that issued it, so the label cannot disagree with the value.
     //
-    // `None` is a real answer, not a failure: an unsold-goods report identifies
-    // a reporting period rather than a trade item. Such a caller supplies
+    // `None` is a real answer, not a failure: an unmodelled product group may
+    // carry no identifier. Such a caller supplies
     // `AssetIdentity::Named { name, value }` instead, and may not reuse a
     // scheme's name for it.
     let identity = AssetIdentity::from_passport(passport).unwrap_or(AssetIdentity::Named {

@@ -2,10 +2,13 @@
 
 **Generated: do not edit.** Regenerate with `just schema-changes`;
 `cargo test -p dpp-tests --test schema_changes` fails if this file has
-drifted from the schemas under `crates/dpp-domain/schemas/`.
+drifted from the schemas under `crates/dpp-domain/schemas/` and
+`crates/dpp-domain/document-schemas/`.
 
-One section per product group, one table per version bump: what each
-version changed relative to the one before it.
+One section per schema family (a product group's, or a document's that is
+not a product group's), one table per version bump: what each version
+changed relative to the one before it. A requirement counts at any depth:
+`lines/[]/reason` is the `reason` of each row of `lines`.
 
 `additive` means the bump only adds properties: no removal, no type
 change, no altered constraint, no newly required property. It is a
@@ -219,6 +222,10 @@ No property or requirement changed.
 
 **No longer required:** `gtin`
 
+## discard-record
+
+Only one version (v1.0.0), so there is nothing to compare against yet.
+
 ## electronics
 
 
@@ -231,6 +238,8 @@ No property or requirement changed.
 | `repairabilityScore` | constraint changed | `minimum=0` | none |
 | `repairabilityScore/criteria` | added | absent | `array` |
 | `repairabilityScore/overall` | added | absent | `number` |
+
+**Newly required:** `repairabilityScore/overall`
 
 ### v1.1.0 → v1.2.0
 
@@ -422,4 +431,8 @@ No property or requirement changed.
 
 ## unsold-goods
 
-Only one version (v2.0.0), so there is nothing to compare against yet.
+
+### v2.0.0 → v2.1.0
+
+
+**No longer required:** `lines/[]/reason`

@@ -27,7 +27,6 @@ use crate::schemas::VersionedSchemaRegistry;
 pub enum ProductGroup {
     Battery,
     Textile,
-    UnsoldGoods,
     Steel,
     Electronics,
     Construction,
@@ -46,14 +45,13 @@ pub enum ProductGroup {
 impl ProductGroup {
     /// Canonical product group key used by the schema registry and the `ProductGroupCatalog`.
     ///
-    /// This is the one true spelling (kebab-case where needed), distinct from
-    /// the enum's camelCase serde tag — e.g. `UnsoldGoods` serialises as
-    /// `"unsoldGoods"` but its catalog/registry key is `"unsold-goods"`.
+    /// This is the one true spelling (kebab-case where needed), which a
+    /// multi-word group would spell differently from the enum's camelCase serde
+    /// tag.
     pub fn catalog_key(&self) -> &str {
         match self {
             Self::Battery => "battery",
             Self::Textile => "textile",
-            Self::UnsoldGoods => "unsold-goods",
             Self::Steel => "steel",
             Self::Electronics => "electronics",
             Self::Construction => "construction",
@@ -70,14 +68,12 @@ impl ProductGroup {
     /// The typed variant for a wire tag, or [`ProductGroup::Other`] carrying the tag.
     ///
     /// Accepts the catalog's kebab-case spelling as well as the camelCase wire
-    /// tag, because both are in circulation — `unsold-goods` and `unsoldGoods`
-    /// name the same product group.
+    /// tag, because both are in circulation.
     #[must_use]
     pub fn from_wire_tag(tag: &str) -> Self {
         match tag {
             "battery" => Self::Battery,
             "textile" => Self::Textile,
-            "unsoldGoods" | "unsold-goods" => Self::UnsoldGoods,
             "steel" => Self::Steel,
             "electronics" => Self::Electronics,
             "construction" => Self::Construction,
@@ -91,9 +87,9 @@ impl ProductGroup {
         }
     }
 
-    /// The serde wire tag for this product group (its `camelCase` JSON discriminant),
-    /// e.g. `"unsoldGoods"` — distinct from [`Self::catalog_key`], which is
-    /// kebab-case (`"unsold-goods"`) and used by the schema registry/catalog.
+    /// The serde wire tag for this product group (its `camelCase` JSON discriminant)
+    /// — distinct from [`Self::catalog_key`], which is kebab-case and used by the
+    /// schema registry/catalog.
     ///
     /// Equivalent to `serde_json::to_value(self)` but without the allocation
     /// and `Value` round trip.
@@ -101,7 +97,6 @@ impl ProductGroup {
         match self {
             Self::Battery => "battery",
             Self::Textile => "textile",
-            Self::UnsoldGoods => "unsoldGoods",
             Self::Steel => "steel",
             Self::Electronics => "electronics",
             Self::Construction => "construction",
@@ -162,9 +157,7 @@ impl ProductGroup {
 ///
 /// # A group absent from this table has no category axis
 ///
-/// `mattress`, `textile`, `toy` and `unsold-goods` define none. Impl. Reg. (EU)
-/// 2026/2 Art. 3 delimits an unsold-goods disclosure by CN code rather than a
-/// category name, so its lines carry `cnCategories` instead.
+/// `mattress`, `textile` and `toy` define none.
 ///
 /// `aluminium` is absent, and that is a correction. It used to be listed with
 /// `productionRoute`, which certified a **production route** as a product

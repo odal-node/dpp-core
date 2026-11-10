@@ -84,16 +84,10 @@ impl InstrumentBinding {
     /// This is the same question [`RegulatoryStatus::allows_determination`] has
     /// always answered, moved to the altitude where it is answerable. It is
     /// **not** the question of whether a passport is required — see
-    /// [`Self::requires_passport`]. Keeping them apart matters in both
-    /// directions:
-    ///
-    /// - ESPR's unsold-goods duties bind today and are determinable, yet impose
-    ///   no passport; and
-    /// - an adjacent act's ecodesign duties bind today while its passport is
-    ///   discharged through another system entirely.
-    ///
-    /// Reading one as the other in the second case is how a passport obligation
-    /// that does not exist became assertable.
+    /// [`Self::requires_passport`]. Keeping them apart matters: an adjacent
+    /// act's ecodesign duties bind today while its passport is discharged
+    /// through another system entirely, and reading one question as the other
+    /// is how a passport obligation that does not exist became assertable.
     #[must_use]
     pub fn allows_determination(&self) -> bool {
         self.status.allows_determination()

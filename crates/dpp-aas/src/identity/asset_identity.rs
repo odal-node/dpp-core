@@ -25,9 +25,9 @@
 //!
 //! It cannot be. The asset identity is the **caller's**: a file export, an
 //! AASX package assembled for a reporting authority, or an unsold-goods
-//! disclosure — which identifies a reporting period rather than a trade item
-//! and has no product identifier at all — each need an identity the passport
-//! does not carry.
+//! disclosure — which identifies a reporting period rather than a trade item,
+//! has no product identifier at all and is not a passport — each need an
+//! identity the passport does not carry.
 //!
 //! So the identity is self-describing instead. [`Product`](Self::Product)
 //! derives its own label and needs no supervision;
@@ -74,12 +74,11 @@ impl<'a> AssetIdentity<'a> {
     ///
     /// The common case in one call — and `None` is the whole point of the
     /// signature. A passport without an identifier is not an error and not a
-    /// reason to invent one: an unsold-goods report identifies a reporting
-    /// period rather than a trade item, and an unmodelled product group whose
-    /// payload carries no valid `productIdentifier` has nothing to give. Both
-    /// give `None`, and the caller has to say what the asset is instead — which
-    /// is exactly the decision that used to be made silently by whatever string
-    /// happened to be passed.
+    /// reason to invent one: an unmodelled product group whose payload carries no
+    /// valid `productIdentifier` has nothing to give, and a passport with no
+    /// product group data has none either. Both give `None`, and the caller has
+    /// to say what the asset is instead — which is exactly the decision that
+    /// used to be made silently by whatever string happened to be passed.
     #[must_use]
     pub fn from_passport(passport: &'a dpp_domain::Passport) -> Option<Self> {
         passport

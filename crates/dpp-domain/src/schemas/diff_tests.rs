@@ -159,3 +159,58 @@ fn identical_schemas_produce_an_empty_diff() {
     assert!(diff.is_empty());
     assert!(diff.is_purely_additive(), "an empty diff adds nothing");
 }
+
+/// A requirement inside an array's items binds every row, so dropping one is a
+/// change of obligation. Only the root's `required` used to be compared, which made
+/// this diff empty and its bump "additive".
+#[test]
+fn a_requirement_dropped_inside_array_items_is_reported_at_its_path() {
+    let rows = |required: serde_json::Value| {
+        json!({
+            "type": "object",
+            "properties": {
+                "lines": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": required,
+                        "properties": {
+                            "description": { "type": "string" },
+                            "reason": { "type": "string" }
+                        }
+                    }
+                }
+            }
+        })
+    };
+
+    let diff = diff_schemas(
+        &rows(json!(["description", "reason"])),
+        &rows(json!(["description"])),
+    );
+    assert_eq!(diff.required_removed, vec!["lines/[]/reason".to_owned()]);
+    assert!(diff.required_added.is_empty());
+    assert!(!diff.is_empty());
+    assert!(!diff.is_purely_additive());
+}
+
+/// The same inside a sub-object, and a requirement added there is not additive.
+#[test]
+fn a_requirement_added_inside_a_sub_object_is_reported_at_its_path() {
+    let entity = |required: serde_json::Value| {
+        json!({
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "object",
+                    "required": required,
+                    "properties": { "name": { "type": "string" }, "id": { "type": "string" } }
+                }
+            }
+        })
+    };
+
+    let diff = diff_schemas(&entity(json!(["name"])), &entity(json!(["name", "id"])));
+    assert_eq!(diff.required_added, vec!["entity/id".to_owned()]);
+    assert!(!diff.is_purely_additive());
+}
