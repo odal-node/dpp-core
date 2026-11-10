@@ -202,6 +202,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   dropping `lines/[]/reason`, and electronics v1.0.0 → v1.1.0 as requiring
   `repairabilityScore/overall`, which it had not mentioned. (#568)
 
+- **The Annex II heading list had one heading the act does not.**
+  `dpp_rules::unsold_goods::disclosure` carried `8527` among the CN headings of
+  Annex II to Impl. Reg. (EU) 2026/2, which Art. 3 has filed at four digits instead
+  of two. The Annex has 44 headings and no `8527`: the string appears only inside
+  the description of 8517 ("other than transmission or reception apparatus of
+  heading 8443, 8525, 8527 or 8528"), and the table runs from 8524 to 8528. A
+  product with a CN code under 8527 was filed at `8527` where the act has it at
+  `85`, and `is_annex_ii_heading`, `chapter_contains_annex_ii_heading`,
+  `annex_ii_headings_in_chapter` and `cn_depth_is_correct` answered for a heading
+  the act does not list. `8527` is removed, the "45 headings" said in the
+  `unsold-goods-format-2026-2` instrument notes and in the module documentation
+  is now 44, and a test holds the list to a transcription of the Official Journal
+  table.
+  The heading had been in the list since v0.19.0. (#570)
+
 ## [0.23.0] - 2026-11-03
 
 ### Breaking
