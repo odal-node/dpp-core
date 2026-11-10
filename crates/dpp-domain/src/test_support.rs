@@ -251,7 +251,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.life_status = Some(LifeStatus::Repurposed);
     passport.retention_until = Some(now);
     passport.product_id = Some(uuid::Uuid::nil());
-    passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));
+    passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8").into());
     passport.operator_identifier = Some("DE123456789".to_owned());
     passport.responsible_operator = Some(crate::operator::ResponsibleOperatorSnapshot {
         operator: crate::operator::ResponsibleOperator {
@@ -334,7 +334,7 @@ pub(crate) fn sample_unsold_goods_report() -> crate::unsold_goods::UnsoldGoodsRe
 /// 120 units weighing 36 kg, recycled, with point (f) relied on. Tests reach in
 /// and change the one thing they are about.
 pub(crate) fn sample_discard_record() -> crate::unsold_goods::DiscardRecord {
-    use crate::identifier::CommodityCode;
+    use crate::identifier::DeclaredCommodityCode;
     use crate::unsold_goods::{DiscardReason, DiscardedQuantity};
     use crate::unsold_goods::{
         DiscardRecord, DiscardedWeight, ReceivingOperator, WasteTreatmentOperation,
@@ -343,7 +343,7 @@ pub(crate) fn sample_discard_record() -> crate::unsold_goods::DiscardRecord {
 
     DiscardRecord {
         discarded_on: NaiveDate::from_ymd_opt(2027, 3, 14).expect("valid date"),
-        cn_codes: vec![CommodityCode::parse("62034231").expect("valid CN code")],
+        cn_codes: vec![DeclaredCommodityCode::new("62034231")],
         description: "Men's cotton trousers".to_owned(),
         units: DiscardedQuantity::measured(120),
         weight: DiscardedWeight::measured(36_000),

@@ -99,6 +99,23 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   be mapped to a point without inventing one. `DerogationRef` stays as that
   read-only history. (#573, #574)
 
+- **`CommodityCode` is valid on read, and what a document declares is a
+  `DeclaredCommodityCode`.** `CommodityCode` is documented as validated and
+  `CommodityCode::parse` refuses anything but 6, 8 or 10 digits, but its
+  `Deserialize` was `#[serde(transparent)]` and never called `parse`, so `"abc"`
+  read as a code. It now does, as `Gtin` does. A document that is already written
+  is another matter: a stored passport read again, or a fetched one signed by
+  another operator, has to go on reading and write back unchanged, and the
+  envelope has no lens to correct it. So `Passport::commodity_code` and
+  `DiscardRecord::cn_codes` hold the new `DeclaredCommodityCode`, which keeps any
+  string exactly as written (`as_str`) and answers separately whether it is a valid
+  code (`validated()`, `Result<CommodityCode, CommodityCodeError>`). It writes the
+  same JSON as a `CommodityCode` and reads what was read before, so no stored
+  document changes. Code that sets either field wraps a `CommodityCode` with
+  `.into()` or builds a `DeclaredCommodityCode::new(..)`. A malformed code is
+  reported where it is used: the registry refuses to register one, and
+  `lint_discard_record` flags one. (#575, #576)
+
 ### Added
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With

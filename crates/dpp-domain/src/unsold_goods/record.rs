@@ -9,7 +9,7 @@ use super::operation::WasteTreatmentOperation;
 use super::receiver::ReceivingOperator;
 use super::retention::{Disclosure, KeepUntil, keep_until};
 use super::weight::DiscardedWeight;
-use crate::identifier::CommodityCode;
+use crate::identifier::DeclaredCommodityCode;
 use crate::unsold_goods::{DiscardReason, DiscardedQuantity};
 
 /// One discard of unsold consumer products: what, when, how much, why, to what
@@ -44,7 +44,7 @@ pub struct DiscardRecord {
     /// The CN codes of the product — Annex I note (d). More than one only where
     /// items sold together count as one unit (note (f)). Art. 3 fixes the depth
     /// the disclosure files them at; the record keeps the product's own code.
-    pub cn_codes: Vec<CommodityCode>,
+    pub cn_codes: Vec<DeclaredCommodityCode>,
     /// What the products are, in the operator's words. It stays with the record, as
     /// part of what the operator can show. The disclosure's line takes the
     /// discloser's own wording for note (e) (see

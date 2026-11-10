@@ -70,8 +70,8 @@ pub use crate::{
     disclosure::{Audience, Disclosure, PASSPORT_FIELD_DISCLOSURE},
     identifier::{
         ActorIdentifier, ActorIdentifierError, ActorPosition, CnCategory, CnCategoryError,
-        CommodityCode, CommodityCodeError, Gln, GlnAi, GlnError, Gtin, GtinError, Icd,
-        ProductIdentifier, ProductIdentifierError, gs1_check_digit,
+        CommodityCode, CommodityCodeError, DeclaredCommodityCode, Gln, GlnAi, GlnError, Gtin,
+        GtinError, Icd, ProductIdentifier, ProductIdentifierError, gs1_check_digit,
     },
     lint::{LintFinding, LintResult, LintSeverity, lint_product_group_data},
     operator::{

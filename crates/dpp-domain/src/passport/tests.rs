@@ -166,6 +166,30 @@ fn a_passport_stored_before_the_serial_existed_reads_with_none() {
     assert_eq!(back.serial_number, None);
 }
 
+/// A passport that declares a commodity code which is not a valid one reads, and
+/// writes back as the same JSON. Such a document is accepted when it is stored and
+/// signed by someone else when it is fetched, and the envelope has no lens to
+/// correct either, so the code is kept as written and is reported where it is used.
+#[test]
+fn a_passport_declaring_a_malformed_commodity_code_still_reads_and_writes_back_unchanged() {
+    for declared in ["not-a-code", " 85076000 ", "8507 60 00"] {
+        let mut json = serde_json::to_value(make_passport()).expect("serialises");
+        json["commodityCode"] = serde_json::json!(declared);
+
+        let back: Passport =
+            serde_json::from_value(json.clone()).expect("a declared code never refuses a read");
+        assert_eq!(
+            back.commodity_code.as_ref().map(|c| c.as_str()),
+            Some(declared)
+        );
+        assert_eq!(
+            serde_json::to_value(&back).unwrap(),
+            json,
+            "{declared:?} did not write back as it was read"
+        );
+    }
+}
+
 #[test]
 fn an_item_serial_round_trips_and_is_omitted_when_unstated() {
     let mut passport = make_passport();

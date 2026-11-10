@@ -121,7 +121,7 @@ as its last edit; if the two disagree, the constant is right.
 | `life_status` | `Option<LifeStatus>` | `"lifeStatus"` | Product-life status from Battery Regulation Annex XIII point 4(c): `original`, `repurposed`, `re-used`, `remanufactured` or `waste`. Separate from `status`, the publication lifecycle. Classified `Individual`. `None` where the product group's act defines no such status. See [PRODUCT-LINEAGE.md](PRODUCT-LINEAGE.md) |
 | `retention_until` | `Option<DateTime<Utc>>` | `"retentionUntil"` | Computed at publish from the instrument bindings' retention fold |
 | `product_id` | `Option<Uuid>` | `"productId"` | Opaque link to an internal product-template record. **Not a legal identifier** |
-| `commodity_code` | `Option<CommodityCode>` | `"commodityCode"` | CN code. Absent rather than guessed: a registry that requires it refuses the registration instead of the issuer inventing a classification |
+| `commodity_code` | `Option<DeclaredCommodityCode>` | `"commodityCode"` | CN code, kept as written: the type holds any string and `validated()` says whether it is a valid `CommodityCode`, so a stored or fetched passport never stops reading over it. Absent rather than guessed: a registry that requires it refuses the registration instead of the issuer inventing a classification |
 | `operator_identifier` | `Option<String>` | `"operatorIdentifier"` | The operator **at signing time**, covered by the signature. Reading it as "who is responsible today" is wrong for any passport that has changed hands |
 | `facility` | `Option<FacilitySnapshot>` | `"facility"` | A snapshot, so a retired facility never orphans a published passport |
 | `seal` | `Option<SealedEnvelope>` | `"seal"` | eIDAS qualified electronic seal over `jws_signature` |
