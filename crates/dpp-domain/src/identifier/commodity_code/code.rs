@@ -30,9 +30,26 @@ use serde::{Deserialize, Serialize};
 use super::error::CommodityCodeError;
 
 /// A validated customs tariff classification: HS-6, CN-8 or TARIC-10.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Valid by construction, and **valid on read**: deserialising one calls
+/// [`parse`](Self::parse), as [`Gtin`](crate::Gtin) does, so `"abc"` is refused.
+/// A document that is already written is a different case: one that declares a
+/// code which is not valid has to keep reading, and to write back as it was. That
+/// is [`DeclaredCommodityCode`](super::DeclaredCommodityCode), which keeps any
+/// string and answers [`validated`](super::DeclaredCommodityCode::validated)
+/// separately.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
 pub struct CommodityCode(String);
+
+impl<'de> Deserialize<'de> for CommodityCode {
+    /// Reads through [`parse`](CommodityCode::parse), so a string that is not a
+    /// code is refused.
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Self::parse(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 impl CommodityCode {
     /// Parse a commodity code, accepting the HS, CN and TARIC lengths.

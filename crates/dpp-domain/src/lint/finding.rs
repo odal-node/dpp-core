@@ -50,7 +50,7 @@ pub fn lint_discard_record(record: &DiscardRecord) -> Vec<LintFinding> {
     let cn_codes: Vec<&str> = record
         .cn_codes
         .iter()
-        .map(crate::identifier::CommodityCode::as_str)
+        .map(crate::identifier::DeclaredCommodityCode::as_str)
         .collect();
     let input = dpp_rules::lint::unsold_goods::DiscardRecordLintInput {
         cn_codes: &cn_codes,

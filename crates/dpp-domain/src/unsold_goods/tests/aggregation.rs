@@ -2,7 +2,7 @@
 
 use chrono::NaiveDate;
 
-use crate::identifier::CommodityCode;
+use crate::identifier::DeclaredCommodityCode;
 use crate::test_support::sample_discard_record;
 use crate::unsold_goods::{
     CnCategory, DiscardReason, DiscardedProductLine, DiscardedQuantity, FinancialYear,
@@ -196,7 +196,7 @@ fn records_with_different_labels_do_not_share_a_line() {
 #[test]
 fn an_annex_ii_heading_files_at_four_digits_and_other_goods_at_two() {
     let fridge = DiscardRecord {
-        cn_codes: vec![CommodityCode::parse("84181000").unwrap()],
+        cn_codes: vec![DeclaredCommodityCode::new("84181000")],
         ..record()
     };
     let lines = lines(&[fridge, record()]);
@@ -210,7 +210,7 @@ fn an_annex_ii_heading_files_at_four_digits_and_other_goods_at_two() {
 #[test]
 fn headings_of_one_chapter_outside_annex_ii_share_a_line() {
     let blouse = DiscardRecord {
-        cn_codes: vec![CommodityCode::parse("62064000").unwrap()],
+        cn_codes: vec![DeclaredCommodityCode::new("62064000")],
         ..record()
     };
     let lines = lines(&[record(), blouse]);
@@ -224,9 +224,9 @@ fn headings_of_one_chapter_outside_annex_ii_share_a_line() {
 fn a_kit_is_filed_under_every_category_it_names() {
     let kit = DiscardRecord {
         cn_codes: vec![
-            CommodityCode::parse("62034231").unwrap(),
-            CommodityCode::parse("34011100").unwrap(),
-            CommodityCode::parse("62064000").unwrap(),
+            DeclaredCommodityCode::new("62034231"),
+            DeclaredCommodityCode::new("34011100"),
+            DeclaredCommodityCode::new("62064000"),
         ],
         ..record()
     };
@@ -240,8 +240,8 @@ fn a_kit_is_filed_under_every_category_it_names() {
 fn a_kit_and_a_single_category_do_not_share_a_line() {
     let kit = DiscardRecord {
         cn_codes: vec![
-            CommodityCode::parse("62034231").unwrap(),
-            CommodityCode::parse("34011100").unwrap(),
+            DeclaredCommodityCode::new("62034231"),
+            DeclaredCommodityCode::new("34011100"),
         ],
         ..record()
     };
@@ -304,8 +304,8 @@ fn a_line_with_no_supplied_wording_is_described_by_its_categories() {
 
     let kit = DiscardRecord {
         cn_codes: vec![
-            CommodityCode::parse("62034231").unwrap(),
-            CommodityCode::parse("61091000").unwrap(),
+            DeclaredCommodityCode::new("62034231"),
+            DeclaredCommodityCode::new("61091000"),
         ],
         ..record()
     };
@@ -506,7 +506,7 @@ fn an_exclusion_names_the_record_by_its_position() {
 #[test]
 fn lines_come_out_in_a_fixed_order() {
     let fridge = DiscardRecord {
-        cn_codes: vec![CommodityCode::parse("84181000").unwrap()],
+        cn_codes: vec![DeclaredCommodityCode::new("84181000")],
         ..record()
     };
     let dangerous = DiscardRecord {

@@ -213,8 +213,9 @@ never confused.
   or batch identifier is treated as lawful, because both obligations depend on such a
   design existing, and recital (14) says products unique by nature have neither. `item_id`
   depends on the declared level rather than being unconditional.
-- **Commodity code:** `CommodityCode` on the passport and the registration payload,
-  validated *structurally* as HS-6, CN-8 or TARIC-10. Whether a code falls inside the range
+- **Commodity code:** `DeclaredCommodityCode` on the passport (kept as written, valid or not)
+  and a string on the registration payload that `CommodityCode::parse` validates
+  *structurally* as HS-6, CN-8 or TARIC-10. Whether a code falls inside the range
   a product group permits (Art. 8(7)(d)) is **not** checked here: those ranges live in the
   applicable delegated act. Absence remains lawful, because the obligation applies "where
   relevant".
