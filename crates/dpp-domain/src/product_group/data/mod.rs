@@ -21,7 +21,6 @@ pub mod tyre;
 pub mod unmodelled;
 #[cfg(test)]
 mod unmodelled_tests;
-pub mod unsold_goods;
 
 pub use aluminium::AluminiumData;
 pub use battery::{
@@ -45,8 +44,3 @@ pub use textile::{FibreEntry, TextileData};
 pub use toy::ToyData;
 pub use tyre::TyreData;
 pub use unmodelled::UnmodelledPayload;
-pub use unsold_goods::{
-    CnCategory, CnCategoryError, DiscardReason, DiscardedProductLine, DiscardedQuantity,
-    DisclosingEntity, DisclosureScope, FinancialYear, LegalEntityIdentifier, UnsoldGoodsReport,
-    WasteTreatmentSplit,
-};

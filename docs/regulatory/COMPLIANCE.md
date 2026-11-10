@@ -51,7 +51,6 @@ so stored passports remain valid against the version they declare.
 |---|---|---|---|---|
 | `battery` | v2.10.0 | Regulation (EU) 2023/1542 | in force | Annex XIII points 1 to 4 and Annex VI Part A; per-property `x-disclosure` |
 | `electronics` | v1.5.0 | Regulations (EU) 2023/1670 and 2023/1669 | in force | Phones and tablets. The passport duty is displaced to EPREL |
-| `unsold-goods` | v2.0.0 | ESPR Arts. 24 and 25; Regulations (EU) 2026/2 and 2026/296 | in force | A yearly disclosure, not a passport |
 | `textile` | v1.4.0 | ESPR | provisional | Fibre composition, durability, microplastics; no delegated act yet |
 | `steel` | v1.2.0 | ESPR | provisional | Production route and embedded emissions, aligned with CBAM |
 | `aluminium` | v1.2.0 | ESPR | provisional | Production route, CO₂e per tonne, recycled content |
@@ -61,6 +60,8 @@ so stored passports remain valid against the version they declare.
 | `construction` | v1.2.0 | Regulation (EU) 2024/3110 (CPR) | provisional | |
 | `detergent` | v1.2.0 | Regulation (EU) 2026/405 | provisional | Surfactant bands per its Annex VII |
 | `toy` | v1.2.0 | Regulation (EU) 2025/2509 | provisional | |
+
+The unsold-goods disclosure (ESPR Arts. 24 and 25; Regulations (EU) 2026/2 and 2026/296, in force) is not a product group. It is a yearly disclosure, not a passport, that binds an operator over every product group; its schema (v2.0.0) is held apart from the product groups' in `dpp_domain::unsold_goods`.
 
 The current version per product group is resolved by `ProductGroupCatalog`, not
 hard-coded at call sites. [REGULATORY.md](REGULATORY.md) says which product groups carry

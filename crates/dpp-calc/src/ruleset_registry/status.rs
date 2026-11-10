@@ -193,13 +193,5 @@ pub fn product_group_calculator_map() -> &'static [ProductGroupCalculatorEntry] 
             methodology: "recycled-content-art8",
             implementation: CalculatorImpl::Ruleset("battery-recycled-content-art8-3"),
         },
-        // ── Unsold goods ─────────────────────────────────────────────────────
-        ProductGroupCalculatorEntry {
-            product_group_key: "unsoldGoods",
-            product_category: "all",
-            methodology: "unsold-goods-reporting",
-            // ESPR Art. 25 imposes reporting/prohibition obligations only.
-            implementation: CalculatorImpl::ReportingOnly,
-        },
     ]
 }

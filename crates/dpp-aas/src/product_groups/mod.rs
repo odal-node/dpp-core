@@ -15,7 +15,6 @@ mod battery;
 mod dispatch;
 mod electronics;
 mod textile;
-mod unsold_goods;
 
 use dpp_domain::Passport;
 
@@ -50,11 +49,9 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
     // either: self-evident to a human reading it, not to a consumer keying on
     // it.
     //
-    // 🚨 Absent for two different reasons, and the emitter must tolerate both:
-    // an unsold-goods report identifies a reporting period rather than a trade
-    // item and has no identifier by law, while an unmodelled product group with
-    // no policy is reduced to its discriminant before any mapper runs, which
-    // leaves no `productIdentifier` to read. Neither may be unwrapped.
+    // 🚨 Absent when an unmodelled product group with no policy has been reduced
+    // to its discriminant before any mapper runs, which leaves no
+    // `productIdentifier` to read. It may not be unwrapped.
     if let Some(identifier) = passport
         .product_group_data
         .as_ref()

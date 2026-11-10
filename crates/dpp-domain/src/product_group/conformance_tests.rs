@@ -176,10 +176,6 @@ fn sample_mattress_data() -> ProductGroupData {
     })
 }
 
-fn sample_unsold_goods_data() -> ProductGroupData {
-    ProductGroupData::UnsoldGoods(crate::test_support::sample_unsold_goods_report())
-}
-
 #[test]
 fn every_product_group_with_an_embedded_schema_round_trips_through_its_current_schema() {
     let catalog = ProductGroupCatalog::new();
@@ -188,7 +184,6 @@ fn every_product_group_with_an_embedded_schema_round_trips_through_its_current_s
     let samples: Vec<ProductGroupData> = vec![
         minimal_battery_data(),
         ProductGroupData::Textile(Box::new(test_textile_data())),
-        sample_unsold_goods_data(),
         sample_steel_data(),
         sample_electronics_data(),
         sample_construction_data(),
@@ -208,7 +203,7 @@ fn every_product_group_with_an_embedded_schema_round_trips_through_its_current_s
     // one group it skipped.
     assert_eq!(
         samples.len(),
-        12,
+        11,
         "expected one sample per non-Other product_group"
     );
 
@@ -242,7 +237,7 @@ fn every_product_group_with_an_embedded_schema_round_trips_through_its_current_s
 /// A table rather than an assertion per group, because the interesting failure
 /// is a *changed* answer: seven groups name their category axis seven different
 /// things, so reading the wrong field compiles, type-checks, and returns a
-/// perfectly plausible string. Pinning all twelve in one place makes such a
+/// perfectly plausible string. Pinning all eleven in one place makes such a
 /// change show up as an edit to this list.
 const EXPECTED_CATEGORY: &[(&str, Option<&str>)] = &[
     // Answers — the group's own category axis, whatever its act calls it.
@@ -261,7 +256,6 @@ const EXPECTED_CATEGORY: &[(&str, Option<&str>)] = &[
     ("mattress", None),
     ("textile", None),
     ("toy", None),
-    ("unsoldGoods", None),
 ];
 
 #[test]
@@ -269,7 +263,6 @@ fn every_product_group_reports_the_category_it_states() {
     let samples: Vec<ProductGroupData> = vec![
         minimal_battery_data(),
         ProductGroupData::Textile(Box::new(test_textile_data())),
-        sample_unsold_goods_data(),
         sample_steel_data(),
         sample_electronics_data(),
         sample_construction_data(),

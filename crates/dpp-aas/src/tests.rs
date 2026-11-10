@@ -17,18 +17,18 @@ fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
 use chrono::Utc;
 use dpp_domain::Audience;
 use dpp_domain::identifier::ProductIdentifier;
+use dpp_domain::unsold_goods::UnsoldGoodsReport;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
     PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
-    UnsoldGoodsReport,
 };
 use serde_json::json;
 
 /// A minimal Annex I disclosure — one line, split totalling 100.
 fn sample_unsold_goods_report() -> UnsoldGoodsReport {
     use chrono::NaiveDate;
-    use dpp_domain::{
+    use dpp_domain::unsold_goods::{
         CnCategory, DiscardReason, DiscardedProductLine, DiscardedQuantity, DisclosingEntity,
         DisclosureScope, FinancialYear, LegalEntityIdentifier, WasteTreatmentSplit,
     };
@@ -928,13 +928,17 @@ fn non_object_input_produces_empty_submodel() {
 // ── New product group builder tests ──────────────────────────────────────────────
 
 #[test]
-fn build_aas_unsold_goods_produces_product_group_submodel() {
-    let mut passport = minimal_passport(ProductGroup::UnsoldGoods);
-    passport.product_group_data = Some(ProductGroupData::UnsoldGoods(sample_unsold_goods_report()));
-    let (_, submodels) =
-        build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
-            .expect("masking");
-    let sub = submodels.iter().find(|s| s.id_short == "UnsoldGoods");
+fn build_aas_unsold_goods_produces_the_disclosure_submodel() {
+    let environment = build_unsold_goods_environment(
+        &sample_unsold_goods_report(),
+        "assetKey",
+        "urn:odal-node:test-asset:1",
+    )
+    .expect("a valid caller-chosen asset key");
+    let sub = environment
+        .submodels
+        .iter()
+        .find(|s| s.id_short == "UnsoldGoods");
     assert!(sub.is_some(), "UnsoldGoods submodel missing");
 
     let id_shorts: Vec<&str> = sub
@@ -1241,4 +1245,64 @@ fn the_point_1_conditions_and_safety_data_project() {
     assert!(json.contains("minC") && json.contains("maxC"));
     // Nickel sulfate is Annex VI Part A point 8 content and public.
     assert!(json.contains("7786-81-4"));
+}
+
+/// A disclosure is no trade item and has no product identifier, so the export names
+/// the asset by a key the caller chose, and refuses a key that claims a name a
+/// clause 5 scheme derives — the defect `AssetIdentity` exists to remove.
+#[test]
+fn an_unsold_goods_export_refuses_an_asset_name_a_scheme_derives() {
+    for reserved in crate::RESERVED_ASSET_ID_NAMES {
+        let refused = build_unsold_goods_environment(
+            &sample_unsold_goods_report(),
+            reserved,
+            "urn:odal-node:test-asset:1",
+        )
+        .expect_err("a reserved name is refused");
+        assert!(
+            matches!(refused, crate::AasError::ReservedAssetIdName(_)),
+            "{reserved}: {refused:?}"
+        );
+    }
+}
+
+#[test]
+fn an_unsold_goods_export_refuses_an_asset_value_that_cannot_appear_in_a_uri() {
+    let refused =
+        build_unsold_goods_environment(&sample_unsold_goods_report(), "assetKey", "two words")
+            .expect_err("whitespace cannot appear in a URI");
+    assert!(
+        matches!(refused, crate::AasError::UnusableAssetIdentity(_)),
+        "{refused:?}"
+    );
+}
+
+/// The shell names the asset by the caller's key and references the one submodel
+/// the export carries.
+#[test]
+fn an_unsold_goods_export_names_the_asset_and_references_its_submodel() {
+    let environment = build_unsold_goods_environment(
+        &sample_unsold_goods_report(),
+        "assetKey",
+        "urn:odal-node:test-asset:1",
+    )
+    .expect("a valid caller-chosen asset key");
+
+    let [shell] = environment.asset_administration_shells.as_slice() else {
+        panic!("one shell");
+    };
+    assert_eq!(
+        shell.asset_information.global_asset_id,
+        "urn:odal-node:test-asset:1"
+    );
+    assert_eq!(
+        shell.asset_information.specific_asset_ids[0].name,
+        "assetKey"
+    );
+    assert_eq!(shell.submodels.len(), 1);
+    assert_eq!(environment.submodels.len(), 1);
+    assert_eq!(
+        shell.submodels[0].keys[0].value,
+        environment.submodels[0].id
+    );
 }

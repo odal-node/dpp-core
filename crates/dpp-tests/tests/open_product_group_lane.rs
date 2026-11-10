@@ -115,18 +115,44 @@ fn known_product_groups_still_deserialize_to_their_typed_variants() {
 }
 
 #[test]
-fn the_kebab_case_catalog_spelling_resolves_to_the_typed_variant() {
-    // Two spellings are in circulation — the catalog's kebab-case key and the
-    // camelCase wire tag. Both name one product group, and neither may fall
-    // through to the untyped lane.
-    assert_eq!(
-        ProductGroup::from_wire_tag("unsold-goods"),
-        ProductGroup::UnsoldGoods
-    );
-    assert_eq!(
-        ProductGroup::from_wire_tag("unsoldGoods"),
-        ProductGroup::UnsoldGoods
-    );
+fn the_catalog_spelling_and_the_wire_tag_both_resolve_to_the_typed_variant() {
+    // Two spellings are in circulation — the catalog's key and the camelCase wire
+    // tag. Both name one product group, and neither may fall through to the
+    // untyped lane. No group has a hyphen in its key today, so the two agree; the
+    // test holds for the one that does.
+    for group in [
+        ProductGroup::Battery,
+        ProductGroup::Textile,
+        ProductGroup::Steel,
+        ProductGroup::Electronics,
+        ProductGroup::Construction,
+        ProductGroup::Tyre,
+        ProductGroup::Toy,
+        ProductGroup::Aluminium,
+        ProductGroup::Furniture,
+        ProductGroup::Mattress,
+        ProductGroup::Detergent,
+    ] {
+        assert_eq!(ProductGroup::from_wire_tag(group.catalog_key()), group);
+        assert_eq!(ProductGroup::from_wire_tag(group.wire_str()), group);
+    }
+}
+
+/// Unsold goods is not a product group, so a payload tagged as one is an unknown
+/// group's, and is carried verbatim rather than refused or mistaken for a typed
+/// variant.
+#[test]
+fn a_payload_tagged_unsold_goods_is_an_unknown_product_group() {
+    for tag in ["unsoldGoods", "unsold-goods"] {
+        let payload = json!({ "productGroup": tag, "lines": [] });
+        let data: ProductGroupData =
+            serde_json::from_value(payload.clone()).expect("an unknown tag is carried");
+        assert!(
+            matches!(data, ProductGroupData::Other(_)),
+            "'{tag}' resolved to {data:?}"
+        );
+        assert_eq!(data.product_group(), ProductGroup::Other(tag.to_owned()));
+    }
 }
 
 #[test]
@@ -146,7 +172,7 @@ fn the_untyped_variant_cannot_alias_a_typed_product_group() {
     // that product group which does not compare equal to the first: it would miss
     // every typed match arm and be refused by validation, while the same bytes
     // deserialized normally produce a valid typed value.
-    for typed in ["battery", "textile", "unsoldGoods", "unsold-goods", "toy"] {
+    for typed in ["battery", "textile", "toy"] {
         assert!(
             ProductGroupData::other(json!({ "productGroup": typed })).is_none(),
             "ProductGroupData::other accepted '{typed}', which has a typed variant"

@@ -788,9 +788,6 @@ impl Passport {
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `product_group_data.product group()` matches `self.product_group` if present
-    /// - for `ProductGroup::UnsoldGoods`, the disclosure carries at least one
-    ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
-    ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     ///
     /// **A write-time check, not a verdict on a fetched passport.** These are
     /// the invariants a record must meet to be created or published. A passport
@@ -914,30 +911,6 @@ impl Passport {
             && let Err(disagreement) = self.declared_placing_date(battery)
         {
             errors.push(disagreement);
-        }
-
-        // An unsold-goods record is a disclosure by an undertaking over a
-        // financial year, not a product placed on the market, so the envelope's
-        // `commodity_code` has nothing to describe: the categories are on the
-        // lines, and there are many of them.
-        //
-        // This deliberately no longer requires Annex VII scope. **Art. 24
-        // (disclosure) and Art. 25 (destruction ban) have different scopes** —
-        // the ban reaches Annex VII's apparel and footwear, while the disclosure
-        // reaches discarded unsold *consumer products* generally, which Impl.
-        // Reg. (EU) 2026/2 Annex II illustrates across 45 CN headings from soap
-        // to refrigerators. Requiring Annex VII here rejected every lawful
-        // disclosure outside apparel and footwear.
-        if self.product_group == ProductGroup::UnsoldGoods
-            && let Some(ProductGroupData::UnsoldGoods(report)) = &self.product_group_data
-            && report.lines.is_empty()
-        {
-            errors.push(FieldError {
-                field: "/productGroupData/lines".to_owned(),
-                message: "an unsold-goods disclosure must carry at least one product line \
-                          (Impl. Reg. (EU) 2026/2 Annex I)"
-                    .to_owned(),
-            });
         }
 
         // Schema conformance is deliberately NOT checked here. It needs the

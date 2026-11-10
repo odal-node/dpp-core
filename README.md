@@ -191,13 +191,19 @@ one, so an application can refuse to run on it in production.
 ## What the library models
 
 **Product groups as data.** Each product group (battery, textile, electronics, steel,
-aluminium, construction, detergent, furniture, mattress, toy, tyre, and the
-unsold-goods disclosure) is an embedded manifest in
+aluminium, construction, detergent, furniture, mattress, toy, tyre) is an embedded
+manifest in
 [`crates/dpp-domain/product-groups/`](crates/dpp-domain/product-groups) with
 versioned schemas under [`crates/dpp-domain/schemas/`](crates/dpp-domain/schemas).
 The manifest's `currentSchemaVersion` is the source of truth for the current
 version. Old passports stay readable: read-time lenses upcast older product data to
 newer schema versions without touching the signed bytes.
+
+**The unsold-goods disclosure is not a product group.** ESPR Art. 24 reaches
+discarded unsold consumer products generally, so the duty is an operator's over every
+product group, and the disclosure is not the data of a passport. It has its own
+module, `dpp_domain::unsold_goods`, and its own versioned schemas under
+[`crates/dpp-domain/document-schemas/`](crates/dpp-domain/document-schemas).
 
 **Applicable law as a set.** `InstrumentCatalog` records, per act and product group,
 whether a passport is required and from when. Several acts can apply to one product

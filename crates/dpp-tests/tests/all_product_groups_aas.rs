@@ -23,7 +23,7 @@ use dpp_domain::{
     AluminiumData, ConstructionData, DetergentData, DeviceType, ElectronicsData,
     EnergyEfficiencyClass, FibreEntry, FurnitureData, Gtin, MattressData, ProductGroup,
     ProductGroupData, ProductionRoute, RepairabilityScore, SteelData, SurfactantEntry,
-    SvhcSubstance, TextileData, ToyData, TyreData, UnsoldGoodsReport,
+    SvhcSubstance, TextileData, ToyData, TyreData,
 };
 use dpp_tests::fixtures::base_passport as base;
 
@@ -224,10 +224,6 @@ fn detergent_data() -> DetergentData {
     }
 }
 
-fn unsold_goods_report() -> UnsoldGoodsReport {
-    dpp_tests::fixtures::unsold_goods_report()
-}
-
 /// Every product group's data, paired with its schema version and the expected
 /// product group-submodel `idShort`.
 fn all_product_group_cases() -> Vec<(ProductGroup, ProductGroupData, &'static str, &'static str)> {
@@ -295,23 +291,8 @@ fn all_product_group_cases() -> Vec<(ProductGroup, ProductGroupData, &'static st
             "1.0.0",
             "DetergentProductData",
         ),
-        (
-            ProductGroup::UnsoldGoods,
-            ProductGroupData::UnsoldGoods(unsold_goods_report()),
-            "2.0.0",
-            "UnsoldGoodsReport",
-        ),
     ]
 }
-
-/// Product groups whose passport carries no product identifier, each for a
-/// stated reason — the written exception the shared emitter needs.
-///
-/// 🚨 Two different facts that look identical at the call site. `unsold-goods`
-/// identifies a *reporting period* rather than a trade item and has no
-/// identifier **by law**; an unmodelled group has none because it was reduced
-/// to its discriminant before any mapper ran. Only the first belongs here.
-const GROUPS_WITH_NO_PRODUCT_IDENTIFIER: [&str; 1] = ["unsold-goods"];
 
 /// 🚨 The identity travels with every passport, not with whichever product
 /// groups someone remembered.
@@ -319,7 +300,7 @@ const GROUPS_WITH_NO_PRODUCT_IDENTIFIER: [&str; 1] = ["unsold-goods"];
 /// Two of the four typed mappers emitted `productIdentifier` into their own
 /// submodel and two did not, and the **eight** catalogued groups with no typed
 /// mapper at all emitted it nowhere. Emitting it from `ProductIdentification`,
-/// which every passport gets, is what makes this assertable for all twelve
+/// which every passport gets, is what makes this assertable for all eleven
 /// rather than for the ones that happened to have a mapper.
 #[test]
 fn every_passport_carries_its_identifier_in_the_identification_submodel() {
@@ -355,13 +336,6 @@ fn every_passport_carries_its_identifier_in_the_identification_submodel() {
             })
             .collect();
 
-        if GROUPS_WITH_NO_PRODUCT_IDENTIFIER.contains(&key.as_str()) {
-            assert!(
-                !names.contains(&"productIdentifier"),
-                "{key} identifies no product and must not claim to: {names:?}"
-            );
-            continue;
-        }
         assert!(
             names.contains(&"productIdentifier"),
             "{key} carries an identifier but the projection drops it: {names:?}"
@@ -374,7 +348,7 @@ fn every_passport_carries_its_identifier_in_the_identification_submodel() {
         );
     }
     // A count, so an empty case list cannot pass this by vacuum.
-    assert_eq!(checked, 12, "expected all twelve product groups");
+    assert_eq!(checked, 11, "expected all eleven product groups");
 }
 
 #[test]
@@ -400,9 +374,8 @@ fn every_product_group_produces_a_valid_aas_shell() {
         );
         assert_eq!(shell.submodels.len(), 6);
         // 🚨 Not `contains(VALID_GTIN)` any more. The shell now names the asset
-        // by whatever actually identifies it: a GTIN for the ten groups whose
-        // fixture carries one, and the caller-chosen key for unsold goods,
-        // which identifies a reporting period rather than a trade item.
+        // by whatever actually identifies it: a GTIN for the groups whose
+        // fixture carries one, and a caller-chosen key for any that does not.
         let identity = identity_of(&passport);
         assert!(
             shell
@@ -689,11 +662,9 @@ use dpp_vocab::VocabularyRegister;
 /// The identity a projection is asked for: the passport's own where it has
 /// one, a caller-chosen key where it does not.
 ///
-/// 🚨 The `None` arm is not a fixture defect. An unsold-goods report covers a
-/// financial year across many products and identifies no single one, and an
-/// unmodelled product group is reduced to its discriminant before any mapper
-/// runs. Both reach here with no identifier, and both need the caller to say
-/// what the asset is instead.
+/// 🚨 The `None` arm is not a fixture defect. An unmodelled product group is
+/// reduced to its discriminant before any mapper runs, so it reaches here with
+/// no identifier, and the caller has to say what the asset is instead.
 fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
     AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
         name: "assetKey",
@@ -1497,6 +1468,48 @@ fn every_product_group_environment_is_schema_valid() {
     assert!(checked > 0, "the gate asserted nothing");
 }
 
+// ─── the unsold-goods disclosure export ──────────────────────────────────────
+
+/// A disclosure is not a passport, so it is not one of `all_product_group_cases`:
+/// its Environment is built through its own entry point, under a key the caller
+/// chose, and held to the same gates below.
+fn unsold_goods_environment() -> dpp_aas::AasEnvironment {
+    dpp_aas::build_unsold_goods_environment(
+        &dpp_tests::fixtures::unsold_goods_report(),
+        "assetKey",
+        "urn:odal-node:test-asset:1",
+    )
+    .expect("a disclosure is exportable under a caller-chosen asset key")
+}
+
+#[test]
+fn the_unsold_goods_export_is_schema_valid() {
+    let document = serde_json::to_value(unsold_goods_environment()).expect("serialises");
+    assert_valid_aas(&document, "the unsold-goods disclosure export");
+}
+
+/// The export's one submodel carries a semantic id of its own, and it is held to the
+/// same rule as every other: in our namespace, or provenanced.
+#[test]
+fn the_unsold_goods_export_emits_only_permitted_semantic_ids() {
+    let mut found = Vec::new();
+    collect_semantic_ids(
+        &serde_json::to_value(unsold_goods_environment()).unwrap(),
+        "",
+        &mut found,
+    );
+    assert!(
+        !found.is_empty(),
+        "the export emitted no semanticIds — the walker missed its path"
+    );
+    for (path, id) in &found {
+        assert!(
+            is_permitted(id),
+            "the unsold-goods export emits unprovenanced semanticId '{id}' at '{path}'"
+        );
+    }
+}
+
 /// The generic fallback path is validated too.
 ///
 /// It builds `idShort`s from arbitrary operator-supplied JSON keys, and
@@ -1798,6 +1811,26 @@ fn committed_environments_match_what_the_mappers_produce() {
                 Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
                 Ok(_) => stale.push("scenario-model-level-did".to_owned()),
                 Err(_) => stale.push("scenario-model-level-did (missing)".to_owned()),
+            }
+        }
+    }
+
+    // The unsold-goods disclosure export, which no product group carries. Committed
+    // beside the rest so the loader oracle, which globs this directory, runs the
+    // reference implementation over it too.
+    {
+        let rendered = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&unsold_goods_environment()).expect("serialises")
+        );
+        let path = environment_fixture_path("unsold-goods");
+        if updating {
+            std::fs::write(&path, &rendered).expect("fixture is writable");
+        } else {
+            match std::fs::read_to_string(&path) {
+                Ok(committed) if committed.replace("\r\n", "\n") == rendered => {}
+                Ok(_) => stale.push("unsold-goods".to_owned()),
+                Err(_) => stale.push("unsold-goods (missing)".to_owned()),
             }
         }
     }
