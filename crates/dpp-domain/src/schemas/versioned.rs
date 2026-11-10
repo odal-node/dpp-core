@@ -326,6 +326,8 @@ impl VersionedSchemaRegistry {
     ) -> Result<(), crate::field_error::ValidationErrors> {
         use crate::field_error::{FieldError, ValidationErrors};
 
+        const MAX_REPORTED_ERRORS: usize = 100;
+
         let compiled = self
             .compiled_schema(product_group, version)
             .ok_or_else(|| ValidationErrors {
@@ -337,8 +339,12 @@ impl VersionedSchemaRegistry {
                 }],
             })?;
 
+        // Reporting every failure of a compact schema can cost far more than the
+        // schema is worth: one definition reached through many branches repeats
+        // its failures at each. The first failures are what a caller can act on.
         let errors: Vec<FieldError> = compiled
             .iter_errors(data)
+            .take(MAX_REPORTED_ERRORS)
             .map(|e| FieldError {
                 field: e.instance_path().to_string(),
                 message: e.to_string(),

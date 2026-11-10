@@ -24,6 +24,8 @@ mod path_matching_tests;
 mod personal_data_view_tests;
 pub mod policy;
 #[cfg(test)]
+mod policy_construction_tests;
+#[cfg(test)]
 mod policy_tests;
 #[cfg(test)]
 mod redaction_tests;

@@ -120,6 +120,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   read-only history. A build older than this one refuses a `Destroyed` event
   written without `derogation`, since the key is left out then. (#573, #574)
 
+- **Integers beyond ±(2^53 − 1) are refused by canonicalization.** `canonicalize`
+  and the `dpp-rules` content hash used to write such an integer as the nearest
+  double, so two different integers shared one signed form. Represent larger
+  exact values as strings. Migration: a document that carried one no longer
+  signs or verifies until its value is a string. (#563)
+- **`complianceResult` is no longer a patchable field.** `patch_fields` refuses
+  it, since it is a host-computed determination. `lintResult` stays patchable. (#563)
+- **A current-format key store with no integrity tag is refused by both open
+  doors.** Only a store written before the tag existed can be migrated.
+  Migration also refuses a stored public key that does not match its private key. (#563)
+- **Policy schemas that cannot be read in full are refused.** A property name
+  containing a dot, two declarations of one path with conflicting classes
+  (`conformity` and `individual`), a disclosure annotation under an unread keyword,
+  or a reference graph past the walk budget yields no policy. (#563)
+- **`TransferError` has a `PassportMismatch` variant,** returned when a record for
+  another passport is appended to a chain. (#563)
+- **The status-list decoder refuses a bitstring past 16 MiB decompressed**
+  (`MAX_DECODED_BYTES`). A larger list read before. Migration: a caller that needs
+  one passes its own budget to `from_encoded_list_within`. (#563)
+
 ### Added
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
@@ -257,6 +277,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   is now 44, and a test holds the list to a transcription of the Official Journal
   table.
   The heading had been in the list since v0.19.0. (#570)
+
+- Whole-passport filtering drops the root proofs for every audience, and a
+  personal-data statement is withheld with the field it describes. (#563)
+- The default `patch_fields` refuses content changes once retention is locked. (#563)
+- A draft that carries a publication timestamp, or a suspended passport that
+  carries none, cannot be published by skipping the mandatory-content gate. (#563)
+- Compromise rotation revokes every archived copy of the compromised key, not only
+  the newest archive. (#563)
+- Qualifier values of only dots are refused, since URI normalization removes them. (#563)
+- Schema-driven policy classification treats a universal conformity field as a
+  floor that a product rule cannot lower. (#563)
 
 ## [0.23.0] - 2026-11-03
 

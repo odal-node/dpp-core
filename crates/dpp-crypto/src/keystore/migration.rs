@@ -3,8 +3,10 @@ use aes_gcm::{
     aead::{Aead, KeyInit, consts::U12},
 };
 use anyhow::{Context, Result};
+use ed25519_dalek::SigningKey;
 use rand::Rng;
-use zeroize::Zeroize;
+use sha2::{Digest, Sha256};
+use zeroize::{Zeroize, Zeroizing};
 
 use super::crypto::derive_aes_key_argon2;
 use super::store::{KeyRecord, KeyRecordMap, KeyStore};
@@ -85,9 +87,28 @@ impl KeyStore {
                 self.cipher
                     .decrypt(nonce, record.encrypted_signing_key.as_ref())
             };
-            let mut raw = opened.map_err(|_| {
+            // Cleared on every exit, the refusals below included.
+            let raw = Zeroizing::new(opened.map_err(|_| {
                 anyhow::anyhow!("AES-GCM decrypt failed during migration for key {id}")
-            })?;
+            })?);
+
+            // The decrypted private key is the authenticated value; the public key
+            // and fingerprint beside it are plaintext metadata. Check them against
+            // the private key before they are written under a fresh integrity tag.
+            let mut seed: [u8; 32] = raw
+                .as_slice()
+                .try_into()
+                .map_err(|_| anyhow::anyhow!("stored signing key for {id} is not 32 bytes"))?;
+            let verifying_key = SigningKey::from_bytes(&seed).verifying_key();
+            seed.zeroize();
+            let derived_hex = hex::encode(verifying_key.as_bytes());
+            let derived_fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
+            anyhow::ensure!(
+                record.verifying_key_hex == derived_hex
+                    && record.fingerprint == derived_fingerprint,
+                "stored public key for {id} does not match its private key; \
+                 refusing to migrate the store"
+            );
 
             // Re-encrypt with new cipher + fresh nonce.
             let mut nonce_bytes = [0u8; 12];
@@ -97,12 +118,11 @@ impl KeyStore {
                 .encrypt(
                     new_nonce,
                     aes_gcm::aead::Payload {
-                        msg: raw.as_ref(),
+                        msg: raw.as_slice(),
                         aad: record.fingerprint.as_bytes(),
                     },
                 )
                 .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed during migration"))?;
-            raw.zeroize();
 
             migrated.insert(
                 id.clone(),

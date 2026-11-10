@@ -142,6 +142,27 @@ pub fn redact_passport(passport: &Passport, audience: Audience) -> PassportView 
     PassportView(view)
 }
 
+/// Whether `audience` may see the product-group field that a personal-data
+/// statement is keyed by. A statement is visible only when that field is: every
+/// key on the way to it must be visible, and the filter makes that same walk.
+/// Shared with [`super::filter_by_audience`], so the two cannot disagree.
+pub(super) fn may_see_personal_data_field(
+    policy: &ProductGroupAccessPolicy,
+    audience: Audience,
+    field: &str,
+) -> bool {
+    let mut path = vec!["productGroupData"];
+    path.extend(field.split('.'));
+    (1..=path.len()).all(|depth| {
+        let scope = if depth == 1 {
+            DocumentScope::Envelope
+        } else {
+            DocumentScope::ProductGroupData
+        };
+        audience.may_see(policy.disclosure_for_path(&path[..depth], scope))
+    })
+}
+
 /// The passport's personal-data statements that `audience` may see, as JSON, or
 /// `None` when it may see none.
 ///
@@ -158,18 +179,7 @@ fn visible_statements(
     let visible: serde_json::Map<String, serde_json::Value> = passport
         .personal_data
         .iter()
-        .filter(|(field, _)| {
-            let mut path = vec!["productGroupData"];
-            path.extend(field.split('.'));
-            (1..=path.len()).all(|depth| {
-                let scope = if depth == 1 {
-                    DocumentScope::Envelope
-                } else {
-                    DocumentScope::ProductGroupData
-                };
-                audience.may_see(policy.disclosure_for_path(&path[..depth], scope))
-            })
-        })
+        .filter(|(field, _)| may_see_personal_data_field(policy, audience, field))
         .filter_map(|(field, statement)| {
             serde_json::to_value(statement)
                 .ok()
