@@ -70,7 +70,6 @@ fn product_groups_returns_unique_sorted_list() {
             "textile",
             "toy",
             "tyre",
-            "unsold-goods",
         ]
     );
 }

@@ -23,8 +23,8 @@ use crate::product_group::ProductGroup;
 /// so a scheme 1 identity is the 14-digit GTIN exactly as before and existing
 /// keys are unchanged.
 ///
-/// Not a validated type: this is a lookup key. `UnsoldGoods` and `Other` carry
-/// no identifier at all and still produce no identity.
+/// Not a validated type: this is a lookup key. An unmodelled product group whose
+/// payload carries no valid identifier produces no identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductIdentity {
     pub product_group: ProductGroup,

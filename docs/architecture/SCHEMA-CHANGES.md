@@ -419,7 +419,3 @@ No property or requirement changed.
 **Newly required:** `productIdentifier`
 
 **No longer required:** `gtin`
-
-## unsold-goods
-
-Only one version (v2.0.0), so there is nothing to compare against yet.

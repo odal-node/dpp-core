@@ -5,7 +5,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::product_group::{self, DisclosureScope, ProductGroupData};
+use crate::product_group::ProductGroupData;
+use crate::unsold_goods::{CnCategory, DisclosureScope, UnsoldGoodsReport};
 
 /// How strongly a lint finding should be read. Neither variant blocks
 /// publish — the distinction is tone, not gating. Mirrors
@@ -147,42 +148,45 @@ fn product_group_lints(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<Lin
                 .map(convert)
                 .collect()
         }
-        ProductGroupData::UnsoldGoods(u) => {
-            let lines: Vec<dpp_rules::lint::unsold_goods::DisclosureLineInput<'_>> = u
-                .lines
-                .iter()
-                .map(|l| dpp_rules::lint::unsold_goods::DisclosureLineInput {
-                    // A line may carry several CN codes (Annex I note (f)); the
-                    // depth rule is about the first, which is the one the line
-                    // is filed under.
-                    cn_category: l
-                        .cn_categories
-                        .first()
-                        .map_or("", product_group::CnCategory::as_str),
-                    reason_point: l.reason.article_2_point(),
-                    units: l.units_discarded.value,
-                    weight_kg: l.weight_kg.value,
-                    preparing_for_reuse_pct: l.treatment.preparing_for_reuse_pct,
-                    recycling_pct: l.treatment.recycling_pct,
-                    other_recovery_pct: l.treatment.other_recovery_pct,
-                    disposal_pct: l.treatment.disposal_pct,
-                    unknown_pct: l.treatment.unknown_pct,
-                })
-                .collect();
-            let input = dpp_rules::lint::unsold_goods::UnsoldGoodsLintInput {
-                lines: &lines,
-                consolidated_undertaking_count: match &u.entity.scope {
-                    DisclosureScope::Consolidated { undertakings } => Some(undertakings.len()),
-                    DisclosureScope::Standalone => None,
-                },
-                measures_taken_len: u.measures_taken.trim().chars().count(),
-                measures_planned_len: u.measures_planned.trim().chars().count(),
-            };
-            dpp_rules::lint::unsold_goods::lint_unsold_goods(&input)
-                .into_iter()
-                .map(convert)
-                .collect()
-        }
         _ => Vec::new(),
     }
+}
+
+/// Lints that read a whole unsold-goods disclosure.
+///
+/// Advisory, like every lint here. A disclosure is not product-group data, so it
+/// is linted by itself rather than through [`lint_product_group_data`].
+#[must_use]
+pub fn lint_unsold_goods_report(report: &UnsoldGoodsReport) -> Vec<LintFinding> {
+    let lines: Vec<dpp_rules::lint::unsold_goods::DisclosureLineInput<'_>> = report
+        .lines
+        .iter()
+        .map(|l| dpp_rules::lint::unsold_goods::DisclosureLineInput {
+            // A line may carry several CN codes (Annex I note (f)); the
+            // depth rule is about the first, which is the one the line
+            // is filed under.
+            cn_category: l.cn_categories.first().map_or("", CnCategory::as_str),
+            reason_point: l.reason.article_2_point(),
+            units: l.units_discarded.value,
+            weight_kg: l.weight_kg.value,
+            preparing_for_reuse_pct: l.treatment.preparing_for_reuse_pct,
+            recycling_pct: l.treatment.recycling_pct,
+            other_recovery_pct: l.treatment.other_recovery_pct,
+            disposal_pct: l.treatment.disposal_pct,
+            unknown_pct: l.treatment.unknown_pct,
+        })
+        .collect();
+    let input = dpp_rules::lint::unsold_goods::UnsoldGoodsLintInput {
+        lines: &lines,
+        consolidated_undertaking_count: match &report.entity.scope {
+            DisclosureScope::Consolidated { undertakings } => Some(undertakings.len()),
+            DisclosureScope::Standalone => None,
+        },
+        measures_taken_len: report.measures_taken.trim().chars().count(),
+        measures_planned_len: report.measures_planned.trim().chars().count(),
+    };
+    dpp_rules::lint::unsold_goods::lint_unsold_goods(&input)
+        .into_iter()
+        .map(convert)
+        .collect()
 }

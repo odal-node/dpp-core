@@ -10,8 +10,7 @@ use super::scope::DisclosureScope;
 /// The first four rows of Annex I, Section 2. This is not passport data in the
 /// ordinary sense — it identifies an **undertaking over a financial year**, not
 /// a product placed on the market, which is the whole reason ESPR Arts. 24–25
-/// impose no passport and this product-group slot exists only for
-/// implementation convenience.
+/// impose no passport.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisclosingEntity {

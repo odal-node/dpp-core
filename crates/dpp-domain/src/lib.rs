@@ -47,6 +47,7 @@ pub mod status;
 mod test_support;
 pub mod transfer;
 pub mod trusted_list;
+pub mod unsold_goods;
 pub mod validation;
 
 #[cfg(feature = "bundle")]
@@ -83,62 +84,24 @@ pub use crate::{
     personal_data::{HeldOutside, LawfulBasis, PersonalDataRecordId, PersonalDataStatement},
     product::ProductIdentity,
     product_group::{
-        AluminiumData,
-        BatteryChemistry,
-        BatteryData,
-        BatteryStatus,
-        BatteryType,
-        CarbonFootprint,
-        CarbonFootprintClass,
-        CarbonFootprintClassError,
-        // The unsold-goods disclosure, whose shape is fixed by Impl. Reg. (EU)
-        // 2026/2 Annex I — see `domain::product_group::data::unsold_goods`.
-        ConstructionData,
-        DetergentData,
-        DeviceType,
-        DiscardReason,
-        DiscardedProductLine,
-        DiscardedQuantity,
-        DisclosingEntity,
-        DisclosureScope,
-        DueDiligenceOperatorScope,
-        DynamicPerformance,
-        ElectronicsData,
-        EnergyEfficiencyClass,
-        EnvironmentalReading,
-        ExpectedLifetime,
-        FibreEntry,
-        FinancialYear,
-        FurnitureData,
-        HarmfulEvents,
-        HazardSymbol,
-        HazardousSubstance,
-        LegalEntityIdentifier,
-        LifecycleStage,
-        MaterialComposition,
-        MattressData,
-        ProductGroup,
-        ProductGroupData,
-        ProductionRoute,
-        RepairCriterion,
-        RepairabilityScore,
-        StateOfChargeReading,
-        StateOfHealth,
-        SteelData,
-        SurfactantEntry,
-        SvhcSubstance,
-        SystemBoundary,
-        TemperatureRange,
-        TextileData,
-        ToyData,
-        TyreData,
-        UnmodelledPayload,
-        UnsoldGoodsReport,
-        UsageHistory,
-        WasteTreatmentSplit,
+        AluminiumData, BatteryChemistry, BatteryData, BatteryStatus, BatteryType, CarbonFootprint,
+        CarbonFootprintClass, CarbonFootprintClassError, ConstructionData, DetergentData,
+        DeviceType, DueDiligenceOperatorScope, DynamicPerformance, ElectronicsData,
+        EnergyEfficiencyClass, EnvironmentalReading, ExpectedLifetime, FibreEntry, FurnitureData,
+        HarmfulEvents, HazardSymbol, HazardousSubstance, LifecycleStage, MaterialComposition,
+        MattressData, ProductGroup, ProductGroupData, ProductionRoute, RepairCriterion,
+        RepairabilityScore, StateOfChargeReading, StateOfHealth, SteelData, SurfactantEntry,
+        SvhcSubstance, SystemBoundary, TemperatureRange, TextileData, ToyData, TyreData,
+        UnmodelledPayload, UsageHistory,
     },
     status::PassportStatus,
     transfer::{TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus},
+    // The unsold-goods disclosure, whose shape is fixed by Impl. Reg. (EU)
+    // 2026/2 Annex I — see `unsold_goods`.
+    unsold_goods::{
+        DiscardReason, DiscardedProductLine, DiscardedQuantity, DisclosingEntity, DisclosureScope,
+        FinancialYear, LegalEntityIdentifier, UnsoldGoodsReport, WasteTreatmentSplit,
+    },
 };
 
 pub use error::DppError;

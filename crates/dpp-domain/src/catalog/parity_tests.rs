@@ -21,7 +21,6 @@ fn product_group_enum_and_catalog_agree() {
     let typed = [
         ProductGroup::Battery,
         ProductGroup::Textile,
-        ProductGroup::UnsoldGoods,
         ProductGroup::Steel,
         ProductGroup::Electronics,
         ProductGroup::Construction,
@@ -86,30 +85,41 @@ fn every_product_group_has_a_retention_period_from_some_act() {
 
 /// Compliance citation: the ESPR unsold-goods destruction ban is **Article 25 /
 /// Annex VII**, not Article 22. A wrong citation in a compliance artifact erodes
-/// auditor trust. The citation now lives on the binding that rests on it, so
-/// this asks the instrument catalog rather than the product group.
+/// auditor trust.
+///
+/// These duties bind an operator over every product group, so no product-group
+/// binding carries the citation: it is in the notes of the framework and of the two
+/// acts under it.
 /// Source: Regulation (EU) 2024/1781 (ESPR) Article 25, Annex VII.
 #[test]
-fn unsold_goods_cites_espr_article_25() {
+fn the_unsold_goods_instruments_cite_espr_article_25() {
     let instruments = InstrumentCatalog::new();
-    let bindings = instruments.bindings_for("unsold-goods");
-    assert!(
-        !bindings.is_empty(),
-        "unsold-goods must be reached by an act"
-    );
-    let basis: String = bindings
+    for id in [
+        "unsold-goods-format-2026-2",
+        "unsold-goods-derogations-2026-296",
+    ] {
+        let instrument = instruments
+            .get(id)
+            .unwrap_or_else(|| panic!("{id} must be in the catalog"));
+        assert!(
+            instrument.product_groups.is_empty(),
+            "{id} binds an operator over every product group, so it is bound to none"
+        );
+    }
+
+    let notes: String = ["espr", "unsold-goods-format-2026-2"]
         .iter()
-        .flat_map(|(_, b)| b.legal_basis.iter())
-        .cloned()
+        .filter_map(|id| instruments.get(id))
+        .filter_map(|i| i.notes.as_deref())
         .collect::<Vec<_>>()
         .join(" ");
     assert!(
-        basis.contains("Art. 25"),
-        "unsold-goods legal basis must cite ESPR Article 25, got: {basis}"
+        notes.contains("Art. 25"),
+        "the destruction ban must be cited to ESPR Article 25, got: {notes}"
     );
     assert!(
-        !basis.contains("Art. 22"),
-        "the incorrect Article 22 citation must be gone, got: {basis}"
+        !notes.contains("Art. 22"),
+        "the incorrect Article 22 citation must be gone, got: {notes}"
     );
 }
 

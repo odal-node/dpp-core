@@ -10,16 +10,16 @@ use super::line::DiscardedProductLine;
 ///
 /// # What this is, and what it is not
 ///
-/// This is **not a passport**. ESPR Arts. 24–25 impose a duty on an *economic
-/// operator* over a *financial year*, disclosed on the operator's own website —
-/// or, where it publishes sustainability reporting under Directive 2013/34/EU
-/// Art. 19a or 29a, by a link to that report naming where the information sits
-/// (Impl. Reg. (EU) 2026/2 Art. 2(2)). There is no product record anywhere in
-/// it, which is why `unsold-goods` carries `PassportObligation::NotRequired`
-/// while still being in force and determinable today.
-///
-/// It occupies a product-group slot for implementation convenience, not because
-/// it is a product group.
+/// This is **not a passport**, and it is not the data of any product group. ESPR
+/// Art. 24 reaches discarded unsold consumer products generally — whatever the
+/// product group — and imposes a duty on an *economic operator* over a *financial
+/// year*, disclosed on the operator's own website, or, where it publishes
+/// sustainability reporting under Directive 2013/34/EU Art. 19a or 29a, by a link
+/// to that report naming where the information sits (Impl. Reg. (EU) 2026/2
+/// Art. 2(2)). Only the Art. 25 destruction ban is limited to the products of
+/// Annex VII. There is no product record anywhere in the disclosure, which is why
+/// the instruments that carry the duty have `PassportObligation::NotRequired`
+/// while still binding today.
 ///
 /// # The format is prescribed
 ///
@@ -91,34 +91,5 @@ impl UnsoldGoodsReport {
         self.lines
             .iter()
             .any(|l| l.units_discarded.estimated || l.weight_kg.estimated)
-    }
-}
-
-impl crate::product_group::payload::ProductGroupPayload for UnsoldGoodsReport {
-    /// A disclosure covers a financial year across many products, so it
-    /// identifies no single product under any scheme. The CN categories are on
-    /// the lines.
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
-        None
-    }
-
-    /// Arts. 24–25 define no model identifier.
-    fn model_identifier(&self) -> Option<&str> {
-        None
-    }
-
-    /// A discard-event report describes a disposal, not an article, so it
-    /// carries no substance declaration for one.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
-        None
-    }
-
-    /// Same reason as the product identifier above: a disclosure covers a
-    /// financial year across many products, so there is no single category to
-    /// state. What categorisation exists is per line and by CN code, which
-    /// Impl. Reg. (EU) 2026/2 Art. 3 makes the axis for this group — not a
-    /// category name.
-    fn product_category(&self) -> Option<&str> {
-        None
     }
 }
