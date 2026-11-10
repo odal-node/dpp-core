@@ -6,12 +6,16 @@ use serde_json::{Value, json};
 
 use crate::catalog::ProductGroupCatalog;
 use crate::schemas::VersionedSchemaRegistry;
-use crate::unsold_goods::{DISCLOSURE_SCHEMA_KEY, UnsoldGoodsReport, document_schemas};
+use crate::test_support::sample_discard_record;
+use crate::unsold_goods::{
+    DISCLOSURE_SCHEMA_KEY, DiscardRecord, RECORD_SCHEMA_KEY, UnsoldGoodsReport, document_schemas,
+};
 
 fn v2_0() -> Version {
     "2.0.0".parse().unwrap()
 }
 
+/// The version that stopped requiring a reason on a line.
 fn v2_1() -> Version {
     "2.1.0".parse().unwrap()
 }
@@ -46,6 +50,7 @@ fn validates(body: &Value) -> bool {
     validates_as(&v2_0(), body)
 }
 
+/// Whether `body` validates against the disclosure schema at `version`.
 fn validates_as(version: &Version, body: &Value) -> bool {
     document_schemas()
         .validate(DISCLOSURE_SCHEMA_KEY, version, body)
@@ -153,25 +158,68 @@ fn the_disclosure_is_not_a_product_group() {
     );
 }
 
-/// One family under one key, every version of it, and nothing else in the
-/// registry.
+/// The two families of the module under their own keys, every version of each, and
+/// nothing else in the registry.
 #[test]
-fn the_disclosure_registry_holds_the_disclosure_schema_and_nothing_else() {
+fn the_registry_holds_the_modules_two_families_and_nothing_else() {
     let schemas = document_schemas();
-    assert_eq!(schemas.product_groups(), [DISCLOSURE_SCHEMA_KEY]);
+    assert_eq!(
+        schemas.product_groups(),
+        [RECORD_SCHEMA_KEY, DISCLOSURE_SCHEMA_KEY]
+    );
     assert_eq!(
         schemas.versions_for(DISCLOSURE_SCHEMA_KEY),
         [&v2_0(), &v2_1()]
     );
+    assert_eq!(
+        schemas.versions_for(RECORD_SCHEMA_KEY),
+        ["1.0.0".parse::<Version>().as_ref().unwrap()]
+    );
 }
 
-fn fixture(version: &str) -> Option<Value> {
+/// The frozen document for a version of a family, if there is one.
+fn fixture(key: &str, version: &str) -> Option<Value> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/document-schemas")
-        .join(DISCLOSURE_SCHEMA_KEY)
+        .join(key)
         .join(format!("v{version}.json"));
     let raw = std::fs::read_to_string(path).ok()?;
     Some(serde_json::from_str(&raw).expect("a frozen fixture must be valid JSON"))
+}
+
+/// Every version of the family `key` has a frozen document that still validates
+/// against it, and reads as the current type `T`, unchanged on the way back out.
+fn frozen_documents_still_validate_and_read<T>(key: &str)
+where
+    T: serde::de::DeserializeOwned + serde::Serialize,
+{
+    let schemas = document_schemas();
+    let versions: Vec<String> = schemas
+        .versions_for(key)
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    assert!(!versions.is_empty());
+
+    for version in versions {
+        let document = fixture(key, &version)
+            .unwrap_or_else(|| panic!("no frozen {key} document for v{version}: add one"));
+
+        schemas
+            .validate_strict(key, &version, &document)
+            .unwrap_or_else(|e| {
+                panic!("the frozen {key} v{version} document no longer validates: {e:?}")
+            });
+
+        let read: T = serde_json::from_value(document.clone()).unwrap_or_else(|e| {
+            panic!("the frozen {key} v{version} document no longer reads: {e}")
+        });
+        assert_eq!(
+            serde_json::to_value(&read).unwrap(),
+            document,
+            "{key} v{version} does not round-trip"
+        );
+    }
 }
 
 /// A declared version with no frozen document is an unguarded version. A document
@@ -182,30 +230,96 @@ fn fixture(version: &str) -> Option<Value> {
 /// schema would agree with it by construction and could not catch anything.
 #[test]
 fn every_declared_version_has_a_frozen_document_that_still_validates_and_reads() {
-    let schemas = document_schemas();
-    let versions: Vec<String> = schemas
-        .versions_for(DISCLOSURE_SCHEMA_KEY)
-        .iter()
-        .map(|v| v.to_string())
-        .collect();
-    assert!(!versions.is_empty());
+    frozen_documents_still_validate_and_read::<UnsoldGoodsReport>(DISCLOSURE_SCHEMA_KEY);
+    frozen_documents_still_validate_and_read::<DiscardRecord>(RECORD_SCHEMA_KEY);
+}
 
-    for version in versions {
-        let document = fixture(&version)
-            .unwrap_or_else(|| panic!("no frozen document for v{version}: add one"));
+/// Whether `body` validates against the discard-record schema v1.0.0.
+fn records_validate_as_v1(body: &Value) -> bool {
+    document_schemas()
+        .validate(RECORD_SCHEMA_KEY, &"1.0.0".parse().unwrap(), body)
+        .is_ok()
+}
 
-        schemas
-            .validate_strict(DISCLOSURE_SCHEMA_KEY, &version, &document)
-            .unwrap_or_else(|e| {
-                panic!("the frozen v{version} document no longer validates: {e:?}")
-            });
+/// A record as the type writes it is a record the schema admits, with and without a
+/// derogation: the schema is the contract for what the type produces.
+#[test]
+fn a_record_as_the_type_writes_it_validates() {
+    let with_reason = serde_json::to_value(sample_discard_record()).unwrap();
+    assert!(records_validate_as_v1(&with_reason), "{with_reason}");
 
-        let report: UnsoldGoodsReport = serde_json::from_value(document.clone())
-            .unwrap_or_else(|e| panic!("the frozen v{version} document no longer reads: {e}"));
-        assert_eq!(
-            serde_json::to_value(&report).unwrap(),
-            document,
-            "v{version} does not round-trip"
-        );
+    let without = serde_json::to_value(DiscardRecord {
+        reason: None,
+        reason_label: Some("Surplus after a discontinued range".to_owned()),
+        ..sample_discard_record()
+    })
+    .unwrap();
+    assert!(records_validate_as_v1(&without), "{without}");
+}
+
+/// What the schema refuses that the type reads. The type keeps a malformed record
+/// readable so it can be reported; the schema is where it is turned away at the
+/// door, and each of these once went through the type unchallenged.
+#[test]
+fn a_record_offered_for_storage_is_held_to_its_shape() {
+    let record = || serde_json::to_value(sample_discard_record()).unwrap();
+    let broken = |edit: &dyn Fn(&mut Value)| {
+        let mut value = record();
+        edit(&mut value);
+        value
+    };
+
+    let refused = [
+        (
+            "a CN code that is not digits",
+            broken(&|v| v["cnCodes"] = json!(["abc"])),
+        ),
+        (
+            "a CN code of five digits",
+            broken(&|v| v["cnCodes"] = json!(["62034"])),
+        ),
+        (
+            "a CN category in place of a code",
+            broken(&|v| v["cnCodes"] = json!(["6203"])),
+        ),
+        ("no CN code", broken(&|v| v["cnCodes"] = json!([]))),
+        (
+            "a zero weight",
+            broken(&|v| v["weight"]["grams"] = json!(0)),
+        ),
+        (
+            "a negative unit count",
+            broken(&|v| v["units"]["value"] = json!(-1)),
+        ),
+        (
+            "a reason outside Art. 2",
+            broken(&|v| v["reason"] = json!("end_of_season")),
+        ),
+        (
+            "a label of 121 characters",
+            broken(&|v| v["reasonLabel"] = json!("x".repeat(121))),
+        ),
+        ("an empty label", broken(&|v| v["reasonLabel"] = json!(""))),
+        (
+            "a treatment outside the five",
+            broken(&|v| v["treatment"] = json!("landfill")),
+        ),
+        (
+            "a misspelt property",
+            broken(&|v| v["reasonLabell"] = json!("typo")),
+        ),
+        (
+            "no receiver",
+            broken(&|v| {
+                v.as_object_mut().unwrap().remove("receiver");
+            }),
+        ),
+        (
+            "a date that is not one",
+            broken(&|v| v["discardedOn"] = json!("14/03/2027")),
+        ),
+    ];
+    for (why, value) in refused {
+        assert!(!records_validate_as_v1(&value), "accepted {why}: {value}");
     }
 }

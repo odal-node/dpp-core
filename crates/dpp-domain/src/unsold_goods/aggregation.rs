@@ -26,31 +26,45 @@ pub struct Aggregation {
     pub excluded: Vec<ExcludedRecord>,
 }
 
+/// The discloser's wording for each line of the table, keyed by the categories the
+/// line is filed under.
+///
+/// Annex I note (e) asks for the description "on the basis of the combined
+/// nomenclature" or "a more detailed description". What the products are, in a
+/// phrase fit for a public table, is the discloser's to say; the records' own
+/// descriptions are not joined into it. A line with no entry here, or a blank one,
+/// is described by its categories (`CN 6203`), which is the nomenclature and
+/// invents nothing.
+pub type LineDescriptions = BTreeMap<Vec<CnCategory>, String>;
+
 /// What a line is made from: records sharing it are one row of the table.
 ///
 /// Annex I note (h) makes the reason part of it, and the packaging column is a
 /// single answer per row, so records that differ on either cannot share one. The
-/// explanation is part of it because where no derogation applies it is the only
+/// operator's label is part of it because where no derogation applies it is the only
 /// statement of the reason. The derived order is the order lines come out in:
 /// category, then derogation by Art. 2 point with those that cite none last, then the
-/// explanation, then packaging excluded before included.
+/// label, then packaging excluded before included.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct LineKey {
     categories: Vec<CnCategory>,
     /// Position of the derogation in [`DiscardReason::ALL`], which is Art. 2's
     /// order; one past the end where none is cited, so those lines come last.
     reason_rank: usize,
-    detail: Option<String>,
+    /// The record's label, trimmed; `None` where it has none or only whitespace.
+    label: Option<String>,
     packaging_included: bool,
 }
 
 impl LineKey {
+    /// The position of a derogation among Art. 2's points; one past the last where none is cited.
     fn rank_of(reason: Option<DiscardReason>) -> usize {
         reason
             .and_then(|reason| DiscardReason::ALL.iter().position(|r| *r == reason))
             .unwrap_or(DiscardReason::ALL.len())
     }
 
+    /// The derogation a rank stands for; `None` for the rank one past the end.
     fn reason(&self) -> Option<DiscardReason> {
         DiscardReason::ALL.get(self.reason_rank).copied()
     }
@@ -63,11 +77,11 @@ struct Totals {
     units_estimated: bool,
     grams: u64,
     weight_estimated: bool,
-    descriptions: BTreeSet<String>,
     /// Grams per operation, in the column order of [`WasteTreatmentSplit`].
     grams_by_operation: [u64; 5],
 }
 
+/// The column of the treatment split that an operation's weight is added to.
 fn operation_column(operation: WasteTreatmentOperation) -> usize {
     match operation {
         WasteTreatmentOperation::PreparingForReuse => 0,
@@ -107,12 +121,20 @@ fn categories_of(record: &DiscardRecord) -> Result<Vec<CnCategory>, ExclusionRea
 ///   kilogrammes once, half up. A total is marked an estimate if any figure in it is.
 /// - The treatment split is each operation's share of the line's **weight** (note
 ///   (i)), in whole percentages totalling exactly 100.
-/// - A line's description is the distinct descriptions of its records, sorted and
-///   joined with `"; "` — "a more detailed description" in the sense of note (e).
+/// - A line's description is the discloser's: `descriptions` is looked up by the
+///   line's categories, and a line without an entry is described by them (see
+///   [`LineDescriptions`]). The records' own descriptions are not joined.
+/// - Records share a line only if their derogation, categories, packaging answer and
+///   [`DiscardRecord::reason_label`] (trimmed) agree, so the lines a year makes are
+///   as many as the operator's list of labels makes them.
 ///
 /// The disclosing entity and the two measures rows are not here: they are the
 /// discloser's to supply.
-pub fn aggregate(records: &[DiscardRecord], year: &FinancialYear) -> Aggregation {
+pub fn aggregate(
+    records: &[DiscardRecord],
+    year: &FinancialYear,
+    descriptions: &LineDescriptions,
+) -> Aggregation {
     let mut lines: BTreeMap<LineKey, Totals> = BTreeMap::new();
     let mut excluded = Vec::new();
 
@@ -139,7 +161,12 @@ pub fn aggregate(records: &[DiscardRecord], year: &FinancialYear) -> Aggregation
         let key = LineKey {
             categories,
             reason_rank: LineKey::rank_of(record.reason),
-            detail: record.reason_detail.clone(),
+            label: record
+                .reason_label
+                .as_deref()
+                .map(str::trim)
+                .filter(|label| !label.is_empty())
+                .map(str::to_owned),
             packaging_included: record.packaging_included,
         };
         let totals = lines.entry(key).or_default();
@@ -147,10 +174,6 @@ pub fn aggregate(records: &[DiscardRecord], year: &FinancialYear) -> Aggregation
         totals.units_estimated |= record.units.estimated;
         totals.grams = totals.grams.saturating_add(record.weight.grams);
         totals.weight_estimated |= record.weight.estimated;
-        let description = record.description.trim();
-        if !description.is_empty() {
-            totals.descriptions.insert(description.to_owned());
-        }
         let column = operation_column(record.treatment);
         totals.grams_by_operation[column] =
             totals.grams_by_operation[column].saturating_add(record.weight.grams);
@@ -158,13 +181,29 @@ pub fn aggregate(records: &[DiscardRecord], year: &FinancialYear) -> Aggregation
 
     let lines = lines
         .into_iter()
-        .map(|(key, totals)| line_of(key, totals))
+        .map(|(key, totals)| line_of(key, totals, descriptions))
         .collect();
 
     Aggregation { lines, excluded }
 }
 
-fn line_of(key: LineKey, totals: Totals) -> DiscardedProductLine {
+/// The wording of a line: the discloser's if it gave one, else the categories.
+fn description_of(categories: &[CnCategory], descriptions: &LineDescriptions) -> String {
+    descriptions
+        .get(categories)
+        .map(|text| text.trim())
+        .filter(|text| !text.is_empty())
+        .map_or_else(
+            || {
+                let codes: Vec<&str> = categories.iter().map(CnCategory::as_str).collect();
+                format!("CN {}", codes.join(", "))
+            },
+            str::to_owned,
+        )
+}
+
+/// Make one line of the table from the records that share a key.
+fn line_of(key: LineKey, totals: Totals, descriptions: &LineDescriptions) -> DiscardedProductLine {
     let [
         preparing_for_reuse_pct,
         recycling_pct,
@@ -173,14 +212,11 @@ fn line_of(key: LineKey, totals: Totals) -> DiscardedProductLine {
         unknown_pct,
     ] = whole_percentages(totals.grams_by_operation);
     let reason = key.reason();
+    let description = description_of(&key.categories, descriptions);
 
     DiscardedProductLine {
         cn_categories: key.categories,
-        description: totals
-            .descriptions
-            .into_iter()
-            .collect::<Vec<_>>()
-            .join("; "),
+        description,
         units_discarded: DiscardedQuantity {
             value: totals.units,
             estimated: totals.units_estimated,
@@ -191,7 +227,7 @@ fn line_of(key: LineKey, totals: Totals) -> DiscardedProductLine {
         },
         packaging_included: key.packaging_included,
         reason,
-        reason_detail: key.detail,
+        reason_detail: key.label,
         treatment: WasteTreatmentSplit {
             preparing_for_reuse_pct,
             recycling_pct,

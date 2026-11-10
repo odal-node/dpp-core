@@ -211,6 +211,7 @@ fn the_partial_list_caveat_is_attached_when_anything_was_checked() {
 
 // ── Discard records ─────────────────────────────────────────────────────────
 
+/// The codes of the findings a record produces, for a test to compare.
 fn record_codes(record: &crate::unsold_goods::DiscardRecord) -> Vec<String> {
     lint_discard_record(record)
         .into_iter()
@@ -218,6 +219,7 @@ fn record_codes(record: &crate::unsold_goods::DiscardRecord) -> Vec<String> {
         .collect()
 }
 
+/// A record that is complete and consistent is not flagged.
 #[test]
 fn a_well_formed_discard_record_produces_no_findings() {
     assert!(record_codes(&crate::test_support::sample_discard_record()).is_empty());
@@ -253,6 +255,7 @@ fn a_discard_for_reuse_needs_no_derogation() {
     assert!(record_codes(&record).is_empty());
 }
 
+/// A record with no weight reaches a caller of `lint_discard_record` as a finding.
 #[test]
 fn a_record_without_weight_surfaces_as_a_domain_finding() {
     let record = crate::unsold_goods::DiscardRecord {

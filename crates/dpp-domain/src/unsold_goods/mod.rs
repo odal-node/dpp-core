@@ -55,7 +55,9 @@
 //! - [`record`] — [`DiscardRecord`], one discard; [`weight`], [`operation`] and
 //!   [`receiver`] are the parts of it that are their own types.
 //! - [`evidence`] — [`EvidenceKind`] and what each record must be able to show.
-//! - [`retention`] — [`KeepUntil`], the later of the two five-year periods.
+//! - [`exemption`] — [`EnterpriseSize`], and who Arts. 24(1) and 25(1) do not reach.
+//! - [`retention`] — [`KeepUntil`], the later of the two five-year periods, and
+//!   [`Disclosure`], the three states the second one can be in.
 //! - [`aggregation`] — [`aggregate`], a year's records into the lines of the
 //!   disclosure; [`exclusion`] is what it leaves out and why; `apportion` is how
 //!   the treatment shares come to exactly 100.
@@ -68,14 +70,16 @@
 //!
 //! Storing records and documents, enforcing retention, exporting for a competent
 //! authority and producing a document within the 30 days Art. 3 allows are a
-//! deployment's concern. So is whether a disclosure is owed at all: micro and
-//! small enterprises are exempt, and medium-sized ones from 19 July 2030.
+//! deployment's concern. So is the operator's size class, which decides whether
+//! any of this binds it ([`exemption`]): this crate holds neither its headcount nor
+//! its turnover, so the host says.
 
 pub mod aggregation;
 mod apportion;
 pub mod entity;
 pub mod evidence;
 pub mod exclusion;
+pub mod exemption;
 pub mod financial_year;
 pub mod identifier;
 pub mod line;
@@ -94,10 +98,11 @@ pub mod weight;
 mod tests;
 
 pub use crate::identifier::{CnCategory, CnCategoryError};
-pub use aggregation::{Aggregation, aggregate};
+pub use aggregation::{Aggregation, LineDescriptions, aggregate};
 pub use entity::DisclosingEntity;
 pub use evidence::{EvidenceKind, EvidenceRequirement, derogation_evidence};
 pub use exclusion::{ExcludedRecord, ExclusionReason};
+pub use exemption::{EnterpriseSize, MEDIUM_ENTERPRISES_FROM};
 pub use financial_year::FinancialYear;
 pub use identifier::LegalEntityIdentifier;
 pub use line::{DiscardedProductLine, DiscardedQuantity};
@@ -106,8 +111,8 @@ pub use reason::DiscardReason;
 pub use receiver::ReceivingOperator;
 pub use record::DiscardRecord;
 pub use report::UnsoldGoodsReport;
-pub use retention::{KeepUntil, keep_until};
-pub use schemas::{DISCLOSURE_SCHEMA_KEY, document_schemas};
+pub use retention::{Disclosure, KeepUntil, keep_until};
+pub use schemas::{DISCLOSURE_SCHEMA_KEY, RECORD_SCHEMA_KEY, document_schemas};
 pub use scope::DisclosureScope;
 pub use treatment::WasteTreatmentSplit;
 pub use weight::DiscardedWeight;

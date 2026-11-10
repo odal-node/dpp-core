@@ -178,6 +178,7 @@ fn clean_record() -> DiscardRecordLintInput<'static> {
     }
 }
 
+/// A record that is complete and consistent produces no findings.
 #[test]
 fn a_clean_record_produces_no_findings() {
     assert!(lint_discard_record(&clean_record()).is_empty());
@@ -215,6 +216,7 @@ fn an_annex_vii_discard_for_reuse_needs_no_derogation() {
     assert!(lint_discard_record(&record).is_empty());
 }
 
+/// A derogation on a discard made for reuse is noticed.
 #[test]
 fn a_derogation_on_a_discard_for_reuse_is_noticed() {
     let mut record = clean_record();
@@ -226,6 +228,7 @@ fn a_derogation_on_a_discard_for_reuse_is_noticed() {
     );
 }
 
+/// A derogation on a good outside Annex VII is noticed.
 #[test]
 fn a_derogation_on_a_good_outside_annex_vii_is_noticed() {
     let mut record = clean_record();
@@ -250,6 +253,7 @@ fn one_annex_vii_code_among_several_puts_a_kit_in_scope() {
     );
 }
 
+/// A record with no CN code is flagged.
 #[test]
 fn a_record_with_no_cn_code_is_flagged() {
     let mut record = clean_record();
@@ -258,6 +262,7 @@ fn a_record_with_no_cn_code_is_flagged() {
     assert_eq!(codes(&findings), ["unsold_goods.record_cn_code_unreadable"]);
 }
 
+/// A CN code of the wrong length is flagged.
 #[test]
 fn a_record_with_a_cn_code_of_the_wrong_length_is_flagged() {
     let mut record = clean_record();

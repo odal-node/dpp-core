@@ -456,10 +456,18 @@ table; `dpp_domain::unsold_goods` models each discard in it (`DiscardRecord`), t
 documents the acts have an operator keep for one (`EvidenceKind`, per derogation point
 under Del. Reg. (EU) 2026/296 Art. 3, plus the delivery and reception documentation of
 ESPR Art. 24(2) and Impl. Reg. (EU) 2026/2 Art. 4), how long (`KeepUntil`: the later of
-five years after the discard and five years after the disclosure covering it) and
-`aggregate`, which turns a financial year's records into the lines of the table. The
-records know what is required and never what is held; storing them and their documents
-is a host's concern.
+five years after the discard and five years after the disclosure covering it, with that
+disclosure `Pending`, `MadeOn` a date, or `NotOwed`) and `aggregate`, which turns a
+financial year's records into the lines of the table. A line takes the discloser's
+wording (`LineDescriptions`) and is keyed by the record's `reason_label`, a short label
+the operator keeps, not a sentence per record. Whether any of it binds an operator
+depends on its size: `EnterpriseSize::is_exempt_on` follows ESPR Arts. 24(1) and 25(1),
+which both leave out micro and small enterprises and reach medium-sized ones from
+19 July 2030, and an exempt operator is required to show nothing. A record offered for
+storage is held to the `discard-record` schema (in `document_schemas()` beside the
+disclosure's); the type reads a malformed one back all the same, so it can be reported.
+The records know what is required and never what is held; storing them and their
+documents is a host's concern.
 
 **There is no v1.0.0.** It predated both acts and nothing could carry a document forward
 from it: a financial year cannot be derived from `"2026-Q2"`, a CN code cannot be

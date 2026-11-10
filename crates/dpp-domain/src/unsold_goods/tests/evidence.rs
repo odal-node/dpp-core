@@ -3,7 +3,8 @@
 use crate::test_support::sample_discard_record;
 use crate::unsold_goods::DiscardReason;
 use crate::unsold_goods::{
-    DiscardRecord, EvidenceKind, WasteTreatmentOperation, derogation_evidence,
+    DiscardRecord, EnterpriseSize, EvidenceKind, MEDIUM_ENTERPRISES_FROM, WasteTreatmentOperation,
+    derogation_evidence,
 };
 
 use EvidenceKind::*;
@@ -17,18 +18,61 @@ fn bare_record() -> DiscardRecord {
     }
 }
 
+/// The kinds each requirement accepts, in order.
 fn kinds(requirements: &[crate::unsold_goods::EvidenceRequirement]) -> Vec<Vec<EvidenceKind>> {
     requirements.iter().map(|r| r.any_of.clone()).collect()
+}
+
+/// Arts. 24(1) and 25(1) do not reach micro and small enterprises, so neither a
+/// disclosure for Art. 24(2)'s documentation to demonstrate nor a ban for a
+/// derogation to except exists. Even a record that claims a derogation owes nothing.
+#[test]
+fn an_exempt_operator_is_required_to_show_nothing() {
+    let record = sample_discard_record();
+    assert!(record.reason.is_some(), "the sample relies on a derogation");
+
+    for size in [EnterpriseSize::Micro, EnterpriseSize::Small] {
+        assert!(record.required_evidence(size).is_empty(), "{size:?}");
+        assert!(record.missing_evidence(size, &[]).is_empty(), "{size:?}");
+    }
+    assert!(!record.required_evidence(EnterpriseSize::Large).is_empty());
+}
+
+/// A medium-sized operator is outside both articles until 19 July 2030, and inside
+/// from that day. The day of the discard decides.
+#[test]
+fn a_medium_sized_operator_is_reached_from_19_july_2030() {
+    let on = |discarded_on| DiscardRecord {
+        discarded_on,
+        ..sample_discard_record()
+    };
+    let day_before = MEDIUM_ENTERPRISES_FROM.pred_opt().expect("a day before");
+
+    assert!(
+        on(day_before)
+            .required_evidence(EnterpriseSize::Medium)
+            .is_empty()
+    );
+    assert!(
+        !on(MEDIUM_ENTERPRISES_FROM)
+            .required_evidence(EnterpriseSize::Medium)
+            .is_empty()
+    );
+    assert_eq!(
+        MEDIUM_ENTERPRISES_FROM,
+        chrono::NaiveDate::from_ymd_opt(2030, 7, 19).unwrap()
+    );
 }
 
 /// ESPR Art. 24(2) reaches the delivery and reception of every discarded product,
 /// not only those destroyed under a derogation.
 #[test]
 fn a_discard_with_no_derogation_still_needs_delivery_documentation() {
-    let required = bare_record().required_evidence();
+    let required = bare_record().required_evidence(EnterpriseSize::Large);
     assert_eq!(kinds(&required), [vec![DeliveryDocumentation]]);
 }
 
+/// A treatment that is stated needs a statement on its reception and treatment.
 #[test]
 fn a_stated_treatment_needs_a_treatment_statement() {
     let record = DiscardRecord {
@@ -36,7 +80,7 @@ fn a_stated_treatment_needs_a_treatment_statement() {
         ..bare_record()
     };
     assert_eq!(
-        kinds(&record.required_evidence()),
+        kinds(&record.required_evidence(EnterpriseSize::Large)),
         [vec![DeliveryDocumentation], vec![TreatmentStatement]]
     );
 }
@@ -45,7 +89,7 @@ fn a_stated_treatment_needs_a_treatment_statement() {
 /// statement to confirm (Annex I note (i)).
 #[test]
 fn an_unknown_treatment_has_nothing_for_a_statement_to_confirm() {
-    let required = bare_record().required_evidence();
+    let required = bare_record().required_evidence(EnterpriseSize::Large);
     assert!(!kinds(&required).contains(&vec![TreatmentStatement]));
 }
 
@@ -59,10 +103,18 @@ fn point_a_is_met_by_either_alternative() {
     };
     let base = [DeliveryDocumentation, TreatmentStatement];
 
-    assert_eq!(record.missing_evidence(&base).len(), 1);
+    assert_eq!(
+        record.missing_evidence(EnterpriseSize::Large, &base).len(),
+        1
+    );
     for alternative in [SafetyAssessment, ChemicalsTestReport] {
         let held = [base[0], base[1], alternative];
-        assert!(record.missing_evidence(&held).is_empty(), "{alternative:?}");
+        assert!(
+            record
+                .missing_evidence(EnterpriseSize::Large, &held)
+                .is_empty(),
+            "{alternative:?}"
+        );
     }
 }
 
@@ -79,7 +131,12 @@ fn point_c_is_met_by_any_of_three() {
         InternalInvestigation,
     ] {
         let held = [DeliveryDocumentation, TreatmentStatement, alternative];
-        assert!(record.missing_evidence(&held).is_empty(), "{alternative:?}");
+        assert!(
+            record
+                .missing_evidence(EnterpriseSize::Large, &held)
+                .is_empty(),
+            "{alternative:?}"
+        );
     }
 }
 
@@ -95,13 +152,13 @@ fn point_d_needs_the_contract_and_the_justification_not_either() {
 
     let only_contract = [base[0], base[1], IpLicenceOrContract];
     assert_eq!(
-        kinds(&record.missing_evidence(&only_contract)),
+        kinds(&record.missing_evidence(EnterpriseSize::Large, &only_contract)),
         [vec![DestructionJustification]]
     );
 
     let only_justification = [base[0], base[1], DestructionJustification];
     assert_eq!(
-        kinds(&record.missing_evidence(&only_justification)),
+        kinds(&record.missing_evidence(EnterpriseSize::Large, &only_justification)),
         [vec![IpLicenceOrContract]]
     );
 
@@ -111,7 +168,11 @@ fn point_d_needs_the_contract_and_the_justification_not_either() {
         IpLicenceOrContract,
         DestructionJustification,
     ];
-    assert!(record.missing_evidence(&both).is_empty());
+    assert!(
+        record
+            .missing_evidence(EnterpriseSize::Large, &both)
+            .is_empty()
+    );
 }
 
 /// Art. 3(f) serves both Art. 2 point (f) and point (g): the quality-assessment
@@ -141,6 +202,7 @@ fn art_3_letters_after_f_run_one_behind_art_2() {
     assert!(basis(DiscardReason::ReusedButNoRecipientFound).ends_with("Art. 3(i)"));
 }
 
+/// Points (b), (e), (h), (i) and (j) each name a single kind of document.
 #[test]
 fn points_b_e_h_i_and_j_each_name_one_document() {
     let expected = [
@@ -174,6 +236,7 @@ fn points_b_e_h_i_and_j_each_name_one_document() {
     }
 }
 
+/// Every derogation has documentation, cited to Art. 3's own letter.
 #[test]
 fn every_derogation_has_documentation_cited_to_art_3() {
     for reason in DiscardReason::ALL {
@@ -204,7 +267,7 @@ fn the_statement_to_the_waste_operator_is_never_required() {
         });
     }
     for record in records {
-        let required = record.required_evidence();
+        let required = record.required_evidence(EnterpriseSize::Large);
         assert!(
             required
                 .iter()
@@ -214,6 +277,7 @@ fn the_statement_to_the_waste_operator_is_never_required() {
     }
 }
 
+/// A document of an unrelated kind does not meet a requirement.
 #[test]
 fn an_unrelated_document_does_not_meet_a_requirement() {
     let record = DiscardRecord {
@@ -222,7 +286,7 @@ fn an_unrelated_document_does_not_meet_a_requirement() {
     };
     let held = [DeliveryDocumentation, TreatmentStatement, InspectionRecord];
     assert_eq!(
-        kinds(&record.missing_evidence(&held)),
+        kinds(&record.missing_evidence(EnterpriseSize::Large, &held)),
         [vec![SafetyAssessment, ChemicalsTestReport]]
     );
 }
@@ -232,5 +296,8 @@ fn an_unrelated_document_does_not_meet_a_requirement() {
 #[test]
 fn a_record_holding_nothing_lacks_everything_it_requires() {
     let record = sample_discard_record();
-    assert_eq!(record.missing_evidence(&[]), record.required_evidence());
+    assert_eq!(
+        record.missing_evidence(EnterpriseSize::Large, &[]),
+        record.required_evidence(EnterpriseSize::Large)
+    );
 }

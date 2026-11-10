@@ -349,7 +349,7 @@ pub(crate) fn sample_discard_record() -> crate::unsold_goods::DiscardRecord {
         weight: DiscardedWeight::measured(36_000),
         packaging_included: false,
         reason: Some(DiscardReason::DamagedOrContaminated),
-        reason_detail: None,
+        reason_label: None,
         treatment: WasteTreatmentOperation::Recycling,
         receiver: ReceivingOperator {
             name: "Example Textile Recovery BV".to_owned(),

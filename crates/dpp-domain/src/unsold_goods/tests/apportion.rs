@@ -4,6 +4,7 @@ use proptest::prelude::*;
 
 use crate::unsold_goods::apportion::whole_percentages;
 
+/// Shares that already total 100 are returned as they are.
 #[test]
 fn exact_shares_need_no_correction() {
     assert_eq!(
@@ -28,6 +29,7 @@ fn shares_that_would_round_up_together_still_total_one_hundred() {
     assert_eq!(shares, [0, 34, 33, 33, 0]);
 }
 
+/// One operation holding all of the weight takes the whole 100.
 #[test]
 fn one_operation_takes_the_whole_line() {
     assert_eq!(whole_percentages([0, 0, 0, 0, 7]), [0, 0, 0, 0, 100]);

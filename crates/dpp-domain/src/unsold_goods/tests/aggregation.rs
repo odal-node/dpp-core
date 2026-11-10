@@ -8,14 +8,16 @@ use crate::unsold_goods::{
     CnCategory, DiscardReason, DiscardedProductLine, DiscardedQuantity, FinancialYear,
 };
 use crate::unsold_goods::{
-    DiscardRecord, DiscardedWeight, ExcludedRecord, ExclusionReason, WasteTreatmentOperation,
-    aggregate,
+    DiscardRecord, DiscardedWeight, ExcludedRecord, ExclusionReason, LineDescriptions,
+    WasteTreatmentOperation, aggregate,
 };
 
+/// A calendar date, for readability.
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
 }
 
+/// The financial year the tests aggregate: the calendar year 2027.
 fn year() -> FinancialYear {
     FinancialYear {
         start: date(2027, 1, 1),
@@ -23,25 +25,30 @@ fn year() -> FinancialYear {
     }
 }
 
+/// The sample record, which falls in `year()`.
 fn record() -> DiscardRecord {
     sample_discard_record()
 }
 
+/// The lines a set of records aggregates to, with no wording supplied by the discloser.
 fn lines(records: &[DiscardRecord]) -> Vec<DiscardedProductLine> {
-    aggregate(records, &year()).lines
+    aggregate(records, &year(), &LineDescriptions::new()).lines
 }
 
+/// A CN category from its digits.
 fn category(code: &str) -> CnCategory {
     CnCategory::parse(code).expect("valid category")
 }
 
+/// No records means no lines and nothing excluded.
 #[test]
 fn an_empty_year_aggregates_to_nothing() {
-    let aggregation = aggregate(&[], &year());
+    let aggregation = aggregate(&[], &year(), &LineDescriptions::new());
     assert!(aggregation.lines.is_empty());
     assert!(aggregation.excluded.is_empty());
 }
 
+/// Records of one category and derogation add up into a single line.
 #[test]
 fn records_of_one_category_and_reason_make_one_line() {
     let lines = lines(&[record(), record()]);
@@ -71,6 +78,7 @@ fn a_weight_is_rounded_once_after_summing_grams() {
     );
 }
 
+/// Annex I Section 2 rounds to the nearest whole number, so 500 g is the next kilogramme.
 #[test]
 fn half_a_kilogramme_rounds_up() {
     let half = DiscardRecord {
@@ -103,6 +111,7 @@ fn a_line_is_estimated_when_any_contributing_record_is() {
     assert!(weight_only.weight_kg.estimated);
 }
 
+/// A line's figures are measurements only when every record behind them is.
 #[test]
 fn a_line_is_measured_when_every_contributing_record_is() {
     let line = &lines(&[record(), record()])[0];
@@ -144,13 +153,13 @@ fn records_with_different_reasons_get_separate_lines() {
     assert_eq!(lines[1].reason, Some(DiscardReason::DamagedOrContaminated));
 }
 
-/// A discard no derogation covers gets a line with no reason, whose detail is all
+/// A discard no derogation covers gets a line with no reason, whose label is all
 /// there is to say why; it sorts after the lines that cite one.
 #[test]
 fn a_discard_with_no_derogation_gets_a_line_with_no_reason() {
     let surplus = DiscardRecord {
         reason: None,
-        reason_detail: Some("Surplus after a discontinued range".to_owned()),
+        reason_label: Some("Surplus after a discontinued range".to_owned()),
         ..record()
     };
     let lines = lines(&[surplus, record()]);
@@ -164,13 +173,13 @@ fn a_discard_with_no_derogation_gets_a_line_with_no_reason() {
     );
 }
 
-/// For a line with no reason the explanation *is* the reason, so two different
-/// explanations are two reasons and two lines.
+/// For a line with no reason the label *is* the reason, so two different labels are
+/// two reasons and two lines.
 #[test]
-fn records_with_different_explanations_do_not_share_a_line() {
+fn records_with_different_labels_do_not_share_a_line() {
     let explained = |text: &str| DiscardRecord {
         reason: None,
-        reason_detail: Some(text.to_owned()),
+        reason_label: Some(text.to_owned()),
         ..record()
     };
     assert_eq!(
@@ -226,6 +235,7 @@ fn a_kit_is_filed_under_every_category_it_names() {
     assert_eq!(lines[0].cn_categories, [category("3401"), category("62")]);
 }
 
+/// Items sold together and a single category are different rows.
 #[test]
 fn a_kit_and_a_single_category_do_not_share_a_line() {
     let kit = DiscardRecord {
@@ -238,21 +248,68 @@ fn a_kit_and_a_single_category_do_not_share_a_line() {
     assert_eq!(lines(&[kit, record()]).len(), 2);
 }
 
-/// Note (e): the description is "the combined nomenclature … or a more detailed
-/// description".
+/// A label is a short name the operator keeps, so the same one written with stray
+/// whitespace is the same label, and a blank one is none.
 #[test]
-fn the_descriptions_of_a_line_are_joined_sorted_and_distinct() {
+fn a_label_is_compared_trimmed_and_a_blank_one_is_none() {
+    let labelled = |text: &str| DiscardRecord {
+        reason: None,
+        reason_label: Some(text.to_owned()),
+        ..record()
+    };
+
+    let same = lines(&[labelled("Overstock"), labelled("  Overstock\n")]);
+    assert_eq!(same.len(), 1);
+    assert_eq!(same[0].reason_detail.as_deref(), Some("Overstock"));
+
+    let blank = lines(&[labelled("   "), labelled("")]);
+    assert_eq!(blank.len(), 1);
+    assert_eq!(blank[0].reason_detail, None);
+}
+
+/// Note (e): the description is "the combined nomenclature … or a more detailed
+/// description", and the discloser supplies it. The records' own wording, however
+/// many distinct phrasings a year holds, is not joined into the line: a line as
+/// long as the year was the alternative.
+#[test]
+fn a_line_is_described_in_the_disclosers_words_not_the_records() {
     let described = |text: &str| DiscardRecord {
         description: text.to_owned(),
         ..record()
     };
-    let lines = lines(&[
+    let records = [
         described("Trousers"),
         described("Blouses"),
-        described("Trousers"),
-    ]);
+        described("Trousers, size 40, blue"),
+    ];
+    let descriptions = LineDescriptions::from([(vec![category("62")], "Men's suits".to_owned())]);
 
-    assert_eq!(lines[0].description, "Blouses; Trousers");
+    let lines = aggregate(&records, &year(), &descriptions).lines;
+
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].description, "Men's suits");
+}
+
+/// With no wording supplied the line is described by its categories: the
+/// nomenclature, and nothing invented. A blank entry counts as none.
+#[test]
+fn a_line_with_no_supplied_wording_is_described_by_its_categories() {
+    assert_eq!(lines(&[record()])[0].description, "CN 62");
+
+    let blank = LineDescriptions::from([(vec![category("62")], "  ".to_owned())]);
+    assert_eq!(
+        aggregate(&[record()], &year(), &blank).lines[0].description,
+        "CN 62"
+    );
+
+    let kit = DiscardRecord {
+        cn_codes: vec![
+            CommodityCode::parse("62034231").unwrap(),
+            CommodityCode::parse("61091000").unwrap(),
+        ],
+        ..record()
+    };
+    assert_eq!(lines(&[kit])[0].description, "CN 61, 62");
 }
 
 /// Note (i): "calculated on the basis of the weight", so a heavy record outweighs
@@ -276,6 +333,7 @@ fn treatment_shares_follow_weight_not_units() {
     assert_eq!((split.recycling_pct, split.disposal_pct), (75, 25));
 }
 
+/// The five shares of a line always total exactly 100.
 #[test]
 fn treatment_shares_total_exactly_one_hundred() {
     let treated = |operation| DiscardRecord {
@@ -314,6 +372,7 @@ fn an_unknown_treatment_is_its_own_share() {
     assert_eq!(split.total_pct(), 100);
 }
 
+/// Preparing for reuse is a share of its own and does not count as destruction.
 #[test]
 fn preparing_for_reuse_is_its_own_share_and_is_not_destruction() {
     let reuse = DiscardRecord {
@@ -334,7 +393,11 @@ fn the_first_and_last_day_of_the_year_are_in_the_year() {
         discarded_on: d,
         ..record()
     };
-    let aggregation = aggregate(&[on(date(2027, 1, 1)), on(date(2027, 12, 31))], &year());
+    let aggregation = aggregate(
+        &[on(date(2027, 1, 1)), on(date(2027, 12, 31))],
+        &year(),
+        &LineDescriptions::new(),
+    );
 
     assert!(aggregation.excluded.is_empty());
     assert_eq!(aggregation.lines[0].units_discarded.value, 240);
@@ -352,7 +415,7 @@ fn a_record_outside_the_year_is_excluded_not_summed() {
         discarded_on: date(2028, 1, 1),
         ..record()
     };
-    let aggregation = aggregate(&[early, record(), late], &year());
+    let aggregation = aggregate(&[early, record(), late], &year(), &LineDescriptions::new());
 
     assert_eq!(aggregation.lines[0].units_discarded.value, 120);
     assert_eq!(
@@ -370,18 +433,20 @@ fn a_record_outside_the_year_is_excluded_not_summed() {
     );
 }
 
+/// A record naming no CN code cannot be filed, so it is returned as excluded.
 #[test]
 fn a_record_with_no_cn_code_is_excluded() {
     let none = DiscardRecord {
         cn_codes: Vec::new(),
         ..record()
     };
-    let aggregation = aggregate(&[none], &year());
+    let aggregation = aggregate(&[none], &year(), &LineDescriptions::new());
 
     assert!(aggregation.lines.is_empty());
     assert_eq!(aggregation.excluded[0].why, ExclusionReason::NoCnCode);
 }
 
+/// A record whose CN code is unreadable is returned as excluded.
 #[test]
 fn a_record_with_an_unreadable_cn_code_is_excluded() {
     for unreadable in ["6203", "abc", "620342310000"] {
@@ -389,7 +454,7 @@ fn a_record_with_an_unreadable_cn_code_is_excluded() {
             cn_codes: vec![serde_json::from_value(serde_json::json!(unreadable)).unwrap()],
             ..record()
         };
-        let aggregation = aggregate(&[record], &year());
+        let aggregation = aggregate(&[record], &year(), &LineDescriptions::new());
 
         assert!(aggregation.lines.is_empty(), "{unreadable}");
         assert_eq!(
@@ -409,19 +474,24 @@ fn a_record_with_no_weight_is_excluded() {
         weight: DiscardedWeight::measured(0),
         ..record()
     };
-    let aggregation = aggregate(&[weightless], &year());
+    let aggregation = aggregate(&[weightless], &year(), &LineDescriptions::new());
 
     assert!(aggregation.lines.is_empty());
     assert_eq!(aggregation.excluded[0].why, ExclusionReason::NoWeight);
 }
 
+/// An exclusion names the record by its position in the slice aggregated.
 #[test]
 fn an_exclusion_names_the_record_by_its_position() {
     let none = DiscardRecord {
         cn_codes: Vec::new(),
         ..record()
     };
-    let aggregation = aggregate(&[record(), record(), none], &year());
+    let aggregation = aggregate(
+        &[record(), record(), none],
+        &year(),
+        &LineDescriptions::new(),
+    );
 
     assert_eq!(
         aggregation.excluded,

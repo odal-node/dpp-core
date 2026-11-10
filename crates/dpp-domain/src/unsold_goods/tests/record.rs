@@ -5,6 +5,7 @@ use serde_json::json;
 use crate::test_support::sample_discard_record;
 use crate::unsold_goods::DiscardRecord;
 
+/// A record written to JSON reads back as the same record.
 #[test]
 fn a_record_round_trips_through_json() {
     let record = sample_discard_record();
@@ -19,14 +20,14 @@ fn a_record_round_trips_through_json() {
 fn a_record_with_no_derogation_writes_no_reason_key() {
     let record = DiscardRecord {
         reason: None,
-        reason_detail: Some("Surplus after a discontinued range".to_owned()),
+        reason_label: Some("Surplus after a discontinued range".to_owned()),
         ..sample_discard_record()
     };
     let wire = serde_json::to_value(&record).unwrap();
 
     assert!(wire.get("reason").is_none(), "{wire}");
     assert_eq!(
-        wire["reasonDetail"],
+        wire["reasonLabel"],
         json!("Surplus after a discontinued range")
     );
     assert_eq!(
@@ -50,6 +51,7 @@ fn a_record_with_no_cn_code_stays_readable() {
     );
 }
 
+/// A record with a malformed CN code still reads, so it can be reported.
 #[test]
 fn a_record_with_a_code_that_is_not_a_cn_code_stays_readable() {
     let mut wire = serde_json::to_value(sample_discard_record()).unwrap();

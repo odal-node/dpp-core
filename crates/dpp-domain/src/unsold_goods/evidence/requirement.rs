@@ -37,6 +37,7 @@ impl EvidenceRequirement {
 pub fn derogation_evidence(reason: DiscardReason) -> Vec<EvidenceRequirement> {
     use EvidenceKind::*;
 
+    /// A requirement that any one of `any_of` meets, citing `basis`.
     fn one_of(any_of: &[EvidenceKind], basis: &'static str) -> EvidenceRequirement {
         EvidenceRequirement {
             any_of: any_of.to_vec(),

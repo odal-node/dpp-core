@@ -36,6 +36,7 @@ fn cn_codes_readable(input: &DiscardRecordLintInput<'_>) -> bool {
             .all(|code| category_of_cn_code(code).is_some())
 }
 
+/// A record names no CN code, or one that is not 6, 8 or 10 digits.
 fn cn_code_unreadable(input: &DiscardRecordLintInput<'_>) -> Option<LintFinding> {
     if cn_codes_readable(input) {
         return None;
@@ -52,6 +53,7 @@ fn cn_code_unreadable(input: &DiscardRecordLintInput<'_>) -> Option<LintFinding>
     })
 }
 
+/// A record that weighs nothing cannot be apportioned across treatments.
 fn without_weight(input: &DiscardRecordLintInput<'_>) -> Option<LintFinding> {
     if input.weight_grams > 0 {
         return None;

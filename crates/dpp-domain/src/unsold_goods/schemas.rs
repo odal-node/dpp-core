@@ -1,4 +1,11 @@
-//! The versioned JSON Schemas of the unsold-goods disclosure.
+//! The versioned JSON Schemas of the unsold-goods disclosure and of the discard
+//! record it is computed from.
+//!
+//! Two families: [`DISCLOSURE_SCHEMA_KEY`], the published document, and
+//! [`RECORD_SCHEMA_KEY`], the contract for a record offered for storage. A record
+//! is read back more leniently than its schema admits (a malformed CN code stays
+//! readable and is reported), so the schema is where a new record is held to the
+//! shape and a stored one never is.
 //!
 //! # A schema family of its own
 //!
@@ -42,27 +49,38 @@ use crate::schemas::{SchemaEntry, SchemaOrigin, VersionedSchemaRegistry};
 /// The key the disclosure's schema versions are held under.
 pub const DISCLOSURE_SCHEMA_KEY: &str = "unsold-goods";
 
-/// Every version of the disclosure schema, compiled into the crate so that a
-/// published crate carries its own schemas.
-const EMBEDDED: &[(&str, &str)] = &[
+/// The key the discard record's schema versions are held under.
+pub const RECORD_SCHEMA_KEY: &str = "discard-record";
+
+/// Every version of every schema in the module, as (key, version, schema),
+/// compiled into the crate so that a published crate carries its own schemas.
+const EMBEDDED: &[(&str, &str, &str)] = &[
     (
+        DISCLOSURE_SCHEMA_KEY,
         "2.0.0",
         include_str!("../../document-schemas/unsold-goods/v2.0.0.json"),
     ),
     (
+        DISCLOSURE_SCHEMA_KEY,
         "2.1.0",
         include_str!("../../document-schemas/unsold-goods/v2.1.0.json"),
     ),
+    (
+        RECORD_SCHEMA_KEY,
+        "1.0.0",
+        include_str!("../../document-schemas/discard-record/v1.0.0.json"),
+    ),
 ];
 
-/// A registry holding the disclosure's schema versions, and nothing else.
+/// A registry holding the module's schema versions — the disclosure's and the
+/// discard record's — and nothing else.
 #[must_use]
 pub fn document_schemas() -> VersionedSchemaRegistry {
     VersionedSchemaRegistry::from_entries(
         EMBEDDED
             .iter()
-            .map(|(version, json)| SchemaEntry {
-                product_group: DISCLOSURE_SCHEMA_KEY.to_owned(),
+            .map(|(key, version, json)| SchemaEntry {
+                product_group: (*key).to_owned(),
                 version: version
                     .parse::<Version>()
                     .expect("embedded schema version is valid semver"),

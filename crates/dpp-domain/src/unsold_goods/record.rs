@@ -4,9 +4,10 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 use super::evidence::{EvidenceKind, EvidenceRequirement, derogation_evidence};
+use super::exemption::EnterpriseSize;
 use super::operation::WasteTreatmentOperation;
 use super::receiver::ReceivingOperator;
-use super::retention::{KeepUntil, keep_until};
+use super::retention::{Disclosure, KeepUntil, keep_until};
 use super::weight::DiscardedWeight;
 use crate::identifier::CommodityCode;
 use crate::unsold_goods::{DiscardReason, DiscardedQuantity};
@@ -44,8 +45,11 @@ pub struct DiscardRecord {
     /// items sold together count as one unit (note (f)). Art. 3 fixes the depth
     /// the disclosure files them at; the record keeps the product's own code.
     pub cn_codes: Vec<CommodityCode>,
-    /// Note (e): the description, on the basis of the combined nomenclature or "a
-    /// more detailed description".
+    /// What the products are, in the operator's words. It stays with the record, as
+    /// part of what the operator can show. The disclosure's line takes the
+    /// discloser's own wording for note (e) (see
+    /// [`aggregate`](super::aggregate)): the records' descriptions joined would make
+    /// a line as long as the year.
     pub description: String,
     /// Note (f): the number of units, and whether it is an estimate.
     pub units: DiscardedQuantity,
@@ -59,10 +63,18 @@ pub struct DiscardRecord {
     /// for the sole purpose of preparing for reuse, has none to cite.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<DiscardReason>,
-    /// Note (h)'s "more detailed explanation" — and, where [`Self::reason`] is
-    /// `None`, the only statement of why the products were discarded.
+    /// The operator's own short label for why the products were discarded — note
+    /// (h)'s "more detailed explanation", and, where [`Self::reason`] is `None`, the
+    /// only statement of why.
+    ///
+    /// A label and not a sentence: records that share a derogation, categories,
+    /// packaging answer and label share a line of the disclosure, so a label is
+    /// chosen from a short list the operator keeps and not typed afresh for each
+    /// record. A sentence per record would make a line per record and a table as
+    /// long as the year. Surrounding whitespace is ignored, and the record schema
+    /// bounds the length.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason_detail: Option<String>,
+    pub reason_label: Option<String>,
     /// The operation the products were delivered for.
     pub treatment: WasteTreatmentOperation,
     /// Who received them.
@@ -70,7 +82,12 @@ pub struct DiscardRecord {
 }
 
 impl DiscardRecord {
-    /// What the acts have an operator be able to show for this discard.
+    /// What the acts have an operator of `size` be able to show for this discard.
+    ///
+    /// **Nothing**, where the operator is outside Arts. 24(1) and 25(1) on the day of
+    /// the discard (see [`EnterpriseSize::is_exempt_on`]): it discloses nothing for
+    /// the documentation to demonstrate, and is not bound by the ban a derogation
+    /// excepts. Otherwise:
     ///
     /// - **Always**, documentation of the delivery and reception (ESPR Art. 24(2),
     ///   Impl. Reg. (EU) 2026/2 Art. 4).
@@ -85,7 +102,10 @@ impl DiscardRecord {
     /// The statement the operator gives the waste treatment operator (Art. 4) is a
     /// duty to provide, not to keep, and is not listed.
     #[must_use]
-    pub fn required_evidence(&self) -> Vec<EvidenceRequirement> {
+    pub fn required_evidence(&self, size: EnterpriseSize) -> Vec<EvidenceRequirement> {
+        if size.is_exempt_on(self.discarded_on) {
+            return Vec::new();
+        }
         let mut required = vec![EvidenceRequirement {
             any_of: vec![EvidenceKind::DeliveryDocumentation],
             basis: "Regulation (EU) 2024/1781 Art. 24(2); Impl. Reg. (EU) 2026/2 Art. 4",
@@ -109,8 +129,12 @@ impl DiscardRecord {
     /// information the competent authority already has under another act, which
     /// only the caller can know.
     #[must_use]
-    pub fn missing_evidence(&self, held: &[EvidenceKind]) -> Vec<EvidenceRequirement> {
-        self.required_evidence()
+    pub fn missing_evidence(
+        &self,
+        size: EnterpriseSize,
+        held: &[EvidenceKind],
+    ) -> Vec<EvidenceRequirement> {
+        self.required_evidence(size)
             .into_iter()
             .filter(|requirement| !requirement.is_met_by(held))
             .collect()
@@ -118,9 +142,16 @@ impl DiscardRecord {
 
     /// Until when this record's documents must be kept — the later of five years
     /// after the discard and five years after the disclosure covering it.
-    /// `disclosed_on` is the date that disclosure was made, if it has been.
+    /// `disclosed_on` is the date that disclosure was made, if it has been; an
+    /// operator that is exempt owes none, whatever it has made.
+    ///
+    /// Where the year is one the Regulation does not cover, which this crate cannot
+    /// tell, use [`keep_until`] with [`Disclosure::NotOwed`].
     #[must_use]
-    pub fn keep_until(&self, disclosed_on: Option<NaiveDate>) -> KeepUntil {
-        keep_until(self.discarded_on, disclosed_on)
+    pub fn keep_until(&self, size: EnterpriseSize, disclosed_on: Option<NaiveDate>) -> KeepUntil {
+        keep_until(
+            self.discarded_on,
+            Disclosure::of(size, self.discarded_on, disclosed_on),
+        )
     }
 }

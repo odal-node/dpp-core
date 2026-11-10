@@ -24,6 +24,7 @@ fn a_heading_beside_an_annex_ii_heading_is_still_filed_at_its_chapter() {
     assert_eq!(category_of_cn_code("85141000"), Some("85"));
 }
 
+/// A code that is not six, eight or ten digits has no category.
 #[test]
 fn a_code_that_is_not_six_eight_or_ten_digits_has_no_category() {
     for unreadable in [

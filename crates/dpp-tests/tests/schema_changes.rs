@@ -40,47 +40,54 @@ fn manifest_relative(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
 }
 
-fn schemas_dir() -> PathBuf {
-    manifest_relative("../dpp-domain/schemas")
-}
+/// The directories schema families live in: a product group's under `schemas/`, and
+/// a document that is not a product group's, such as the unsold-goods disclosure,
+/// under `document-schemas/`. A family in the second is as published as one in the
+/// first, so its bumps are as worth reading.
+const SCHEMA_DIRS: [&str; 2] = ["../dpp-domain/schemas", "../dpp-domain/document-schemas"];
 
 fn report_path() -> PathBuf {
     manifest_relative("../../docs/architecture/SCHEMA-CHANGES.md")
 }
 
-/// Every product group's schema versions, semver-ordered.
+/// Every schema family's versions, semver-ordered.
 fn schema_versions() -> BTreeMap<String, Vec<(Version, serde_json::Value)>> {
     let mut out: BTreeMap<String, Vec<(Version, serde_json::Value)>> = BTreeMap::new();
 
-    for entry in fs::read_dir(schemas_dir()).expect("schemas dir") {
-        let dir = entry.expect("dir entry").path();
-        if !dir.is_dir() {
-            continue;
-        }
-        let group = dir
-            .file_name()
-            .and_then(|s| s.to_str())
-            .expect("product group name")
-            .to_owned();
+    for root in SCHEMA_DIRS {
+        for entry in fs::read_dir(manifest_relative(root)).expect("schemas dir") {
+            let dir = entry.expect("dir entry").path();
+            if !dir.is_dir() {
+                continue;
+            }
+            let group = dir
+                .file_name()
+                .and_then(|s| s.to_str())
+                .expect("schema family name")
+                .to_owned();
 
-        let mut versions = Vec::new();
-        for file in fs::read_dir(&dir).expect("product group dir") {
-            let path = file.expect("file entry").path();
-            let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
-                continue;
-            };
-            let Some(raw) = name.strip_prefix('v').and_then(|n| n.strip_suffix(".json")) else {
-                continue;
-            };
-            let version = Version::parse(raw)
-                .unwrap_or_else(|e| panic!("{group}/{name} is not a semver filename: {e}"));
-            let doc: serde_json::Value =
-                serde_json::from_str(&fs::read_to_string(&path).expect("read schema"))
-                    .unwrap_or_else(|e| panic!("{group}/{name} is not valid JSON: {e}"));
-            versions.push((version, doc));
+            let mut versions = Vec::new();
+            for file in fs::read_dir(&dir).expect("schema family dir") {
+                let path = file.expect("file entry").path();
+                let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                let Some(raw) = name.strip_prefix('v').and_then(|n| n.strip_suffix(".json")) else {
+                    continue;
+                };
+                let version = Version::parse(raw)
+                    .unwrap_or_else(|e| panic!("{group}/{name} is not a semver filename: {e}"));
+                let doc: serde_json::Value =
+                    serde_json::from_str(&fs::read_to_string(&path).expect("read schema"))
+                        .unwrap_or_else(|e| panic!("{group}/{name} is not valid JSON: {e}"));
+                versions.push((version, doc));
+            }
+            versions.sort_by(|a, b| a.0.cmp(&b.0));
+            assert!(
+                out.insert(group.clone(), versions).is_none(),
+                "{group} is a schema family in two directories"
+            );
         }
-        versions.sort_by(|a, b| a.0.cmp(&b.0));
-        out.insert(group, versions);
     }
     out
 }
@@ -91,9 +98,12 @@ fn render() -> String {
         "# Schema changes\n\n\
          **Generated: do not edit.** Regenerate with `just schema-changes`;\n\
          `cargo test -p dpp-tests --test schema_changes` fails if this file has\n\
-         drifted from the schemas under `crates/dpp-domain/schemas/`.\n\n\
-         One section per product group, one table per version bump: what each\n\
-         version changed relative to the one before it.\n\n\
+         drifted from the schemas under `crates/dpp-domain/schemas/` and\n\
+         `crates/dpp-domain/document-schemas/`.\n\n\
+         One section per schema family (a product group's, or a document's that is\n\
+         not a product group's), one table per version bump: what each version\n\
+         changed relative to the one before it. A requirement counts at any depth:\n\
+         `lines/[]/reason` is the `reason` of each row of `lines`.\n\n\
          `additive` means the bump only adds properties: no removal, no type\n\
          change, no altered constraint, no newly required property. It is a\n\
          statement about *shape* and not a compatibility verdict; whether stored\n\
@@ -247,6 +257,30 @@ fn the_report_covers_every_product_group_with_more_than_one_version() {
             );
         }
     }
+}
+
+/// A requirement dropped inside a table row is a change of obligation, not "no
+/// change". The disclosure's v2.1.0 stopped requiring `reason` on a line, and the
+/// report once said that nothing had changed because it read only the root's
+/// `required`.
+#[test]
+fn a_requirement_dropped_below_the_root_is_reported() {
+    let versions = schema_versions();
+    let disclosure = &versions["unsold-goods"];
+    let find = |want: &str| {
+        disclosure
+            .iter()
+            .find(|(v, _)| v.to_string() == want)
+            .unwrap_or_else(|| panic!("unsold-goods v{want} is missing"))
+    };
+
+    let diff = diff_schemas(&find("2.0.0").1, &find("2.1.0").1);
+    assert_eq!(diff.required_removed, ["lines/[]/reason"]);
+    assert!(!diff.is_purely_additive());
+    assert!(
+        render().contains("**No longer required:** `lines/[]/reason`"),
+        "the generated report does not say it"
+    );
 }
 
 /// The classification the report exists to make visible, asserted against real
