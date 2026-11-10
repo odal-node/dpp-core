@@ -114,6 +114,18 @@ pub(super) fn builtin_lenses() -> Vec<Lens> {
             electronics_v1_1_to_v1_2,
         ),
         Lens::new(
+            "unsold-goods",
+            Version::new(2, 0, 0),
+            Version::new(2, 1, 0),
+            false,
+            "Impl. Reg. (EU) 2026/2 Annex I note (h) v2.1.0: a line's reason becomes \
+             optional, because the note asks for one only where a Del. Reg. (EU) \
+             2026/296 Art. 2 derogation applies. Dropping a requirement only widens \
+             what validates, so a v2.0.0 disclosure — every line of which names a \
+             reason — passes through untouched.",
+            pass_through,
+        ),
+        Lens::new(
             "steel",
             Version::new(1, 0, 0),
             Version::new(1, 1, 0),

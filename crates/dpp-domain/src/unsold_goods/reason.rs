@@ -33,7 +33,13 @@ use serde::{Deserialize, Serialize};
 /// requires the operator to keep specified evidence per derogation for **five
 /// years** after destruction, in electronic form, produced within 30 days of a
 /// competent authority's request. That evidence is not passport data and is not
-/// modelled here; the reason recorded is the claim, not the proof of it.
+/// part of the disclosure: the reason recorded is the claim, not the proof of it.
+/// What each reason needs is `crate::unsold_goods::derogation_evidence`.
+///
+/// **A reason is not always owed.** The derogations except the destruction of Annex
+/// VII products from the Art. 25(1) prohibition, so a discard of anything else, or
+/// one made to prepare for reuse, has none to cite; the disclosure carries
+/// `Option<DiscardReason>` and note (h) asks for it only "where applicable".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]

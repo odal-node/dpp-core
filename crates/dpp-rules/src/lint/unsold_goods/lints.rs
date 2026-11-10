@@ -22,8 +22,9 @@ use crate::unsold_goods::disclosure;
 pub struct DisclosureLineInput<'a> {
     /// The CN chapter or heading this line is filed under.
     pub cn_category: &'a str,
-    /// The Del. Reg. (EU) 2026/296 Art. 2 point letter claimed for this line.
-    pub reason_point: char,
+    /// The Del. Reg. (EU) 2026/296 Art. 2 point letter claimed for this line, if
+    /// any. Annex I note (h) asks for it only "where applicable".
+    pub reason_point: Option<char>,
     /// Units discarded.
     pub units: u64,
     /// Weight discarded, in kilogrammes.
@@ -41,6 +42,10 @@ pub struct DisclosureLineInput<'a> {
 pub struct UnsoldGoodsLintInput<'a> {
     /// Every line of the Annex I table.
     pub lines: &'a [DisclosureLineInput<'a>],
+    /// First day of the financial year, as (year, month, day).
+    pub financial_year_start: (i32, u32, u32),
+    /// Last day of the financial year, as (year, month, day).
+    pub financial_year_end: (i32, u32, u32),
     /// Whether a consolidated disclosure listed its undertakings.
     pub consolidated_undertaking_count: Option<usize>,
     /// Annex I note (i) — measures taken, trimmed length.
@@ -132,13 +137,13 @@ fn donation_claimed_alongside_stronger_reason(
 ) -> Option<LintFinding> {
     let mut offending: Vec<&str> = Vec::new();
     for line in lines {
-        if line.reason_point != 'h' {
+        if line.reason_point != Some('h') {
             continue;
         }
         let same_category: Vec<char> = lines
             .iter()
             .filter(|l| l.cn_category == line.cn_category)
-            .map(|l| l.reason_point)
+            .filter_map(|l| l.reason_point)
             .collect();
         if !disclosure::donation_reason_is_admissible(&same_category)
             && !offending.contains(&line.cn_category)
@@ -159,6 +164,23 @@ fn donation_claimed_alongside_stronger_reason(
              (g) applies",
             offending.join(", ")
         ),
+    })
+}
+
+/// Art. 1 ties the disclosure to a financial year, which cannot end before it
+/// starts. The domain type leaves such a value readable, on the footing that it is
+/// reported here.
+fn financial_year_ends_before_it_starts(input: &UnsoldGoodsLintInput<'_>) -> Option<LintFinding> {
+    if input.financial_year_end >= input.financial_year_start {
+        return None;
+    }
+    Some(LintFinding {
+        code: "unsold_goods.financial_year_ends_before_it_starts",
+        field: "/financialYear",
+        severity: LintSeverity::Warning,
+        message: "the financial year ends before it starts — Annex I asks for its first and last \
+                  day, and every figure in the disclosure is over that period"
+            .into(),
     })
 }
 
@@ -204,6 +226,7 @@ pub fn lint_unsold_goods(input: &UnsoldGoodsLintInput<'_>) -> Vec<LintFinding> {
         findings.extend(weight_without_units(line, index));
     }
     findings.extend(donation_claimed_alongside_stronger_reason(input.lines));
+    findings.extend(financial_year_ends_before_it_starts(input));
     findings.extend(consolidated_without_undertakings(input));
     findings.extend(narrative_too_thin(
         input.measures_taken_len,

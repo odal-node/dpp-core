@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.odal-node.io/dpp/discard-record-v1.0.0.json",
+  "title": "Odal Node — Discard of Unsold Consumer Products (v1.0.0)",
+  "description": "One discard of unsold consumer products and what the acts have an operator keep for it: ESPR Article 24(1) has the operator disclose the number and weight discarded, the reasons, and the proportion delivered to each treatment, and Article 24(2) has it demonstrate the delivery and reception of the discarded products on request. The reason vocabulary is the derogation list of Commission Delegated Regulation (EU) 2026/296 (CELEX 32026R0296), Article 2. The yearly disclosure of Commission Implementing Regulation (EU) 2026/2 (CELEX 32026R0002) Annex I is computed from a year of these.",
+  "type": "object",
+  "required": [
+    "discardedOn",
+    "cnCodes",
+    "description",
+    "units",
+    "weight",
+    "packagingIncluded",
+    "treatment",
+    "receiver"
+  ],
+  "properties": {
+    "discardedOn": {
+      "type": "string",
+      "format": "date",
+      "description": "The day the products were discarded. It decides the financial year the discard is disclosed in, and the day the retention period runs from."
+    },
+    "cnCodes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Annex I note (d): the combined nomenclature codes of the product, as the product's own code (6, 8 or 10 digits, no separators), not the 2- or 4-digit category the disclosure files them under. More than one only where items sold together count as one unit (note (f)).",
+      "items": {
+        "type": "string",
+        "pattern": "^([0-9]{6}|[0-9]{8}|[0-9]{10})$"
+      }
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the products are, in the operator's words. It stays with the record; the disclosure's line takes the discloser's own wording."
+    },
+    "units": {
+      "type": "object",
+      "description": "Note (f): the number of units discarded. May be estimated from an accurately determined weight, in which case `estimated` is true.",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": "integer", "minimum": 0 },
+        "estimated": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "weight": {
+      "type": "object",
+      "description": "Note (g): the weight of the units discarded, in grams, so that the rounding to whole kilogrammes Annex I Section 2 asks for happens once, on the line. May be estimated from an accurate count, in which case `estimated` is true. A discard that weighed nothing is no discard of anything; a record without a weight cannot be counted in the treatment split, so give the estimate.",
+      "required": ["grams"],
+      "properties": {
+        "grams": { "type": "integer", "minimum": 1 },
+        "estimated": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "packagingIncluded": {
+      "type": "boolean",
+      "description": "Whether packaging is included in the weight."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Note (h): where applicable, the derogation of Del. Reg. (EU) 2026/296 Art. 2, points (a) to (j), that the discard relies on. Absent where none applies: they except the destruction of the ESPR Annex VII products from the Art. 25(1) prohibition, so a discard of any other product, or one made for the sole purpose of preparing for reuse, has no point to cite.",
+      "enum": [
+        "dangerousProduct",
+        "nonCompliantWithLaw",
+        "intellectualPropertyInfringement",
+        "licensedPeriodExpired",
+        "markingsCannotBeRemoved",
+        "damagedOrContaminated",
+        "defectiveBeyondRepair",
+        "offeredForDonationNotAccepted",
+        "donatedButNoRecipientFound",
+        "reusedButNoRecipientFound"
+      ]
+    },
+    "reasonLabel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "The operator's own short label for why the products were discarded, chosen from a short list it keeps and not written afresh for each record: records that share a derogation, categories, packaging answer and label share a line of the disclosure, and it is that line's note (h) explanation."
+    },
+    "treatment": {
+      "type": "string",
+      "description": "The operation the products were delivered for. A delivery treated two ways is two records. 'unknown' is a real answer, for where the waste treatment operator could not say (note (i)).",
+      "enum": ["preparingForReuse", "recycling", "otherRecovery", "disposal", "unknown"]
+    },
+    "receiver": {
+      "type": "object",
+      "description": "Who received the products: the operator whose statement on their reception and treatment Impl. Reg. (EU) 2026/2 Article 4 has the discarding operator keep.",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "identifier": {
+          "type": "object",
+          "description": "The EUID established by Directive (EU) 2017/1132 or, only where no EUID is available, an identifier from an officially recognised Member State scheme. Optional: no act requires a waste treatment operator to hold one.",
+          "oneOf": [
+            {
+              "required": ["type", "value"],
+              "properties": {
+                "type": { "const": "euid" },
+                "value": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["type", "scheme", "value"],
+              "properties": {
+                "type": { "const": "other" },
+                "scheme": { "type": "string", "minLength": 1 },
+                "value": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "NOT PUBLISHED. A record is kept by the operator and handed to a competent authority on request (ESPR Art. 24(2)); nothing serves it to an audience, so no property declares an x-disclosure class. This schema is the contract for a record offered for storage. Reading a stored record back is deliberately more lenient than this schema (a record with a malformed CN code stays readable and is reported, not hidden), so a record that predates a stricter version still reads."
+}

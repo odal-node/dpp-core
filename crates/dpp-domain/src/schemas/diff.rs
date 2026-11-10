@@ -1,4 +1,4 @@
-//! [`SchemaDiff`] — what changed between two versions of one product group's schema.
+//! [`SchemaDiff`] — what changed between two versions of one schema.
 //!
 //! # Why this exists
 //!
@@ -22,7 +22,7 @@
 //! to disagree.
 //!
 //! It is also not a general JSON-Schema differ. It walks `properties` and
-//! `required`, which is where a product-group schema states its obligations, and
+//! `required` at every level, which is where a schema states its obligations, and
 //! ignores the rest of the vocabulary.
 //!
 //! **The known blind spot is the combinators.** A property declared with
@@ -39,14 +39,15 @@ use serde_json::Value;
 
 use super::change::{CONSTRAINT_KEYWORDS, ChangeKind, PropertyChange};
 
-/// Everything that changed between two versions of one product group's schema.
+/// Everything that changed between two versions of one schema.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SchemaDiff {
     /// Property-level changes, ordered by path.
     pub properties: Vec<PropertyChange>,
-    /// Property names that became required.
+    /// Properties that became required: a bare name at the root, `parent/child`
+    /// inside an object and `list/[]/child` inside an array's items.
     pub required_added: Vec<String>,
-    /// Property names that stopped being required.
+    /// Properties that stopped being required, named as in [`Self::required_added`].
     pub required_removed: Vec<String>,
 }
 
@@ -75,7 +76,7 @@ impl SchemaDiff {
     }
 }
 
-/// Diff two schema documents of the same product group.
+/// Diff two schema documents of the same family.
 ///
 /// `prev` and `next` are whole JSON Schema documents. Walks `properties`
 /// recursively — through nested objects and through an array's `items` — so a
@@ -86,13 +87,26 @@ pub fn diff_schemas(prev: &Value, next: &Value) -> SchemaDiff {
     let mut diff = SchemaDiff::default();
     walk(prev, next, "", &mut diff);
 
+    diff.properties.sort_by(|a, b| a.path.cmp(&b.path));
+    diff.required_added.sort();
+    diff.required_removed.sort();
+    diff
+}
+
+/// Compare the `required` lists of two subschemas at one level, recording each
+/// difference under its full path.
+///
+/// A requirement inside a sub-object or an array's items binds every document that
+/// has the object or a row, so it is as much a change of obligation as one at the
+/// root: reading only the root reported a dropped line-level requirement as no
+/// change at all.
+fn compare_required(prev: &Value, next: &Value, prefix: &str, diff: &mut SchemaDiff) {
     let before = required_set(prev);
     let after = required_set(next);
-    diff.required_added = after.difference(&before).cloned().collect();
-    diff.required_removed = before.difference(&after).cloned().collect();
-
-    diff.properties.sort_by(|a, b| a.path.cmp(&b.path));
-    diff
+    diff.required_added
+        .extend(after.difference(&before).map(|name| join(prefix, name)));
+    diff.required_removed
+        .extend(before.difference(&after).map(|name| join(prefix, name)));
 }
 
 fn required_set(schema: &Value) -> BTreeSet<String> {
@@ -111,6 +125,8 @@ fn required_set(schema: &Value) -> BTreeSet<String> {
 /// Compare the `properties` maps of two subschemas, recursing into each shared
 /// property.
 fn walk(prev: &Value, next: &Value, prefix: &str, diff: &mut SchemaDiff) {
+    compare_required(prev, next, prefix, diff);
+
     let prev_props = properties_of(prev);
     let next_props = properties_of(next);
 
