@@ -347,30 +347,36 @@ struct SchemaProse {
     descriptions: Vec<String>,
 }
 
-/// Every schema in the registry, with its prose.
+/// Every schema in the registry, with its prose — the product groups' and the
+/// unsold-goods disclosure's, which is held in a registry of its own.
 fn schema_prose() -> Vec<SchemaProse> {
-    let registry = VersionedSchemaRegistry::new();
+    let registries = [
+        VersionedSchemaRegistry::new(),
+        crate::unsold_goods::document_schemas(),
+    ];
     let mut out = Vec::new();
 
-    for product_group in registry.product_groups() {
-        for version in registry.versions_for(product_group) {
-            let json_text = registry
-                .get(product_group, version)
-                .expect("the registry listed it");
-            let schema: serde_json::Value =
-                serde_json::from_str(json_text).expect("schema is valid JSON");
-            let mut descriptions = Vec::new();
-            collect_descriptions(&schema, &mut descriptions);
-            out.push(SchemaProse {
-                product_group: product_group.to_owned(),
-                version: version.to_string(),
-                root_description: schema
-                    .get("description")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or_default()
-                    .to_owned(),
-                descriptions,
-            });
+    for registry in &registries {
+        for product_group in registry.product_groups() {
+            for version in registry.versions_for(product_group) {
+                let json_text = registry
+                    .get(product_group, version)
+                    .expect("the registry listed it");
+                let schema: serde_json::Value =
+                    serde_json::from_str(json_text).expect("schema is valid JSON");
+                let mut descriptions = Vec::new();
+                collect_descriptions(&schema, &mut descriptions);
+                out.push(SchemaProse {
+                    product_group: product_group.to_owned(),
+                    version: version.to_string(),
+                    root_description: schema
+                        .get("description")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    descriptions,
+                });
+            }
         }
     }
 

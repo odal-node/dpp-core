@@ -18,9 +18,10 @@
 //!   called `require_gtin`, so when every other plugin's call had to be
 //!   replaced it had nothing to replace, and came through clean by accident.
 //!
-//! A third was found only by writing this test: the unsold-goods branch checked
-//! neither `entity` nor `financialYear`, so a disclosure naming no discloser and
-//! no reporting period passed.
+//! A third was found only by writing this test: the textile plugin's unsold-goods
+//! branch checked neither `entity` nor `financialYear`, so a disclosure naming no
+//! discloser and no reporting period passed. That branch is gone with the product
+//! group it served; the disclosure's own schema requires both.
 //!
 //! # What this can and cannot see
 //!
@@ -35,9 +36,8 @@
 //! everywhere — `productIdentifier.scheme` — is the exception, because
 //! `require_product_identifier` walks into the object itself.
 //!
-//! 🚨 It also cannot see **which branch** a call sits in, which matters for the
-//! one crate serving two product groups. That is pinned behaviourally instead,
-//! by `an_unsold_goods_report_still_needs_no_identifier` in the textile crate.
+//! It also cannot see **which branch** a call sits in. Each plugin crate serves one
+//! product group, so there is one set of calls to read.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -45,11 +45,7 @@ use std::path::{Path, PathBuf};
 
 /// Plugin crate → the product groups whose schemas it must satisfy.
 ///
-/// One entry per crate. `product-group-textile` serves **two**: it dispatches
-/// on the in-payload `productGroup` discriminant, because `meta().product_group`
-/// can only name one and the host cannot select a dedicated unsold-goods
-/// plugin. So `unsold-goods` has no directory of its own and its required
-/// fields are this crate's to check.
+/// One entry per crate.
 const PLUGIN_GROUPS: &[(&str, &[&str])] = &[
     ("product-group-aluminium", &["aluminium"]),
     ("product-group-battery", &["battery"]),
@@ -59,7 +55,7 @@ const PLUGIN_GROUPS: &[(&str, &[&str])] = &[
     ("product-group-furniture", &["furniture"]),
     ("product-group-mattress", &["mattress"]),
     ("product-group-steel", &["steel"]),
-    ("product-group-textile", &["textile", "unsold-goods"]),
+    ("product-group-textile", &["textile"]),
     ("product-group-toy", &["toy"]),
     ("product-group-tyre", &["tyre"]),
 ];
@@ -175,11 +171,11 @@ fn every_plugin_checks_every_field_its_schema_requires() {
         problems.join("\n  ")
     );
 
-    // 🚨 A count, because a loop over an empty list passes. Eleven crates, twelve
-    // product groups: the textile crate answers for two.
+    // 🚨 A count, because a loop over an empty list passes. Eleven crates, eleven
+    // product groups.
     assert_eq!(
-        checked, 12,
-        "expected 12 (crate, product group) pairs, checked {checked}"
+        checked, 11,
+        "expected 11 (crate, product group) pairs, checked {checked}"
     );
 }
 

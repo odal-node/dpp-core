@@ -55,6 +55,22 @@ impl VersionedSchemaRegistry {
         }
     }
 
+    /// A registry holding exactly `entries` and none of the product-group
+    /// schemas.
+    ///
+    /// For a family of schemas that is not a product group — a document with its
+    /// own versions — so that it is validated by the same machinery without
+    /// appearing in [`Self::new`], whose every entry is read as the data of a
+    /// product group.
+    #[must_use]
+    pub fn from_entries(entries: Vec<SchemaEntry>) -> Self {
+        Self {
+            entries,
+            #[cfg(not(target_arch = "wasm32"))]
+            compiled: std::sync::RwLock::new(std::collections::HashMap::new()),
+        }
+    }
+
     /// Validate that `json` is not just valid JSON but a compilable JSON Schema.
     ///
     /// On `wasm32` (no `jsonschema`), only the JSON parse is checked.

@@ -139,7 +139,7 @@ All eleven plugins use the SDK (`dpp-plugin-sdk` and `export_plugin!`):
 | Plugin | Product group |
 |---|---|
 | `product-group-battery` | battery (the reference implementation) |
-| `product-group-textile` | textile, unsold-goods |
+| `product-group-textile` | textile |
 | `product-group-steel` | steel |
 | `product-group-electronics`, `-construction`, `-tyre`, `-toy`, `-aluminium`, `-furniture`, `-mattress`, `-detergent` | the group of the same name |
 
@@ -147,9 +147,7 @@ Schema versions are not listed here: several groups are past v1.0.0, and a list 
 the first time one moved. A plugin validates against whatever versions its product group
 has registered in `dpp_domain::schemas::embedded`, which is the authority.
 
-Twelve product groups, eleven plugins: `unsold-goods` has no plugin of its own and runs on
-`product-group-textile`, which dispatches on the payload's `productGroup`. `mattress` was
-split out of `furniture` because the ESPR working plan makes mattresses a separate product
+Eleven product groups, eleven plugins. `mattress` was split out of `furniture` because the ESPR working plan makes mattresses a separate product
 group. Furniture's plugin cannot serve it (it requires a `productType` a mattress payload
 does not carry), so mattress has its own plugin, with furniture's checks minus that field.
 

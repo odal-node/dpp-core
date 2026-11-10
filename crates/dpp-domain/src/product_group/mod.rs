@@ -40,10 +40,6 @@ pub use carbon_footprint::{
     CarbonFootprint, CarbonFootprintClass, CarbonFootprintClassError, LifecycleStage,
     SystemBoundary,
 };
-pub use data::unsold_goods::{
-    CnCategory, CnCategoryError, DiscardReason, DiscardedProductLine, DiscardedQuantity,
-    DisclosingEntity, DisclosureScope, FinancialYear, LegalEntityIdentifier, WasteTreatmentSplit,
-};
 pub use data::{
     AluminiumData, BatteryChemistry, BatteryData, BatteryStatus, BatteryType, ConstructionData,
     CriticalRawMaterial, DetergentData, DeviceType, DueDiligenceOperatorScope, DynamicPerformance,
@@ -51,7 +47,7 @@ pub use data::{
     FurnitureData, HarmfulEvents, HazardSymbol, HazardousSubstance, MaterialComposition,
     MattressData, ProductGroupData, ProductionRoute, StateOfChargeReading, StateOfHealth,
     SteelData, SurfactantEntry, SvhcSubstance, TemperatureRange, TextileData, ToyData, TyreData,
-    UnmodelledPayload, UnsoldGoodsReport, UsageHistory,
+    UnmodelledPayload, UsageHistory,
 };
 pub use group::ProductGroup;
 pub use payload::ProductGroupPayload;

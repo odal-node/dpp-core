@@ -342,7 +342,6 @@ const ROOT_FILES_BASELINE: &[&str] = &[
     "crates/dpp-vc/src/passport_credential.rs",
     "crates/dpp-vc/src/status_list.rs",
     "plugins/product-group-textile/src/fibre_composition.rs",
-    "plugins/product-group-textile/src/unsold_goods.rs",
 ];
 
 #[test]
@@ -571,6 +570,7 @@ const TIERS: &[(&str, u8)] = &[
     ("graph", 5),
     ("product", 5),
     ("transfer", 5),
+    ("unsold_goods", 5),
     // 6 policy — decides something.
     ("access", 6),
     ("lint", 6),

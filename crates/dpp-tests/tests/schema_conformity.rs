@@ -221,9 +221,20 @@ fn steel_schema_v1_is_valid() {
     assert_eq!(schema["type"].as_str().unwrap(), "object");
 }
 
+/// The disclosure is not a product group, so its schema is not in the product-group
+/// registry that `schema` reads; it has a registry of its own.
 #[test]
 fn unsold_goods_schema_v2_is_valid() {
-    let schema = schema("unsold-goods", "2.0.0");
+    use dpp_domain::unsold_goods::{DISCLOSURE_SCHEMA_KEY, document_schemas};
+
+    let registry = document_schemas();
+    let json = registry
+        .get(
+            DISCLOSURE_SCHEMA_KEY,
+            &Version::parse("2.0.0").expect("valid semver"),
+        )
+        .expect("the disclosure schema v2.0.0 is embedded");
+    let schema: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
     assert_eq!(schema["type"].as_str().unwrap(), "object");
 }
 

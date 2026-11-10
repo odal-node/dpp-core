@@ -10,5 +10,5 @@ mod result;
 #[cfg(test)]
 mod tests;
 
-pub use finding::{LintFinding, LintSeverity, lint_product_group_data};
+pub use finding::{LintFinding, LintSeverity, lint_product_group_data, lint_unsold_goods_report};
 pub use result::LintResult;

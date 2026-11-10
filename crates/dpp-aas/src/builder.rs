@@ -59,8 +59,9 @@ impl std::error::Error for AasError {}
 ///
 /// `gtin` becomes the `globalAssetId` and a `specificAssetId` entry for GS1
 /// Digital Link routing. It is a parameter, and not read off the passport, so
-/// that the asset identity stays the caller's to decide — the unsold-goods
-/// mapper's module note records the case that forced it.
+/// that the asset identity stays the caller's to decide — a file export, or an
+/// asset the passport's identifier does not name, needs one the passport does
+/// not carry.
 ///
 /// 🚨 The `specificAssetId` it populates is named `gtin` unconditionally, so a
 /// caller passing anything else — an EN 18219 scheme 2 or 3 identifier, an

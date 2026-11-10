@@ -21,10 +21,6 @@ const EMBEDDED: &[EmbeddedManifest] = &[
         json: include_str!("../../product-groups/electronics.json"),
     },
     EmbeddedManifest {
-        key: "unsold-goods",
-        json: include_str!("../../product-groups/unsold-goods.json"),
-    },
-    EmbeddedManifest {
         key: "textile",
         json: include_str!("../../product-groups/textile.json"),
     },

@@ -7,7 +7,6 @@ fn wire_str_matches_serde_serialization() {
     for product_group in [
         ProductGroup::Battery,
         ProductGroup::Textile,
-        ProductGroup::UnsoldGoods,
         ProductGroup::Steel,
         ProductGroup::Electronics,
         ProductGroup::Construction,
