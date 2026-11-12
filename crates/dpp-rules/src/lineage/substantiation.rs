@@ -134,9 +134,11 @@ const REPURPOSING: &str = "repurposing";
 /// Returns one outcome per edge, in edge order. An edge is backed by the
 /// strongest item that backs it, in [`SubstantiationBasis`] order, the first in
 /// list order among equals. An edge that nothing backs reports one defect: the
-/// most fundamental defect of its strongest kind of evidence, so a missing
-/// predecessor authorisation is not buried under a detail about a document. An
-/// edge with no evidence reports [`SubstantiationDefect::NoEvidence`].
+/// most fundamental defect among the items of its strongest kind, the first in
+/// list order among equals, so a missing predecessor authorisation is buried
+/// neither under a detail about a document nor under a lesser defect of a
+/// second transfer. An edge with no evidence reports
+/// [`SubstantiationDefect::NoEvidence`].
 ///
 /// A passport with no derivation edges gets no outcomes — this says nothing
 /// about bill-of-materials edges, which deliberately carry no substantiation
@@ -164,8 +166,9 @@ pub fn check_derivation_substantiation<'a>(
 }
 
 /// The item an edge's outcome rests on, and that outcome: a backing item over
-/// a refused one, then the stronger kind, then the earlier item. `None` for an
-/// edge with no evidence.
+/// a refused one, then the stronger kind, then (between refused items) the more
+/// fundamental defect, then the earlier item. `None` for an edge with no
+/// evidence.
 fn decisive<'a>(
     passport_operator_did: &'a str,
     edge: &DerivationEdge<'a>,
@@ -177,8 +180,27 @@ fn decisive<'a>(
             let outcome = judge(passport_operator_did, edge.operation, item);
             (index, strength(item), outcome)
         })
-        .min_by_key(|(index, strength, outcome)| (outcome.is_err(), *strength, *index))
+        .min_by_key(|(index, strength, outcome)| {
+            let defect = outcome.as_ref().err().map_or(0, fundamentality);
+            (outcome.is_err(), *strength, defect, *index)
+        })
         .map(|(index, _, outcome)| (index, outcome))
+}
+
+/// Rank of a defect, most fundamental first, in the order the `judge_*`
+/// functions check: a predecessor's authorisation before its completion, both
+/// before what the record says. Only defects of one kind are ever compared,
+/// since [`strength`] decides between kinds first.
+fn fundamentality(defect: &SubstantiationDefect<'_>) -> u8 {
+    match defect {
+        SubstantiationDefect::NoEvidence
+        | SubstantiationDefect::OutgoingAuthorisationMissing
+        | SubstantiationDefect::DocumentTypeMissing => 0,
+        SubstantiationDefect::NotAccepted | SubstantiationDefect::DocumentDigestMalformed => 1,
+        SubstantiationDefect::IncomingOperatorMismatch { .. } => 2,
+        SubstantiationDefect::OperationMismatch { .. }
+        | SubstantiationDefect::WasteHandoverContradictsOperation { .. } => 3,
+    }
 }
 
 /// Rank of an item's kind, strongest first, matching [`SubstantiationBasis`].

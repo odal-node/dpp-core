@@ -461,12 +461,16 @@ checked as a *status*, not as a second signature.
 
 So the two are bound rather than adding a third mechanism:
 
-> A passport carrying a non-empty `derived_from` must reference a `TransferRecord` for each
-> predecessor, whose `TransferReason` matches that edge's `SecondLifeOperation`, and whose
-> incoming operator is this passport's operator.
+> A passport carrying a non-empty `derived_from` is substantiated edge by edge, on one of
+> three bases, strongest first. A `TransferRecord` on the predecessor whose `TransferReason`
+> matches the edge's `SecondLifeOperation` and whose incoming operator is this passport's
+> operator (`PredecessorTransfer`). A waste handover on the predecessor, which a `repurposing`
+> edge contradicts (`PredecessorWasteHandover`). A document the claiming operator supplies,
+> pinned by its SHA-256 (`SuppliedDocument`). The rule reports which basis backed each edge.
 
-That one rule closes two gaps: the two mechanisms become one event (G2), and a second-life
-claim carries the predecessor operator's authorisation (G7). It shipped in Phase 4 as
+Where the evidence is a transfer, that one rule closes two gaps: the two mechanisms become
+one event (G2), and the second-life claim carries the predecessor operator's authorisation
+(G7). Where it is not, the basis says so. It shipped in Phase 4 as
 `dpp_rules::lineage::consent`, since renamed `substantiation`: a pure cross-field rule,
 which is where it belongs.
 

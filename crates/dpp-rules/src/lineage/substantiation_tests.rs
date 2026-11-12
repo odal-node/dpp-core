@@ -342,6 +342,54 @@ fn when_nothing_backs_the_strongest_kinds_defect_is_reported() {
     );
 }
 
+/// Between two refused items of one kind, the more fundamental defect is
+/// reported, wherever it sits in the list: a missing predecessor authorisation
+/// is not hidden behind another transfer's operation mismatch.
+#[test]
+fn between_refused_items_of_one_kind_the_more_fundamental_defect_wins() {
+    let unauthorised = Evidence::Transfer(TransferEvidence {
+        outgoing_authorised: false,
+        ..good_transfer()
+    });
+    let wrong_operation = Evidence::Transfer(TransferEvidence {
+        reason: "remanufacturing",
+        ..good_transfer()
+    });
+
+    assert_edge(
+        "repurposing",
+        &[wrong_operation, unauthorised],
+        Err(SubstantiationDefect::OutgoingAuthorisationMissing),
+        Some(1),
+    );
+    assert_edge(
+        "repurposing",
+        &[unauthorised, wrong_operation],
+        Err(SubstantiationDefect::OutgoingAuthorisationMissing),
+        Some(0),
+    );
+}
+
+/// The same holds for documents: a missing type outranks a malformed digest.
+#[test]
+fn between_refused_documents_the_missing_type_wins() {
+    let untyped = Evidence::Document(DocumentEvidence {
+        document_type: "",
+        ..good_document()
+    });
+    let bad_digest = Evidence::Document(DocumentEvidence {
+        sha256: NOT_HEX,
+        ..good_document()
+    });
+
+    assert_edge(
+        "repurposing",
+        &[bad_digest, untyped],
+        Err(SubstantiationDefect::DocumentTypeMissing),
+        Some(1),
+    );
+}
+
 #[test]
 fn among_equals_the_first_item_decides() {
     assert_edge(
