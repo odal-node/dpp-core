@@ -251,7 +251,7 @@ pub(crate) fn fully_populated_passport() -> Passport {
     passport.life_status = Some(LifeStatus::Repurposed);
     passport.retention_until = Some(now);
     passport.product_id = Some(uuid::Uuid::nil());
-    passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8"));
+    passport.commodity_code = Some(CommodityCode::parse("85076000").expect("valid CN-8").into());
     passport.operator_identifier = Some("DE123456789".to_owned());
     passport.responsible_operator = Some(crate::operator::ResponsibleOperatorSnapshot {
         operator: crate::operator::ResponsibleOperator {
@@ -292,9 +292,8 @@ pub(crate) fn fully_populated_passport() -> Passport {
 /// One line, a treatment split totalling 100, and a CN heading outside Annex II
 /// so the depth lint stays quiet — tests that want a finding should reach in and
 /// break one thing rather than build a whole second fixture.
-pub(crate) fn sample_unsold_goods_report()
--> crate::product_group::data::unsold_goods::UnsoldGoodsReport {
-    use crate::product_group::data::unsold_goods::*;
+pub(crate) fn sample_unsold_goods_report() -> crate::unsold_goods::UnsoldGoodsReport {
+    use crate::unsold_goods::*;
     use chrono::NaiveDate;
 
     UnsoldGoodsReport {
@@ -315,7 +314,7 @@ pub(crate) fn sample_unsold_goods_report()
             units_discarded: DiscardedQuantity::measured(1_200),
             weight_kg: DiscardedQuantity::estimated(430),
             packaging_included: false,
-            reason: DiscardReason::DamagedOrContaminated,
+            reason: Some(DiscardReason::DamagedOrContaminated),
             reason_detail: None,
             treatment: WasteTreatmentSplit {
                 preparing_for_reuse_pct: 20,
@@ -327,5 +326,34 @@ pub(crate) fn sample_unsold_goods_report()
         }],
         measures_taken: "Introduced pre-season demand forecasting across all lines.".to_owned(),
         measures_planned: "Extending the donation offer window to twelve weeks.".to_owned(),
+    }
+}
+
+/// A minimal, well-formed discard of apparel for a derogation.
+///
+/// 120 units weighing 36 kg, recycled, with point (f) relied on. Tests reach in
+/// and change the one thing they are about.
+pub(crate) fn sample_discard_record() -> crate::unsold_goods::DiscardRecord {
+    use crate::identifier::DeclaredCommodityCode;
+    use crate::unsold_goods::{DiscardReason, DiscardedQuantity};
+    use crate::unsold_goods::{
+        DiscardRecord, DiscardedWeight, ReceivingOperator, WasteTreatmentOperation,
+    };
+    use chrono::NaiveDate;
+
+    DiscardRecord {
+        discarded_on: NaiveDate::from_ymd_opt(2027, 3, 14).expect("valid date"),
+        cn_codes: vec![DeclaredCommodityCode::new("62034231")],
+        description: "Men's cotton trousers".to_owned(),
+        units: DiscardedQuantity::measured(120),
+        weight: DiscardedWeight::measured(36_000),
+        packaging_included: false,
+        reason: Some(DiscardReason::DamagedOrContaminated),
+        reason_label: None,
+        treatment: WasteTreatmentOperation::Recycling,
+        receiver: ReceivingOperator {
+            name: "Example Textile Recovery BV".to_owned(),
+            identifier: None,
+        },
     }
 }

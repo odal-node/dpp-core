@@ -7,7 +7,6 @@ fn wire_str_matches_serde_serialization() {
     for product_group in [
         ProductGroup::Battery,
         ProductGroup::Textile,
-        ProductGroup::UnsoldGoods,
         ProductGroup::Steel,
         ProductGroup::Electronics,
         ProductGroup::Construction,
@@ -90,23 +89,19 @@ fn a_withdrawn_category_is_a_value_in_any_version_only() {
 
 /// The any-version list begins with the current one, holds each value once,
 /// and is absent for exactly the groups the current list is absent for.
+///
+/// Every group the catalog holds, read from the catalog rather than listed here,
+/// so a group added or removed there is checked without touching this test.
 #[test]
 fn the_any_version_list_extends_the_current_one() {
-    for group in [
-        ProductGroup::Battery,
-        ProductGroup::Textile,
-        ProductGroup::UnsoldGoods,
-        ProductGroup::Steel,
-        ProductGroup::Electronics,
-        ProductGroup::Construction,
-        ProductGroup::Tyre,
-        ProductGroup::Toy,
-        ProductGroup::Aluminium,
-        ProductGroup::Furniture,
-        ProductGroup::Mattress,
-        ProductGroup::Detergent,
-        ProductGroup::Other("packaging".into()),
-    ] {
+    let catalog = crate::catalog::ProductGroupCatalog::new();
+    let keys = catalog.keys();
+    assert!(!keys.is_empty(), "the catalog holds no product group");
+    let groups = keys
+        .into_iter()
+        .map(ProductGroup::from_wire_tag)
+        .chain([ProductGroup::Other("packaging".into())]);
+    for group in groups {
         match (
             group.product_category_values(),
             group.product_category_values_any_version(),

@@ -13,6 +13,133 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **`ObligationEvent` gains a `bundle` field.** It names the signed bundle an
+  event came from, as a `BundleOrigin` (bundle version and content hash), and is
+  `None` for every date the build holds itself. `None` is left out of the JSON,
+  so every event a calendar returns today serialises as it did. Code that builds
+  an `ObligationEvent` with a struct literal adds `bundle: None`. (#508, #565)
+
+- **Unsold goods is no longer a product group.** ESPR Art. 24 reaches discarded
+  unsold consumer products generally, and only the Art. 25 destruction ban is
+  limited to the products of Annex VII, so the duty is an operator's, over a
+  financial year, layered over every product group. Holding it in a product-group
+  slot made a sibling of it: it had a variant of its own, a catalog manifest, a
+  plugin borrowed from textile and a signed passport carrying a disclosure that
+  no act asks anyone to carry in one. It is now `dpp_domain::unsold_goods`, a
+  module of its own.
+  - **Removed:** `ProductGroup::UnsoldGoods` and `ProductGroupData::UnsoldGoods`
+    (and `UnsoldGoodsReport`'s `ProductGroupPayload` impl); the `unsold-goods`
+    catalog manifest, so the catalog holds eleven groups; the `unsold-goods`
+    entry in `VersionedSchemaRegistry::new()`; the check in `Passport::validate`
+    that such a passport has a line; the `unsold-goods` AAS submodel template and
+    its place in the product-group dispatch; the textile plugin's unsold-goods
+    path, which gave the plugin a second product group it could not name; and the
+    `unsoldGoods` row of the calculator registry. The instruments
+    `unsold-goods-format-2026-2` and `unsold-goods-derogations-2026-296` stay, and
+    so does the framework's record of Arts. 24 and 25, but none is bound to a
+    product group any longer: their bindings are gone, their substance is in
+    their notes, and `determinable_for("unsold-goods")` answers nothing, as it
+    does for any key that is not a group.
+  - **Moved, unchanged:** `UnsoldGoodsReport`, `DisclosingEntity`,
+    `DisclosureScope`, `FinancialYear`, `LegalEntityIdentifier`,
+    `DiscardedProductLine`, `DiscardedQuantity`, `DiscardReason` and
+    `WasteTreatmentSplit` from `dpp_domain::product_group` to
+    `dpp_domain::unsold_goods`. The crate-root re-exports are where they were.
+  - **The schema is a family of its own, with its version numbers kept.**
+    `unsold-goods` v2.0.0 moved byte for byte from `schemas/unsold-goods/` to
+    `document-schemas/unsold-goods/`, and is validated through
+    `unsold_goods::document_schemas()`, a registry that holds nothing else. The
+    shape is the same, the `$id` is the one already published, and a published
+    schema version is never modified, so it was neither renumbered nor republished
+    as a first version. A product-group registry listing it would also have had it
+    linted and given a JSON-LD scope as a product's.
+  - **Failure mode for a stored or fetched document.** One tagged `unsoldGoods`
+    or `unsold-goods` no longer has a typed variant. It reads as an unknown
+    product group, with its payload carried verbatim, and is neither refused nor
+    rewritten. A passport that spells the tag the same way in its envelope and its
+    payload is unaffected. One that spells it differently (`unsold-goods` in one,
+    `unsoldGoods` in the other) reads the same way, but `Passport::validate` now
+    reports the mismatch, because the two spellings used to resolve to one typed
+    variant and are now two different unknown tags.
+  - **Replaced:** `lint_product_group_data` no longer lints a disclosure; call
+    `lint::lint_unsold_goods_report`. The AAS projection is no longer reached by
+    a passport: `dpp_aas::build_unsold_goods_environment(report, name, value)`
+    builds an Environment for a file or an AASX package under an asset key the
+    caller chooses (an `AssetIdentity::Named`), with no masking, since a
+    disclosure is published in full. It carries the one disclosure submodel; the
+    five passport submodels the old route added described a manufacturer and a
+    material composition that a disclosure does not have. (#572)
+
+- **A disclosure line's reason is optional, and `unsold-goods` moves to schema
+  v2.1.0.** `DiscardedProductLine::reason` is now `Option<DiscardReason>`, and
+  `dpp_rules::lint::unsold_goods::DisclosureLineInput::reason_point` an
+  `Option<char>`. Annex I note (h) of Impl. Reg. (EU) 2026/2 asks for the reason
+  "where applicable", and the Del. Reg. (EU) 2026/296 Art. 2 derogations except
+  only the destruction of Annex VII products from the ESPR Art. 25(1)
+  prohibition. A line for any other discard, or for one made to prepare products
+  for reuse, has no point to cite, and requiring one made it claim a derogation
+  that does not exist. `None` is left out of the JSON, so every line written
+  before reads as it did, and `reasonDetail` can still say why. Code that builds
+  a line wraps the reason in `Some`. The AAS projection leaves out
+  `line{n}Reason` for a line without one. Schema v2.1.0 stops requiring `reason`
+  on a line; v2.0.0 is unchanged, and a lens carries a v2.0.0 disclosure to
+  v2.1.0 as it is. `UnsoldGoodsLintInput` gains `financial_year_start` and
+  `financial_year_end`, which the new ordering lint reads (see Fixed). (#568)
+
+- **`CommodityCode` is valid on read, and what a document declares is a
+  `DeclaredCommodityCode`.** `CommodityCode` is documented as validated and
+  `CommodityCode::parse` refuses anything but 6, 8 or 10 digits, but its
+  `Deserialize` was `#[serde(transparent)]` and never called `parse`, so `"abc"`
+  read as a code. It now does, as `Gtin` does. A document that is already written
+  is another matter: a stored passport read again, or a fetched one signed by
+  another operator, has to go on reading and write back unchanged, and the
+  envelope has no lens to correct it. So `Passport::commodity_code` and
+  `DiscardRecord::cn_codes` hold the new `DeclaredCommodityCode`, which keeps any
+  string exactly as written (`as_str`) and answers separately whether it is a valid
+  code (`validated()`, `Result<CommodityCode, CommodityCodeError>`). It writes the
+  same JSON as a `CommodityCode` and reads what was read before, so no stored
+  document changes. Code that sets either field wraps a `CommodityCode` with
+  `.into()` or builds a `DeclaredCommodityCode::new(..)`. A malformed code is
+  reported where it is used: the registry refuses to register one, and
+  `lint_discard_record` flags one. (#575, #576)
+- **An end-of-life destruction cites a point of the closed derogation list, and
+  only where ESPR Art. 25(1) bars it.** `DeactivationReason::Destroyed` carried a
+  `DerogationRef { category: String }` that nothing in this crate checked, and
+  every destruction had to have one, although the ban reaches only the
+  destruction of unsold Annex VII products by an operator it applies to. It now
+  carries `derogation: Option<Derogation>`, where `Derogation::Point` is a
+  `DiscardReason`, a point of Del. Reg. (EU) 2026/296 Art. 2.
+  `EolEvent::requires_derogation()` is replaced by
+  `EolEvent::missing_derogation(ban_applies)`, which is true for a destruction the
+  ban reaches that cites no point. An event written
+  with the free-text citation still reads and writes back byte for byte, as
+  `Derogation::Legacy`; it is never taken as a derogation, since the text cannot
+  be mapped to a point without inventing one. `DerogationRef` stays as that
+  read-only history. A build older than this one refuses a `Destroyed` event
+  written without `derogation`, since the key is left out then. (#573, #574)
+
+- **Integers beyond ±(2^53 − 1) are refused by canonicalization.** `canonicalize`
+  and the `dpp-rules` content hash used to write such an integer as the nearest
+  double, so two different integers shared one signed form. Represent larger
+  exact values as strings. Migration: a document that carried one no longer
+  signs or verifies until its value is a string. (#563)
+- **`complianceResult` is no longer a patchable field.** `patch_fields` refuses
+  it, since it is a host-computed determination. `lintResult` stays patchable. (#563)
+- **A current-format key store with no integrity tag is refused by both open
+  doors.** Only a store written before the tag existed can be migrated.
+  Migration also refuses a stored public key that does not match its private key. (#563)
+- **Policy schemas that cannot be read in full are refused.** A property name
+  containing a dot, two declarations of one path with conflicting classes
+  (`conformity` and `individual`), a disclosure annotation under an unread keyword,
+  or a reference graph past the walk budget yields no policy. (#563)
+- **`TransferError` has a `PassportMismatch` variant,** returned when a record for
+  another passport is appended to a chain. (#563)
+- **The status-list decoder refuses a bitstring past 16 MiB decompressed**
+  (`MAX_DECODED_BYTES`). A larger list read before. Migration: a caller that needs
+  one passes its own budget to `from_encoded_list_within`. (#563)
+
 ### Added
 
 - **`ProductGroup::product_category_values_any_version` lists every category a
@@ -26,6 +153,165 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   first, then each withdrawn one, and is `None` exactly where
   `product_category_values` is, whose documentation now points a caller
   matching stored passports at it. (#561)
+
+- **The obligation calendar reads dates out of a signed ruleset bundle.** With
+  `dpp-domain`'s new `bundle` feature, `ObligationCalendar::with_bundle(catalog,
+  acceptance)` lays the schedule in a verified bundle's `obligations` section
+  over the built-in calendar, so a node learns a new or amended date without a
+  crate release. Each entry has an `ObligationEvent`'s wire shape without
+  `bundle`, which is filled from the verified manifest, so an entry cannot claim
+  an origin. Precedence is by id: a date the build does not hold is added, one it
+  holds as `Assumed` is replaced, and any other is kept, because the build's
+  rules select their answers by those dates and a calendar announcing another
+  would contradict its own publish gate. A bundle date that disagrees with one,
+  earlier or later, is recorded as a `ScheduleConflict` in
+  `ObligationCalendar::conflicts` instead of being announced. Only a bundle that
+  passed `verify_bundle` is read: a compiled-in baseline is refused with
+  `ScheduleBundleError::Unverified`, and a schedule with an unknown field, a
+  repeated id or an entry that does not parse is refused whole with
+  `ScheduleBundleError::Malformed`. A bundle carries the whole schedule, not a
+  change to the previous one. Without a bundle, or with one carrying no
+  `obligations` section, the calendar is what it was. (#508, #565)
+
+- **`VersionedSchemaRegistry::from_entries`**, a registry holding exactly the
+  schemas it is given and none of the product groups', for a family of schemas
+  that is not a product group's. The prose gates read it as well as the product
+  groups' registry. (#572)
+
+- **Discards of unsold consumer products are modelled, with the documents the
+  acts have an operator keep and the yearly disclosure computed from them.**
+  `UnsoldGoodsReport` models the table ESPR Art. 24 has an operator publish;
+  nothing modelled what the table summarises, or the documentation Art. 24(2) and
+  Del. Reg. (EU) 2026/296 Art. 3 require, which since 19 July 2026 conditions
+  destroying an Annex VII product under a derogation. The new
+  `dpp_domain::unsold_goods` holds:
+  - `DiscardRecord`: the date, CN codes, description, units and weight (in
+    grams, so the rounding Annex I asks for happens once, on the line), each with
+    the estimate marker, whether packaging is included, the derogation relied on
+    if any, the operator's short `reason_label`, the `WasteTreatmentOperation`
+    delivered to and the `ReceivingOperator`. Every discard is a record, not only a
+    destruction under a derogation. A label is chosen from a short list the
+    operator keeps, because records share a line of the disclosure when it
+    matches (whitespace aside), and a sentence per record would make a line per
+    record. Reading is lenient: a malformed record is reported by
+    `lint_discard_record`, not made unreadable.
+  - A schema for a record offered for storage: `discard-record` v1.0.0 in
+    `unsold_goods::document_schemas()` (key `RECORD_SCHEMA_KEY`), beside the
+    disclosure's. It is where a CN code that is not 6, 8 or 10 digits, a zero
+    weight, a reason outside Del. Reg. (EU) 2026/296 Art. 2, a label over 120
+    characters and a misspelt property are turned away; the type itself still
+    reads such a record back.
+  - `EnterpriseSize` and `EnterpriseSize::is_exempt_on`: ESPR Arts. 24(1) and 25(1)
+    end alike, "shall not apply to micro and small enterprises" and "shall apply to
+    medium-sized enterprises from 19 July 2030" (`MEDIUM_ENTERPRISES_FROM`). The
+    host says which class an operator is; this crate does not hold the headcount
+    and turnover that decide it.
+  - `EvidenceKind` and `DiscardRecord::required_evidence(size)` /
+    `missing_evidence(size, held)`: the delivery and reception documentation of
+    ESPR Art. 24(2) and Impl. Reg. (EU) 2026/2 Art. 4 for every record, a
+    statement on the treatment where one is stated, and for a derogation the
+    Art. 3 documentation. An operator outside Arts. 24(1) and 25(1) on the day of
+    the discard is required to show nothing: it discloses nothing for the
+    documentation to demonstrate, and the ban a derogation excepts does not bind
+    it. That documentation is not one document per point: points (a), (c), (f) and
+    (g) accept alternatives and point (d) needs a licence **and** a justification,
+    so a requirement is "any of these", and a record's requirements are all of
+    them. The statement the operator gives the waste treatment operator (Art. 4) is
+    a kind a record may carry and is never required, because the duty is to
+    provide it. Art. 3 excepts information the competent authority already holds
+    under another act, which this crate cannot know, so a gap is a document the
+    act lists, not a breach.
+  - `keep_until`, `KeepUntil` and `Disclosure`: the later of five years after the
+    discard and five years after the disclosure covering it, with the disclosure
+    in one of three states. `Pending` gives `Open`, which never permits deletion,
+    so a late discloser's documents are not released early. `NotOwed` (an exempt
+    operator, or a year before the first one the Regulation covers) gives five
+    years after the discard, where reading it as pending held the documents for
+    ever. `MadeOn` gives the later of the two. `DiscardRecord::keep_until(size,
+    disclosed_on)` works the state out from the operator's size.
+  - `aggregate`: a financial year's records into `DiscardedProductLine`s under
+    Annex I. Categories follow Art. 3 (two digits, four for Annex II, via the new
+    `dpp_rules::unsold_goods::disclosure::category_of_cn_code`); items sold
+    together are filed under every category they name; a line is made per
+    category, derogation, label and packaging answer (note (h)); weights are
+    summed in grams and rounded once; a total is marked an estimate if any figure
+    in it is; and the treatment split is each operation's share of the line's
+    weight, in whole percentages that total exactly 100. A line is described in
+    the discloser's words (a `LineDescriptions` map from the line's categories to
+    its wording, or `CN 6203` where there is none), not by joining the records'
+    descriptions, which made a line as long as the year. A record outside the
+    year, without a readable CN code or without a weight is returned in
+    `Aggregation::excluded` rather than dropped. The disclosing entity and the two
+    measures rows stay the discloser's to supply.
+
+  Storing records and documents, enforcing retention and exporting for an
+  authority are left to the host. `dpp_rules::lint::unsold_goods` gains
+  `lint_discard_record` (an Annex VII discard with no derogation, a derogation on
+  a discard that is not an Annex VII destruction, an unreadable CN code, a record
+  without weight), and the lint pack is 1.2.0. (#568)
+
+- **`destruction_ban_applies`**, which says whether ESPR Art. 25(1) bars a
+  destruction: the product is unsold, a CN code of it is in Annex VII, the day is
+  on or after `DESTRUCTION_BAN_FROM` (19 July 2026), and the operator is not exempt
+  on it (`EnterpriseSize::is_exempt_on`). A passport says neither whether its
+  product was ever sold nor how large the operator is, so the caller supplies
+  both. It takes `CommodityCode`s, so a padded code is trimmed and a malformed one
+  cannot reach it. Its answer is what `EolEvent::missing_derogation` takes.
+  (#573, #574)
+
+### Fixed
+
+- **`FinancialYear` leaves a start after its end unrefused on the footing that it
+  is reported, and nothing reported it.** Its documentation says the check lives
+  in `dpp-rules`; there was none. `lint_unsold_goods` now flags a financial year
+  that ends before it starts. (#568)
+
+- **The schema diff compared only the root's `required`, so a requirement dropped
+  or added below it was reported as no change, and the bump as additive.**
+  `diff_schemas` now compares `required` at every level and names a nested one by
+  its path (`lines/[]/reason`), so `SchemaDiff::required_added` and
+  `required_removed` can hold such paths. The generated `SCHEMA-CHANGES.md` now
+  also reads `document-schemas/`, so it shows the disclosure's v2.0.0 → v2.1.0 as
+  dropping `lines/[]/reason`, and electronics v1.0.0 → v1.1.0 as requiring
+  `repairabilityScore/overall`, which it had not mentioned. (#568)
+
+- **The Annex II heading list had one heading the act does not.**
+  `dpp_rules::unsold_goods::disclosure` carried `8527` among the CN headings of
+  Annex II to Impl. Reg. (EU) 2026/2, which Art. 3 has filed at four digits instead
+  of two. The Annex has 44 headings and no `8527`: the string appears only inside
+  the description of 8517 ("other than transmission or reception apparatus of
+  heading 8443, 8525, 8527 or 8528"), and the table runs from 8524 to 8528. A
+  product with a CN code under 8527 was filed at `8527` where the act has it at
+  `85`, and `is_annex_ii_heading`, `chapter_contains_annex_ii_heading`,
+  `annex_ii_headings_in_chapter` and `cn_depth_is_correct` answered for a heading
+  the act does not list. `8527` is removed, the "45 headings" said in the
+  `unsold-goods-format-2026-2` instrument notes and in the module documentation
+  is now 44, and a test holds the list to a transcription of the Official Journal
+  table.
+  The heading had been in the list since v0.19.0. (#570)
+
+- Whole-passport filtering drops the root proofs for every audience, and a
+  personal-data statement is withheld with the field it describes. (#563)
+- The default `patch_fields` refuses content changes once retention is locked. (#563)
+- A draft that carries a publication timestamp, or a suspended passport that
+  carries none, cannot be published by skipping the mandatory-content gate. (#563)
+- Compromise rotation revokes every archived copy of the compromised key, not only
+  the newest archive. (#563)
+- Qualifier values of only dots are refused, since URI normalization removes them. (#563)
+- Schema-driven policy classification treats a universal conformity field as a
+  floor that a product rule cannot lower. (#563)
+- `Passport::co2e_per_unit` and `Passport::repairability_score` are documented as
+  the operator's declared values, not as calculated ones, so a host no longer has
+  a reason to copy a calculated figure into them. The calculated values are
+  `ComplianceResult::co2e_score` and `ComplianceResult::repairability_index`, beside
+  the ruleset that produced them. Documentation only. (#581)
+- `RETENTION_MUTABLE_FIELDS` said a passport is re-signed after publication. The
+  proofs are attached once, at publication, and a re-lint rewrites `lintResult` and
+  leaves the signatures as they were. The docs of `PASSPORT_PROOF_FIELDS` and
+  `RETENTION_MUTABLE_FIELDS` now say a host serves a view as the payload its proof
+  covers, never the live record. `disclosureSignatures` is keyed by disclosure set,
+  which the JSON-LD comments in `dpp-vc` and `docs/architecture/DATA-MODEL.md` had
+  described as a dotted path or an audience. Documentation only. (#578)
 
 ## [0.23.0] - 2026-11-03
 

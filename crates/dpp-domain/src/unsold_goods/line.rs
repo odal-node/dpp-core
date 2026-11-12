@@ -94,8 +94,17 @@ pub struct DiscardedProductLine {
     /// Whether packaging is included in [`Self::weight_kg`] — its own column in
     /// Annex I, because the answer changes what the weight means.
     pub packaging_included: bool,
-    /// Note (h), and the closed list in Del. Reg. (EU) 2026/296 Art. 2.
-    pub reason: DiscardReason,
+    /// Note (h), and the closed list in Del. Reg. (EU) 2026/296 Art. 2 — which
+    /// note (h) asks the reason to refer to only "where applicable".
+    ///
+    /// `None` is a real answer: no derogation applies. The derogations except
+    /// the destruction of Annex VII products from the Art. 25(1) prohibition, so
+    /// a discard of any other product, or of an Annex VII product for the sole
+    /// purpose of preparing it for reuse (ESPR Art. 2(34)), has no point to cite,
+    /// and requiring one would make the line claim a derogation that does not
+    /// exist. [`Self::reason_detail`] can still say why it was discarded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<DiscardReason>,
     /// A more detailed explanation, which note (h) permits alongside the reason.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason_detail: Option<String>,

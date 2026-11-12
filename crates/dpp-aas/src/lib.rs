@@ -63,6 +63,7 @@ mod property;
 mod templates;
 #[cfg(test)]
 mod tests;
+mod unsold_goods;
 
 pub use builder::{AasError, build_aas_environment, build_aas_from_passport};
 pub use identity::{AssetIdentity, RESERVED_ASSET_ID_NAMES};
@@ -73,6 +74,7 @@ pub use model::{
 };
 pub use property::{boolean_property, double_property, integer_property, string_property};
 pub use templates::{SubmodelTemplate, placeholder_templates, product_group_submodel_template};
+pub use unsold_goods::build_unsold_goods_environment;
 
 /// Compile-checks this crate's README examples.
 ///

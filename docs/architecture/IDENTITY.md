@@ -197,7 +197,7 @@ from: `build_qr_url` returns `None` for it, and the caller chooses the carrier.
   stays operator free text that no carrier prints.
 
 `build_qr_url` does **not** verify the passport: verify it before you build its carrier.
-If the product group data has no GTIN (an unsold-goods report, for example), the builder
+If the product group data has no GTIN (an unmodelled product group, for example), the builder
 returns `Ok(None)`, because there is no GS1 Digital Link to print. Because the carrier is standard GS1 Digital
 Link, any conformant resolver serving the same path answers the same scan, so moving a
 passport is a DNS or registry change, not a reprint.

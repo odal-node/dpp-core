@@ -45,18 +45,7 @@
       "status": "provisional",
       "legalBasis": ["Regulation (EU) 2024/1781 Art. 18"],
       "notes": "Art. 18 priority list; working plan intermediate product, indicative adoption 2027. Intermediate products may have their delegated acts reach final products containing them, which is one of the ways one product accumulates several instruments."
-    },
-    {
-      "productGroup": "unsold-goods",
-      "status": "in_force",
-      "legalBasis": [
-        "Regulation (EU) 2024/1781 Art. 24",
-        "Regulation (EU) 2024/1781 Art. 25",
-        "Regulation (EU) 2024/1781 Annex VII"
-      ],
-      "passport": { "obligation": "notRequired" },
-      "notes": "Binding today and determinable: the Art. 25(1) destruction prohibition for Annex VII goods has applied since 2026-07-19, and the Art. 24 disclosure duty is live for large operators, with medium-sized operators brought in from 2030-07-19 and micro and small enterprises exempt. There is no passport anywhere in Arts. 24-25 — the subject is an operator over a financial year, disclosed on its own website, not a product placed on the market. This is why the obligation binds while requiring no passport: the two questions are separate and this binding answers them differently. The 2026-07-19 date is the destruction ban's, and it must never be recorded as a passport date."
     }
   ],
-  "notes": "The framework itself. Art. 9(1) requires 'a digital product passport ... in accordance with the applicable delegated acts' — singular passport, plural acts — so the obligation is real but undated until a delegated act fixes it. Art. 5(7) lets one act cover many product groups and lets a group-specific act supplement a horizontal one, and no precedence rule exists anywhere in the Regulation: overlapping acts accumulate. retentionYears is assumed, not sourced, and applies to every group below: Art. 9(2)(i) sets no figure — it requires availability for at least the expected lifetime of the product, delegated per product group, and no delegated act has been adopted for any of them. As of 2026-08-24 that is true of every ESPR product group without exception."
+  "notes": "The framework itself. Art. 9(1) requires 'a digital product passport ... in accordance with the applicable delegated acts' — singular passport, plural acts — so the obligation is real but undated until a delegated act fixes it. Art. 5(7) lets one act cover many product groups and lets a group-specific act supplement a horizontal one, and no precedence rule exists anywhere in the Regulation: overlapping acts accumulate. retentionYears is assumed, not sourced, and applies to every group below: Art. 9(2)(i) sets no figure — it requires availability for at least the expected lifetime of the product, delegated per product group, and no delegated act has been adopted for any of them. As of 2026-08-24 that is true of every ESPR product group without exception. Arts. 24 and 25 are not an act about one product group: they bind every economic operator that discards unsold consumer products, whatever the product group, so no binding above is for them. They are recorded as the instruments unsold-goods-format-2026-2 and unsold-goods-derogations-2026-296, which are bound to no product group. Binding today: the Art. 25(1) destruction prohibition for Annex VII goods has applied since 2026-07-19, and the Art. 24 disclosure duty is live for large operators, with medium-sized operators brought in from 2030-07-19 and micro and small enterprises exempt. There is no passport anywhere in Arts. 24-25 — the subject is an operator over a financial year, disclosed on its own website, not a product placed on the market. The 2026-07-19 date is the destruction ban's, and it must never be recorded as a passport date."
 }

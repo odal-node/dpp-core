@@ -1,31 +1,15 @@
 //! Unsold-goods reports as an AAS submodel.
 //!
-//! # Reachable through the library, not over HTTP
-//!
-//! An AAS shell's `globalAssetId` is built from the GTIN, and an unsold-goods
-//! report has none — it declares a *volume of goods disposed of in a reporting
-//! period*, not a trade item, so `ProductGroupData::gtin()` returns `None` for it by
-//! design. A content-negotiated HTTP door that serves AAS therefore has nothing
-//! to identify the asset with and answers `406`: this mapper never runs for a
-//! request over the wire, and no amount of fixing the door changes that.
-//!
-//! It is kept, rather than deleted, because the constraint is the *shell's*,
-//! not the submodel's. Callers that supply their own asset identity — a file
-//! export, an AASX package assembled for a reporting authority, a caller
-//! building an Environment around a non-trade-item asset — get a correct
-//! submodel from it today. `build_aas_from_passport` takes `gtin` as a
-//! parameter precisely so the identity is the caller's to decide.
-//!
-//! So: if you are here because an HTTP request for
-//! `application/aas+json` returned `406` on an unsold-goods passport, that is
-//! the designed answer and not a defect in this file. Inventing a
-//! `globalAssetId` to make the door respond would put a fabricated trade-item
-//! identifier into a document an integrator's toolchain treats as authoritative.
+//! One submodel per disclosure, carrying the Annex I header and a flattened
+//! element per line. It is not a passport submodel: a disclosure is not the data
+//! of a passport, so this mapper is reached through
+//! [`build_unsold_goods_environment`](super::build_unsold_goods_environment) and
+//! not through the product-group dispatch.
 
-use dpp_domain::product_group::{DisclosureScope, UnsoldGoodsReport};
+use dpp_domain::unsold_goods::{DisclosureScope, UnsoldGoodsReport};
 
 use crate::model::{AasSemId, AasSubmodel};
-use crate::property::{double_property, enum_wire_str, string_property};
+use crate::property::{double_property, opt_enum_wire_str, string_property};
 use crate::semantic_ids;
 
 /// One submodel per disclosure, carrying the Annex I header and a flattened
@@ -36,7 +20,7 @@ use crate::semantic_ids;
 /// (Annex I: "additional lines may be added as necessary") and this projection
 /// indexes it. A reader wanting the structured record should take the JSON;
 /// this exists for toolchains that only speak AAS.
-pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &str) -> AasSubmodel {
+pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, id: &str) -> AasSubmodel {
     let mut elements = vec![
         string_property("entityName", &r.entity.name, None),
         string_property("entityIdentifier", r.entity.identifier.value(), None),
@@ -62,7 +46,7 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &s
     ];
 
     for (i, line) in r.lines.iter().enumerate() {
-        let reason_str = enum_wire_str(&line.reason);
+        let reason_str = opt_enum_wire_str(&line.reason);
         elements.push(string_property(
             &format!("line{i}CnCategories"),
             &line
@@ -88,11 +72,15 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &s
             line.units_discarded.value as f64,
             None,
         ));
-        elements.push(string_property(
-            &format!("line{i}Reason"),
-            &reason_str,
-            None,
-        ));
+        // Absent, not empty, where no derogation applies (Annex I note (h):
+        // "where applicable").
+        if let Some(reason_str) = reason_str {
+            elements.push(string_property(
+                &format!("line{i}Reason"),
+                &reason_str,
+                None,
+            ));
+        }
         // Derived, per Annex I note (i) — never a stored field, but a reader of
         // the projection needs it without recomputing.
         elements.push(double_property(
@@ -110,7 +98,7 @@ pub(super) fn build_unsold_goods_submodel(r: &UnsoldGoodsReport, passport_id: &s
     ));
 
     AasSubmodel {
-        id: format!("urn:odal-node:dpp:{passport_id}:unsold-goods"),
+        id: id.to_owned(),
         id_short: "UnsoldGoods".into(),
         model_type: "Submodel".into(),
         kind: "Instance".into(),

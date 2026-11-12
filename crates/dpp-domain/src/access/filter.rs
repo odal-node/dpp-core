@@ -1,7 +1,9 @@
 //! Access filter engine — applies a `ProductGroupAccessPolicy` to a JSON document.
 
 use crate::Audience;
+use crate::passport::PASSPORT_PROOF_FIELDS;
 
+use super::passport_view::may_see_personal_data_field;
 use super::policy::{DocumentScope, ProductGroupAccessPolicy};
 
 /// The result of a policy evaluation.
@@ -88,6 +90,29 @@ pub fn filter_by_audience_in_scope(
 /// The envelope key below which a product group's own schema governs.
 const PRODUCT_GROUP_DATA: &str = "productGroupData";
 
+/// The envelope key holding personal-data statements, keyed by the field each one
+/// describes.
+const PERSONAL_DATA: &str = "personalData";
+
+/// The statements whose described field `audience` may see. A statement is visible
+/// only when that field is, so a restricted field's statement cannot outlive it.
+fn visible_personal_data(
+    statements: &serde_json::Value,
+    policy: &ProductGroupAccessPolicy,
+    audience: Audience,
+) -> serde_json::Value {
+    let Some(statements) = statements.as_object() else {
+        return statements.clone();
+    };
+    serde_json::Value::Object(
+        statements
+            .iter()
+            .filter(|(field, _)| may_see_personal_data_field(policy, audience, field))
+            .map(|(field, statement)| (field.clone(), statement.clone()))
+            .collect(),
+    )
+}
+
 fn filter_value(
     data: &serde_json::Value,
     policy: &ProductGroupAccessPolicy,
@@ -101,6 +126,16 @@ fn filter_value(
         serde_json::Value::Object(map) => {
             let mut filtered = serde_json::Map::new();
             for (key, value) in map {
+                // A root proof is a compact JWS that carries its own payload, which
+                // holds content this audience may not see. The proofs are dropped for
+                // every audience; the serving layer attaches only the proof that
+                // covers the view it returns.
+                if prefix.is_empty()
+                    && scope == DocumentScope::Envelope
+                    && PASSPORT_PROOF_FIELDS.contains(&key.as_str())
+                {
+                    continue;
+                }
                 let path = if prefix.is_empty() {
                     key.clone()
                 } else {
@@ -127,6 +162,16 @@ fn filter_value(
                     DocumentScope::Envelope
                 };
                 if audience.may_see(class) {
+                    let statements;
+                    let value = if key == PERSONAL_DATA
+                        && prefix.is_empty()
+                        && scope == DocumentScope::Envelope
+                    {
+                        statements = visible_personal_data(value, policy, audience);
+                        &statements
+                    } else {
+                        value
+                    };
                     filtered.insert(
                         key.clone(),
                         filter_value(

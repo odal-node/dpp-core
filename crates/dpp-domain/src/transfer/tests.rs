@@ -46,7 +46,7 @@ fn make_transfer(
 #[test]
 fn new_chain_returns_original_operator() {
     let pid = PassportId::new();
-    let op = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
+    let op = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
     let chain = TransferChain::new(pid, op.clone());
     assert_eq!(chain.current_operator(), &op);
     assert_eq!(chain.transfer_count(), 0);
@@ -55,9 +55,9 @@ fn new_chain_returns_original_operator() {
 #[test]
 fn completed_transfer_changes_current_operator() {
     let pid = PassportId::new();
-    let original = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
+    let original = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
     let new_op = make_operator(
-        "did:web:remaker.com",
+        "did:web:remaker.example",
         "ReMaker",
         OperatorRole::Remanufacturer,
     );
@@ -68,16 +68,45 @@ fn completed_transfer_changes_current_operator() {
     transfer.completed_at = Some(Utc::now());
 
     chain.initiate_transfer(transfer).unwrap();
-    assert_eq!(chain.current_operator().did, "did:web:remaker.com");
+    assert_eq!(chain.current_operator().did, "did:web:remaker.example");
     assert_eq!(chain.transfer_count(), 1);
+}
+
+/// A completed transfer for another passport must not reach this chain: it would
+/// change what `current_operator` answers here, while its own passport kept none
+/// of the record.
+#[test]
+fn a_record_for_another_passport_is_refused_even_from_the_current_operator() {
+    let pid = PassportId::new();
+    let original = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
+    let target = make_operator(
+        "did:web:retailer.example",
+        "Retailer",
+        OperatorRole::Distributor,
+    );
+    let mut chain = TransferChain::new(pid, original.clone());
+
+    let mut elsewhere = make_transfer(PassportId::new(), &original, &target, TransferReason::Sale);
+    elsewhere.node_acceptance_attestation = Some("sig-to".into());
+    elsewhere.completed_at = Some(Utc::now());
+    assert!(matches!(
+        chain.initiate_transfer(elsewhere),
+        Err(TransferError::PassportMismatch { .. })
+    ));
+    assert!(chain.transfers.is_empty());
+    assert_eq!(chain.current_operator().did, original.did);
 }
 
 #[test]
 fn operator_mismatch_rejected() {
     let pid = PassportId::new();
-    let original = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
-    let wrong = make_operator("did:web:wrong.com", "Wrong", OperatorRole::Importer);
-    let target = make_operator("did:web:target.com", "Target", OperatorRole::Distributor);
+    let original = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
+    let wrong = make_operator("did:web:wrong.example", "Wrong", OperatorRole::Importer);
+    let target = make_operator(
+        "did:web:retailer.example",
+        "Retailer",
+        OperatorRole::Distributor,
+    );
     let mut chain = TransferChain::new(pid, original);
 
     let transfer = make_transfer(pid, &wrong, &target, TransferReason::Sale);
@@ -91,9 +120,17 @@ fn operator_mismatch_rejected() {
 #[test]
 fn pending_transfer_blocks_new_initiation() {
     let pid = PassportId::new();
-    let original = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
-    let target1 = make_operator("did:web:target1.com", "Target1", OperatorRole::Importer);
-    let target2 = make_operator("did:web:target2.com", "Target2", OperatorRole::Distributor);
+    let original = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
+    let target1 = make_operator(
+        "did:web:retailer1.example",
+        "Retailer1",
+        OperatorRole::Importer,
+    );
+    let target2 = make_operator(
+        "did:web:retailer2.example",
+        "Retailer2",
+        OperatorRole::Distributor,
+    );
     let mut chain = TransferChain::new(pid, original.clone());
 
     // First transfer — initiated but not completed
@@ -109,8 +146,8 @@ fn pending_transfer_blocks_new_initiation() {
 #[test]
 fn transfer_status_derives_correctly() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
 
     // Initiated only
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
@@ -129,9 +166,9 @@ fn transfer_status_derives_correctly() {
 #[test]
 fn multiple_completed_transfers_track_chain() {
     let pid = PassportId::new();
-    let op_a = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let op_b = make_operator("did:web:b.com", "B", OperatorRole::Importer);
-    let op_c = make_operator("did:web:c.com", "C", OperatorRole::Remanufacturer);
+    let op_a = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let op_b = make_operator("did:web:b.example", "B", OperatorRole::Importer);
+    let op_c = make_operator("did:web:c.example", "C", OperatorRole::Remanufacturer);
     let mut chain = TransferChain::new(pid, op_a.clone());
 
     // A → B
@@ -139,33 +176,33 @@ fn multiple_completed_transfers_track_chain() {
     t1.node_acceptance_attestation = Some("sig".into());
     t1.completed_at = Some(Utc::now());
     chain.initiate_transfer(t1).unwrap();
-    assert_eq!(chain.current_operator().did, "did:web:b.com");
+    assert_eq!(chain.current_operator().did, "did:web:b.example");
 
     // B → C
     let mut t2 = make_transfer(pid, &op_b, &op_c, TransferReason::Remanufacturing);
     t2.node_acceptance_attestation = Some("sig".into());
     t2.completed_at = Some(Utc::now());
     chain.initiate_transfer(t2).unwrap();
-    assert_eq!(chain.current_operator().did, "did:web:c.com");
+    assert_eq!(chain.current_operator().did, "did:web:c.example");
     assert_eq!(chain.transfer_count(), 2);
 }
 
 #[test]
 fn serde_round_trip() {
     let pid = PassportId::new();
-    let op = make_operator("did:web:acme.com", "ACME", OperatorRole::Manufacturer);
+    let op = make_operator("did:web:acme.example", "ACME", OperatorRole::Manufacturer);
     let chain = TransferChain::new(pid, op);
     let json = serde_json::to_string(&chain).unwrap();
     let back: TransferChain = serde_json::from_str(&json).unwrap();
     assert_eq!(back.passport_id, pid);
-    assert_eq!(back.original_operator.did, "did:web:acme.com");
+    assert_eq!(back.original_operator.did, "did:web:acme.example");
 }
 
 #[test]
 fn reject_from_initiated_succeeds() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     assert_eq!(t.status(), TransferStatus::Initiated);
     t.reject().unwrap();
@@ -176,8 +213,8 @@ fn reject_from_initiated_succeeds() {
 #[test]
 fn reject_from_accepted_fails() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     t.node_acceptance_attestation = Some("sig-to".into()); // now Accepted
     assert_eq!(t.status(), TransferStatus::Accepted);
@@ -190,8 +227,8 @@ fn reject_from_accepted_fails() {
 #[test]
 fn cancel_from_initiated_succeeds() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     t.cancel().unwrap();
     assert_eq!(t.status(), TransferStatus::Cancelled);
@@ -200,8 +237,8 @@ fn cancel_from_initiated_succeeds() {
 #[test]
 fn cancel_from_accepted_succeeds() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     t.node_acceptance_attestation = Some("sig-to".into());
     assert_eq!(t.status(), TransferStatus::Accepted);
@@ -212,8 +249,8 @@ fn cancel_from_accepted_succeeds() {
 #[test]
 fn cancel_from_completed_fails() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     t.node_acceptance_attestation = Some("sig-to".into());
     t.completed_at = Some(Utc::now());
@@ -227,8 +264,8 @@ fn cancel_from_completed_fails() {
 #[test]
 fn complete_from_accepted_succeeds() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     t.node_acceptance_attestation = Some("sig-to".into());
     t.complete().unwrap();
@@ -239,8 +276,8 @@ fn complete_from_accepted_succeeds() {
 #[test]
 fn complete_from_initiated_fails() {
     let pid = PassportId::new();
-    let from = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let to = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let from = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let to = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     // Only the from-signature is present → still Initiated, not Accepted.
     let mut t = make_transfer(pid, &from, &to, TransferReason::Sale);
     assert_eq!(t.status(), TransferStatus::Initiated);
@@ -253,12 +290,12 @@ fn complete_from_initiated_fails() {
 #[test]
 fn transfer_error_display_messages() {
     let mismatch = TransferError::OperatorMismatch {
-        expected: "did:web:a.com".into(),
-        got: "did:web:b.com".into(),
+        expected: "did:web:a.example".into(),
+        got: "did:web:b.example".into(),
     };
     assert_eq!(
         mismatch.to_string(),
-        "operator mismatch: expected did:web:a.com, got did:web:b.com"
+        "operator mismatch: expected did:web:a.example, got did:web:b.example"
     );
 
     let pending = TransferError::TransferAlreadyPending;
@@ -278,8 +315,8 @@ fn transfer_error_display_messages() {
 #[test]
 fn rejected_transfer_unblocks_new_initiation() {
     let pid = PassportId::new();
-    let op_a = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let op_b = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let op_a = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let op_b = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut chain = TransferChain::new(pid, op_a.clone());
 
     // Initiate and then reject
@@ -296,8 +333,8 @@ fn rejected_transfer_unblocks_new_initiation() {
 #[test]
 fn cancelled_transfer_unblocks_new_initiation() {
     let pid = PassportId::new();
-    let op_a = make_operator("did:web:a.com", "A", OperatorRole::Manufacturer);
-    let op_b = make_operator("did:web:b.com", "B", OperatorRole::Importer);
+    let op_a = make_operator("did:web:a.example", "A", OperatorRole::Manufacturer);
+    let op_b = make_operator("did:web:b.example", "B", OperatorRole::Importer);
     let mut chain = TransferChain::new(pid, op_a.clone());
 
     let t1 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);

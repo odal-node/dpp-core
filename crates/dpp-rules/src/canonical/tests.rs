@@ -50,3 +50,15 @@ fn a_non_finite_float_is_refused_not_hashed_as_null() {
         "if this stops holding, the reason in content_hash's docs is stale"
     );
 }
+
+#[test]
+fn the_largest_exact_integer_hashes() {
+    assert!(content_hash(&json!({"n": 9_007_199_254_740_991_u64})).is_ok());
+}
+
+#[test]
+fn two_integers_a_double_cannot_tell_apart_do_not_share_a_digest() {
+    // Both round to 2^53 as doubles; the hash must refuse, not collapse them.
+    assert!(content_hash(&json!({"n": 9_007_199_254_740_993_u64})).is_err());
+    assert!(content_hash(&json!({"n": 9_007_199_254_740_992_u64})).is_err());
+}

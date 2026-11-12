@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use serde_json::json;
 
-use super::*;
+use crate::unsold_goods::*;
 
 fn line() -> DiscardedProductLine {
     DiscardedProductLine {
@@ -12,7 +12,7 @@ fn line() -> DiscardedProductLine {
         units_discarded: DiscardedQuantity::measured(1_200),
         weight_kg: DiscardedQuantity::estimated(430),
         packaging_included: false,
-        reason: DiscardReason::DamagedOrContaminated,
+        reason: Some(DiscardReason::DamagedOrContaminated),
         reason_detail: None,
         treatment: WasteTreatmentSplit {
             preparing_for_reuse_pct: 20,
@@ -232,4 +232,21 @@ fn a_non_euid_identifier_carries_its_scheme() {
     let value = serde_json::to_value(&id).unwrap();
     assert_eq!(value["type"], json!("other"));
     assert_eq!(value["scheme"], json!("SE-Bolagsverket"));
+}
+
+// ── A line with no derogation ───────────────────────────────────────────────
+
+/// Annex I note (h) asks for the reason "where applicable", and Del. Reg. (EU)
+/// 2026/296 Art. 2 reaches only the destruction of Annex VII products, so a
+/// discard of anything else has no point to cite. A line must be able to say so
+/// without inventing one.
+#[test]
+fn a_line_with_no_derogation_reads_and_writes_without_a_reason() {
+    let mut wire = serde_json::to_value(line()).unwrap();
+    wire.as_object_mut().unwrap().remove("reason");
+
+    let read: DiscardedProductLine =
+        serde_json::from_value(wire.clone()).expect("a line with no reason reads");
+
+    assert_eq!(serde_json::to_value(&read).unwrap(), wire);
 }

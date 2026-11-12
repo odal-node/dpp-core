@@ -81,11 +81,6 @@ static SUBMODEL_TEMPLATES: &[SubmodelTemplate] = &[
         semantic_id: semantic_ids::DETERGENT_PRODUCT_DATA,
         version: "1.0",
     },
-    SubmodelTemplate {
-        product_group_key: "unsold-goods",
-        semantic_id: semantic_ids::UNSOLD_GOODS_REPORT,
-        version: "1.0",
-    },
 ];
 
 /// Look up the AAS submodel template binding for a catalog product group key.

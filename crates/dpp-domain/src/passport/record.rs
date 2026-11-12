@@ -105,9 +105,13 @@ pub struct Passport {
     pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
-    /// CO₂ equivalent per unit — manufacturer-supplied or calculated.
+    /// CO₂ equivalent per unit, as the operator declared it. Never copy a calculated
+    /// figure in here: the calculated value is [`ComplianceResult::co2e_score`],
+    /// beside the ruleset that produced it.
     pub co2e_per_unit: Option<CarbonFootprint>,
-    /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
+    /// Repairability score, as the operator declared it (non-regulatory heuristic —
+    /// not EN 45554 / EU 2023/1669). Never copy a calculated index in here: the
+    /// calculated value is [`ComplianceResult::repairability_index`].
     pub repairability_score: Option<RepairabilityScore>,
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
@@ -359,7 +363,7 @@ pub struct Passport {
     /// that requires it will refuse the registration rather than this node
     /// inventing a classification it cannot derive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub commodity_code: Option<crate::identifier::CommodityCode>,
+    pub commodity_code: Option<crate::identifier::DeclaredCommodityCode>,
     /// EORI or national economic-operator identifier for the responsible party.
     /// Confirmed against the verbatim OJ text (Regulation (EU) 2024/1781):
     /// **Annex III, point (k)** is the data-content basis — "the name, contact
@@ -540,6 +544,10 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
 /// that, so redaction removes every one of these unconditionally and leaves
 /// attaching the right one to the serving layer.
 ///
+/// A host serves that payload, not the live record. A field can change after
+/// publication (see [`RETENTION_MUTABLE_FIELDS`]), so the record and a proof can
+/// disagree, and a served view must be the bytes its proof covers.
+///
 /// `passport_every_wire_key_is_classified` fails the build if a new key is added
 /// to [`Passport`] without being placed here, in [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`],
 /// or on that test's explicit public allowlist — because a name list is exactly
@@ -557,8 +565,15 @@ pub const PASSPORT_PROOF_FIELDS: &[&str] = &[
 ///
 /// Retention-locking a passport freezes its *content* (ESPR: the record must
 /// remain available and unaltered for the retention period). It does not freeze
-/// the record entirely — a passport is still suspended, sealed, re-linted and
-/// re-signed after publication, and each of those writes a key here.
+/// the record entirely — a passport is still suspended, sealed and re-linted after
+/// publication, and each of those writes a key here. The proofs are attached once,
+/// at publication, after the lock is set, and are never re-issued: a re-lint
+/// rewrites `lintResult` in the record and leaves every signature over the body it
+/// was made over.
+///
+/// A host therefore serves a view as the payload its proof covers, never as the
+/// live record: a live field beside an older signature is a body that does not
+/// verify.
 ///
 /// # Why this belongs in core
 ///
@@ -584,7 +599,7 @@ pub const RETENTION_MUTABLE_FIELDS: &[&str] = &[
     "publishedAt",
     "retentionLocked",
     "updatedAt",
-    // Proofs: re-signing and sealing land after the content is frozen, and each
+    // Proofs: signing and sealing land after the content is frozen, and each
     // covers the frozen content rather than altering it.
     "jwsSignature",
     "publicJwsSignature",
@@ -788,9 +803,6 @@ impl Passport {
     /// - `co2e_per_unit` is non-negative if present
     /// - `repairability_score` is in range [0.0, 10.0] if present
     /// - `product_group_data.product group()` matches `self.product_group` if present
-    /// - for `ProductGroup::UnsoldGoods`, the disclosure carries at least one
-    ///   product line (Impl. Reg. (EU) 2026/2 Annex I). No Annex VII scope check:
-    ///   that is Art. 25's destruction ban, not Art. 24's disclosure duty
     ///
     /// **A write-time check, not a verdict on a fetched passport.** These are
     /// the invariants a record must meet to be created or published. A passport
@@ -916,30 +928,6 @@ impl Passport {
             errors.push(disagreement);
         }
 
-        // An unsold-goods record is a disclosure by an undertaking over a
-        // financial year, not a product placed on the market, so the envelope's
-        // `commodity_code` has nothing to describe: the categories are on the
-        // lines, and there are many of them.
-        //
-        // This deliberately no longer requires Annex VII scope. **Art. 24
-        // (disclosure) and Art. 25 (destruction ban) have different scopes** —
-        // the ban reaches Annex VII's apparel and footwear, while the disclosure
-        // reaches discarded unsold *consumer products* generally, which Impl.
-        // Reg. (EU) 2026/2 Annex II illustrates across 45 CN headings from soap
-        // to refrigerators. Requiring Annex VII here rejected every lawful
-        // disclosure outside apparel and footwear.
-        if self.product_group == ProductGroup::UnsoldGoods
-            && let Some(ProductGroupData::UnsoldGoods(report)) = &self.product_group_data
-            && report.lines.is_empty()
-        {
-            errors.push(FieldError {
-                field: "/productGroupData/lines".to_owned(),
-                message: "an unsold-goods disclosure must carry at least one product line \
-                          (Impl. Reg. (EU) 2026/2 Annex I)"
-                    .to_owned(),
-            });
-        }
-
         // Schema conformance is deliberately NOT checked here. It needs the
         // versioned schema registry, which drags `jsonschema` and through it a
         // blocking HTTP client, and an aggregate that cannot state its own
@@ -1055,12 +1043,30 @@ impl Passport {
 
         let now = chrono::Utc::now();
 
-        // First publish: gate on mandatory content, then lock retention and
-        // record the timestamp.
-        if next == PassportStatus::Published && self.published_at.is_none() {
+        // First publish is identified by the source state. `published_at` is a
+        // writable field, so a Draft that already carries a timestamp is
+        // inconsistent and must not reach the mandatory-content gate by a side door.
+        if next == PassportStatus::Published && self.status == PassportStatus::Draft {
+            if self.published_at.is_some() {
+                return Err(crate::error::dpp::DppError::Validation(
+                    "a draft passport must not carry published_at".into(),
+                ));
+            }
             self.check_mandatory_content()?;
             self.retention_locked = true;
             self.published_at = Some(now);
+        }
+
+        // Suspended is reached only from Published, so a suspended passport with no
+        // `published_at` was never published, and republishing it would skip the
+        // gate above.
+        if next == PassportStatus::Published
+            && self.status == PassportStatus::Suspended
+            && self.published_at.is_none()
+        {
+            return Err(crate::error::dpp::DppError::Validation(
+                "a suspended passport must carry published_at".into(),
+            ));
         }
 
         self.status = next;

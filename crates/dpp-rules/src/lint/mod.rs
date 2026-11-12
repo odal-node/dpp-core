@@ -28,4 +28,9 @@ pub use types::{LintFinding, LintSeverity};
 /// scoped to one product group: REACH Art. 33 reaches every article, so the
 /// lints run wherever a payload declares substances rather than under a single
 /// product group's arm.
-pub const LINT_PACK_VERSION: &str = "1.1.0";
+///
+/// 1.2.0 adds the four [`unsold_goods::lint_discard_record`] lints, the first
+/// that read one discard rather than a whole disclosure, and a financial-year
+/// ordering lint to [`unsold_goods::lint_unsold_goods`]. A line with no
+/// derogation no longer reads as a point (h) claim.
+pub const LINT_PACK_VERSION: &str = "1.2.0";

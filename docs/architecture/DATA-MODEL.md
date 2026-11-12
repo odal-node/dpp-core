@@ -60,7 +60,7 @@ stateDiagram-v2
 | `Suspended` | `"suspended"` | No | Temporarily hidden: recall, regulatory hold or dispute. The JWS is kept |
 | `Retired` | `"retired"` | Read-only | Publication life over; kept for regulatory record-keeping; immutable. **Not EN 18221 clause 4.2 archiving**, which keeps the historical versions of a passport that is still live |
 | `Superseded` | `"superseded"` | Read-only | Replaced by a newer passport whose `supersedes_id` points back here |
-| `Deactivated` | `"deactivated"` | Read-only | End of life: the product was recycled, destroyed under a derogation, exported or lost. The typed reason is on the end-of-life event (`dpp_domain::eol`) |
+| `Deactivated` | `"deactivated"` | Read-only | End of life: the product was recycled, destroyed (citing a derogation where ESPR Art. 25(1) bars it), exported or lost. The typed reason is on the end-of-life event (`dpp_domain::eol`) |
 
 **Transition rules:**
 
@@ -97,7 +97,7 @@ as its last edit; if the two disagree, the constant is right.
 | `granularity` | `Option<Granularity>` | `"granularity"` | Model, batch or item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one, which is every ESPR product group today. Also decides what the carrier prints after the GTIN: nothing at model level, the batch at batch level, the carrier serial at item level or when `None`. A stated level must agree with `batch_id` and `serial_number` |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill-of-materials entries |
-| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit; may be set by a compliance engine |
+| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit, as the operator declared it; the calculated figure is `ComplianceResult::co2e_score` |
 | `repairability_score` | `Option<RepairabilityScore>` | `"repairabilityScore"` | Structured `{overall, criteria}`, not a bare number |
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
@@ -107,7 +107,7 @@ as its last edit; if the two disagree, the constant is right.
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |
 | `public_jws_signature` | `Option<String>` | `"publicJwsSignature"` | JWS over the **public projection**, a different redaction, so never interchangeable with the above |
-| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Per-audience signatures, keyed by audience |
+| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Signatures over the non-public views, keyed by disclosure set (e.g. `public+restricted`), never by audience name |
 | `created_at` | `DateTime<Utc>` | `"createdAt"` | Record creation timestamp |
 | `updated_at` | `DateTime<Utc>` | `"updatedAt"` | Last modification timestamp |
 | `published_at` | `Option<DateTime<Utc>>` | `"publishedAt"` | First publish timestamp |
@@ -121,7 +121,7 @@ as its last edit; if the two disagree, the constant is right.
 | `life_status` | `Option<LifeStatus>` | `"lifeStatus"` | Product-life status from Battery Regulation Annex XIII point 4(c): `original`, `repurposed`, `re-used`, `remanufactured` or `waste`. Separate from `status`, the publication lifecycle. Classified `Individual`. `None` where the product group's act defines no such status. See [PRODUCT-LINEAGE.md](PRODUCT-LINEAGE.md) |
 | `retention_until` | `Option<DateTime<Utc>>` | `"retentionUntil"` | Computed at publish from the instrument bindings' retention fold |
 | `product_id` | `Option<Uuid>` | `"productId"` | Opaque link to an internal product-template record. **Not a legal identifier** |
-| `commodity_code` | `Option<CommodityCode>` | `"commodityCode"` | CN code. Absent rather than guessed: a registry that requires it refuses the registration instead of the issuer inventing a classification |
+| `commodity_code` | `Option<DeclaredCommodityCode>` | `"commodityCode"` | CN code, kept as written: the type holds any string and `validated()` says whether it is a valid `CommodityCode`, so a stored or fetched passport never stops reading over it. Absent rather than guessed: a registry that requires it refuses the registration instead of the issuer inventing a classification |
 | `operator_identifier` | `Option<String>` | `"operatorIdentifier"` | The operator **at signing time**, covered by the signature. Reading it as "who is responsible today" is wrong for any passport that has changed hands |
 | `facility` | `Option<FacilitySnapshot>` | `"facility"` | A snapshot, so a retired facility never orphans a published passport |
 | `seal` | `Option<SealedEnvelope>` | `"seal"` | eIDAS qualified electronic seal over `jws_signature` |
@@ -173,7 +173,6 @@ its own regulation:
 | `detergent` | `product_type` | `"laundry"`, `"dishwashing"` and so on. Not `format`, which is the physical presentation of the same type |
 | `steel` | `product_category` | `"flat"`, `"long"` and so on |
 | `electronics` | `product_category` | `"smartphone"`, `"other-mobile-phone"`, `"cordless-phone"`, `"tablet"`: closed, Reg. (EU) 2023/1670 Art. 1(1) |
-| `unsold-goods` | *(none)* | Removed in schema v2.0.0. Impl. Reg. (EU) 2026/2 Art. 3 delimits a disclosure by **CN code**, so its lines carry `cnCategories`, not a category word of ours. See §4.4 |
 | `furniture` | `product_type` | No regulatory source yet |
 | `tyre` | `tyre_class` | `"C1"` and so on |
 | `aluminium` · `textile` · `mattress` · `toy` | *(none)* | No act defines a category axis for these. `aluminium` and `textile` declared one in the catalog until it was removed: aluminium's values were its `productionRoute` enum, and textile's were defined by no schema at all |
@@ -393,21 +392,29 @@ Every product group has a typed variant and at least one schema. Only `battery` 
 | `steel` | `SteelData` | v1.2.0 | CBAM-aligned. Intermediate product; the earliest indicative act of any group |
 | `toy` | `ToyData` | v1.2.0 | Reg. (EU) 2025/2509 |
 | `tyre` | `TyreData` | v1.1.0 | |
-| `unsold-goods` | `UnsoldGoodsReport` | v2.0.0 | See §4.4. **Not a product group**; built to Impl. Reg. (EU) 2026/2 Annex I |
 
 `ProductGroupData::Other` keeps the tag and payload of a product group this build has no
 typed variant for, verbatim, so an unknown group round-trips instead of being dropped.
 
-### 4.4 Unsold goods is not a product group, and its model predates its law
+### 4.4 Unsold goods is a duty over every product group
 
-ESPR Arts. 24 and 25, Annex VII. It occupies a catalog slot for implementation
-convenience and borrows textile's plugin, but it is a **horizontal obligation on an
-operator over a financial year**, not a product placed on the market. It carries
+ESPR Arts. 24 and 25, Annex VII. Art. 24 reaches discarded unsold consumer products
+generally, and only Art. 25's destruction ban is limited to the products of Annex VII, so
+this is a **horizontal obligation on an operator over a financial year**, layered over
+every product group, not a product placed on the market and not a product group of its
+own. It was once held in a product-group slot, with a signed passport of its own and a
+plugin borrowed from textile; that made a sibling of what is a duty over all of them. It
+is `dpp_domain::unsold_goods` now: no `ProductGroup` variant, no catalog manifest, no
+passport, and a schema family of its own under `crates/dpp-domain/document-schemas/`
+(key `unsold-goods`, validated through `unsold_goods::document_schemas()`).
+
+The instruments that carry the duty, `unsold-goods-format-2026-2` and
+`unsold-goods-derogations-2026-296`, are bound to no product group and carry
 `PassportObligation::NotRequired`: the duty is real and binding today, and there is no
 passport anywhere in Arts. 24 and 25.
 
-Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` v2.0.0 is built
-to them:
+Two acts govern it, both adopted 9 February 2026, and `UnsoldGoodsReport` is built to
+them (schema v2.1.0):
 
 - **Commission Implementing Regulation (EU) 2026/2** (CELEX `32026R0002`), under
   Art. 24(3). Art. 2(1) binds the disclosure to the format in its **Annex I**, and Art. 3
@@ -422,10 +429,16 @@ consolidated with its undertakings listed), a `financialYear` with both endpoint
 repeating body of `lines`, and the two narrative rows `measuresTaken` and
 `measuresPlanned`. Each line carries its CN categories (plural, because note (f) allows
 several where items sold together count as one unit), a description, unit and weight
-quantities each flagged `estimated` or not, a packaging-included flag, one `reason`, and
-a `treatment` split.
+quantities each flagged `estimated` or not, a packaging-included flag, an optional
+`reason`, and a `treatment` split.
 
-Three points that are easy to get wrong:
+Four points that are easy to get wrong:
+
+- **A line's `reason` is optional.** Note (h) asks for it "where applicable", and the
+  derogations except only the destruction of Annex VII products from the Art. 25(1)
+  prohibition. A discard of anything else, or of an Annex VII product for the sole purpose
+  of preparing it for reuse (ESPR Art. 2(34)), has no point to cite, and v2.0.0 required
+  one anyway. v2.1.0 does not; `reasonDetail` can still say why.
 
 - **Total destruction is derived, never stored.** Note (i) defines it as recycling plus
   other recovery plus disposal. Preparing for reuse and unknown sit outside it, which is
@@ -437,6 +450,24 @@ Three points that are easy to get wrong:
 - **`CnCategory` is not `CommodityCode`.** Two digits or four, against six, eight or ten.
   A product's own classification is a different level of the same nomenclature, and
   substituting it files a whole chapter's goods under one article.
+
+**What the disclosure summarises is a separate model.** `UnsoldGoodsReport` is the yearly
+table; `dpp_domain::unsold_goods` models each discard in it (`DiscardRecord`), the
+documents the acts have an operator keep for one (`EvidenceKind`, per derogation point
+under Del. Reg. (EU) 2026/296 Art. 3, plus the delivery and reception documentation of
+ESPR Art. 24(2) and Impl. Reg. (EU) 2026/2 Art. 4), how long (`KeepUntil`: the later of
+five years after the discard and five years after the disclosure covering it, with that
+disclosure `Pending`, `MadeOn` a date, or `NotOwed`) and `aggregate`, which turns a
+financial year's records into the lines of the table. A line takes the discloser's
+wording (`LineDescriptions`) and is keyed by the record's `reason_label`, a short label
+the operator keeps, not a sentence per record. Whether any of it binds an operator
+depends on its size: `EnterpriseSize::is_exempt_on` follows ESPR Arts. 24(1) and 25(1),
+which both leave out micro and small enterprises and reach medium-sized ones from
+19 July 2030, and an exempt operator is required to show nothing. A record offered for
+storage is held to the `discard-record` schema (in `document_schemas()` beside the
+disclosure's); the type reads a malformed one back all the same, so it can be reported.
+The records know what is required and never what is held; storing them and their
+documents is a host's concern.
 
 **There is no v1.0.0.** It predated both acts and nothing could carry a document forward
 from it: a financial year cannot be derived from `"2026-Q2"`, a CN code cannot be
@@ -467,7 +498,7 @@ so none can stand in for another:
 |---|---|
 | `jws_signature` | The full passport |
 | `public_jws_signature` | The public projection, after disclosure filtering |
-| `disclosure_signatures` | One projection per audience, keyed by audience |
+| `disclosure_signatures` | One projection per disclosure set, keyed by disclosure set |
 
 The protected header names the algorithm and the verification method. The `kid` is the
 DID URL of the key, using its RFC 7638 thumbprint, so a verifier resolves the operator's

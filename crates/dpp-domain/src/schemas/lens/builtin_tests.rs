@@ -342,3 +342,43 @@ fn battery_lens_with_nothing_to_derive_still_validates_against_v2() {
         .validate("battery", &v("2.0.0"), &derived.data)
         .expect("a v1 record with no rated capacity still validates against v2");
 }
+
+/// v2.1.0 stops requiring a reason on a line and changes nothing else, so a
+/// v2.0.0 disclosure — every line of which carries one — reaches it unchanged.
+#[test]
+fn unsold_goods_v2_0_passes_through_to_v2_1_unchanged() {
+    let lenses = LensRegistry::new();
+    let schemas = crate::unsold_goods::document_schemas();
+    let v2_0 = serde_json::json!({
+        "entity": {
+            "name": "Example Retail Group SA",
+            "identifier": { "type": "euid", "value": "LUB123456789" },
+            "scope": { "type": "standalone" }
+        },
+        "financialYear": { "start": "2027-01-01", "end": "2027-12-31" },
+        "lines": [{
+            "cnCategories": ["6203"],
+            "description": "Men's suits and trousers",
+            "unitsDiscarded": { "value": 1200 },
+            "weightKg": { "value": 430 },
+            "packagingIncluded": false,
+            "reason": "damagedOrContaminated",
+            "treatment": {
+                "preparingForReusePct": 20, "recyclingPct": 50,
+                "otherRecoveryPct": 20, "disposalPct": 5, "unknownPct": 5
+            }
+        }],
+        "measuresTaken": "Pre-season demand forecasting.",
+        "measuresPlanned": "Twelve-week donation window."
+    });
+
+    let derived = lenses
+        .upcast("unsold-goods", &v2_0, &v("2.0.0"), &v("2.1.0"))
+        .unwrap();
+
+    assert!(!derived.lossy);
+    assert_eq!(derived.data, v2_0);
+    schemas
+        .validate("unsold-goods", &v("2.1.0"), &derived.data)
+        .expect("derived view must validate against v2.1.0");
+}

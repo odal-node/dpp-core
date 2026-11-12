@@ -51,7 +51,6 @@ so stored passports remain valid against the version they declare.
 |---|---|---|---|---|
 | `battery` | v2.10.0 | Regulation (EU) 2023/1542 | in force | Annex XIII points 1 to 4 and Annex VI Part A; per-property `x-disclosure` |
 | `electronics` | v1.5.0 | Regulations (EU) 2023/1670 and 2023/1669 | in force | Phones and tablets. The passport duty is displaced to EPREL |
-| `unsold-goods` | v2.0.0 | ESPR Arts. 24 and 25; Regulations (EU) 2026/2 and 2026/296 | in force | A yearly disclosure, not a passport |
 | `textile` | v1.4.0 | ESPR | provisional | Fibre composition, durability, microplastics; no delegated act yet |
 | `steel` | v1.2.0 | ESPR | provisional | Production route and embedded emissions, aligned with CBAM |
 | `aluminium` | v1.2.0 | ESPR | provisional | Production route, CO₂e per tonne, recycled content |
@@ -61,6 +60,10 @@ so stored passports remain valid against the version they declare.
 | `construction` | v1.2.0 | Regulation (EU) 2024/3110 (CPR) | provisional | |
 | `detergent` | v1.2.0 | Regulation (EU) 2026/405 | provisional | Surfactant bands per its Annex VII |
 | `toy` | v1.2.0 | Regulation (EU) 2025/2509 | provisional | |
+
+The unsold-goods disclosure (ESPR Arts. 24 and 25) is not a product group. It is a yearly disclosure, not a passport, that binds an operator over every product group; its schema (v2.0.0) is held apart from the product groups' in `dpp_domain::unsold_goods`.
+
+Its two acts are in force but apply from different dates. Implementing Regulation (EU) 2026/2, which sets the disclosure's format, applies from 2 March 2027 and to products discarded from the first full financial year after that date (its Art. 1). Delegated Regulation (EU) 2026/296, which lists the derogations from the destruction ban, applies from 19 July 2026. ESPR Art. 24(1) itself can reach earlier years, for which the Implementing Regulation's format is not yet in application, so the v2.0.0 schema is not a claim about those.
 
 The current version per product group is resolved by `ProductGroupCatalog`, not
 hard-coded at call sites. [REGULATORY.md](REGULATORY.md) says which product groups carry
@@ -210,8 +213,9 @@ never confused.
   or batch identifier is treated as lawful, because both obligations depend on such a
   design existing, and recital (14) says products unique by nature have neither. `item_id`
   depends on the declared level rather than being unconditional.
-- **Commodity code:** `CommodityCode` on the passport and the registration payload,
-  validated *structurally* as HS-6, CN-8 or TARIC-10. Whether a code falls inside the range
+- **Commodity code:** `DeclaredCommodityCode` on the passport (kept as written, valid or not)
+  and a string on the registration payload that `CommodityCode::parse` validates
+  *structurally* as HS-6, CN-8 or TARIC-10. Whether a code falls inside the range
   a product group permits (Art. 8(7)(d)) is **not** checked here: those ranges live in the
   applicable delegated act. Absence remains lawful, because the obligation applies "where
   relevant".

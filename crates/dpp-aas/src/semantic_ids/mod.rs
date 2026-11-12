@@ -112,5 +112,6 @@ pub const FURNITURE_PRODUCT_DATA: &str =
 pub const DETERGENT_PRODUCT_DATA: &str =
     "urn:odal-node:aas:submodel-template:detergent-product-data:1.0";
 
-/// Odal Node unsold goods report template (EU ESPR Art. 25).
+/// Odal Node unsold goods report template (EU ESPR Arts. 24–25). Used by the
+/// disclosure export, not by a product group.
 pub const UNSOLD_GOODS_REPORT: &str = "urn:odal-node:aas:submodel-template:unsold-goods:1.0";

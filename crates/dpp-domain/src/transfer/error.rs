@@ -6,6 +6,9 @@ use super::status::TransferStatus;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum TransferError {
+    /// The transfer record names a different passport from the chain it is
+    /// appended to.
+    PassportMismatch { expected: String, got: String },
     /// The `from_operator` on the transfer record doesn't match the
     /// current responsible operator on the chain.
     OperatorMismatch { expected: String, got: String },
@@ -21,6 +24,12 @@ pub enum TransferError {
 impl std::fmt::Display for TransferError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            TransferError::PassportMismatch { expected, got } => {
+                write!(
+                    f,
+                    "passport mismatch: chain is for {expected}, record is for {got}"
+                )
+            }
             TransferError::OperatorMismatch { expected, got } => {
                 write!(f, "operator mismatch: expected {expected}, got {got}")
             }
