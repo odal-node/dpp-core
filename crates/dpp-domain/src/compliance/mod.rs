@@ -18,4 +18,5 @@ mod tests;
 pub use error::{ComplianceError, ComplianceErrorKind};
 pub use finding::ComplianceFinding;
 pub use result::ComplianceResult;
+pub(crate) use result::compliance_input_hash;
 pub use status::{ComplianceStatus, gate_determination};

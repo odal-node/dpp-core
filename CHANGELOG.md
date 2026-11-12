@@ -139,6 +139,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **The status-list decoder refuses a bitstring past 16 MiB decompressed**
   (`MAX_DECODED_BYTES`). A larger list read before. Migration: a caller that needs
   one passes its own budget to `from_encoded_list_within`. (#563)
+- **A compliance determination is bound to the `productGroupData` it was computed
+  over.** `ComplianceResult` gains `inputHash`, the content hash of the product group
+  key and `productGroupData`, and `Passport::attach_compliance_result` is the way to
+  attach one. The first publish refuses a determination whose hash is missing or no
+  longer matches the passport's content, so an edit after assessment cannot publish
+  under a verdict on the old content. Migration: a draft carrying a determination
+  from before this change is reassessed and attached again before it can publish. A
+  determination from before this change still reads, and a passport with none still
+  publishes. A struct literal of `ComplianceResult` adds `input_hash: None`. (#580)
 
 - **The lineage substantiation rule takes more than one kind of evidence, and
   says which one backed each edge.** Reg. (EU) 2023/1542 Art. 77(7) moves
@@ -169,6 +178,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   as the predecessor's corroboration. (#499)
 
 ### Added
+
+- **`ProductGroup::product_category_values_any_version` lists every category a
+  stored passport may state.** `product_category_values` answers for a new
+  passport: the current schema's `enum`. A stored passport is re-validated
+  against the version it was written under, so it may state a value since
+  withdrawn, such as an electronics `laptop` from before `v1.2.0` or a furniture
+  `mattress`. Checked against the current list, such a value read as one no
+  passport can state, so a caller narrowing a credential to categories refused
+  one that matches stored passports. The new list holds the current values
+  first, then each withdrawn one, and is `None` exactly where
+  `product_category_values` is, whose documentation now points a caller
+  matching stored passports at it. (#561)
 
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
   `dpp-domain`'s new `bundle` feature, `ObligationCalendar::with_bundle(catalog,

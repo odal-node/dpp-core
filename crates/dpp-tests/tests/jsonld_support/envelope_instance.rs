@@ -111,6 +111,7 @@ pub fn populate_envelope(passport: &mut Passport, basis: ResponsibilityBasis) {
         assessed_at: Some(at),
         // Whatever a calculation recorded: keys no schema fixes.
         receipt: Some(json!({ "inputs": { "anyKey": 1 }, "steps": [{ "free": "form" }] })),
+        input_hash: Some("0".repeat(64)),
     });
 
     passport.lint_result = Some(LintResult {

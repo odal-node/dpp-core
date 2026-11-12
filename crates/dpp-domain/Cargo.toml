@@ -12,7 +12,9 @@ homepage.workspace    = true
 rust-version.workspace = true
 
 [dependencies]
-dpp-rules   = { workspace = true }
+# `bundle` is always on: the content hash that binds a compliance determination to
+# its input comes from it, and a gate a default build leaves out is not a gate.
+dpp-rules   = { workspace = true, features = ["bundle"] }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
 serde_with  = { workspace = true }
@@ -38,10 +40,10 @@ jsonschema  = { workspace = true }
 [features]
 # The obligation calendar reads dated schedule entries out of a verified signed
 # ruleset bundle. Off by default: a caller with no bundle channel needs none of
-# the bundle format's dependencies.
+# the calendar's code.
 bundle = ["dpp-rules/bundle"]
 # The in-memory back-up and archive hash a document the way both ports define it,
-# over its RFC 8785 canonical form, which `dpp-rules` supplies behind `bundle`.
+# over its RFC 8785 canonical form, which `dpp-rules` supplies.
 test-utils = ["dpp-rules/bundle"]
 
 [dev-dependencies]
