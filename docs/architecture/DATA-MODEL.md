@@ -107,7 +107,7 @@ as its last edit; if the two disagree, the constant is right.
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |
 | `public_jws_signature` | `Option<String>` | `"publicJwsSignature"` | JWS over the **public projection**, a different redaction, so never interchangeable with the above |
-| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Per-audience signatures, keyed by audience |
+| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Signatures over the non-public views, keyed by disclosure set (e.g. `public+restricted`), never by audience name |
 | `created_at` | `DateTime<Utc>` | `"createdAt"` | Record creation timestamp |
 | `updated_at` | `DateTime<Utc>` | `"updatedAt"` | Last modification timestamp |
 | `published_at` | `Option<DateTime<Utc>>` | `"publishedAt"` | First publish timestamp |
@@ -498,7 +498,7 @@ so none can stand in for another:
 |---|---|
 | `jws_signature` | The full passport |
 | `public_jws_signature` | The public projection, after disclosure filtering |
-| `disclosure_signatures` | One projection per audience, keyed by audience |
+| `disclosure_signatures` | One projection per disclosure set, keyed by disclosure set |
 
 The protected header names the algorithm and the verification method. The `kid` is the
 DID URL of the key, using its RFC 7638 thumbprint, so a verifier resolves the operator's

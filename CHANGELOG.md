@@ -293,6 +293,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a reason to copy a calculated figure into them. The calculated values are
   `ComplianceResult::co2e_score` and `ComplianceResult::repairability_index`, beside
   the ruleset that produced them. Documentation only. (#581)
+- `RETENTION_MUTABLE_FIELDS` said a passport is re-signed after publication. The
+  proofs are attached once, at publication, and a re-lint rewrites `lintResult` and
+  leaves the signatures as they were. The docs of `PASSPORT_PROOF_FIELDS` and
+  `RETENTION_MUTABLE_FIELDS` now say a host serves a view as the payload its proof
+  covers, never the live record. `disclosureSignatures` is keyed by disclosure set,
+  which the JSON-LD comments in `dpp-vc` and `docs/architecture/DATA-MODEL.md` had
+  described as a dotted path or an audience. Documentation only. (#578)
 
 ## [0.23.0] - 2026-11-03
 
