@@ -182,8 +182,8 @@ fn every_scope_is_exact_and_every_iri_is_its_members_path() {
 /// `personalData` is.
 ///
 /// A `receipt` holds whatever a calculation recorded, and `disclosureSignatures`
-/// is keyed by the dotted path of the field each signature covers. Neither key is
-/// a term or an IRI, so as plain terms a processor would drop all of them.
+/// is keyed by disclosure set, such as `public+restricted`. Neither key is a term
+/// or an IRI, so as plain terms a processor would drop all of them.
 #[test]
 fn members_whose_keys_are_data_are_json_literals() {
     let terms = base_terms();

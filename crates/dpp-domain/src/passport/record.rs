@@ -105,9 +105,13 @@ pub struct Passport {
     pub granularity: Option<Granularity>,
     pub manufacturer: ManufacturerInfo,
     pub materials: Vec<MaterialEntry>,
-    /// CO₂ equivalent per unit — manufacturer-supplied or calculated.
+    /// CO₂ equivalent per unit, as the operator declared it. Never copy a calculated
+    /// figure in here: the calculated value is [`ComplianceResult::co2e_score`],
+    /// beside the ruleset that produced it.
     pub co2e_per_unit: Option<CarbonFootprint>,
-    /// Repairability score (non-regulatory heuristic — not EN 45554 / EU 2023/1669).
+    /// Repairability score, as the operator declared it (non-regulatory heuristic —
+    /// not EN 45554 / EU 2023/1669). Never copy a calculated index in here: the
+    /// calculated value is [`ComplianceResult::repairability_index`].
     pub repairability_score: Option<RepairabilityScore>,
     /// The computed compliance determination — status, metrics, binding
     /// `violations` + advisory `warnings`, and (when a calculation ran) a
@@ -545,6 +549,10 @@ pub const PASSPORT_WIRE_KEYS: &[&str] = &[
 /// that, so redaction removes every one of these unconditionally and leaves
 /// attaching the right one to the serving layer.
 ///
+/// A host serves that payload, not the live record. A field can change after
+/// publication (see [`RETENTION_MUTABLE_FIELDS`]), so the record and a proof can
+/// disagree, and a served view must be the bytes its proof covers.
+///
 /// `passport_every_wire_key_is_classified` fails the build if a new key is added
 /// to [`Passport`] without being placed here, in [`crate::disclosure::PASSPORT_FIELD_DISCLOSURE`],
 /// or on that test's explicit public allowlist — because a name list is exactly
@@ -562,8 +570,15 @@ pub const PASSPORT_PROOF_FIELDS: &[&str] = &[
 ///
 /// Retention-locking a passport freezes its *content* (ESPR: the record must
 /// remain available and unaltered for the retention period). It does not freeze
-/// the record entirely — a passport is still suspended, sealed, re-linted and
-/// re-signed after publication, and each of those writes a key here.
+/// the record entirely — a passport is still suspended, sealed and re-linted after
+/// publication, and each of those writes a key here. The proofs are attached once,
+/// at publication, after the lock is set, and are never re-issued: a re-lint
+/// rewrites `lintResult` in the record and leaves every signature over the body it
+/// was made over.
+///
+/// A host therefore serves a view as the payload its proof covers, never as the
+/// live record: a live field beside an older signature is a body that does not
+/// verify.
 ///
 /// # Why this belongs in core
 ///
@@ -589,7 +604,7 @@ pub const RETENTION_MUTABLE_FIELDS: &[&str] = &[
     "publishedAt",
     "retentionLocked",
     "updatedAt",
-    // Proofs: re-signing and sealing land after the content is frozen, and each
+    // Proofs: signing and sealing land after the content is frozen, and each
     // covers the frozen content rather than altering it.
     "jwsSignature",
     "publicJwsSignature",

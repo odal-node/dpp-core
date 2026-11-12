@@ -97,7 +97,7 @@ as its last edit; if the two disagree, the constant is right.
 | `granularity` | `Option<Granularity>` | `"granularity"` | Model, batch or item level, an ESPR Art. 9(2)(d) delegated-act decision. `None` where no act has fixed one, which is every ESPR product group today. Also decides what the carrier prints after the GTIN: nothing at model level, the batch at batch level, the carrier serial at item level or when `None`. A stated level must agree with `batch_id` and `serial_number` |
 | `manufacturer` | `ManufacturerInfo` | `"manufacturer"` | Nested: name, address, optional did:web URL |
 | `materials` | `Vec<MaterialEntry>` | `"materials"` | Bill-of-materials entries |
-| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit; may be set by a compliance engine |
+| `co2e_per_unit` | `Option<CarbonFootprint>` | `"co2ePerUnit"` | CO₂e per unit, as the operator declared it; the calculated figure is `ComplianceResult::co2e_score` |
 | `repairability_score` | `Option<RepairabilityScore>` | `"repairabilityScore"` | Structured `{overall, criteria}`, not a bare number |
 | `compliance_result` | `Option<ComplianceResult>` | `"complianceResult"` | Outcome of the last determination |
 | `lint_result` | `Option<LintResult>` | `"lintResult"` | Advisory findings. `None` until a lint pass has run |
@@ -107,7 +107,7 @@ as its last edit; if the two disagree, the constant is right.
 | `qr_code_url` | `Option<String>` | `"qrCodeUrl"` | Public URL for QR code resolution |
 | `jws_signature` | `Option<String>` | `"jwsSignature"` | Compact JWS over the **full** canonical payload (Ed25519) |
 | `public_jws_signature` | `Option<String>` | `"publicJwsSignature"` | JWS over the **public projection**, a different redaction, so never interchangeable with the above |
-| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Per-audience signatures, keyed by audience |
+| `disclosure_signatures` | `BTreeMap<String, String>` | `"disclosureSignatures"` | Signatures over the non-public views, keyed by disclosure set (e.g. `public+restricted`), never by audience name |
 | `created_at` | `DateTime<Utc>` | `"createdAt"` | Record creation timestamp |
 | `updated_at` | `DateTime<Utc>` | `"updatedAt"` | Last modification timestamp |
 | `published_at` | `Option<DateTime<Utc>>` | `"publishedAt"` | First publish timestamp |
@@ -498,7 +498,7 @@ so none can stand in for another:
 |---|---|
 | `jws_signature` | The full passport |
 | `public_jws_signature` | The public projection, after disclosure filtering |
-| `disclosure_signatures` | One projection per audience, keyed by audience |
+| `disclosure_signatures` | One projection per disclosure set, keyed by disclosure set |
 
 The protected header names the algorithm and the verification method. The `kid` is the
 DID URL of the key, using its RFC 7638 thumbprint, so a verifier resolves the operator's
