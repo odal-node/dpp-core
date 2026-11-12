@@ -12,7 +12,9 @@
 //! filing it under `batteries` would imply only batteries can have second-life
 //! lineage — which the envelope contradicts.
 
+pub mod basis;
 pub mod consistency;
+pub mod evidence;
 pub mod finding;
 pub mod input;
 pub mod status_defect;
@@ -23,8 +25,10 @@ mod consistency_tests;
 #[cfg(test)]
 mod substantiation_tests;
 
+pub use basis::SubstantiationBasis;
 pub use consistency::check_life_status_consistency;
-pub use finding::{SubstantiationDefect, SubstantiationFinding};
-pub use input::{DerivationEdge, TransferEvidence};
+pub use evidence::{DocumentEvidence, TransferEvidence, WasteHandoverEvidence};
+pub use finding::{EdgeSubstantiation, SubstantiationDefect};
+pub use input::{DerivationEdge, Evidence};
 pub use status_defect::StatusDefect;
 pub use substantiation::check_derivation_substantiation;

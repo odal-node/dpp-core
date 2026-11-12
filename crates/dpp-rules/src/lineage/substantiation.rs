@@ -1,4 +1,4 @@
-//! Is a second-life claim substantiated by a transfer of responsibility?
+//! Is a second-life claim substantiated by evidence that the operation happened?
 //!
 //! # The gap this closes
 //!
@@ -42,17 +42,46 @@
 //! the claim is *substantiated*: whether evidence that the operation took place
 //! accompanies it.
 //!
-//! # What counts as the evidence, and what it does not prove
+//! # What counts as evidence, and what each kind proves
 //!
-//! A transfer-of-responsibility record is that evidence. A second-life operation
-//! *is* a transfer under Art. 77(7), so a record of one can corroborate the other,
-//! and a record that names a different operation, or a different incoming
-//! operator, is no evidence of this claim. But the record is an implementation
-//! artefact. Art. 77(7)'s transfer is a legal consequence that follows the
-//! operation; nothing in the article requires a bilateral instrument to exist or
-//! to be recorded, and the absence of one is **not a breach** of it. This rule
-//! asks for the record because it is the one corroborating artefact the model
-//! has, not because the Regulation does.
+//! Art. 77(7) names no evidence. Nothing in it requires a bilateral instrument to
+//! exist or to be recorded, so a claim with none is **unsubstantiated, not a
+//! breach**. The rule accepts three kinds, and reports which one backed each edge
+//! ([`SubstantiationBasis`]), because they do not prove the same thing:
+//!
+//! - **A transfer of responsibility** on the predecessor, to this passport's
+//!   operator, for the operation the edge claims. A second-life operation *is* a
+//!   transfer under Art. 77(7), so a record of one corroborates the other, and the
+//!   predecessor's operator signs it. The strongest kind.
+//! - **A waste handover** on the predecessor, under Art. 77(7) second
+//!   subparagraph: the battery became waste and responsibility left its operator
+//!   for a producer, a producer responsibility organisation or a waste management
+//!   operator. The predecessor's operator signs this one too. A battery can reach
+//!   a second-life operator through the waste stream without its original
+//!   operator ever handing it over, and this is the record that original operator
+//!   does produce. It shows the battery left the predecessor's hands, not that it
+//!   reached this one.
+//! - **A document** from the value chain — a delivery note, a purchase record —
+//!   supplied by this passport's operator and pinned by its digest. It covers what
+//!   the other two cannot, such as a battery that is not waste bought through
+//!   several owners. Nobody but the claiming operator stands behind it.
+//!
+//! The document's type is an identifier the caller chooses, never a list fixed
+//! here: see [`DocumentEvidence::document_type`] for why.
+//!
+//! One consistency is checked across kinds. Art. 3(31) defines repurposing over
+//! "a battery, that is not a waste battery", so a waste handover contradicts a
+//! `repurposing` edge; the operation on a waste battery is preparation for
+//! repurposing, Art. 3(30). Art. 3(29) defines preparation for re-use by reference
+//! to Directive 2008/98/EC, and nothing here says whether that operation starts
+//! from waste.
+//!
+//! # What the result leaves to the caller
+//!
+//! Which bases to accept is the caller's policy, and the rule does not set it.
+//! Counting a document the claiming operator supplied the same as the
+//! predecessor's own signature would reopen the gap this rule closes, so the
+//! basis is reported rather than folded into a yes or no.
 //!
 //! # What the corroboration actually rests on
 //!
@@ -60,7 +89,8 @@
 //! **outgoing** operator's authorisation, produced with that operator's key. The
 //! acceptance half is the hosting node's attestation that the acceptance step
 //! ran — it is not a signature by the incoming operator, who has no key on the
-//! node recording it.
+//! node recording it. The same holds for a waste handover, which is a transfer
+//! record of its own reason.
 //!
 //! That asymmetry happens to be harmless here, and the reason is worth stating
 //! because it is easy to get backwards. The corroboration this rule asks for is the
@@ -73,84 +103,159 @@
 //!
 //! An earlier statement of this design justified the rule by saying a transfer
 //! record is "dual-signed by both operators". It is not, and this rule does not
-//! rely on that. [`TransferEvidence::accepted`](super::input::TransferEvidence::accepted)
-//! is carried and checked because an abandoned or rejected handover should not
+//! rely on that. [`TransferEvidence::accepted`] is carried and checked because an abandoned or rejected handover should not
 //! support a live claim, not because it is a second party's signature.
 //!
 //! # What this rule cannot do
 //!
-//! It cannot tell whether a transfer record actually concerns the predecessor a
+//! It cannot tell whether an item of evidence actually concerns the predecessor a
 //! given edge points at. An edge identifies its target by URI; a transfer record
 //! identifies its subject by passport id, and resolving one to the other is a
-//! network fetch. **The caller correlates; this rule checks.** An edge whose
-//! caller found no corresponding transfer arrives here with
-//! [`DerivationEdge::transfer`] as `None` and is reported as unsubstantiated —
+//! network fetch. Nor can it read a document, so whether one is genuine and
+//! matches its digest is the caller's to check. **The caller correlates and
+//! verifies; this rule judges.** An edge whose caller found nothing arrives here
+//! with empty [`DerivationEdge::evidence`] and is reported as unsubstantiated —
 //! which is the correct reading of "no evidence was found", not an assumption that
 //! none exists.
 
 use alloc::vec::Vec;
 
-use super::finding::{SubstantiationDefect, SubstantiationFinding};
-use super::input::DerivationEdge;
+use super::basis::SubstantiationBasis;
+use super::evidence::{DocumentEvidence, TransferEvidence, WasteHandoverEvidence};
+use super::finding::{EdgeSubstantiation, SubstantiationDefect};
+use super::input::{DerivationEdge, Evidence};
 
-/// Check every derivation edge against the transfer correlated to it.
+/// The wire form of the one operation a waste handover contradicts: Art. 3(31)
+/// repurposing, which is defined over a battery that is not waste.
+const REPURPOSING: &str = "repurposing";
+
+/// Judge every derivation edge on the evidence the caller found for it.
 ///
-/// Returns one finding per unsupported edge, in edge order. An empty result
-/// means every edge is backed by a completed transfer, authorised by the
-/// outgoing operator, naming the same operation, and handing responsibility to
-/// this passport's operator.
+/// Returns one outcome per edge, in edge order. An edge is backed by the
+/// strongest item that backs it, in [`SubstantiationBasis`] order, the first in
+/// list order among equals. An edge that nothing backs reports one defect: the
+/// most fundamental defect of its strongest kind of evidence, so a missing
+/// predecessor authorisation is not buried under a detail about a document. An
+/// edge with no evidence reports [`SubstantiationDefect::NoEvidence`].
 ///
-/// At most one finding per edge: the defects are ordered by how fundamental they
-/// are, and reporting "the operation disagrees" about a transfer that was never
-/// authorised would bury the real problem. A caller that fixes the reported
-/// defect and re-runs sees the next one.
-///
-/// A passport with no derivation edges is trivially substantiated — this says
-/// nothing about bill-of-materials edges, which deliberately carry no
-/// substantiation requirement at all.
+/// A passport with no derivation edges gets no outcomes — this says nothing
+/// about bill-of-materials edges, which deliberately carry no substantiation
+/// requirement at all.
 #[must_use]
 pub fn check_derivation_substantiation<'a>(
     passport_operator_did: &'a str,
     edges: &'a [DerivationEdge<'a>],
-) -> Vec<SubstantiationFinding<'a>> {
-    let mut findings = Vec::new();
-
-    for (edge_index, edge) in edges.iter().enumerate() {
-        if let Some(defect) = edge_defect(passport_operator_did, edge) {
-            findings.push(SubstantiationFinding { edge_index, defect });
-        }
-    }
-
-    findings
+) -> Vec<EdgeSubstantiation<'a>> {
+    edges
+        .iter()
+        .enumerate()
+        .map(|(edge_index, edge)| {
+            let (evidence_index, outcome) = match decisive(passport_operator_did, edge) {
+                Some((index, outcome)) => (Some(index), outcome),
+                None => (None, Err(SubstantiationDefect::NoEvidence)),
+            };
+            EdgeSubstantiation {
+                edge_index,
+                outcome,
+                evidence_index,
+            }
+        })
+        .collect()
 }
 
-/// The single most fundamental defect on one edge, if any.
-fn edge_defect<'a>(
+/// The item an edge's outcome rests on, and that outcome: a backing item over
+/// a refused one, then the stronger kind, then the earlier item. `None` for an
+/// edge with no evidence.
+fn decisive<'a>(
     passport_operator_did: &'a str,
     edge: &DerivationEdge<'a>,
-) -> Option<SubstantiationDefect<'a>> {
-    let Some(transfer) = edge.transfer else {
-        return Some(SubstantiationDefect::NoTransfer);
-    };
+) -> Option<(usize, Result<SubstantiationBasis, SubstantiationDefect<'a>>)> {
+    edge.evidence
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let outcome = judge(passport_operator_did, edge.operation, item);
+            (index, strength(item), outcome)
+        })
+        .min_by_key(|(index, strength, outcome)| (outcome.is_err(), *strength, *index))
+        .map(|(index, _, outcome)| (index, outcome))
+}
 
+/// Rank of an item's kind, strongest first, matching [`SubstantiationBasis`].
+fn strength(item: &Evidence<'_>) -> u8 {
+    match item {
+        Evidence::Transfer(_) => 0,
+        Evidence::WasteHandover(_) => 1,
+        Evidence::Document(_) => 2,
+    }
+}
+
+/// What one item backs, or its single most fundamental defect.
+fn judge<'a>(
+    passport_operator_did: &'a str,
+    operation: &'a str,
+    item: &Evidence<'a>,
+) -> Result<SubstantiationBasis, SubstantiationDefect<'a>> {
+    match *item {
+        Evidence::Transfer(transfer) => judge_transfer(passport_operator_did, operation, transfer),
+        Evidence::WasteHandover(handover) => judge_waste_handover(operation, handover),
+        Evidence::Document(document) => judge_document(document),
+    }
+}
+
+fn judge_transfer<'a>(
+    passport_operator_did: &'a str,
+    operation: &'a str,
+    transfer: TransferEvidence<'a>,
+) -> Result<SubstantiationBasis, SubstantiationDefect<'a>> {
     if !transfer.outgoing_authorised {
-        return Some(SubstantiationDefect::OutgoingAuthorisationMissing);
+        return Err(SubstantiationDefect::OutgoingAuthorisationMissing);
     }
     if !transfer.accepted {
-        return Some(SubstantiationDefect::NotAccepted);
+        return Err(SubstantiationDefect::NotAccepted);
     }
     if transfer.incoming_operator_did != passport_operator_did {
-        return Some(SubstantiationDefect::IncomingOperatorMismatch {
+        return Err(SubstantiationDefect::IncomingOperatorMismatch {
             expected: passport_operator_did,
             found: transfer.incoming_operator_did,
         });
     }
-    if transfer.reason != edge.operation {
-        return Some(SubstantiationDefect::OperationMismatch {
-            edge_operation: edge.operation,
+    if transfer.reason != operation {
+        return Err(SubstantiationDefect::OperationMismatch {
+            edge_operation: operation,
             transfer_reason: transfer.reason,
         });
     }
+    Ok(SubstantiationBasis::PredecessorTransfer)
+}
 
-    None
+fn judge_waste_handover(
+    operation: &str,
+    handover: WasteHandoverEvidence,
+) -> Result<SubstantiationBasis, SubstantiationDefect<'_>> {
+    if !handover.outgoing_authorised {
+        return Err(SubstantiationDefect::OutgoingAuthorisationMissing);
+    }
+    if !handover.accepted {
+        return Err(SubstantiationDefect::NotAccepted);
+    }
+    if operation == REPURPOSING {
+        return Err(SubstantiationDefect::WasteHandoverContradictsOperation {
+            edge_operation: operation,
+        });
+    }
+    Ok(SubstantiationBasis::PredecessorWasteHandover)
+}
+
+fn judge_document(
+    document: DocumentEvidence<'_>,
+) -> Result<SubstantiationBasis, SubstantiationDefect<'_>> {
+    if document.document_type.trim().is_empty() {
+        return Err(SubstantiationDefect::DocumentTypeMissing);
+    }
+    let digest = document.sha256;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(SubstantiationDefect::DocumentDigestMalformed);
+    }
+    Ok(SubstantiationBasis::SuppliedDocument)
 }

@@ -47,8 +47,10 @@ pub enum TransferReason {
     /// different vocabulary. Those four describe second-life *processing* that
     /// produces a new unit, whereas this records a waste handover on a record
     /// that continues. Folding them would let the lineage-substantiation rule
-    /// match a waste handover against a derivation edge, which is not the
-    /// evidence that rule is looking for.
+    /// match a waste handover against a derivation edge's operation. That rule
+    /// takes a waste handover as evidence of its own kind instead: that the
+    /// battery left the predecessor's hands, not that it reached a second-life
+    /// operator.
     WasteHandover,
     /// Product imported into the EU by a new importer.
     Import,

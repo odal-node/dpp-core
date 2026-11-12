@@ -248,9 +248,11 @@ regulatory responsibility, and a false claim purports to end the original operat
 Art. 77(4) duty for a unit that may still be on the market under their name.
 
 Closed in Phase 4 for the derivation direction: `dpp_rules::lineage::substantiation`
-refuses a second-life edge that no transfer of responsibility supports. The corroboration
-it relies on is the **outgoing** operator's authorisation, the predecessor's own, for the
-reason §5.1 gives (which is not the one this document originally gave). The rule was first
+reports a second-life edge that no evidence backs, and says what backed each one that is.
+The strongest evidence is the **outgoing** operator's authorisation on a transfer of
+responsibility, the predecessor's own, for the reason §5.1 gives (which is not the one this
+document originally gave). A waste handover the predecessor authorised, and a document the
+claiming operator holds, count for less, and §5.1 says how much. The rule was first
 named `consent`; Art. 77(7) moves the responsibility by operation of law and asks for
 nobody's agreement, so the rule asks for evidence, not consent.
 
@@ -470,22 +472,58 @@ which is where it belongs.
 
 This is the model's rule, not the Regulation's. Art. 77(7) moves the responsibility by
 operation of law and requires no transfer record to exist, so a missing record makes a claim
-**unsubstantiated**, not a breach. Whether the rule should keep requiring the outgoing
-operator's authorisation, which a lawful second-life operator may be unable to obtain, is
-tracked in #499.
+**unsubstantiated**, not a breach.
+
+**And a transfer record is not the only evidence the rule accepts.** A lawful second-life
+operator may be unable to obtain one: a battery can reach it through several owners, or
+through the waste stream, without its original operator ever handing it over. So the rule
+takes three kinds of evidence per edge, and reports which one backed it, because they do
+not prove the same thing:
+
+| Kind | Produced by | What it shows | Basis reported |
+|---|---|---|---|
+| A transfer of responsibility on the predecessor, to this passport's operator, for the edge's operation | The predecessor's operator, by its authorisation | The predecessor handed this unit over for this operation | `PredecessorTransfer` |
+| A waste handover on the predecessor (`TransferReason::WasteHandover`, Art. 77(7) second subparagraph) | The predecessor's operator, by its authorisation | The battery became waste and left the predecessor's hands, not that it reached this operator | `PredecessorWasteHandover` |
+| A document from the value chain, supplied by this passport's operator and pinned by its SHA-256 | Anyone; nobody but the claiming operator stands behind it | Whatever its type names | `SuppliedDocument` |
+
+Which bases to accept is your application's policy. Folding them into one yes or no would
+let a document the claiming operator supplied count the same as the predecessor's
+signature, which would reopen G7.
+
+One consistency is checked across kinds: a waste handover contradicts a `repurposing` edge,
+since Art. 3(31) defines repurposing over "a battery, that is not a waste battery" and the
+operation on a waste battery is preparation for repurposing, Art. 3(30). Art. 3(29) defines
+preparation for re-use by reference to Directive 2008/98/EC, and the rule says nothing about
+whether that operation starts from waste.
+
+Two things are deliberately left out:
+
+- **A list of document types.** Art. 77(7) names no evidence, and Implementing Regulation
+  (EU) 2026/1778 Art. 12(2)(a) has the Commission's semantic repository specify "links
+  between digital product passport attributes and underlying evidence communicated through
+  the product value chain". A document's type is an identifier the caller chooses, so that
+  specification can be consumed when it is published rather than anticipated here.
+- **Evidence on the passport.** `DerivationRef` carries no evidence field. An envelope field
+  is signed, and in a fetched passport it can never be rewritten, so it waits for the same
+  specification. The operator keeps the evidence and shows it on request, as Art. 10(4)
+  already has it demonstrate the original battery's placing on the market.
+
+A record from the EU registry is not a kind yet: the registry's interface for transfers is
+unpublished. `Evidence` is non-exhaustive, so it can be added without a breaking change.
 
 The rule also depended on G3 being closed first: it matches a `SecondLifeOperation` against
 a `TransferReason`, so a `TransferReason` unable to express `preparation for repurposing`
 would have made the rule unsatisfiable for one of the four operations.
 
-**What the rule cannot do.** It cannot tell whether a transfer record concerns the
+**What the rule cannot do.** It cannot tell whether an item of evidence concerns the
 predecessor a given edge points at: an edge identifies its target by URI, a transfer
 identifies its subject by passport id, and resolving one to the other is a network fetch.
-So **the caller correlates and the rule checks**. An edge for which the caller found no
-transfer is reported as unsubstantiated, the correct reading of "no evidence was found",
-rather than an assumption that none exists. The split follows from what the library cannot
-do: your application resolves the URI and correlates the transfer, and
-`dpp_rules::lineage::substantiation` judges the evidence it found.
+Nor can it read a document, so whether one is genuine and matches its digest is not its
+question. So **the caller correlates and verifies, and the rule judges**. An edge for which
+the caller found no evidence is reported as unsubstantiated, the correct reading of "no
+evidence was found", rather than an assumption that none exists. The split follows from what
+the library cannot do: your application resolves the URI, correlates the evidence and checks
+the signatures and digests, and `dpp_rules::lineage::substantiation` judges what it found.
 
 Bill-of-materials edges get **no** substantiation requirement: it would demand a signature
 from every supplier for every assembly, which no supply chain will produce. A
