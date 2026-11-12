@@ -4,33 +4,35 @@
 //! adapt their own representation — typed structs on one side, JSON fields on
 //! the other — without this crate depending on either.
 
-/// What a caller found out about the transfer it correlated to one edge.
+use super::evidence::{DocumentEvidence, TransferEvidence, WasteHandoverEvidence};
+
+/// One item of evidence a caller found for one derivation edge.
+///
+/// Three kinds, and they do not prove the same thing: see
+/// [`SubstantiationBasis`](super::SubstantiationBasis) for what each one backs.
+///
+/// `#[non_exhaustive]`, so that a kind added later is not a breaking change. The
+/// one in view is a record from the EU registry, whose interface for transfers is
+/// not published yet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TransferEvidence<'a> {
-    /// The transfer's reason, in wire form (`"repurposing"`, …).
-    ///
-    /// Compared as a string against the edge's operation because the two
-    /// vocabularies are defined in a crate this one must not depend on. They are
-    /// pinned byte-identical on the core side.
-    pub reason: &'a str,
-    /// The DID of the operator taking responsibility on.
-    pub incoming_operator_did: &'a str,
-    /// Whether the **outgoing** operator's authorisation is present.
-    ///
-    /// This is the predecessor's own signature, and the load-bearing half — see
-    /// [`super::substantiation`] for why the other half is not corroboration.
-    pub outgoing_authorised: bool,
-    /// Whether the handover was accepted and completed, rather than left
-    /// pending, rejected or cancelled.
-    pub accepted: bool,
+#[non_exhaustive]
+pub enum Evidence<'a> {
+    /// A transfer of responsibility on the predecessor, to this passport's
+    /// operator.
+    Transfer(TransferEvidence<'a>),
+    /// A waste handover on the predecessor, under Reg. (EU) 2023/1542 Art. 77(7)
+    /// second subparagraph.
+    WasteHandover(WasteHandoverEvidence),
+    /// A document from the value chain, supplied by this passport's operator.
+    Document(DocumentEvidence<'a>),
 }
 
-/// One derivation edge, with whatever transfer the caller correlated to it.
+/// One derivation edge, with every item of evidence the caller found for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DerivationEdge<'a> {
     /// The Art. 77(7) operation this edge claims, in wire form.
     pub operation: &'a str,
-    /// The transfer the caller matched to this predecessor. `None` means the
+    /// The evidence the caller matched to this predecessor. Empty means the
     /// caller looked and found nothing.
-    pub transfer: Option<TransferEvidence<'a>>,
+    pub evidence: &'a [Evidence<'a>],
 }

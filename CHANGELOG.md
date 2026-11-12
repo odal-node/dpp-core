@@ -149,6 +149,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   determination from before this change still reads, and a passport with none still
   publishes. A struct literal of `ComplianceResult` adds `input_hash: None`. (#580)
 
+- **The lineage substantiation rule takes more than one kind of evidence, and
+  says which one backed each edge.** Reg. (EU) 2023/1542 Art. 77(7) moves
+  responsibility to the second-life operator by operation of law, and a battery
+  can reach that operator through several owners or the waste stream without its
+  original operator ever handing it over. So a transfer authorised by the
+  predecessor's operator is no longer the only evidence:
+  - `DerivationEdge::transfer: Option<TransferEvidence>` is replaced by
+    `evidence: &[Evidence]`, where `Evidence` is `Transfer`, `WasteHandover`
+    (a `WasteHandoverEvidence`: a waste handover on the predecessor, which a
+    `repurposing` edge contradicts under Art. 3(31)) or `Document` (a
+    `DocumentEvidence`: a type the caller names and a SHA-256). `Evidence` is
+    `#[non_exhaustive]`.
+  - `check_derivation_substantiation` returns one `EdgeSubstantiation` per edge,
+    not a finding per unsupported edge. Its `outcome` is
+    `Ok(SubstantiationBasis)` (`PredecessorTransfer`, `PredecessorWasteHandover`
+    or `SuppliedDocument`) or `Err(SubstantiationDefect)`, and its
+    `evidence_index` names the item the outcome rests on.
+  - `SubstantiationFinding` is removed. `SubstantiationDefect::NoTransfer` is now
+    `NoEvidence`, and the enum gains `WasteHandoverContradictsOperation`,
+    `DocumentTypeMissing` and `DocumentDigestMalformed`.
+  - `TransferEvidence` moves from `lineage::input` to `lineage::evidence`, beside
+    the two new payloads. Its re-export at `dpp_rules::lineage` is unchanged.
+
+  Migration: wrap a transfer in `Evidence::Transfer` and pass a slice; read
+  `outcome` for every edge, and decide which bases your application accepts. A
+  document the claiming operator supplied is reported as `SuppliedDocument`, never
+  as the predecessor's corroboration. (#499)
+
 ### Added
 
 - **`ProductGroup::product_category_values_any_version` lists every category a

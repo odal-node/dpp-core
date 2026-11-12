@@ -96,11 +96,13 @@ impl SecondLifeOperation {
 ///
 /// The edge is a *claim* until it is substantiated. A hash-pin proves the target
 /// has not been modified; it does not prove the operation the edge names took
-/// place, and Art. 77(7) moves regulatory responsibility. The evidence is the
-/// [`TransferRecord`](crate::transfer::TransferRecord), which carries the
+/// place, and Art. 77(7) moves regulatory responsibility. The strongest evidence
+/// is a [`TransferRecord`](crate::transfer::TransferRecord), which carries the
 /// **outgoing** operator's own authorisation — the predecessor's, which is the
-/// half that matters here. Binding the two is a cross-field rule
-/// (`dpp_rules::lineage::substantiation`), not a property of this type.
+/// half that matters here. A waste handover on the predecessor and a document
+/// the operator holds count too, for less. Judging the evidence is a cross-field
+/// rule (`dpp_rules::lineage::substantiation`), not a property of this type, and
+/// the evidence is not carried on the edge.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivationRef {
