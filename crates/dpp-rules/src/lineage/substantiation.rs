@@ -89,8 +89,9 @@
 //! **outgoing** operator's authorisation, produced with that operator's key. The
 //! acceptance half is the hosting node's attestation that the acceptance step
 //! ran — it is not a signature by the incoming operator, who has no key on the
-//! node recording it. The same holds for a waste handover, which is a transfer
-//! record of its own reason.
+//! node recording it.
+//! The same holds for a waste handover, which is a transfer record of its own
+//! reason.
 //!
 //! That asymmetry happens to be harmless here, and the reason is worth stating
 //! because it is easy to get backwards. The corroboration this rule asks for is the
