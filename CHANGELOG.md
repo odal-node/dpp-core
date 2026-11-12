@@ -142,6 +142,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`ProductGroup::product_category_values_any_version` lists every category a
+  stored passport may state.** `product_category_values` answers for a new
+  passport: the current schema's `enum`. A stored passport is re-validated
+  against the version it was written under, so it may state a value since
+  withdrawn, such as an electronics `laptop` from before `v1.2.0` or a furniture
+  `mattress`. Checked against the current list, such a value read as one no
+  passport can state, so a caller narrowing a credential to categories refused
+  one that matches stored passports. The new list holds the current values
+  first, then each withdrawn one, and is `None` exactly where
+  `product_category_values` is, whose documentation now points a caller
+  matching stored passports at it. (#561)
+
 - **The obligation calendar reads dates out of a signed ruleset bundle.** With
   `dpp-domain`'s new `bundle` feature, `ObligationCalendar::with_bundle(catalog,
   acceptance)` lays the schedule in a verified bundle's `obligations` section
