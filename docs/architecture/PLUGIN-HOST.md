@@ -77,9 +77,10 @@ Besides metrics and status, a plugin's `calculate_metrics` returns two finding l
 
 The plugin produces them by calling the shared rules the SDK re-exports as
 `dpp_plugin_sdk::rules` (`dpp-rules`). The host maps each `PluginFinding` to a
-`ComplianceFinding` on the core `ComplianceResult` (`plugin_result_to_compliance`), stores
-it on the passport (`compliance_result`, part of the signed payload) and gates publish on
-it.
+`ComplianceFinding` on the core `ComplianceResult` (`plugin_result_to_compliance`), attaches
+it to the passport with `Passport::attach_compliance_result` (`compliance_result`, part of
+the signed payload), which binds it to the `productGroupData` it was computed over, and
+gates publish on it.
 
 `product-group-battery` is the reference. It scopes the Regulation (EU) 2023/1542 Art. 8(2)
 recycled-content checks to the declared chemistry and emits them as **advisory** warnings

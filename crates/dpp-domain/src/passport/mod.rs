@@ -27,6 +27,8 @@ mod reference_tests;
 pub mod view;
 
 #[cfg(test)]
+mod compliance_binding_tests;
+#[cfg(test)]
 mod from_stored_tests;
 #[cfg(test)]
 mod publish_gate_scope_tests;

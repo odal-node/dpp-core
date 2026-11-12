@@ -41,6 +41,12 @@ pub struct ComplianceResult {
     /// version, factor dataset version + table hash) for notified-body audit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receipt: Option<serde_json::Value>,
+    /// The content hash of the product group key and `productGroupData` this
+    /// determination was computed over. Set by `Passport::attach_compliance_result`,
+    /// the one way to bind a determination. The first publish refuses a determination
+    /// whose hash is missing or no longer matches the passport's content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_hash: Option<String>,
 }
 
 impl Default for ComplianceResult {
@@ -55,6 +61,7 @@ impl Default for ComplianceResult {
             ruleset_version: None,
             assessed_at: None,
             receipt: None,
+            input_hash: None,
         }
     }
 }
@@ -81,4 +88,29 @@ impl ComplianceResult {
     pub fn has_violations(&self) -> bool {
         !self.violations.is_empty()
     }
+}
+
+/// What a determination is computed over: exactly what
+/// [`ComplianceRegistry::compute`](crate::ports::compliance::ComplianceRegistry::compute) reads.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ComplianceInput<'a, T: Serialize + ?Sized> {
+    product_group_key: &'a str,
+    product_group_data: Option<&'a T>,
+}
+
+/// The RFC 8785 content hash of a determination's input, as [`ComplianceResult::input_hash`]
+/// records it. `data` is the product group's typed data, which this module does not name.
+///
+/// # Errors
+/// Returns the canonicalisation error when the input cannot be hashed: a non-finite
+/// number, or an integer beyond 2^53 - 1.
+pub(crate) fn compliance_input_hash<T: Serialize + ?Sized>(
+    product_group_key: &str,
+    data: Option<&T>,
+) -> Result<String, serde_json::Error> {
+    dpp_rules::canonical::content_hash(&ComplianceInput {
+        product_group_key,
+        product_group_data: data,
+    })
 }
