@@ -414,19 +414,14 @@ fn transfer_reject_unblocks_chain() {
         .initiate_transfer(t1)
         .expect("initiate first transfer");
     assert_eq!(
-        chain.transfers.last().unwrap().status(),
+        chain.records().last().unwrap().status(),
         TransferStatus::Initiated
     );
 
     // Buyer A rejects
-    chain
-        .transfers
-        .last_mut()
-        .unwrap()
-        .reject()
-        .expect("reject");
+    chain.reject_pending().expect("reject");
     assert_eq!(
-        chain.transfers.last().unwrap().status(),
+        chain.records().last().unwrap().status(),
         TransferStatus::Rejected
     );
 
@@ -435,7 +430,7 @@ fn transfer_reject_unblocks_chain() {
     chain
         .initiate_transfer(t2)
         .expect("chain must be unblocked after rejection");
-    assert_eq!(chain.transfers.len(), 2);
+    assert_eq!(chain.records().len(), 2);
 }
 
 /// After the outgoing operator cancels a pending transfer, a new transfer
@@ -458,14 +453,9 @@ fn transfer_cancel_unblocks_chain() {
     // Initiate and then cancel
     let t1 = make_initiated_transfer(pid, &manufacturer, &buyer);
     chain.initiate_transfer(t1).expect("initiate");
-    chain
-        .transfers
-        .last_mut()
-        .unwrap()
-        .cancel()
-        .expect("cancel");
+    chain.cancel_pending().expect("cancel");
     assert_eq!(
-        chain.transfers.last().unwrap().status(),
+        chain.records().last().unwrap().status(),
         TransferStatus::Cancelled
     );
 

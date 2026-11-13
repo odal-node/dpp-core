@@ -1,5 +1,7 @@
 //! [`TransferError`] — errors from transfer-of-responsibility operations.
 
+use uuid::Uuid;
+
 use super::status::TransferStatus;
 
 /// Errors specific to transfer-of-responsibility operations.
@@ -18,6 +20,18 @@ pub enum TransferError {
     InvalidState {
         current: TransferStatus,
         action: String,
+    },
+    /// A step was asked of the pending transfer, and the chain has none pending.
+    NoPendingTransfer,
+    /// A chain read from storage breaks the chain's invariant.
+    ///
+    /// `index` and `transfer_id` locate the record that breaks it, and `reason`
+    /// is the error the same check raises when that record is appended.
+    InvalidChain {
+        passport_id: String,
+        index: usize,
+        transfer_id: String,
+        reason: Box<TransferError>,
     },
 }
 
@@ -39,8 +53,32 @@ impl std::fmt::Display for TransferError {
             TransferError::InvalidState { current, action } => {
                 write!(f, "cannot {action}: transfer is in {current:?} state")
             }
+            TransferError::NoPendingTransfer => {
+                write!(f, "no transfer is pending for this passport")
+            }
+            TransferError::InvalidChain {
+                passport_id,
+                index,
+                transfer_id,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "transfer chain for passport {passport_id} is invalid at record {index} ({transfer_id}): {reason}"
+                )
+            }
         }
     }
 }
 
 impl std::error::Error for TransferError {}
+
+/// Where a chain's check stopped: the first record that breaks the invariant.
+///
+/// Crate-private. Appending a record returns its `reason`, and reading a chain
+/// wraps it in [`TransferError::InvalidChain`] together with the location.
+pub(super) struct ChainFault {
+    pub(super) index: usize,
+    pub(super) transfer_id: Uuid,
+    pub(super) reason: TransferError,
+}

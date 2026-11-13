@@ -177,6 +177,31 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   document the claiming operator supplied is reported as `SuppliedDocument`, never
   as the predecessor's corroboration. (#499)
 
+- **`TransferChain` is checked on read and on append.** A stored chain that holds
+  a record for another passport, a broken operator sequence, a record after a
+  pending one, a record with more than one outcome (completed and rejected, for
+  instance), or a completion without both signatures now fails to read. That is
+  intended: nothing in such a chain says which operator is right, and the chain's
+  answer names the responsible operator. A record with two outcomes reports itself
+  rejected or cancelled while `current_operator()` counts it as the hand-over that
+  happened, and a completion without both signatures reports itself as still
+  pending.
+  `passport_id`, `original_operator` and `transfers` are private. Read them through
+  `passport_id()`, `original_operator()` and `records()`, and read the pending
+  record through `pending()`. `complete_pending(attestation)`, `cancel_pending()`
+  and `reject_pending()` move that record on, and refuse with the new
+  `TransferError::NoPendingTransfer` when nothing is pending. `TransferError` also
+  gains `InvalidChain`, which names the passport, the index and `transfer_id` of the
+  record that failed, and the reason. The JSON shape is unchanged.
+
+  Migration: code that read `chain.transfers` uses `records()` or `pending()`. Code
+  that signed, completed, cancelled or rejected a record by indexing
+  `chain.transfers` uses `complete_pending`, `cancel_pending` or `reject_pending`.
+  The outgoing operator's `from_signature` is set on the `TransferRecord` before
+  `initiate_transfer`, because nothing can add it once the record is in the chain.
+  Code that built a chain with a struct literal builds it with `TransferChain::new`
+  and `initiate_transfer`, or deserialises it. (#579)
+
 ### Added
 
 - **`ProductGroup::product_category_values_any_version` lists every category a
