@@ -169,6 +169,16 @@ verification paths; a new direct dependency; a new edge in the crate graph; and
 a branch open long enough that `main` has moved underneath it. Not worth one: a
 single-crate mechanical change, a doc typo, a version bump, a dependency bump.
 
+**Greptile reviews only when the maintainer asks for it by name.** CodeRabbit is
+the default review, and the `review-ready` label means CodeRabbit alone. Each
+Greptile review has a cost, so it is a second opinion the maintainer approves for
+one pull request at a time, by commenting `@greptileai` on it. It never runs on
+its own: `.greptile/config.json` sets `autoReview` to `[]`, and no label triggers
+it. It reviews against the same rules, because `.greptile/rules.md` sends it to
+`.coderabbit.yaml` and keeps no rules of its own. `.greptile/files.json` names
+the standards documents one by one, because Greptile takes no globs there. A
+document added under `docs/` is added to that list too.
+
 ## Overview
 
 **dpp-core** is the pure, stateless core library for the Odal Node Digital Product Passport system. It contains domain types, cryptographic primitives, schema validation, and port traits — all publishable under Apache-2.0. No database, no HTTP framework, no infrastructure dependencies.
