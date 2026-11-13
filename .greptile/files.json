@@ -1,0 +1,146 @@
+{
+  "files": [
+    {
+      "path": ".coderabbit.yaml",
+      "description": "The review rules for this repository: path-scoped instructions, pre-merge checks, and the standards documents they rely on. .greptile/rules.md says how to apply them."
+    },
+    {
+      "path": "CLAUDE.md",
+      "description": "How work is done here: the publication boundary, commit rules, when a review is asked for, persisted shapes, crate layout."
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "description": "Contribution rules: tests, changelog entries, documentation and pull request conventions."
+    },
+    {
+      "path": "README.md",
+      "description": "The workspace's public description and its crate list.",
+      "scope": ["README.md", "crates/*/README.md", "crates/*/Cargo.toml"]
+    },
+    {
+      "path": "SECURITY.md",
+      "description": "Security policy and the handling of keys and secrets.",
+      "scope": ["SECURITY.md", "deny.toml", "crates/dpp-crypto/**", "crates/dpp-vc/**", ".github/**"]
+    },
+    {
+      "path": "GOVERNANCE.md",
+      "description": "Who decides what, and how decisions are recorded.",
+      "scope": ["GOVERNANCE.md", "CONTRIBUTING.md", ".github/**"]
+    },
+    {
+      "path": "docs/README.md",
+      "description": "The index of this repository's documentation.",
+      "scope": ["docs/**"]
+    },
+    {
+      "path": "docs/architecture/CODE-LAYOUT.md",
+      "description": "Where a file goes and the numbered layout rules the tripwires enforce: tests in sibling files, errors in error.rs, file size limits.",
+      "scope": ["crates/**", "plugins/**"]
+    },
+    {
+      "path": "docs/architecture/ARCHITECTURE.md",
+      "description": "The crate graph and the boundaries between crates.",
+      "scope": ["crates/**", "plugins/**", "**/Cargo.toml"]
+    },
+    {
+      "path": "docs/architecture/OVERVIEW.md",
+      "description": "What each crate is for.",
+      "scope": ["crates/**", "plugins/**"]
+    },
+    {
+      "path": "docs/architecture/DESIGN-PATTERNS.md",
+      "description": "The patterns this codebase uses and why.",
+      "scope": ["crates/**", "plugins/**"]
+    },
+    {
+      "path": "docs/architecture/DATA-MODEL.md",
+      "description": "The passport data model, envelope keys and product group data.",
+      "scope": ["crates/dpp-domain/**", "crates/dpp-aas/**", "crates/dpp-vc/**"]
+    },
+    {
+      "path": "docs/architecture/PERSISTED-SHAPES.md",
+      "description": "Why a change to a stored shape is a data-migration question: stored and fetched passports, the lens escape hatch, the signed public view.",
+      "scope": ["crates/dpp-domain/**"]
+    },
+    {
+      "path": "docs/architecture/SCHEMA-CHANGES.md",
+      "description": "How a product group schema version is added, and why a published version is never edited in place.",
+      "scope": ["crates/dpp-domain/schemas/**", "crates/dpp-domain/src/**"]
+    },
+    {
+      "path": "docs/architecture/PRODUCT-LINEAGE.md",
+      "description": "Lineage between passports, transfers of responsibility and the evidence behind them.",
+      "scope": ["crates/dpp-domain/src/**", "crates/dpp-rules/**"]
+    },
+    {
+      "path": "docs/architecture/PLUGIN-HOST.md",
+      "description": "The Wasm plugin contract between host and guest.",
+      "scope": ["plugins/**", "crates/dpp-plugin-traits/**", "crates/dpp-plugin-sdk/**"]
+    },
+    {
+      "path": "docs/architecture/PORTS.md",
+      "description": "The port traits at the boundary with the hosts that consume this workspace.",
+      "scope": ["crates/dpp-domain/src/ports/**"]
+    },
+    {
+      "path": "docs/architecture/EFFECTIVE-DATES.md",
+      "description": "How dated obligations and their effective dates are modelled.",
+      "scope": ["crates/dpp-domain/**", "crates/dpp-rules/**"]
+    },
+    {
+      "path": "docs/architecture/IDENTITY.md",
+      "description": "Identifiers, operators, keys and DIDs.",
+      "scope": ["crates/dpp-crypto/**", "crates/dpp-vc/**", "crates/dpp-domain/**", "crates/dpp-registry/**"]
+    },
+    {
+      "path": "docs/architecture/PERSONAL-DATA.md",
+      "description": "Which personal data may appear where, and how it is erased.",
+      "scope": ["crates/dpp-domain/**", "crates/dpp-vc/**"]
+    },
+    {
+      "path": "docs/architecture/STANDARDS.md",
+      "description": "The standards register: every standard the code cites, its status and the evidence for each conformance claim.",
+      "scope": ["crates/**", "plugins/**", "docs/**"]
+    },
+    {
+      "path": "docs/regulatory/REGULATORY.md",
+      "description": "The regulatory reading this repository has committed to, including why a rule module is a placeholder.",
+      "scope": ["crates/dpp-rules/**", "crates/dpp-domain/**", "crates/dpp-calc/**", "plugins/**", "docs/regulatory/**"]
+    },
+    {
+      "path": "docs/regulatory/COMPLIANCE.md",
+      "description": "What the compliance checks decide, and on what basis in EU law.",
+      "scope": ["crates/dpp-rules/**", "crates/dpp-domain/**", "crates/dpp-calc/**", "plugins/**", "docs/regulatory/**"]
+    },
+    {
+      "path": "docs/regulatory/CONFORMITY.md",
+      "description": "Conformity with the standards and acts this workspace implements.",
+      "scope": ["crates/dpp-rules/**", "crates/dpp-domain/**", "crates/dpp-vc/**", "plugins/**", "docs/regulatory/**"]
+    },
+    {
+      "path": "docs/governance/VERSIONING.md",
+      "description": "The pre-1.0 versioning rules, and the CHANGELOG convention: every breaking change under a Breaking heading with a migration note.",
+      "scope": ["CHANGELOG.md", "**/Cargo.toml"]
+    },
+    {
+      "path": "docs/governance/RELEASE.md",
+      "description": "The release checklist.",
+      "scope": ["CHANGELOG.md", "docs/governance/**", "justfile", ".github/workflows/**"]
+    },
+    {
+      "path": "docs/governance/DEVELOPMENT.md",
+      "description": "Local development, the just recipes and the gates.",
+      "scope": ["justfile", "scripts/**", ".github/**", "rust-toolchain.toml"]
+    },
+    {
+      "path": "docs/governance/GIT-STRATEGY.md",
+      "description": "Branches, pull requests and how changes land on main.",
+      "scope": [".github/**"]
+    },
+    {
+      "path": "docs/project/BLUEPRINT.md",
+      "description": "The project's intended shape.",
+      "scope": ["docs/**", "README.md"]
+    }
+  ]
+}
