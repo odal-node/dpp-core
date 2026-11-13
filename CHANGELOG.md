@@ -50,8 +50,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **The schema is a family of its own, with its version numbers kept.**
     `unsold-goods` v2.0.0 moved byte for byte from `schemas/unsold-goods/` to
     `document-schemas/unsold-goods/`, and is validated through
-    `unsold_goods::document_schemas()`, a registry that holds nothing else. The
-    shape is the same, the `$id` is the one already published, and a published
+    `unsold_goods::document_schemas()`, a registry that holds only this module's
+    schemas, the discard record's among them (see Added). The shape is the same,
+    the `$id` is the one already published, and a published
     schema version is never modified, so it was neither renumbered nor republished
     as a first version. A product-group registry listing it would also have had it
     linted and given a JSON-LD scope as a product's.
@@ -106,9 +107,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `lint_discard_record` flags one. (#575, #576)
 - **An end-of-life destruction cites a point of the closed derogation list, and
   only where ESPR Art. 25(1) bars it.** `DeactivationReason::Destroyed` carried a
-  `DerogationRef { category: String }` that nothing in this crate checked, and
-  every destruction had to have one, although the ban reaches only the
-  destruction of unsold Annex VII products by an operator it applies to. It now
+  `DerogationRef { category: String, act_citation: Option<String> }` that nothing
+  in this crate checked, and every destruction had to have one, although the ban
+  reaches only the destruction of unsold Annex VII products by an operator it
+  applies to. It now
   carries `derogation: Option<Derogation>`, where `Derogation::Point` is a
   `DiscardReason`, a point of Del. Reg. (EU) 2026/296 Art. 2.
   `EolEvent::requires_derogation()` is replaced by
@@ -359,7 +361,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   carries none, cannot be published by skipping the mandatory-content gate. (#563)
 - Compromise rotation revokes every archived copy of the compromised key, not only
   the newest archive. (#563)
-- Qualifier values of only dots are refused, since URI normalization removes them. (#563)
+- A qualifier value of `.` or `..` is refused, since URI normalization removes a
+  dot segment. A value with dots among other characters, such as `a..b`, is
+  accepted. (#563)
 - Schema-driven policy classification treats a universal conformity field as a
   floor that a product rule cannot lower. (#563)
 - `Passport::co2e_per_unit` and `Passport::repairability_score` are documented as
