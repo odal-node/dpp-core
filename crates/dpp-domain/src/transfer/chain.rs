@@ -1,8 +1,29 @@
 //! [`TransferChain`] — the append-only history of responsibility transfers.
+//!
+//! A chain is validated on construction, on append and on read. [`TransferChain::new`]
+//! starts an empty chain, which has nothing to check. Appending a record runs the
+//! check on the chain with that record added, and a record that fails it is
+//! refused. Reading a chain through `Deserialize` runs the check on every record,
+//! and a stored chain that fails it is an error, not a chain with its history
+//! repaired.
+//!
+//! The reason is what the chain answers. [`TransferChain::current_operator`] names
+//! the responsible economic operator, and a chain that holds a record for another
+//! passport, a broken operator sequence, a record after a pending one or a record
+//! with more than one outcome gives no single operator to name. A record that is
+//! both completed and rejected, for instance, reports itself as rejected while
+//! `current_operator` counts it as the hand-over that happened. Nothing in the stored
+//! data says which record is right, so the chain does not hold one.
+//!
+//! The fields are private for the same reason. The history is read through
+//! [`TransferChain::records`] and [`TransferChain::pending`]. The pending record is
+//! moved on through [`TransferChain::complete_pending`],
+//! [`TransferChain::cancel_pending`] and [`TransferChain::reject_pending`], and none
+//! of them can leave the chain in a state the check would refuse.
 
 use serde::{Deserialize, Serialize};
 
-use super::error::TransferError;
+use super::error::{ChainFault, TransferError};
 use super::record::TransferRecord;
 use super::status::TransferStatus;
 use crate::operator::ResponsibleOperator;
@@ -12,15 +33,46 @@ use crate::passport::PassportId;
 ///
 /// Maintained as an append-only log. Once a transfer is completed,
 /// it cannot be modified or removed.
+///
+/// Every record belongs to this passport, each `from_operator` is the operator the
+/// records before it left in place, only the last record may be pending, and no
+/// record carries more than one outcome. The chain is checked on construction, on
+/// append and on read (see the module docs).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", try_from = "TransferChainRaw")]
 pub struct TransferChain {
-    /// The passport this chain belongs to.
-    pub passport_id: PassportId,
-    /// The original responsible operator (at first publication).
-    pub original_operator: ResponsibleOperator,
-    /// Ordered list of transfer events (oldest first).
-    pub transfers: Vec<TransferRecord>,
+    passport_id: PassportId,
+    original_operator: ResponsibleOperator,
+    transfers: Vec<TransferRecord>,
+}
+
+/// The stored shape of a [`TransferChain`], read before the chain is checked.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransferChainRaw {
+    passport_id: PassportId,
+    original_operator: ResponsibleOperator,
+    transfers: Vec<TransferRecord>,
+}
+
+impl TryFrom<TransferChainRaw> for TransferChain {
+    type Error = TransferError;
+
+    fn try_from(raw: TransferChainRaw) -> Result<Self, Self::Error> {
+        Self::validate(raw.passport_id, &raw.original_operator, &raw.transfers).map_err(
+            |fault| TransferError::InvalidChain {
+                passport_id: raw.passport_id.to_string(),
+                index: fault.index,
+                transfer_id: fault.transfer_id.to_string(),
+                reason: Box::new(fault.reason),
+            },
+        )?;
+        Ok(Self {
+            passport_id: raw.passport_id,
+            original_operator: raw.original_operator,
+            transfers: raw.transfers,
+        })
+    }
 }
 
 impl TransferChain {
@@ -32,6 +84,28 @@ impl TransferChain {
             original_operator,
             transfers: Vec::new(),
         }
+    }
+
+    /// The passport this chain belongs to.
+    pub fn passport_id(&self) -> PassportId {
+        self.passport_id
+    }
+
+    /// The original responsible operator (at first publication).
+    pub fn original_operator(&self) -> &ResponsibleOperator {
+        &self.original_operator
+    }
+
+    /// Every transfer record, oldest first, terminal ones included.
+    pub fn records(&self) -> &[TransferRecord] {
+        &self.transfers
+    }
+
+    /// The pending record, if one is awaiting acceptance or completion.
+    ///
+    /// A chain holds at most one, because no record may follow a pending one.
+    pub fn pending(&self) -> Option<&TransferRecord> {
+        self.transfers.iter().find(|record| is_pending(record))
     }
 
     /// Returns the current responsible operator.
@@ -54,38 +128,143 @@ impl TransferChain {
 
     /// Append a new transfer record to the chain.
     ///
-    /// Validates that:
-    /// - The record belongs to this chain's passport.
-    /// - The `from_operator` matches the current responsible operator.
-    /// - No other transfer is currently pending (initiated but not completed/cancelled).
+    /// The chain is checked with the record added, by the same check a read
+    /// applies. The record is refused if it names another passport, if its
+    /// `from_operator` is not the current responsible operator, or if another
+    /// transfer is still pending. On error the chain is unchanged.
     pub fn initiate_transfer(&mut self, record: TransferRecord) -> Result<(), TransferError> {
-        // A record for another passport would change this chain's answer to
-        // `current_operator` while leaving its own passport untouched.
-        if record.passport_id != self.passport_id {
-            return Err(TransferError::PassportMismatch {
-                expected: self.passport_id.to_string(),
-                got: record.passport_id.to_string(),
-            });
-        }
-
-        // Check that from_operator matches current
-        let current = self.current_operator();
-        if record.from_operator.did != current.did {
-            return Err(TransferError::OperatorMismatch {
-                expected: current.did.clone(),
-                got: record.from_operator.did.clone(),
-            });
-        }
-
-        // Check no pending transfer exists
-        let has_pending = self.transfers.iter().any(|t| {
-            t.status() == TransferStatus::Initiated || t.status() == TransferStatus::Accepted
-        });
-        if has_pending {
-            return Err(TransferError::TransferAlreadyPending);
-        }
-
-        self.transfers.push(record);
+        let mut records = self.transfers.clone();
+        records.push(record);
+        Self::validate(self.passport_id, &self.original_operator, &records)
+            .map_err(|fault| fault.reason)?;
+        self.transfers = records;
         Ok(())
     }
+
+    /// The incoming operator rejects the pending transfer.
+    ///
+    /// Refuses with [`TransferError::NoPendingTransfer`] when nothing is pending,
+    /// and with the record's own error when it cannot be rejected. On error the
+    /// chain is unchanged.
+    pub fn reject_pending(&mut self) -> Result<&TransferRecord, TransferError> {
+        self.update_pending(TransferRecord::reject)
+    }
+
+    /// The outgoing operator cancels the pending transfer.
+    ///
+    /// Refuses with [`TransferError::NoPendingTransfer`] when nothing is pending,
+    /// and with the record's own error when it cannot be cancelled. On error the
+    /// chain is unchanged.
+    pub fn cancel_pending(&mut self) -> Result<&TransferRecord, TransferError> {
+        self.update_pending(TransferRecord::cancel)
+    }
+
+    /// Attest that the incoming operator accepted the pending transfer, and
+    /// complete it.
+    ///
+    /// The attestation is a host's record of the acceptance step, as described on
+    /// [`TransferRecord::node_acceptance_attestation`]. A record that already carries
+    /// a different attestation is refused, because an attestation is never replaced.
+    /// Giving the same one again is accepted. Refuses with
+    /// [`TransferError::NoPendingTransfer`] when nothing is pending, and leaves the
+    /// chain unchanged on any error.
+    pub fn complete_pending(
+        &mut self,
+        node_acceptance_attestation: String,
+    ) -> Result<&TransferRecord, TransferError> {
+        self.update_pending(|record| {
+            if record
+                .node_acceptance_attestation
+                .as_deref()
+                .is_some_and(|existing| existing != node_acceptance_attestation)
+            {
+                return Err(TransferError::InvalidState {
+                    current: record.status(),
+                    action: "replace the acceptance attestation".into(),
+                });
+            }
+            record.node_acceptance_attestation = Some(node_acceptance_attestation);
+            record.complete()
+        })
+    }
+
+    /// Applies `step` to a copy of the pending record, and keeps the copy only if
+    /// the step succeeds, so an error leaves the chain as it was.
+    fn update_pending(
+        &mut self,
+        step: impl FnOnce(&mut TransferRecord) -> Result<(), TransferError>,
+    ) -> Result<&TransferRecord, TransferError> {
+        let index = self.pending_index()?;
+        let mut record = self.transfers[index].clone();
+        step(&mut record)?;
+        self.transfers[index] = record;
+        Ok(&self.transfers[index])
+    }
+
+    fn pending_index(&self) -> Result<usize, TransferError> {
+        self.transfers
+            .iter()
+            .position(is_pending)
+            .ok_or(TransferError::NoPendingTransfer)
+    }
+
+    /// Checks every record in order, and returns the first that breaks the chain's
+    /// invariant.
+    ///
+    /// A record must name this passport, and it may carry at most one outcome. A
+    /// record with two of `completed_at`, `rejected_at` and `cancelled_at` reports
+    /// itself as rejected or cancelled, while `current_operator` counts it as the
+    /// hand-over, so nothing can say what happened to it. Its `from_operator` must
+    /// be the operator that the completed records before it leave in place. No
+    /// record may follow a pending one, so at most the last record is pending. The
+    /// passport, operator and pending checks are the ones `initiate_transfer` made
+    /// record by record. The outcome check is applied to the whole history too.
+    fn validate(
+        passport_id: PassportId,
+        original_operator: &ResponsibleOperator,
+        records: &[TransferRecord],
+    ) -> Result<(), ChainFault> {
+        let mut current = original_operator;
+        for (index, record) in records.iter().enumerate() {
+            let fault = |reason: TransferError| ChainFault {
+                index,
+                transfer_id: record.transfer_id,
+                reason,
+            };
+            if record.passport_id != passport_id {
+                return Err(fault(TransferError::PassportMismatch {
+                    expected: passport_id.to_string(),
+                    got: record.passport_id.to_string(),
+                }));
+            }
+            let outcomes = [record.completed_at, record.rejected_at, record.cancelled_at];
+            if outcomes.into_iter().flatten().count() > 1 {
+                return Err(fault(TransferError::InvalidState {
+                    current: record.status(),
+                    action: "record more than one outcome".into(),
+                }));
+            }
+            if record.from_operator.did != current.did {
+                return Err(fault(TransferError::OperatorMismatch {
+                    expected: current.did.clone(),
+                    got: record.from_operator.did.clone(),
+                }));
+            }
+            if records[..index].last().is_some_and(is_pending) {
+                return Err(fault(TransferError::TransferAlreadyPending));
+            }
+            if record.is_complete() {
+                current = &record.to_operator;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Initiated or accepted: the states in which a record still awaits its outcome.
+fn is_pending(record: &TransferRecord) -> bool {
+    matches!(
+        record.status(),
+        TransferStatus::Initiated | TransferStatus::Accepted
+    )
 }

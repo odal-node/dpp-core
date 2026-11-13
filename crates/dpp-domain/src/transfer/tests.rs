@@ -93,7 +93,7 @@ fn a_record_for_another_passport_is_refused_even_from_the_current_operator() {
         chain.initiate_transfer(elsewhere),
         Err(TransferError::PassportMismatch { .. })
     ));
-    assert!(chain.transfers.is_empty());
+    assert!(chain.records().is_empty());
     assert_eq!(chain.current_operator().did, original.did);
 }
 
@@ -194,8 +194,8 @@ fn serde_round_trip() {
     let chain = TransferChain::new(pid, op);
     let json = serde_json::to_string(&chain).unwrap();
     let back: TransferChain = serde_json::from_str(&json).unwrap();
-    assert_eq!(back.passport_id, pid);
-    assert_eq!(back.original_operator.did, "did:web:acme.example");
+    assert_eq!(back.passport_id(), pid);
+    assert_eq!(back.original_operator().did, "did:web:acme.example");
 }
 
 #[test]
@@ -322,8 +322,7 @@ fn rejected_transfer_unblocks_new_initiation() {
     // Initiate and then reject
     let t1 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
     chain.initiate_transfer(t1.clone()).unwrap();
-    let t1_mut = chain.transfers.last_mut().unwrap();
-    t1_mut.reject().unwrap();
+    chain.reject_pending().unwrap();
 
     // Chain should allow a new transfer
     let t2 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
@@ -339,7 +338,7 @@ fn cancelled_transfer_unblocks_new_initiation() {
 
     let t1 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
     chain.initiate_transfer(t1).unwrap();
-    chain.transfers.last_mut().unwrap().cancel().unwrap();
+    chain.cancel_pending().unwrap();
 
     let t2 = make_transfer(pid, &op_a, &op_b, TransferReason::Sale);
     assert!(chain.initiate_transfer(t2).is_ok());

@@ -87,11 +87,10 @@ fn full_transfer_lifecycle_manufacturer_to_remanufacturer_to_distributor() {
         "incomplete transfer should not change current operator"
     );
 
-    // Step 3: Complete transfer (incoming operator signs)
-    // We need to modify the last transfer in the chain directly
-    // since initiate_transfer moved it in
-    let last = chain.transfers.last_mut().unwrap();
-    complete_transfer(last);
+    // Step 3: Complete transfer (a host attests that the incoming operator accepted)
+    let last = chain
+        .complete_pending("eyJhbGciOiJFZERTQSJ9.to-sig".into())
+        .unwrap();
     assert_eq!(last.status(), TransferStatus::Completed);
 
     // Step 4: Current operator should now be the remanufacturer
@@ -218,9 +217,9 @@ fn transfer_chain_serialisation_round_trip() {
     let json = serde_json::to_value(&chain).unwrap();
     let back: TransferChain = serde_json::from_value(json).unwrap();
 
-    assert_eq!(back.passport_id, pid);
-    assert_eq!(back.original_operator.did, "did:web:acme.example.com");
-    assert_eq!(back.transfers.len(), 1);
+    assert_eq!(back.passport_id(), pid);
+    assert_eq!(back.original_operator().did, "did:web:acme.example.com");
+    assert_eq!(back.records().len(), 1);
     assert_eq!(back.current_operator().did, "did:web:dist.example.com");
 }
 
@@ -249,7 +248,7 @@ fn transfer_provenance_audit_trail() {
     assert_eq!(chain.current_operator().did, "did:web:d.com");
 
     // Every completed transfer should have both signatures and a completion timestamp
-    for t in &chain.transfers {
+    for t in chain.records() {
         assert!(t.is_complete());
         assert!(t.from_signature.is_some());
         assert!(t.node_acceptance_attestation.is_some());
