@@ -35,9 +35,10 @@ use crate::passport::PassportId;
 /// it cannot be modified or removed.
 ///
 /// Every record belongs to this passport, each `from_operator` is the operator the
-/// records before it left in place, only the last record may be pending, and no
-/// record carries more than one outcome. The chain is checked on construction, on
-/// append and on read (see the module docs).
+/// records before it left in place, only the last record may be pending, no record
+/// carries more than one outcome, and a completed record carries both signatures.
+/// The chain is checked on construction, on append and on read (see the module
+/// docs).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", try_from = "TransferChainRaw")]
 pub struct TransferChain {
@@ -59,14 +60,17 @@ impl TryFrom<TransferChainRaw> for TransferChain {
     type Error = TransferError;
 
     fn try_from(raw: TransferChainRaw) -> Result<Self, Self::Error> {
-        Self::validate(raw.passport_id, &raw.original_operator, &raw.transfers).map_err(
-            |fault| TransferError::InvalidChain {
-                passport_id: raw.passport_id.to_string(),
-                index: fault.index,
-                transfer_id: fault.transfer_id.to_string(),
-                reason: Box::new(fault.reason),
-            },
-        )?;
+        Self::validate(
+            raw.passport_id,
+            &raw.original_operator,
+            raw.transfers.iter(),
+        )
+        .map_err(|fault| TransferError::InvalidChain {
+            passport_id: raw.passport_id.to_string(),
+            index: fault.index,
+            transfer_id: fault.transfer_id.to_string(),
+            reason: Box::new(fault.reason),
+        })?;
         Ok(Self {
             passport_id: raw.passport_id,
             original_operator: raw.original_operator,
@@ -133,11 +137,10 @@ impl TransferChain {
     /// `from_operator` is not the current responsible operator, or if another
     /// transfer is still pending. On error the chain is unchanged.
     pub fn initiate_transfer(&mut self, record: TransferRecord) -> Result<(), TransferError> {
-        let mut records = self.transfers.clone();
-        records.push(record);
-        Self::validate(self.passport_id, &self.original_operator, &records)
+        let records = self.transfers.iter().chain(std::iter::once(&record));
+        Self::validate(self.passport_id, &self.original_operator, records)
             .map_err(|fault| fault.reason)?;
-        self.transfers = records;
+        self.transfers.push(record);
         Ok(())
     }
 
@@ -214,18 +217,21 @@ impl TransferChain {
     /// A record must name this passport, and it may carry at most one outcome. A
     /// record with two of `completed_at`, `rejected_at` and `cancelled_at` reports
     /// itself as rejected or cancelled, while `current_operator` counts it as the
-    /// hand-over, so nothing can say what happened to it. Its `from_operator` must
-    /// be the operator that the completed records before it leave in place. No
-    /// record may follow a pending one, so at most the last record is pending. The
-    /// passport, operator and pending checks are the ones `initiate_transfer` made
-    /// record by record. The outcome check is applied to the whole history too.
-    fn validate(
+    /// hand-over, so nothing can say what happened to it. A record with `completed_at`
+    /// set must also carry both signatures, or it reports `Initiated` while holding an
+    /// outcome. Its `from_operator` must be the operator that the completed records
+    /// before it leave in place. No record may follow a pending one, so at most the
+    /// last record is pending. The passport, operator and pending checks are the ones
+    /// `initiate_transfer` made record by record. The outcome checks are applied to the
+    /// whole history too.
+    fn validate<'a>(
         passport_id: PassportId,
         original_operator: &ResponsibleOperator,
-        records: &[TransferRecord],
+        records: impl IntoIterator<Item = &'a TransferRecord>,
     ) -> Result<(), ChainFault> {
         let mut current = original_operator;
-        for (index, record) in records.iter().enumerate() {
+        let mut previous_pending = false;
+        for (index, record) in records.into_iter().enumerate() {
             let fault = |reason: TransferError| ChainFault {
                 index,
                 transfer_id: record.transfer_id,
@@ -244,15 +250,22 @@ impl TransferChain {
                     action: "record more than one outcome".into(),
                 }));
             }
+            if record.completed_at.is_some() && !record.is_complete() {
+                return Err(fault(TransferError::InvalidState {
+                    current: record.status(),
+                    action: "record a completion without both signatures".into(),
+                }));
+            }
             if record.from_operator.did != current.did {
                 return Err(fault(TransferError::OperatorMismatch {
                     expected: current.did.clone(),
                     got: record.from_operator.did.clone(),
                 }));
             }
-            if records[..index].last().is_some_and(is_pending) {
+            if previous_pending {
                 return Err(fault(TransferError::TransferAlreadyPending));
             }
+            previous_pending = is_pending(record);
             if record.is_complete() {
                 current = &record.to_operator;
             }

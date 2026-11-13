@@ -8,9 +8,9 @@ use super::{TransferChain, TransferError, TransferReason, TransferRecord, Transf
 use crate::operator::{OperatorRole, ResponsibleOperator};
 use crate::passport::PassportId;
 
-const ATTESTATION: &str = "eyJhbGciOiJFZERTQSJ9.attestation";
+pub(super) const ATTESTATION: &str = "eyJhbGciOiJFZERTQSJ9.attestation";
 
-fn operator(did: &str) -> ResponsibleOperator {
+pub(super) fn operator(did: &str) -> ResponsibleOperator {
     ResponsibleOperator {
         did: did.into(),
         name: did.into(),
@@ -26,7 +26,7 @@ fn operator(did: &str) -> ResponsibleOperator {
 }
 
 /// A transfer from `from` to `to`, authorised but not yet accepted.
-fn record(
+pub(super) fn record(
     passport_id: PassportId,
     from: &ResponsibleOperator,
     to: &ResponsibleOperator,
@@ -48,7 +48,7 @@ fn record(
 }
 
 /// Appends a transfer from the chain's current operator to `to`, still pending.
-fn append_pending(chain: &mut TransferChain, to: &ResponsibleOperator) {
+pub(super) fn append_pending(chain: &mut TransferChain, to: &ResponsibleOperator) {
     let passport_id = chain.passport_id();
     let from = chain.current_operator().clone();
     chain
@@ -57,17 +57,17 @@ fn append_pending(chain: &mut TransferChain, to: &ResponsibleOperator) {
 }
 
 /// Appends a transfer from the chain's current operator to `to`, and completes it.
-fn append_completed(chain: &mut TransferChain, to: &ResponsibleOperator) {
+pub(super) fn append_completed(chain: &mut TransferChain, to: &ResponsibleOperator) {
     append_pending(chain, to);
     chain.complete_pending(ATTESTATION.into()).unwrap();
 }
 
-fn to_json(chain: &TransferChain) -> Value {
+pub(super) fn to_json(chain: &TransferChain) -> Value {
     serde_json::to_value(chain).unwrap()
 }
 
 /// Reads a chain that must be refused, and returns the error text.
-fn refused(value: Value) -> String {
+pub(super) fn refused(value: Value) -> String {
     serde_json::from_value::<TransferChain>(value)
         .expect_err("a chain that breaks the invariant must not read")
         .to_string()
@@ -440,48 +440,4 @@ fn a_valid_stored_chain_under_the_old_acceptance_key_still_reads() {
     let back: TransferChain = serde_json::from_value(value).expect("a valid chain must read");
     assert!(back.records()[0].is_complete());
     assert_eq!(back.current_operator().did, b.did);
-}
-
-#[test]
-fn a_stored_record_with_two_outcomes_is_refused_on_read() {
-    let pid = PassportId::new();
-    let (a, b) = (operator("did:web:a.example"), operator("did:web:b.example"));
-    let mut chain = TransferChain::new(pid, a.clone());
-    append_completed(&mut chain, &b);
-    append_pending(&mut chain, &a);
-    chain.reject_pending().unwrap();
-    for (index, key) in [(0, "rejectedAt"), (0, "cancelledAt"), (1, "cancelledAt")] {
-        let mut value = to_json(&chain);
-        value["transfers"][index][key] = json!(Utc::now());
-        let message = refused(value);
-        assert!(
-            message.contains(&format!(
-                "at record {index} ({})",
-                chain.records()[index].transfer_id
-            )) && message.contains("more than one outcome"),
-            "{message}"
-        );
-    }
-}
-
-#[test]
-fn initiate_transfer_refuses_a_record_with_two_outcomes_and_leaves_the_chain_alone() {
-    let pid = PassportId::new();
-    let (a, b) = (operator("did:web:a.example"), operator("did:web:b.example"));
-    let mut chain = TransferChain::new(pid, a.clone());
-    append_completed(&mut chain, &b);
-    let mut both = record(pid, &b, &a);
-    both.node_acceptance_attestation = Some(ATTESTATION.into());
-    both.completed_at = Some(Utc::now());
-    both.rejected_at = Some(Utc::now());
-    let before = to_json(&chain);
-    assert_eq!(
-        chain.initiate_transfer(both).unwrap_err(),
-        TransferError::InvalidState {
-            current: TransferStatus::Rejected,
-            action: "record more than one outcome".into(),
-        }
-    );
-    assert_eq!(to_json(&chain), before);
-    assert_eq!(chain.current_operator().did, b.did);
 }
