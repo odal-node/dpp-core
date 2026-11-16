@@ -247,7 +247,7 @@ pub struct Passport {
     /// not product group-specific: ESPR attaches its duties at placing on the market
     /// for every product group, as do Regulation (EU) 2023/1542 Art. 7, 8 and
     /// 10 for batteries. It lived only on `BatteryData` before, which made the
-    /// governing law underivable for the other eleven product groups.
+    /// governing law underivable for every other product group.
     ///
     /// `None` means the date was not declared, which is **not** a licence to
     /// substitute the current date. A determination that depends on it has no

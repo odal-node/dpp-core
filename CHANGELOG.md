@@ -323,6 +323,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot reach it. Its answer is what `EolEvent::missing_derogation` takes.
   (#573, #574)
 
+### Changed
+
+- The workspace requires at least `serde` 1.0.229 and `anyhow` 1.0.104, where it
+  accepted any 1.x release of each, and moves `jsonschema` from 0.60 to 0.61,
+  at least 0.61.2. Each is a lowest version, not an exact pin: a consumer still
+  resolves the newest compatible release, and one that resolves to minimal
+  versions now gets the releases this workspace is tested against. No public item
+  names a `jsonschema` type, so the move to 0.61 changes no API. (#600)
+
 ### Fixed
 
 - **`FinancialYear` leaves a start after its end unrefused on the footing that it
@@ -378,11 +387,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   covers, never the live record. `disclosureSignatures` is keyed by disclosure set,
   which the JSON-LD comments in `dpp-vc` and `docs/architecture/DATA-MODEL.md` had
   described as a dotted path or an audience. Documentation only. (#578)
-
-- Workspace dependency versions are pinned to exact patch releases so downstream
-  consumers using `--minimal-versions` or old toolchains cannot resolve unexpectedly
-  old releases missing APIs or bug fixes. `serde` is now `1.0.229`, `anyhow` is
-  `1.0.104`, and `jsonschema` is `0.61.2`. (#600)
 
 ## [0.23.0] - 2026-11-03
 

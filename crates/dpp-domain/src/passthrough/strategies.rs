@@ -15,7 +15,7 @@
 //! [`ComplianceStrategy`] is the
 //! seam it swaps out **one product group at a time**, which is the useful granularity:
 //! a tier that computes a real battery determination still wants the passthrough
-//! behaviour for the eleven product groups it does not model.
+//! behaviour for every product group it does not model.
 //!
 //! That seam previously had no implementation anywhere — the trait was
 //! published, documented as having two, and dispatched to by nothing. These are
