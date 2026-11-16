@@ -7,6 +7,9 @@
 //!
 //! Run with: `cargo run --example registry_identifiers -p dpp-registry`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use dpp_registry::{FacilityIdentifier, OperatorIdentifier, ProductIdentifier};
 
 fn main() {

@@ -2,6 +2,9 @@
 //!
 //! Run with: `cargo run --example parse_and_negotiate`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use dpp_digital_link::{
     DigitalLink, DppMediaType, Gs1LinkType, LinkDescriptor, ResolutionRequest, negotiate,
 };

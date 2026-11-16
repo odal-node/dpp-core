@@ -20,3 +20,6 @@ dpp-plugin-traits = { workspace = true }
 dpp-rules         = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }
+
+[lints]
+workspace = true

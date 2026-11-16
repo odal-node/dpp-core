@@ -3,6 +3,9 @@
 //!
 //! Run with: `cargo run -p dpp-crypto --example sign_and_verify`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use dpp_crypto::jws::{signer, verifier};
 use dpp_crypto::keystore::KeyStore;
 use serde_json::json;

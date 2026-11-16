@@ -58,3 +58,6 @@ tokio      = { version = "1", features = ["macros", "rt"] }
 sha2       = { workspace = true }
 hex        = { workspace = true }
 proptest   = { workspace = true }
+
+[lints]
+workspace = true

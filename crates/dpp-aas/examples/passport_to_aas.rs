@@ -2,6 +2,9 @@
 //!
 //! Run with: `cargo run --example passport_to_aas`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use chrono::Utc;
 use dpp_aas::AssetIdentity;
 use dpp_aas::{AasSubmodelElement, build_aas_from_passport};
