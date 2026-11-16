@@ -108,7 +108,7 @@ fn svhc_lints(data: &ProductGroupData) -> Vec<LintFinding> {
 }
 
 /// Dispatch to the product group-specific lint pack. ProductGroups with no lint pack yet
-/// (everything but battery/textile/unsold-goods in the first ruleset)
+/// (everything but battery and textile)
 /// produce no findings.
 fn product_group_lints(data: &ProductGroupData, as_of: DateTime<Utc>) -> Vec<LintFinding> {
     match data {

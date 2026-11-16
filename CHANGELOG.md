@@ -50,8 +50,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - **The schema is a family of its own, with its version numbers kept.**
     `unsold-goods` v2.0.0 moved byte for byte from `schemas/unsold-goods/` to
     `document-schemas/unsold-goods/`, and is validated through
-    `unsold_goods::document_schemas()`, a registry that holds nothing else. The
-    shape is the same, the `$id` is the one already published, and a published
+    `unsold_goods::document_schemas()`, a registry that holds only this module's
+    schemas, the discard record's among them (see Added). The shape is the same,
+    the `$id` is the one already published, and a published
     schema version is never modified, so it was neither renumbered nor republished
     as a first version. A product-group registry listing it would also have had it
     linted and given a JSON-LD scope as a product's.
@@ -106,9 +107,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `lint_discard_record` flags one. (#575, #576)
 - **An end-of-life destruction cites a point of the closed derogation list, and
   only where ESPR Art. 25(1) bars it.** `DeactivationReason::Destroyed` carried a
-  `DerogationRef { category: String }` that nothing in this crate checked, and
-  every destruction had to have one, although the ban reaches only the
-  destruction of unsold Annex VII products by an operator it applies to. It now
+  `DerogationRef { category: String, act_citation: Option<String> }` that nothing
+  in this crate checked, and every destruction had to have one, although the ban
+  reaches only the destruction of unsold Annex VII products by an operator it
+  applies to. It now
   carries `derogation: Option<Derogation>`, where `Derogation::Point` is a
   `DiscardReason`, a point of Del. Reg. (EU) 2026/296 Art. 2.
   `EolEvent::requires_derogation()` is replaced by
@@ -321,6 +323,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   cannot reach it. Its answer is what `EolEvent::missing_derogation` takes.
   (#573, #574)
 
+### Changed
+
+- The workspace requires at least `serde` 1.0.229 and `anyhow` 1.0.104, where it
+  accepted any 1.x release of each, and moves `jsonschema` from 0.60 to 0.61,
+  at least 0.61.2. Each is a lowest version, not an exact pin: a consumer still
+  resolves the newest compatible release, and one that resolves to minimal
+  versions now gets the releases this workspace is tested against. No public item
+  names a `jsonschema` type, so the move to 0.61 changes no API. (#600)
+
 ### Fixed
 
 - **`FinancialYear` leaves a start after its end unrefused on the footing that it
@@ -359,7 +370,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   carries none, cannot be published by skipping the mandatory-content gate. (#563)
 - Compromise rotation revokes every archived copy of the compromised key, not only
   the newest archive. (#563)
-- Qualifier values of only dots are refused, since URI normalization removes them. (#563)
+- A qualifier value of `.` or `..` is refused, since URI normalization removes a
+  dot segment. A value with dots among other characters, such as `a..b`, is
+  accepted. (#563)
 - Schema-driven policy classification treats a universal conformity field as a
   floor that a product rule cannot lower. (#563)
 - `Passport::co2e_per_unit` and `Passport::repairability_score` are documented as
@@ -374,11 +387,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   covers, never the live record. `disclosureSignatures` is keyed by disclosure set,
   which the JSON-LD comments in `dpp-vc` and `docs/architecture/DATA-MODEL.md` had
   described as a dotted path or an audience. Documentation only. (#578)
-
-- Workspace dependency versions are pinned to exact patch releases so downstream
-  consumers using `--minimal-versions` or old toolchains cannot resolve unexpectedly
-  old releases missing APIs or bug fixes. `serde` is now `1.0.229`, `anyhow` is
-  `1.0.104`, and `jsonschema` is `0.61.2`. (#600)
 
 ## [0.23.0] - 2026-11-03
 

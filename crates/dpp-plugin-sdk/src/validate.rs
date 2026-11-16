@@ -394,8 +394,7 @@ impl<'a> Validator<'a> {
     /// Require a present, non-empty object.
     ///
     /// The counterpart to [`require_non_empty_array`](Self::require_non_empty_array)
-    /// for a schema-required field whose value is a nested object — an
-    /// unsold-goods report's `entity` and `financialYear`, for instance.
+    /// for a schema-required field whose value is a nested object.
     ///
     /// 🚨 **Presence only. It does not reach inside.** `present` is
     /// `input.get(key)` with no path traversal, so nothing here can assert a

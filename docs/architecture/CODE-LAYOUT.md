@@ -232,7 +232,7 @@ It applies to directories too: `ghosts/archive.rs`, not `ghosts/ghost_archive.rs
 ### Rule 13: hyphens outside module paths, underscores inside
 
 Crate directories, plugin directories and data directories use `-` (`crates/dpp-domain/`,
-`product-groups/`, `schemas/unsold-goods/`), and so do data files (`unsold-goods.json`).
+`product-groups/`, `document-schemas/unsold-goods/`), and so do data files (`unsold-goods.json`).
 Module directories and every `.rs` file use `_`.
 
 This is not taste. A directory under `src/` **is** a Rust identifier, and identifiers

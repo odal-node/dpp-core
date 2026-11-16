@@ -164,11 +164,13 @@ crates/dpp-domain/schemas/
   textile/v1.0.0.json … v1.4.0.json
   …
 crates/dpp-domain/document-schemas/
-  unsold-goods/v2.0.0.json
+  discard-record/v1.0.0.json
+  unsold-goods/v2.0.0.json, v2.1.0.json
 ```
 
 The second directory holds schemas that are not a product group's: the unsold-goods
-disclosure, validated through `dpp_domain::unsold_goods::document_schemas()`.
+disclosure and the discard records it is computed from, validated through
+`dpp_domain::unsold_goods::document_schemas()`.
 
 A new version is a new file plus one entry in that table (see
 [CONTRIBUTING.md §6](../../CONTRIBUTING.md#6-changing-a-schema)). Callers validate
