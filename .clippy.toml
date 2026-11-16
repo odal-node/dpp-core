@@ -6,3 +6,7 @@ arithmetic-side-effects-allowed = []
 
 # Disallow std::mem::forget — use drop() or ManuallyDrop.
 # (prevents accidental key material leaks in identity service)
+
+# A test may print what it found or wrote; `print_stdout` and `print_stderr`
+# (the workspace lints in Cargo.toml) hold for everything else.
+allow-print-in-tests = true

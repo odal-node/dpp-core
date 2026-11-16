@@ -65,3 +65,6 @@ jsonschema = { workspace = true }
 # their NOTICE.md. Both are already in the workspace graph.
 sha2       = { workspace = true }
 hex        = { workspace = true }
+
+[lints]
+workspace = true

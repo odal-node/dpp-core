@@ -49,3 +49,6 @@ thiserror  = { workspace = true }
 # drive the real `verify_bundle` rather than a stand-in for it. Signing stays
 # engine-side, so only the base64 encoding is needed here.
 base64 = { workspace = true }
+
+[lints]
+workspace = true

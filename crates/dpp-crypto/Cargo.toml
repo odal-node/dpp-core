@@ -47,3 +47,6 @@ proptest      = { workspace = true }
 ring          = "0.17"
 rcgen = { version = "0.14.9", default-features = false, features = ["ring", "pem"] }
 x509-parser = "0.18.1"
+
+[lints]
+workspace = true

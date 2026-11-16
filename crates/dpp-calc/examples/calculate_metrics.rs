@@ -2,6 +2,9 @@
 //!
 //! Run with: `cargo run --example calculate_metrics -p dpp-calc`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use chrono::NaiveDate;
 use dpp_calc::clock::AssessmentClock;
 use dpp_calc::co2e::{self, Co2eInputs, CradleToGateRuleset, MaterialFootprint};

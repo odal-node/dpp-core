@@ -59,6 +59,22 @@ tag-message = "Release version {{version}}"
 allow-branch = ["main"]
 
 # ---------------------------------------------------------------------------
+# Lints every member takes with `[lints] workspace = true`. `just lint` and CI
+# run clippy with `-D warnings`, so a warning here fails the build.
+#
+# A library writes nothing to its caller's stdout or stderr: whatever it has to
+# say is a return value, and output the caller did not ask for lands in their
+# logs, their CLI's output or a wasm host that has no console. `dbg!` is a
+# debugging aid that was never meant to ship. Tests may print
+# (`allow-print-in-tests` in `.clippy.toml`), and so may an example, which says
+# so at its top: printing is what it is for.
+# ---------------------------------------------------------------------------
+[workspace.lints.clippy]
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro    = "warn"
+
+# ---------------------------------------------------------------------------
 # Shared dependency versions — crates inherit these with `workspace = true`
 # ---------------------------------------------------------------------------
 [workspace.dependencies]

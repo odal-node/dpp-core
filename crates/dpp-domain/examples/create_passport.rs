@@ -2,6 +2,9 @@
 //!
 //! Run with: `cargo run --example create_passport`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use chrono::{NaiveDate, Utc};
 use dpp_domain::schemas::VersionedSchemaRegistry;
 use dpp_domain::{

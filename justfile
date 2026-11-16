@@ -71,6 +71,10 @@ audit:
         cargo audit -f "$ws/Cargo.lock" --deny yanked || rc=1
         cargo deny --manifest-path "$ws/Cargo.toml" check bans licenses sources || rc=1
     done
+    # Every ignored advisory carries a header that is checked, and the check
+    # still refuses (`scripts/check-audit-register.sh`).
+    bash scripts/check-audit-register.sh || rc=1
+    bash scripts/check-audit-register.test.sh || rc=1
     exit "$rc"
 
 # The committed lockfiles must match the manifests.
@@ -276,6 +280,36 @@ release-checks-self-test:
     bash scripts/release-tag-check.test.sh
     bash scripts/release-crates-check.test.sh
 
+# A released schema version changes only in its prose. The reasons are in the
+# script; the self-test proves it refuses every other change.
+schema-freeze-check:
+    bash scripts/schema-freeze-check.sh
+
+schema-freeze-check-self-test:
+    bash scripts/schema-freeze-check.test.sh
+
+# Every fuzz target is built by fuzz/Cargo.toml, run by the nightly job, and
+# named in fuzz/README.md.
+fuzz-targets-check:
+    bash scripts/fuzz-targets-check.sh
+
+fuzz-targets-check-self-test:
+    bash scripts/fuzz-targets-check.test.sh
+
+# Every guard script runs in some workflow, or is listed as local-only with why.
+ci-guard-check:
+    bash scripts/ci-guard-check.sh
+
+ci-guard-check-self-test:
+    bash scripts/ci-guard-check.test.sh
+
+# "Archive" means EN 18221 clause 4.2 version archiving, and never a status.
+vocabulary-check:
+    bash scripts/vocabulary-check.sh
+
+vocabulary-check-self-test:
+    bash scripts/vocabulary-check.test.sh
+
 # Prove the vacuous-pass guards actually bite.
 #
 # Every looping gate above asserts it did some work, because the failure that
@@ -358,7 +392,7 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test doc lock-check audit
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That

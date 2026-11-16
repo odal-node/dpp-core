@@ -40,7 +40,7 @@ just check
 
 | Command | What it runs |
 |---|---|
-| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny` |
+| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny`, the advisory register, and the repository guards in `scripts/` with their self-tests |
 | `just ci` | `just check` plus the Wasm cross-compiles (`wasm-build`), the plugin builds (`build-plugins`) and the test-count check (`test-count`). Run it before pushing. Hosted CI also runs jobs no recipe runs, such as the oracle suites |
 | `just test` | `cargo nextest run --workspace --all-features` (no doctests) |
 | `just test-doc` | Doctests, including the crate READMEs |
@@ -174,7 +174,8 @@ output.
 ### Lints and formatting
 
 Code passes `cargo clippy --workspace --all-targets --all-features -- -D warnings` and
-`cargo fmt --all --check`.
+`cargo fmt --all --check`. Library code prints nothing: the workspace lints refuse
+`println!`, `eprintln!` and `dbg!` outside tests and examples.
 
 ## 5. Tests
 
@@ -189,8 +190,10 @@ No test needs Docker, a database or network access.
 
 ## 6. Changing a schema
 
-A published schema version is never edited: a passport validated against it must stay
-valid against it. Every change is a new version.
+A published schema version is never edited, except in its prose (`title`, `description`,
+`$comment`, `examples`): a passport validated against it must stay valid against it, and
+receive the same disclosure. Every other change is a new version, and
+`scripts/schema-freeze-check.sh` refuses it in a file a release tag already holds.
 
 To add a version to an existing product group:
 
