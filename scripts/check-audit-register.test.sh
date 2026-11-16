@@ -123,6 +123,29 @@ printf '[advisories]\nignore = [\n    { id = "RUSTSEC-2023-0071", reason = "x" }
 expect_message "an advisory ignored in both files is not reported as missing" "$BASE" "$DENY_SAME" absent \
   "ignored in"
 
+# 11. A relative date: `date -d` reads "tomorrow", which never comes.
+expect_message "a relative expires is rejected" \
+  "$(variant relative 's/^# expires:    2999-12-31$/# expires:    tomorrow/')" \
+  "$NO_DENY" present "expires 'tomorrow' is not a YYYY-MM-DD date"
+
+# 12. The advisory has moved to a package the header does not name. The raw
+#     report (a saved one, standing in for cargo-audit) says it now hits
+#     serde_json, which every build resolves; the header still says rsa 0.9.10,
+#     which no graph holds. Checking only the header would pass.
+MOVED="$SCRATCH/moved.json"
+serde_json_version="$(awk '/^name = "serde_json"$/ { getline; gsub(/version = |"/, ""); print; exit }' Cargo.lock)"
+[ -n "$serde_json_version" ] # sanity: the lockfile still resolves serde_json
+printf '{"vulnerabilities":{"list":[{"advisory":{"id":"RUSTSEC-2023-0071"},"package":{"name":"serde_json","version":"%s"}}]},"warnings":{}}' \
+  "$serde_json_version" > "$MOVED"
+AUDIT_RAW_JSON="$MOVED" expect_message "an advisory that moved to an in-graph package is rejected" \
+  "$BASE" "$NO_DENY" present "'serde_json@$serde_json_version' resolves in the . (all features) dependency graph"
+
+# 13. A deny.toml whose [advisories] header carries a comment is still read.
+DENY_COMMENTED="$SCRATCH/deny-commented.toml"
+printf '[ advisories ] # suppressions\nignore = [ "RUSTSEC-2024-0001" ]\n' > "$DENY_COMMENTED"
+expect_message "a commented [advisories] header in deny.toml is still read" "$BASE" "$DENY_COMMENTED" present \
+  "RUSTSEC-2024-0001: ignored in"
+
 echo ""
 echo "check-audit-register.test: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]]

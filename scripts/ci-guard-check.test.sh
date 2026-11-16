@@ -61,6 +61,10 @@ run_case "a_guard_no_workflow_runs_is_refused" reject \
 run_case "a_guard_named_only_in_a_comment_is_refused" reject \
     'touch scripts/b-check.sh && printf "%s\n" "      # see scripts/b-check.sh" >> .github/workflows/ci.yml'
 
+# 2b. So is one named after a command, in that line's trailing comment.
+run_case "a_guard_named_only_in_a_trailing_comment_is_refused" reject \
+    'touch scripts/b-check.sh && printf "%s\n" "      - run: true # scripts/b-check.sh" >> .github/workflows/ci.yml'
+
 # 3. A guard in any workflow file counts, not only ci.yml.
 run_case "a_guard_run_by_another_workflow_is_accepted" accept \
     'touch scripts/b-check.sh && printf "%s\n" "jobs:" "  b:" "    steps:" "      - run: bash scripts/b-check.sh" > .github/workflows/other.yml'

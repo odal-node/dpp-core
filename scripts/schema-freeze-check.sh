@@ -15,8 +15,9 @@
 # For every schema file the latest release tag holds, the file with the same
 # `$id` must still exist and must match it once the prose is set aside. Prose is
 # `title`, `description`, `$comment` and `examples` where they annotate a schema:
-# a property named `description` is not prose, and neither is anything inside
-# `enum`, `const`, `default` or an `x-*` value. Key order does not count. So a
+# a property named `description` is not prose, and neither is a key of
+# `dependencies` or `dependentRequired`, or anything inside `enum`, `const`,
+# `default` or an `x-*` value. Key order does not count. So a
 # reworded description passes, and so does a file moved with its `$id`; a changed
 # keyword, a changed `x-*` annotation and a deleted file do not.
 #
@@ -47,10 +48,12 @@ def strip:
   if type == "object" then
     with_entries(
       if (.key | IN("title", "description", "$comment", "examples")) then empty
-      elif (.key | IN("enum", "const", "default")) or (.key | startswith("x-")) then .
+      elif (.key | IN("enum", "const", "default", "dependentRequired")) or (.key | startswith("x-")) then .
       elif (.key | IN("properties", "patternProperties", "$defs", "definitions", "dependentSchemas"))
         and (.value | type) == "object"
       then .value |= map_values(strip)
+      elif .key == "dependencies" and (.value | type) == "object"
+      then .value |= map_values(if type == "object" then strip else . end)
       else .value |= strip
       end)
   elif type == "array" then map(strip)

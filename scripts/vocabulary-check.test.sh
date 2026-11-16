@@ -81,6 +81,16 @@ run_case "the_refusal_removed_is_refused" reject \
     'grep -v "=> Err(Error::custom" "$lib" > t && mv t "$lib"'
 run_case "the_word_in_a_test_file_is_accepted" accept \
     'printf "%s\n" "fn t() { let _ = \"archive\"; }" >> crates/dom/src/status/tests.rs'
+run_case "the_word_in_an_inline_test_module_is_accepted" accept \
+    'printf "%s\n" "#[cfg(test)]" "mod tests { fn t() { let _ = parse(\"archived\"); } }" >> "$lib"'
+run_case "the_word_in_a_message_is_accepted" accept \
+    'printf "%s\n" "const KEPT: &str = \"Archived keys must be retained\";" >> "$lib"'
+run_case "a_rename_split_across_lines_is_refused" reject \
+    'printf "%s\n" "#[serde(" "    rename =" "        \"archivedAt\"" ")]" "struct S;" >> "$lib"'
+run_case "an_alias_split_across_lines_is_refused" reject \
+    'printf "%s\n" "#[serde(" "    alias" "        = \"archivedOn\"" ")]" "struct T;" >> "$lib"'
+run_case "a_value_above_an_inline_test_module_is_still_refused" reject \
+    'printf "%s\n" "const SENT: &str = \"archived\";" "#[cfg(test)]" "mod tests {}" >> "$lib"'
 
 echo "vocabulary-check.test: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

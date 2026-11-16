@@ -30,8 +30,12 @@ local_only=(
 
 status=0
 
-# What the workflows run: every line that is not a comment.
-workflow_lines="$(cat .github/workflows/*.yml | grep -v '^[[:space:]]*#' || true)"
+# What the workflows run: every line with its comment cut off, a whole-line one
+# or one after the command (`run: true # scripts/a-check.sh` runs nothing). A
+# comment starts at a `#` that follows whitespace, in YAML and in the shell alike.
+# Cutting at one inside a quoted string can only hide a real run, so the error
+# that follows is a false alarm, never a false pass.
+workflow_lines="$(cat .github/workflows/*.yml | sed -E -e 's/^[[:space:]]*#.*$//' -e 's/[[:space:]]+#.*$//')"
 
 is_local_only() {
   local entry

@@ -31,13 +31,24 @@ cd "$ROOT"
 
 status=0
 
-# Production Rust: crates/*/src without test modules and files. A comment line is
-# prose, which may name the word to explain it.
-production() {
-    grep -rn --include='*.rs' -E "$1" crates/*/src 2> /dev/null \
-        | grep -v -E '^[^:]+/(tests|oracle_tests)/|^[^:]+/tests\.rs:|^[^:]+_tests\.rs:' \
-        | grep -v -E '^[^:]+:[0-9]+:[[:space:]]*//' || true
-}
+# Production Rust: crates/*/src without test files, and each file only up to its
+# first `#[cfg(test)]`, since a test module sits at the bottom of the file it
+# tests. Comment lines are blanked rather than dropped, so line numbers hold: a
+# comment is prose, which may name the word to explain it. The view is written to
+# a scratch tree with the same paths, and every rule below reads that.
+VIEW="$(mktemp -d)"
+trap 'rm -rf "$VIEW"' EXIT
+while IFS= read -r file; do
+    mkdir -p "$VIEW/$(dirname "$file")"
+    awk '/^[[:space:]]*#\[cfg\(test\)\]/ { exit }
+         { if ($0 ~ /^[[:space:]]*\/\//) print ""; else print }' "$file" > "$VIEW/$file"
+done < <(find crates/*/src -name '*.rs' -type f 2> /dev/null \
+    | grep -v -E '/(tests|oracle_tests)/|/tests\.rs$|_tests\.rs$' | sort)
+
+production() (
+    cd "$VIEW" || exit 1
+    grep -rn --include='*.rs' -E "$1" crates 2> /dev/null || true
+)
 
 hits="$(production '"archived?"' | grep -v -E '"archived?"[[:space:]]*=>[[:space:]]*Err\(' || true)"
 if [ -n "$hits" ]; then
@@ -46,14 +57,23 @@ if [ -n "$hits" ]; then
     status=1
 fi
 
-hits="$(production '(rename|alias)[[:space:]]*=[[:space:]]*"[^"]*[Aa]rchiv')"
+# Across line breaks: an attribute may put `rename =` and its value on two lines.
+split_names() (
+    cd "$VIEW" || exit 1
+    find crates -name '*.rs' -type f -exec perl -0ne \
+        'print "$ARGV: $&\n" while /\b(?:rename|alias)\s*=\s*"[^"]*[Aa]rchiv[^"]*"/g' {} + || true
+)
+hits="$(split_names)"
 if [ -n "$hits" ]; then
     printf '%s\n' "$hits"
     echo "ERROR: a serde name containing \"archiv\" puts the word on the wire. See the rule at the top of scripts/vocabulary-check.sh."
     status=1
 fi
 
-hits="$(production '(^|[^A-Za-z0-9_])Archived?([^A-Za-z0-9_]|$)')"
+# Identifiers only: string contents are set aside first, so a message such as
+# "Archived keys are kept" is not read as a name.
+hits="$(production 'Archived?' | sed -E 's/"([^"\\]|\\.)*"/""/g' \
+    | grep -E '^[^:]+:[0-9]+:.*(^|[^A-Za-z0-9_])Archived?([^A-Za-z0-9_]|$)' || true)"
 if [ -n "$hits" ]; then
     printf '%s\n' "$hits"
     echo "ERROR: an identifier named bare \`Archive\` or \`Archived\`. The status is \`Retired\`; a clause 4.2 type names what is archived (\`ArchivedVersionPort\`)."

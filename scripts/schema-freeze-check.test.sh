@@ -31,6 +31,10 @@ cat > "$repo/schemas/widget/v1.0.0.json" <<'JSON'
     "mass": { "type": "number", "minimum": 0, "description": "In grams.", "x-disclosure": "public" },
     "description": { "type": "string", "x-disclosure": "public" },
     "colour": { "enum": ["red", "blue"], "examples": ["red"] }
+  },
+  "dependencies": {
+    "description": ["mass"],
+    "colour": { "required": ["mass"], "description": "A coloured widget states its mass." }
   }
 }
 JSON
@@ -92,6 +96,9 @@ run_case "a type changed" reject edit '.properties.mass.type = "string"'
 run_case "a disclosure annotation changed" reject edit '.properties.mass."x-disclosure" = "restricted"'
 run_case "a property named description removed" reject edit 'del(.properties.description)'
 run_case "an enum member added" reject edit '.properties.colour.enum += ["green"]'
+run_case "a dependency on a property named description changed" reject edit '.dependencies.description = ["colour"]'
+run_case "a dependency renamed" reject edit '.dependencies.title = .dependencies.description | del(.dependencies.description)'
+run_case "prose inside a schema dependency reworded" accept edit '.dependencies.colour.description = "Reworded."'
 run_case "moved with its \$id, a rule changed" reject move_then '.required = []'
 run_case "the released file deleted" reject delete
 run_case "the \$id changed" reject edit '."$id" = "https://example.test/other.json"'
