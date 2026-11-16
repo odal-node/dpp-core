@@ -34,6 +34,7 @@ ignore = [
 
 [licenses]
 version = 2
+unused-allowed-license = "allow"
 # Permissive only. This is not a preference: an Apache-2.0 crate that pulls a
 # reciprocal or copyleft dependency into a consumer's graph changes that
 # consumer's obligations without telling them.
