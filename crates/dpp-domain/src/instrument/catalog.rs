@@ -198,7 +198,7 @@ impl InstrumentCatalog {
     /// Whether any recorded act requires a passport for `product_group`.
     ///
     /// Independent of [`Self::determinable_for`]: an act may bind today and
-    /// require no passport (unsold goods), or require a passport whose date has
+    /// require no passport (electronics), or require a passport whose date has
     /// not arrived (batteries).
     #[must_use]
     pub fn passport_required_for(&self, product_group: &str) -> bool {
