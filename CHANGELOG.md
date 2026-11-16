@@ -13,6 +13,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-16
+
 ### Breaking
 
 - **`ObligationEvent` gains a `bundle` field.** It names the signed bundle an
@@ -47,6 +49,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     `DiscardedProductLine`, `DiscardedQuantity`, `DiscardReason` and
     `WasteTreatmentSplit` from `dpp_domain::product_group` to
     `dpp_domain::unsold_goods`. The crate-root re-exports are where they were.
+    `CnCategory` and `CnCategoryError`, which the old module re-exported, can no
+    longer be imported from `dpp_domain::product_group` or
+    `dpp_domain::product_group::data`; they stay at the crate root, in
+    `dpp_domain::identifier` and in `dpp_domain::unsold_goods`.
   - **The schema is a family of its own, with its version numbers kept.**
     `unsold-goods` v2.0.0 moved byte for byte from `schemas/unsold-goods/` to
     `document-schemas/unsold-goods/`, and is validated through
@@ -149,7 +155,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   under a verdict on the old content. Migration: a draft carrying a determination
   from before this change is reassessed and attached again before it can publish. A
   determination from before this change still reads, and a passport with none still
-  publishes. A struct literal of `ComplianceResult` adds `input_hash: None`. (#580)
+  publishes. A struct literal of `ComplianceResult` adds `input_hash: None`.
+  `dpp-domain` now always enables the `bundle` feature of `dpp-rules`, where the
+  content hash comes from, so a default build of `dpp-domain` also compiles
+  `serde_jcs`, `sha2`, `hex` and `base64`. (#580)
 
 - **The lineage substantiation rule takes more than one kind of evidence, and
   says which one backed each edge.** Reg. (EU) 2023/1542 Art. 77(7) moves
@@ -203,6 +212,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `initiate_transfer`, because nothing can add it once the record is in the chain.
   Code that built a chain with a struct literal builds it with `TransferChain::new`
   and `initiate_transfer`, or deserialises it. (#579)
+- **Whole-passport filtering drops the root proofs for every audience, and a
+  personal-data statement is withheld with the field it describes.** The raw
+  filter used to pass `jwsSignature`, `publicJwsSignature`,
+  `disclosureSignatures` and `seal` through to any audience allowed to see them,
+  and none of them covers the filtered body it sat beside. Migration: a caller
+  that serves the filter's output with a proof attaches one that covers the body
+  it serves. (#563)
+- **The default `patch_fields` refuses content changes once retention is
+  locked.** A key outside `RETENTION_MUTABLE_FIELDS` on a `retention_locked`
+  passport is refused with a validation error, where the default applied it.
+  Migration: a caller that patched a published passport's content through the
+  default gets the error instead; only the fields in `RETENTION_MUTABLE_FIELDS`
+  stay writable after publication. (#563)
 
 ### Added
 
@@ -331,6 +353,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   resolves the newest compatible release, and one that resolves to minimal
   versions now gets the releases this workspace is tested against. No public item
   names a `jsonschema` type, so the move to 0.61 changes no API. (#600)
+- `VersionedSchemaRegistry::validate` reports at most 100 errors for one
+  document, where it reported every one. A document with more failures is still
+  refused, with the first 100. (#563)
 
 ### Fixed
 
@@ -363,9 +388,6 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   table.
   The heading had been in the list since v0.19.0. (#570)
 
-- Whole-passport filtering drops the root proofs for every audience, and a
-  personal-data statement is withheld with the field it describes. (#563)
-- The default `patch_fields` refuses content changes once retention is locked. (#563)
 - A draft that carries a publication timestamp, or a suspended passport that
   carries none, cannot be published by skipping the mandatory-content gate. (#563)
 - Compromise rotation revokes every archived copy of the compromised key, not only
