@@ -113,12 +113,22 @@ lock-regen:
         (cd "$ws" && cargo update --workspace)
     done
 
+# The `pre-release-hook` in `crates/dpp-tests/Cargo.toml`, run by cargo-release
+# before it commits or publishes anything: refuse a checkout that is not
+# origin's main, then relock the two workspaces beside this one.
+pre-release: release-head-check relock
+
+# Refuse a release from anything but main as origin has it. Runs in a dry run
+# too, so the dry run shows the refusal. The reasons are in the script.
+release-head-check:
+    bash scripts/release-head-check.sh
+
 # Re-resolve the lockfiles of the two workspaces beside this one, after a version
 # moved. `plugins/` and `fuzz/` record the version of the workspace crates they
 # take by path, and cargo-release only sees this workspace, so it leaves both
-# lockfiles stale and `lock-check` red. It is the `pre-release-hook` in
-# `crates/dpp-tests/Cargo.toml`; it runs under `cargo release --dry-run` too,
-# so it does nothing there. By hand: `just relock`.
+# lockfiles stale and `lock-check` red. It is the second step of `pre-release`;
+# it runs under `cargo release --dry-run` too, so it does nothing there. By
+# hand: `just relock`.
 relock:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -258,6 +268,14 @@ fmt-plugins prefix=PLUGIN_PREFIX:
 changelog-check-self-test:
     bash scripts/changelog-check.test.sh
 
+# The release checks run only when a release is cut or a tag is pushed, the one
+# moment one that accepts everything would be found out. So each is proved to
+# refuse here, on every pull request, before a release depends on it.
+release-checks-self-test:
+    bash scripts/release-head-check.test.sh
+    bash scripts/release-tag-check.test.sh
+    bash scripts/release-crates-check.test.sh
+
 # Prove the vacuous-pass guards actually bite.
 #
 # Every looping gate above asserts it did some work, because the failure that
@@ -340,7 +358,7 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test doc lock-check audit
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test doc lock-check audit
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
