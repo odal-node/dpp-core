@@ -375,6 +375,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   which the JSON-LD comments in `dpp-vc` and `docs/architecture/DATA-MODEL.md` had
   described as a dotted path or an audience. Documentation only. (#578)
 
+- Workspace dependency versions are pinned to exact patch releases so downstream
+  consumers using `--minimal-versions` or old toolchains cannot resolve unexpectedly
+  old releases missing APIs or bug fixes. `serde` is now `1.0.229`, `anyhow` is
+  `1.0.104`, and `jsonschema` is `0.61.2`. (#600)
+
 ## [0.23.0] - 2026-11-03
 
 ### Breaking
