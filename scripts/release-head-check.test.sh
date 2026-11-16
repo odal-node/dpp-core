@@ -74,6 +74,15 @@ git -C "$release" switch -q -c feature
 commit "$release" "unmerged feature work"
 run_case "a feature branch" reject
 
+# A fetch refspec that does not map main leaves origin/main where it was, so
+# the check must fetch main into it explicitly rather than trust the config.
+git -C "$release" switch -q main
+git -C "$release" reset -q --hard origin/main
+git -C "$release" config remote.origin.fetch '+refs/heads/other:refs/remotes/origin/other'
+commit "$upstream" "merged while the tracking ref was not being updated"
+git -C "$upstream" push -q origin main
+run_case "a stale origin/main under a refspec that skips main" reject
+
 git -C "$release" remote set-url origin "$TMP/absent.git"
 run_case "an origin that cannot be fetched" reject
 

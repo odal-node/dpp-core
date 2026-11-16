@@ -59,7 +59,7 @@ for name in $crates; do
     if ! curl -fsSL --retry "$retries" --retry-delay 12 --retry-all-errors \
         -A "dpp-core release-crates-check" \
         -o "$file" "$crates_url/$name/$name-$version.crate"; then
-        printf '::error::%s %s is not on crates.io.\n' "$name" "$version" >&2
+        printf '::error::%s %s could not be downloaded: it is not published at this version, or crates.io could not be reached (re-run before touching the tag).\n' "$name" "$version" >&2
         bad=$((bad + 1))
         continue
     fi
