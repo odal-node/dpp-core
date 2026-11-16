@@ -25,7 +25,10 @@ fail() {
     exit 1
 }
 
-git fetch --quiet "$remote" main \
+# Into an explicit ref: a bare `git fetch <remote> main` updates the tracking ref
+# only when the configured refspec maps main to it, and a stale one would let a
+# HEAD that matches it pass while origin has moved on.
+git fetch --quiet "$remote" "+refs/heads/main:refs/remotes/$remote/main" \
     || fail "could not fetch $remote main, so this checkout cannot be compared with it."
 main="$(git rev-parse --verify "refs/remotes/$remote/main^{commit}")"
 head="$(git rev-parse --verify 'HEAD^{commit}')"

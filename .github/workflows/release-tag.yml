@@ -6,8 +6,9 @@
 # It runs after the publish, so it cannot stop one: `allow-branch` in Cargo.toml
 # and the pre-release hook (scripts/release-head-check.sh) do that. What it
 # catches is a tag made on the wrong commit, which would otherwise stand as the
-# name of a release it is not. A red run means: delete the tag and tag the
-# commit the crates record.
+# name of a release it is not. On a red run, read which step failed first: a crate
+# that could not be downloaded is crates.io or the network, so re-run; only a tag
+# on the wrong commit is deleted and made again on the commit the crates record.
 name: Release tag
 
 on:

@@ -186,9 +186,11 @@ will be published at, which tells you which of the two cases you are in.
    not on `main`, whose name is not `v` followed by that commit's `Cargo.toml` version
    (`scripts/release-tag-check.sh`), or whose commit is not the one every published
    crate records in its `.cargo_vcs_info.json` (`scripts/release-crates-check.sh`). It
-   cannot stop a publish, which has already happened; a red run means delete the tag
-   with `git tag -d v<version>` and `git push origin :refs/tags/v<version>`, then tag
-   the commit the crates record.
+   cannot stop a publish, which has already happened. On a red run, read which check
+   failed before touching the tag. A crate that could not be downloaded is crates.io
+   or the network, not the tag: re-run the workflow. Only when the tag names the wrong
+   commit, delete it with `git tag -d v<version>` and
+   `git push origin :refs/tags/v<version>`, then tag the commit the crates record.
 3. Create a GitHub Release from the tag, with a summary taken from CHANGELOG.md.
 4. Announce the release in the project's channels.
 

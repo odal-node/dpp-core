@@ -12,6 +12,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+# The fixture's commits must not depend on the machine's Git config: a global
+# `commit.gpgSign` would ask for a key the fixture identity does not have.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 repo="$TMP/repo"
 git init -q -b main "$repo"
