@@ -53,6 +53,10 @@ consolidate-commits = true
 tag-name    = "v{{version}}"
 tag-prefix  = ""
 tag-message = "Release version {{version}}"
+# A crates.io publish cannot be undone, and cargo-release's default allows any
+# branch. Every step refuses another branch by name, `publish` and `tag`
+# included; `scripts/release-head-check.sh` refuses a main that is not origin's.
+allow-branch = ["main"]
 
 # ---------------------------------------------------------------------------
 # Shared dependency versions — crates inherit these with `workspace = true`

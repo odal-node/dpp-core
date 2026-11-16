@@ -157,6 +157,15 @@ cargo release minor --workspace --exclude dpp-benches --execute
 Replace `minor` with `patch` or `major` as the [versioning policy](VERSIONING.md) requires.
 `--execute` also pushes the commit and tag to `origin` unless `--no-push` is given.
 
+**Run it from `main`, exactly as `origin` has it.** A crates.io publish cannot be undone,
+only yanked, so two checks stop a release from anything else before it publishes, in
+the dry run too. `allow-branch = ["main"]` in the root `Cargo.toml` makes every
+cargo-release step refuse another branch by name. The pre-release hook (`just
+pre-release`) then fetches and refuses a `main` that is behind `origin/main` or has
+commits it does not (`scripts/release-head-check.sh`). `allow-branch` binds every
+step, but the hook runs only in a full release: `cargo release publish` run as a single
+step skips it, so release with the full command above.
+
 Read the dry run's output rather than skimming it: it names the exact version each crate
 will be published at, which tells you which of the two cases you are in.
 
@@ -164,8 +173,26 @@ will be published at, which tells you which of the two cases you are in.
 
 1. Check that the crates appear on [crates.io](https://crates.io/) and that the docs.rs
    builds succeed.
-2. Create a GitHub Release from the tag, with a summary taken from CHANGELOG.md.
-3. Announce the release in the project's channels.
+2. Check that the `v<version>` tag is on `origin`. If cargo-release did not push one,
+   tag the commit the crates were published from **by its full hash**, since `git tag`
+   without a commit tags whatever is checked out:
+
+   ```bash
+   git tag -a v<version> <release-commit-sha> -m "Release version <version>"
+   git push origin v<version>
+   ```
+
+   Pushing the tag runs the **Release tag** workflow. It refuses a tag whose commit is
+   not on `main`, whose name is not `v` followed by that commit's `Cargo.toml` version
+   (`scripts/release-tag-check.sh`), or whose commit is not the one every published
+   crate records in its `.cargo_vcs_info.json` (`scripts/release-crates-check.sh`). It
+   cannot stop a publish, which has already happened. On a red run, read which check
+   failed before touching the tag. A crate that could not be downloaded is crates.io
+   or the network, not the tag: re-run the workflow. Only when the tag names the wrong
+   commit, delete it with `git tag -d v<version>` and
+   `git push origin :refs/tags/v<version>`, then tag the commit the crates record.
+3. Create a GitHub Release from the tag, with a summary taken from CHANGELOG.md.
+4. Announce the release in the project's channels.
 
 ## Yanking a release
 
