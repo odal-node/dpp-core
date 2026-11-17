@@ -16,7 +16,7 @@ export. It is stateless: no database, no HTTP server, no network I/O.
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fodal-node%2Fdpp-core%2Fmain%2FCargo.toml&query=%24.workspace.package%5B'rust-version'%5D&label=MSRV&prefix=Rust%20&logo=rust)](Cargo.toml)
 [![Docs](https://img.shields.io/badge/docs-docs.odal--node.io-blue)](https://docs.odal-node.io/core/overview/)
-[![Status: pre-production](https://img.shields.io/badge/status-pre--production-yellow)](#dpp-core)
+[![Status: alpha, pre-production](https://img.shields.io/badge/status-alpha%2C%20pre--production-yellow)](#dpp-core)
 
 Checked in CI against independent implementations of the standards it follows:
 
@@ -28,8 +28,8 @@ Checked in CI against independent implementations of the standards it follows:
 [![AAS (IDTA)](https://img.shields.io/github/actions/workflow/status/odal-node/dpp-core/aas-oracle.yml?branch=main&label=AAS%20%28IDTA%29)](https://github.com/odal-node/dpp-core/actions/workflows/aas-oracle.yml)
 
 > [!NOTE]
-> **Status: pre-production.** Published on crates.io and tested in CI, but not yet
-> used in production. Before 1.0, a minor version may change public APIs; every
+> **Status: alpha, pre-production.** Published on crates.io and tested in CI, but not
+> yet used in production. Before 1.0, a minor version may change public APIs; every
 > change is listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick start
