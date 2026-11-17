@@ -183,7 +183,7 @@ impl Drop for Issuer {
 /// What `dpp_vc` makes of a token under a Key Binding policy, or none: accepted
 /// with these claims, or refused.
 fn verdict(token: &str, issuer: &Issuer, vct: &str, policy: Option<&KeyBindingPolicy>) -> Value {
-    match verify(token, &issuer.public_key_b64, vct, now(), policy) {
+    match verify_under(token, &issuer.public_key_b64, vct, now(), policy) {
         Ok(claims) => json!({ "accepts": true, "payload": claims }),
         Err(e) => json!({ "accepts": false, "error": format!("{e:?}") }),
     }
@@ -204,6 +204,29 @@ fn full_disclosure_of(passport: &Value, vct: &str, cnf: Option<Value>) -> Value 
     Value::Object(claims)
 }
 
+/// An Ed25519 key given as base64url, the shape the corpus files use. `None`
+/// when it is not one.
+fn ed25519_key(public_key_b64: &str) -> Option<dpp_crypto::jws::PublicKey> {
+    let raw = B64.decode(public_key_b64).ok()?;
+    dpp_crypto::jws::PublicKey::from_bytes(dpp_crypto::jws::KeyAlgorithm::Ed25519, &raw).ok()
+}
+
+/// [`verify`] under a key given as base64url. A key that does not decode is
+/// refused as a bad signature, the same verdict `verify` gives a key that does
+/// not verify the token.
+fn verify_under(
+    token: &str,
+    public_key_b64: &str,
+    vct: &str,
+    now: DateTime<Utc>,
+    policy: Option<&KeyBindingPolicy>,
+) -> Result<Map<String, Value>, SdJwtVcError> {
+    match ed25519_key(public_key_b64) {
+        Some(key) => verify(token, &key, vct, now, policy),
+        None => Err(SdJwtVcError::BadSignature),
+    }
+}
+
 /// A credential for `passport`, bound to the Holder when `bound`.
 fn issue_for(
     issuer: &Issuer,
@@ -212,6 +235,7 @@ fn issue_for(
     vct: &str,
     bound: bool,
 ) -> SdJwt {
+    let holder = issuer.holder.public_key();
     issue(
         &issuer.store,
         KEY_ID,
@@ -221,7 +245,7 @@ fn issue_for(
             issuer: ISSUER,
             vct,
             issued_at: ISSUED_AT,
-            holder_key: bound.then(|| issuer.holder.verifying_key.to_bytes()),
+            holder_key: bound.then_some(&holder),
         },
     )
     .unwrap_or_else(|e| panic!("issuing a credential for {vct}: {e:?}"))
@@ -292,7 +316,7 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
             .expect("the Holder binds its presentation")
             .serialise();
         let challenge = challenge(&nonce);
-        let cnf = holder_key_confirmation(&issuer.holder.verifying_key.to_bytes());
+        let cnf = holder_key_confirmation(&issuer.holder.public_key());
         cases.push(json!({
             "id": format!("{key}/{version}/bound"),
             "productGroup": key,
@@ -491,7 +515,7 @@ fn disagreements(file: &Value) -> Vec<String> {
         });
         match (
             case["verdict"].as_str(),
-            verify(token, key, vct, now, policy.as_ref()),
+            verify_under(token, key, vct, now, policy.as_ref()),
         ) {
             (Some("accept"), Ok(claims)) => {
                 // `expected` is optional in the file: a case without it is judged

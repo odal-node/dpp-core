@@ -237,10 +237,11 @@ Compact JWS signing (EdDSA with Ed25519):
 
 The single place JWS verification lives:
 
-- `verify_jws(jws, public_key_b64)`: verify a JWS against a base64-encoded public key
-- `resolve_verification_key(did_document, jws)`: the Ed25519 public key of the
-  verification method the JWS `kid` names, after the Controlled Identifiers v1.0 binding
-  checks. No `kid`, no key
+- `verify_jws(jws, key)`: verify a JWS against a `PublicKey`, which carries the algorithm
+  the key is used under
+- `resolve_verification_key(did_document, jws)`: the `PublicKey` (Ed25519 in this
+  release) of the verification method the JWS `kid` names, after the Controlled
+  Identifiers v1.0 binding checks. No `kid`, no key
 
 ---
 

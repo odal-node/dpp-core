@@ -90,9 +90,9 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
 
 /// One verification method: a `JsonWebKey` identified by its own thumbprint.
 fn verification_method(did: &str, key: &PublicKeyInfo) -> anyhow::Result<Value> {
-    let public_key = hex::decode(&key.verifying_key_hex)?;
+    let public_key = key.public_key()?;
     Ok(json!({
-        "id": format!("{did}#{}", key.algorithm.thumbprint_uri(&public_key)),
+        "id": format!("{did}#{}", public_key.thumbprint_uri()),
         "type": "JsonWebKey",
         "controller": did,
         // The JWK shape comes from the algorithm recorded on the key, not from
@@ -100,6 +100,6 @@ fn verification_method(did: &str, key: &PublicKeyInfo) -> anyhow::Result<Value> 
         // algorithm, and `dpp-crypto` is the crate that knows which is which.
         // Per key, so a rotation across algorithms produces a document carrying
         // both shapes rather than one mislabelled.
-        "publicKeyJwk": key.algorithm.published_jwk(&public_key)
+        "publicKeyJwk": public_key.published_jwk()
     }))
 }

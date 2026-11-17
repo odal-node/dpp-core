@@ -61,7 +61,7 @@ fn issued_to(cnf: Value) -> SdJwt {
 }
 
 fn issued(holder: &KeyEntry) -> SdJwt {
-    issued_to(holder_key_confirmation(&holder.verifying_key.to_bytes()))
+    issued_to(holder_key_confirmation(&holder.public_key()))
 }
 
 fn every_digest(sd_jwt: &SdJwt) -> Vec<String> {
@@ -98,10 +98,17 @@ fn kb_header() -> Value {
 
 #[test]
 fn the_issuer_names_the_holder_key_with_the_jwk_confirmation_method() {
-    let key = [7u8; 32];
+    // The public half of a fixed seed: a valid Ed25519 key, and a reproducible one.
+    let key = crate::jws::PublicKey::from_bytes(
+        crate::jws::KeyAlgorithm::Ed25519,
+        ed25519_dalek::SigningKey::from_bytes(&[2u8; 32])
+            .verifying_key()
+            .as_bytes(),
+    )
+    .expect("the public half of a seed is a valid key");
     assert_eq!(
         holder_key_confirmation(&key),
-        json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key) } })
+        json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key.as_bytes()) } })
     );
 }
 
@@ -176,7 +183,7 @@ fn a_holder_key_must_be_named_and_be_ed25519() {
         p256.present_with_key_binding(&[], &binding(), &key).err(),
         Some(SdJwtError::UnsupportedHolderKey)
     );
-    let mut declared = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let mut declared = holder_key_confirmation(&key.public_key());
     declared["jwk"]["alg"] = json!("ES256");
     assert_eq!(
         issued_to(declared)
@@ -204,10 +211,7 @@ fn a_holder_cannot_bind_with_a_key_the_token_does_not_name() {
 fn a_concealed_holder_key_has_to_be_presented() {
     let key = holder("kb-concealed-cnf");
     let mut claims = Map::new();
-    claims.insert(
-        "cnf".to_owned(),
-        holder_key_confirmation(&key.verifying_key.to_bytes()),
-    );
+    claims.insert("cnf".to_owned(), holder_key_confirmation(&key.public_key()));
     let (kept, disclosures) = conceal(&claims, |_| true).unwrap();
     let sd_jwt = SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures);
     assert_eq!(
@@ -410,7 +414,7 @@ fn the_type_is_compared_as_a_media_type() {
 #[test]
 fn a_declared_algorithm_is_the_one_written_and_held_to() {
     let key = holder("kb-declared");
-    let mut cnf = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let mut cnf = holder_key_confirmation(&key.public_key());
     cnf["jwk"]["alg"] = json!("Ed25519");
     let presented = issued_to(cnf)
         .present_with_key_binding(&[], &binding(), &key)

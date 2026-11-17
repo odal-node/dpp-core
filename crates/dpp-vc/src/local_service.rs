@@ -81,10 +81,10 @@ impl IdentityPort for LocalIdentityService {
         let did_doc = build_did_document(&self.store, &self.base_url, &self.key_id)
             .map_err(|e| DppError::Signing(e.to_string()))?;
 
-        let pub_key_b64 = resolve_verification_key(&did_doc, jws)
+        let key = resolve_verification_key(&did_doc, jws)
             .ok_or_else(|| DppError::Signing("no matching public key in DID document".into()))?;
 
-        if !verify_jws(jws, &pub_key_b64).map_err(|e| DppError::Signing(e.to_string()))? {
+        if !verify_jws(jws, &key).map_err(|e| DppError::Signing(e.to_string()))? {
             return Ok(false);
         }
 

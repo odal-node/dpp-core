@@ -114,7 +114,7 @@ fn the_claims_the_issuer_sets_are_never_disclosable() {
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
-            holder_key: Some(holder.verifying_key.to_bytes()),
+            holder_key: Some(&holder.public_key()),
         },
     )
     .expect("issue");

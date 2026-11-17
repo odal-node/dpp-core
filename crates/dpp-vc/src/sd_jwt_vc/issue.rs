@@ -35,7 +35,7 @@ pub struct Issuance<'a> {
     /// 2.2.2.3 recommends, and which Key Binding requires: a presentation must then
     /// carry a Key Binding JWT signed by this key. `None` issues a credential that
     /// anyone holding a copy can present as their own (RFC 9901 clause 9.5).
-    pub holder_key: Option<[u8; 32]>,
+    pub holder_key: Option<&'a dpp_crypto::jws::PublicKey>,
 }
 
 /// Build and sign an SD-JWT VC over `payload`.
@@ -99,7 +99,7 @@ pub fn issue(
     // Clause 2.2.2.3: REQUIRED when Key Binding is to be supported, and never in a
     // Disclosure.
     if let Some(key) = credential.holder_key {
-        claims.insert("cnf".to_owned(), holder_key_confirmation(&key));
+        claims.insert("cnf".to_owned(), holder_key_confirmation(key));
     }
 
     let mut disclosures = Vec::new();

@@ -31,13 +31,30 @@ fn arb_json() -> impl Strategy<Value = serde_json::Value> {
     })
 }
 
+/// A fixed Ed25519 key, so verification reaches the signature check.
+fn fixed_key() -> super::PublicKey {
+    let ed = ed25519_dalek::SigningKey::from_bytes(&[7; 32]).verifying_key();
+    super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, ed.as_bytes()).expect("ed")
+}
+
+/// The Ed25519 key a base64url string names, when it names one.
+fn key_named_by(public_key_b64: &str) -> Option<super::PublicKey> {
+    let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(public_key_b64)
+        .ok()?;
+    super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, &raw).ok()
+}
+
 proptest! {
     /// `verify_jws` must never panic on arbitrary compact-JWS-shaped input —
     /// it should fail closed (`Ok(false)`) or report a parse error (`Err`),
-    /// never crash the process that's verifying an untrusted signature.
+    /// never crash the process that's verifying an untrusted signature. The key
+    /// is fuzzed as well: a string that names an Ed25519 key is verified under
+    /// that key, and any other string under `fixed_key()`.
     #[test]
     fn verify_jws_never_panics(jws in ".{0,128}", public_key_b64 in ".{0,64}") {
-        let _ = verify_jws(&jws, &public_key_b64);
+        let key = key_named_by(&public_key_b64).unwrap_or_else(fixed_key);
+        let _ = verify_jws(&jws, &key);
     }
 
     /// Same property, restricted to strings that at least have the right
@@ -48,7 +65,7 @@ proptest! {
         header in ".{0,32}", payload in ".{0,64}", sig in ".{0,32}"
     ) {
         let jws = format!("{header}.{payload}.{sig}");
-        let _ = verify_jws(&jws, &sig);
+        let _ = verify_jws(&jws, &fixed_key());
     }
 
     /// `extract_kid_from_jws` must never panic on arbitrary input.

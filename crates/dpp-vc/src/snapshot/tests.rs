@@ -11,9 +11,8 @@ use crate::test_support::temp_store;
 
 const KEY: &str = "snapshot-signer";
 
-fn public_key_b64(store: &KeyStore) -> String {
-    let entry = store.load_key(KEY).expect("load key");
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(entry.verifying_key.to_bytes())
+fn public_key(store: &KeyStore) -> dpp_crypto::jws::PublicKey {
+    store.load_key(KEY).expect("load key").public_key()
 }
 
 /// A stand-in for the publish-time proof, which these tests only ever carry
@@ -69,7 +68,7 @@ fn snapshot(store: &KeyStore, as_of: chrono::DateTime<Utc>, valid_for: Duration)
 #[test]
 fn a_document_with_no_outer_proof_is_unbound() {
     let store = temp_store("snapshot-unbound", KEY);
-    let bound = verify_snapshot_bound(&public_view(), &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&public_view(), &public_key(&store), Utc::now());
 
     assert_eq!(bound, SnapshotBound::Absent);
     assert!(!bound.is_expired());
@@ -82,11 +81,7 @@ fn a_snapshot_inside_its_bound_is_current() {
     let as_of = Utc::now();
     let document = snapshot(&store, as_of, Duration::days(7));
 
-    let bound = verify_snapshot_bound(
-        &document,
-        &public_key_b64(&store),
-        as_of + Duration::days(1),
-    );
+    let bound = verify_snapshot_bound(&document, &public_key(&store), as_of + Duration::days(1));
 
     assert!(matches!(bound, SnapshotBound::Current { .. }), "{bound:?}");
     assert!(!bound.is_expired());
@@ -102,7 +97,7 @@ fn a_snapshot_past_its_bound_is_expired() {
     let as_of = Utc::now() - Duration::days(30);
     let document = snapshot(&store, as_of, Duration::days(7));
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     let SnapshotBound::Expired {
         as_of: reported,
@@ -128,7 +123,7 @@ fn an_expired_snapshot_is_not_reported_as_tampering() {
     let as_of = Utc::now() - Duration::days(30);
     let document = snapshot(&store, as_of, Duration::days(7));
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert!(
         !matches!(bound, SnapshotBound::Unproven(_)),
@@ -150,7 +145,7 @@ fn a_forged_valid_until_does_not_extend_the_bound() {
         json!((Utc::now() + Duration::days(365)).to_rfc3339_opts(SecondsFormat::Secs, true)),
     );
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert!(
         matches!(bound, SnapshotBound::Unproven(_)),
@@ -173,7 +168,7 @@ fn the_outer_proof_covers_the_publish_time_proof() {
         json!(format!("{}-swapped", frozen_public_proof())),
     );
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert!(matches!(bound, SnapshotBound::Unproven(_)), "{bound:?}");
 }
@@ -188,7 +183,7 @@ fn a_tampered_passport_field_leaves_the_bound_unproven() {
         .expect("object")
         .insert("productName".to_owned(), json!("Something Else"));
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert!(matches!(bound, SnapshotBound::Unproven(_)), "{bound:?}");
 }
@@ -199,7 +194,7 @@ fn a_proof_from_another_key_is_unproven() {
     let other = temp_store("snapshot-wrong-key-other", KEY);
     let document = snapshot(&signer, Utc::now(), Duration::days(7));
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&other), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&other), Utc::now());
 
     assert!(matches!(bound, SnapshotBound::Unproven(_)), "{bound:?}");
 }
@@ -222,7 +217,7 @@ fn a_stripped_proof_leaves_the_dates_vouched_for_by_nobody() {
         .expect("object")
         .remove("snapshotJwsSignature");
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert_eq!(bound, SnapshotBound::Absent);
     assert!(
@@ -243,7 +238,7 @@ fn the_expiry_edge_is_the_stated_skew_tolerance() {
     let store = temp_store("snapshot-skew", KEY);
     let as_of = Utc::now().trunc_subsecs(0);
     let document = snapshot(&store, as_of, Duration::days(7));
-    let key = public_key_b64(&store);
+    let key = public_key(&store);
     let deadline = as_of + Duration::days(7);
 
     let at_the_edge = verify_snapshot_bound(&document, &key, deadline + CLOCK_SKEW_TOLERANCE);
@@ -297,7 +292,7 @@ fn a_snapshot_survives_the_round_trip_through_bytes() {
     let bytes = serde_json::to_vec(&document).expect("serialise snapshot");
     let parsed: Value = serde_json::from_slice(&bytes).expect("parse snapshot");
 
-    let bound = verify_snapshot_bound(&parsed, &public_key_b64(&store), as_of + Duration::days(1));
+    let bound = verify_snapshot_bound(&parsed, &public_key(&store), as_of + Duration::days(1));
 
     assert!(
         matches!(bound, SnapshotBound::Current { .. }),
@@ -310,7 +305,7 @@ fn a_non_object_document_is_unproven_rather_than_unbound() {
     let store = temp_store("snapshot-not-an-object", KEY);
     let bound = verify_snapshot_bound(
         &json!(["not", "a", "snapshot"]),
-        &public_key_b64(&store),
+        &public_key(&store),
         Utc::now(),
     );
 
@@ -327,7 +322,7 @@ fn a_non_string_proof_is_unproven() {
         .expect("object")
         .insert("snapshotJwsSignature".to_owned(), json!(42));
 
-    let bound = verify_snapshot_bound(&document, &public_key_b64(&store), Utc::now());
+    let bound = verify_snapshot_bound(&document, &public_key(&store), Utc::now());
 
     assert!(matches!(bound, SnapshotBound::Unproven(_)), "{bound:?}");
 }

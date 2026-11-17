@@ -1,15 +1,8 @@
-use aes_gcm::{
-    Nonce,
-    aead::{Aead, consts::U12},
-};
 use anyhow::Result;
-use rand::Rng;
-use sha2::{Digest, Sha256};
-use zeroize::Zeroize;
 
-use super::entry::KeyEntry;
+use super::entry::{KeyEntry, SigningMaterial};
 use super::store::{KeyRecord, KeyStore};
-use ed25519_dalek::SigningKey;
+use crate::jws::algorithm::KeyAlgorithm;
 
 /// Build the archived-record key for `key_id`.
 ///
@@ -73,35 +66,12 @@ impl KeyStore {
         }
 
         // Prepare the new key material up front so the lock-held section is just
-        // the in-memory swap + single persist.
-        let signing_key = SigningKey::generate(&mut crate::os_rng());
-        let verifying_key = signing_key.verifying_key();
-        let fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
-        let verifying_key_hex = hex::encode(verifying_key.as_bytes());
-        let mut nonce_bytes = [0u8; 12];
-        crate::os_rng().fill_bytes(&mut nonce_bytes);
-        let nonce = <&Nonce<U12>>::from(&nonce_bytes);
-        let mut raw = signing_key.to_bytes();
-        // Bound to the new key's own fingerprint. The archived copy below keeps
-        // the one it was sealed under, which is why the binding is to the
-        // fingerprint rather than the map key it is filed at.
-        let encrypted = self
-            .cipher
-            .encrypt(
-                nonce,
-                aes_gcm::aead::Payload {
-                    msg: raw.as_ref(),
-                    aad: fingerprint.as_bytes(),
-                },
-            )
-            .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
-        raw.zeroize();
-        let new_record = KeyRecord::new(
-            encrypted,
-            nonce_bytes.to_vec(),
-            fingerprint.clone(),
-            verifying_key_hex,
-        );
+        // the in-memory swap + single persist. Bound to the new key's own
+        // fingerprint. The archived copy below keeps the one it was sealed under,
+        // which is why the binding is to the fingerprint rather than the map key it
+        // is filed at.
+        let (new_record, entry) =
+            self.seal_new_record(SigningMaterial::generate(KeyAlgorithm::Ed25519))?;
 
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
@@ -130,12 +100,6 @@ impl KeyStore {
             self.persist_envelope(&map)?;
         }
 
-        Ok(KeyEntry {
-            signing_key,
-            verifying_key,
-            fingerprint,
-            revoked: false,
-            algorithm: super::store::default_algorithm(),
-        })
+        Ok(entry)
     }
 }

@@ -13,6 +13,77 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Verification takes a `PublicKey`, not base64 text.**
+  `jws::verifier::verify_jws` takes `&PublicKey`, a validated key that carries the
+  algorithm it is used under. Build the key once with
+  `PublicKey::from_bytes(KeyAlgorithm::Ed25519, &raw)` or `PublicKey::from_jwk(&jwk)`,
+  and pass `&key` where a base64url string was passed. A key that is not a point on
+  the curve is refused when it is built, not when a signature is checked against it.
+  (#586)
+
+- **`resolve_verification_key` returns `Option<PublicKey>`.** It returned the base64url
+  `x` of the verification method's JWK. Pass the returned key to `verify_jws` as it
+  is, or call `as_bytes()` or `jwk()` where the text was used. It also returns `None`
+  when the JWK's `x` is not a point on the curve, and when the JWS names an algorithm
+  other than the key's (`EdDSA` or `Ed25519`), even where the JWK declares no `alg`.
+  Before, such a token resolved to the key and was refused by `verify_jws`. Treat
+  `None` as the answer for those tokens. (#586)
+
+- **Invalid keys are refused where they are read.** `PublicKeyInfo::thumbprint_uri`,
+  `build_did_document` and the SD-JWT VC issuer metadata now refuse a recorded public
+  key that is not an Ed25519 point, with an error, where they derived an identifier
+  from its bytes before. A Holder key in `cnf` that is not a point is refused as
+  `SdJwtError::UnsupportedHolderKey`, where it was refused as `HolderKeyMismatch` or
+  as a bad signature before. Keys a store generates are always points, so no stored
+  key is affected unless the store was edited by hand. Migration: none. (#586)
+
+- **`sd_jwt::holder_key_confirmation` takes a `PublicKey`.** It took the raw key bytes.
+  Migration: `holder_key_confirmation(&PublicKey::from_bytes(KeyAlgorithm::Ed25519,
+  &raw)?)`, or `holder_key_confirmation(&entry.public_key())` for a key the store holds.
+  (#586)
+
+- **The raw-byte key methods on `KeyAlgorithm` are removed.** `public_key_jwk`,
+  `jwk_thumbprint`, `thumbprint_uri` and `published_jwk` took the key bytes. Migration:
+  call `jwk()`, `thumbprint()`, `thumbprint_uri()` and `published_jwk()` on a
+  `PublicKey`. The thumbprint and the JWK of an Ed25519 key are unchanged. (#586)
+
+- **`KeyEntry` no longer exposes its key material.** The public `signing_key` and
+  `verifying_key` fields are removed. Migration: `entry.public_key()` for the public
+  half and `entry.sign(message)` for a signature. `fingerprint`, `revoked` and
+  `algorithm` stay public. (#586)
+
+- **`sd_jwt_vc::Issuance::holder_key` takes a `PublicKey`.** It was
+  `Option<[u8; 32]>` and is now `Option<&PublicKey>`. Migration:
+  `holder_key: Some(&holder.public_key())`. (#586)
+
+- **`sd_jwt_vc::verify` takes a `PublicKey`.** The second argument was the base64url
+  key. Migration: pass the `PublicKey` built as above. (#586)
+
+- **`verify_snapshot_bound` takes a `PublicKey`.** It is re-exported as
+  `dpp_vc::verify_snapshot_bound`, and its second argument was the base64url key.
+  Migration: pass the `PublicKey` built as above. (#586)
+
+### Added
+
+- **`jws::PublicKey`, a validated public key and its algorithm.** It is built with
+  `from_bytes` or `from_jwk`, and reads back as `algorithm`, `as_bytes`, `jwk`,
+  `thumbprint`, `thumbprint_uri` and `published_jwk`. `verify` checks a signature
+  under it. (#586)
+
+- **`jws::PublicKeyError`**, why bytes were refused as a public key. (#586)
+
+- **`jws::KeyAlgorithm` is re-exported at the `jws` root**, as
+  `dpp_crypto::jws::KeyAlgorithm`. It was reachable at `jws::algorithm::KeyAlgorithm`
+  and still is. (#586)
+
+- **`keystore::PublicKeyInfo::public_key()`** returns the recorded key as a
+  `PublicKey`, validated as a key of its recorded algorithm. (#586)
+
+- **`keystore::KeyEntry::public_key()` and `sign()`**, the public half of a key pair
+  and a signature under it. (#586)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking

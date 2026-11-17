@@ -110,7 +110,7 @@ fn add(out: &mut Vec<Bound>, id: &str, clause: &'static str, token: String) {
 pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
     let key = holder("sdjwt-oracle-holder");
     let stranger = holder("sdjwt-oracle-stranger");
-    let cnf = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let cnf = holder_key_confirmation(&key.public_key());
     let sd_jwt = issued(issuer, Some(cnf.clone()), false);
     let all = every(&sd_jwt);
     let mut out = Vec::new();

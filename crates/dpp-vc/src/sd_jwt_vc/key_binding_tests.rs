@@ -38,7 +38,7 @@ fn bound(store: &KeyStore, holder: &KeyEntry) -> SdJwt {
             issuer: ISSUER,
             vct: &vct(),
             issued_at: ISSUED_AT,
-            holder_key: Some(holder.verifying_key.to_bytes()),
+            holder_key: Some(&holder.public_key()),
         },
     )
     .expect("issue")
@@ -69,7 +69,7 @@ fn verify_as(
     store: &KeyStore,
     policy: Option<&KeyBindingPolicy>,
 ) -> Result<Map<String, Value>, SdJwtVcError> {
-    verify(token, &public_key_b64(store), &vct(), now(), policy)
+    verify(token, &public_key(store), &vct(), now(), policy)
 }
 
 /// The JWT's payload as signed, without processing any Disclosure.
@@ -92,7 +92,7 @@ fn a_bound_credential_names_the_holder_key_in_the_clear() {
 
     assert_eq!(
         signed_payload(&credential)["cnf"],
-        holder_key_confirmation(&holder.verifying_key.to_bytes())
+        holder_key_confirmation(&holder.public_key())
     );
     assert!(
         credential
@@ -129,10 +129,7 @@ fn a_bound_presentation_verifies_under_the_policy_and_reads_to_what_was_chosen()
             .get("stateOfHealthPct")
             .is_none()
     );
-    assert_eq!(
-        claims["cnf"],
-        holder_key_confirmation(&holder.verifying_key.to_bytes())
-    );
+    assert_eq!(claims["cnf"], holder_key_confirmation(&holder.public_key()));
 }
 
 /// RFC 9901 clause 4: a Verifier that expects an SD-JWT MUST find the last
@@ -220,7 +217,7 @@ fn credential_concealing(store: &KeyStore, conceal_if: &[&str], nested: bool) ->
         "iat": ISSUED_AT,
         "nbf": ISSUED_AT - 10,
         "exp": ISSUED_AT + 3600,
-        "cnf": holder_key_confirmation(&holder.verifying_key.to_bytes()),
+        "cnf": holder_key_confirmation(&holder.public_key()),
         "vct#integrity": "sha256-WUbW3HSBb8BUkkn7WN2xKkGXRx6gDwYn8vFLnzzYfMM",
         "aka_vcts": ["https://credentials.example/other"],
         "status": { "status_list": { "idx": 0, "uri": "https://status.example/1" } },

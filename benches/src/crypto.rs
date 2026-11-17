@@ -1,4 +1,3 @@
-use base64::Engine;
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use dpp_crypto::{
     jws::canonicalize, jws::signer, jws::verifier as jws_verifier, keystore::KeyStore,
@@ -13,23 +12,28 @@ use tempfile::TempDir;
 /// A key store with one key, and what the sign and verify benches share: the
 /// payload, its signature, and the key's public half. The `TempDir` holds the
 /// store's file and must outlive the store.
-fn setup() -> (KeyStore, TempDir, String, serde_json::Value, String, String) {
+fn setup() -> (
+    KeyStore,
+    TempDir,
+    String,
+    serde_json::Value,
+    String,
+    dpp_crypto::jws::PublicKey,
+) {
     let (store, dir) = keystore("bench");
 
     let payload = json!({"passport_id": "bench-001", "status": "draft"});
     let jws = signer::sign(&store, "bench", &payload, "bench-kid").expect("sign");
 
-    let entry = store.load_key("bench").expect("load key");
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    let pub_key_b64 = b64.encode(entry.verifying_key.as_bytes());
+    let public_key = store.load_key("bench").expect("load key").public_key();
 
-    (store, dir, "bench".to_owned(), payload, jws, pub_key_b64)
+    (store, dir, "bench".to_owned(), payload, jws, public_key)
 }
 
 /// Signing and verifying a small payload, then whole passports of 1, 50 and 500
 /// materials.
 fn crypto_benchmarks(c: &mut Criterion) {
-    let (store, _dir, key_id, payload, jws, pub_key_b64) = setup();
+    let (store, _dir, key_id, payload, jws, public_key) = setup();
 
     c.bench_function("jws_sign", |b| {
         b.iter(|| signer::sign(&store, &key_id, &payload, "bench-kid").unwrap());
@@ -40,7 +44,7 @@ fn crypto_benchmarks(c: &mut Criterion) {
     });
 
     c.bench_function("jws_verify_standalone", |b| {
-        b.iter(|| jws_verifier::verify_jws(&jws, &pub_key_b64).unwrap());
+        b.iter(|| jws_verifier::verify_jws(&jws, &public_key).unwrap());
     });
 
     // The payload above is two keys; a published passport is the whole record.
@@ -72,7 +76,7 @@ fn crypto_benchmarks(c: &mut Criterion) {
     for (materials, _, jws, bytes) in &signed {
         verify.throughput(Throughput::Bytes(*bytes));
         verify.bench_with_input(BenchmarkId::from_parameter(materials), jws, |b, jws| {
-            b.iter(|| jws_verifier::verify_jws(jws, &pub_key_b64).unwrap())
+            b.iter(|| jws_verifier::verify_jws(jws, &public_key).unwrap())
         });
     }
     verify.finish();
