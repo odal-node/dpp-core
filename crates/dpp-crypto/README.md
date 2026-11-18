@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
 Cryptographic primitives for EU Digital Product Passports: key management in which every
-key carries its signature algorithm (Ed25519 is the only one available), JWS signing and
+key carries its signature algorithm (Ed25519, or ES256 on P-256), JWS signing and
 verification, JCS canonicalisation, JAdES baseline signature construction, and an
 AES-256-GCM encrypted keystore with Argon2id key derivation and rotation. Part of
 [dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
@@ -21,7 +21,7 @@ a domain type.
 ## When to use this crate
 
 - You need to sign or verify passport data as a compact JWS. Every key records its
-  algorithm, and Ed25519 (`EdDSA`) is the only one available.
+  algorithm: Ed25519 (`EdDSA`), or P-256 (`ES256`).
 - You need JCS canonicalisation, so two nodes produce byte-identical payloads before
   signing.
 - You manage signing keys at rest (generation, rotation, revocation, archival) with
@@ -70,8 +70,9 @@ cargo run -p dpp-crypto --example sign_and_verify
 - `KeyStore::public_key` and `PublicKeyInfo` are public so the `did:web` builder in
   `dpp-vc` can read public key material and revocation state. Neither exposes private
   key material.
-- Every key carries its algorithm. Ed25519 is the only one available: signing uses
-  `alg: "EdDSA"` with curve `Ed25519`, per RFC 8037.
+- Every key carries its algorithm. Ed25519 signs with `alg: "EdDSA"` and curve
+  `Ed25519`, per RFC 8037. P-256 signs with `alg: "ES256"`, with RFC 6979 deterministic
+  nonces and low-S signatures, per RFC 7518 section 3.4.
 - The `jades` module produces a **structurally conformant** JAdES-B-B signature. That
   does not make it *qualified*: under Regulation (EU) No 910/2014 a qualified signature
   needs a qualified certificate, a qualified creation device and the trust service

@@ -2,20 +2,29 @@
 //!
 //! Every verification path takes one of these, never raw bytes. The algorithm
 //! travels with the key, so a JWS header can only *confirm* it (see
-//! the verifier's header check) and never select it.
+//! the verifier's header check) and never select it. Nothing here infers an
+//! algorithm from a length: an Ed25519 signature and an ES256 signature are both
+//! 64 bytes.
 
 use base64::Engine;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use super::algorithm::{ED25519_CRV, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
+use super::algorithm::{ED25519_CRV, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, P256_CRV};
 use super::error::PublicKeyError;
+
+/// The length of a P-256 field element, and so of each of `x`, `y`, `R` and `S`.
+const P256_FIELD_LEN: usize = 32;
 
 /// A validated public key and its algorithm.
 ///
-/// Constructed through [`Self::from_bytes`] or [`Self::from_jwk`], both of which
-/// refuse an encoding that is not a key of that algorithm (an Ed25519 encoding
-/// that does not decode to a curve point), or from a key that is already parsed.
+/// Constructed only through [`Self::from_bytes`] or [`Self::from_jwk`], both of
+/// which refuse an encoding that is not a key of that algorithm (an Ed25519
+/// encoding that does not decode to a curve point, or a P-256 encoding that is not
+/// a point on the curve). P-256 keys are held in the SEC1 uncompressed form,
+/// whatever form they arrived in, so two encodings of one key compare equal and
+/// fingerprint the same. Inside this crate, a key that is already parsed is wrapped
+/// without a check.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublicKey {
     key: Key,
@@ -28,6 +37,12 @@ pub struct PublicKey {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Key {
     Ed25519(ed25519_dalek::VerifyingKey),
+    /// The parsed P-256 key, with its 65-byte SEC1 uncompressed encoding beside it.
+    /// The key's own `Clone`, `Debug`, `PartialEq` and `Eq` make these derives hold.
+    EcdsaP256 {
+        key: p256::ecdsa::VerifyingKey,
+        sec1: Vec<u8>,
+    },
 }
 
 impl PublicKey {
@@ -43,6 +58,11 @@ impl PublicKey {
                     .map_err(|_| PublicKeyError::Ed25519)?;
                 Ok(Self::from_ed25519_key(key))
             }
+            KeyAlgorithm::EcdsaP256 => {
+                let key = p256::ecdsa::VerifyingKey::from_sec1_bytes(bytes)
+                    .map_err(|_| PublicKeyError::P256)?;
+                Ok(Self::from_p256_key(key))
+            }
         }
     }
 
@@ -54,27 +74,41 @@ impl PublicKey {
         }
     }
 
+    /// A public key from a P-256 verifying key that is already parsed. Its SEC1
+    /// uncompressed encoding is kept beside it, so [`Self::as_bytes`] can borrow.
+    pub(crate) fn from_p256_key(key: p256::ecdsa::VerifyingKey) -> Self {
+        let sec1 = key.to_sec1_point(false).as_bytes().to_vec();
+        Self {
+            key: Key::EcdsaP256 { key, sec1 },
+        }
+    }
+
     /// The algorithm this key is used under.
     #[must_use]
     pub fn algorithm(&self) -> KeyAlgorithm {
         match self.key {
             Key::Ed25519(_) => KeyAlgorithm::Ed25519,
+            Key::EcdsaP256 { .. } => KeyAlgorithm::EcdsaP256,
         }
     }
 
-    /// The key's bytes: the 32-byte Ed25519 public key.
+    /// The key's bytes: the 32-byte Ed25519 public key, or the 65-byte SEC1
+    /// uncompressed point for P-256.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match &self.key {
             Key::Ed25519(key) => key.as_bytes(),
+            Key::EcdsaP256 { sec1, .. } => sec1.as_slice(),
         }
     }
 
     /// Read a public key from a JWK.
     ///
     /// `OKP` must say `crv: Ed25519`, and the `x` member must be a point on the
-    /// curve. `None` for any other key type or curve, so a JWK cannot be
-    /// mis-selected into a verification path it was not written for.
+    /// curve. `EC` must say `crv: P-256`, with full-length `x` and `y` (RFC 7518
+    /// §6.2.1.2 and §6.2.1.3 require the full size of a coordinate), and the point
+    /// must be on the curve. `None` for any other key type or curve, so a JWK
+    /// cannot be mis-selected into a verification path it was not written for.
     #[must_use]
     pub fn from_jwk(jwk: &Value) -> Option<Self> {
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -84,15 +118,27 @@ impl PublicKey {
                 let x = b64.decode(member("x")?).ok()?;
                 Self::from_bytes(KeyAlgorithm::Ed25519, &x).ok()
             }
+            "EC" if member("crv")? == P256_CRV => {
+                let x = b64.decode(member("x")?).ok()?;
+                let y = b64.decode(member("y")?).ok()?;
+                if x.len() != P256_FIELD_LEN || y.len() != P256_FIELD_LEN {
+                    return None;
+                }
+                let mut sec1 = Vec::with_capacity(1 + 2 * P256_FIELD_LEN);
+                sec1.push(0x04);
+                sec1.extend_from_slice(&x);
+                sec1.extend_from_slice(&y);
+                Self::from_bytes(KeyAlgorithm::EcdsaP256, &sec1).ok()
+            }
             _ => None,
         }
     }
 
     /// The JWK members describing this key, for a DID document's `publicKeyJwk`:
-    /// its type, its curve and its coordinate. No `kid` and no `alg`.
+    /// its type, its curve and its coordinates. No `kid` and no `alg`.
     ///
     /// The per-algorithm match lives here rather than in the DID-document builder,
-    /// so it stays exhaustive in the crate that defines the algorithm. A second
+    /// so it stays exhaustive in the crate that defines the algorithm. Each further
     /// algorithm needs a `kty` and parameter set that only this crate should have
     /// to know.
     #[must_use]
@@ -104,17 +150,26 @@ impl PublicKey {
                 "crv": ED25519_CRV,
                 "x": b64.encode(self.as_bytes()),
             }),
+            Key::EcdsaP256 { sec1, .. } => {
+                let (x, y) = p256_coordinates(sec1);
+                json!({
+                    "kty": "EC",
+                    "crv": P256_CRV,
+                    "x": b64.encode(x),
+                    "y": b64.encode(y),
+                })
+            }
         }
     }
 
     /// The RFC 7638 thumbprint: the base64url SHA-256 of the JWK's required
     /// members, ordered by name, with no whitespace.
     ///
-    /// The required members of an OKP key are `crv`, `kty` and `x` (RFC 7638
-    /// clause 3.2), and that is also their order by name. A key's thumbprint is
-    /// derived from the key alone, so it is the same before and after a rotation
-    /// and for every verifier. That is why it, and not a position in a list, names
-    /// the key.
+    /// The required members of an OKP key are `crv`, `kty` and `x`, and of an EC
+    /// key `crv`, `kty`, `x` and `y` (RFC 7638 §3.2). In both, that is also their
+    /// order by name. A key's thumbprint is derived from the key alone, so it is
+    /// the same before and after a rotation and for every verifier. That is why it,
+    /// and not a position in a list, names the key.
     #[must_use]
     pub fn thumbprint(&self) -> String {
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -123,6 +178,14 @@ impl PublicKey {
                 r#"{{"crv":"{ED25519_CRV}","kty":"OKP","x":"{}"}}"#,
                 b64.encode(self.as_bytes())
             ),
+            Key::EcdsaP256 { sec1, .. } => {
+                let (x, y) = p256_coordinates(sec1);
+                format!(
+                    r#"{{"crv":"{P256_CRV}","kty":"EC","x":"{}","y":"{}"}}"#,
+                    b64.encode(x),
+                    b64.encode(y)
+                )
+            }
         };
         b64.encode(Sha256::digest(canonical.as_bytes()))
     }
@@ -156,11 +219,20 @@ impl PublicKey {
         jwk
     }
 
-    /// Whether `signature` is this key's signature over `message`: 64 bytes,
-    /// verified strictly as RFC 8032 §8 requires. Strict verification rejects the
-    /// signature-malleability and small-order/cofactor edge cases that the
-    /// non-strict `VerifyingKey::verify` admits, which is undesirable when the
-    /// signature is the trust anchor.
+    /// Whether `signature` is this key's signature over `message`, in the form its
+    /// algorithm defines.
+    ///
+    /// - **Ed25519:** 64 bytes, verified strictly. This is this crate's policy, which is
+    ///   stricter than RFC 8032 §5.1.7 requires: that section permits the cofactored
+    ///   check. Strict verification rejects the signature-malleability and
+    ///   small-order/cofactor edge cases that the non-strict `VerifyingKey::verify`
+    ///   admits, which is undesirable when the signature is the trust anchor.
+    /// - **ES256:** exactly 64 bytes, `R ‖ S` (RFC 7518 §3.4 makes any other length
+    ///   a failure), ECDSA over SHA-256. `R` or `S` of zero or not below the group
+    ///   order is refused. **A high-`S` signature is accepted**: it is lawful ECDSA,
+    ///   other implementations emit it, and the RFC 7515 Appendix A.3 example is
+    ///   high-`S`. So an ES256 signature is malleable (`(R, n − S)` verifies too),
+    ///   and nothing may use signature bytes as an identifier.
     #[must_use]
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
         match &self.key {
@@ -174,6 +246,22 @@ impl PublicKey {
                 )
                 .is_ok()
             }
+            Key::EcdsaP256 { key, .. } => {
+                use p256::ecdsa::signature::Verifier as _;
+                if signature.len() != 2 * P256_FIELD_LEN {
+                    return false;
+                }
+                let Ok(signature) = p256::ecdsa::Signature::from_slice(signature) else {
+                    return false;
+                };
+                key.verify(message, &signature).is_ok()
+            }
         }
     }
+}
+
+/// `x` and `y` of a P-256 key held in SEC1 uncompressed form.
+fn p256_coordinates(sec1: &[u8]) -> (&[u8], &[u8]) {
+    // Construction normalises every P-256 key to `0x04 ‖ x ‖ y`.
+    sec1[1..].split_at(P256_FIELD_LEN)
 }

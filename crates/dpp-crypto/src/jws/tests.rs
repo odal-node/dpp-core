@@ -146,7 +146,8 @@ fn wrong_key_fails() {
     assert!(!super::verifier::verify_jws(&jws, &public_key(&key2)).unwrap());
 }
 
-/// Regression (red-team ATK-4): the header `alg` is pinned to EdDSA.
+/// Regression (red-team ATK-4): the header `alg` must name the key's algorithm,
+/// which for this Ed25519 key is EdDSA.
 #[test]
 fn non_eddsa_alg_is_rejected() {
     let key = SigningKey::generate(&mut crate::os_rng());

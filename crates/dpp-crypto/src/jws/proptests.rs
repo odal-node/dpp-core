@@ -38,24 +38,41 @@ fn fixed_key() -> super::PublicKey {
     super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, &raw).expect("an RFC 8032 key")
 }
 
-/// The Ed25519 key a base64url string names, when it names one.
+/// One published public key of each algorithm, so verification reaches the signature
+/// check under both: RFC 8032 clause 7.1's TEST 1 for Ed25519, and the public key of
+/// RFC 7515 Appendix A.3's P-256 example for ES256.
+fn fixed_keys() -> [super::PublicKey; 2] {
+    [fixed_key(), super::es256_tests::rfc7515_key()]
+}
+
+/// The key a base64url string names, under either algorithm, when it names one.
 fn key_named_by(public_key_b64: &str) -> Option<super::PublicKey> {
     let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(public_key_b64)
         .ok()?;
-    super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, &raw).ok()
+    [super::KeyAlgorithm::Ed25519, super::KeyAlgorithm::EcdsaP256]
+        .into_iter()
+        .find_map(|algorithm| super::PublicKey::from_bytes(algorithm, &raw).ok())
 }
 
 proptest! {
     /// `verify_jws` must never panic on arbitrary compact-JWS-shaped input —
     /// it should fail closed (`Ok(false)`) or report a parse error (`Err`),
     /// never crash the process that's verifying an untrusted signature. The key
-    /// is fuzzed as well: a string that names an Ed25519 key is verified under
-    /// that key, and any other string under `fixed_key()`.
+    /// is fuzzed as well: a string that names a key is verified under that key,
+    /// and any other string under each of `fixed_keys()`.
     #[test]
     fn verify_jws_never_panics(jws in ".{0,128}", public_key_b64 in ".{0,64}") {
-        let key = key_named_by(&public_key_b64).unwrap_or_else(fixed_key);
-        let _ = verify_jws(&jws, &key);
+        match key_named_by(&public_key_b64) {
+            Some(key) => {
+                let _ = verify_jws(&jws, &key);
+            }
+            None => {
+                for key in fixed_keys() {
+                    let _ = verify_jws(&jws, &key);
+                }
+            }
+        }
     }
 
     /// Same property, restricted to strings that at least have the right
@@ -66,7 +83,66 @@ proptest! {
         header in ".{0,32}", payload in ".{0,64}", sig in ".{0,32}"
     ) {
         let jws = format!("{header}.{payload}.{sig}");
-        let _ = verify_jws(&jws, &fixed_key());
+        for key in fixed_keys() {
+            let _ = verify_jws(&jws, &key);
+        }
+    }
+
+    /// Key decoding never panics on arbitrary bytes, for any algorithm, and an
+    /// encoding it accepts verifies arbitrary signatures without panicking.
+    #[test]
+    fn public_key_decoding_never_panics(bytes in prop::collection::vec(any::<u8>(), 0..80),
+                                        sig in prop::collection::vec(any::<u8>(), 0..80)) {
+        for algorithm in [super::KeyAlgorithm::Ed25519, super::KeyAlgorithm::EcdsaP256] {
+            if let Ok(key) = super::PublicKey::from_bytes(algorithm, &bytes) {
+                let _ = key.verify(b"message", &sig);
+            }
+        }
+    }
+
+    /// JWK parsing never panics on an arbitrary JSON value.
+    #[test]
+    fn public_key_from_jwk_never_panics(jwk in arb_json()) {
+        let _ = super::PublicKey::from_jwk(&jwk);
+    }
+
+    /// A P-256 JWK whose `x` or `y` is 31 or 33 bytes is no key, whatever else it says,
+    /// and parsing it never panics. Coordinates are 32 bytes or the key is refused.
+    #[test]
+    fn a_p256_jwk_with_a_coordinate_of_the_wrong_length_is_refused(
+        x in prop::collection::vec(any::<u8>(), 31..=33),
+        y in prop::collection::vec(any::<u8>(), 31..=33),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jwk = serde_json::json!({
+            "kty": "EC",
+            "crv": "P-256",
+            "x": b64.encode(&x),
+            "y": b64.encode(&y),
+        });
+        let key = super::PublicKey::from_jwk(&jwk);
+        if x.len() != 32 || y.len() != 32 {
+            prop_assert!(key.is_none());
+        }
+    }
+
+    /// An ES256 JWS whose signature is 63, 64 or 65 bytes, under the RFC 7515 A.3 key,
+    /// never panics, and a signature that is not 64 bytes is refused.
+    #[test]
+    fn es256_signatures_of_63_to_65_bytes_never_panic(
+        sig in prop::collection::vec(any::<u8>(), 63..=65),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jws = format!(
+            "{}.{}.{}",
+            b64.encode(br#"{"alg":"ES256"}"#),
+            b64.encode(b"{}"),
+            b64.encode(&sig),
+        );
+        let verdict = verify_jws(&jws, &super::es256_tests::rfc7515_key());
+        if sig.len() != 64 {
+            prop_assert!(verdict.is_err());
+        }
     }
 
     /// `extract_kid_from_jws` must never panic on arbitrary input.

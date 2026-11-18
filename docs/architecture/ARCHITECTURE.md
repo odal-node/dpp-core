@@ -215,7 +215,7 @@ what, and deciding which fields a role may see are three jobs; this crate does t
 
 ### KeyStore
 
-Ed25519 key storage encrypted with AES-256-GCM, persisted as a JSON file on the local
+Ed25519 and ES256 (P-256) key storage encrypted with AES-256-GCM, persisted as a JSON file on the local
 filesystem. The path is injected, so tests use temporary directories.
 
 - `open(path, passphrase)`: open or create a key store
@@ -227,7 +227,7 @@ filesystem. The path is injected, so tests use temporary directories.
 
 ### Signer
 
-Compact JWS signing (EdDSA with Ed25519):
+Compact JWS signing (EdDSA with Ed25519, or ES256 with P-256, under the key's own algorithm):
 
 - `sign(store, key_id, payload, kid)`: a compact JWS whose header names the signing key
   by `kid`
@@ -239,8 +239,8 @@ The single place JWS verification lives:
 
 - `verify_jws(jws, key)`: verify a JWS against a `PublicKey`, which carries the algorithm
   the key is used under
-- `resolve_verification_key(did_document, jws)`: the `PublicKey` (Ed25519 in this
-  release) of the verification method the JWS `kid` names, after the Controlled
+- `resolve_verification_key(did_document, jws)`: the `PublicKey` (Ed25519 or P-256) of
+  the verification method the JWS `kid` names, after the Controlled
   Identifiers v1.0 binding checks. No `kid`, no key
 
 ---

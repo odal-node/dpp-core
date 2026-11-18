@@ -1,10 +1,15 @@
-//! JWS signing primitives — EdDSA over RFC 8785 (JCS) canonical bytes.
+//! JWS signing primitives — EdDSA and ES256 over RFC 8785 (JCS) canonical bytes,
+//! each bound to the algorithm its key is recorded as using.
 
 pub mod algorithm;
 pub mod canonical;
 #[cfg(test)]
 mod crit_tests;
 mod error;
+#[cfg(test)]
+mod es256_tests;
+#[cfg(test)]
+mod es256_vector_tests;
 #[cfg(test)]
 mod proptests;
 pub mod public_key;
@@ -24,10 +29,11 @@ mod thumbprint_tests;
 pub mod verifier;
 
 pub use algorithm::{
-    ED25519_ALG, ED25519_CRV, EDDSA_ALG, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, is_allowed_alg,
+    ED25519_ALG, ED25519_CRV, EDDSA_ALG, ES256_ALG, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm,
+    P256_CRV, is_allowed_alg,
 };
 pub use canonical::canonicalize;
-pub use error::PublicKeyError;
+pub use error::{PublicKeyError, SignatureLengthError};
 pub use public_key::PublicKey;
 pub use signer::{sign, sign_typed, verify};
 pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};

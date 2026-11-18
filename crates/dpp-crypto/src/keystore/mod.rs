@@ -24,6 +24,8 @@ mod crypto;
 mod entry;
 mod migration;
 #[cfg(test)]
+mod persist_tests;
+#[cfg(test)]
 mod rfc9106_vector_tests;
 mod rotation;
 mod store;
@@ -31,4 +33,6 @@ mod store;
 mod tests;
 
 pub use entry::KeyEntry;
+#[cfg(test)]
+pub(crate) use entry::SigningMaterial;
 pub use store::{KeyStore, PublicKeyInfo, UpgradeNeeded};

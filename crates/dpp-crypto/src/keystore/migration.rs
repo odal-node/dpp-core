@@ -131,9 +131,9 @@ impl KeyStore {
             );
         }
 
-        *map = migrated;
-        self.persist_envelope(&map)
+        self.persist_envelope(&migrated)
             .context("Failed to persist migrated key store")?;
+        *map = migrated;
 
         drop(map);
         *self.needs_migration.write().expect("lock") = false;
