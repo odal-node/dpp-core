@@ -10,8 +10,8 @@
 //! IETF SD-JWT VC profile.
 //!
 //! **No conformance is claimed.** What was read and what each part is checked
-//! against is recorded in the standards register, and the suite's results are the
-//! founder's to publish.
+//! against is recorded in the standards register. A claim of conformance waits for
+//! the W3C test suite's results.
 //!
 //! # How this differs from the access credential
 //!
