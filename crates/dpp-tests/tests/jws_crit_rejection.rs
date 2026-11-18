@@ -24,8 +24,8 @@ use dpp_domain::ProductGroup;
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::ports::identity::IdentityPort;
 use dpp_rules::bundle::{
-    AcceptancePolicy, JwsVerify, RulesetError, RulesetManifest, SignedBundle, content_hash,
-    verify_bundle,
+    AcceptancePolicy, JwsVerify, PinnedKey, RulesetError, RulesetManifest, SignedBundle,
+    content_hash, verify_bundle,
 };
 use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::authenticate_access_credential;
@@ -263,19 +263,29 @@ fn an_sd_jwt_vc_with_crit_is_refused() {
 // ── Ruleset bundle ───────────────────────────────────────────────────────────
 
 /// The adapter a consumer writes: `verify_bundle` delegates the signature check
-/// to the caller, and the natural implementation is this crate's verifier.
+/// to the caller, and the natural implementation is this crate's verifier. It
+/// verifies under the pinned algorithm and key. `verify_bundle` has already
+/// compared the header's `alg` with the pin, and `verify_jws` makes its own
+/// header check as well.
 struct OverDppCrypto;
 
 impl JwsVerify for OverDppCrypto {
-    fn verify_eddsa(&self, jws: &str, public_key_b64: &str) -> Result<bool, RulesetError> {
-        // A key that does not decode, or is not an Ed25519 point, is malformed
-        // input, as every failure of `verify_jws` was before keys were validated.
+    fn verify(&self, jws: &str, key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
+        // A pin naming an algorithm this crate does not implement is malformed
+        // input, not evidence about the bundle: `Ok(false)` would report a
+        // misconfigured pin as a forged bundle.
+        let algorithm = KeyAlgorithm::from_jose_alg(key.alg).ok_or_else(|| {
+            RulesetError::Malformed(format!("unsupported pinned algorithm `{}`", key.alg))
+        })?;
+        // A key that does not decode, or is not a point of that algorithm, is
+        // malformed input, as every failure of `verify_jws` was before keys were
+        // validated.
         let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(public_key_b64)
+            .decode(key.public_key_b64)
             .map_err(|e| RulesetError::Malformed(e.to_string()))?;
-        let key = PublicKey::from_bytes(KeyAlgorithm::Ed25519, &raw)
+        let public_key = PublicKey::from_bytes(algorithm, &raw)
             .map_err(|e| RulesetError::Malformed(e.to_string()))?;
-        verify_jws(jws, &key).map_err(|e| RulesetError::Malformed(e.to_string()))
+        verify_jws(jws, &public_key).map_err(|e| RulesetError::Malformed(e.to_string()))
     }
 }
 
@@ -302,17 +312,174 @@ fn bundle(store: &KeyStore, header: &Value) -> SignedBundle {
 fn a_ruleset_bundle_whose_manifest_has_crit_is_refused() {
     let store = temp_store("crit-bundle");
     let key = public_key_b64(&store);
+    let pin = PinnedKey {
+        alg: "EdDSA",
+        public_key_b64: &key,
+    };
     let policy = AcceptancePolicy {
         now: Utc.with_ymd_and_hms(2026, 10, 5, 0, 0, 0).unwrap(),
         in_force: None,
     };
 
     assert!(
-        verify_bundle(&bundle(&store, &plain()), &key, &OverDppCrypto, &policy).is_ok(),
+        verify_bundle(&bundle(&store, &plain()), &pin, &OverDppCrypto, &policy).is_ok(),
         "control: the same bundle without crit must verify"
     );
     assert!(matches!(
-        verify_bundle(&bundle(&store, &crit()), &key, &OverDppCrypto, &policy),
+        verify_bundle(&bundle(&store, &crit()), &pin, &OverDppCrypto, &policy),
         Err(RulesetError::BadSignature)
     ));
+}
+
+/// The policy the pin tests read at: after the bundle's effective date, with
+/// nothing in force.
+fn bundle_policy() -> AcceptancePolicy<'static> {
+    AcceptancePolicy {
+        now: Utc.with_ymd_and_hms(2026, 10, 5, 0, 0, 0).unwrap(),
+        in_force: None,
+    }
+}
+
+/// The pin names the algorithm a bundle must verify under, and this crate verifies
+/// only under the algorithms it implements. The bundle is Ed25519-signed under
+/// `EdDSA`, so a pin naming another identifier is refused by `verify_bundle`
+/// itself, as `BadSignature`, before the adapter runs. Only a header that names
+/// the pin reaches the adapter, and an identifier this crate cannot verify under
+/// is then refused as malformed: the pin is the caller's configuration.
+#[test]
+fn a_ruleset_bundle_is_refused_under_a_pin_for_another_algorithm() {
+    let store = temp_store("pin-other-alg");
+    let key = public_key_b64(&store);
+    let signed = bundle(&store, &plain());
+
+    assert!(
+        verify_bundle(
+            &signed,
+            &PinnedKey {
+                alg: "EdDSA",
+                public_key_b64: &key,
+            },
+            &OverDppCrypto,
+            &bundle_policy(),
+        )
+        .is_ok(),
+        "control: the algorithm the bundle was signed under verifies"
+    );
+    for alg in ["ES256", "not-an-algorithm"] {
+        assert!(
+            matches!(
+                verify_bundle(
+                    &signed,
+                    &PinnedKey {
+                        alg,
+                        public_key_b64: &key,
+                    },
+                    &OverDppCrypto,
+                    &bundle_policy(),
+                ),
+                Err(RulesetError::BadSignature)
+            ),
+            "pinned under {alg}, header EdDSA"
+        );
+    }
+    for alg in ["ES256", "not-an-algorithm"] {
+        let named = bundle(&store, &json!({"alg": alg}));
+        assert!(
+            matches!(
+                verify_bundle(
+                    &named,
+                    &PinnedKey {
+                        alg,
+                        public_key_b64: &key,
+                    },
+                    &OverDppCrypto,
+                    &bundle_policy(),
+                ),
+                Err(RulesetError::Malformed(_))
+            ),
+            "pinned under {alg}, header {alg}"
+        );
+    }
+}
+
+/// The manifest's own header must name the pinned identifier, so `verify_bundle`
+/// refuses a header that names another algorithm, `none` included, before the
+/// adapter runs. The signature is genuine over the header it names, so the header's
+/// `alg` is the only difference.
+#[test]
+fn a_ruleset_bundle_whose_header_names_another_algorithm_is_refused() {
+    let store = temp_store("header-alg");
+    let key = public_key_b64(&store);
+    let pin = PinnedKey {
+        alg: "EdDSA",
+        public_key_b64: &key,
+    };
+
+    assert!(
+        verify_bundle(
+            &bundle(&store, &plain()),
+            &pin,
+            &OverDppCrypto,
+            &bundle_policy()
+        )
+        .is_ok(),
+        "control: a header naming the pinned algorithm verifies"
+    );
+    for header in [json!({"alg": "ES256"}), json!({"alg": "none"})] {
+        assert!(
+            matches!(
+                verify_bundle(
+                    &bundle(&store, &header),
+                    &pin,
+                    &OverDppCrypto,
+                    &bundle_policy()
+                ),
+                Err(RulesetError::BadSignature)
+            ),
+            "header {header}"
+        );
+    }
+}
+
+/// `EdDSA` and `Ed25519` are separate JOSE registrations (RFC 9864 section 4.1),
+/// and a bundle's header must name the pin's identifier exactly. So a bundle
+/// pinned under one and headed with the other is refused by `verify_bundle`,
+/// as `BadSignature`, before the adapter runs. The matching pairs verify.
+#[test]
+fn a_header_must_name_the_pins_identifier_exactly() {
+    let store = temp_store("exact-identifier");
+    let key = public_key_b64(&store);
+
+    for alg in ["EdDSA", "Ed25519"] {
+        assert!(
+            verify_bundle(
+                &bundle(&store, &json!({"alg": alg})),
+                &PinnedKey {
+                    alg,
+                    public_key_b64: &key,
+                },
+                &OverDppCrypto,
+                &bundle_policy(),
+            )
+            .is_ok(),
+            "pin {alg}, header {alg}"
+        );
+    }
+    for (pin_alg, header_alg) in [("EdDSA", "Ed25519"), ("Ed25519", "EdDSA")] {
+        assert!(
+            matches!(
+                verify_bundle(
+                    &bundle(&store, &json!({"alg": header_alg})),
+                    &PinnedKey {
+                        alg: pin_alg,
+                        public_key_b64: &key,
+                    },
+                    &OverDppCrypto,
+                    &bundle_policy(),
+                ),
+                Err(RulesetError::BadSignature)
+            ),
+            "pin {pin_alg}, header {header_alg}"
+        );
+    }
 }
