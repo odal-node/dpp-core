@@ -40,14 +40,19 @@
 //! Verification ignores members it does not understand, as §3.1.3 and §5.4 require:
 //! the discipline is an issuer's, not a verifier's.
 //!
+//! Signing also refuses what verification would refuse for the same document: an `iss`
+//! that is not the issuer, and an `exp` or `nbf` that is not a JSON number. No time is
+//! compared at signing.
+//!
 //! # Verifying a credential
 //!
 //! [`verify_credential`] takes the issuer's [`PublicKey`](dpp_crypto::jws::PublicKey)
 //! and refuses at the first failed check, in this order: compact form, protected
-//! header (readable, no `crit`, `alg` is the key's, so `alg: none` is refused),
-//! signature, `typ` and `cty`, payload, `vc` and `vp`, time, then the issuer
-//! binding of §4.1.2 and the `kid` of §4.2. Every refusal is a variant of
-//! [`JoseError`].
+//! header (readable, no `crit`, no `b64` of `false`, `alg` is the key's, so `alg:
+//! none` is refused), signature, `typ` and `cty`, payload and its `@context`, `vc`
+//! and `vp`, time, the issuer binding of §4.1.2 and the `kid` of §4.2, then the
+//! credential's `type`, `issuer` and `credentialSubject`. Every refusal is a variant
+//! of [`JoseError`].
 //!
 //! **Time is explicit.** `now: Option<i64>`, seconds since the epoch. Under
 //! `Some(now)`, `exp` must be a number and `now` before it, and `nbf` must be a
@@ -58,18 +63,24 @@
 //!
 //! # Verifying a presentation
 //!
-//! [`verify_presentation`] checks the outer token completely first, then every
-//! envelope's shape, then asks the caller about each envelope through a closure:
-//! verify it under a key, skip it, or nothing known, an [`EnvelopeDecision`]. **An
-//! envelope this crate cannot verify is refused unless the caller skips it**, and
-//! each skip is reported in [`VerifiedPresentation::skipped`], with its index, media
-//! type and `kid`. Only `vc+jwt` envelopes can be verified; a `vc+sd-jwt` or a
-//! `vc+cose` envelope passes only as a skip.
+//! Verifying a presentation and verifying the credentials it envelops are two
+//! operations. VC-JOSE-COSE §5.1 defines verifying a presentation secured with JOSE as
+//! validating its own JWT (RFC 7519), and §5 says key discovery is assumed to have
+//! succeeded before each document is verified. So [`verify_presentation`] checks the
+//! presentation's outer token completely, then the shape of every envelope (§3.1.2),
+//! and returns a [`VerifiedPresentation`] whose envelopes are **not** verified. Each
+//! credential is verified afterwards, under the key the caller has for its issuer: one at
+//! a time with [`UnverifiedEnvelope::verify`], or all of them with
+//! [`VerifiedPresentation::verify_credentials`], which fails if any one fails. Only a
+//! `vc+jwt` can be verified, so an envelope of another format makes
+//! `verify_credentials` fail with `UnsupportedEnvelopeFormat`. §5.4 asks for further
+//! validation once verification succeeds; the checks this crate does not make are listed
+//! below.
 //!
 //! # What is deliberately absent
 //!
-//! - **JSON-LD expansion.** `@context` must be present, as a string or an array, and
-//!   nothing is fetched or expanded: this crate does no network access.
+//! - **JSON-LD expansion.** `@context` is checked against the VC Data Model 2.0 context
+//!   set (§4.3), and nothing is fetched or expanded: this crate does no network access.
 //! - **Key discovery.** §4.2 leaves how a verifier finds a key to the verifier, and
 //!   this crate does not check that a `kid` names a method the issuer controls.
 //! - **`credentialStatus` and `credentialSchema` checks** (§5.4 SHOULD), and the
@@ -78,13 +89,12 @@
 //!   since no critical extension is understood.
 
 mod absolute_url;
-mod envelope_decision;
 mod envelope_shape;
 pub mod error;
 mod presentation;
+mod properties;
 mod sign;
-mod skipped_envelope;
-mod verified_envelope;
+mod unverified_envelope;
 mod verified_presentation;
 mod verify;
 mod vocabulary;
@@ -92,13 +102,17 @@ mod vocabulary;
 #[cfg(test)]
 mod algorithm_tests;
 #[cfg(test)]
-mod decision_tests;
+mod credentials_tests;
+#[cfg(test)]
+mod envelope_shape_tests;
 #[cfg(test)]
 mod fixtures_tests;
 #[cfg(test)]
 mod issuer_tests;
 #[cfg(test)]
 mod presentation_tests;
+#[cfg(test)]
+mod properties_tests;
 #[cfg(test)]
 mod sign_tests;
 #[cfg(test)]
@@ -108,18 +122,14 @@ mod suite_tests;
 #[cfg(test)]
 mod temporal_tests;
 #[cfg(test)]
-mod test_fixtures;
-#[cfg(test)]
 mod verify_tests;
 #[cfg(test)]
 mod vocabulary_tests;
 
-pub use envelope_decision::EnvelopeDecision;
 pub use error::JoseError;
 pub use presentation::verify_presentation;
 pub use sign::{sign_credential, sign_presentation};
-pub use skipped_envelope::SkippedEnvelope;
-pub use verified_envelope::VerifiedEnvelope;
+pub use unverified_envelope::UnverifiedEnvelope;
 pub use verified_presentation::VerifiedPresentation;
 pub use verify::verify_credential;
 pub use vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS};

@@ -9,8 +9,16 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::jws::canonical::canonicalize;
 
-use super::test_fixtures::{KID, credential, generated, presentation};
-use super::{JoseError, sign_credential, sign_presentation, verify_credential};
+use super::{
+    JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
+};
+use crate::test_support::{
+    KID, credential, credential_header, forge, generated, presentation, presentation_header,
+};
+
+/// The time a verifier checks against: the signer compares no time, so only verification
+/// under this `now` refuses an `exp` or `nbf` that is not a number.
+const NOW: i64 = 1_800_000_000;
 
 fn segment(token: &str, index: usize) -> Vec<u8> {
     base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -92,7 +100,7 @@ fn a_document_without_a_usable_context_is_not_signed() {
         let refused = sign_credential(&document, &key, KID, &[]).expect_err("refused");
 
         assert!(
-            matches!(refused, JoseError::MalformedPayload { .. }),
+            matches!(refused, JoseError::InvalidContext { .. }),
             "{context:?}: {refused:?}"
         );
     }
@@ -103,7 +111,7 @@ fn a_document_without_a_usable_context_is_not_signed() {
         .remove("@context");
     assert!(matches!(
         sign_presentation(&document, &key, KID, &[]),
-        Err(JoseError::MalformedPayload { .. })
+        Err(JoseError::InvalidContext { .. })
     ));
 }
 
@@ -179,18 +187,146 @@ fn a_bare_kid_is_fine_when_the_credential_has_an_iss() {
     assert!(verify_credential(&token, &key.public_key(), None).is_ok());
 }
 
+/// An issuer that is not a URL is refused for the issuer itself (VC DM 2.0 §4.7), so
+/// the bare kid is never what fails, and the kid rule has no URL issuer to apply to.
 #[test]
-fn a_bare_kid_is_fine_when_the_issuer_is_not_a_url() {
+fn a_credential_with_a_non_url_issuer_is_refused_as_an_invalid_issuer() {
     let key = generated(KeyAlgorithm::Ed25519);
     let mut document = credential();
     document["issuer"] = json!("Example Issuer Ltd");
 
-    assert!(sign_credential(&document, &key, THUMBPRINT, &[]).is_ok());
+    assert!(matches!(
+        sign_credential(&document, &key, THUMBPRINT, &[]),
+        Err(JoseError::InvalidIssuer { .. })
+    ));
+}
+
+/// The §4.2 rule for a presentation: with no `iss` and a holder that is a URL, the
+/// `kid` must be absolute, as it is for a credential's issuer.
+#[test]
+fn the_kid_rule_applies_to_a_presentations_holder_as_to_a_credentials_issuer() {
+    let key = generated(KeyAlgorithm::Ed25519);
+
+    assert_eq!(
+        sign_presentation(&presentation(Vec::new()), &key, THUMBPRINT, &[]),
+        Err(JoseError::KidNotAbsolute {
+            kid: Some(THUMBPRINT.to_owned())
+        })
+    );
+    assert!(sign_presentation(&presentation(Vec::new()), &key, KID, &[]).is_ok());
+
+    let mut not_a_url = presentation(Vec::new());
+    not_a_url["holder"] = json!("Example Holder Ltd");
+    assert!(sign_presentation(&not_a_url, &key, THUMBPRINT, &[]).is_ok());
+
+    let mut with_iss = presentation(Vec::new());
+    with_iss["iss"] = json!("https://holder.example");
+    assert!(sign_presentation(&with_iss, &key, THUMBPRINT, &[]).is_ok());
+}
+
+// ── what verification refuses, signing refuses too ────────────────────────────
+
+/// An `iss` that is not the issuer, or its `id`, is refused by verification as
+/// `IssuerMismatch`, and signing refuses the same document under the same error.
+#[test]
+fn an_iss_that_is_not_the_issuer_is_refused_at_signing() {
+    let key = generated(KeyAlgorithm::Ed25519);
+    let mut document = credential();
+    document["iss"] = json!("https://attacker.example");
+    let refused = JoseError::IssuerMismatch {
+        iss: "https://attacker.example".to_owned(),
+        issuer: Some("https://issuer.example".to_owned()),
+    };
+
+    assert_eq!(
+        sign_credential(&document, &key, KID, &[]),
+        Err(refused.clone())
+    );
+    let token = forge(&key, &credential_header(&key), &document);
+    assert_eq!(
+        verify_credential(&token, &key.public_key(), None),
+        Err(refused)
+    );
+
+    document["iss"] = json!("https://issuer.example");
+    assert!(sign_credential(&document, &key, KID, &[]).is_ok());
+    document["issuer"] = json!({"id": "https://issuer.example"});
+    assert!(sign_credential(&document, &key, KID, &[]).is_ok());
+}
+
+/// An `iss` that is not a string is refused by verification as a malformed payload, and
+/// by signing too.
+#[test]
+fn an_iss_that_is_not_a_string_is_refused_at_signing() {
+    let key = generated(KeyAlgorithm::Ed25519);
+    let mut document = credential();
+    document["iss"] = json!(["https://issuer.example"]);
+
+    assert!(matches!(
+        sign_credential(&document, &key, KID, &[]),
+        Err(JoseError::MalformedPayload { .. })
+    ));
+    let token = forge(&key, &credential_header(&key), &document);
+    assert!(matches!(
+        verify_credential(&token, &key.public_key(), Some(NOW)),
+        Err(JoseError::MalformedPayload { .. })
+    ));
+}
+
+/// An `exp` or `nbf` that is not a JSON number is refused by verification under a `now`,
+/// and signing refuses it too. A number signs, whatever it says about time.
+#[test]
+fn an_exp_or_nbf_that_is_not_a_number_is_refused_at_signing() {
+    let key = generated(KeyAlgorithm::Ed25519);
+    for claim in ["exp", "nbf"] {
+        for value in [
+            json!("1900000000"),
+            json!(null),
+            json!(true),
+            json!([1_900_000_000]),
+            json!({}),
+        ] {
+            let mut document = credential();
+            document[claim] = value.clone();
+            let refused = JoseError::MalformedTemporalClaim { claim };
+
+            assert_eq!(
+                sign_credential(&document, &key, KID, &[]),
+                Err(refused.clone()),
+                "{claim}: {value}"
+            );
+            let token = forge(&key, &credential_header(&key), &document);
+            assert_eq!(
+                verify_credential(&token, &key.public_key(), Some(NOW)),
+                Err(refused),
+                "{claim}: {value}"
+            );
+        }
+
+        // A number signs even when it is in the past: the signer compares no time.
+        let mut document = credential();
+        document[claim] = json!(1);
+        assert!(
+            sign_credential(&document, &key, KID, &[]).is_ok(),
+            "{claim}"
+        );
+    }
 }
 
 #[test]
-fn the_kid_rule_is_about_a_credentials_issuer_and_not_a_presentations() {
+fn an_exp_that_is_not_a_number_is_refused_at_presentation_signing() {
     let key = generated(KeyAlgorithm::Ed25519);
+    let mut document = presentation(Vec::new());
+    document["exp"] = json!("tomorrow");
+    let refused = JoseError::MalformedTemporalClaim { claim: "exp" };
 
-    assert!(sign_presentation(&presentation(Vec::new()), &key, THUMBPRINT, &[]).is_ok());
+    assert_eq!(
+        sign_presentation(&document, &key, KID, &[]),
+        Err(refused.clone())
+    );
+    let token = forge(&key, &presentation_header(&key), &document);
+    assert_eq!(
+        verify_presentation(&token, &key.public_key(), Some(NOW)).map(|_| ()),
+        Err(refused)
+    );
 }

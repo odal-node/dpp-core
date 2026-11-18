@@ -34,9 +34,9 @@ pub enum JoseError {
         /// `"vc"` or `"vp"`.
         name: &'static str,
     },
-    /// `iss` is absent, the issuer is identified by a URL, and the `kid` is not an
-    /// absolute URL (VC-JOSE-COSE §4.2). `None` when a verified token has no
-    /// `kid` at all.
+    /// `iss` is absent, the issuer of a credential or the holder of a presentation is
+    /// identified by a URL, and the `kid` is not an absolute URL (VC-JOSE-COSE §4.2).
+    /// `None` when a verified token has no `kid` at all.
     #[error("kid {} is not an absolute URL, and the token has no iss", .kid.as_deref().unwrap_or("(none)"))]
     KidNotAbsolute {
         /// The `kid` that was given, if there was one.
@@ -58,6 +58,12 @@ pub enum JoseError {
     /// (RFC 7515 §4.1.11), so none is accepted.
     #[error("the protected header carries crit, and no critical extension is supported")]
     UnsupportedCritical,
+    /// The protected header sets `b64` to `false`. RFC 7797 §7 says a JSON Web Token
+    /// must not use that value, and `vc+jwt` and `vp+jwt` are JSON Web Tokens. A
+    /// header that also carries `crit` is refused as [`JoseError::UnsupportedCritical`]
+    /// first.
+    #[error("the protected header sets b64 to false, which a JSON Web Token must not do")]
+    UnencodedPayload,
     /// The header's `alg` is not the algorithm of the key the token is checked
     /// against, including `none`.
     #[error(
@@ -98,11 +104,41 @@ pub enum JoseError {
         /// What it must name.
         expected: &'static str,
     },
-    /// The payload is not a credential or presentation document: not base64url,
-    /// not a JSON object, or without a usable `@context`.
+    /// The payload is not a credential or presentation document: not base64url, or
+    /// not a JSON object, or an `iss` that is not a string.
     #[error("malformed payload: {reason}")]
     MalformedPayload {
         /// What was wrong with it.
+        reason: String,
+    },
+    /// The document's `@context` is not the VC Data Model 2.0 context set (§4.3): the
+    /// first item must be `https://www.w3.org/ns/credentials/v2`, given alone or first
+    /// in an ordered set, and each later item a URL or an object.
+    #[error("@context {reason}")]
+    InvalidContext {
+        /// What is wrong with it.
+        reason: String,
+    },
+    /// The document's `type` does not name what it must: a credential's `type` must
+    /// include `VerifiableCredential` (§4.5), and a presentation's must include
+    /// `VerifiablePresentation` (§4.13). Both are a string or an array of strings.
+    #[error("type {reason}")]
+    InvalidType {
+        /// What is wrong with it.
+        reason: String,
+    },
+    /// A credential's `issuer` is not a URL, or an object with a URL `id` (VC Data
+    /// Model 2.0 §4.7). Refused whether or not the credential carries an `iss`.
+    #[error("issuer {reason}")]
+    InvalidIssuer {
+        /// What is wrong with it.
+        reason: String,
+    },
+    /// A credential's `credentialSubject` is not an object or a non-empty array of
+    /// objects (VC Data Model 2.0 §4.8).
+    #[error("credentialSubject {reason}")]
+    InvalidCredentialSubject {
+        /// What is wrong with it.
         reason: String,
     },
     /// `exp` or `nbf` is present and is not a JSON number, so it cannot be read as a
@@ -140,22 +176,19 @@ pub enum JoseError {
         /// What was wrong with it.
         reason: String,
     },
-    /// The caller's decision for an envelope was neither to verify it nor to skip
-    /// it.
+    /// `verify_credentials` was given no key for an envelope. Its `kid` is the `kid` the
+    /// envelope's protected header names, when it is a `vc+jwt` that names one.
     #[error(
-        "no decision for envelope {index} ({media_type}, kid {})",
+        "no key for envelope {index} (kid {})",
         .kid.as_deref().unwrap_or("(none)")
     )]
-    EnvelopeNotDecided {
+    CredentialKeyUnknown {
         /// The envelope's position.
         index: usize,
-        /// The media type its `id` names.
-        media_type: String,
         /// The `kid` its protected header names, for a `vc+jwt`.
         kid: Option<String>,
     },
-    /// The caller asked for an envelope to be verified, and it is not a `vc+jwt`.
-    /// This crate verifies no other format.
+    /// An envelope is not a `vc+jwt`, the only format this crate verifies.
     #[error("envelope {index} is {media_type}, and only vc+jwt can be verified here")]
     UnsupportedEnvelopeFormat {
         /// The envelope's position.

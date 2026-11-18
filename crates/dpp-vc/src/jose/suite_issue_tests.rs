@@ -8,11 +8,10 @@
 //! file. Rows 3 and 5 are the two the brief singled out, and each is explained where
 //! it is tested.
 
-use super::test_fixtures::{json, key_id, public_key, signing_key};
 use super::{
-    EnvelopeDecision, JoseError, sign_credential, sign_presentation, verify_credential,
-    verify_presentation,
+    JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
+use crate::test_support::{json, key_id, public_key, signing_key};
 
 #[test]
 fn row_1_a_basic_credential_is_issued_and_verifies_back() {
@@ -48,23 +47,18 @@ fn row_3_a_presentation_with_a_malformed_envelope_is_issued_and_then_refused() {
     let token = sign_presentation(&presentation, &signing_key("p256"), &key_id("p256"), &[])
         .expect("issued: envelopes are not parsed at issuance");
 
-    let mut asked = false;
-    let result = verify_presentation(&token, &public_key("p256"), None, |_, _, _| {
-        asked = true;
-        EnvelopeDecision::Skip
-    });
     assert_eq!(
-        result.expect_err("refused"),
-        JoseError::MalformedEnvelope {
+        verify_presentation(&token, &public_key("p256"), None).map(|_| ()),
+        Err(JoseError::MalformedEnvelope {
             index: 0,
             reason: "the vc+jwt data is not a compact JWS".to_owned(),
-        }
+        })
     );
-    assert!(!asked);
 }
 
 /// Row 4's presentation holds a `vc+jwt` signed under P-256 and a `vc+sd-jwt` and a
-/// `vc+cose`, which are outside what this crate verifies.
+/// `vc+cose`. The presentation verifies under its own key and lists the three
+/// envelopes. Only the `vc+jwt` can be verified here, and it verifies under P-256.
 #[test]
 fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let presentation = json("presentation-multiple.json");
@@ -72,18 +66,30 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let token = sign_presentation(&presentation, &signing_key("p521"), &key_id("p521"), &[])
         .expect("issued");
 
-    let p256 = public_key("p256");
-    let verified = verify_presentation(&token, &public_key("p521"), None, |index, _, _| {
-        if index == 0 {
-            EnvelopeDecision::Verify(p256.clone())
-        } else {
-            EnvelopeDecision::Skip
-        }
-    })
-    .expect("verifies");
+    let verified = verify_presentation(&token, &public_key("p521"), None).expect("verifies");
     assert_eq!(verified.payload, presentation);
-    assert_eq!(verified.verified.len(), 1);
-    assert_eq!(verified.skipped.len(), 2);
+    let listed: Vec<(usize, &str)> = verified
+        .envelopes
+        .iter()
+        .map(|e| (e.index, e.media_type.as_str()))
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            (0, "application/vc+jwt"),
+            (1, "application/vc+sd-jwt"),
+            (2, "application/vc+cose"),
+        ]
+    );
+    assert!(
+        verified.envelopes[0]
+            .verify(&public_key("p256"), None)
+            .is_ok()
+    );
+    assert!(matches!(
+        verified.envelopes[1].verify(&public_key("p256"), None),
+        Err(JoseError::UnsupportedEnvelopeFormat { index: 1, .. })
+    ));
 }
 
 /// Row 5 carries two members that are in no VC Data Model 2.0 vocabulary, and the

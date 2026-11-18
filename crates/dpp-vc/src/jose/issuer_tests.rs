@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
-use super::test_fixtures::{credential, forge, generated, with_credential, with_header};
 use super::{JoseError, verify_credential};
+use crate::test_support::{credential, forge, generated, with_credential, with_header};
 
 fn key() -> KeyEntry {
     generated(KeyAlgorithm::EcdsaP256)
@@ -133,7 +133,7 @@ fn without_an_iss_a_url_issuer_needs_an_absolute_kid() {
 }
 
 #[test]
-fn the_kid_is_not_read_when_there_is_an_iss_or_the_issuer_is_not_a_url() {
+fn an_iss_passes_and_a_non_url_issuer_is_refused_as_an_invalid_issuer() {
     let key = key();
     let with_iss = forge(&key, &json!({"alg": "ES256", "typ": "vc+jwt"}), &{
         let mut c = credential();
@@ -151,5 +151,9 @@ fn the_kid_is_not_read_when_there_is_an_iss_or_the_issuer_is_not_a_url() {
     );
 
     assert!(verify(&with_iss, &key).is_ok());
-    assert!(verify(&not_a_url, &key).is_ok());
+    // A non-URL issuer is refused for the issuer (VC DM 2.0 §4.7), not for the bare kid.
+    assert!(matches!(
+        verify(&not_a_url, &key),
+        Err(JoseError::InvalidIssuer { .. })
+    ));
 }

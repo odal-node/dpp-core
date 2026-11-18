@@ -4,12 +4,11 @@
 use base64::Engine as _;
 use serde_json::Value;
 
-use super::test_fixtures::{KID, credential, generated, presentation};
 use super::{
-    EnvelopeDecision, JoseError, sign_credential, sign_presentation, verify_credential,
-    verify_presentation,
+    JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
 use crate::test_support::EVERY_ALGORITHM;
+use crate::test_support::{KID, credential, generated, presentation};
 
 fn header_of(token: &str) -> Value {
     let segment = token.split('.').next().expect("a header");
@@ -48,10 +47,7 @@ fn a_presentation_round_trips_under_every_algorithm() {
         let header = header_of(&token);
         assert_eq!(header["typ"], "vp+jwt");
         assert_eq!(header["cty"], "vp");
-        let verified = verify_presentation(&token, &key.public_key(), None, |_, _, _| {
-            EnvelopeDecision::Unknown
-        })
-        .expect("verifies");
+        let verified = verify_presentation(&token, &key.public_key(), None).expect("verifies");
         assert_eq!(verified.payload, holder, "{algorithm:?}");
     }
 }

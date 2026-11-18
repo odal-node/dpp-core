@@ -1,7 +1,6 @@
-//! Verifying a presentation: the outer token, the envelope shapes, and what the
-//! closure is told.
+//! Verifying a presentation: the outer token, and the shape of each envelope it lists.
 //!
-//! What the caller answers for each envelope is in `decision_tests`.
+//! The credentials inside the envelopes are verified in `credentials_tests`.
 
 use base64::Engine as _;
 use serde_json::{Value, json};
@@ -9,36 +8,25 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
-use super::test_fixtures::{
+use super::{
+    JoseError, VerifiedPresentation, sign_credential, sign_presentation, verify_presentation,
+};
+use crate::test_support::{
     KID, credential, credential_header, envelope, foreign_envelope, forge, generated, presentation,
     presentation_header,
-};
-use super::{
-    EnvelopeDecision, JoseError, VerifiedPresentation, sign_credential, sign_presentation,
-    verify_presentation,
 };
 
 fn holder() -> KeyEntry {
     generated(KeyAlgorithm::EcdsaP384)
 }
 
-fn skip(_: usize, _: &str, _: Option<&str>) -> EnvelopeDecision {
-    EnvelopeDecision::Skip
-}
-
-/// A presentation of `members`, signed by `holder`, verified with every envelope
-/// skipped; and whether the closure was asked.
+/// A presentation of `members`, signed by `holder`, and verified.
 fn verify_members(
     holder: &KeyEntry,
     members: Vec<Value>,
-) -> (Result<VerifiedPresentation, JoseError>, bool) {
+) -> Result<VerifiedPresentation, JoseError> {
     let token = sign_presentation(&presentation(members), holder, KID, &[]).expect("signs");
-    let mut asked = false;
-    let result = verify_presentation(&token, &holder.public_key(), None, |_, _, _| {
-        asked = true;
-        EnvelopeDecision::Skip
-    });
-    (result, asked)
+    verify_presentation(&token, &holder.public_key(), None)
 }
 
 fn issuer_token(issuer: &KeyEntry) -> String {
@@ -54,16 +42,19 @@ fn a_presentation_of_one_verified_credential_round_trips() {
     let document = presentation(vec![envelope(&issuer_token(&issuer))]);
     let token = sign_presentation(&document, &holder, KID, &[]).expect("signs");
 
-    let verified = verify_presentation(&token, &holder.public_key(), None, |index, media, kid| {
-        assert_eq!((index, media, kid), (0, "application/vc+jwt", Some(KID)));
-        EnvelopeDecision::Verify(issuer.public_key())
-    })
-    .expect("verifies");
+    let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
     assert_eq!(verified.payload, document);
-    assert_eq!(verified.verified.len(), 1);
-    assert_eq!(verified.verified[0].credential, credential());
-    assert!(verified.skipped.is_empty());
+    assert_eq!(verified.envelopes.len(), 1);
+    assert_eq!(
+        verified.envelopes[0].kid.as_deref(),
+        Some(KID),
+        "the envelope names its kid"
+    );
+    let credentials = verified
+        .verify_credentials(None, |_| Some(issuer.public_key()))
+        .expect("the credential verifies");
+    assert_eq!(credentials, [credential()]);
 }
 
 #[test]
@@ -76,12 +67,9 @@ fn a_presentation_with_no_credentials_verifies_with_nothing_to_report() {
         .remove("verifiableCredential");
     let token = sign_presentation(&document, &holder, KID, &[]).expect("signs");
 
-    let verified = verify_presentation(&token, &holder.public_key(), None, |_, _, _| {
-        panic!("there is no envelope to ask about")
-    })
-    .expect("verifies");
+    let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
-    assert!(verified.verified.is_empty() && verified.skipped.is_empty());
+    assert!(verified.envelopes.is_empty());
 }
 
 #[test]
@@ -90,7 +78,7 @@ fn a_credential_token_is_not_a_presentation() {
     let token = sign_credential(&credential(), &holder, KID, &[]).expect("signs");
 
     assert_eq!(
-        verify_presentation(&token, &holder.public_key(), None, skip).map(|_| ()),
+        verify_presentation(&token, &holder.public_key(), None).map(|_| ()),
         Err(JoseError::WrongMediaType {
             member: "typ",
             found: Some("\"vc+jwt\"".to_owned()),
@@ -123,14 +111,9 @@ fn the_outer_token_is_refused_before_any_envelope_is_read() {
         &presentation_header(&other),
         &presentation(vec![json!("not an envelope")]),
     );
-    let mut asked = false;
 
-    let refused = verify_presentation(&token, &holder.public_key(), None, |_, _, _| {
-        asked = true;
-        EnvelopeDecision::Skip
-    });
+    let refused = verify_presentation(&token, &holder.public_key(), None);
 
-    assert!(refused.is_err());
     assert!(
         matches!(
             refused,
@@ -138,7 +121,6 @@ fn the_outer_token_is_refused_before_any_envelope_is_read() {
         ),
         "{refused:?}"
     );
-    assert!(!asked);
 }
 
 fn holder_other() -> KeyEntry {
@@ -152,7 +134,7 @@ fn no_holder_against_iss_comparison_is_made() {
     document["iss"] = json!("https://not-the-holder.example");
     let token = forge(&holder, &presentation_header(&holder), &document);
 
-    assert!(verify_presentation(&token, &holder.public_key(), None, skip).is_ok());
+    assert!(verify_presentation(&token, &holder.public_key(), None).is_ok());
 }
 
 // ── envelope shapes ───────────────────────────────────────────────────────────
@@ -164,10 +146,9 @@ fn malformed(index: usize, reason: &str) -> Result<(), JoseError> {
     })
 }
 
-/// Every shape error is refused, naming the envelope, and the closure is never
-/// asked.
+/// Every shape error is refused, naming the envelope, wherever it sits in the list.
 #[test]
-fn a_malformed_envelope_is_refused_whatever_the_closure_would_say() {
+fn a_malformed_envelope_is_refused() {
     let holder = holder();
     let token = issuer_token(&generated(KeyAlgorithm::Ed25519));
     let good = envelope(&token);
@@ -189,7 +170,7 @@ fn a_malformed_envelope_is_refused_whatever_the_closure_would_say() {
         ),
         (
             json!({"@context": 7, "type": "EnvelopedVerifiableCredential", "id": "data:application/vc+jwt,x"}),
-            "@context is absent",
+            "@context is neither a string, an object nor an array",
         ),
         (
             json!({"@context": "c", "type": "EnvelopedVerifiableCredential"}),
@@ -215,10 +196,12 @@ fn a_malformed_envelope_is_refused_whatever_the_closure_would_say() {
             } else {
                 vec![good.clone(), bad.clone()]
             };
-            let (result, asked) = verify_members(&holder, members);
 
-            assert_eq!(result.map(|_| ()), malformed(position, reason), "{bad}");
-            assert!(!asked, "the closure was asked about {bad}");
+            assert_eq!(
+                verify_members(&holder, members).map(|_| ()),
+                malformed(position, reason),
+                "{bad}"
+            );
         }
     }
 }
@@ -243,14 +226,11 @@ fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused() {
         String::new(),
     ];
     for data in bad {
-        let (result, asked) = verify_members(&holder, vec![envelope(&data)]);
-
         assert_eq!(
-            result.map(|_| ()),
+            verify_members(&holder, vec![envelope(&data)]).map(|_| ()),
             malformed(0, "the vc+jwt data is not a compact JWS"),
             "{data}"
         );
-        assert!(!asked);
     }
 }
 
@@ -264,13 +244,12 @@ fn an_envelope_of_another_type_is_not_read() {
         foreign_envelope("application/vc+cose;base64"),
     ];
 
-    let (result, _) = verify_members(&holder, members);
+    let verified = verify_members(&holder, members).expect("verifies");
 
-    let verified = result.expect("verifies");
     let media: Vec<&str> = verified
-        .skipped
+        .envelopes
         .iter()
-        .map(|s| s.media_type.as_str())
+        .map(|e| e.media_type.as_str())
         .collect();
     assert_eq!(
         media,
@@ -282,10 +261,10 @@ fn an_envelope_of_another_type_is_not_read() {
     );
 }
 
-// ── what the closure is told ──────────────────────────────────────────────────
+// ── what each envelope is listed with ─────────────────────────────────────────
 
 #[test]
-fn the_closure_is_called_once_per_envelope_in_order_with_what_it_needs() {
+fn every_envelope_is_listed_in_order_with_what_it_needs() {
     let holder = holder();
     let issuer = generated(KeyAlgorithm::Ed25519);
     let no_kid = {
@@ -309,22 +288,21 @@ fn the_closure_is_called_once_per_envelope_in_order_with_what_it_needs() {
         envelope(&no_kid),
         json!({"@context": "c", "type": "EnvelopedVerifiableCredential", "id": mixed_case}),
     ];
-    let token = sign_presentation(&presentation(members), &holder, KID, &[]).expect("signs");
 
-    let mut calls = Vec::new();
-    verify_presentation(&token, &holder.public_key(), None, |index, media, kid| {
-        calls.push((index, media.to_owned(), kid.map(str::to_owned)));
-        EnvelopeDecision::Skip
-    })
-    .expect("verifies");
+    let verified = verify_members(&holder, members).expect("verifies");
 
+    let listed: Vec<(usize, &str, Option<&str>)> = verified
+        .envelopes
+        .iter()
+        .map(|e| (e.index, e.media_type.as_str(), e.kid.as_deref()))
+        .collect();
     assert_eq!(
-        calls,
+        listed,
         [
-            (0, "application/vc+jwt".to_owned(), Some(KID.to_owned())),
-            (1, "application/vc+sd-jwt".to_owned(), None),
-            (2, "application/vc+jwt".to_owned(), None),
-            (3, "application/vc+jwt".to_owned(), Some(KID.to_owned())),
+            (0, "application/vc+jwt", Some(KID)),
+            (1, "application/vc+sd-jwt", None),
+            (2, "application/vc+jwt", None),
+            (3, "application/vc+jwt", Some(KID)),
         ]
     );
 }
@@ -336,9 +314,9 @@ fn a_single_envelope_without_the_array_is_one_envelope() {
     document["verifiableCredential"] = foreign_envelope("application/vc+cose");
     let token = sign_presentation(&document, &holder, KID, &[]).expect("signs");
 
-    let verified = verify_presentation(&token, &holder.public_key(), None, skip).expect("verifies");
+    let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
-    assert_eq!(verified.skipped.len(), 1);
+    assert_eq!(verified.envelopes.len(), 1);
 }
 
 #[test]
@@ -354,10 +332,10 @@ fn a_data_url_may_carry_the_jws_in_base64() {
     ];
     let outer = sign_presentation(&presentation(members), &holder, KID, &[]).expect("signs");
 
-    let verified = verify_presentation(&outer, &holder.public_key(), None, |_, _, _| {
-        EnvelopeDecision::Verify(issuer.public_key())
-    })
-    .expect("verifies");
+    let verified = verify_presentation(&outer, &holder.public_key(), None).expect("verifies");
+    let credentials = verified
+        .verify_credentials(None, |_| Some(issuer.public_key()))
+        .expect("both credentials verify");
 
-    assert_eq!(verified.verified.len(), 2);
+    assert_eq!(credentials.len(), 2);
 }

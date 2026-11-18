@@ -9,6 +9,7 @@ use dpp_crypto::jws::{HeaderRefusal, PublicKey};
 
 use super::absolute_url::is_absolute_url;
 use super::error::JoseError;
+use super::properties::{check_context, check_credential_properties, id_of};
 use crate::common::media_type::{self, TypeRefusal};
 
 /// The `typ` of a secured credential, and the `cty` naming what it carries
@@ -37,20 +38,25 @@ pub(crate) struct Opened {
 /// Checks, in order, refusing at the first that fails:
 ///
 /// 1. the token is a compact JWS ([`JoseError::NotCompactJws`]);
-/// 2. the protected header is readable, carries no `crit`, and its `alg` is
-///    `key`'s algorithm, so `alg: none` and every substitution are refused
-///    (§1.1.2.1, RFC 7519 §7.2);
+/// 2. the protected header is readable, carries no `crit`, does not set `b64` to
+///    `false` (RFC 7797 §7, which [`JoseError::UnencodedPayload`] reports; a header
+///    with both `crit` and `b64` is refused for `crit`), and its `alg` is `key`'s
+///    algorithm, so `alg: none` and every substitution are refused (§1.1.2.1,
+///    RFC 7519 §7.2);
 /// 3. the signature verifies under `key`;
 /// 4. `typ` is present and names `vc+jwt`, and `cty`, if present, names `vc`
 ///    (RFC 7515 §4.1.9, with or without the `application/` prefix);
-/// 5. the payload is a JSON object with an `@context` (§5.4), and carries neither
-///    `vc` nor `vp` (§1.1.2.1, §3.1.3);
+/// 5. the payload is a JSON object whose `@context` is the VC Data Model 2.0 context
+///    set (VC DM 2.0 §4.3), and carries neither `vc` nor `vp` (§1.1.2.1, §3.1.3);
 /// 6. under `Some(now)`, the time claims, below;
 /// 7. `iss`, if present, equals the credential's `issuer`, or its `id` when the
 ///    issuer is an object (§4.1.2); and when `iss` is absent and the issuer is a
 ///    URL, the `kid` is an absolute URL (§4.2). That the `kid` names a verification
 ///    method of the issuer is the caller's, since this function has no identifier
-///    document to look it up in.
+///    document to look it up in;
+/// 8. the credential's `type` names `VerifiableCredential`, its `issuer` is a URL or
+///    an object with a URL `id`, and its `credentialSubject` is an object or a
+///    non-empty array of objects (VC DM 2.0 §4.5, §4.7, §4.8).
 ///
 /// Members this function does not understand are ignored (§3.1.3, §5.4).
 ///
@@ -78,6 +84,7 @@ pub(crate) struct Opened {
 pub fn verify_credential(jws: &str, key: &PublicKey, now: Option<i64>) -> Result<Value, JoseError> {
     let Opened { payload, kid } = open(jws, key, now, CREDENTIAL_TYP, CREDENTIAL_CTY)?;
     check_issuer(&payload, kid.as_deref())?;
+    check_credential_properties(&payload)?;
     Ok(Value::Object(payload))
 }
 
@@ -105,6 +112,9 @@ pub(crate) fn open(
             });
         }
         Some(_) => return Err(JoseError::UnreadableHeader),
+    }
+    if unencoded_payload(jws) {
+        return Err(JoseError::UnencodedPayload);
     }
     match verify_jws(jws, key) {
         Ok(true) => {}
@@ -164,20 +174,42 @@ pub(crate) fn open(
     })
 }
 
-/// The document must be a JSON-LD document that names its context: `@context` is a
-/// string or an array. Nothing is expanded, which would need the context documents
-/// and so the network (VC-JOSE-COSE §5.4 asks for a well-formed compact JSON-LD
-/// document; this is the part that can be checked without one).
-pub(crate) fn check_context(document: &Map<String, Value>) -> Result<(), JoseError> {
-    match document.get("@context") {
-        Some(Value::String(_) | Value::Array(_)) => Ok(()),
-        Some(_) => Err(JoseError::MalformedPayload {
-            reason: "@context is neither a string nor an array".to_owned(),
-        }),
-        None => Err(JoseError::MalformedPayload {
-            reason: "@context is absent".to_owned(),
-        }),
+/// Whether the protected header sets `b64` to the boolean `false` (RFC 7797 §7). The
+/// header has already been read by [`header_refusal`], so an unreadable one answers
+/// `false` here and is refused there.
+fn unencoded_payload(jws: &str) -> bool {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    jws.split('.')
+        .next()
+        .and_then(|segment| b64.decode(segment).ok())
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|header| header.get("b64").cloned())
+        == Some(Value::Bool(false))
+}
+
+/// `claim` read as a NumericDate: `None` when it is absent, its value when it is a finite
+/// JSON number, and [`JoseError::MalformedTemporalClaim`] when it is present and is not one.
+fn numeric_date(
+    payload: &Map<String, Value>,
+    claim: &'static str,
+) -> Result<Option<f64>, JoseError> {
+    match payload.get(claim) {
+        None => Ok(None),
+        Some(value) => value
+            .as_f64()
+            .filter(|s| s.is_finite())
+            .map(Some)
+            .ok_or(JoseError::MalformedTemporalClaim { claim }),
     }
+}
+
+/// `exp` and `nbf`, when present, must be JSON numbers. Verification refuses one that is
+/// not, under a `now`, so signing refuses it too; no time is compared here.
+pub(crate) fn check_temporal_claims(payload: &Map<String, Value>) -> Result<(), JoseError> {
+    for claim in ["exp", "nbf"] {
+        numeric_date(payload, claim)?;
+    }
+    Ok(())
 }
 
 /// Enforce `exp` and `nbf` against `now`, and refuse one that is not a number.
@@ -191,11 +223,8 @@ fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
     // not fit an `f64`'s 53 bits is far past the year 285 million.
     let now = now as f64;
     for claim in ["exp", "nbf"] {
-        let Some(value) = payload.get(claim) else {
+        let Some(seconds) = numeric_date(payload, claim)? else {
             continue;
-        };
-        let Some(seconds) = value.as_f64().filter(|s| s.is_finite()) else {
-            return Err(JoseError::MalformedTemporalClaim { claim });
         };
         match claim {
             "exp" if now >= seconds => return Err(JoseError::Expired),
@@ -209,16 +238,22 @@ fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
 /// The issuer of a credential: its `issuer` when that is a string, or its `id` when
 /// that is an object (VC-JOSE-COSE §4.1.2).
 fn issuer_of(credential: &Map<String, Value>) -> Option<&str> {
-    match credential.get("issuer")? {
-        Value::String(issuer) => Some(issuer),
-        Value::Object(issuer) => issuer.get("id")?.as_str(),
-        _ => None,
-    }
+    credential.get("issuer").and_then(id_of)
+}
+
+/// The holder of a presentation, read as the issuer of a credential is: its `holder`
+/// when that is a string, or its `id` when that is an object (VC-JOSE-COSE §4.2).
+fn holder_of(presentation: &Map<String, Value>) -> Option<&str> {
+    presentation.get("holder").and_then(id_of)
 }
 
 /// `iss` against the credential's issuer (§4.1.2), and, when there is no `iss`,
-/// [`check_kid`].
-fn check_issuer(credential: &Map<String, Value>, kid: Option<&str>) -> Result<(), JoseError> {
+/// [`check_kid`]. Signing runs this too, so a credential whose `iss` names another
+/// issuer is not signed.
+pub(crate) fn check_issuer(
+    credential: &Map<String, Value>,
+    kid: Option<&str>,
+) -> Result<(), JoseError> {
     let issuer = issuer_of(credential);
     match credential.get("iss") {
         Some(iss) => {
@@ -251,10 +286,29 @@ pub(crate) fn check_kid(
     credential: &Map<String, Value>,
     kid: Option<&str>,
 ) -> Result<(), JoseError> {
-    if credential.contains_key("iss") {
+    check_kid_of(credential, issuer_of(credential), kid)
+}
+
+/// The same rule for a presentation: when it has no `iss` and its holder is identified
+/// by a URL, the `kid` must be an absolute URL (VC-JOSE-COSE §4.2, the second rule).
+pub(crate) fn check_holder_kid(
+    presentation: &Map<String, Value>,
+    kid: Option<&str>,
+) -> Result<(), JoseError> {
+    check_kid_of(presentation, holder_of(presentation), kid)
+}
+
+/// The `kid` rule of §4.2 for the party a token names, which is the issuer of a
+/// credential or the holder of a presentation.
+fn check_kid_of(
+    document: &Map<String, Value>,
+    party: Option<&str>,
+    kid: Option<&str>,
+) -> Result<(), JoseError> {
+    if document.contains_key("iss") {
         return Ok(());
     }
-    if issuer_of(credential).is_some_and(is_absolute_url) && !kid.is_some_and(is_absolute_url) {
+    if party.is_some_and(is_absolute_url) && !kid.is_some_and(is_absolute_url) {
         return Err(JoseError::KidNotAbsolute {
             kid: kid.map(str::to_owned),
         });

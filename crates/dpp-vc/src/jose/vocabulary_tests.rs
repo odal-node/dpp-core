@@ -8,11 +8,11 @@ use serde_json::json;
 
 use dpp_crypto::jws::KeyAlgorithm;
 
-use super::test_fixtures::{KID, credential, generated, presentation};
 use super::{
     CREDENTIAL_TERMS, JoseError, PRESENTATION_TERMS, sign_credential, sign_presentation,
     verify_credential, verify_presentation,
 };
+use crate::test_support::{KID, credential, generated, presentation};
 
 fn key() -> dpp_crypto::keystore::KeyEntry {
     generated(KeyAlgorithm::Ed25519)
@@ -149,9 +149,9 @@ fn verification_ignores_members_it_does_not_understand() {
     let mut document = credential();
     document["badExtension"] = json!({"huh": "what?"});
     document["anotherBadOne"] = json!([1, 2]);
-    let forged = super::test_fixtures::forge(
+    let forged = crate::test_support::forge(
         &key,
-        &super::test_fixtures::credential_header(&key),
+        &crate::test_support::credential_header(&key),
         &document,
     );
     assert!(sign_credential(&document, &key, KID, &[]).is_err());
@@ -162,15 +162,10 @@ fn verification_ignores_members_it_does_not_understand() {
 
     let mut holder = presentation(Vec::new());
     holder["unknownToTheVocabulary"] = json!(true);
-    let forged = super::test_fixtures::forge(
+    let forged = crate::test_support::forge(
         &key,
-        &super::test_fixtures::presentation_header(&key),
+        &crate::test_support::presentation_header(&key),
         &holder,
     );
-    assert!(
-        verify_presentation(&forged, &key.public_key(), None, |_, _, _| {
-            super::EnvelopeDecision::Unknown
-        })
-        .is_ok()
-    );
+    assert!(verify_presentation(&forged, &key.public_key(), None).is_ok());
 }

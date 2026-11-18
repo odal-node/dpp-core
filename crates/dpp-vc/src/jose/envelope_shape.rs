@@ -14,26 +14,18 @@ use serde_json::Value;
 use dpp_crypto::jws::verifier::extract_kid_from_jws;
 
 use super::error::JoseError;
+use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT};
 
-/// The media type of a JWT-secured credential in a `data:` URL.
-const VC_JWT: &str = "application/vc+jwt";
+/// The `type` of an Enveloped Verifiable Credential object.
+const ENVELOPED: &str = "EnvelopedVerifiableCredential";
 
-/// An envelope whose shape is right.
-pub(crate) struct Envelope {
-    /// The media type its `id` names, lower-cased and without parameters.
-    pub(crate) media_type: String,
-    /// The compact JWS inside it, for a `vc+jwt`.
-    pub(crate) token: Option<String>,
-    /// The `kid` that token's protected header names.
-    pub(crate) kid: Option<String>,
-}
-
-/// Check the envelope at `index`, and read out what a decision needs.
+/// Check the envelope at `index`, and keep what [`verify_credentials`](super::VerifiedPresentation::verify_credentials)
+/// needs.
 ///
 /// Only a `vc+jwt` envelope's data is read. For any other media type the `id` is
 /// held to being a `data:` URL and nothing more, since this crate cannot read the
 /// format.
-pub(crate) fn inspect(index: usize, value: &Value) -> Result<Envelope, JoseError> {
+pub(crate) fn inspect(index: usize, value: &Value) -> Result<UnverifiedEnvelope, JoseError> {
     let malformed = |reason: &str| JoseError::MalformedEnvelope {
         index,
         reason: reason.to_owned(),
@@ -41,14 +33,37 @@ pub(crate) fn inspect(index: usize, value: &Value) -> Result<Envelope, JoseError
     let Some(object) = value.as_object() else {
         return Err(malformed("not a JSON object"));
     };
-    if object.get("type").and_then(Value::as_str) != Some("EnvelopedVerifiableCredential") {
+    // JSON-LD reads a one-item array as the item itself, so `type` may be either.
+    let is_enveloped = match object.get("type") {
+        Some(Value::String(name)) => name == ENVELOPED,
+        Some(Value::Array(names)) => {
+            matches!(names.as_slice(), [Value::String(name)] if name == ENVELOPED)
+        }
+        _ => false,
+    };
+    if !is_enveloped {
         return Err(malformed("type is not EnvelopedVerifiableCredential"));
     }
-    if !matches!(
-        object.get("@context"),
-        Some(Value::String(_) | Value::Array(_))
-    ) {
-        return Err(malformed("@context is absent"));
+    match object.get("@context") {
+        None => return Err(malformed("@context is absent")),
+        Some(Value::Array(items)) if items.is_empty() => {
+            return Err(malformed("@context is an empty array"));
+        }
+        Some(Value::Array(items))
+            if !items
+                .iter()
+                .all(|item| matches!(item, Value::String(_) | Value::Object(_))) =>
+        {
+            return Err(malformed(
+                "@context has an item that is neither a string nor an object",
+            ));
+        }
+        Some(Value::String(_) | Value::Object(_) | Value::Array(_)) => {}
+        Some(_) => {
+            return Err(malformed(
+                "@context is neither a string, an object nor an array",
+            ));
+        }
     }
     let id = object
         .get("id")
@@ -58,20 +73,12 @@ pub(crate) fn inspect(index: usize, value: &Value) -> Result<Envelope, JoseError
     let media_type = url.media_type;
 
     if media_type != VC_JWT {
-        return Ok(Envelope {
-            media_type,
-            token: None,
-            kid: None,
-        });
+        return Ok(UnverifiedEnvelope::new(index, media_type, None, None));
     }
     let token = token_of(url.data, url.base64)
         .ok_or_else(|| malformed("the vc+jwt data is not a compact JWS"))?;
     let kid = extract_kid_from_jws(&token);
-    Ok(Envelope {
-        media_type,
-        token: Some(token),
-        kid,
-    })
+    Ok(UnverifiedEnvelope::new(index, media_type, kid, Some(token)))
 }
 
 /// The parts of a `data:` URL that an envelope is read by.

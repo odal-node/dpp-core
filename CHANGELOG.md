@@ -176,12 +176,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and `cty`, the payload, `vc` and `vp` claims, the time claims, and `iss` against the
   credential's `issuer` (§4.1.2) and the `kid` when there is no `iss` (§4.2). Every
   refusal is a variant of `jose::JoseError`. Three rules are the caller's to know:
-  - A presentation's envelope that this crate cannot verify is refused unless the caller
-    skips it. `verify_presentation` calls a closure once per envelope, after its shape
-    is checked, and the closure answers `EnvelopeDecision::Verify(key)`, `Skip` or
-    `Unknown`. A `vc+jwt` verified goes through every check of `verify_credential`, with
-    the same `now`; a `vc+sd-jwt` or `vc+cose` passes only as a `Skip`. Each skip is in
-    `VerifiedPresentation::skipped`, with its index, media type and `kid`.
+  - Verifying a presentation and verifying its credentials are two operations (VC-JOSE-COSE
+    §5.1 and §5). `verify_presentation` checks the presentation's own token and the shape
+    of each envelope, and lists the envelopes in `VerifiedPresentation::envelopes`
+    unverified. `VerifiedPresentation::verify_credentials` verifies every credential under
+    the key the caller gives for its envelope, and fails on the first that fails;
+    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` can be verified.
   - Time is explicit: `now: Option<i64>`. Under `Some(now)`, `exp` and `nbf` must be
     numbers and are held to `now` with no leeway; under `None` neither is read. `iat` is
     never checked.
@@ -189,7 +189,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     `extension_terms`. The base vocabulary is `jose::CREDENTIAL_TERMS` and
     `jose::PRESENTATION_TERMS`, the terms the VC Data Model 2.0 context defines, with the
     JWT registered claim names. `vc` and `vp` are refused even when declared.
-    Verification ignores members it does not know.
+    Signing also refuses an `iss` that is not the issuer, and an `exp` or `nbf` that is
+    not a number, as verification does. Verification ignores members it does not know.
 
   The W3C VC-JOSE-COSE test suite's verification inputs, and its issuance inputs signed
   with its own keys, are vendored under `crates/dpp-vc/src/jose/fixtures` and each

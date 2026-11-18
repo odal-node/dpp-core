@@ -11,10 +11,10 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
-use super::test_fixtures::{
+use super::{JoseError, sign_credential, verify_credential};
+use crate::test_support::{
     KID, credential, credential_header, forge, forge_raw, generated, with_credential, with_header,
 };
-use super::{JoseError, sign_credential, verify_credential};
 
 fn key() -> KeyEntry {
     generated(KeyAlgorithm::EcdsaP256)
@@ -66,15 +66,34 @@ fn an_unreadable_header_is_refused() {
 fn crit_is_refused_and_the_same_token_without_it_verifies() {
     let key = key();
     let crit = with_header(&key, |h| {
-        h["crit"] = json!(["b64"]);
-        h["b64"] = json!(false);
+        h["crit"] = json!(["x"]);
+        h["x"] = json!(1);
     });
     let control = with_header(&key, |h| {
-        h["b64"] = json!(false);
+        h["x"] = json!(1);
     });
 
     assert_eq!(verify(&crit, &key), Err(JoseError::UnsupportedCritical));
     assert!(verify(&control, &key).is_ok());
+}
+
+/// RFC 7797 §7: a JWT MUST NOT use `b64` with `false`. The token is validly signed, so
+/// the refusal is the header's, and it comes after `crit`: a header with both is
+/// refused as critical.
+#[test]
+fn b64_false_is_refused_and_crit_is_reported_first_when_both_are_present() {
+    let key = key();
+    let unencoded = with_header(&key, |h| h["b64"] = json!(false));
+    let critical_and_unencoded = with_header(&key, |h| {
+        h["crit"] = json!(["b64"]);
+        h["b64"] = json!(false);
+    });
+
+    assert_eq!(verify(&unencoded, &key), Err(JoseError::UnencodedPayload));
+    assert_eq!(
+        verify(&critical_and_unencoded, &key),
+        Err(JoseError::UnsupportedCritical)
+    );
 }
 
 #[test]
@@ -172,7 +191,12 @@ fn a_payload_changed_after_signing_is_refused() {
     let key = key();
     let token = sign_credential(&credential(), &key, KID, &[]).expect("signs");
     let other = sign_credential(
-        &json!({"@context": ["https://www.w3.org/ns/credentials/v2"], "issuer": "https://other.example"}),
+        &json!({
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "type": ["VerifiableCredential"],
+            "issuer": "https://other.example",
+            "credentialSubject": {"id": "did:example:other"},
+        }),
         &key,
         KID,
         &[],
@@ -297,11 +321,11 @@ fn a_payload_without_a_usable_context_is_refused() {
 
     assert!(matches!(
         verify(&absent, &key),
-        Err(JoseError::MalformedPayload { .. })
+        Err(JoseError::InvalidContext { .. })
     ));
     assert!(matches!(
         verify(&number, &key),
-        Err(JoseError::MalformedPayload { .. })
+        Err(JoseError::InvalidContext { .. })
     ));
     assert!(verify(&string, &key).is_ok());
 }

@@ -1,64 +1,50 @@
-//! Verifying a presentation secured as a VC-JOSE-COSE `vp+jwt`.
+//! Verifying a presentation secured as a VC-JOSE-COSE `vp+jwt`: its own token, and the
+//! shape of each credential it envelops.
 
 use serde_json::Value;
 
 use dpp_crypto::jws::PublicKey;
 
-use super::envelope_decision::EnvelopeDecision;
 use super::envelope_shape::inspect;
 use super::error::JoseError;
-use super::skipped_envelope::SkippedEnvelope;
-use super::verified_envelope::VerifiedEnvelope;
+use super::properties::check_presentation_properties;
 use super::verified_presentation::VerifiedPresentation;
-use super::verify::{PRESENTATION_CTY, PRESENTATION_TYP, open, verify_credential};
+use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid, open};
 
-/// Verify a presentation secured as a `vp+jwt` (VC-JOSE-COSE §3.1.2), and account
-/// for every credential it envelops.
+/// Verify a presentation secured as a `vp+jwt` (VC-JOSE-COSE §3.1.2), and check the shape
+/// of every credential it envelops.
 ///
-/// `key` is the holder's verification key for the outer token, with the same
-/// meaning as in [`verify_credential`]. The outer token is checked completely
-/// first, signature, header, `typ` (`vp+jwt`, with `cty` `vp` if present), claims
-/// and time, before any envelope is read: §5 says a verifier should minimise the
-/// processing of untrusted data. No `holder` against `iss` comparison is made.
+/// This verifies the presentation's own token and nothing inside an envelope. VC-JOSE-COSE
+/// §5.1 says verifying a presentation secured with JOSE means following the algorithm
+/// "Validating a JWT" of RFC 7519, and §5 says key discovery "is assumed to have succeeded
+/// prior to beginning the verification process". The credentials are verified separately, with
+/// [`VerifiedPresentation::verify_credentials`] or one at a time with
+/// [`UnverifiedEnvelope::verify`](super::UnverifiedEnvelope::verify), each under its own key.
 ///
-/// # The envelopes
+/// `holder_key` is the holder's verification key for the outer token, with the same meaning
+/// as in [`verify_credential`](super::verify_credential). The checks run in this order,
+/// refusing at the first that fails: the outer token (compact form, header,
+/// signature, `typ` and `cty`, payload and its `@context`, `vc` and `vp`, and the time
+/// claims under `Some(now)`), the holder's `kid` (§4.2), the presentation's `type`
+/// (VC DM 2.0 §4.13), and then each envelope in order.
 ///
-/// Each member of `verifiableCredential` must be an Enveloped Verifiable
-/// Credential: an object whose `type` is `EnvelopedVerifiableCredential`, with an
-/// `@context`, and an `id` that is a `data:` URL; and when it is a
-/// `vc+jwt`, its data must be a compact JWS. Those shape checks come first, for
-/// every envelope, and refuse the presentation whatever the caller would answer.
-///
-/// Then `envelope_key` is called once per envelope, in order, with its index, its
-/// media type, and, for a `vc+jwt`, the `kid` its protected header names (`None`
-/// when it names none). It answers with an [`EnvelopeDecision`]:
-///
-/// - **`Verify(key)`** for a `vc+jwt` verifies the inner token with
-///   [`verify_credential`], under the same `now`, and any failure refuses the
-///   presentation, naming the envelope ([`JoseError::CredentialRefused`]). For any
-///   other media type it refuses the presentation: this crate verifies only
-///   `vc+jwt` ([`JoseError::UnsupportedEnvelopeFormat`]).
-/// - **`Skip`** leaves the envelope unverified and lists it in
-///   [`VerifiedPresentation::skipped`], with its index, media type and `kid`.
-/// - **`Unknown`** refuses the presentation ([`JoseError::EnvelopeNotDecided`]).
-///
-/// So a presentation whose envelopes this crate cannot verify, such as a
-/// `vc+sd-jwt` or a `vc+cose`, passes only when the caller skips them, and the
-/// result says so. Nothing passes unverified without being reported.
+/// Each member of `verifiableCredential` must be an Enveloped Verifiable Credential (VC DM
+/// 2.0 §4.13): an object whose `type` is `EnvelopedVerifiableCredential`, alone or as a
+/// one-item array, with an `@context`, and an `id` that is a `data:` URL. A `vc+jwt`
+/// envelope's data must also be a compact JWS. Any envelope that fails these refuses the
+/// presentation with [`JoseError::MalformedEnvelope`].
 ///
 /// # Errors
 ///
 /// A [`JoseError`] naming the first check that failed.
-pub fn verify_presentation<F>(
+pub fn verify_presentation(
     jws: &str,
-    key: &PublicKey,
+    holder_key: &PublicKey,
     now: Option<i64>,
-    mut envelope_key: F,
-) -> Result<VerifiedPresentation, JoseError>
-where
-    F: FnMut(usize, &str, Option<&str>) -> EnvelopeDecision,
-{
-    let payload = open(jws, key, now, PRESENTATION_TYP, PRESENTATION_CTY)?.payload;
+) -> Result<VerifiedPresentation, JoseError> {
+    let Opened { payload, kid } = open(jws, holder_key, now, PRESENTATION_TYP, PRESENTATION_CTY)?;
+    check_holder_kid(&payload, kid.as_deref())?;
+    check_presentation_properties(&payload)?;
 
     // JSON-LD lets a property that holds one value hold it without the array.
     let members: Vec<&Value> = match payload.get("verifiableCredential") {
@@ -72,43 +58,8 @@ where
         .map(|(index, member)| inspect(index, member))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut verified = Vec::new();
-    let mut skipped = Vec::new();
-    for (index, envelope) in envelopes.into_iter().enumerate() {
-        let decision = envelope_key(index, &envelope.media_type, envelope.kid.as_deref());
-        match (decision, envelope.token) {
-            (EnvelopeDecision::Verify(inner_key), Some(token)) => {
-                let credential = verify_credential(&token, &inner_key, now).map_err(|source| {
-                    JoseError::CredentialRefused {
-                        index,
-                        source: Box::new(source),
-                    }
-                })?;
-                verified.push(VerifiedEnvelope { index, credential });
-            }
-            (EnvelopeDecision::Verify(_), None) => {
-                return Err(JoseError::UnsupportedEnvelopeFormat {
-                    index,
-                    media_type: envelope.media_type,
-                });
-            }
-            (EnvelopeDecision::Skip, _) => skipped.push(SkippedEnvelope {
-                index,
-                media_type: envelope.media_type,
-                kid: envelope.kid,
-            }),
-            (EnvelopeDecision::Unknown, _) => {
-                return Err(JoseError::EnvelopeNotDecided {
-                    index,
-                    media_type: envelope.media_type,
-                    kid: envelope.kid,
-                });
-            }
-        }
-    }
     Ok(VerifiedPresentation {
         payload: Value::Object(payload),
-        verified,
-        skipped,
+        envelopes,
     })
 }

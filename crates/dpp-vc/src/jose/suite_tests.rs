@@ -14,8 +14,8 @@
 use dpp_crypto::jws::verifier::verify_jws;
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
 
-use super::test_fixtures::{public_key, token};
-use super::{EnvelopeDecision, JoseError, verify_credential, verify_presentation};
+use super::{JoseError, verify_credential, verify_presentation};
+use crate::test_support::{public_key, token};
 
 /// The suite's verdict for a verification: success when the function returned.
 fn harness<T>(result: &Result<T, JoseError>) -> &'static str {
@@ -24,11 +24,6 @@ fn harness<T>(result: &Result<T, JoseError>) -> &'static str {
 
 fn signature_is_valid(file: &str, key: &PublicKey) -> bool {
     verify_jws(&token(file), key).expect("well-formed")
-}
-
-/// The decision of a caller that verifies nothing and says so.
-fn skip_all(_: usize, _: &str, _: Option<&str>) -> EnvelopeDecision {
-    EnvelopeDecision::Skip
 }
 
 #[test]
@@ -46,28 +41,26 @@ fn row_6_a_basic_credential_verifies() {
 }
 
 /// Row 7: the presentation's outer token is ES384, and its three envelopes are a
-/// `vc+jwt` signed under P-256, a `vc+sd-jwt` and a `vc+cose`. The suite's key is
-/// P-384, so it cannot verify the inner `vc+jwt`, and this function verifies only
-/// `vc+jwt`. The caller says what to do with each envelope.
+/// `vc+jwt` signed under P-256, a `vc+sd-jwt` and a `vc+cose`. The outer token verifies
+/// under the P-384 key. The envelopes are listed and none is verified: verifying a
+/// presentation does not verify the credentials in it.
 #[test]
-fn row_7_skipping_every_envelope_passes_and_reports_all_three() {
+fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
     let result = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
         None,
-        skip_all,
     );
 
     assert_eq!(harness(&result), "success");
     let presentation = result.expect("verified");
-    assert!(presentation.verified.is_empty());
-    let skipped: Vec<_> = presentation
-        .skipped
+    let listed: Vec<_> = presentation
+        .envelopes
         .iter()
-        .map(|s| (s.index, s.media_type.as_str(), s.kid.as_deref()))
+        .map(|e| (e.index, e.media_type.as_str(), e.kid.as_deref()))
         .collect();
     assert_eq!(
-        skipped,
+        listed,
         [
             (
                 0,
@@ -81,47 +74,61 @@ fn row_7_skipping_every_envelope_passes_and_reports_all_three() {
 }
 
 #[test]
-fn row_7_verifying_the_vc_jwt_under_p256_and_skipping_the_rest() {
-    let p256 = public_key("p256");
-    let result = verify_presentation(
+fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
+    let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
         None,
-        |index, media_type, kid| match (index, media_type) {
-            (0, "application/vc+jwt") => {
-                assert_eq!(kid, Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU"));
-                EnvelopeDecision::Verify(p256.clone())
-            }
-            _ => EnvelopeDecision::Skip,
-        },
-    );
+    )
+    .expect("verified");
 
-    let presentation = result.expect("verified");
-    assert_eq!(presentation.verified.len(), 1);
-    assert_eq!(presentation.verified[0].index, 0);
+    let first = &presentation.envelopes[0];
     assert_eq!(
-        presentation.verified[0].credential["issuer"],
-        "https://example.issuer/vc-jose-cose"
+        first.kid.as_deref(),
+        Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")
     );
-    let skipped: Vec<usize> = presentation.skipped.iter().map(|s| s.index).collect();
-    assert_eq!(skipped, [1, 2]);
+    let credential = first
+        .verify(&public_key("p256"), None)
+        .expect("the vc+jwt verifies under P-256");
+    assert_eq!(credential["issuer"], "https://example.issuer/vc-jose-cose");
 }
 
 #[test]
-fn row_7_with_no_decision_the_presentation_is_refused() {
-    let result = verify_presentation(
+fn row_7_verify_credentials_refuses_the_second_envelope_as_unsupported() {
+    let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
         None,
-        |_, _, _| EnvelopeDecision::Unknown,
-    );
+    )
+    .expect("verified");
+    let p256 = public_key("p256");
 
-    assert_eq!(harness(&result), "failure");
+    let result = presentation.verify_credentials(None, |_| Some(p256.clone()));
+
     assert_eq!(
         result.expect_err("refused"),
-        JoseError::EnvelopeNotDecided {
+        JoseError::UnsupportedEnvelopeFormat {
+            index: 1,
+            media_type: "application/vc+sd-jwt".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn row_7_with_no_key_for_the_first_envelope_the_credentials_are_refused() {
+    let presentation = verify_presentation(
+        &token("presentation-jose-multiple.txt"),
+        &public_key("p384"),
+        None,
+    )
+    .expect("verified");
+
+    let result = presentation.verify_credentials(None, |_| None);
+
+    assert_eq!(
+        result.expect_err("refused"),
+        JoseError::CredentialKeyUnknown {
             index: 0,
-            media_type: "application/vc+jwt".to_owned(),
             kid: Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU".to_owned()),
         }
     );
@@ -163,9 +170,9 @@ fn row_9_is_refused_because_its_algorithm_is_not_the_keys() {
 fn rows_10_and_11_json_that_is_not_a_token_is_refused() {
     let ed25519 = public_key("ed25519");
     for file in ["credential-minimal.json", "presentation-single.json"] {
-        let raw = super::test_fixtures::file(file);
+        let raw = crate::test_support::file(file);
         let credential = verify_credential(raw, &ed25519, None);
-        let presentation = verify_presentation(raw, &ed25519, None, skip_all);
+        let presentation = verify_presentation(raw, &ed25519, None);
 
         assert_eq!(harness(&credential), "failure", "{file}");
         assert_eq!(harness(&presentation), "failure", "{file}");
@@ -227,12 +234,7 @@ fn row_14_a_presentation_with_a_bad_media_type_is_refused_for_its_typ() {
         &key
     ));
 
-    let result = verify_presentation(
-        &token("presentation-jose-bad-media-type.txt"),
-        &key,
-        None,
-        skip_all,
-    );
+    let result = verify_presentation(&token("presentation-jose-bad-media-type.txt"), &key, None);
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -260,8 +262,8 @@ fn row_15_a_credential_with_vc_and_vp_claims_is_refused_for_them() {
 }
 
 /// The outer token is valid, typed `vp+jwt`, and carries one envelope whose `id` is
-/// `not-a-credential`. The caller is never asked about it: shape errors are refused
-/// whatever the closure would say.
+/// `not-a-credential`. The envelope's shape is refused by `verify_presentation`, so no
+/// presentation is returned and no credential is looked at.
 #[test]
 fn row_16_an_envelope_that_is_not_a_data_url_is_refused() {
     let key = public_key("ed25519");
@@ -270,16 +272,7 @@ fn row_16_an_envelope_that_is_not_a_data_url_is_refused() {
         &key
     ));
 
-    let mut asked = false;
-    let result = verify_presentation(
-        &token("presentation-jose-bad-credential.txt"),
-        &key,
-        None,
-        |_, _, _| {
-            asked = true;
-            EnvelopeDecision::Skip
-        },
-    );
+    let result = verify_presentation(&token("presentation-jose-bad-credential.txt"), &key, None);
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -289,5 +282,4 @@ fn row_16_an_envelope_that_is_not_a_data_url_is_refused() {
             reason: "id is not a data: URL".to_owned(),
         }
     );
-    assert!(!asked);
 }

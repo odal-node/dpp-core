@@ -16,7 +16,7 @@
 
 use sha2::{Digest, Sha256};
 
-use super::test_fixtures::{FILES, file};
+use crate::test_support::{FILES, file};
 
 /// File name, Git blob at the suite commit (empty for the licence, which is not a
 /// suite blob), SHA-256.
