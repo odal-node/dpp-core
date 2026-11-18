@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use base64::Engine;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use dpp_rules::bundle::{
-    AcceptancePolicy, JwsVerify, RulesetAcceptance, RulesetError, RulesetManifest, SignedBundle,
-    content_hash, verify_bundle,
+    AcceptancePolicy, JwsVerify, PinnedKey, RulesetAcceptance, RulesetError, RulesetManifest,
+    SignedBundle, content_hash, verify_bundle,
 };
 use serde_json::{Value, json};
 
@@ -20,7 +20,7 @@ use crate::instrument::{DateBasis, InstrumentCatalog, ObligationDate, PassportOb
 
 struct AcceptsEverySignature;
 impl JwsVerify for AcceptsEverySignature {
-    fn verify_eddsa(&self, _jws: &str, _public_key_b64: &str) -> Result<bool, RulesetError> {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
         Ok(true)
     }
 }
@@ -45,13 +45,17 @@ fn manifest(content: &Value) -> RulesetManifest {
     }
 }
 
+/// The protected header `{"alg":"EdDSA"}`, base64url: the identifier the pin of
+/// these fixtures names.
+const EDDSA_HEADER: &str = "eyJhbGciOiJFZERTQSJ9";
+
 /// `content` as a bundle that passed `verify_bundle`.
 fn verified(content: Value) -> RulesetAcceptance {
     let manifest = manifest(&content);
     let payload = serde_json::to_vec(&manifest).unwrap();
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload);
     let bundle = SignedBundle {
-        manifest_jws: format!("aGVhZGVy.{payload_b64}.c2ln"),
+        manifest_jws: format!("{EDDSA_HEADER}.{payload_b64}.c2ln"),
         content,
     };
     let policy = AcceptancePolicy {
@@ -60,7 +64,10 @@ fn verified(content: Value) -> RulesetAcceptance {
     };
     verify_bundle(
         &bundle,
-        "pinned-publisher-key",
+        &PinnedKey {
+            alg: "EdDSA",
+            public_key_b64: "pinned-publisher-key",
+        },
         &AcceptsEverySignature,
         &policy,
     )

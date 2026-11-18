@@ -3,8 +3,8 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use dpp_rules::bundle::{
-    AcceptancePolicy, JwsVerify, RulesetAcceptance, RulesetError, RulesetManifest, SignedBundle,
-    content_hash, verify_bundle,
+    AcceptancePolicy, JwsVerify, PinnedKey, RulesetAcceptance, RulesetError, RulesetManifest,
+    SignedBundle, content_hash, verify_bundle,
 };
 
 use super::*;
@@ -66,10 +66,10 @@ fn calculating_with_a_pending_ruleset_is_rejected_as_undetermined() {
 
 /// The signature check is exercised by `dpp-rules`' own tests against both
 /// outcomes. What is under test here is what happens *after* a bundle
-/// verifies, so this stands in for a host-side EdDSA adapter.
+/// verifies, so this stands in for a host-side adapter.
 struct SignatureAccepted;
 impl JwsVerify for SignatureAccepted {
-    fn verify_eddsa(&self, _jws: &str, _key: &str) -> Result<bool, RulesetError> {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
         Ok(true)
     }
 }
@@ -80,14 +80,19 @@ fn at(y: i32, m: u32, d: u32) -> DateTime<Utc> {
         .expect("real instant")
 }
 
-/// A JWS-shaped string whose payload segment decodes to `m`. Header and
-/// signature are placeholders: `verify_bundle` delegates signature checking
-/// to the injected verifier and only decodes the payload itself.
+/// The protected header `{"alg":"EdDSA"}`, base64url: the identifier the pin of
+/// these fixtures names.
+const EDDSA_HEADER: &str = "eyJhbGciOiJFZERTQSJ9";
+
+/// A JWS-shaped string whose header names the pinned `EdDSA` and whose payload
+/// segment decodes to `m`. The signature is a placeholder: `verify_bundle` reads
+/// the header's `alg`, decodes the payload itself, and delegates the signature
+/// check to the injected verifier.
 fn jws_carrying(m: &RulesetManifest) -> String {
     use base64::Engine;
     let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(serde_json::to_vec(m).expect("manifest serialises"));
-    format!("aGVhZGVy.{payload}.c2ln")
+    format!("{EDDSA_HEADER}.{payload}.c2ln")
 }
 
 /// A bundle offering `content`, signed-shaped and internally consistent.
@@ -108,7 +113,10 @@ fn bundle_offering(content: serde_json::Value) -> SignedBundle {
 fn accept(bundle: &SignedBundle) -> RulesetAcceptance {
     verify_bundle(
         bundle,
-        "pinned-publisher-key",
+        &PinnedKey {
+            alg: "EdDSA",
+            public_key_b64: "pinned-publisher-key",
+        },
         &SignatureAccepted,
         &AcceptancePolicy {
             now: at(2026, 8, 1),

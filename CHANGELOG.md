@@ -61,9 +61,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **`sd_jwt_vc::verify` takes a `PublicKey`.** The second argument was the base64url
   key. Migration: pass the `PublicKey` built as above. (#586)
 
-- **`verify_snapshot_bound` takes a `PublicKey`.** It is re-exported as
-  `dpp_vc::verify_snapshot_bound`, and its second argument was the base64url key.
-  Migration: pass the `PublicKey` built as above. (#586)
+- **`dpp_rules::bundle::JwsVerify::verify` replaces `verify_eddsa`, and
+  `verify_bundle` takes a `PinnedKey`.** `PinnedKey { alg, public_key_b64 }` pins
+  the publisher key together with its JOSE `alg` identifier, so the algorithm can
+  change by re-pinning. `verify_bundle`'s second argument was the base64url key.
+  `verify_bundle` refuses a manifest whose protected header `alg` is not exactly the
+  pin's `alg`, as `BadSignature`, before the verifier runs. An implementer of
+  `JwsVerify` must verify under exactly `key.alg`, and should refuse a mismatched
+  header too. Migration for an implementer: rename `verify_eddsa(jws, public_key_b64)`
+  to `verify(jws, key)`, read the key from `key.public_key_b64`, and return `Err` for
+  an `alg` you do not implement. Migration for a caller: pin under the identifier your
+  publisher writes, which `dpp-crypto` writes as `EdDSA`, and pass
+  `&PinnedKey { alg: "EdDSA", public_key_b64: &key }` where `&key` was passed. (#592)
 
 ### Added
 

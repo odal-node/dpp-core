@@ -2,27 +2,35 @@
 //! this crate's own tests never need a real signing key. The real EdDSA path
 //! is covered end-to-end where the adapter lives (host-side).
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 
 use super::*;
 
+/// The pin every test here verifies under. The key is a placeholder: the fake
+/// verifiers below never read it.
+const PIN: PinnedKey<'static> = PinnedKey {
+    alg: "EdDSA",
+    public_key_b64: "pubkey",
+};
+
 struct AlwaysOk;
 impl JwsVerify for AlwaysOk {
-    fn verify_eddsa(&self, _jws: &str, _public_key_b64: &str) -> Result<bool, RulesetError> {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
         Ok(true)
     }
 }
 
 struct AlwaysBad;
 impl JwsVerify for AlwaysBad {
-    fn verify_eddsa(&self, _jws: &str, _public_key_b64: &str) -> Result<bool, RulesetError> {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
         Ok(false)
     }
 }
 
 struct AlwaysErr;
 impl JwsVerify for AlwaysErr {
-    fn verify_eddsa(&self, _jws: &str, _public_key_b64: &str) -> Result<bool, RulesetError> {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
         Err(RulesetError::Malformed("verifier exploded".into()))
     }
 }
@@ -60,14 +68,22 @@ fn manifest_effective(
     }
 }
 
-/// A JWS-shaped string whose payload segment decodes to `m`. Header and
-/// signature segments are placeholders — `verify_bundle` never parses them
-/// itself; that's the injected verifier's job.
-fn fake_jws(m: &RulesetManifest) -> String {
+/// The protected header `{"alg":"EdDSA"}`, base64url: the identifier every
+/// fixture here is pinned under.
+const EDDSA_HEADER: &str = "eyJhbGciOiJFZERTQSJ9";
+
+/// A JWS-shaped string whose protected header segment is `header_segment`, as
+/// given, and whose payload segment decodes to `m`. The signature segment is a
+/// placeholder: no verifier in this file checks it.
+fn jws_with_header_segment(header_segment: &str, m: &RulesetManifest) -> String {
     use base64::Engine;
     let payload = serde_json::to_vec(m).expect("manifest serialises");
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload);
-    format!("aGVhZGVy.{payload_b64}.c2ln")
+    format!("{header_segment}.{payload_b64}.c2ln")
+}
+
+fn fake_jws(m: &RulesetManifest) -> String {
+    jws_with_header_segment(EDDSA_HEADER, m)
 }
 
 fn bundle(version: &str, threshold: i64) -> SignedBundle {
@@ -82,7 +98,7 @@ fn bundle(version: &str, threshold: i64) -> SignedBundle {
 #[test]
 fn valid_bundle_verifies_and_carries_version() {
     let b = bundle("2026-Q3.1", 5);
-    let v = verify_bundle(&b, "pubkey", &AlwaysOk, &accepting()).expect("must verify");
+    let v = verify_bundle(&b, &PIN, &AlwaysOk, &accepting()).expect("must verify");
     assert_eq!(v.version(), "2026-Q3.1");
     assert_eq!(v.content()["textileFibreThreshold"], 5);
 }
@@ -91,7 +107,7 @@ fn valid_bundle_verifies_and_carries_version() {
 fn bad_signature_is_refused() {
     let b = bundle("2026-Q3.1", 5);
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysBad, &accepting()),
+        verify_bundle(&b, &PIN, &AlwaysBad, &accepting()),
         Err(RulesetError::BadSignature)
     ));
 }
@@ -100,7 +116,7 @@ fn bad_signature_is_refused() {
 fn verifier_error_propagates_as_malformed() {
     let b = bundle("2026-Q3.1", 5);
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysErr, &accepting()),
+        verify_bundle(&b, &PIN, &AlwaysErr, &accepting()),
         Err(RulesetError::Malformed(_))
     ));
 }
@@ -111,7 +127,7 @@ fn tampered_content_is_refused() {
     // Change the content without updating the signed manifest's hash.
     b.content = serde_json::json!({ "textileFibreThreshold": 999 });
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &accepting()),
+        verify_bundle(&b, &PIN, &AlwaysOk, &accepting()),
         Err(RulesetError::ContentHashMismatch)
     ));
 }
@@ -119,11 +135,11 @@ fn tampered_content_is_refused() {
 #[test]
 fn malformed_jws_missing_payload_segment_is_refused() {
     let b = SignedBundle {
-        manifest_jws: "onlyoneseg".into(),
+        manifest_jws: EDDSA_HEADER.into(),
         content: serde_json::json!({}),
     };
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &accepting()),
+        verify_bundle(&b, &PIN, &AlwaysOk, &accepting()),
         Err(RulesetError::Malformed(_))
     ));
 }
@@ -133,13 +149,91 @@ fn malformed_jws_payload_not_json_is_refused() {
     use base64::Engine;
     let bad_payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"not json");
     let b = SignedBundle {
-        manifest_jws: format!("aGVhZGVy.{bad_payload}.c2ln"),
+        manifest_jws: format!("{EDDSA_HEADER}.{bad_payload}.c2ln"),
         content: serde_json::json!({}),
     };
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &accepting()),
+        verify_bundle(&b, &PIN, &AlwaysOk, &accepting()),
         Err(RulesetError::Malformed(_))
     ));
+}
+
+/// A verifier that accepts every signature, as `AlwaysOk` does, and records that
+/// it was asked.
+struct Recorder(Cell<bool>);
+impl JwsVerify for Recorder {
+    fn verify(&self, _jws: &str, _key: &PinnedKey<'_>) -> Result<bool, RulesetError> {
+        self.0.set(true);
+        Ok(true)
+    }
+}
+
+/// Base64url of `text`, for a protected header a test writes out.
+fn encoded(text: &str) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(text)
+}
+
+/// A bundle whose manifest header segment is `header_segment`, with a consistent
+/// body.
+fn bundle_with_header(header_segment: &str) -> SignedBundle {
+    let content = serde_json::json!({ "textileFibreThreshold": 5 });
+    let m = manifest("2026-Q3.1", &content);
+    SignedBundle {
+        manifest_jws: jws_with_header_segment(header_segment, &m),
+        content,
+    }
+}
+
+/// `verify_bundle` reads the manifest header's `alg` and refuses any identifier but
+/// the pin's, exactly, before the verifier runs. The verifier here accepts
+/// everything, as `AlwaysOk` does, so only the header check can refuse.
+#[test]
+fn a_header_naming_another_alg_is_refused_before_the_verifier_runs() {
+    for alg in ["ES256", "Ed25519", "none"] {
+        let verifier = Recorder(Cell::new(false));
+        let b = bundle_with_header(&encoded(&serde_json::json!({ "alg": alg }).to_string()));
+        assert!(
+            matches!(
+                verify_bundle(&b, &PIN, &verifier, &accepting()),
+                Err(RulesetError::BadSignature)
+            ),
+            "header {alg}"
+        );
+        assert!(!verifier.0.get(), "header {alg}: the verifier was asked");
+    }
+}
+
+/// The control for the test above: a header naming the pinned identifier reaches
+/// the verifier, and verifies.
+#[test]
+fn a_header_naming_the_pinned_alg_reaches_the_verifier() {
+    let verifier = Recorder(Cell::new(false));
+    let b = bundle_with_header(&encoded(&serde_json::json!({ "alg": "EdDSA" }).to_string()));
+    assert!(verify_bundle(&b, &PIN, &verifier, &accepting()).is_ok());
+    assert!(verifier.0.get());
+}
+
+/// A header that cannot be read is malformed input, and the verifier is never
+/// asked: not base64url, not a JSON object, and an object with no string `alg`.
+#[test]
+fn a_header_that_cannot_be_read_is_malformed_before_the_verifier_runs() {
+    for header in [
+        "!!!".to_owned(),
+        encoded("[\"EdDSA\"]"),
+        encoded(r#"{"typ":"JWT"}"#),
+    ] {
+        let verifier = Recorder(Cell::new(false));
+        let b = bundle_with_header(&header);
+        assert!(
+            matches!(
+                verify_bundle(&b, &PIN, &verifier, &accepting()),
+                Err(RulesetError::Malformed(_))
+            ),
+            "header {header}"
+        );
+        assert!(!verifier.0.get(), "header {header}: the verifier was asked");
+    }
 }
 
 #[test]
@@ -192,7 +286,7 @@ fn a_future_dated_bundle_is_refused_as_not_yet_effective() {
         in_force: None,
     };
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &policy),
+        verify_bundle(&b, &PIN, &AlwaysOk, &policy),
         Err(RulesetError::NotYetEffective { .. })
     ));
 }
@@ -210,7 +304,7 @@ fn a_bundle_effective_exactly_now_is_applicable() {
         now: at(2026, 10, 1),
         in_force: None,
     };
-    assert!(verify_bundle(&b, "pubkey", &AlwaysOk, &policy).is_ok());
+    assert!(verify_bundle(&b, &PIN, &AlwaysOk, &policy).is_ok());
 }
 
 /// **The rollback case.** An older, perfectly-signed bundle must not displace a
@@ -234,7 +328,7 @@ fn an_older_bundle_is_refused_as_superseded() {
         in_force: Some(&in_force),
     };
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &policy),
+        verify_bundle(&b, &PIN, &AlwaysOk, &policy),
         Err(RulesetError::Superseded { .. })
     ));
 }
@@ -259,7 +353,7 @@ fn a_republish_at_the_same_effective_date_is_accepted() {
         now: at(2027, 1, 1),
         in_force: Some(&in_force),
     };
-    let v = verify_bundle(&b, "pubkey", &AlwaysOk, &policy).expect("same-date republish");
+    let v = verify_bundle(&b, &PIN, &AlwaysOk, &policy).expect("same-date republish");
     assert_eq!(v.version(), "2026-Q4.2");
 }
 
@@ -280,7 +374,7 @@ fn applicability_is_reported_before_currency() {
         in_force: Some(&in_force),
     };
     assert!(matches!(
-        verify_bundle(&b, "pubkey", &AlwaysOk, &policy),
+        verify_bundle(&b, &PIN, &AlwaysOk, &policy),
         Err(RulesetError::NotYetEffective { .. })
     ));
 }
@@ -293,7 +387,7 @@ fn applicability_is_reported_before_currency() {
 #[test]
 fn provenance_distinguishes_a_verified_bundle_from_a_local_baseline() {
     let b = bundle("2026-Q3.1", 5);
-    let verified = verify_bundle(&b, "pubkey", &AlwaysOk, &accepting()).expect("must verify");
+    let verified = verify_bundle(&b, &PIN, &AlwaysOk, &accepting()).expect("must verify");
     assert_eq!(verified.provenance(), RulesetProvenance::Verified);
 
     let content = serde_json::json!({});
