@@ -31,8 +31,13 @@ pub fn verify_jws(jws: &str, key: &PublicKey) -> anyhow::Result<bool> {
     let sig_bytes = b64
         .decode(parts[2])
         .map_err(|e| anyhow::anyhow!("base64 signature: {e}"))?;
-    if sig_bytes.len() != key.algorithm().signature_len() {
-        return Err(anyhow::anyhow!("Ed25519 signature must be 64 bytes"));
+    let expected = key.algorithm().signature_len();
+    if sig_bytes.len() != expected {
+        let name = match key.algorithm() {
+            KeyAlgorithm::Ed25519 => "Ed25519",
+            KeyAlgorithm::EcdsaP256 => "ES256",
+        };
+        return Err(anyhow::anyhow!("{name} signature must be {expected} bytes"));
     }
 
     Ok(key.verify(signing_input.as_bytes(), &sig_bytes))
@@ -133,15 +138,16 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
 ///   `controller`. These are the binding checks of the Controlled Identifiers
 ///   v1.0 retrieval algorithm (§3.3): a document vouches only for its own keys;
 /// - `assertionMethod` references that method;
-/// - its `publicKeyJwk` is an Ed25519 key (`OKP`, `crv: Ed25519`) on the curve;
+/// - its `publicKeyJwk` is an Ed25519 key (`OKP`, `crv: Ed25519`) or a P-256 key
+///   (`EC`, `crv: P-256`), on its curve;
 /// - if the fragment is a thumbprint URI, it is that key's own. An identifier
 ///   that claims to be derived from the key is held to it, or a document could
 ///   file any key under another key's name. Other fragments, such as `#key-1`
 ///   in a document someone else wrote, are taken as the names they are;
 /// - if the JWK declares an `alg`, the JWS `alg` is the same string. A key that
 ///   says what it is for is held to it;
-/// - the JWS `alg` names the key's algorithm (`EdDSA` or `Ed25519`), even when the
-///   JWK declares no `alg`.
+/// - the JWS `alg` names the key's algorithm (`EdDSA` or `Ed25519` for an Ed25519
+///   key, `ES256` for a P-256 key), even when the JWK declares no `alg`.
 ///
 /// The ids this crate issues are stable across rotation and revocation, so a
 /// signature made before a rotation resolves to the key that made it. A revoked

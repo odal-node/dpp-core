@@ -363,7 +363,7 @@ pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
         ),
         (
             "reject/holder-key-is-p-256",
-            "this crate binds with Ed25519 keys only",
+            "RFC 9901 section 4.3.2: the Key Binding JWT must validate under the key the SD-JWT names as the Holder's, so one signed by another key is refused",
             Some(json!({ "jwk": p256 })),
         ),
         (

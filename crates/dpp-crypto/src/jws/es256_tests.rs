@@ -1,0 +1,242 @@
+//! ES256 hazards: algorithm confusion between two 64-byte signature formats,
+//! JWK reading, and P-256 keys through the store. The vectors are in
+//! `es256_vector_tests.rs`, and the helpers both files use are here.
+
+use base64::Engine;
+use serde_json::{Value, json};
+
+use super::algorithm::KeyAlgorithm;
+use super::public_key::PublicKey;
+use super::signer;
+use super::verifier::verify_jws;
+use crate::keystore::SigningMaterial;
+use crate::test_support::temp_store;
+
+pub(super) const B64: base64::engine::general_purpose::GeneralPurpose =
+    base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+/// The order of the P-256 group, big-endian.
+const N: [u8; 32] = hex32("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551");
+/// `n / 2`, rounded down: an `S` above it is "high".
+const HALF_N: [u8; 32] = hex32("7FFFFFFF800000007FFFFFFFFFFFFFFFDE737D56D38BCF4279DCE5617E3192A8");
+
+const fn hex32(hex: &str) -> [u8; 32] {
+    let bytes = hex.as_bytes();
+    let mut out = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        out[i] = nibble(bytes[2 * i]) << 4 | nibble(bytes[2 * i + 1]);
+        i += 1;
+    }
+    out
+}
+
+const fn nibble(c: u8) -> u8 {
+    match c {
+        b'0'..=b'9' => c - b'0',
+        b'A'..=b'F' => c - b'A' + 10,
+        b'a'..=b'f' => c - b'a' + 10,
+        _ => panic!("not hex"),
+    }
+}
+
+pub(super) fn is_high_s(signature: &[u8]) -> bool {
+    signature[32..] > HALF_N[..]
+}
+
+/// `n − s`, the other valid `S` for the same `R`.
+pub(super) fn negate_s(signature: &[u8]) -> Vec<u8> {
+    let mut out = signature[..32].to_vec();
+    let s = &signature[32..];
+    let mut negated = [0u8; 32];
+    let mut borrow = 0i16;
+    for i in (0..32).rev() {
+        let mut d = i16::from(N[i]) - i16::from(s[i]) - borrow;
+        borrow = 0;
+        if d < 0 {
+            d += 256;
+            borrow = 1;
+        }
+        negated[i] = u8::try_from(d).expect("a byte");
+    }
+    out.extend_from_slice(&negated);
+    out
+}
+
+pub(super) fn p256(jwk: &Value) -> PublicKey {
+    PublicKey::from_jwk(jwk).expect("a P-256 JWK")
+}
+
+pub(super) fn rfc7515_key() -> PublicKey {
+    p256(&json!({
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+        "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+    }))
+}
+
+// ── Algorithm confusion ───────────────────────────────────────────────────────
+
+/// Two 64-byte signature formats now coexist. The key decides the algorithm, so
+/// each of these substitutions is refused, by both verification paths.
+#[test]
+fn no_header_can_move_a_signature_to_the_other_algorithm() {
+    let store = temp_store("es256-confusion", "ed");
+    store
+        .generate_key_with("p256", KeyAlgorithm::EcdsaP256)
+        .expect("generate");
+    let ed = store.load_key("ed").expect("ed");
+    let p = store.load_key("p256").expect("p256");
+
+    let token = |alg: &str, signer: &crate::keystore::KeyEntry| {
+        let input = format!(
+            "{}.{}",
+            B64.encode(format!(r#"{{"alg":"{alg}"}}"#)),
+            B64.encode(r#"{"claim":"value"}"#)
+        );
+        format!("{input}.{}", B64.encode(signer.sign(input.as_bytes())))
+    };
+
+    // Controls: each key under its own algorithm.
+    assert!(verify_jws(&token("EdDSA", &ed), &ed.public_key()).expect("ok"));
+    assert!(verify_jws(&token("ES256", &p), &p.public_key()).expect("ok"));
+    assert!(signer::verify(&store, "ed", &token("EdDSA", &ed)).expect("ok"));
+    assert!(signer::verify(&store, "p256", &token("ES256", &p)).expect("ok"));
+
+    // An Ed25519 signature labelled ES256, offered against the P-256 key and
+    // against its own key; and the reverse.
+    for (jws, key, id) in [
+        (token("ES256", &ed), p.public_key(), "p256"),
+        (token("ES256", &ed), ed.public_key(), "ed"),
+        (token("EdDSA", &p), ed.public_key(), "ed"),
+        (token("EdDSA", &p), p.public_key(), "p256"),
+        (token("Ed25519", &p), p.public_key(), "p256"),
+        (token("none", &p), p.public_key(), "p256"),
+        (token("ES384", &p), p.public_key(), "p256"),
+    ] {
+        assert!(!verify_jws(&jws, &key).expect("well-formed"), "{jws}");
+        assert!(
+            !signer::verify(&store, id, &jws).expect("well-formed"),
+            "{jws}"
+        );
+    }
+}
+
+/// A JWK is read only into the verification path its type and curve name, with
+/// full-length coordinates of a point on the curve.
+#[test]
+fn an_ec_jwk_must_be_p256_full_length_and_on_the_curve() {
+    let good = rfc7515_key().jwk();
+    assert!(PublicKey::from_jwk(&good).is_some());
+
+    let mut wrong_curve = good.clone();
+    wrong_curve["crv"] = json!("P-384");
+    let mut okp_curve = good.clone();
+    okp_curve["crv"] = json!("Ed25519");
+    let mut okp_type = good.clone();
+    okp_type["kty"] = json!("OKP");
+    let mut short_x = good.clone();
+    short_x["x"] = json!(B64.encode(&B64.decode(good["x"].as_str().unwrap()).unwrap()[1..]));
+    let mut off_curve = good.clone();
+    let mut y = B64.decode(good["y"].as_str().unwrap()).unwrap();
+    y[31] ^= 1;
+    off_curve["y"] = json!(B64.encode(&y));
+    let mut no_y = good.clone();
+    no_y.as_object_mut().unwrap().remove("y");
+
+    for (name, jwk) in [
+        ("wrong curve", wrong_curve),
+        ("EC with an OKP curve", okp_curve),
+        ("OKP with an EC curve", okp_type),
+        ("shortened x", short_x),
+        ("off the curve", off_curve),
+        ("no y", no_y),
+    ] {
+        assert!(PublicKey::from_jwk(&jwk).is_none(), "{name}");
+    }
+}
+
+/// A P-256 key given in SEC1 compressed form is the same key, held uncompressed,
+/// with the same thumbprint.
+#[test]
+fn a_compressed_p256_key_is_the_same_key() {
+    let key = SigningMaterial::generate(KeyAlgorithm::EcdsaP256).public_key();
+    let uncompressed = key.as_bytes();
+    let mut compressed = vec![2 + (uncompressed[64] & 1)];
+    compressed.extend_from_slice(&uncompressed[1..33]);
+    let again = PublicKey::from_bytes(KeyAlgorithm::EcdsaP256, &compressed).expect("compressed");
+    assert_eq!(again, key);
+    assert_eq!(again.thumbprint(), key.thumbprint());
+}
+
+// ── Keystore ──────────────────────────────────────────────────────────────────
+
+/// A P-256 key survives the store: generated, persisted, reopened from disk,
+/// loaded, and its signature verifies under the public key the store records.
+/// The record names `ES256` on disk.
+#[test]
+fn a_p256_key_round_trips_through_the_encrypted_store() {
+    let path = std::env::temp_dir().join(format!("es256-store-{}.json", uuid::Uuid::now_v7()));
+    let generated = {
+        let store = crate::keystore::KeyStore::open(&path, "pass").expect("open");
+        store
+            .generate_key_with("issuer", KeyAlgorithm::EcdsaP256)
+            .expect("generate")
+            .public_key()
+    };
+    let on_disk: Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("read")).expect("json");
+    assert_eq!(on_disk["keys"]["issuer"]["algorithm"], "ES256");
+    assert_eq!(
+        on_disk["keys"]["issuer"]["verifying_key_hex"]
+            .as_str()
+            .expect("hex")
+            .len(),
+        130,
+        "65 bytes, SEC1 uncompressed"
+    );
+
+    let store = crate::keystore::KeyStore::open(&path, "pass").expect("reopen");
+    let loaded = store.load_key("issuer").expect("load");
+    assert_eq!(loaded.algorithm, KeyAlgorithm::EcdsaP256);
+    assert_eq!(loaded.public_key(), generated);
+    let info = store.public_key("issuer").expect("info");
+    assert_eq!(info.public_key().expect("valid"), generated);
+
+    let jws = signer::sign(&store, "issuer", &json!({"a": 1}), "kid").expect("sign");
+    assert!(verify_jws(&jws, &generated).expect("well-formed"));
+    let _ = std::fs::remove_file(path);
+}
+
+/// Rotation keeps the algorithm unless told otherwise, and a cross-algorithm
+/// rotation leaves the old key archived under its own algorithm.
+#[test]
+fn rotation_keeps_or_changes_the_algorithm_as_asked() {
+    let store = temp_store("es256-rotate", "issuer");
+    assert_eq!(
+        store.rotate_key("issuer").expect("rotate").algorithm,
+        KeyAlgorithm::Ed25519
+    );
+    let rotated = store
+        .rotate_key_to("issuer", KeyAlgorithm::EcdsaP256)
+        .expect("rotate to P-256");
+    assert_eq!(rotated.algorithm, KeyAlgorithm::EcdsaP256);
+    assert_eq!(
+        store.rotate_key("issuer").expect("rotate").algorithm,
+        KeyAlgorithm::EcdsaP256
+    );
+    let archived: Vec<KeyAlgorithm> = store
+        .archived_public_keys("issuer")
+        .iter()
+        .map(|k| k.algorithm)
+        .collect();
+    assert_eq!(
+        archived,
+        [
+            KeyAlgorithm::Ed25519,
+            KeyAlgorithm::Ed25519,
+            KeyAlgorithm::EcdsaP256
+        ]
+    );
+}

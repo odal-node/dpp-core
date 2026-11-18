@@ -31,4 +31,6 @@ mod store;
 mod tests;
 
 pub use entry::KeyEntry;
+#[cfg(test)]
+pub(crate) use entry::SigningMaterial;
 pub use store::{KeyStore, PublicKeyInfo, UpgradeNeeded};

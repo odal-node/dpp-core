@@ -412,14 +412,23 @@ impl KeyStore {
         }
     }
 
+    /// Generate an Ed25519 key under `key_id`. See [`Self::generate_key_with`].
     pub fn generate_key(&self, key_id: &str) -> Result<KeyEntry> {
+        self.generate_key_with(key_id, KeyAlgorithm::Ed25519)
+    }
+
+    /// Generate a key of `algorithm` under `key_id`, replacing any key there.
+    ///
+    /// # Errors
+    /// When the store still needs migration, or cannot be written.
+    pub fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
                  open it with `KeyStore::open_and_migrate`"
             );
         }
-        let material = SigningMaterial::generate(KeyAlgorithm::Ed25519);
+        let material = SigningMaterial::generate(algorithm);
         let (record, entry) = self.seal_new_record(material)?;
         {
             let mut map = self.records.write().expect("key store write lock poisoned");

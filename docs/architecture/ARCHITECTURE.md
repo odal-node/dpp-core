@@ -239,8 +239,8 @@ The single place JWS verification lives:
 
 - `verify_jws(jws, key)`: verify a JWS against a `PublicKey`, which carries the algorithm
   the key is used under
-- `resolve_verification_key(did_document, jws)`: the `PublicKey` (Ed25519 in this
-  release) of the verification method the JWS `kid` names, after the Controlled
+- `resolve_verification_key(did_document, jws)`: the `PublicKey` (Ed25519 or P-256) of
+  the verification method the JWS `kid` names, after the Controlled
   Identifiers v1.0 binding checks. No `kid`, no key
 
 ---

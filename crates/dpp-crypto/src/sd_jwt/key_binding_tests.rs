@@ -169,7 +169,7 @@ fn a_token_without_a_key_binding_jwt_is_refused_when_one_is_required() {
 }
 
 #[test]
-fn a_holder_key_must_be_named_and_be_ed25519() {
+fn a_holder_key_must_be_named_and_of_a_supported_curve() {
     let key = holder("kb-no-cnf");
     let unnamed = issued_to(json!(null));
     assert_eq!(

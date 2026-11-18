@@ -162,7 +162,7 @@ fn a_method_not_listed_in_assertion_method_is_not_a_signer() {
 /// Only `kty: OKP, crv: Ed25519` keys resolve. The identifier is built from the
 /// same `x`, so it is the JWK's type and not the identifier that refuses.
 #[test]
-fn only_an_ed25519_jwk_resolves() {
+fn only_an_ed25519_or_p256_jwk_resolves() {
     let key = public_key();
     let id = vm_id(&key);
     let with = |jwk: Value| {

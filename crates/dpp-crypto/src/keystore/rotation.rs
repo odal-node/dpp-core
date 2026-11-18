@@ -45,7 +45,17 @@ impl KeyStore {
     /// [`generate_key`](Self::generate_key), there is no intermediate on-disk
     /// state where the archive exists but the new key does not (identity I4).
     pub fn rotate_key(&self, key_id: &str) -> Result<KeyEntry> {
-        self.rotate_inner(key_id, false)
+        self.rotate_inner(key_id, false, None)
+    }
+
+    /// [`rotate_key`](Self::rotate_key), installing a key of `algorithm`.
+    ///
+    /// The archived key keeps its own algorithm, so a DID document built after
+    /// a cross-algorithm rotation lists both, each under its own JWK shape, and
+    /// a signature made before the rotation still resolves to the key that made
+    /// it.
+    pub fn rotate_key_to(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        self.rotate_inner(key_id, false, Some(algorithm))
     }
 
     /// Atomically **revoke** the current key and install a fresh one. The old key
@@ -54,10 +64,15 @@ impl KeyStore {
     /// Use this on key **compromise** (vs. hygiene rotation, where the old key
     /// stays valid — see [`rotate_key`](Self::rotate_key)).
     pub fn revoke_and_rotate(&self, key_id: &str) -> Result<KeyEntry> {
-        self.rotate_inner(key_id, true)
+        self.rotate_inner(key_id, true, None)
     }
 
-    fn rotate_inner(&self, key_id: &str, revoke_old: bool) -> Result<KeyEntry> {
+    fn rotate_inner(
+        &self,
+        key_id: &str,
+        revoke_old: bool,
+        algorithm: Option<KeyAlgorithm>,
+    ) -> Result<KeyEntry> {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
@@ -65,13 +80,21 @@ impl KeyStore {
             );
         }
 
+        // A rotation keeps the key's algorithm unless the caller names another.
+        let algorithm = algorithm.unwrap_or_else(|| {
+            self.records
+                .read()
+                .expect("key store read lock poisoned")
+                .get(key_id)
+                .map_or_else(super::store::default_algorithm, |r| r.algorithm)
+        });
+
         // Prepare the new key material up front so the lock-held section is just
         // the in-memory swap + single persist. Bound to the new key's own
         // fingerprint. The archived copy below keeps the one it was sealed under,
         // which is why the binding is to the fingerprint rather than the map key it
         // is filed at.
-        let (new_record, entry) =
-            self.seal_new_record(SigningMaterial::generate(KeyAlgorithm::Ed25519))?;
+        let (new_record, entry) = self.seal_new_record(SigningMaterial::generate(algorithm))?;
 
         {
             let mut map = self.records.write().expect("key store write lock poisoned");

@@ -114,6 +114,8 @@ mod oracle_tests;
 #[cfg(test)]
 mod rfc9901_array_tests;
 #[cfg(test)]
+mod rfc9901_es256_tests;
+#[cfg(test)]
 mod rfc9901_example_tests;
 #[cfg(test)]
 mod rfc9901_examples;

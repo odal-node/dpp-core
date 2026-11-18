@@ -16,8 +16,14 @@ pub const EDDSA_ALG: &str = "EdDSA";
 /// header is checked against the algorithm the key is recorded as using.
 pub const ED25519_ALG: &str = "Ed25519";
 
+/// The JOSE `alg` identifier for ECDSA over P-256 with SHA-256 (RFC 7518 §3.4).
+pub const ES256_ALG: &str = "ES256";
+
 /// JWK curve name for Ed25519 (RFC 8037 §2).
 pub const ED25519_CRV: &str = "Ed25519";
+
+/// JWK curve name for P-256 (RFC 7518 §6.2.1.1).
+pub const P256_CRV: &str = "P-256";
 
 /// The prefix of a JWK Thumbprint URI (RFC 9278), for the SHA-256 hash. What
 /// follows it is the RFC 7638 thumbprint.
@@ -25,7 +31,7 @@ pub const JWK_THUMBPRINT_URI_PREFIX: &str = "urn:ietf:params:oauth:jwk-thumbprin
 
 /// Whether `alg` names an algorithm this crate signs or verifies under: the
 /// signing algorithms accepted on a JWS for all DPP credentials and passport
-/// proofs, `EdDSA` and the RFC 9864 identifier for the same operation.
+/// proofs, `EdDSA` and the RFC 9864 identifier for the same operation, and `ES256`.
 ///
 /// Pinned at compile time, so a future algorithm addition requires a deliberate
 /// change in [`KeyAlgorithm::from_jose_alg`] plus a corresponding bump of the
@@ -40,11 +46,11 @@ pub fn is_allowed_alg(alg: &str) -> bool {
 
 /// The signature algorithm a key pair uses.
 ///
-/// There is exactly one variant, and [`is_allowed_alg`] admits two spellings of
-/// it. The type exists so that the algorithm travels *with* the key rather than
-/// being assumed by every reader of it: a verifier can then bind the JWS `alg`
-/// header to what the key record says, instead of letting an attacker-supplied
-/// header select the verification path.
+/// There is one variant per algorithm; [`is_allowed_alg`] admits two spellings of
+/// Ed25519 and one of ES256. The type exists so that the algorithm travels *with*
+/// the key rather than being assumed by every reader of it: a verifier can then
+/// bind the JWS `alg` header to what the key record says, instead of letting an
+/// attacker-supplied header select the verification path.
 ///
 /// `#[non_exhaustive]` so that adding a second algorithm later is not a
 /// breaking change for downstream matches.
@@ -54,6 +60,9 @@ pub enum KeyAlgorithm {
     /// Ed25519 signatures, JOSE `EdDSA` (RFC 8037 §3.1).
     #[serde(rename = "EdDSA")]
     Ed25519,
+    /// ECDSA over P-256 with SHA-256, JOSE `ES256` (RFC 7518 §3.4).
+    #[serde(rename = "ES256")]
+    EcdsaP256,
 }
 
 impl KeyAlgorithm {
@@ -62,6 +71,7 @@ impl KeyAlgorithm {
     pub fn jose_alg(self) -> &'static str {
         match self {
             Self::Ed25519 => EDDSA_ALG,
+            Self::EcdsaP256 => ES256_ALG,
         }
     }
 
@@ -70,6 +80,8 @@ impl KeyAlgorithm {
     pub(crate) fn signature_len(self) -> usize {
         match self {
             Self::Ed25519 => 64,
+            // `R ‖ S`, each a 32-octet big-endian integer (RFC 7518 §3.4).
+            Self::EcdsaP256 => 64,
         }
     }
 
@@ -79,6 +91,7 @@ impl KeyAlgorithm {
     pub fn from_jose_alg(alg: &str) -> Option<Self> {
         match alg {
             EDDSA_ALG | ED25519_ALG => Some(Self::Ed25519),
+            ES256_ALG => Some(Self::EcdsaP256),
             _ => None,
         }
     }

@@ -10,10 +10,9 @@
 //! its policy, and clause 7.3 step 1 says that choice MUST NOT depend on whether a
 //! Key Binding JWT arrived, so neither looks at the token to decide.
 //!
-//! Ed25519 only, like the rest of this crate: the Holder key in `cnf` must be an
-//! Ed25519 JWK, and the Key Binding JWT is signed with it. The RFC's own examples
-//! bind with P-256 keys, so for those this crate checks the `sd_hash` and not the
-//! signature.
+//! The Holder key in `cnf` is an Ed25519 (`OKP`) or a P-256 (`EC`) JWK, and the
+//! Key Binding JWT is held to that key's algorithm. The RFC's own examples bind
+//! with P-256 keys, and their Key Binding JWTs verify here.
 
 use serde_json::{Map, Value, json};
 
@@ -64,13 +63,13 @@ pub struct KeyBindingPolicy {
 }
 
 /// The `cnf` value an Issuer puts in the payload to enable Key Binding for the
-/// Holder whose Ed25519 public key is `holder` (clause 4.1.2): RFC 7800's `jwk`
+/// Holder whose public key is `holder` (clause 4.1.2): RFC 7800's `jwk`
 /// confirmation method, which the clause suggests.
 pub fn holder_key_confirmation(holder: &PublicKey) -> Value {
     json!({ "jwk": holder.jwk() })
 }
 
-/// The Holder key a processed payload names: the Ed25519 JWK in `cnf.jwk`, and the
+/// The Holder key a processed payload names: the Ed25519 or P-256 JWK in `cnf.jwk`, and the
 /// `alg` the JWK declares, if it declares one. A declared `alg` must be the key's
 /// own.
 fn holder_key(payload: &Map<String, Value>) -> Result<(PublicKey, Option<String>), SdJwtError> {
@@ -149,7 +148,7 @@ impl SdJwt {
     /// What [`Self::present`] refuses. [`SdJwtError::NoHolderKey`] when the
     /// presentation names no Holder key, which is also the case when `cnf` was
     /// concealed and not chosen: the Verifier could not find the key either.
-    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is not Ed25519, and
+    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is neither Ed25519 nor P-256, and
     /// [`SdJwtError::HolderKeyMismatch`] when `holder` is not the key `cnf`
     /// names.
     pub fn present_with_key_binding(
@@ -187,7 +186,7 @@ impl SdJwt {
     /// The Holder key is taken from the processed payload's `cnf` (step 5.a), so
     /// a `cnf` that is selectively disclosable has to have been disclosed. The
     /// signature is checked against it with this crate's JWS verifier, which
-    /// refuses `none`, any algorithm but Ed25519 and any `crit` (step 5.b), and
+    /// refuses `none`, an algorithm other than the key's own and any `crit` (step 5.b), and
     /// an `alg` other than the one the JWK declares.
     ///
     /// # Errors
