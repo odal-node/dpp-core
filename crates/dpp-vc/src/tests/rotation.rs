@@ -5,9 +5,18 @@
 //! rotation still verifies against the DID document afterwards, and a revoked
 //! key's signature does not. `dpp-vc` is where they can see both halves.
 
+use std::sync::Arc;
+
+use base64::Engine;
 use serde_json::json;
 
-use dpp_crypto::keystore::KeyStore;
+use dpp_crypto::jws::KeyAlgorithm;
+use dpp_crypto::keystore::{KeyEntry, KeyStore};
+use dpp_domain::PassportId;
+use dpp_domain::ports::identity::IdentityPort;
+
+use crate::local_service::LocalIdentityService;
+use crate::test_support::{EVERY_ALGORITHM, temp_store_with};
 
 const ROTATION_BASE_URL: &str = "https://id.example.com";
 
@@ -128,4 +137,134 @@ fn a_revoked_key_dropping_out_does_not_rename_the_others() {
         verifies_in(&did_doc, &jws_first),
         "a token issued under the first key still resolves after another key was revoked"
     );
+}
+
+/// The identifier the current key is published under.
+fn current_kid(store: &KeyStore) -> String {
+    let thumbprint = store
+        .public_key("issuer")
+        .expect("a current key")
+        .thumbprint_uri()
+        .expect("thumbprint");
+    format!(
+        "{}#{thumbprint}",
+        crate::did_builder::did_for(ROTATION_BASE_URL)
+    )
+}
+
+/// A compact JWS over `payload`, signed by `key` and naming `kid`. Assembled here so
+/// that a test can sign with a key the store no longer makes current.
+fn sign_with(key: &KeyEntry, payload: &serde_json::Value, kid: &str) -> String {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let header = json!({ "alg": key.algorithm().jose_alg(), "kid": kid });
+    let body = dpp_crypto::jws::canonicalize(payload).expect("canonical payload");
+    let signing_input = format!("{}.{}", b64.encode(header.to_string()), b64.encode(body));
+    let signature = key.sign(signing_input.as_bytes());
+    format!("{signing_input}.{}", b64.encode(signature))
+}
+
+/// A rotation from Ed25519 to an EC key keeps a signature made before it verifiable,
+/// and one made after it, for each curve the issuer may move to.
+#[test]
+fn a_rotation_from_ed25519_to_an_ec_key_keeps_every_signature_verifiable() {
+    for target in [
+        KeyAlgorithm::EcdsaP256,
+        KeyAlgorithm::EcdsaP384,
+        KeyAlgorithm::EcdsaP521,
+    ] {
+        let label = target.jose_alg();
+        let store = rotation_store(&format!("ed-to-{label}"));
+        let payload = json!({"product": "battery", "status": "draft"});
+        let before = sign_as_current(&store, &payload);
+
+        store
+            .rotate_key_to("issuer", target)
+            .expect("rotate to an EC key");
+        let after = sign_as_current(&store, &payload);
+        let doc = did_document(&store);
+
+        assert!(
+            verifies_in(&doc, &before),
+            "{label}: a signature made before the rotation must verify"
+        );
+        assert!(
+            verifies_in(&doc, &after),
+            "{label}: a signature made after the rotation must verify"
+        );
+    }
+}
+
+/// A passport signed before a rotation to an EC key verifies after it, and so does
+/// one signed after, through the service that signs passports.
+#[tokio::test]
+async fn a_passport_signed_before_a_rotation_to_an_ec_key_still_verifies() {
+    let store = Arc::new(rotation_store("passport-rotate"));
+    let svc = LocalIdentityService::new(
+        store.clone(),
+        "issuer".to_owned(),
+        ROTATION_BASE_URL.to_owned(),
+    );
+    let payload = json!({"productName": "Widget", "productGroup": "battery"});
+    let before = svc
+        .sign_passport(PassportId::new(), &payload)
+        .await
+        .expect("sign before the rotation");
+
+    store
+        .rotate_key_to("issuer", KeyAlgorithm::EcdsaP256)
+        .expect("rotate to P-256");
+    let after = svc
+        .sign_passport(PassportId::new(), &payload)
+        .await
+        .expect("sign after the rotation");
+
+    for (when, jws) in [("before", &before.jws), ("after", &after.jws)] {
+        assert!(
+            svc.verify_signature(jws, &payload).await.expect("verify"),
+            "a passport signed {when} the rotation must verify"
+        );
+    }
+}
+
+/// A token whose `kid` names the other key of its own document is refused, whichever
+/// key made it, and whether or not the two keys share an algorithm. The `kid` is the
+/// key the verifier checks against, so a signature by one key under the other's name
+/// is a signature by no key the document lists under that name.
+#[test]
+fn a_token_whose_kid_names_the_other_key_of_its_document_is_refused() {
+    for old in EVERY_ALGORITHM {
+        for new in EVERY_ALGORITHM {
+            let label = format!("swap-{}-{}", old.jose_alg(), new.jose_alg());
+            let store = temp_store_with(&label, "issuer", old);
+            let payload = json!({"product": "battery", "status": "draft"});
+            let old_kid = current_kid(&store);
+            store.rotate_key_to("issuer", new).expect("rotate");
+            let new_kid = current_kid(&store);
+
+            let old_key = store
+                .load_archived_keys("issuer")
+                .into_iter()
+                .next()
+                .expect("the archived key");
+            let new_key = store.load_key("issuer").expect("the current key");
+            let doc = did_document(&store);
+
+            assert!(
+                verifies_in(&doc, &sign_with(&old_key, &payload, &old_kid)),
+                "{label}: a token under its own kid verifies"
+            );
+            assert!(
+                verifies_in(&doc, &sign_with(&new_key, &payload, &new_kid)),
+                "{label}: a token under its own kid verifies"
+            );
+            assert!(
+                !verifies_in(&doc, &sign_with(&old_key, &payload, &new_kid)),
+                "{label}: the archived key's signature, under the current key's kid, must not verify"
+            );
+            assert!(
+                !verifies_in(&doc, &sign_with(&new_key, &payload, &old_kid)),
+                "{label}: the current key's signature, under the archived key's kid, must not verify"
+            );
+        }
+    }
 }

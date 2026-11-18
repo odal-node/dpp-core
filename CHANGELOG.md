@@ -139,6 +139,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `d` that does not match the public key. The key is never written to a `KeyStore`,
   which holds only keys it generated. (#589)
 
+- **EC issuer keys in `dpp-vc`, issued and verified end to end.** A `did:web` document,
+  the VC-JWT envelope and the SD-JWT VC issuer metadata publish and resolve P-256,
+  P-384 and P-521 keys in their own JWK shapes, under the `kid` a token names. A
+  rotation from Ed25519 to an EC key keeps every credential and passport issued before
+  it verifiable, and a token whose `kid` names the other key of its document is
+  refused. The SD-JWT VC Key Binding tests cover every issuer and Holder algorithm pair,
+  and a presentation for another audience is refused for each pair. The README section
+  "Issuer keys: Ed25519 and the EC curves" shows the published shapes. (#590)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking

@@ -12,9 +12,11 @@
 //! (JCS) canonical form of the credential JSON. The credential model itself is
 //! untouched: the envelope is external, and there is no `proof` member.
 //!
-//! - `alg` is `EdDSA`. `none` is rejected, and the algorithm is bound to the key
-//!   record rather than read from the attacker-supplied header. A verifier also
-//!   accepts `Ed25519`, the RFC 9864 name for the same operation.
+//! - `alg` is the signing key's algorithm: `EdDSA` for an Ed25519 key, `ES256`,
+//!   `ES384` or `ES512` for a P-256, P-384 or P-521 key. `none` is rejected, and the
+//!   algorithm is bound to the key record rather than read from the attacker-supplied
+//!   header. A verifier also accepts `Ed25519`, the RFC 9864 name for the same
+//!   operation.
 //! - `kid` is the absolute DID URL of the signing key's verification method in the
 //!   issuer's `did:web` document: the issuer's DID, then `#`, then the key's
 //!   thumbprint URI. It is required, and it is stable across rotation.

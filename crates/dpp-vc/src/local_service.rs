@@ -18,8 +18,9 @@ use crate::passport_credential::build_passport_credential;
 
 /// Concrete `IdentityPort` backed by a local `KeyStore`.
 ///
-/// Signs passports **in-process** using Ed25519 keys from the store and verifies
-/// JWS signatures against the issuer's published DID document. Holds the store
+/// Signs passports **in-process** with the store's signing key, under whichever
+/// algorithm that key is recorded as using (Ed25519, ES256, ES384 or ES512), and
+/// verifies JWS signatures against the issuer's published DID document. Holds the store
 /// behind an `Arc` so one store can be shared with the did:web document endpoint
 /// — signing and the published key are then guaranteed identical, and there is
 /// no network-reachable signing endpoint to attack.

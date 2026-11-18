@@ -143,6 +143,8 @@ mod vct;
 mod verify;
 
 #[cfg(test)]
+mod algorithm_tests;
+#[cfg(test)]
 mod claim_path_tests;
 #[cfg(test)]
 mod issuer_metadata_tests;
