@@ -21,6 +21,11 @@ use crate::test_support::temp_store;
 
 const NOW: i64 = 1_800_000_000;
 
+/// The public keys of RFC 8032 clause 7.1's TEST 1 and TEST 3: published Ed25519
+/// keys, not generated here.
+const TEST1_PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const TEST3_PUBLIC: &str = "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025";
+
 fn holder(label: &str) -> KeyEntry {
     temp_store(label, "holder")
         .load_key("holder")
@@ -98,14 +103,9 @@ fn kb_header() -> Value {
 
 #[test]
 fn the_issuer_names_the_holder_key_with_the_jwk_confirmation_method() {
-    // The public half of a fixed seed: a valid Ed25519 key, and a reproducible one.
-    let key = crate::jws::PublicKey::from_bytes(
-        crate::jws::KeyAlgorithm::Ed25519,
-        ed25519_dalek::SigningKey::from_bytes(&[2u8; 32])
-            .verifying_key()
-            .as_bytes(),
-    )
-    .expect("the public half of a seed is a valid key");
+    let raw = hex::decode(TEST3_PUBLIC).expect("hex");
+    let key = crate::jws::PublicKey::from_bytes(crate::jws::KeyAlgorithm::Ed25519, &raw)
+        .expect("a published Ed25519 key");
     assert_eq!(
         holder_key_confirmation(&key),
         json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key.as_bytes()) } })
@@ -190,6 +190,29 @@ fn a_holder_key_must_be_named_and_be_ed25519() {
             .present_with_key_binding(&[], &binding(), &key)
             .err(),
         Some(SdJwtError::UnsupportedHolderKey)
+    );
+}
+
+/// A Holder key is named by its JWK, and a JWK whose `x` is not a point on the
+/// curve names no key, so the Holder is refused before anything is signed. The
+/// control is the same token naming the real key, which binds.
+#[test]
+fn a_holder_key_that_is_not_a_point_on_the_curve_is_refused() {
+    let key = holder("kb-off-curve");
+    let mut off_curve = hex::decode(TEST1_PUBLIC).expect("hex");
+    off_curve[0] ^= 1;
+    let cnf = json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(&off_curve) } });
+
+    assert_eq!(
+        issued_to(cnf)
+            .present_with_key_binding(&[], &binding(), &key)
+            .err(),
+        Some(SdJwtError::UnsupportedHolderKey)
+    );
+    assert!(
+        issued(&key)
+            .present_with_key_binding(&[], &binding(), &key)
+            .is_ok()
     );
 }
 

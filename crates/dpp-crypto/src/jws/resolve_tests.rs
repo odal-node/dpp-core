@@ -182,6 +182,43 @@ fn only_an_ed25519_jwk_resolves() {
     }
 }
 
+/// Bytes that are not the encoding of a point on the curve are no key: they are
+/// refused as a bare key, as a JWK and as the key a document names. The identifier
+/// is a plain fragment, not a thumbprint, so the curve is the only thing that can
+/// refuse. The control is a real key in the same document.
+#[test]
+fn a_key_that_is_not_a_point_on_the_curve_resolves_to_nothing() {
+    let mut flipped = hex::decode(super::rfc8032_vector_tests::public_hex("TEST 1")).expect("hex");
+    flipped[0] ^= 1;
+
+    let id = format!("{DID}#key-1");
+    let with = |bytes: &[u8]| {
+        document(&[json!({
+            "id": id,
+            "type": "JsonWebKey",
+            "controller": DID,
+            "publicKeyJwk": {"kty": "OKP", "crv": "Ed25519", "x": x(bytes)},
+        })])
+    };
+
+    let real = public_key();
+    assert_eq!(
+        resolve_verification_key(&with(&real), &naming(&id)),
+        Some(pk(&real)),
+        "the control"
+    );
+
+    for bytes in [vec![7u8; 32], flipped] {
+        assert_eq!(
+            super::public_key::PublicKey::from_bytes(KeyAlgorithm::Ed25519, &bytes).err(),
+            Some(super::error::PublicKeyError::Ed25519)
+        );
+        let jwk = json!({"kty": "OKP", "crv": "Ed25519", "x": x(&bytes)});
+        assert_eq!(super::public_key::PublicKey::from_jwk(&jwk), None);
+        assert_eq!(resolve_verification_key(&with(&bytes), &naming(&id)), None);
+    }
+}
+
 /// An identifier that claims to be derived from a key is held to it. A document
 /// that files one key under another key's thumbprint would otherwise let that
 /// key answer to the other's `kid`.

@@ -13,13 +13,21 @@ use super::error::PublicKeyError;
 
 /// A validated public key and its algorithm.
 ///
-/// Constructed only through [`Self::from_bytes`] or [`Self::from_jwk`], both of
-/// which refuse an encoding that is not a key of that algorithm (an Ed25519
-/// encoding that does not decode to a curve point).
+/// Constructed through [`Self::from_bytes`] or [`Self::from_jwk`], both of which
+/// refuse an encoding that is not a key of that algorithm (an Ed25519 encoding
+/// that does not decode to a curve point), or from a key that is already parsed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublicKey {
-    algorithm: KeyAlgorithm,
-    bytes: Vec<u8>,
+    key: Key,
+}
+
+/// The parsed key, one variant per algorithm. The variant is the algorithm, so the
+/// two cannot disagree. A variant holds the parsed key and any encoding its key
+/// type does not keep for itself, so [`PublicKey::as_bytes`] borrows for every
+/// algorithm.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Key {
+    Ed25519(ed25519_dalek::VerifyingKey),
 }
 
 impl PublicKey {
@@ -31,26 +39,35 @@ impl PublicKey {
         match algorithm {
             KeyAlgorithm::Ed25519 => {
                 let array: [u8; 32] = bytes.try_into().map_err(|_| PublicKeyError::Ed25519)?;
-                ed25519_dalek::VerifyingKey::from_bytes(&array)
+                let key = ed25519_dalek::VerifyingKey::from_bytes(&array)
                     .map_err(|_| PublicKeyError::Ed25519)?;
-                Ok(Self {
-                    algorithm,
-                    bytes: array.to_vec(),
-                })
+                Ok(Self::from_ed25519_key(key))
             }
+        }
+    }
+
+    /// A public key from a verifying key that is already parsed, so nothing can be
+    /// refused: the parse happened when the key was made.
+    pub(crate) fn from_ed25519_key(key: ed25519_dalek::VerifyingKey) -> Self {
+        Self {
+            key: Key::Ed25519(key),
         }
     }
 
     /// The algorithm this key is used under.
     #[must_use]
     pub fn algorithm(&self) -> KeyAlgorithm {
-        self.algorithm
+        match self.key {
+            Key::Ed25519(_) => KeyAlgorithm::Ed25519,
+        }
     }
 
     /// The key's bytes: the 32-byte Ed25519 public key.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
+        match &self.key {
+            Key::Ed25519(key) => key.as_bytes(),
+        }
     }
 
     /// Read a public key from a JWK.
@@ -81,11 +98,11 @@ impl PublicKey {
     #[must_use]
     pub fn jwk(&self) -> Value {
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        match self.algorithm {
-            KeyAlgorithm::Ed25519 => json!({
+        match &self.key {
+            Key::Ed25519(_) => json!({
                 "kty": "OKP",
                 "crv": ED25519_CRV,
-                "x": b64.encode(&self.bytes),
+                "x": b64.encode(self.as_bytes()),
             }),
         }
     }
@@ -101,10 +118,10 @@ impl PublicKey {
     #[must_use]
     pub fn thumbprint(&self) -> String {
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        let canonical = match self.algorithm {
-            KeyAlgorithm::Ed25519 => format!(
+        let canonical = match &self.key {
+            Key::Ed25519(_) => format!(
                 r#"{{"crv":"{ED25519_CRV}","kty":"OKP","x":"{}"}}"#,
-                b64.encode(&self.bytes)
+                b64.encode(self.as_bytes())
             ),
         };
         b64.encode(Sha256::digest(canonical.as_bytes()))
@@ -133,7 +150,7 @@ impl PublicKey {
             object.insert("kid".to_owned(), Value::String(self.thumbprint_uri()));
             object.insert(
                 "alg".to_owned(),
-                Value::String(self.algorithm.jose_alg().to_owned()),
+                Value::String(self.algorithm().jose_alg().to_owned()),
             );
         }
         jwk
@@ -146,15 +163,9 @@ impl PublicKey {
     /// signature is the trust anchor.
     #[must_use]
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
-        match self.algorithm {
-            KeyAlgorithm::Ed25519 => {
-                let Ok(key_bytes) = <[u8; 32]>::try_from(self.bytes.as_slice()) else {
-                    return false;
-                };
+        match &self.key {
+            Key::Ed25519(key) => {
                 let Ok(signature_bytes) = <[u8; 64]>::try_from(signature) else {
-                    return false;
-                };
-                let Ok(key) = ed25519_dalek::VerifyingKey::from_bytes(&key_bytes) else {
                     return false;
                 };
                 key.verify_strict(

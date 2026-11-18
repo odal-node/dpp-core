@@ -31,10 +31,11 @@ fn arb_json() -> impl Strategy<Value = serde_json::Value> {
     })
 }
 
-/// A fixed Ed25519 key, so verification reaches the signature check.
+/// The public key of RFC 8032 clause 7.1's TEST 1, so verification reaches the
+/// signature check.
 fn fixed_key() -> super::PublicKey {
-    let ed = ed25519_dalek::SigningKey::from_bytes(&[7; 32]).verifying_key();
-    super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, ed.as_bytes()).expect("ed")
+    let raw = hex::decode(super::rfc8032_vector_tests::public_hex("TEST 1")).expect("hex");
+    super::PublicKey::from_bytes(super::KeyAlgorithm::Ed25519, &raw).expect("an RFC 8032 key")
 }
 
 /// The Ed25519 key a base64url string names, when it names one.

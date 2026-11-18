@@ -97,7 +97,9 @@ impl SigningMaterial {
     /// The secret the store encrypts: the Ed25519 seed, 32 bytes.
     pub(crate) fn secret(&self) -> Zeroizing<Vec<u8>> {
         match self {
-            Self::Ed25519(key) => Zeroizing::new(key.to_bytes().to_vec()),
+            // Copied straight from the key's borrowed secret, so no unprotected array is
+            // made on the way. The copy is cleared on drop.
+            Self::Ed25519(key) => Zeroizing::new(key.as_bytes().to_vec()),
         }
     }
 
@@ -109,12 +111,7 @@ impl SigningMaterial {
 
     pub(crate) fn public_key(&self) -> PublicKey {
         match self {
-            // The public half of a valid signing key always decodes as a point,
-            // so `from_bytes` cannot refuse it.
-            Self::Ed25519(key) => {
-                PublicKey::from_bytes(KeyAlgorithm::Ed25519, key.verifying_key().as_bytes())
-                    .expect("the public half of a signing key is a valid public key")
-            }
+            Self::Ed25519(key) => PublicKey::from_ed25519_key(key.verifying_key()),
         }
     }
 

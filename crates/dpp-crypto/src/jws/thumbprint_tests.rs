@@ -68,11 +68,8 @@ fn the_published_jwk_names_itself_without_changing_its_thumbprint() {
 
 #[test]
 fn different_keys_have_different_thumbprints() {
-    // The public half of a fixed seed: another valid key, and a reproducible one.
-    let other = ed25519_dalek::SigningKey::from_bytes(&[1u8; 32])
-        .verifying_key()
-        .to_bytes()
-        .to_vec();
+    // The public key of RFC 8032 clause 7.1's TEST 2: another valid, published key.
+    let other = hex::decode(super::rfc8032_vector_tests::public_hex("TEST 2")).expect("hex");
 
     assert_ne!(ed(&public_key()).thumbprint(), ed(&other).thumbprint());
 }
