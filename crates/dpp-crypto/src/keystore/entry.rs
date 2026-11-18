@@ -75,25 +75,6 @@ const _: () = {
     assert_zeroize_on_drop::<p521::ecdsa::SigningKey>();
 };
 
-/// A uniformly random scalar of `N` octets, drawn from the operating system's
-/// entropy source. `top_mask` clears the bits of the first octet that lie above the
-/// order's bit length, and `parse` decides whether the draw is kept: it refuses zero
-/// and any value at or above the group order. A refused draw is drawn again.
-///
-/// The draw is refused with probability `(2^b − n) / 2^b`, where `b` is the bit
-/// length of the order. The mask is what keeps P-521 rare: its order has 521 bits, and
-/// an unmasked draw of its 528 bits would be refused about 127 times in 128.
-fn random_scalar<const N: usize, T>(top_mask: u8, parse: impl Fn(&[u8]) -> Option<T>) -> T {
-    loop {
-        let mut bytes = Zeroizing::new([0u8; N]);
-        rand::Rng::fill_bytes(&mut crate::os_rng(), bytes.as_mut());
-        bytes[0] &= top_mask;
-        if let Some(scalar) = parse(&bytes[..]) {
-            return scalar;
-        }
-    }
-}
-
 impl SigningMaterial {
     /// A fresh key pair from the operating system's entropy source.
     pub(crate) fn generate(algorithm: KeyAlgorithm) -> Self {
@@ -121,9 +102,17 @@ impl SigningMaterial {
                     &mut crate::os_rng(),
                 ))
             }
-            KeyAlgorithm::EcdsaP521 => Self::EcdsaP521(random_scalar::<66, _>(0x01, |bytes| {
-                p521::ecdsa::SigningKey::from_slice(bytes).ok()
-            })),
+            KeyAlgorithm::EcdsaP521 => {
+                use p521::elliptic_curve::Generate as _;
+                // The curve's own sampler. Its 66 octets hold 528 bits and the order `n` has
+                // 521, so a draw is refused when it is at least `n`. `n` is `2^521` less about
+                // `2^259`, so `n / 2^528` is 1/128 to within 2^-269, and the refusal probability
+                // `1 − n / 2^528` is 127/128 to that same precision. The sampler draws again, so
+                // a key takes about 128 draws of 66 octets on average.
+                Self::EcdsaP521(p521::ecdsa::SigningKey::generate_from_rng(
+                    &mut crate::os_rng(),
+                ))
+            }
         }
     }
 
