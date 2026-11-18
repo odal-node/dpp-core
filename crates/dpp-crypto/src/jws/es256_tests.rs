@@ -10,7 +10,7 @@ use super::public_key::PublicKey;
 use super::signer;
 use super::verifier::verify_jws;
 use crate::keystore::SigningMaterial;
-use crate::test_support::temp_store;
+use crate::test_support::{temp_path, temp_store};
 
 pub(super) const B64: base64::engine::general_purpose::GeneralPurpose =
     base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -177,7 +177,7 @@ fn a_compressed_p256_key_is_the_same_key() {
 /// The record names `ES256` on disk.
 #[test]
 fn a_p256_key_round_trips_through_the_encrypted_store() {
-    let path = std::env::temp_dir().join(format!("es256-store-{}.json", uuid::Uuid::now_v7()));
+    let path = temp_path("es256-store");
     let generated = {
         let store = crate::keystore::KeyStore::open(&path, "pass").expect("open");
         store
@@ -239,4 +239,37 @@ fn rotation_keeps_or_changes_the_algorithm_as_asked() {
             KeyAlgorithm::EcdsaP256
         ]
     );
+}
+
+/// A rotation that keeps the algorithm cannot undo a concurrent change of it. The
+/// algorithm is chosen under the lock the swap takes, so both serial orders of the
+/// two rotations leave the P-256 key installed. The race is timing-dependent, so the
+/// test catches a regression only some of the time (about 1 run in 10 against the
+/// old code), and it never fails on correct code.
+#[test]
+fn a_rotation_that_keeps_the_algorithm_cannot_undo_a_concurrent_change() {
+    let store = temp_store("es256-race", "issuer");
+    for round in 0..64 {
+        store
+            .rotate_key_to("issuer", KeyAlgorithm::Ed25519)
+            .expect("reset to Ed25519");
+        let barrier = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            let keep = scope.spawn(|| {
+                barrier.wait();
+                store.rotate_key("issuer")
+            });
+            let change = scope.spawn(|| {
+                barrier.wait();
+                store.rotate_key_to("issuer", KeyAlgorithm::EcdsaP256)
+            });
+            keep.join().expect("thread").expect("rotate");
+            change.join().expect("thread").expect("rotate to P-256");
+        });
+        assert_eq!(
+            store.load_key("issuer").expect("load").algorithm,
+            KeyAlgorithm::EcdsaP256,
+            "round {round}"
+        );
+    }
 }

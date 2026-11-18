@@ -80,24 +80,22 @@ impl KeyStore {
             );
         }
 
-        // A rotation keeps the key's algorithm unless the caller names another.
-        let algorithm = algorithm.unwrap_or_else(|| {
-            self.records
-                .read()
-                .expect("key store read lock poisoned")
-                .get(key_id)
-                .map_or_else(super::store::default_algorithm, |r| r.algorithm)
-        });
-
-        // Prepare the new key material up front so the lock-held section is just
-        // the in-memory swap + single persist. Bound to the new key's own
-        // fingerprint. The archived copy below keeps the one it was sealed under,
-        // which is why the binding is to the fingerprint rather than the map key it
-        // is filed at.
-        let (new_record, entry) = self.seal_new_record(SigningMaterial::generate(algorithm))?;
-
+        // The write lock is taken before the algorithm is chosen and held through the
+        // swap, so no other rotation can change the algorithm between the choice and
+        // the install. Key generation and sealing run under the lock too; the persist
+        // below does disk I/O under it as well.
+        //
+        // Bound to the new key's own fingerprint. The archived copy below keeps the
+        // one it was sealed under, which is why the binding is to the fingerprint
+        // rather than the map key it is filed at.
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
+            // A rotation keeps the key's algorithm unless the caller names another.
+            let algorithm = algorithm.unwrap_or_else(|| {
+                map.get(key_id)
+                    .map_or_else(super::store::default_algorithm, |r| r.algorithm)
+            });
+            let (new_record, entry) = self.seal_new_record(SigningMaterial::generate(algorithm))?;
             // Archive the existing current key (if any), marking it revoked when
             // this is a compromise rotation.
             if let Some(record) = map.get(key_id).cloned() {
@@ -121,8 +119,7 @@ impl KeyStore {
             }
             map.insert(key_id.to_owned(), new_record);
             self.persist_envelope(&map)?;
+            Ok(entry)
         }
-
-        Ok(entry)
     }
 }

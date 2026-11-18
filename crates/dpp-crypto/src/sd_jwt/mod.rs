@@ -106,6 +106,8 @@ mod select;
 #[cfg(test)]
 mod array_tests;
 #[cfg(test)]
+mod holder_key_tests;
+#[cfg(test)]
 mod holder_tests;
 #[cfg(test)]
 mod key_binding_tests;

@@ -68,9 +68,14 @@ pub enum SdJwtError {
     /// and nothing for a Holder to sign with.
     #[error("the token names no Holder key in cnf")]
     NoHolderKey,
-    /// The Holder key in `cnf` is not an Ed25519 key, the one algorithm this
-    /// crate verifies, or declares an algorithm that is not Ed25519.
-    #[error("the Holder key in cnf is not an Ed25519 key")]
+    /// The Holder key in `cnf` is not one this crate reads, or it declares an
+    /// `alg` that is not the key's own. Three cases: the JWK is not an Ed25519
+    /// (`OKP`) or P-256 (`EC`) key, or its coordinates are not a point on that
+    /// curve; its `alg` is present but not a string; or its `alg` names an
+    /// algorithm other than the key's.
+    #[error(
+        "the Holder key in cnf is not a valid Ed25519 or P-256 key, or declares an alg that is not the key's own"
+    )]
     UnsupportedHolderKey,
     /// A Holder was asked to bind a presentation with a key other than the one
     /// `cnf` names. Every Verifier would refuse the result (clause 7.3 step 5.c).
