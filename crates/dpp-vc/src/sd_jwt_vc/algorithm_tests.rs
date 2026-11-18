@@ -214,13 +214,24 @@ fn a_presentation_for_another_audience_is_refused_for_every_pair() {
     }
 }
 
-/// The JWK the issuer metadata publishes under `kid`.
-fn published_jwk<'a>(metadata: &'a Value, kid: &Value) -> &'a Value {
+/// The `kid` a token's protected header names. It must be a non-empty string.
+fn kid_of(jwt: &str) -> String {
+    let kid = header_of(jwt)["kid"]
+        .as_str()
+        .expect("the protected header names its kid as a string")
+        .to_owned();
+    assert!(!kid.is_empty(), "the protected header's kid is empty");
+    kid
+}
+
+/// The JWK the issuer metadata publishes under `kid`. Only a key whose own `kid` is
+/// that same string is selected, so a missing `kid` on either side matches nothing.
+fn published_jwk<'a>(metadata: &'a Value, kid: &str) -> &'a Value {
     metadata["jwks"]["keys"]
         .as_array()
         .expect("a key set")
         .iter()
-        .find(|key| &key["kid"] == kid)
+        .find(|key| key["kid"].as_str() == Some(kid))
         .unwrap_or_else(|| panic!("no published key under kid {kid}"))
 }
 
@@ -232,7 +243,7 @@ fn an_ec_issuer_key_is_published_under_the_kid_its_credentials_name() {
     for (algorithm, kty, crv, alg) in EC_SHAPES {
         let store = temp_store_with("sd-jwt-vc-meta", KEY_ID, algorithm);
         let credential = issued(&store);
-        let kid = header_of(credential.jwt())["kid"].clone();
+        let kid = kid_of(credential.jwt());
 
         let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
         let jwk = published_jwk(&metadata, &kid);
@@ -265,10 +276,18 @@ fn a_rotation_to_an_ec_key_keeps_every_credential_verifiable() {
         let after = issued(&store);
         let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
 
-        for (when, credential) in [("before", &before), ("after", &after)] {
-            let kid = header_of(credential.jwt())["kid"].clone();
+        for (when, credential, resolved) in [
+            ("before", &before, KeyAlgorithm::Ed25519),
+            ("after", &after, algorithm),
+        ] {
+            let kid = kid_of(credential.jwt());
             let key = PublicKey::from_jwk(published_jwk(&metadata, &kid))
                 .expect("the published key reads back");
+            assert_eq!(
+                key.algorithm(),
+                resolved,
+                "{name}: the key a credential issued {when} the rotation resolves to"
+            );
             verify(&credential.serialise(), &key, &vct(), now(), None).unwrap_or_else(|e| {
                 panic!("{name}: a credential issued {when} the rotation must verify, got {e:?}")
             });

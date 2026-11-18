@@ -21,9 +21,15 @@ use crate::passport_credential::build_passport_credential;
 /// Signs passports **in-process** with the store's signing key, under whichever
 /// algorithm that key is recorded as using (Ed25519, ES256, ES384 or ES512), and
 /// verifies JWS signatures against the issuer's published DID document. Holds the store
-/// behind an `Arc` so one store can be shared with the did:web document endpoint
-/// — signing and the published key are then guaranteed identical, and there is
-/// no network-reachable signing endpoint to attack.
+/// behind an `Arc` so one store can be shared with the did:web document endpoint: the
+/// published key and the signing key are then the same store's, and there is no
+/// network-reachable signing endpoint to attack.
+///
+/// That is not one atomic read. `sign_passport` reads the key's thumbprint for the
+/// `kid` (`store.public_key`), and then `signer::sign` loads the key again to sign. A
+/// passport signed while its key rotates between those two reads can carry the
+/// replaced key's `kid` with a signature made by the new key. Verification refuses
+/// that passport, so a caller keeps key rotation and passport issuance apart.
 pub struct LocalIdentityService {
     store: Arc<KeyStore>,
     key_id: String,

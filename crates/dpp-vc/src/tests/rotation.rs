@@ -247,6 +247,16 @@ fn a_token_whose_kid_names_the_other_key_of_its_document_is_refused() {
                 .next()
                 .expect("the archived key");
             let new_key = store.load_key("issuer").expect("the current key");
+            assert_eq!(
+                old_key.algorithm(),
+                old,
+                "{label}: the archived key is a key of the old algorithm"
+            );
+            assert_eq!(
+                new_key.algorithm(),
+                new,
+                "{label}: the current key is a key of the new algorithm"
+            );
             let doc = did_document(&store);
 
             assert!(

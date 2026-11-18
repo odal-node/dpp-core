@@ -4,7 +4,7 @@
 use base64::Engine;
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
 
-use crate::did_builder::build_did_document;
+use crate::did_builder::{build_did_document, did_for};
 use crate::test_support::{temp_store, temp_store_with};
 
 const BASE_URL: &str = "https://id.example.com";
@@ -49,10 +49,21 @@ fn each_algorithm_is_published_in_its_own_jwk_shape() {
             assert!(jwk.get("y").is_none(), "{alg}: an OKP key has no y");
         }
 
+        let published = PublicKey::from_jwk(jwk).expect("the published JWK reads back");
         assert_eq!(
-            PublicKey::from_jwk(jwk).map(|key| key.algorithm()),
-            Some(algorithm),
+            published.algorithm(),
+            algorithm,
             "{alg}: the published JWK reads back as a key of this algorithm"
+        );
+        let stored = store
+            .public_key("issuer")
+            .expect("the issuer's key")
+            .public_key()
+            .expect("a valid key");
+        assert_eq!(
+            published.as_bytes(),
+            stored.as_bytes(),
+            "{alg}: the published JWK is the store's own public key"
         );
     }
 }
@@ -62,6 +73,9 @@ fn each_algorithm_is_published_in_its_own_jwk_shape() {
 #[test]
 fn a_rotated_document_lists_each_key_in_its_own_shape() {
     let store = temp_store("did-mixed", "issuer");
+    let before = build_did_document(&store, BASE_URL, "issuer").expect("build");
+    let original_id = before["verificationMethod"][0]["id"].clone();
+
     store
         .rotate_key_to("issuer", KeyAlgorithm::EcdsaP256)
         .expect("rotate to P-256");
@@ -85,5 +99,19 @@ fn a_rotated_document_lists_each_key_in_its_own_shape() {
     assert_ne!(
         methods[0]["id"], methods[1]["id"],
         "each key keeps its own identifier"
+    );
+    assert_eq!(
+        methods[1]["id"], original_id,
+        "the archived Ed25519 key keeps the identifier it was published under"
+    );
+    let current = store
+        .public_key("issuer")
+        .expect("a current key")
+        .thumbprint_uri()
+        .expect("a valid key");
+    assert_eq!(
+        methods[0]["id"],
+        format!("{}#{current}", did_for(BASE_URL)),
+        "the current key is named by the issuer DID, '#', and its thumbprint URI"
     );
 }

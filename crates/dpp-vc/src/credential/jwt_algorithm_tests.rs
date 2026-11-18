@@ -32,8 +32,8 @@ fn every_algorithm_signs_a_credential_that_authenticates() {
         let name = algorithm.jose_alg();
         let store = temp_store_with("jwt-alg", KEY_ID, algorithm);
         let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
-        let jws =
-            sign_access_credential(&credential_from(ISSUER_DID), &store, KEY_ID).expect("sign");
+        let input = credential_from(ISSUER_DID);
+        let jws = sign_access_credential(&input, &store, KEY_ID).expect("sign");
 
         assert_eq!(
             header_of(&jws)["alg"],
@@ -43,6 +43,10 @@ fn every_algorithm_signs_a_credential_that_authenticates() {
         let credential = authenticate_access_credential(&jws, &doc)
             .unwrap_or_else(|e| panic!("{name}: must authenticate, got {e:?}"));
         assert_eq!(credential.issuer, ISSUER_DID, "{name}");
+        assert_eq!(
+            credential.credential_subject, input.credential_subject,
+            "{name}: the subject id, role and product scope come back as signed"
+        );
     }
 }
 

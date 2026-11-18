@@ -141,12 +141,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 - **EC issuer keys in `dpp-vc`, issued and verified end to end.** A `did:web` document,
   the VC-JWT envelope and the SD-JWT VC issuer metadata publish and resolve P-256,
-  P-384 and P-521 keys in their own JWK shapes, under the `kid` a token names. A
-  rotation from Ed25519 to an EC key keeps every credential and passport issued before
-  it verifiable, and a token whose `kid` names the other key of its document is
-  refused. The SD-JWT VC Key Binding tests cover every issuer and Holder algorithm pair,
-  and a presentation for another audience is refused for each pair. The README section
-  "Issuer keys: Ed25519 and the EC curves" shows the published shapes. (#590)
+  P-384 and P-521 keys in their own JWK shapes, under the `kid` a token names. The
+  caller selects the issuer key in each format. For a VC-JWT, `authenticate_access_credential`
+  resolves the envelope's `kid` in the DID document the caller passes in. For an SD-JWT
+  VC, `build_issuer_metadata` publishes the keys, the caller picks the one whose `kid`
+  matches the token's and reads it with `PublicKey::from_jwk`, and `verify` checks the
+  token against that key without a lookup of its own. A rotation from Ed25519 to an EC
+  key keeps the signature of every credential and passport issued before it verifiable,
+  for as long as the archived key stays published and not revoked. A token whose `kid`
+  names the other key of its document is refused. The SD-JWT VC Key Binding tests cover
+  every issuer and Holder algorithm pair, and a presentation for another audience is
+  refused for each pair. The README section "Issuer keys: Ed25519 and the EC curves"
+  shows the published shapes. (#590)
 
 ## [0.24.0] - 2026-11-16
 

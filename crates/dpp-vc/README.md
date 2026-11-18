@@ -71,8 +71,10 @@ A runnable version covering issuance and transfer is in
 An issuer's signing key can be Ed25519, signing JWS with `EdDSA`, or an EC key on
 P-256, P-384 or P-521, signing with `ES256`, `ES384` or `ES512`. A key store makes the
 key you ask for (`KeyStore::generate_key_with`), and `rotate_key_to` moves an issuer
-from one algorithm to another. Everything signed before the rotation stays
-verifiable, because the archived key stays published under its own shape.
+from one algorithm to another. The archived key stays published under its own shape,
+so a verifier can check the signature of a token made before the rotation for as long
+as that key is published and not revoked. Keeping the key published does not keep a
+credential valid past its expiry or its revocation: those are separate checks.
 
 Each key is published with the JWK shape of its algorithm:
 
@@ -126,8 +128,9 @@ In the JWT VC issuer metadata of an SD-JWT VC, the same key is one entry of
 
 A token names its key in the protected header's `kid`. In a `did:web` document that
 is the verification method's absolute DID URL, and in the SD-JWT VC metadata it is the
-thumbprint URI alone. A key that was rotated out is still listed, so a token it signed
-still verifies. A revoked key is listed in neither document.
+thumbprint URI alone. A key that was rotated out is still listed while it is not
+revoked, so a signature it made still verifies. A revoked archived key is listed in
+neither document.
 
 ## Relationship to other crates
 
