@@ -147,7 +147,7 @@ let credential = json!({
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential"],
     "issuer": "https://issuer.example",
-    "credentialSubject": {"id": "did:example:subject"},
+    "credentialSubject": {"id": "did:example:subject", "name": "Example"},
     "productPassport": {"id": "urn:example:passport:1"},
 });
 
@@ -170,7 +170,7 @@ let vp = sign_presentation(&presentation, holder_key, "https://holder.example/ke
 
 // Verify the presentation's own token. Its credentials are listed, not verified.
 let presented = verify_presentation(&vp, &holder_key.public_key(), Some(now))?;
-assert_eq!(presented.envelopes.len(), 1);
+assert_eq!(presented.envelopes().len(), 1);
 
 // Verify each credential under the key of its issuer's `kid`. `None` refuses the set.
 let credentials = presented.verify_credentials(Some(now), |envelope| {

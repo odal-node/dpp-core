@@ -67,9 +67,9 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
         .expect("issued");
 
     let verified = verify_presentation(&token, &public_key("p521"), None).expect("verifies");
-    assert_eq!(verified.payload, presentation);
+    assert_eq!(verified.payload(), &presentation);
     let listed: Vec<(usize, &str)> = verified
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| (e.index, e.media_type.as_str()))
         .collect();
@@ -82,12 +82,12 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
         ]
     );
     assert!(
-        verified.envelopes[0]
+        verified.envelopes()[0]
             .verify(&public_key("p256"), None)
             .is_ok()
     );
     assert!(matches!(
-        verified.envelopes[1].verify(&public_key("p256"), None),
+        verified.envelopes()[1].verify(&public_key("p256"), None),
         Err(JoseError::UnsupportedEnvelopeFormat { index: 1, .. })
     ));
 }

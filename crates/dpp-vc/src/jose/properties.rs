@@ -81,6 +81,18 @@ pub(crate) fn check_presentation_properties(
     check_type(document, "VerifiablePresentation")
 }
 
+/// `holder`, when present, is a URL or an object whose `id` is a URL (VC DM 2.0 §4.13).
+/// A presentation with no `holder` is valid.
+pub(crate) fn check_holder(document: &Map<String, Value>) -> Result<(), JoseError> {
+    match document.get("holder") {
+        None => Ok(()),
+        Some(holder) if id_of(holder).is_some_and(is_absolute_url) => Ok(()),
+        Some(_) => Err(JoseError::InvalidHolder {
+            reason: "is neither a URL nor an object with a URL id".to_owned(),
+        }),
+    }
+}
+
 /// The URL that an `issuer` or a `holder` value names: the value itself when it is a
 /// string, or its `id` when it is an object. Whether that is an absolute URL is for the
 /// caller to test.
@@ -133,22 +145,41 @@ fn check_issuer_property(document: &Map<String, Value>) -> Result<(), JoseError>
     }
 }
 
-/// `credentialSubject` is an object, or a non-empty array of objects. A credential
-/// contains claims about one or more subjects (VC DM 2.0 §4.8).
+/// `credentialSubject` is an object, or a non-empty array of objects, and each object is
+/// the subject of one or more claims besides its `id`. A credential contains claims about
+/// one or more subjects, and each subject object MUST be the subject of one or more
+/// claims, which MAY be accompanied by an `id` (VC DM 2.0 §4.8). An object whose only
+/// member is `id` carries no claim, so it is refused.
 fn check_credential_subject(document: &Map<String, Value>) -> Result<(), JoseError> {
     let refuse = |reason: &str| JoseError::InvalidCredentialSubject {
         reason: reason.to_owned(),
     };
-    match document.get("credentialSubject") {
-        None => Err(refuse("is absent")),
-        Some(Value::Object(_)) => Ok(()),
-        Some(Value::Array(subjects))
-            if !subjects.is_empty() && subjects.iter().all(Value::is_object) =>
-        {
-            Ok(())
+    let subjects: Vec<&Value> = match document.get("credentialSubject") {
+        None => return Err(refuse("is absent")),
+        Some(subject @ Value::Object(_)) => vec![subject],
+        Some(Value::Array(items)) if items.is_empty() => {
+            return Err(refuse("is an empty array"));
         }
-        Some(_) => Err(refuse(
+        Some(Value::Array(items)) => items.iter().collect(),
+        Some(_) => {
+            return Err(refuse(
+                "is neither an object nor a non-empty array of objects",
+            ));
+        }
+    };
+    if !subjects.iter().all(|subject| subject.is_object()) {
+        return Err(refuse(
             "is neither an object nor a non-empty array of objects",
-        )),
+        ));
+    }
+    let claimed = |subject: &&Value| {
+        subject
+            .as_object()
+            .is_some_and(|object| object.keys().any(|key| key != "id"))
+    };
+    if subjects.iter().all(claimed) {
+        Ok(())
+    } else {
+        Err(refuse("has an object with no claim besides its id"))
     }
 }

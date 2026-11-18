@@ -55,7 +55,7 @@ fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
     assert_eq!(harness(&result), "success");
     let presentation = result.expect("verified");
     let listed: Vec<_> = presentation
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| (e.index, e.media_type.as_str(), e.kid.as_deref()))
         .collect();
@@ -82,7 +82,7 @@ fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
     )
     .expect("verified");
 
-    let first = &presentation.envelopes[0];
+    let first = &presentation.envelopes()[0];
     assert_eq!(
         first.kid.as_deref(),
         Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")

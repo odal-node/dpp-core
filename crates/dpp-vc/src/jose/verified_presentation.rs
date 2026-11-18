@@ -16,18 +16,40 @@ use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT};
 /// operations. To use a credential, verify it: one at a time with
 /// [`UnverifiedEnvelope::verify`], or every one of them with
 /// [`verify_credentials`](Self::verify_credentials).
+///
+/// The fields are private, so the envelopes cannot be dropped or reordered between
+/// `verify_presentation` and `verify_credentials`.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct VerifiedPresentation {
-    /// The presentation: the decoded payload of its JWS, with the envelopes as they
-    /// arrived. Its signature and claims were verified.
-    pub payload: Value,
-    /// Every envelope of `verifiableCredential`, in order. Each was shape-checked and is
-    /// NOT verified.
-    pub envelopes: Vec<UnverifiedEnvelope>,
+    payload: Value,
+    envelopes: Vec<UnverifiedEnvelope>,
 }
 
 impl VerifiedPresentation {
+    /// A presentation whose own token verified, with its envelopes listed.
+    pub(crate) fn new(payload: Value, envelopes: Vec<UnverifiedEnvelope>) -> Self {
+        Self { payload, envelopes }
+    }
+
+    /// The presentation: the decoded payload of its JWS. Its signature and claims were
+    /// verified.
+    ///
+    /// The payload still carries each envelope's raw `data:` URL, unverified: the compact
+    /// JWS of a `vc+jwt` is in it as text. Reading the payload therefore gives the
+    /// credentials as they arrived, not their verified claims. A credential's verified
+    /// claims are what [`verify_credentials`](Self::verify_credentials) or
+    /// [`UnverifiedEnvelope::verify`] return.
+    pub fn payload(&self) -> &Value {
+        &self.payload
+    }
+
+    /// Every envelope of `verifiableCredential`, in order. Each was shape-checked and is
+    /// NOT verified.
+    pub fn envelopes(&self) -> &[UnverifiedEnvelope] {
+        &self.envelopes
+    }
+
     /// Verify every credential the presentation envelops, in order, each under the key
     /// `issuer_key` gives for it.
     ///

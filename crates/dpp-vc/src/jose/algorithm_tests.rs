@@ -48,7 +48,7 @@ fn a_presentation_round_trips_under_every_algorithm() {
         assert_eq!(header["typ"], "vp+jwt");
         assert_eq!(header["cty"], "vp");
         let verified = verify_presentation(&token, &key.public_key(), None).expect("verifies");
-        assert_eq!(verified.payload, holder, "{algorithm:?}");
+        assert_eq!(verified.payload(), &holder, "{algorithm:?}");
     }
 }
 

@@ -195,7 +195,7 @@ fn a_payload_changed_after_signing_is_refused() {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiableCredential"],
             "issuer": "https://other.example",
-            "credentialSubject": {"id": "did:example:other"},
+            "credentialSubject": {"id": "did:example:other", "name": "Other"},
         }),
         &key,
         KID,

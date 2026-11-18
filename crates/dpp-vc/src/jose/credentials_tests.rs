@@ -86,7 +86,7 @@ fn an_envelope_of_another_format_cannot_be_verified_here() {
         };
 
         assert_eq!(
-            verified.envelopes[0].verify(&key, None).map(|_| ()),
+            verified.envelopes()[0].verify(&key, None).map(|_| ()),
             Err(unsupported.clone()),
             "{media_type}"
         );
@@ -110,7 +110,7 @@ fn every_envelope_is_listed_with_its_index_media_type_and_kid() {
     .expect("verifies");
 
     let listed: Vec<(usize, &str, Option<&str>)> = verified
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| (e.index, e.media_type.as_str(), e.kid.as_deref()))
         .collect();
@@ -136,7 +136,7 @@ fn verify_presentation_does_not_verify_an_envelope_that_would_fail() {
         present(&holder, vec![envelope(&broken)]).expect("the envelope's shape is right");
 
     assert!(matches!(
-        verified.envelopes[0].verify(&signer.public_key(), None),
+        verified.envelopes()[0].verify(&signer.public_key(), None),
         Err(JoseError::CredentialRefused { index: 0, .. })
     ));
 }
@@ -257,7 +257,7 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
     .expect("verifies");
 
     let listed: Vec<(usize, &str)> = verified
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| (e.index, e.media_type.as_str()))
         .collect();
@@ -270,12 +270,12 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
         ]
     );
     assert!(
-        verified.envelopes[0]
+        verified.envelopes()[0]
             .verify(&issuer.public_key(), None)
             .is_ok()
     );
     assert!(
-        verified.envelopes[2]
+        verified.envelopes()[2]
             .verify(&issuer.public_key(), None)
             .is_ok()
     );
@@ -305,4 +305,26 @@ fn verify_credentials_returns_every_payload_in_envelope_order() {
     assert_eq!(payloads.len(), 2);
     assert_eq!(payloads[0]["id"], "urn:example:first");
     assert_eq!(payloads[1]["id"], "urn:example:second");
+}
+
+/// The payload of a verified presentation still carries each envelope's raw `data:` URL,
+/// and the verified claims come only from `verify_credentials`.
+#[test]
+fn the_payload_still_carries_each_envelope_raw_and_unverified() {
+    let (holder, issuer) = (holder(), issuer());
+    let member = signed_by(&issuer);
+    let raw = member["id"].as_str().expect("an id").to_owned();
+    let verified = present(&holder, vec![member]).expect("verifies");
+
+    assert_eq!(
+        verified.payload()["verifiableCredential"][0]["id"].as_str(),
+        Some(raw.as_str())
+    );
+    assert_eq!(verified.envelopes().len(), 1);
+    assert_eq!(
+        verified
+            .verify_credentials(None, |_| Some(issuer.public_key()))
+            .expect("verifies")[0]["id"],
+        credential()["id"]
+    );
 }

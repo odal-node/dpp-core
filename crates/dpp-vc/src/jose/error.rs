@@ -134,8 +134,16 @@ pub enum JoseError {
         /// What is wrong with it.
         reason: String,
     },
+    /// A presentation's `holder`, when present, is not a URL or an object with a URL `id`
+    /// (VC Data Model 2.0 §4.13).
+    #[error("holder {reason}")]
+    InvalidHolder {
+        /// What is wrong with it.
+        reason: String,
+    },
     /// A credential's `credentialSubject` is not an object or a non-empty array of
-    /// objects (VC Data Model 2.0 §4.8).
+    /// objects, or one of its objects has no claim besides its `id` (VC Data Model 2.0
+    /// §4.8).
     #[error("credentialSubject {reason}")]
     InvalidCredentialSubject {
         /// What is wrong with it.

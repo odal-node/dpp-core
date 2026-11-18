@@ -299,14 +299,22 @@ pub(crate) fn check_holder_kid(
 }
 
 /// The `kid` rule of §4.2 for the party a token names, which is the issuer of a
-/// credential or the holder of a presentation.
+/// credential or the holder of a presentation. An `iss` that is present must be a string
+/// (RFC 7519 §4.1.1), and an `iss` of any other type is refused before the rule is read,
+/// so a `null` or a number cannot switch the rule off.
 fn check_kid_of(
     document: &Map<String, Value>,
     party: Option<&str>,
     kid: Option<&str>,
 ) -> Result<(), JoseError> {
-    if document.contains_key("iss") {
-        return Ok(());
+    match document.get("iss") {
+        Some(iss) if !iss.is_string() => {
+            return Err(JoseError::MalformedPayload {
+                reason: "iss is not a string".to_owned(),
+            });
+        }
+        Some(_) => return Ok(()),
+        None => {}
     }
     if party.is_some_and(is_absolute_url) && !kid.is_some_and(is_absolute_url) {
         return Err(JoseError::KidNotAbsolute {

@@ -7,7 +7,7 @@ use dpp_crypto::keystore::KeyEntry;
 
 use super::error::JoseError;
 use super::properties::{
-    check_context, check_credential_properties, check_presentation_properties,
+    check_context, check_credential_properties, check_holder, check_presentation_properties,
 };
 use super::verify::{
     CREDENTIAL_CTY, CREDENTIAL_TYP, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid,
@@ -81,9 +81,11 @@ pub fn sign_credential(
 /// # Refused before signing
 ///
 /// The same members, `@context`, and `exp`/`nbf` rules as [`sign_credential`], and a
-/// `type` that does not include `VerifiablePresentation` (VC DM 2.0 §4.13). A `kid` that
-/// is not an absolute URL is refused when the presentation has no `iss` and its `holder`
-/// is a URL, by the rule of §4.2 that a credential's issuer is held to.
+/// `type` that does not include `VerifiablePresentation` (VC DM 2.0 §4.13), and a `holder`,
+/// when present, that is not a URL or an object with a URL `id`. A `kid` that is not an
+/// absolute URL is refused when the presentation has no `iss` and its `holder` is a URL,
+/// by the rule of §4.2 that a credential's issuer is held to. An `iss` that is not a
+/// string is refused, as RFC 7519 §4.1.1 requires of the claim.
 ///
 /// # Errors
 ///
@@ -99,6 +101,7 @@ pub fn sign_presentation(
     check_members(document, &PRESENTATION_TERMS, extension_terms)?;
     check_context(document)?;
     check_temporal_claims(document)?;
+    check_holder(document)?;
     check_holder_kid(document, Some(kid))?;
     check_presentation_properties(document)?;
     seal(presentation, key, kid, PRESENTATION_TYP, PRESENTATION_CTY)

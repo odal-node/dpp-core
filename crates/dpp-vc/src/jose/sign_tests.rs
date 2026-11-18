@@ -215,9 +215,15 @@ fn the_kid_rule_applies_to_a_presentations_holder_as_to_a_credentials_issuer() {
     );
     assert!(sign_presentation(&presentation(Vec::new()), &key, KID, &[]).is_ok());
 
+    // A holder that is not a URL is refused for the holder itself, before the kid rule is read.
     let mut not_a_url = presentation(Vec::new());
     not_a_url["holder"] = json!("Example Holder Ltd");
-    assert!(sign_presentation(&not_a_url, &key, THUMBPRINT, &[]).is_ok());
+    assert_eq!(
+        sign_presentation(&not_a_url, &key, THUMBPRINT, &[]),
+        Err(JoseError::InvalidHolder {
+            reason: "is neither a URL nor an object with a URL id".to_owned(),
+        })
+    );
 
     let mut with_iss = presentation(Vec::new());
     with_iss["iss"] = json!("https://holder.example");

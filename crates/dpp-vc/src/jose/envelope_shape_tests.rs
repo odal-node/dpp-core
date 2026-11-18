@@ -29,7 +29,7 @@ fn verify_alone(member: Value) -> Result<(), JoseError> {
     let holder = generated(KeyAlgorithm::Ed25519);
     let token = sign_presentation(&presentation(vec![member]), &holder, KID, &[]).expect("signs");
     verify_presentation(&token, &holder.public_key(), None)
-        .map(|verified| assert_eq!(verified.envelopes.len(), 1))
+        .map(|verified| assert_eq!(verified.envelopes().len(), 1))
 }
 
 fn malformed(reason: &str) -> Result<(), JoseError> {

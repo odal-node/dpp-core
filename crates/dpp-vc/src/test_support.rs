@@ -183,7 +183,7 @@ pub(crate) fn credential() -> Value {
         "type": ["VerifiableCredential"],
         "issuer": "https://issuer.example",
         "validFrom": "2025-01-01T00:00:00Z",
-        "credentialSubject": {"id": "did:example:subject"},
+        "credentialSubject": {"id": "did:example:subject", "name": "Example"},
     })
 }
 

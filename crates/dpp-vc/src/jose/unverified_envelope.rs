@@ -13,9 +13,12 @@ pub(crate) const VC_JWT: &str = "application/vc+jwt";
 /// An envelope of a presentation whose shape was checked, and whose credential has not
 /// been verified.
 ///
-/// [`verify`](Self::verify) verifies it under the issuer's key. The compact JWS is
-/// private, so the claims of a credential that has not passed `verify` are never handed
-/// out by this type.
+/// [`verify`](Self::verify) verifies it under the issuer's key. This type has no accessor
+/// that decodes the credential, so no claim of it is returned unverified, and its compact
+/// JWS is private. The `kid` is read from the token's protected header, which is not
+/// verified either: it is a hint for choosing a key, and nothing more. The presentation
+/// that lists this envelope still carries the raw `data:` URL in its payload, so the
+/// token is reachable through [`VerifiedPresentation::payload`](super::VerifiedPresentation::payload).
 #[derive(Clone, PartialEq, Eq)]
 pub struct UnverifiedEnvelope {
     /// The envelope's position in `verifiableCredential`.
@@ -69,7 +72,8 @@ impl UnverifiedEnvelope {
 }
 
 impl std::fmt::Debug for UnverifiedEnvelope {
-    /// The token is left out, so a `Debug` print shows no claims that were not verified.
+    /// The token is left out of a `Debug` print, so the print shows the envelope's index,
+    /// media type and `kid` and no part of the credential.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UnverifiedEnvelope")
             .field("index", &self.index)

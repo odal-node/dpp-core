@@ -298,7 +298,7 @@ fn a_credential_subject_must_be_an_object_or_a_non_empty_array_of_objects() {
         json!("subject"),
         json!(null),
         json!([]),
-        json!([{"id": "did:example:a"}, 7]),
+        json!([{"id": "did:example:a", "name": "A"}, 7]),
     ] {
         let document = edited(|c| c["credentialSubject"] = subject.clone());
 
@@ -310,10 +310,39 @@ fn a_credential_subject_must_be_an_object_or_a_non_empty_array_of_objects() {
             "{subject}"
         );
     }
+}
+
+/// Each subject object is the subject of one or more claims, and `id` is only an identifier
+/// (VC DM 2.0 §4.8). An object whose only member is `id`, or that has no member at all,
+/// carries no claim, so it is refused alone and inside the array form.
+#[test]
+fn a_credential_subject_object_must_carry_a_claim_besides_its_id() {
+    for subject in [
+        json!({}),
+        json!({"id": "did:example:a"}),
+        json!([{"id": "did:example:a"}]),
+        json!([{"id": "did:example:a", "name": "A"}, {"id": "did:example:b"}]),
+        json!([{}]),
+    ] {
+        let document = edited(|c| c["credentialSubject"] = subject.clone());
+
+        assert!(
+            matches!(
+                credential_refused(&document),
+                JoseError::InvalidCredentialSubject { .. }
+            ),
+            "{subject}"
+        );
+    }
+}
+
+#[test]
+fn a_credential_subject_with_a_claim_besides_its_id_is_accepted() {
     let key = key();
     for subject in [
-        json!({"id": "did:example:a"}),
-        json!([{"id": "did:example:a"}, {"id": "did:example:b"}]),
+        json!({"id": "did:example:a", "name": "A"}),
+        json!({"name": "A"}),
+        json!([{"id": "did:example:a", "name": "A"}, {"name": "B"}]),
     ] {
         let document = edited(|c| c["credentialSubject"] = subject.clone());
 
@@ -360,23 +389,72 @@ fn a_holder_object_with_a_url_id_counts_as_a_url() {
 }
 
 #[test]
-fn a_bare_kid_is_fine_with_an_iss_or_without_a_url_holder() {
+fn a_bare_kid_is_fine_with_an_iss_or_without_a_holder() {
     let key = key();
     let mut with_iss = presentation(Vec::new());
     with_iss["iss"] = json!("https://holder.example");
-    let mut not_a_url = presentation(Vec::new());
-    not_a_url["holder"] = json!("Example Holder Ltd");
     let mut no_holder = presentation(Vec::new());
     no_holder
         .as_object_mut()
         .expect("an object")
         .remove("holder");
 
-    for document in [with_iss, not_a_url, no_holder] {
+    for document in [with_iss, no_holder] {
         assert!(
             verify_presentation(&outer(&key, THUMBPRINT, &document), &key.public_key(), None)
                 .is_ok(),
             "{document}"
+        );
+    }
+}
+
+/// A presentation's `holder`, when present, is a URL or an object with a URL `id` (VC DM 2.0
+/// §4.13). Anything else is refused as an invalid holder, at signing and on verification.
+#[test]
+fn a_holder_that_is_not_a_url_or_an_object_with_a_url_id_is_refused() {
+    for holder in [
+        json!("Example Holder Ltd"),
+        json!(null),
+        json!(7),
+        json!({"name": "no id"}),
+        json!({"id": "not a url"}),
+    ] {
+        let mut document = presentation(Vec::new());
+        document["holder"] = holder.clone();
+
+        assert_eq!(
+            presentation_refused(&document),
+            JoseError::InvalidHolder {
+                reason: "is neither a URL nor an object with a URL id".to_owned(),
+            },
+            "{holder}"
+        );
+    }
+}
+
+/// `iss`, when present, must be a string (RFC 7519 §4.1.1). A `null` or a number beside a
+/// URL holder and a bare `kid` used to switch the holder's `kid` rule off. It is refused,
+/// at signing and on verification, before the rule is read.
+#[test]
+fn an_iss_that_is_not_a_string_is_refused_for_a_presentation() {
+    let key = key();
+    for iss in [json!(null), json!(7)] {
+        let mut document = presentation(Vec::new());
+        document["iss"] = iss.clone();
+        let refused = JoseError::MalformedPayload {
+            reason: "iss is not a string".to_owned(),
+        };
+
+        assert_eq!(
+            sign_presentation(&document, &key, THUMBPRINT, &[]),
+            Err(refused.clone()),
+            "{iss}"
+        );
+        assert_eq!(
+            verify_presentation(&outer(&key, THUMBPRINT, &document), &key.public_key(), None)
+                .map(|_| ()),
+            Err(refused),
+            "{iss}"
         );
     }
 }

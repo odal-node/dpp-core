@@ -7,7 +7,7 @@ use dpp_crypto::jws::PublicKey;
 
 use super::envelope_shape::inspect;
 use super::error::JoseError;
-use super::properties::check_presentation_properties;
+use super::properties::{check_holder, check_presentation_properties};
 use super::verified_presentation::VerifiedPresentation;
 use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid, open};
 
@@ -25,8 +25,9 @@ use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid
 /// as in [`verify_credential`](super::verify_credential). The checks run in this order,
 /// refusing at the first that fails: the outer token (compact form, header,
 /// signature, `typ` and `cty`, payload and its `@context`, `vc` and `vp`, and the time
-/// claims under `Some(now)`), the holder's `kid` (§4.2), the presentation's `type`
-/// (VC DM 2.0 §4.13), and then each envelope in order.
+/// claims under `Some(now)`), the presentation's `holder`, when present, which must be a
+/// URL or an object with a URL `id` (VC DM 2.0 §4.13), the holder's `kid` (§4.2), the
+/// presentation's `type` (VC DM 2.0 §4.13), and then each envelope in order.
 ///
 /// Each member of `verifiableCredential` must be an Enveloped Verifiable Credential (VC DM
 /// 2.0 §4.13): an object whose `type` is `EnvelopedVerifiableCredential`, alone or as a
@@ -43,6 +44,7 @@ pub fn verify_presentation(
     now: Option<i64>,
 ) -> Result<VerifiedPresentation, JoseError> {
     let Opened { payload, kid } = open(jws, holder_key, now, PRESENTATION_TYP, PRESENTATION_CTY)?;
+    check_holder(&payload)?;
     check_holder_kid(&payload, kid.as_deref())?;
     check_presentation_properties(&payload)?;
 
@@ -58,8 +60,5 @@ pub fn verify_presentation(
         .map(|(index, member)| inspect(index, member))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(VerifiedPresentation {
-        payload: Value::Object(payload),
-        envelopes,
-    })
+    Ok(VerifiedPresentation::new(Value::Object(payload), envelopes))
 }

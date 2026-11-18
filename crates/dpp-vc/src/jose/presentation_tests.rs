@@ -44,10 +44,10 @@ fn a_presentation_of_one_verified_credential_round_trips() {
 
     let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
-    assert_eq!(verified.payload, document);
-    assert_eq!(verified.envelopes.len(), 1);
+    assert_eq!(verified.payload(), &document);
+    assert_eq!(verified.envelopes().len(), 1);
     assert_eq!(
-        verified.envelopes[0].kid.as_deref(),
+        verified.envelopes()[0].kid.as_deref(),
         Some(KID),
         "the envelope names its kid"
     );
@@ -69,7 +69,7 @@ fn a_presentation_with_no_credentials_verifies_with_nothing_to_report() {
 
     let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
-    assert!(verified.envelopes.is_empty());
+    assert!(verified.envelopes().is_empty());
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn an_envelope_of_another_type_is_not_read() {
     let verified = verify_members(&holder, members).expect("verifies");
 
     let media: Vec<&str> = verified
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| e.media_type.as_str())
         .collect();
@@ -292,7 +292,7 @@ fn every_envelope_is_listed_in_order_with_what_it_needs() {
     let verified = verify_members(&holder, members).expect("verifies");
 
     let listed: Vec<(usize, &str, Option<&str>)> = verified
-        .envelopes
+        .envelopes()
         .iter()
         .map(|e| (e.index, e.media_type.as_str(), e.kid.as_deref()))
         .collect();
@@ -316,7 +316,7 @@ fn a_single_envelope_without_the_array_is_one_envelope() {
 
     let verified = verify_presentation(&token, &holder.public_key(), None).expect("verifies");
 
-    assert_eq!(verified.envelopes.len(), 1);
+    assert_eq!(verified.envelopes().len(), 1);
 }
 
 #[test]
