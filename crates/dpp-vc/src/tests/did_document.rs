@@ -229,7 +229,7 @@ fn did_document_jwk_x_matches_keystore_public_key() {
     );
 
     // Pin: x must be base64url(verifying_key_bytes), not re-encoded or truncated.
-    let expected_x = b64.encode(loaded.verifying_key.as_bytes());
+    let expected_x = b64.encode(loaded.public_key().as_bytes());
     assert_eq!(
         primary_jwk["x"].as_str().unwrap(),
         expected_x,

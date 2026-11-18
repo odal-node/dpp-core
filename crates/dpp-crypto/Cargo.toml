@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-crypto"
-description = "Ed25519 key management, JWS signing/verification, JAdES baseline construction, and an encrypted keystore"
+description = "Key management in which every key carries its signature algorithm (Ed25519 is the only one available), JWS signing/verification, JAdES baseline construction, and an encrypted keystore"
 keywords    = ["dpp", "ed25519", "jws", "keystore", "cryptography"]
 categories  = ["cryptography", "authentication"]
 version.workspace     = true

@@ -49,7 +49,7 @@ fn key_material_absent_from_jws() {
     let payload = json!({"test": true});
     let jws = super::signer::sign(&store, "t4", &payload, "test-kid").expect("sign");
 
-    let signing_key_hex = hex::encode(loaded.signing_key.as_bytes());
+    let signing_key_hex = hex::encode(loaded.secret_for_test().as_slice());
     assert!(
         !jws.contains(&signing_key_hex),
         "JWS must not contain raw private key bytes"
@@ -61,7 +61,7 @@ fn key_material_absent_from_jws() {
 fn key_material_absent_from_logs() {
     let store = temp_store("signer-logs", "t5");
     let loaded = store.load_key("t5").expect("load");
-    let priv_hex = hex::encode(loaded.signing_key.as_bytes());
+    let priv_hex = hex::encode(loaded.secret_for_test().as_slice());
     let payload = json!({"passport_id": "p-log-safety", "status": "draft"});
     let _ = super::signer::sign(&store, "t5", &payload, "test-kid").expect("sign");
     assert!(
@@ -82,7 +82,7 @@ fn signer_verify_rejects_non_eddsa_alg() {
     for alg in ["none", "HS256", "RS256"] {
         let header_b64 = b64.encode(format!(r#"{{"alg":"{alg}","kid":"x"}}"#));
         let signing_input = format!("{header_b64}.{payload_b64}");
-        let sig_b64 = b64.encode(loaded.signing_key.sign(signing_input.as_bytes()).to_bytes());
+        let sig_b64 = b64.encode(loaded.sign(signing_input.as_bytes()));
         let jws = format!("{signing_input}.{sig_b64}");
         assert!(
             !super::signer::verify(&store, "t6", &jws).unwrap(),
@@ -105,9 +105,12 @@ fn make_jws(signing_key: &SigningKey, payload: &serde_json::Value) -> String {
     format!("{signing_input}.{sig_b64}")
 }
 
-fn pub_key_b64(signing_key: &SigningKey) -> String {
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    b64.encode(signing_key.verifying_key().as_bytes())
+fn public_key(signing_key: &SigningKey) -> crate::jws::PublicKey {
+    crate::jws::PublicKey::from_bytes(
+        crate::jws::KeyAlgorithm::Ed25519,
+        signing_key.verifying_key().as_bytes(),
+    )
+    .expect("an Ed25519 public key")
 }
 
 #[test]
@@ -115,7 +118,7 @@ fn valid_jws_verifies() {
     let key = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test", "status": "published"});
     let jws = make_jws(&key, &payload);
-    assert!(super::verifier::verify_jws(&jws, &pub_key_b64(&key)).unwrap());
+    assert!(super::verifier::verify_jws(&jws, &public_key(&key)).unwrap());
 }
 
 #[test]
@@ -127,7 +130,7 @@ fn tampered_signature_fails() {
     jws.push(if last == 'A' { 'B' } else { 'A' });
     assert!(
         matches!(
-            super::verifier::verify_jws(&jws, &pub_key_b64(&key)),
+            super::verifier::verify_jws(&jws, &public_key(&key)),
             Ok(false) | Err(_)
         ),
         "tampered JWS must be rejected"
@@ -140,7 +143,7 @@ fn wrong_key_fails() {
     let key2 = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test"});
     let jws = make_jws(&key1, &payload);
-    assert!(!super::verifier::verify_jws(&jws, &pub_key_b64(&key2)).unwrap());
+    assert!(!super::verifier::verify_jws(&jws, &public_key(&key2)).unwrap());
 }
 
 /// Regression (red-team ATK-4): the header `alg` is pinned to EdDSA.
@@ -155,7 +158,7 @@ fn non_eddsa_alg_is_rejected() {
         let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()).to_bytes());
         let jws = format!("{signing_input}.{sig_b64}");
         assert!(
-            !super::verifier::verify_jws(&jws, &pub_key_b64(&key)).unwrap(),
+            !super::verifier::verify_jws(&jws, &public_key(&key)).unwrap(),
             "alg={alg} must be rejected"
         );
     }
@@ -225,7 +228,7 @@ fn both_ed25519_identifiers_verify_and_no_other_does() {
         let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()).to_bytes());
         let jws = format!("{signing_input}.{sig_b64}");
         assert_eq!(
-            super::verifier::verify_jws(&jws, &pub_key_b64(&key)).unwrap(),
+            super::verifier::verify_jws(&jws, &public_key(&key)).unwrap(),
             accepted,
             "alg={alg}"
         );
@@ -268,10 +271,12 @@ fn jws_golden_vector_raw_dalek_verification() {
     let raw_sig = ed25519_dalek::Signature::from_bytes(&sig_arr);
     let signing_input = format!("{}.{}", parts[0], parts[1]);
     assert!(
-        loaded
-            .verifying_key
-            .verify_strict(signing_input.as_bytes(), &raw_sig)
-            .is_ok(),
+        ed25519_dalek::VerifyingKey::from_bytes(
+            loaded.public_key().as_bytes().try_into().expect("32 bytes")
+        )
+        .expect("a valid key")
+        .verify_strict(signing_input.as_bytes(), &raw_sig)
+        .is_ok(),
         "raw ed25519_dalek::verify_strict must accept the JWS produced by our signer"
     );
 }
@@ -299,7 +304,8 @@ fn jws_golden_vector_independent_ring_verification() {
 
     let signing_input = format!("{}.{}", parts[0], parts[1]);
     let sig_bytes = b64.decode(parts[2]).expect("decode sig b64");
-    let pub_key_bytes = loaded.verifying_key.as_bytes();
+    let public = loaded.public_key();
+    let pub_key_bytes = public.as_bytes();
 
     let ring_key =
         ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, pub_key_bytes);

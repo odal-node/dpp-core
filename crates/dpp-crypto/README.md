@@ -4,9 +4,10 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-crypto)](https://docs.rs/dpp-crypto)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Cryptographic primitives for EU Digital Product Passports: Ed25519 key management, JWS
-signing and verification, JCS canonicalisation, JAdES baseline signature construction,
-and an AES-256-GCM encrypted keystore with Argon2id key derivation and rotation. Part of
+Cryptographic primitives for EU Digital Product Passports: key management in which every
+key carries its signature algorithm (Ed25519 is the only one available), JWS signing and
+verification, JCS canonicalisation, JAdES baseline signature construction, and an
+AES-256-GCM encrypted keystore with Argon2id key derivation and rotation. Part of
 [dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
 
 Pure Rust, with no I/O beyond the keystore file. It does not build for
@@ -19,7 +20,8 @@ a domain type.
 
 ## When to use this crate
 
-- You need to sign or verify passport data with Ed25519 as a compact JWS.
+- You need to sign or verify passport data as a compact JWS. Every key records its
+  algorithm, and Ed25519 (`EdDSA`) is the only one available.
 - You need JCS canonicalisation, so two nodes produce byte-identical payloads before
   signing.
 - You manage signing keys at rest (generation, rotation, revocation, archival) with
@@ -68,7 +70,8 @@ cargo run -p dpp-crypto --example sign_and_verify
 - `KeyStore::public_key` and `PublicKeyInfo` are public so the `did:web` builder in
   `dpp-vc` can read public key material and revocation state. Neither exposes private
   key material.
-- Signing uses `alg: "EdDSA"` with curve `Ed25519`, per RFC 8037.
+- Every key carries its algorithm. Ed25519 is the only one available: signing uses
+  `alg: "EdDSA"` with curve `Ed25519`, per RFC 8037.
 - The `jades` module produces a **structurally conformant** JAdES-B-B signature. That
   does not make it *qualified*: under Regulation (EU) No 910/2014 a qualified signature
   needs a qualified certificate, a qualified creation device and the trust service

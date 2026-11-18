@@ -5,7 +5,6 @@
 //! fixtures are common to all three, so they live beside them rather than being
 //! duplicated into each.
 
-use base64::Engine;
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Value, json};
 
@@ -49,12 +48,12 @@ pub(super) fn payload() -> Value {
     })
 }
 
-pub(super) fn public_key_b64(store: &KeyStore) -> String {
-    let info = store.public_key(KEY_ID).expect("key present");
-    // `verify_jws` decodes with URL_SAFE_NO_PAD, so the caller must encode the
-    // same way — a STANDARD-encoded key silently fails to verify.
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(hex::decode(&info.verifying_key_hex).unwrap())
+pub(super) fn public_key(store: &KeyStore) -> dpp_crypto::jws::PublicKey {
+    store
+        .public_key(KEY_ID)
+        .expect("key present")
+        .public_key()
+        .expect("a valid key")
 }
 
 /// Resolve claim names to the digests `present` selects by.
@@ -117,7 +116,7 @@ pub(super) fn check(
 ) -> Result<(), SdJwtVcError> {
     verify(
         credential,
-        &public_key_b64(store),
+        &public_key(store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         at,
         None,

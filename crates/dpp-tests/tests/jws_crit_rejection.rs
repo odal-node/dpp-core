@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use chrono::{TimeZone, Utc};
-use dpp_crypto::jws::{canonicalize, verifier::verify_jws};
+use dpp_crypto::jws::{KeyAlgorithm, PublicKey, canonicalize, verifier::verify_jws};
 use dpp_crypto::keystore::KeyStore;
 use dpp_crypto::sd_jwt::SdJwt;
 use dpp_domain::ProductGroup;
@@ -34,7 +34,6 @@ use dpp_vc::{
     CredentialBuilder, CredentialRole, LocalIdentityService, SD_JWT_VC_TYP, SdJwtVcError,
     SnapshotBound, VerificationResult, build_did_document, vct_for, verify_snapshot_bound,
 };
-use ed25519_dalek::Signer;
 use serde_json::{Value, json};
 
 const KEY_ID: &str = "crit-key";
@@ -60,9 +59,12 @@ fn temp_store(label: &str) -> KeyStore {
     store
 }
 
+fn public_key(store: &KeyStore) -> PublicKey {
+    store.load_key(KEY_ID).expect("load key").public_key()
+}
+
 fn public_key_b64(store: &KeyStore) -> String {
-    let key = store.load_key(KEY_ID).expect("load key");
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(key.verifying_key.to_bytes())
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key(store).as_bytes())
 }
 
 /// A compact JWS carrying a genuine signature over `header` and `payload`, with
@@ -83,8 +85,8 @@ fn forge(store: &KeyStore, header: &Value, payload: &[u8]) -> String {
         b64.encode(serde_json::to_vec(&header).expect("header serialises")),
         b64.encode(payload),
     );
-    let signature = key.signing_key.sign(signing_input.as_bytes());
-    format!("{signing_input}.{}", b64.encode(signature.to_bytes()))
+    let signature = key.sign(signing_input.as_bytes());
+    format!("{signing_input}.{}", b64.encode(signature))
 }
 
 // ── Snapshot bound ───────────────────────────────────────────────────────────
@@ -108,7 +110,7 @@ fn snapshot(store: &KeyStore, header: &Value) -> Value {
 #[test]
 fn a_snapshot_proof_with_crit_proves_nothing() {
     let store = temp_store("crit-snapshot");
-    let key = public_key_b64(&store);
+    let key = public_key(&store);
     let now = Utc.with_ymd_and_hms(2026, 10, 5, 0, 0, 0).unwrap();
 
     assert!(
@@ -231,7 +233,7 @@ fn sd_jwt_vc_under(store: &KeyStore, vct: &str, header: &Value) -> String {
 #[test]
 fn an_sd_jwt_vc_with_crit_is_refused() {
     let store = temp_store("crit-sd-jwt-vc");
-    let key = public_key_b64(&store);
+    let key = public_key(&store);
     let vct = vct_for(ProductGroup::Battery, "2.6.0");
     let now = Utc.timestamp_opt(1_789_000_060, 0).unwrap();
 
@@ -266,7 +268,14 @@ struct OverDppCrypto;
 
 impl JwsVerify for OverDppCrypto {
     fn verify_eddsa(&self, jws: &str, public_key_b64: &str) -> Result<bool, RulesetError> {
-        verify_jws(jws, public_key_b64).map_err(|e| RulesetError::Malformed(e.to_string()))
+        // A key that does not decode, or is not an Ed25519 point, is malformed
+        // input, as every failure of `verify_jws` was before keys were validated.
+        let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(public_key_b64)
+            .map_err(|e| RulesetError::Malformed(e.to_string()))?;
+        let key = PublicKey::from_bytes(KeyAlgorithm::Ed25519, &raw)
+            .map_err(|e| RulesetError::Malformed(e.to_string()))?;
+        verify_jws(jws, &key).map_err(|e| RulesetError::Malformed(e.to_string()))
     }
 }
 

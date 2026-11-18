@@ -22,13 +22,18 @@ fn public_key() -> Vec<u8> {
         .to_vec()
 }
 
+fn pk(public_key: &[u8]) -> super::public_key::PublicKey {
+    super::public_key::PublicKey::from_bytes(KeyAlgorithm::Ed25519, public_key)
+        .expect("an Ed25519 key")
+}
+
 fn x(public_key: &[u8]) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key)
 }
 
 /// The DID URL of the verification method this crate's builder would give a key.
 fn vm_id(public_key: &[u8]) -> String {
-    format!("{DID}#{}", KeyAlgorithm::Ed25519.thumbprint_uri(public_key))
+    format!("{DID}#{}", pk(public_key).thumbprint_uri())
 }
 
 /// A verification method for `public_key`, identified as the builder would.
@@ -37,7 +42,7 @@ fn vm(public_key: &[u8]) -> Value {
         "id": vm_id(public_key),
         "type": "JsonWebKey",
         "controller": DID,
-        "publicKeyJwk": KeyAlgorithm::Ed25519.published_jwk(public_key),
+        "publicKeyJwk": pk(public_key).published_jwk(),
     })
 }
 
@@ -64,7 +69,7 @@ fn a_kid_that_is_a_verification_method_id_resolves_to_its_key() {
 
     assert_eq!(
         resolve_verification_key(&doc, &naming(&vm_id(&key))),
-        Some(x(&key))
+        Some(pk(&key))
     );
 }
 
@@ -81,11 +86,11 @@ fn each_key_resolves_by_its_own_identifier_in_any_order() {
     ] {
         assert_eq!(
             resolve_verification_key(&doc, &naming(&vm_id(&older))),
-            Some(x(&older))
+            Some(pk(&older))
         );
         assert_eq!(
             resolve_verification_key(&doc, &naming(&vm_id(&newer))),
-            Some(x(&newer))
+            Some(pk(&newer))
         );
     }
 }
@@ -94,7 +99,7 @@ fn each_key_resolves_by_its_own_identifier_in_any_order() {
 fn a_kid_that_names_no_verification_method_resolves_to_nothing() {
     let key = public_key();
     let doc = document(&[vm(&key)]);
-    let thumbprint = KeyAlgorithm::Ed25519.thumbprint_uri(&key);
+    let thumbprint = pk(&key).thumbprint_uri();
 
     for kid in [
         // Another key's identifier.
@@ -177,13 +182,50 @@ fn only_an_ed25519_jwk_resolves() {
     }
 }
 
+/// Bytes that are not the encoding of a point on the curve are no key: they are
+/// refused as a bare key, as a JWK and as the key a document names. The identifier
+/// is a plain fragment, not a thumbprint, so the curve is the only thing that can
+/// refuse. The control is a real key in the same document.
+#[test]
+fn a_key_that_is_not_a_point_on_the_curve_resolves_to_nothing() {
+    let mut flipped = hex::decode(super::rfc8032_vector_tests::public_hex("TEST 1")).expect("hex");
+    flipped[0] ^= 1;
+
+    let id = format!("{DID}#key-1");
+    let with = |bytes: &[u8]| {
+        document(&[json!({
+            "id": id,
+            "type": "JsonWebKey",
+            "controller": DID,
+            "publicKeyJwk": {"kty": "OKP", "crv": "Ed25519", "x": x(bytes)},
+        })])
+    };
+
+    let real = public_key();
+    assert_eq!(
+        resolve_verification_key(&with(&real), &naming(&id)),
+        Some(pk(&real)),
+        "the control"
+    );
+
+    for bytes in [vec![7u8; 32], flipped] {
+        assert_eq!(
+            super::public_key::PublicKey::from_bytes(KeyAlgorithm::Ed25519, &bytes).err(),
+            Some(super::error::PublicKeyError::Ed25519)
+        );
+        let jwk = json!({"kty": "OKP", "crv": "Ed25519", "x": x(&bytes)});
+        assert_eq!(super::public_key::PublicKey::from_jwk(&jwk), None);
+        assert_eq!(resolve_verification_key(&with(&bytes), &naming(&id)), None);
+    }
+}
+
 /// An identifier that claims to be derived from a key is held to it. A document
 /// that files one key under another key's thumbprint would otherwise let that
 /// key answer to the other's `kid`.
 #[test]
 fn a_key_filed_under_another_keys_thumbprint_resolves_to_nothing() {
     let (key, other) = (public_key(), public_key());
-    let jwk = KeyAlgorithm::Ed25519.published_jwk(&key);
+    let jwk = pk(&key).published_jwk();
 
     for id in [vm_id(&other), format!("{DID}#")] {
         let doc = document(&[
@@ -205,7 +247,7 @@ fn a_key_filed_under_another_keys_thumbprint_resolves_to_nothing() {
 #[test]
 fn a_fragment_that_is_not_a_thumbprint_is_taken_as_a_name() {
     let key = public_key();
-    let jwk = KeyAlgorithm::Ed25519.published_jwk(&key);
+    let jwk = pk(&key).published_jwk();
     let absolute = format!("{DID}#key-1");
 
     for (id, reference) in [
@@ -223,7 +265,7 @@ fn a_fragment_that_is_not_a_thumbprint_is_taken_as_a_name() {
         });
         assert_eq!(
             resolve_verification_key(&doc, &naming(&absolute)),
-            Some(x(&key)),
+            Some(pk(&key)),
             "id {id:?}, referenced as {reference:?}"
         );
     }
@@ -270,7 +312,7 @@ fn a_jwk_that_declares_an_alg_binds_the_jws_to_it() {
     let key = public_key();
     let id = vm_id(&key);
     let with_alg = |declared: Option<&str>| {
-        let mut jwk = KeyAlgorithm::Ed25519.published_jwk(&key);
+        let mut jwk = pk(&key).published_jwk();
         match declared {
             Some(alg) => jwk["alg"] = json!(alg),
             None => {

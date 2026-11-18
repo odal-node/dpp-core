@@ -4,8 +4,10 @@ pub mod algorithm;
 pub mod canonical;
 #[cfg(test)]
 mod crit_tests;
+mod error;
 #[cfg(test)]
 mod proptests;
+pub mod public_key;
 #[cfg(test)]
 mod resolve_tests;
 #[cfg(test)]
@@ -22,8 +24,10 @@ mod thumbprint_tests;
 pub mod verifier;
 
 pub use algorithm::{
-    ED25519_ALG, ED25519_CRV, EDDSA_ALG, JWK_THUMBPRINT_URI_PREFIX, is_allowed_alg,
+    ED25519_ALG, ED25519_CRV, EDDSA_ALG, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, is_allowed_alg,
 };
 pub use canonical::canonicalize;
+pub use error::PublicKeyError;
+pub use public_key::PublicKey;
 pub use signer::{sign, sign_typed, verify};
 pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};

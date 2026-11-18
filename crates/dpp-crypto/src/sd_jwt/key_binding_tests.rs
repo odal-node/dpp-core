@@ -21,6 +21,11 @@ use crate::test_support::temp_store;
 
 const NOW: i64 = 1_800_000_000;
 
+/// The public keys of RFC 8032 clause 7.1's TEST 1 and TEST 3: published Ed25519
+/// keys, not generated here.
+const TEST1_PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const TEST3_PUBLIC: &str = "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025";
+
 fn holder(label: &str) -> KeyEntry {
     temp_store(label, "holder")
         .load_key("holder")
@@ -61,7 +66,7 @@ fn issued_to(cnf: Value) -> SdJwt {
 }
 
 fn issued(holder: &KeyEntry) -> SdJwt {
-    issued_to(holder_key_confirmation(&holder.verifying_key.to_bytes()))
+    issued_to(holder_key_confirmation(&holder.public_key()))
 }
 
 fn every_digest(sd_jwt: &SdJwt) -> Vec<String> {
@@ -98,10 +103,12 @@ fn kb_header() -> Value {
 
 #[test]
 fn the_issuer_names_the_holder_key_with_the_jwk_confirmation_method() {
-    let key = [7u8; 32];
+    let raw = hex::decode(TEST3_PUBLIC).expect("hex");
+    let key = crate::jws::PublicKey::from_bytes(crate::jws::KeyAlgorithm::Ed25519, &raw)
+        .expect("a published Ed25519 key");
     assert_eq!(
         holder_key_confirmation(&key),
-        json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key) } })
+        json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key.as_bytes()) } })
     );
 }
 
@@ -176,13 +183,36 @@ fn a_holder_key_must_be_named_and_be_ed25519() {
         p256.present_with_key_binding(&[], &binding(), &key).err(),
         Some(SdJwtError::UnsupportedHolderKey)
     );
-    let mut declared = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let mut declared = holder_key_confirmation(&key.public_key());
     declared["jwk"]["alg"] = json!("ES256");
     assert_eq!(
         issued_to(declared)
             .present_with_key_binding(&[], &binding(), &key)
             .err(),
         Some(SdJwtError::UnsupportedHolderKey)
+    );
+}
+
+/// A Holder key is named by its JWK, and a JWK whose `x` is not a point on the
+/// curve names no key, so the Holder is refused before anything is signed. The
+/// control is the same token naming the real key, which binds.
+#[test]
+fn a_holder_key_that_is_not_a_point_on_the_curve_is_refused() {
+    let key = holder("kb-off-curve");
+    let mut off_curve = hex::decode(TEST1_PUBLIC).expect("hex");
+    off_curve[0] ^= 1;
+    let cnf = json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(&off_curve) } });
+
+    assert_eq!(
+        issued_to(cnf)
+            .present_with_key_binding(&[], &binding(), &key)
+            .err(),
+        Some(SdJwtError::UnsupportedHolderKey)
+    );
+    assert!(
+        issued(&key)
+            .present_with_key_binding(&[], &binding(), &key)
+            .is_ok()
     );
 }
 
@@ -204,10 +234,7 @@ fn a_holder_cannot_bind_with_a_key_the_token_does_not_name() {
 fn a_concealed_holder_key_has_to_be_presented() {
     let key = holder("kb-concealed-cnf");
     let mut claims = Map::new();
-    claims.insert(
-        "cnf".to_owned(),
-        holder_key_confirmation(&key.verifying_key.to_bytes()),
-    );
+    claims.insert("cnf".to_owned(), holder_key_confirmation(&key.public_key()));
     let (kept, disclosures) = conceal(&claims, |_| true).unwrap();
     let sd_jwt = SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures);
     assert_eq!(
@@ -410,7 +437,7 @@ fn the_type_is_compared_as_a_media_type() {
 #[test]
 fn a_declared_algorithm_is_the_one_written_and_held_to() {
     let key = holder("kb-declared");
-    let mut cnf = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let mut cnf = holder_key_confirmation(&key.public_key());
     cnf["jwk"]["alg"] = json!("Ed25519");
     let presented = issued_to(cnf)
         .present_with_key_binding(&[], &binding(), &key)

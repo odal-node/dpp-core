@@ -27,8 +27,8 @@ const NEVER_DISCLOSED: [&str; 8] = [
 
 /// Verify a credential or a presentation, and return what it discloses.
 ///
-/// `public_key_b64` is the issuer's verification key, base64url-encoded, which a
-/// consumer obtains from the document
+/// `key` is the issuer's verification key, with its algorithm, which a
+/// consumer reads from the JWK in the document
 /// [`build_issuer_metadata`](super::build_issuer_metadata) produces by matching
 /// the JWT's `kid`. Fetching that document is I/O and therefore not this crate's
 /// job — the same reason `did:web` resolution has always lived outside it.
@@ -81,14 +81,14 @@ const NEVER_DISCLOSED: [&str; 8] = [
 /// losing the claim that was altered.
 pub fn verify(
     serialised: &str,
-    public_key_b64: &str,
+    key: &dpp_crypto::jws::PublicKey,
     expected_vct: &str,
     now: DateTime<Utc>,
     key_binding: Option<&KeyBindingPolicy>,
 ) -> Result<Map<String, Value>, SdJwtVcError> {
     let sd_jwt = SdJwt::parse(serialised)?;
 
-    match dpp_crypto::jws::verifier::verify_jws(sd_jwt.jwt(), public_key_b64) {
+    match dpp_crypto::jws::verifier::verify_jws(sd_jwt.jwt(), key) {
         Ok(true) => {}
         _ => return Err(SdJwtVcError::BadSignature),
     }

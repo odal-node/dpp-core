@@ -1,7 +1,6 @@
 //! JWS compact serialisation signer — EdDSA over RFC 8785 (JCS) canonical bytes.
 
 use base64::Engine;
-use ed25519_dalek::Signer;
 use serde_json::Value;
 
 use crate::keystore::{KeyEntry, KeyStore};
@@ -90,8 +89,7 @@ pub(crate) fn sign_with_header(
     let payload_b64 = b64.encode(payload);
 
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let signature = key.signing_key.sign(signing_input.as_bytes());
-    let sig_b64 = b64.encode(signature.to_bytes());
+    let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()));
 
     format!("{signing_input}.{sig_b64}")
 }
@@ -120,17 +118,13 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     let sig_bytes = b64
         .decode(parts[2])
         .map_err(|e| anyhow::anyhow!("base64: {e}"))?;
+    if sig_bytes.len() != key.algorithm.signature_len() {
+        return Err(anyhow::anyhow!("invalid signature length"));
+    }
 
-    let sig_arr: [u8; 64] = sig_bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("invalid signature length"))?;
-
-    let signature = ed25519_dalek::Signature::from_bytes(&sig_arr);
-
-    // Strict verification (RFC 8032 §8) — see verifier::verify_jws.
+    // Per-algorithm checks, Ed25519's strict verification included, live in one
+    // place — see `PublicKey::verify`.
     Ok(key
-        .verifying_key
-        .verify_strict(signing_input.as_bytes(), &signature)
-        .is_ok())
+        .public_key()
+        .verify(signing_input.as_bytes(), &sig_bytes))
 }

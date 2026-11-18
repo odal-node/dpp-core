@@ -20,12 +20,13 @@ fn public_key() -> Vec<u8> {
     hex::decode(PUBLIC_KEY_HEX).expect("hex")
 }
 
+fn ed(bytes: &[u8]) -> super::public_key::PublicKey {
+    super::public_key::PublicKey::from_bytes(KeyAlgorithm::Ed25519, bytes).expect("an Ed25519 key")
+}
+
 #[test]
 fn the_rfc_example_key_has_the_rfc_thumbprint() {
-    assert_eq!(
-        KeyAlgorithm::Ed25519.jwk_thumbprint(&public_key()),
-        THUMBPRINT
-    );
+    assert_eq!(ed(&public_key()).thumbprint(), THUMBPRINT);
 
     // The same value, decoded: the SHA-256 the RFC prints beside it.
     use base64::Engine;
@@ -43,7 +44,7 @@ fn the_uri_form_prefixes_the_thumbprint_with_its_hash() {
         "urn:ietf:params:oauth:jwk-thumbprint:sha-256:"
     );
     assert_eq!(
-        KeyAlgorithm::Ed25519.thumbprint_uri(&public_key()),
+        ed(&public_key()).thumbprint_uri(),
         format!("urn:ietf:params:oauth:jwk-thumbprint:sha-256:{THUMBPRINT}")
     );
 }
@@ -54,24 +55,21 @@ fn the_uri_form_prefixes_the_thumbprint_with_its_hash() {
 #[test]
 fn the_published_jwk_names_itself_without_changing_its_thumbprint() {
     let key = public_key();
-    let bare = KeyAlgorithm::Ed25519.public_key_jwk(&key);
-    let published = KeyAlgorithm::Ed25519.published_jwk(&key);
+    let bare = ed(&key).jwk();
+    let published = ed(&key).published_jwk();
 
     for member in ["kty", "crv", "x"] {
         assert_eq!(published[member], bare[member], "{member}");
     }
-    assert_eq!(published["kid"], KeyAlgorithm::Ed25519.thumbprint_uri(&key));
+    assert_eq!(published["kid"], ed(&key).thumbprint_uri());
     assert_eq!(published["alg"], "EdDSA");
     assert_eq!(published.as_object().expect("object").len(), 5);
 }
 
 #[test]
 fn different_keys_have_different_thumbprints() {
-    let mut other = public_key();
-    other[0] ^= 1;
+    // The public key of RFC 8032 clause 7.1's TEST 2: another valid, published key.
+    let other = hex::decode(super::rfc8032_vector_tests::public_hex("TEST 2")).expect("hex");
 
-    assert_ne!(
-        KeyAlgorithm::Ed25519.jwk_thumbprint(&public_key()),
-        KeyAlgorithm::Ed25519.jwk_thumbprint(&other)
-    );
+    assert_ne!(ed(&public_key()).thumbprint(), ed(&other).thumbprint());
 }

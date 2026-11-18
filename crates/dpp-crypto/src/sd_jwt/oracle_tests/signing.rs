@@ -128,10 +128,24 @@ pub(super) fn ours(token: &str, public_key_b64: &str) -> Verdict {
     let Ok(parsed) = SdJwt::parse(token) else {
         return structure(token);
     };
-    match verify_jws(parsed.jwt(), public_key_b64) {
-        Ok(true) => structure(token),
-        other => Verdict::refused(format!("signature: {other:?}")),
+    match ed25519_key(public_key_b64) {
+        Some(key) => match verify_jws(parsed.jwt(), &key) {
+            Ok(true) => structure(token),
+            other => Verdict::refused(format!("signature: {other:?}")),
+        },
+        None => Verdict::refused(NOT_A_KEY),
     }
+}
+
+/// Why a token is refused when its issuer key does not decode. The token is
+/// refused, as it was when `verify_jws` rejected the key itself.
+pub(super) const NOT_A_KEY: &str = "signature: the issuer key is not an Ed25519 public key";
+
+/// An Ed25519 public key given as base64url, the shape the oracle files use.
+/// `None` when it is not one.
+pub(super) fn ed25519_key(public_key_b64: &str) -> Option<crate::jws::PublicKey> {
+    let raw = URL_SAFE_NO_PAD.decode(public_key_b64).ok()?;
+    crate::jws::PublicKey::from_bytes(crate::jws::KeyAlgorithm::Ed25519, &raw).ok()
 }
 
 /// A Holder: the Ed25519 key an Issuer names in `cnf` and binds a presentation
@@ -159,8 +173,11 @@ pub(super) fn ours_bound(token: &str, public_key_b64: &str, policy: &KeyBindingP
     let Ok(parsed) = SdJwt::parse(token) else {
         return bound_structure(token, policy);
     };
-    match verify_jws(parsed.jwt(), public_key_b64) {
-        Ok(true) => bound_structure(token, policy),
-        other => Verdict::refused(format!("signature: {other:?}")),
+    match ed25519_key(public_key_b64) {
+        Some(key) => match verify_jws(parsed.jwt(), &key) {
+            Ok(true) => bound_structure(token, policy),
+            other => Verdict::refused(format!("signature: {other:?}")),
+        },
+        None => Verdict::refused(NOT_A_KEY),
     }
 }

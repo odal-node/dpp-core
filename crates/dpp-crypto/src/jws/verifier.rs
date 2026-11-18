@@ -1,18 +1,19 @@
-//! JWS compact serialisation verifier — EdDSA/Ed25519, algorithm-pinned.
+//! JWS compact serialisation verifier, algorithm-bound: the key decides the
+//! algorithm and the header may only confirm it.
 
 use base64::Engine;
-use ed25519_dalek::{Signature, VerifyingKey};
 
 use super::algorithm::{JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
+use super::public_key::PublicKey;
 
-/// Verify an EdDSA compact JWS given a base64url-encoded public key.
+/// Verify a compact JWS under `key`.
 ///
 /// Returns `Ok(true)` when the signature is valid, `Ok(false)` when it is not.
 /// A protected header that names a critical extension (`crit`, RFC 7515 clause
-/// 4.1.11), or any algorithm but `EdDSA` and its RFC 9864 name `Ed25519`, is
-/// refused the same way: `Ok(false)`.
-/// Returns `Err` only on malformed input (bad base64, wrong key/sig length).
-pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
+/// 4.1.11), or whose `alg` is not the key's algorithm, is refused the same way:
+/// `Ok(false)`. Returns `Err` only on malformed input (bad base64, or a
+/// signature of the wrong length).
+pub fn verify_jws(jws: &str, key: &PublicKey) -> anyhow::Result<bool> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
     let parts: Vec<&str> = jws.splitn(3, '.').collect();
@@ -20,53 +21,21 @@ pub fn verify_jws(jws: &str, public_key_b64: &str) -> anyhow::Result<bool> {
         return Ok(false);
     }
 
-    // No key record here — the caller supplies raw Ed25519 key bytes — so the
-    // algorithm is pinned rather than bound. Rejects `alg:none` and every
-    // substitution downgrade.
-    if !header_admissible(&b64, parts[0], KeyAlgorithm::Ed25519) {
+    // The key names its algorithm; the header may only confirm it. Rejects
+    // `alg:none` and every substitution downgrade.
+    if !header_admissible(&b64, parts[0], key.algorithm()) {
         return Ok(false);
     }
 
     let signing_input = format!("{}.{}", parts[0], parts[1]);
-
     let sig_bytes = b64
         .decode(parts[2])
         .map_err(|e| anyhow::anyhow!("base64 signature: {e}"))?;
-    let sig_arr: [u8; 64] = sig_bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Ed25519 signature must be 64 bytes"))?;
-    let signature = Signature::from_bytes(&sig_arr);
-
-    let key_bytes = b64
-        .decode(public_key_b64)
-        .map_err(|e| anyhow::anyhow!("base64 public key: {e}"))?;
-    let key_arr: [u8; 32] = key_bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Ed25519 public key must be 32 bytes"))?;
-    let verifying_key =
-        VerifyingKey::from_bytes(&key_arr).map_err(|e| anyhow::anyhow!("invalid key: {e}"))?;
-
-    // Strict verification (RFC 8032 §8): rejects the signature-malleability /
-    // small-order/cofactor edge cases that the non-strict `verify` admits —
-    // undesirable when the signature is the trust anchor.
-    Ok(verifying_key
-        .verify_strict(signing_input.as_bytes(), &signature)
-        .is_ok())
-}
-
-/// Extract the base64url-encoded `x` from a JWK, but only if it is a genuine
-/// Ed25519 key (`kty:"OKP"`, `crv:"Ed25519"`). Returns `None` for any other
-/// key type/curve so a malformed or wrong-curve JWK can't be mis-selected.
-pub(crate) fn jwk_ed25519_x(jwk: &serde_json::Value) -> Option<String> {
-    if jwk.get("kty")?.as_str()? != "OKP" {
-        return None;
+    if sig_bytes.len() != key.algorithm().signature_len() {
+        return Err(anyhow::anyhow!("Ed25519 signature must be 64 bytes"));
     }
-    if jwk.get("crv")?.as_str()? != "Ed25519" {
-        return None;
-    }
-    jwk.get("x")?.as_str().map(String::from)
+
+    Ok(key.verify(signing_input.as_bytes(), &sig_bytes))
 }
 
 /// The absolute form of an identifier inside the document `document_id`: a
@@ -149,8 +118,8 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
     header.get("kid")?.as_str().map(String::from)
 }
 
-/// Resolve the public key a JWS names, from its issuer's DID document: the
-/// base64url Ed25519 `x` of the verification method the `kid` identifies.
+/// Resolve the public key a JWS names, from its issuer's DID document: the key
+/// of the verification method the `kid` identifies, with its algorithm.
 ///
 /// The `kid` must be the absolute URL of a verification method: the document's
 /// DID, `#`, and a fragment. The ones this crate issues end in the key's
@@ -164,18 +133,20 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
 ///   `controller`. These are the binding checks of the Controlled Identifiers
 ///   v1.0 retrieval algorithm (§3.3): a document vouches only for its own keys;
 /// - `assertionMethod` references that method;
-/// - its `publicKeyJwk` is an Ed25519 key (`kty: OKP`, `crv: Ed25519`);
+/// - its `publicKeyJwk` is an Ed25519 key (`OKP`, `crv: Ed25519`) on the curve;
 /// - if the fragment is a thumbprint URI, it is that key's own. An identifier
 ///   that claims to be derived from the key is held to it, or a document could
 ///   file any key under another key's name. Other fragments, such as `#key-1`
 ///   in a document someone else wrote, are taken as the names they are;
 /// - if the JWK declares an `alg`, the JWS `alg` is the same string. A key that
-///   says what it is for is held to it.
+///   says what it is for is held to it;
+/// - the JWS `alg` names the key's algorithm (`EdDSA` or `Ed25519`), even when the
+///   JWK declares no `alg`.
 ///
 /// The ids this crate issues are stable across rotation and revocation, so a
 /// signature made before a rotation resolves to the key that made it. A revoked
 /// key is absent from the document, and so resolves to nothing.
-pub fn resolve_verification_key(did_document: &serde_json::Value, jws: &str) -> Option<String> {
+pub fn resolve_verification_key(did_document: &serde_json::Value, jws: &str) -> Option<PublicKey> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header_bytes = b64.decode(jws.split('.').next()?).ok()?;
     let header: serde_json::Value = serde_json::from_slice(&header_bytes).ok()?;
@@ -203,12 +174,9 @@ pub fn resolve_verification_key(did_document: &serde_json::Value, jws: &str) -> 
     }
 
     let jwk = vm.get("publicKeyJwk")?;
-    let x = jwk_ed25519_x(jwk)?;
-    let raw = b64.decode(&x).ok()?;
+    let key = PublicKey::from_jwk(jwk)?;
 
-    if fragment.starts_with(JWK_THUMBPRINT_URI_PREFIX)
-        && fragment != KeyAlgorithm::Ed25519.thumbprint_uri(&raw)
-    {
+    if fragment.starts_with(JWK_THUMBPRINT_URI_PREFIX) && fragment != key.thumbprint_uri() {
         return None;
     }
     if let Some(declared) = jwk.get("alg")
@@ -216,5 +184,11 @@ pub fn resolve_verification_key(did_document: &serde_json::Value, jws: &str) -> 
     {
         return None;
     }
-    Some(x)
+    // A JWK that declares no `alg` still has one: its key type's. The header is
+    // checked against it again by `verify_jws`; refusing here as well keeps a
+    // resolver caller from acting on a key the token's `alg` contradicts.
+    if KeyAlgorithm::from_jose_alg(jws_alg) != Some(key.algorithm()) {
+        return None;
+    }
+    Some(key)
 }
