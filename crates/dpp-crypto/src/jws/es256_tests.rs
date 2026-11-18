@@ -174,6 +174,47 @@ fn an_ec_jwk_must_be_p256_full_length_and_on_the_curve() {
     }
 }
 
+/// A coordinate longer than its curve's is refused on every curve, `x` and `y` alike,
+/// and before it is decoded: its encoded length is wrong, which is the whole refusal.
+/// Each case is one octet too long, or a megabyte of `A`. An OKP key has only `x`.
+#[test]
+fn an_oversized_coordinate_is_refused_on_every_curve() {
+    for algorithm in [
+        KeyAlgorithm::Ed25519,
+        KeyAlgorithm::EcdsaP256,
+        KeyAlgorithm::EcdsaP384,
+        KeyAlgorithm::EcdsaP521,
+    ] {
+        let good = SigningMaterial::generate(algorithm).public_key().jwk();
+        assert!(PublicKey::from_jwk(&good).is_some(), "{algorithm:?}");
+
+        let members: &[&str] = if good["kty"] == "EC" {
+            &["x", "y"]
+        } else {
+            &["x"]
+        };
+        for member in members {
+            let mut octets = B64
+                .decode(good[*member].as_str().expect("a coordinate"))
+                .expect("base64url");
+            octets.push(0);
+            let mut one_too_long = good.clone();
+            one_too_long[*member] = json!(B64.encode(&octets));
+            assert!(
+                PublicKey::from_jwk(&one_too_long).is_none(),
+                "{algorithm:?}: one octet too long in {member}"
+            );
+
+            let mut megabyte = good.clone();
+            megabyte[*member] = json!("A".repeat(1 << 20));
+            assert!(
+                PublicKey::from_jwk(&megabyte).is_none(),
+                "{algorithm:?}: a megabyte in {member}"
+            );
+        }
+    }
+}
+
 /// A P-256 key given in SEC1 compressed form is the same key, held uncompressed,
 /// with the same thumbprint.
 #[test]

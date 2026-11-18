@@ -40,20 +40,27 @@ fn algorithm_of(jwk: &Value) -> Result<KeyAlgorithm, PrivateJwkError> {
 
 /// The octets of the private member `d`, base64url-decoded into a buffer that is
 /// zeroized when it drops, including on a refusal, since a partly decoded secret is
-/// still secret. The length must be exact. Upstream `from_slice` pads a shorter slice
-/// with leading zeros rather than refusing it, so a truncated `d` would otherwise
-/// build the same key.
+/// still secret. The encoded length is checked before anything is decoded, so an
+/// oversized `d` costs nothing to refuse: a valid `d` is the unpadded base64url of
+/// exactly `private_len` octets. The length must be exact. Upstream `from_slice` pads a
+/// shorter slice with leading zeros rather than refusing it, so a truncated `d` would
+/// otherwise build the same key.
 fn decode_private(
     d: &Value,
     algorithm: KeyAlgorithm,
 ) -> Result<Zeroizing<Vec<u8>>, PrivateJwkError> {
     let encoded = d.as_str().ok_or(PrivateJwkError::PrivateKeyInvalid)?;
-    let mut secret = Zeroizing::new(vec![0u8; base64::decoded_len_estimate(encoded.len())]);
+    let octets = private_len(algorithm);
+    let expected = base64::encoded_len(octets, false).ok_or(PrivateJwkError::PrivateKeyInvalid)?;
+    if encoded.len() != expected {
+        return Err(PrivateJwkError::PrivateKeyInvalid);
+    }
+    let mut secret = Zeroizing::new(vec![0u8; octets]);
     let written = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode_slice(encoded, &mut secret)
         .map_err(|_| PrivateJwkError::PrivateKeyInvalid)?;
     secret.truncate(written);
-    if written != private_len(algorithm) {
+    if written != octets {
         return Err(PrivateJwkError::PrivateKeyInvalid);
     }
     Ok(secret)

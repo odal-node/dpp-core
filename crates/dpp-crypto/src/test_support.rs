@@ -18,9 +18,15 @@ pub(crate) fn temp_dir(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(unique_name(label))
 }
 
+/// An empty [`KeyStore`] at `path`. Opening writes nothing: the file appears on the
+/// first save.
+pub(crate) fn open_empty_store(path: &std::path::Path) -> KeyStore {
+    KeyStore::open(path, "test-pass").expect("open store")
+}
+
 /// A fresh [`KeyStore`] at a unique temp path, with one key already generated.
 pub(crate) fn temp_store(label: &str, key_id: &str) -> KeyStore {
-    let store = KeyStore::open(temp_path(label), "test-pass").expect("open store");
+    let store = open_empty_store(&temp_path(label));
     store.generate_key(key_id).expect("generate key");
     store
 }

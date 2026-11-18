@@ -179,6 +179,17 @@ fn a_d_that_is_not_base64url_is_refused() {
     }
 }
 
+/// A `d` a megabyte long is refused as malformed on each suite key. Its encoded length
+/// is wrong, so it is refused before anything is decoded.
+#[test]
+fn an_oversized_d_is_refused_on_each_suite_key() {
+    for (name, _) in SUITE {
+        let mut jwk = secret(name);
+        jwk["d"] = json!("A".repeat(1 << 20));
+        assert_eq!(refused(&jwk), PrivateJwkError::PrivateKeyInvalid, "{name}");
+    }
+}
+
 /// A `d` of zero octets is not a private scalar on any EC curve.
 #[test]
 fn a_zero_d_is_refused_on_each_ec_curve() {

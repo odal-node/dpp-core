@@ -22,7 +22,9 @@ pub enum PrivateJwkError {
     #[error("the public members are not a valid public key")]
     PublicKeyInvalid,
     /// `d` is not base64url, is not the curve's field size, or is not a valid private
-    /// key: zero, or at or above the group order.
+    /// key. For an EC curve that means zero, or at or above the group order. An Ed25519
+    /// `d` is a 32-octet seed (RFC 8037 §2), and any 32 octets are one, so only the
+    /// length applies to it.
     #[error("the private member `d` is not a valid private key")]
     PrivateKeyInvalid,
     /// The public key that `d` derives is not the public key in `x` and `y`.
