@@ -1,5 +1,6 @@
 //! [`KeyEntry`] — a decrypted, in-memory key pair handed back by the store.
 
+use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use crate::jws::algorithm::KeyAlgorithm;
@@ -54,6 +55,13 @@ impl KeyEntry {
     pub(crate) fn secret_for_test(&self) -> Zeroizing<Vec<u8>> {
         self.material.secret()
     }
+}
+
+/// The fingerprint a key pair is recorded under: the hex SHA-256 of its public bytes.
+/// The store binds each record's ciphertext to it, so every path that makes a key
+/// pair computes it this way.
+pub(crate) fn fingerprint_of(public: &PublicKey) -> String {
+    hex::encode(Sha256::digest(public.as_bytes()))
 }
 
 /// The private half of a key pair, one variant per algorithm.

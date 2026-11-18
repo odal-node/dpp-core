@@ -243,6 +243,41 @@ proptest! {
         }
     }
 
+    /// Private-JWK parsing never panics on arbitrary members. Each member is drawn from
+    /// the values a real key carries as well as arbitrary text, and `d`, `x` and `y` from
+    /// the lengths of the curves' encodings, so the strategy reaches the key paths and
+    /// not only the first refusal.
+    #[test]
+    fn private_jwk_never_panics(
+        kty in prop_oneof![Just("OKP".to_owned()), Just("EC".to_owned()), ".{0,8}"],
+        crv in prop_oneof![
+            Just("Ed25519".to_owned()),
+            Just("P-256".to_owned()),
+            Just("P-384".to_owned()),
+            Just("P-521".to_owned()),
+            ".{0,8}",
+        ],
+        alg in prop_oneof![
+            Just("EdDSA".to_owned()),
+            Just("ES256".to_owned()),
+            Just("ES384".to_owned()),
+            Just("ES512".to_owned()),
+            ".{0,8}",
+        ],
+        d in prop_oneof!["[A-Za-z0-9_-]{43}", "[A-Za-z0-9_-]{64}", "[A-Za-z0-9_-]{88}", ".{0,96}"],
+        x in prop_oneof!["[A-Za-z0-9_-]{43}", "[A-Za-z0-9_-]{64}", "[A-Za-z0-9_-]{88}", ".{0,96}"],
+        y in prop_oneof!["[A-Za-z0-9_-]{43}", "[A-Za-z0-9_-]{64}", "[A-Za-z0-9_-]{88}", ".{0,96}"],
+    ) {
+        let jwk = serde_json::json!({"kty": kty, "crv": crv, "alg": alg, "d": d, "x": x, "y": y});
+        let _ = crate::keystore::KeyEntry::from_private_jwk(&jwk);
+    }
+
+    /// Private-JWK parsing never panics on an arbitrary JSON value.
+    #[test]
+    fn private_jwk_from_arbitrary_json_never_panics(jwk in arb_json()) {
+        let _ = crate::keystore::KeyEntry::from_private_jwk(&jwk);
+    }
+
     /// `extract_kid_from_jws` must never panic on arbitrary input.
     #[test]
     fn extract_kid_never_panics(jws in ".{0,128}") {

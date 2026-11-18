@@ -26,6 +26,8 @@ a domain type.
   signing.
 - You manage signing keys at rest (generation, rotation, revocation, archival) with
   encryption and integrity protection.
+- You need to sign with a key someone else generated, given as its private JWK:
+  `KeyEntry::from_private_jwk` builds it in memory, and it is never written to a store.
 - You need to build an **ETSI TS 119 182-1 JAdES-B-B** signature whose signature value
   comes from elsewhere, typically a remote signing service. The `jades` module derives
   the signing input and assembles the compact form; it never signs.

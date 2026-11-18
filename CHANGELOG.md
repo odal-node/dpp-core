@@ -128,6 +128,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **`jws::ES384_ALG`, `jws::ES512_ALG`, `jws::P384_CRV` and `jws::P521_CRV`**, the JOSE
   identifiers and the JWK curve names, re-exported beside the ES256 constants. (#588)
 
+- **`keystore::KeyEntry::from_private_jwk` builds a signing key from a private JWK, in
+  memory.** It takes the `secretKeyJwk` of a key someone else generated, such as a key
+  file of the W3C VC-JOSE-COSE test suite. The `kty` and `crv` pair decides the
+  algorithm (`OKP` with `Ed25519`, or `EC` with `P-256`, `P-384` or `P-521`), and a
+  declared `alg` must name it. The public members must be the key that `d` derives
+  (RFC 7518 §6.2.2, RFC 8037 §2). Each refusal has its own `keystore::PrivateJwkError`
+  variant: no `d`, an unsupported key, an `alg` naming another key, public members that
+  are not a point on the curve, a `d` of the wrong length or not a valid scalar, and a
+  `d` that does not match the public key. The key is never written to a `KeyStore`,
+  which holds only keys it generated. (#589)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking
