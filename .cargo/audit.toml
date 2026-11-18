@@ -2,4 +2,16 @@
 # https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md
 
 [advisories]
-ignore = []
+# --- RUSTSEC-2026-0543 ------------------------------------------------------
+# crate:      chrono 0.4.45
+# path:       direct normal dependency of dpp-calc, dpp-crypto, dpp-domain, dpp-registry, dpp-rules (its bundle feature, which dpp-domain always enables), dpp-tests, dpp-vc; direct dev-dependency of dpp-aas and dpp-benches (cargo tree -i chrono --workspace -e normal,dev)
+# class:      reachable-accepted
+# rationale:  chrono is unmaintained, and every version is affected with no safe upgrade (RUSTSEC-2026-0543). No vulnerability is reported against it, so it is accepted until timestamps move from chrono to jiff (issue #610).
+# anchor:     —
+# owner:      maintainer
+# recorded:   2026-11-18
+# expires:    2027-05-17
+# release-on: chrono leaves Cargo.lock in all three workspaces when issue #610 (timestamps move from chrono to jiff) lands
+ignore = [
+    "RUSTSEC-2026-0543",
+]
