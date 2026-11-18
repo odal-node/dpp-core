@@ -31,23 +31,31 @@
 //!   fixture (its test 7) needs a presentation type, so it is not used here.
 //!
 //! The RFC 6979 and RFC 7515 data is reused as Code Components under the IETF Trust's
-//! Legal Provisions Relating to IETF Documents. Each RFC's own notice reads:
+//! Legal Provisions Relating to IETF Documents. In place of the licence text, each
+//! RFC's data carries the notification of Section 6.d of those provisions, with that
+//! RFC's year.
 //!
-//! > RFC 6979, copyright (c) 2013 IETF Trust and the persons identified as the
-//! > authors of the code. All rights reserved.
+//! For RFC 6979:
+//!
+//! > Copyright (c) 2013 IETF Trust and the persons identified as authors of the
+//! > code. All rights reserved.
 //! >
 //! > Redistribution and use in source and binary forms, with or without
 //! > modification, is permitted pursuant to, and subject to the license terms
-//! > contained in, the Simplified BSD License set forth in Section 4.c of the IETF
+//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
 //! > Trust's Legal Provisions Relating to IETF Documents
-//! > (<http://trustee.ietf.org/license-info>).
+//! > (<https://trustee.ietf.org/license-info>).
 //!
-//! > RFC 7515, copyright (c) 2015 IETF Trust and the persons identified as the
-//! > authors of the code. All rights reserved.
+//! For RFC 7515:
+//!
+//! > Copyright (c) 2015 IETF Trust and the persons identified as authors of the
+//! > code. All rights reserved.
 //! >
-//! > Code Components extracted from this document must include Simplified BSD
-//! > License text as described in Section 4.e of the Trust Legal Provisions and are
-//! > provided without warranty as described in the Simplified BSD License.
+//! > Redistribution and use in source and binary forms, with or without
+//! > modification, is permitted pursuant to, and subject to the license terms
+//! > contained in, the Revised BSD License set forth in Section 4.c of the IETF
+//! > Trust's Legal Provisions Relating to IETF Documents
+//! > (<https://trustee.ietf.org/license-info>).
 
 use base64::Engine;
 use serde_json::{Value, json};

@@ -11,10 +11,11 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::KeyEntry;
+use super::entry::SigningMaterial;
 use super::error::PrivateJwkError;
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
-use crate::test_support::temp_store;
+use crate::test_support::{open_empty_store, temp_path};
 
 pub(super) const B64: base64::engine::general_purpose::GeneralPurpose =
     base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -137,12 +138,15 @@ fn the_fingerprint_is_the_store_fingerprint() {
         assert!(!entry.revoked, "{name}");
     }
 
-    let store = temp_store("private-jwk-fingerprint", "unused");
-    let generated = store
-        .generate_key_with("p384", KeyAlgorithm::EcdsaP384)
-        .expect("generate");
-    let expected = hex::encode(Sha256::digest(generated.public_key().as_bytes()));
-    assert_eq!(generated.fingerprint, expected, "the store's own key");
+    let path = temp_path("private-jwk-fingerprint");
+    let store = open_empty_store(&path);
+    let (record, entry) = store
+        .seal_new_record(SigningMaterial::generate(KeyAlgorithm::EcdsaP384))
+        .expect("seal");
+    let expected = hex::encode(Sha256::digest(entry.public_key().as_bytes()));
+    assert_eq!(entry.fingerprint, expected, "the store's own key");
+    assert_eq!(record.fingerprint, expected, "the record sealed for it");
+    assert!(!path.exists(), "sealing writes nothing to disk");
 }
 
 /// `ed25519` declared as `Ed25519` (RFC 9864's name for the same operation) builds.
