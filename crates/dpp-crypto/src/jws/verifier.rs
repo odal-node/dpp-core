@@ -5,6 +5,7 @@ use base64::Engine;
 
 use super::algorithm::{JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
 use super::error::SignatureLengthError;
+use super::header_refusal::HeaderRefusal;
 use super::public_key::PublicKey;
 
 /// Verify a compact JWS under `key`.
@@ -24,7 +25,7 @@ pub fn verify_jws(jws: &str, key: &PublicKey) -> anyhow::Result<bool> {
 
     // The key names its algorithm; the header may only confirm it. Rejects
     // `alg:none` and every substitution downgrade.
-    if !header_admissible(&b64, parts[0], key.algorithm()) {
+    if !header_admissible(jws, key.algorithm()) {
         return Ok(false);
     }
 
@@ -71,9 +72,20 @@ fn is_assertion_method(did_document: &serde_json::Value, document_id: &str, vm_i
         })
 }
 
-/// Whether a JWS protected header may be acted on at all: it names no critical
-/// extension, and its `alg` is exactly the algorithm the signing key is
-/// recorded as using.
+/// Whether a JWS protected header may be acted on at all: [`header_refusal`] has
+/// nothing to say about it.
+///
+/// Every verification path in this crate calls this one function, or
+/// [`header_refusal`] that it is defined by, so a check added there cannot be
+/// skipped by a path that was written later.
+pub(crate) fn header_admissible(jws: &str, expected: KeyAlgorithm) -> bool {
+    header_refusal(jws, expected).is_none()
+}
+
+/// Why the protected header of the compact JWS `jws` may not be acted on, or
+/// `None` when it may: it names no critical extension, and its `alg` is exactly
+/// the algorithm the signing key is recorded as using. Only the first segment
+/// is read.
 ///
 /// **`crit`.** RFC 7515 clause 4.1.11 says a JWS whose `crit` lists an
 /// extension the recipient does not understand is invalid, and the recipient
@@ -88,30 +100,32 @@ fn is_assertion_method(did_document: &serde_json::Value, document_id: &str, vm_i
 /// checked *against* the key. With one algorithm in the allowlist this is
 /// equivalent to pinning; with two it is the difference between a verifier and
 /// an algorithm-confusion oracle, which is why it is written this way now rather
-/// than later. `false` for a malformed header, a missing `alg`, `alg:none`, or
-/// anything outside the allowlist.
+/// than later. Refused for a missing `alg`, `alg:none`, or anything outside the
+/// allowlist.
 ///
-/// Every verification path in this crate calls this one function, so a check
-/// added here cannot be skipped by a path that was written later.
-pub(crate) fn header_admissible(
-    b64: &base64::engine::general_purpose::GeneralPurpose,
-    header_b64: &str,
-    expected: KeyAlgorithm,
-) -> bool {
+/// [`verify_jws`] answers `false` for every refusal here without saying which, so
+/// a caller that has to tell its user *why* a token failed asks this first.
+#[must_use]
+pub fn header_refusal(jws: &str, expected: KeyAlgorithm) -> Option<HeaderRefusal> {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let header_b64 = jws.split('.').next().unwrap_or_default();
     let Ok(bytes) = b64.decode(header_b64) else {
-        return false;
+        return Some(HeaderRefusal::Unreadable);
     };
-    let Ok(header) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
-        return false;
+    let Ok(serde_json::Value::Object(header)) = serde_json::from_slice(&bytes) else {
+        return Some(HeaderRefusal::Unreadable);
     };
-    if header.get("crit").is_some() {
-        return false;
+    if header.contains_key("crit") {
+        return Some(HeaderRefusal::Critical);
     }
-    header
-        .get("alg")
-        .and_then(serde_json::Value::as_str)
-        .and_then(KeyAlgorithm::from_jose_alg)
-        == Some(expected)
+    let alg = header.get("alg").and_then(serde_json::Value::as_str);
+    if alg.and_then(KeyAlgorithm::from_jose_alg) == Some(expected) {
+        None
+    } else {
+        Some(HeaderRefusal::Algorithm {
+            found: alg.map(str::to_owned),
+        })
+    }
 }
 
 /// Extract the `kid` field from the JWS protected header.

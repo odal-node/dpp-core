@@ -14,6 +14,9 @@ mod es256_vector_tests;
 mod es384_es512_tests;
 #[cfg(test)]
 mod es384_es512_vector_tests;
+mod header_refusal;
+#[cfg(test)]
+mod header_refusal_tests;
 #[cfg(test)]
 mod proptests;
 pub mod public_key;
@@ -25,6 +28,8 @@ mod rfc8032_vector_tests;
 mod rfc8037_vector_tests;
 #[cfg(test)]
 mod rfc8785_vector_tests;
+#[cfg(test)]
+mod sign_typed_with_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;
@@ -38,6 +43,7 @@ pub use algorithm::{
 };
 pub use canonical::canonicalize;
 pub use error::{PublicKeyError, SignatureLengthError};
+pub use header_refusal::HeaderRefusal;
 pub use public_key::PublicKey;
-pub use signer::{sign, sign_typed, verify};
-pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
+pub use signer::{sign, sign_typed, sign_typed_with, verify};
+pub use verifier::{extract_kid_from_jws, header_refusal, resolve_verification_key, verify_jws};

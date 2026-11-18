@@ -1,0 +1,103 @@
+//! Signing a credential or a presentation as a VC-JOSE-COSE compact JWS.
+
+use serde_json::{Map, Value};
+
+use dpp_crypto::jws::signer::sign_typed_with;
+use dpp_crypto::keystore::KeyEntry;
+
+use super::error::JoseError;
+use super::verify::{
+    CREDENTIAL_CTY, CREDENTIAL_TYP, PRESENTATION_CTY, PRESENTATION_TYP, check_context, check_kid,
+};
+use super::vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS, check_members};
+
+/// Sign a credential as a `vc+jwt` (VC-JOSE-COSE §3.1.1), and return the compact
+/// JWS.
+///
+/// The payload is `credential` as given, in RFC 8785 canonical form, with no claim
+/// added: the unsecured credential is the unencoded JWS payload (§3.1.1). The
+/// protected header carries the key's `alg`, the `kid` given, `typ: vc+jwt` and
+/// `cty: vc`.
+///
+/// # Refused before signing
+///
+/// - A top-level member that is not in [`CREDENTIAL_TERMS`], is not a JWT
+///   registered claim name (`iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, `jti`, RFC
+///   7519 §4.1), and is not named in `extension_terms`. An issuer that means to
+///   sign a term of its own declares it: the discipline is the issuer's, and
+///   [`verify_credential`](super::verify_credential) ignores unknown members as
+///   §3.1.3 requires.
+/// - A `vc` or a `vp` member, even when `extension_terms` names it (§1.1.2.1).
+/// - A missing or ill-typed `@context`, which [`verify_credential`](super::verify_credential)
+///   would refuse in turn.
+/// - A `kid` that is not an absolute URL when the credential has no `iss` and its
+///   issuer is a URL (§4.2).
+///
+/// `iat`, `exp` and `nbf` are the caller's to put in the credential, or not: this
+/// function stamps nothing, so the same input gives the same token.
+///
+/// # Errors
+///
+/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the
+/// signer failed.
+pub fn sign_credential(
+    credential: &Value,
+    key: &KeyEntry,
+    kid: &str,
+    extension_terms: &[&str],
+) -> Result<String, JoseError> {
+    let document = object(credential, "credential")?;
+    check_members(document, &CREDENTIAL_TERMS, extension_terms)?;
+    check_context(document)?;
+    check_kid(document, Some(kid))?;
+    seal(credential, key, kid, CREDENTIAL_TYP, CREDENTIAL_CTY)
+}
+
+/// Sign a presentation as a `vp+jwt` (VC-JOSE-COSE §3.1.2), and return the compact
+/// JWS.
+///
+/// The members are checked as [`sign_credential`] checks them, against
+/// [`PRESENTATION_TERMS`]. The credentials a presentation holds are given already
+/// enveloped, as Enveloped Verifiable Credential objects: they are secured by their
+/// own signature, and this function does not open them, so an envelope this crate
+/// could not verify is signed over all the same. A verifier decides about each
+/// envelope for itself
+/// ([`verify_presentation`](super::verify_presentation)).
+///
+/// The protected header carries `typ: vp+jwt` and `cty: vp`. The `kid` rule of
+/// §4.2 is about a credential's issuer and does not apply.
+///
+/// # Errors
+///
+/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the
+/// signer failed.
+pub fn sign_presentation(
+    presentation: &Value,
+    key: &KeyEntry,
+    kid: &str,
+    extension_terms: &[&str],
+) -> Result<String, JoseError> {
+    let document = object(presentation, "presentation")?;
+    check_members(document, &PRESENTATION_TERMS, extension_terms)?;
+    check_context(document)?;
+    seal(presentation, key, kid, PRESENTATION_TYP, PRESENTATION_CTY)
+}
+
+fn object<'a>(
+    document: &'a Value,
+    what: &'static str,
+) -> Result<&'a Map<String, Value>, JoseError> {
+    document.as_object().ok_or(JoseError::NotAnObject { what })
+}
+
+fn seal(
+    document: &Value,
+    key: &KeyEntry,
+    kid: &str,
+    typ: &str,
+    cty: &str,
+) -> Result<String, JoseError> {
+    sign_typed_with(key, document, kid, Some(typ), Some(cty)).map_err(|e| JoseError::Signing {
+        reason: e.to_string(),
+    })
+}

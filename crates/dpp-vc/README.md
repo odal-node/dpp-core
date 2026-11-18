@@ -29,6 +29,8 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   `build_issuer_metadata` produces the document an issuer publishes, and `verify` takes
   the key the caller has already chosen. Fetching the metadata, deciding whether to
   trust it, and picking the key are your application's job, and so is the network policy.
+- You sign or verify **any** W3C credential or presentation as a VC-JOSE-COSE
+  `vc+jwt` or `vp+jwt`, with a key you supply. See `jose`.
 
 ## What this crate does not cover
 
@@ -131,6 +133,86 @@ is the verification method's absolute DID URL, and in the SD-JWT VC metadata it 
 thumbprint URI alone. A key that was rotated out is still listed while it is not
 revoked, so a signature it made still verifies. A revoked archived key is listed in
 neither document.
+
+## Any credential and presentation, as VC-JOSE-COSE
+
+`jose` signs and verifies a credential or a presentation of any shape, given as
+JSON, as a compact JWS: `vc+jwt` for a credential and `vp+jwt` for a presentation
+(W3C Securing Verifiable Credentials using JOSE and COSE, Recommendation of 15 May
+2025, §3.1). It resolves no key and performs no I/O. You hand it the signing key
+when you sign and the issuer's public key when you verify, under EdDSA, ES256, ES384
+or ES512. This is a different path from the access credential above, which is one
+typed document verified through a `did:web` document. No conformance is claimed.
+
+Three rules are the caller's to know:
+
+- **An envelope this crate cannot verify is refused unless you skip it by name.**
+  A presentation holds its credentials as Enveloped Verifiable Credentials.
+  `verify_presentation` calls your closure once per envelope with its index, its
+  media type and, for a `vc+jwt`, the `kid` it names, and you answer
+  `EnvelopeDecision::Verify(key)`, `Skip` or `Unknown`. A `vc+jwt` you verify goes
+  through every check of `verify_credential`. Only `vc+jwt` can be verified, so a
+  `vc+sd-jwt` or a `vc+cose` envelope passes only as a `Skip`. Every skip is listed
+  in the result, with its index, media type and `kid`, and an envelope with no
+  decision refuses the presentation.
+- **Time is the `now` you pass.** `Some(seconds)` holds `exp` and `nbf` to it, with
+  no leeway, and refuses one that is not a number. `None` reads neither. `iat` is
+  never checked, because the specification says it describes the signature, and a
+  credential's own `validFrom` and `validUntil` are yours to check.
+- **Undeclared top-level members are refused at signing.** A member must be a term
+  of the VC Data Model 2.0 vocabulary, a JWT registered claim name (`iss`, `sub`,
+  `aud`, `exp`, `nbf`, `iat`, `jti`), or named in the `extension_terms` you pass.
+  `vc` and `vp` are refused even then. Verification ignores members it does not know.
+
+```rust
+use dpp_crypto::keystore::KeyEntry;
+use dpp_vc::jose::{
+    EnvelopeDecision, sign_credential, sign_presentation, verify_credential, verify_presentation,
+};
+use serde_json::json;
+
+# fn demo(issuer_key: &KeyEntry, holder_key: &KeyEntry, now: i64) -> Result<(), Box<dyn std::error::Error>> {
+let issuer_kid = "https://issuer.example/keys#1";
+let credential = json!({
+    "@context": ["https://www.w3.org/ns/credentials/v2"],
+    "type": ["VerifiableCredential"],
+    "issuer": "https://issuer.example",
+    "credentialSubject": {"id": "did:example:subject"},
+    "productPassport": {"id": "urn:example:passport:1"},
+});
+
+// `productPassport` is not a VC term, so the signer is told to expect it.
+let token = sign_credential(&credential, issuer_key, issuer_kid, &["productPassport"])?;
+let issuer_public = issuer_key.public_key();
+let verified = verify_credential(&token, &issuer_public, Some(now))?;
+assert_eq!(verified["issuer"], "https://issuer.example");
+
+let presentation = json!({
+    "@context": ["https://www.w3.org/ns/credentials/v2"],
+    "type": ["VerifiablePresentation"],
+    "verifiableCredential": [{
+        "@context": "https://www.w3.org/ns/credentials/v2",
+        "type": "EnvelopedVerifiableCredential",
+        "id": format!("data:application/vc+jwt,{token}"),
+    }],
+});
+let vp = sign_presentation(&presentation, holder_key, "https://holder.example/keys#1", &[])?;
+
+// Verify the envelope this issuer signed. Any other envelope gets no decision, so it
+// refuses the presentation; answer `Skip` only for one you have chosen to leave
+// unverified, and it is then listed in `result.skipped`.
+let result = verify_presentation(&vp, &holder_key.public_key(), Some(now), |_, media_type, kid| {
+    if media_type == "application/vc+jwt" && kid == Some(issuer_kid) {
+        EnvelopeDecision::Verify(issuer_public.clone())
+    } else {
+        EnvelopeDecision::Unknown
+    }
+})?;
+assert_eq!(result.verified.len(), 1);
+assert!(result.skipped.is_empty());
+# Ok(())
+# }
+```
 
 ## Relationship to other crates
 
