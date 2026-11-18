@@ -15,6 +15,8 @@ use super::algorithm::{
 };
 use super::error::PublicKeyError;
 
+/// The length of an Ed25519 public key in octets, the `x` of its JWK.
+const ED25519_KEY_LEN: usize = 32;
 /// The length of a P-256 field element, and so of each of `x`, `y`, `R` and `S`.
 const P256_FIELD_LEN: usize = 32;
 /// The length of a P-384 field element, and so of each of `x`, `y`, `R` and `S`.
@@ -160,11 +162,10 @@ impl PublicKey {
     /// mis-selected into a verification path it was not written for.
     #[must_use]
     pub fn from_jwk(jwk: &Value) -> Option<Self> {
-        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
         let member = |name: &str| jwk.get(name).and_then(Value::as_str);
         match member("kty")? {
             "OKP" if member("crv")? == ED25519_CRV => {
-                let x = b64.decode(member("x")?).ok()?;
+                let x = member_of_width(jwk, "x", ED25519_KEY_LEN)?;
                 Self::from_bytes(KeyAlgorithm::Ed25519, &x).ok()
             }
             "EC" => {
@@ -174,8 +175,8 @@ impl PublicKey {
                     P521_CRV => (KeyAlgorithm::EcdsaP521, P521_FIELD_LEN),
                     _ => return None,
                 };
-                let x = b64.decode(member("x")?).ok()?;
-                let y = b64.decode(member("y")?).ok()?;
+                let x = member_of_width(jwk, "x", field_len)?;
+                let y = member_of_width(jwk, "y", field_len)?;
                 if x.len() != field_len || y.len() != field_len {
                     return None;
                 }
@@ -325,6 +326,22 @@ impl PublicKey {
             }
         }
     }
+}
+
+/// The octets of the base64url member `name` of a JWK, when the member is the unpadded
+/// base64url of exactly `octets` octets. The encoded length is read before anything is
+/// decoded, so an oversized member costs nothing to refuse. `URL_SAFE_NO_PAD` refuses
+/// padding and non-zero trailing bits, and of the encoded lengths it accepts only the
+/// one given here decodes to `octets`, so this accepts the same members as decoding
+/// alone would, minus the oversized ones.
+fn member_of_width(jwk: &Value, name: &str, octets: usize) -> Option<Vec<u8>> {
+    let encoded = jwk.get(name)?.as_str()?;
+    if encoded.len() != base64::encoded_len(octets, false)? {
+        return None;
+    }
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(encoded)
+        .ok()
 }
 
 /// `x` and `y` of an EC key held in SEC1 uncompressed form, each `field_len` octets.

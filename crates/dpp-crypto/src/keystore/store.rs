@@ -10,14 +10,13 @@ use aes_gcm::{
 };
 use anyhow::{Context, Result};
 use rand::Rng;
-use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use super::crypto::{
     compute_envelope_hmac, derive_aes_key_argon2, derive_aes_key_sha256, derive_integrity_key,
     verify_envelope_hmac,
 };
-use super::entry::{KeyEntry, SigningMaterial};
+use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
@@ -451,7 +450,7 @@ impl KeyStore {
         material: SigningMaterial,
     ) -> Result<(KeyRecord, KeyEntry)> {
         let public = material.public_key();
-        let fingerprint = hex::encode(Sha256::digest(public.as_bytes()));
+        let fingerprint = fingerprint_of(&public);
         let verifying_key_hex = hex::encode(public.as_bytes());
 
         let mut nonce_bytes = [0u8; 12];

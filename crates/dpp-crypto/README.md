@@ -26,6 +26,8 @@ a domain type.
   signing.
 - You manage signing keys at rest (generation, rotation, revocation, archival) with
   encryption and integrity protection.
+- You need to sign with a key someone else generated, given as its private JWK:
+  `KeyEntry::from_private_jwk` builds it in memory, and it is never written to a store.
 - You need to build an **ETSI TS 119 182-1 JAdES-B-B** signature whose signature value
   comes from elsewhere, typically a remote signing service. The `jades` module derives
   the signing input and assembles the compact form; it never signs.
@@ -55,12 +57,37 @@ fn sign_a_payload(store: &KeyStore) {
 }
 ```
 
-`KeyStore::open` **creates the file if it is absent**, so choose the path deliberately
-and keep it outside the source tree. A complete, runnable version including keystore
+`KeyStore::open` **accepts a path where no file exists yet and creates the file there
+on the first save**, so choose the path deliberately and keep it outside the source tree. A complete, runnable version including keystore
 setup is in [`examples/sign_and_verify.rs`](examples/sign_and_verify.rs):
 
 ```bash
 cargo run -p dpp-crypto --example sign_and_verify
+```
+
+## Signing with a key someone else generated
+
+`KeyEntry::from_private_jwk` builds a signing key from the private JWK of a key someone
+else generated. The key is held in memory and is never written to a store. The example
+below takes the `secretKeyJwk` of a published test key: the P-256 key of the W3C
+VC-JOSE-COSE suite, whose file is vendored with this crate. `sign` returns the raw
+signature, which for P-256 is the 64-octet `R ‖ S`. It is not a compact JWS.
+
+```rust
+use dpp_crypto::keystore::KeyEntry;
+use serde_json::Value;
+
+let text = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/jws/fixtures/w3c-vc-jose-cose/vm-p256.json"
+));
+let method: Value = serde_json::from_str(text).expect("a verification method");
+let entry = KeyEntry::from_private_jwk(&method["secretKeyJwk"]).expect("a valid private JWK");
+
+let message = b"a signed passport";
+let signature = entry.sign(message);
+assert_eq!(signature.len(), 64);
+assert!(entry.public_key().verify(message, &signature));
 ```
 
 ## Security notes

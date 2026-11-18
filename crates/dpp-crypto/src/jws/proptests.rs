@@ -51,6 +51,47 @@ fn fixed_keys() -> [super::PublicKey; 4] {
     ]
 }
 
+/// Each of the W3C VC-JOSE-COSE suite's four key files, as its `secretKeyJwk` and the
+/// public key its `publicKeyJwk` reads. The files are read as `keystore::private_jwk_tests`
+/// reads them.
+fn suite_keys() -> [(serde_json::Value, super::PublicKey); 4] {
+    [
+        include_str!("fixtures/w3c-vc-jose-cose/vm-p256.json"),
+        include_str!("fixtures/w3c-vc-jose-cose/vm-p384.json"),
+        include_str!("fixtures/w3c-vc-jose-cose/vm-p521.json"),
+        include_str!("fixtures/w3c-vc-jose-cose/vm-ed25519.json"),
+    ]
+    .map(|text| {
+        let method: serde_json::Value = serde_json::from_str(text).expect("a verification method");
+        let public =
+            super::PublicKey::from_jwk(&method["publicKeyJwk"]).expect("the suite's public key");
+        (method["secretKeyJwk"].clone(), public)
+    })
+}
+
+/// The index of a suite key file, with a `d` to give it: the file's own `d`, arbitrary
+/// base64url of any length, random octets of the file's field size, encoded, or text
+/// that is not base64url.
+fn suite_index_and_d() -> impl Strategy<Value = (usize, String)> {
+    (0usize..4).prop_flat_map(|index| {
+        let suite = suite_keys();
+        let own = suite[index].0["d"].as_str().expect("a d").to_owned();
+        let field_len = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&own)
+            .expect("base64url")
+            .len();
+        prop_oneof![
+            Just(own),
+            "[A-Za-z0-9_-]{0,200}",
+            prop::collection::vec(any::<u8>(), field_len).prop_map(|octets| {
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(octets)
+            }),
+            ".{0,64}",
+        ]
+        .prop_map(move |d| (index, d))
+    })
+}
+
 /// The key a base64url string names, under any algorithm, when it names one.
 fn key_named_by(public_key_b64: &str) -> Option<super::PublicKey> {
     let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -241,6 +282,29 @@ proptest! {
         if sig.len() != 132 {
             prop_assert!(verdict.is_err());
         }
+    }
+
+    /// Private-JWK parsing never panics on a suite key with its `d` replaced, and an `Ok`
+    /// entry holds the public key the file names. Each case starts from one of the suite's
+    /// four `secretKeyJwk` values, so the public members and the rules after them are
+    /// reached, and varies `d` alone: the file's own `d`, which builds, arbitrary base64url
+    /// of any length, random octets of the file's field size, or text that is not
+    /// base64url.
+    #[test]
+    fn private_jwk_never_panics((index, d) in suite_index_and_d()) {
+        let suite = suite_keys();
+        let (secret, public) = &suite[index];
+        let mut jwk = secret.clone();
+        jwk["d"] = serde_json::json!(d);
+        if let Ok(entry) = crate::keystore::KeyEntry::from_private_jwk(&jwk) {
+            prop_assert_eq!(entry.public_key(), public.clone());
+        }
+    }
+
+    /// Private-JWK parsing never panics on an arbitrary JSON value.
+    #[test]
+    fn private_jwk_from_arbitrary_json_never_panics(jwk in arb_json()) {
+        let _ = crate::keystore::KeyEntry::from_private_jwk(&jwk);
     }
 
     /// `extract_kid_from_jws` must never panic on arbitrary input.
