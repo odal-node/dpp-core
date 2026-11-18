@@ -70,12 +70,12 @@ pub enum SdJwtError {
     NoHolderKey,
     /// The Holder key in `cnf` is not one this crate reads, or it declares an
     /// `alg` that is not the key's own. Four cases: the JWK is not an Ed25519
-    /// (`OKP`) or P-256 (`EC`) key, or its coordinates are not a point on that
-    /// curve; its `alg` is present but not a string; its `alg` names an algorithm
-    /// other than the key's; or `cnf` carries `jwk` beside `jwe` or `jku`, which
-    /// RFC 7800 §3.1 does not allow, since `cnf` names one key.
+    /// (`OKP`) key or a P-256, P-384 or P-521 (`EC`) key, or its coordinates are not
+    /// a point on that curve; its `alg` is present but not a string; its `alg` names
+    /// an algorithm other than the key's; or `cnf` carries `jwk` beside `jwe` or
+    /// `jku`, which RFC 7800 §3.1 does not allow, since `cnf` names one key.
     #[error(
-        "the Holder key in cnf is not a valid Ed25519 or P-256 key, or declares an alg that is not the key's own"
+        "the Holder key in cnf is not a valid Ed25519, P-256, P-384 or P-521 key, or declares an alg that is not the key's own"
     )]
     UnsupportedHolderKey,
     /// A Holder was asked to bind a presentation with a key other than the one

@@ -1,5 +1,5 @@
-//! JWS compact serialisation signer, under the key's own algorithm (EdDSA or ES256),
-//! over RFC 8785 (JCS) canonical bytes.
+//! JWS compact serialisation signer, under the key's own algorithm (EdDSA, ES256, ES384
+//! or ES512), over RFC 8785 (JCS) canonical bytes.
 
 use base64::Engine;
 use serde_json::Value;
@@ -7,7 +7,8 @@ use serde_json::Value;
 use crate::keystore::{KeyEntry, KeyStore};
 
 /// Produces a compact JWS, signed under the key's own algorithm (`EdDSA` for Ed25519,
-/// `ES256` for P-256), over the **RFC 8785 (JCS) canonical** form of the JSON payload.
+/// `ES256` for P-256, `ES384` for P-384 or `ES512` for P-521), over the **RFC 8785 (JCS)
+/// canonical** form of the JSON payload.
 ///
 /// Signing over the canonical bytes (rather than incidental serde output) is
 /// the content-binding contract: a verifier recomputes the canonical form of

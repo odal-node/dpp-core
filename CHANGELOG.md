@@ -96,10 +96,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   in SEC1 uncompressed form. An EC JWK is read only with `crv: P-256`, full-length `x`
   and `y`, and a point on the curve (RFC 7518 §6.2.1); its thumbprint follows RFC 7638
   §3.2. `verify_jws` names the algorithm in its wrong-length error, so a P-256 key
-  reports `ES256 signature must be 64 bytes`. A key store holding a P-256 key fails
-  closed in a build from before this change, so once one exists the crate cannot be
-  rolled back. An older build must not be run against the same file, even briefly: its
-  saves replace the file from its own map, which has no P-256 key. (#587)
+  reports `ES256 signature must be 64 bytes`. A key store holding a P-256, P-384 or
+  P-521 key fails closed in a build from before this change, so once one exists the
+  crate cannot be rolled back. An older build must not be run against the same file,
+  even briefly: its saves replace the file from its own map, which has no such key.
+  (#587, #588)
 
 - **`KeyStore::generate_key_with(key_id, algorithm)` and `KeyStore::rotate_key_to(key_id,
   algorithm)`** create a key of either algorithm. `rotate_key` keeps the key's algorithm,
@@ -110,8 +111,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 - **`jws::SignatureLengthError`**, the typed error a signature of the wrong length
   returns through `anyhow`, so a caller can `downcast_ref` it and tell it from a bad
-  signature. Its text is unchanged: `Ed25519 signature must be 64 bytes` and
-  `ES256 signature must be 64 bytes`. (#587)
+  signature. Its text is unchanged for Ed25519 and ES256: `Ed25519 signature must be 64
+  bytes` and `ES256 signature must be 64 bytes`. For ES384 and ES512 it reads `ES384
+  signature must be 96 bytes` and `ES512 signature must be 132 bytes`. (#587, #588)
+
+- **ES384 and ES512: ECDSA over P-384 with SHA-384 and over P-521 with SHA-512.**
+  `KeyAlgorithm::EcdsaP384` and `KeyAlgorithm::EcdsaP521` are written and read as
+  `"ES384"` and `"ES512"`, with the rules of ES256: RFC 6979 deterministic nonces,
+  low-S signatures written, high-S accepted on verification, and `R ‖ S` of 96 and 132
+  octets (RFC 7518 §3.4). An EC JWK is read with `crv: P-384` or `P-521` and
+  full-length coordinates on the curve (RFC 7518 §6.2.1), and the curve decides the
+  algorithm. A key on either curve is held in SEC1 uncompressed form. A Holder key in a
+  Key Binding `cnf` may be on either curve. `PublicKeyError` gains `P384` and `P521`,
+  which is not a break: the enum is `non_exhaustive`. (#588)
+
+- **`jws::ES384_ALG`, `jws::ES512_ALG`, `jws::P384_CRV` and `jws::P521_CRV`**, the JOSE
+  identifiers and the JWK curve names, re-exported beside the ES256 constants. (#588)
 
 ## [0.24.0] - 2026-11-16
 

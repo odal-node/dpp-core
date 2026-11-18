@@ -4,27 +4,33 @@
 //! travels with the key, so a JWS header can only *confirm* it (see
 //! the verifier's header check) and never select it. Nothing here infers an
 //! algorithm from a length: an Ed25519 signature and an ES256 signature are both
-//! 64 bytes.
+//! 64 bytes, and the ES384 and ES512 signatures are 96 and 132.
 
 use base64::Engine;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use super::algorithm::{ED25519_CRV, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, P256_CRV};
+use super::algorithm::{
+    ED25519_CRV, JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, P256_CRV, P384_CRV, P521_CRV,
+};
 use super::error::PublicKeyError;
 
 /// The length of a P-256 field element, and so of each of `x`, `y`, `R` and `S`.
 const P256_FIELD_LEN: usize = 32;
+/// The length of a P-384 field element, and so of each of `x`, `y`, `R` and `S`.
+const P384_FIELD_LEN: usize = 48;
+/// The length of a P-521 field element, and so of each of `x`, `y`, `R` and `S`.
+const P521_FIELD_LEN: usize = 66;
 
 /// A validated public key and its algorithm.
 ///
 /// Constructed only through [`Self::from_bytes`] or [`Self::from_jwk`], both of
 /// which refuse an encoding that is not a key of that algorithm (an Ed25519
-/// encoding that does not decode to a curve point, or a P-256 encoding that is not
-/// a point on the curve). P-256 keys are held in the SEC1 uncompressed form,
-/// whatever form they arrived in, so two encodings of one key compare equal and
-/// fingerprint the same. Inside this crate, a key that is already parsed is wrapped
-/// without a check.
+/// encoding that does not decode to a curve point, or an EC encoding that is not
+/// a point on its curve). EC keys are held in the SEC1 uncompressed form, whatever
+/// form they arrived in, so two encodings of one key compare equal and fingerprint
+/// the same. Inside this crate, a key that is already parsed is wrapped without a
+/// check.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublicKey {
     key: Key,
@@ -41,6 +47,16 @@ enum Key {
     /// The key's own `Clone`, `Debug`, `PartialEq` and `Eq` make these derives hold.
     EcdsaP256 {
         key: p256::ecdsa::VerifyingKey,
+        sec1: Vec<u8>,
+    },
+    /// The parsed P-384 key, with its 97-byte SEC1 uncompressed encoding beside it.
+    EcdsaP384 {
+        key: p384::ecdsa::VerifyingKey,
+        sec1: Vec<u8>,
+    },
+    /// The parsed P-521 key, with its 133-byte SEC1 uncompressed encoding beside it.
+    EcdsaP521 {
+        key: p521::ecdsa::VerifyingKey,
         sec1: Vec<u8>,
     },
 }
@@ -63,6 +79,16 @@ impl PublicKey {
                     .map_err(|_| PublicKeyError::P256)?;
                 Ok(Self::from_p256_key(key))
             }
+            KeyAlgorithm::EcdsaP384 => {
+                let key = p384::ecdsa::VerifyingKey::from_sec1_bytes(bytes)
+                    .map_err(|_| PublicKeyError::P384)?;
+                Ok(Self::from_p384_key(key))
+            }
+            KeyAlgorithm::EcdsaP521 => {
+                let key = p521::ecdsa::VerifyingKey::from_sec1_bytes(bytes)
+                    .map_err(|_| PublicKeyError::P521)?;
+                Ok(Self::from_p521_key(key))
+            }
         }
     }
 
@@ -83,32 +109,55 @@ impl PublicKey {
         }
     }
 
+    /// A public key from a P-384 verifying key that is already parsed, with its
+    /// SEC1 uncompressed encoding kept beside it.
+    pub(crate) fn from_p384_key(key: p384::ecdsa::VerifyingKey) -> Self {
+        let sec1 = key.to_sec1_point(false).as_bytes().to_vec();
+        Self {
+            key: Key::EcdsaP384 { key, sec1 },
+        }
+    }
+
+    /// A public key from a P-521 verifying key that is already parsed, with its
+    /// SEC1 uncompressed encoding kept beside it.
+    pub(crate) fn from_p521_key(key: p521::ecdsa::VerifyingKey) -> Self {
+        let sec1 = key.to_sec1_point(false).as_bytes().to_vec();
+        Self {
+            key: Key::EcdsaP521 { key, sec1 },
+        }
+    }
+
     /// The algorithm this key is used under.
     #[must_use]
     pub fn algorithm(&self) -> KeyAlgorithm {
         match self.key {
             Key::Ed25519(_) => KeyAlgorithm::Ed25519,
             Key::EcdsaP256 { .. } => KeyAlgorithm::EcdsaP256,
+            Key::EcdsaP384 { .. } => KeyAlgorithm::EcdsaP384,
+            Key::EcdsaP521 { .. } => KeyAlgorithm::EcdsaP521,
         }
     }
 
-    /// The key's bytes: the 32-byte Ed25519 public key, or the 65-byte SEC1
-    /// uncompressed point for P-256.
+    /// The key's bytes: the 32-byte Ed25519 public key, or the SEC1 uncompressed
+    /// point for an EC key (65, 97 or 133 bytes for P-256, P-384 and P-521).
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match &self.key {
             Key::Ed25519(key) => key.as_bytes(),
-            Key::EcdsaP256 { sec1, .. } => sec1.as_slice(),
+            Key::EcdsaP256 { sec1, .. }
+            | Key::EcdsaP384 { sec1, .. }
+            | Key::EcdsaP521 { sec1, .. } => sec1.as_slice(),
         }
     }
 
     /// Read a public key from a JWK.
     ///
     /// `OKP` must say `crv: Ed25519`, and the `x` member must be a point on the
-    /// curve. `EC` must say `crv: P-256`, with full-length `x` and `y` (RFC 7518
-    /// §6.2.1.2 and §6.2.1.3 require the full size of a coordinate), and the point
-    /// must be on the curve. `None` for any other key type or curve, so a JWK
-    /// cannot be mis-selected into a verification path it was not written for.
+    /// curve. `EC` must say `crv` `P-256`, `P-384` or `P-521`, with full-length `x`
+    /// and `y` (RFC 7518 §6.2.1.2 and §6.2.1.3 require the full size of a
+    /// coordinate), and the point must be on the curve; the curve decides the
+    /// algorithm. `None` for any other key type or curve, so a JWK cannot be
+    /// mis-selected into a verification path it was not written for.
     #[must_use]
     pub fn from_jwk(jwk: &Value) -> Option<Self> {
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -118,17 +167,23 @@ impl PublicKey {
                 let x = b64.decode(member("x")?).ok()?;
                 Self::from_bytes(KeyAlgorithm::Ed25519, &x).ok()
             }
-            "EC" if member("crv")? == P256_CRV => {
+            "EC" => {
+                let (algorithm, field_len) = match member("crv")? {
+                    P256_CRV => (KeyAlgorithm::EcdsaP256, P256_FIELD_LEN),
+                    P384_CRV => (KeyAlgorithm::EcdsaP384, P384_FIELD_LEN),
+                    P521_CRV => (KeyAlgorithm::EcdsaP521, P521_FIELD_LEN),
+                    _ => return None,
+                };
                 let x = b64.decode(member("x")?).ok()?;
                 let y = b64.decode(member("y")?).ok()?;
-                if x.len() != P256_FIELD_LEN || y.len() != P256_FIELD_LEN {
+                if x.len() != field_len || y.len() != field_len {
                     return None;
                 }
-                let mut sec1 = Vec::with_capacity(1 + 2 * P256_FIELD_LEN);
+                let mut sec1 = Vec::with_capacity(1 + 2 * field_len);
                 sec1.push(0x04);
                 sec1.extend_from_slice(&x);
                 sec1.extend_from_slice(&y);
-                Self::from_bytes(KeyAlgorithm::EcdsaP256, &sec1).ok()
+                Self::from_bytes(algorithm, &sec1).ok()
             }
             _ => None,
         }
@@ -150,15 +205,9 @@ impl PublicKey {
                 "crv": ED25519_CRV,
                 "x": b64.encode(self.as_bytes()),
             }),
-            Key::EcdsaP256 { sec1, .. } => {
-                let (x, y) = p256_coordinates(sec1);
-                json!({
-                    "kty": "EC",
-                    "crv": P256_CRV,
-                    "x": b64.encode(x),
-                    "y": b64.encode(y),
-                })
-            }
+            Key::EcdsaP256 { sec1, .. } => ec_jwk(P256_CRV, sec1, P256_FIELD_LEN),
+            Key::EcdsaP384 { sec1, .. } => ec_jwk(P384_CRV, sec1, P384_FIELD_LEN),
+            Key::EcdsaP521 { sec1, .. } => ec_jwk(P521_CRV, sec1, P521_FIELD_LEN),
         }
     }
 
@@ -178,14 +227,9 @@ impl PublicKey {
                 r#"{{"crv":"{ED25519_CRV}","kty":"OKP","x":"{}"}}"#,
                 b64.encode(self.as_bytes())
             ),
-            Key::EcdsaP256 { sec1, .. } => {
-                let (x, y) = p256_coordinates(sec1);
-                format!(
-                    r#"{{"crv":"{P256_CRV}","kty":"EC","x":"{}","y":"{}"}}"#,
-                    b64.encode(x),
-                    b64.encode(y)
-                )
-            }
+            Key::EcdsaP256 { sec1, .. } => ec_canonical(P256_CRV, sec1, P256_FIELD_LEN),
+            Key::EcdsaP384 { sec1, .. } => ec_canonical(P384_CRV, sec1, P384_FIELD_LEN),
+            Key::EcdsaP521 { sec1, .. } => ec_canonical(P521_CRV, sec1, P521_FIELD_LEN),
         };
         b64.encode(Sha256::digest(canonical.as_bytes()))
     }
@@ -233,6 +277,9 @@ impl PublicKey {
     ///   other implementations emit it, and the RFC 7515 Appendix A.3 example is
     ///   high-`S`. So an ES256 signature is malleable (`(R, n − S)` verifies too),
     ///   and nothing may use signature bytes as an identifier.
+    /// - **ES384** and **ES512:** the same rules over P-384 with SHA-384 and P-521
+    ///   with SHA-512, with `R ‖ S` of exactly 96 and 132 bytes. High-`S` is
+    ///   accepted for the same reasons.
     #[must_use]
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
         match &self.key {
@@ -256,12 +303,56 @@ impl PublicKey {
                 };
                 key.verify(message, &signature).is_ok()
             }
+            Key::EcdsaP384 { key, .. } => {
+                use p384::ecdsa::signature::Verifier as _;
+                if signature.len() != 2 * P384_FIELD_LEN {
+                    return false;
+                }
+                let Ok(signature) = p384::ecdsa::Signature::from_slice(signature) else {
+                    return false;
+                };
+                key.verify(message, &signature).is_ok()
+            }
+            Key::EcdsaP521 { key, .. } => {
+                use p521::ecdsa::signature::Verifier as _;
+                if signature.len() != 2 * P521_FIELD_LEN {
+                    return false;
+                }
+                let Ok(signature) = p521::ecdsa::Signature::from_slice(signature) else {
+                    return false;
+                };
+                key.verify(message, &signature).is_ok()
+            }
         }
     }
 }
 
-/// `x` and `y` of a P-256 key held in SEC1 uncompressed form.
-fn p256_coordinates(sec1: &[u8]) -> (&[u8], &[u8]) {
-    // Construction normalises every P-256 key to `0x04 ‖ x ‖ y`.
-    sec1[1..].split_at(P256_FIELD_LEN)
+/// `x` and `y` of an EC key held in SEC1 uncompressed form, each `field_len` octets.
+fn coordinates(sec1: &[u8], field_len: usize) -> (&[u8], &[u8]) {
+    // Construction normalises every EC key to `0x04 ‖ x ‖ y`.
+    sec1[1..].split_at(field_len)
+}
+
+/// The JWK members of an EC key on `crv`: its type, its curve and its coordinates.
+fn ec_jwk(crv: &str, sec1: &[u8], field_len: usize) -> Value {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let (x, y) = coordinates(sec1, field_len);
+    json!({
+        "kty": "EC",
+        "crv": crv,
+        "x": b64.encode(x),
+        "y": b64.encode(y),
+    })
+}
+
+/// The RFC 7638 canonical form of an EC key on `crv`: the required members, ordered
+/// by name, with no whitespace.
+fn ec_canonical(crv: &str, sec1: &[u8], field_len: usize) -> String {
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let (x, y) = coordinates(sec1, field_len);
+    format!(
+        r#"{{"crv":"{crv}","kty":"EC","x":"{}","y":"{}"}}"#,
+        b64.encode(x),
+        b64.encode(y)
+    )
 }

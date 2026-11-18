@@ -268,6 +268,8 @@ fn this_crate_never_emits_high_s() {
 fn vm(file: &str) -> Value {
     let text = match file {
         "p256" => include_str!("fixtures/w3c-vc-jose-cose/vm-p256.json"),
+        "p384" => include_str!("fixtures/w3c-vc-jose-cose/vm-p384.json"),
+        "p521" => include_str!("fixtures/w3c-vc-jose-cose/vm-p521.json"),
         "ed25519" => include_str!("fixtures/w3c-vc-jose-cose/vm-ed25519.json"),
         _ => unreachable!(),
     };
@@ -275,11 +277,11 @@ fn vm(file: &str) -> Value {
 }
 
 /// The suite's key files carry a `kid` equal to the RFC 7638 thumbprint of the
-/// public JWK. This crate's thumbprint matches both: a third-party vector for
-/// the EC members (`crv`, `kty`, `x`, `y`) and for OKP.
+/// public JWK. This crate's thumbprint matches all four: third-party vectors for
+/// the EC members (`crv`, `kty`, `x`, `y`) on P-256, P-384 and P-521, and for OKP.
 #[test]
 fn the_suite_key_ids_are_this_crates_thumbprints() {
-    for file in ["p256", "ed25519"] {
+    for file in ["p256", "p384", "p521", "ed25519"] {
         let method = vm(file);
         let key = PublicKey::from_jwk(&method["publicKeyJwk"]).expect("a key");
         assert_eq!(

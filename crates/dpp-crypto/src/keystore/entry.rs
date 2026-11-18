@@ -43,7 +43,7 @@ impl KeyEntry {
     }
 
     /// Sign `message` under this key's algorithm and return the raw signature:
-    /// 64 bytes for Ed25519 and for ES256 (`R ‖ S`, low-`S`).
+    /// 64 bytes for Ed25519 and ES256, 96 for ES384 and 132 for ES512 (`R ‖ S`, low-`S`).
     #[must_use]
     pub fn sign(&self, message: &[u8]) -> Vec<u8> {
         self.material.sign(message)
@@ -60,6 +60,8 @@ impl KeyEntry {
 pub(crate) enum SigningMaterial {
     Ed25519(ed25519_dalek::SigningKey),
     EcdsaP256(p256::ecdsa::SigningKey),
+    EcdsaP384(p384::ecdsa::SigningKey),
+    EcdsaP521(p521::ecdsa::SigningKey),
 }
 
 // The private keys zeroize when they drop. This fails to compile if the `zeroize`
@@ -69,7 +71,28 @@ const _: () = {
     const fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
     assert_zeroize_on_drop::<ed25519_dalek::SigningKey>();
     assert_zeroize_on_drop::<p256::ecdsa::SigningKey>();
+    assert_zeroize_on_drop::<p384::ecdsa::SigningKey>();
+    assert_zeroize_on_drop::<p521::ecdsa::SigningKey>();
 };
+
+/// A uniformly random scalar of `N` octets, drawn from the operating system's
+/// entropy source. `top_mask` clears the bits of the first octet that lie above the
+/// order's bit length, and `parse` decides whether the draw is kept: it refuses zero
+/// and any value at or above the group order. A refused draw is drawn again.
+///
+/// The draw is refused with probability `(2^b − n) / 2^b`, where `b` is the bit
+/// length of the order. The mask is what keeps P-521 rare: its order has 521 bits, and
+/// an unmasked draw of its 528 bits would be refused about 127 times in 128.
+fn random_scalar<const N: usize, T>(top_mask: u8, parse: impl Fn(&[u8]) -> Option<T>) -> T {
+    loop {
+        let mut bytes = Zeroizing::new([0u8; N]);
+        rand::Rng::fill_bytes(&mut crate::os_rng(), bytes.as_mut());
+        bytes[0] &= top_mask;
+        if let Some(scalar) = parse(&bytes[..]) {
+            return scalar;
+        }
+    }
+}
 
 impl SigningMaterial {
     /// A fresh key pair from the operating system's entropy source.
@@ -90,6 +113,17 @@ impl SigningMaterial {
                     }
                 }
             }
+            KeyAlgorithm::EcdsaP384 => {
+                use p384::elliptic_curve::Generate as _;
+                // The curve's own sampler. Its 48 octets fill the order's 384 bits, so a
+                // draw is refused only when it is at least `n`, about 2^-194 of the time.
+                Self::EcdsaP384(p384::ecdsa::SigningKey::generate_from_rng(
+                    &mut crate::os_rng(),
+                ))
+            }
+            KeyAlgorithm::EcdsaP521 => Self::EcdsaP521(random_scalar::<66, _>(0x01, |bytes| {
+                p521::ecdsa::SigningKey::from_slice(bytes).ok()
+            })),
         }
     }
 
@@ -112,11 +146,17 @@ impl SigningMaterial {
             KeyAlgorithm::EcdsaP256 => p256::ecdsa::SigningKey::from_slice(secret)
                 .map(Self::EcdsaP256)
                 .map_err(|_| anyhow::anyhow!("not a P-256 private key")),
+            KeyAlgorithm::EcdsaP384 => p384::ecdsa::SigningKey::from_slice(secret)
+                .map(Self::EcdsaP384)
+                .map_err(|_| anyhow::anyhow!("not a P-384 private key")),
+            KeyAlgorithm::EcdsaP521 => p521::ecdsa::SigningKey::from_slice(secret)
+                .map(Self::EcdsaP521)
+                .map_err(|_| anyhow::anyhow!("not a P-521 private key")),
         }
     }
 
-    /// The secret the store encrypts: the Ed25519 seed or the P-256 scalar, 32
-    /// bytes for both.
+    /// The secret the store encrypts: the Ed25519 seed (32 octets), or an EC scalar
+    /// of the curve's field size (32, 48 or 66 octets for P-256, P-384 and P-521).
     pub(crate) fn secret(&self) -> Zeroizing<Vec<u8>> {
         match self {
             // Copied straight from the key's borrowed secret, so no unprotected array is
@@ -128,6 +168,14 @@ impl SigningMaterial {
                 let scalar = Zeroizing::new(key.to_bytes());
                 Zeroizing::new(scalar.to_vec())
             }
+            Self::EcdsaP384(key) => {
+                let scalar = Zeroizing::new(key.to_bytes());
+                Zeroizing::new(scalar.to_vec())
+            }
+            Self::EcdsaP521(key) => {
+                let scalar = Zeroizing::new(key.to_bytes());
+                Zeroizing::new(scalar.to_vec())
+            }
         }
     }
 
@@ -135,6 +183,8 @@ impl SigningMaterial {
         match self {
             Self::Ed25519(_) => KeyAlgorithm::Ed25519,
             Self::EcdsaP256(_) => KeyAlgorithm::EcdsaP256,
+            Self::EcdsaP384(_) => KeyAlgorithm::EcdsaP384,
+            Self::EcdsaP521(_) => KeyAlgorithm::EcdsaP521,
         }
     }
 
@@ -142,6 +192,8 @@ impl SigningMaterial {
         match self {
             Self::Ed25519(key) => PublicKey::from_ed25519_key(key.verifying_key()),
             Self::EcdsaP256(key) => PublicKey::from_p256_key(*key.verifying_key()),
+            Self::EcdsaP384(key) => PublicKey::from_p384_key(*key.verifying_key()),
+            Self::EcdsaP521(key) => PublicKey::from_p521_key(*key.verifying_key()),
         }
     }
 
@@ -156,6 +208,20 @@ impl SigningMaterial {
                 // RFC 6979 deterministic nonce, SHA-256. Normalised to low-S so
                 // this crate's output is canonical; verification accepts both.
                 let signature: p256::ecdsa::Signature = key.sign(message);
+                signature.normalize_s().to_bytes().to_vec()
+            }
+            Self::EcdsaP384(key) => {
+                use p384::ecdsa::signature::Signer as _;
+                // RFC 6979 deterministic nonce, SHA-384. Normalised to low-S so this
+                // crate's output is canonical; verification accepts both.
+                let signature: p384::ecdsa::Signature = key.sign(message);
+                signature.normalize_s().to_bytes().to_vec()
+            }
+            Self::EcdsaP521(key) => {
+                use p521::ecdsa::signature::Signer as _;
+                // RFC 6979 deterministic nonce, SHA-512. Normalised to low-S so this
+                // crate's output is canonical; verification accepts both.
+                let signature: p521::ecdsa::Signature = key.sign(message);
                 signature.normalize_s().to_bytes().to_vec()
             }
         }

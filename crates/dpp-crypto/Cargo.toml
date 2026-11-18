@@ -1,6 +1,6 @@
 [package]
 name        = "dpp-crypto"
-description = "Key management in which every key carries its signature algorithm (Ed25519 and ES256 on P-256), JWS signing/verification, JAdES baseline construction, and an encrypted keystore"
+description = "Key management in which every key carries its signature algorithm (Ed25519, and ECDSA on P-256, P-384 and P-521 as ES256, ES384 and ES512), JWS signing/verification, JAdES baseline construction, and an encrypted keystore"
 keywords    = ["dpp", "ed25519", "jws", "keystore", "cryptography"]
 categories  = ["cryptography", "authentication"]
 version.workspace     = true
@@ -19,6 +19,8 @@ path = "src/lib.rs"
 thiserror  = { workspace = true }
 ed25519-dalek    = { workspace = true }
 p256             = { workspace = true }
+p384             = { workspace = true }
+p521             = { workspace = true }
 zeroize          = { workspace = true }
 aes-gcm          = { workspace = true }
 rand             = { workspace = true }
