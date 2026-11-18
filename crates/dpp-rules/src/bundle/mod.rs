@@ -2,8 +2,9 @@
 //!
 //! Rulesets ship as versioned bundles whose
 //! manifest is signed (compact EdDSA JWS) by an **offline publisher key**,
-//! distinct from any operator key. A verifier pins the publisher public key,
-//! checks fail-closed, and only then trusts the bundle. "Provably more
+//! distinct from any operator key. A verifier pins the publisher public key
+//! together with its algorithm, checks fail-closed, and only then trusts the
+//! bundle. "Provably more
 //! current than a fork" becomes a wire artifact a customer or auditor can
 //! verify with an Apache-licensed library call, not a consulting promise.
 //!
@@ -25,8 +26,8 @@
 //! stay there. Verification itself doesn't depend on a JWS/crypto crate
 //! directly — see [`JwsVerify`] — because `dpp-crypto` depends on
 //! `dpp-domain`, which depends on this crate; a direct dependency the other
-//! way would be a cycle. Callers inject their own EdDSA verifier (e.g. a thin
-//! wrapper over `dpp-crypto`'s JWS verifier).
+//! way would be a cycle. Callers inject their own verifier for the pinned
+//! algorithm (e.g. a thin wrapper over `dpp-crypto`'s JWS verifier).
 
 #[cfg(test)]
 mod tests;
@@ -37,4 +38,4 @@ pub use types::{
     AcceptancePolicy, RulesetAcceptance, RulesetError, RulesetManifest, RulesetProvenance,
     SignedBundle,
 };
-pub use verify::{JwsVerify, content_hash, verify_bundle};
+pub use verify::{JwsVerify, PinnedKey, content_hash, verify_bundle};

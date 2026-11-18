@@ -405,7 +405,7 @@ pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
         .expect("the P-256 Holder binds");
     add(
         &mut out,
-        "accept/holder-key-is-p-256",
+        "control/holder-key-is-p-256",
         "RFC 9901 §4.3.2: the Key Binding JWT validates under the P-256 key the SD-JWT names as the Holder's, and is ES256",
         bound_p256.serialise(),
     );
