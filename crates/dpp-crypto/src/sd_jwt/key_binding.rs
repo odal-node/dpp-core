@@ -10,9 +10,9 @@
 //! its policy, and clause 7.3 step 1 says that choice MUST NOT depend on whether a
 //! Key Binding JWT arrived, so neither looks at the token to decide.
 //!
-//! The Holder key in `cnf` is an Ed25519 (`OKP`) or a P-256 (`EC`) JWK, and the
-//! Key Binding JWT is held to that key's algorithm. The RFC's own examples bind
-//! with P-256 keys, and their Key Binding JWTs verify here.
+//! The Holder key in `cnf` is an Ed25519 (`OKP`) JWK, or an EC (`EC`) JWK on P-256,
+//! P-384 or P-521, and the Key Binding JWT is held to that key's algorithm. The
+//! RFC's own examples bind with P-256 keys, and their Key Binding JWTs verify here.
 
 use serde_json::{Map, Value, json};
 
@@ -69,9 +69,9 @@ pub fn holder_key_confirmation(holder: &PublicKey) -> Value {
     json!({ "jwk": holder.jwk() })
 }
 
-/// The Holder key a processed payload names: the Ed25519 or P-256 JWK in `cnf.jwk`, and the
-/// `alg` the JWK declares, if it declares one. A declared `alg` must be the key's
-/// own.
+/// The Holder key a processed payload names: the Ed25519 or EC JWK (P-256, P-384 or
+/// P-521) in `cnf.jwk`, and the `alg` the JWK declares, if it declares one. A declared
+/// `alg` must be the key's own.
 fn holder_key(payload: &Map<String, Value>) -> Result<(PublicKey, Option<String>), SdJwtError> {
     let cnf = payload.get("cnf").ok_or(SdJwtError::NoHolderKey)?;
     let jwk = cnf.get("jwk").ok_or(SdJwtError::NoHolderKey)?;
@@ -152,7 +152,8 @@ impl SdJwt {
     /// What [`Self::present`] refuses. [`SdJwtError::NoHolderKey`] when the
     /// presentation names no Holder key, which is also the case when `cnf` was
     /// concealed and not chosen: the Verifier could not find the key either.
-    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is neither Ed25519 nor P-256, and
+    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is none of Ed25519, P-256,
+    /// P-384 and P-521, and
     /// [`SdJwtError::HolderKeyMismatch`] when `holder` is not the key `cnf`
     /// names.
     pub fn present_with_key_binding(

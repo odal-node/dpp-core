@@ -29,7 +29,7 @@ pub struct Issuance<'a> {
     pub vct: &'a str,
     /// `iat`, in seconds since the epoch.
     pub issued_at: i64,
-    /// The Holder's Ed25519 public key, to bind the credential to.
+    /// The Holder's public key (Ed25519, P-256, P-384 or P-521), to bind the credential to.
     ///
     /// Written as `cnf` with RFC 7800's `jwk` confirmation method, which clause
     /// 2.2.2.3 recommends, and which Key Binding requires: a presentation must then

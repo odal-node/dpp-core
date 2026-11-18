@@ -140,8 +140,8 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
 ///   `controller`. These are the binding checks of the Controlled Identifiers
 ///   v1.0 retrieval algorithm (§3.3): a document vouches only for its own keys;
 /// - `assertionMethod` references that method;
-/// - its `publicKeyJwk` is an Ed25519 key (`OKP`, `crv: Ed25519`) or a P-256 key
-///   (`EC`, `crv: P-256`), on its curve;
+/// - its `publicKeyJwk` is an Ed25519 key (`OKP`, `crv: Ed25519`) or an EC key on
+///   P-256, P-384 or P-521 (`EC`, `crv` naming that curve), on its curve;
 /// - if the fragment is a thumbprint URI, it is that key's own. An identifier
 ///   that claims to be derived from the key is held to it, or a document could
 ///   file any key under another key's name. Other fragments, such as `#key-1`
@@ -149,7 +149,8 @@ pub fn extract_kid_from_jws(jws: &str) -> Option<String> {
 /// - if the JWK declares an `alg`, the JWS `alg` is the same string. A key that
 ///   says what it is for is held to it;
 /// - the JWS `alg` names the key's algorithm (`EdDSA` or `Ed25519` for an Ed25519
-///   key, `ES256` for a P-256 key), even when the JWK declares no `alg`.
+///   key, `ES256`, `ES384` or `ES512` for a P-256, P-384 or P-521 key), even when the
+///   JWK declares no `alg`.
 ///
 /// The ids this crate issues are stable across rotation and revocation, so a
 /// signature made before a rotation resolves to the key that made it. A revoked

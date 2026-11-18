@@ -81,7 +81,7 @@
 //! (clause 4.3). The mechanism is `dpp_crypto::sd_jwt`'s. This module decides
 //! where it applies:
 //!
-//! - [`issue`] names the Holder's Ed25519 key when [`Issuance::holder_key`] is
+//! - [`issue`] names the Holder's key when [`Issuance::holder_key`] is
 //!   set, as `cnf` with RFC 7800's `jwk` method, signed in the clear.
 //! - A Holder binds a presentation with
 //!   [`SdJwt::present_with_key_binding`](dpp_crypto::sd_jwt::SdJwt::present_with_key_binding).
@@ -101,8 +101,8 @@
 //! - **Clause 2.4:** when Key Binding is required, the Key Binding JWT is verified
 //!   as RFC 9901 clause 7.3 says, with the key in `cnf`.
 //! - **Clause 8.3:** a confirmation method that fetches key material (`x5u`, `jku`,
-//!   a URL in `kid`) is not to be resolved. Only `jwk` with an Ed25519 key is read
-//!   here, so nothing is fetched.
+//!   a URL in `kid`) is not to be resolved. Only `jwk` with an Ed25519, P-256,
+//!   P-384 or P-521 key is read here, so nothing is fetched.
 //!
 //! # What is deliberately absent
 //!

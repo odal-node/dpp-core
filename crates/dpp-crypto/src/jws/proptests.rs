@@ -39,20 +39,31 @@ fn fixed_key() -> super::PublicKey {
 }
 
 /// One published public key of each algorithm, so verification reaches the signature
-/// check under both: RFC 8032 clause 7.1's TEST 1 for Ed25519, and the public key of
-/// RFC 7515 Appendix A.3's P-256 example for ES256.
-fn fixed_keys() -> [super::PublicKey; 2] {
-    [fixed_key(), super::es256_tests::rfc7515_key()]
+/// check under all four: RFC 8032 clause 7.1's TEST 1 for Ed25519; the public key of
+/// RFC 7515 Appendix A.3's P-256 example for ES256; the public point of RFC 6979
+/// clause A.2.6 for ES384; and the public key of RFC 7515 Appendix A.4 for ES512.
+fn fixed_keys() -> [super::PublicKey; 4] {
+    [
+        fixed_key(),
+        super::es256_tests::rfc7515_key(),
+        super::es384_es512_tests::rfc6979_p384_key(),
+        super::es384_es512_tests::rfc7515_p521_key(),
+    ]
 }
 
-/// The key a base64url string names, under either algorithm, when it names one.
+/// The key a base64url string names, under any algorithm, when it names one.
 fn key_named_by(public_key_b64: &str) -> Option<super::PublicKey> {
     let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(public_key_b64)
         .ok()?;
-    [super::KeyAlgorithm::Ed25519, super::KeyAlgorithm::EcdsaP256]
-        .into_iter()
-        .find_map(|algorithm| super::PublicKey::from_bytes(algorithm, &raw).ok())
+    [
+        super::KeyAlgorithm::Ed25519,
+        super::KeyAlgorithm::EcdsaP256,
+        super::KeyAlgorithm::EcdsaP384,
+        super::KeyAlgorithm::EcdsaP521,
+    ]
+    .into_iter()
+    .find_map(|algorithm| super::PublicKey::from_bytes(algorithm, &raw).ok())
 }
 
 proptest! {
@@ -93,7 +104,12 @@ proptest! {
     #[test]
     fn public_key_decoding_never_panics(bytes in prop::collection::vec(any::<u8>(), 0..80),
                                         sig in prop::collection::vec(any::<u8>(), 0..80)) {
-        for algorithm in [super::KeyAlgorithm::Ed25519, super::KeyAlgorithm::EcdsaP256] {
+        for algorithm in [
+            super::KeyAlgorithm::Ed25519,
+            super::KeyAlgorithm::EcdsaP256,
+            super::KeyAlgorithm::EcdsaP384,
+            super::KeyAlgorithm::EcdsaP521,
+        ] {
             if let Ok(key) = super::PublicKey::from_bytes(algorithm, &bytes) {
                 let _ = key.verify(b"message", &sig);
             }
@@ -141,6 +157,88 @@ proptest! {
         );
         let verdict = verify_jws(&jws, &super::es256_tests::rfc7515_key());
         if sig.len() != 64 {
+            prop_assert!(verdict.is_err());
+        }
+    }
+
+    /// A P-384 JWK whose `x` or `y` is 47 or 49 bytes is no key, whatever else it says,
+    /// and parsing it never panics. Coordinates are 48 bytes or the key is refused.
+    #[test]
+    fn a_p384_jwk_with_a_coordinate_of_the_wrong_length_is_refused(
+        x in prop::collection::vec(any::<u8>(), 47..=49),
+        y in prop::collection::vec(any::<u8>(), 47..=49),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jwk = serde_json::json!({
+            "kty": "EC",
+            "crv": "P-384",
+            "x": b64.encode(&x),
+            "y": b64.encode(&y),
+        });
+        let key = super::PublicKey::from_jwk(&jwk);
+        if x.len() != 48 || y.len() != 48 {
+            prop_assert!(key.is_none());
+        }
+    }
+
+    /// A P-521 JWK whose `x` or `y` is 65 or 67 bytes is no key, whatever else it says,
+    /// and parsing it never panics. Coordinates are 66 bytes or the key is refused.
+    #[test]
+    fn a_p521_jwk_with_a_coordinate_of_the_wrong_length_is_refused(
+        x in prop::collection::vec(any::<u8>(), 65..=67),
+        y in prop::collection::vec(any::<u8>(), 65..=67),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jwk = serde_json::json!({
+            "kty": "EC",
+            "crv": "P-521",
+            "x": b64.encode(&x),
+            "y": b64.encode(&y),
+        });
+        let key = super::PublicKey::from_jwk(&jwk);
+        if x.len() != 66 || y.len() != 66 {
+            prop_assert!(key.is_none());
+        }
+    }
+
+    /// An ES384 JWS whose signature is 95, 96 or 97 bytes, under a P-384 key, never
+    /// panics, and a signature that is not 96 bytes is refused.
+    #[test]
+    fn es384_signatures_of_95_to_97_bytes_never_panic(
+        sig in prop::collection::vec(any::<u8>(), 95..=97),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let key = crate::keystore::SigningMaterial::generate(super::KeyAlgorithm::EcdsaP384)
+            .public_key();
+        let jws = format!(
+            "{}.{}.{}",
+            b64.encode(br#"{"alg":"ES384"}"#),
+            b64.encode(b"{}"),
+            b64.encode(&sig),
+        );
+        let verdict = verify_jws(&jws, &key);
+        if sig.len() != 96 {
+            prop_assert!(verdict.is_err());
+        }
+    }
+
+    /// An ES512 JWS whose signature is 131, 132 or 133 bytes, under a P-521 key, never
+    /// panics, and a signature that is not 132 bytes is refused.
+    #[test]
+    fn es512_signatures_of_131_to_133_bytes_never_panic(
+        sig in prop::collection::vec(any::<u8>(), 131..=133),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let key = crate::keystore::SigningMaterial::generate(super::KeyAlgorithm::EcdsaP521)
+            .public_key();
+        let jws = format!(
+            "{}.{}.{}",
+            b64.encode(br#"{"alg":"ES512"}"#),
+            b64.encode(b"{}"),
+            b64.encode(&sig),
+        );
+        let verdict = verify_jws(&jws, &key);
+        if sig.len() != 132 {
             prop_assert!(verdict.is_err());
         }
     }

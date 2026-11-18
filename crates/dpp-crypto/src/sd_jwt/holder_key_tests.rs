@@ -1,6 +1,6 @@
 //! The Holder key an Issuer names in `cnf` (RFC 9901 clause 4.1.2, carried by the
-//! `jwk` confirmation method of RFC 7800 §3.2). This crate reads an Ed25519
-//! or a P-256 key there, which must be a point on its curve, and an `alg` the JWK
+//! `jwk` confirmation method of RFC 7800 §3.2). This crate reads an Ed25519,
+//! P-256, P-384 or P-521 key there, which must be a point on its curve, and an `alg` the JWK
 //! declares only when it is the key's own. A Holder binds a presentation only with
 //! the key the token names.
 
@@ -32,17 +32,17 @@ fn the_issuer_names_the_holder_key_with_the_jwk_confirmation_method() {
     );
 }
 
-/// A P-256 Holder, named in `cnf` with its `alg` declared: the Key Binding JWT is
-/// ES256 under that key, and the Verifier reads the payload back as it does for an
-/// Ed25519 Holder.
-#[test]
-fn a_p256_holder_round_trips_through_key_binding() {
-    let store = KeyStore::open(temp_path("kb-p256"), "test-pass").expect("open");
+/// A Holder of `algorithm` (P-256, P-384 or P-521), named in `cnf` with its JOSE
+/// `alg` declared: the Key Binding JWT is signed under that key and declares the
+/// same `alg`, and the Verifier reads the payload back as it does for an Ed25519
+/// Holder.
+fn an_ec_holder_round_trips_through_key_binding(algorithm: crate::jws::KeyAlgorithm) {
+    let store = KeyStore::open(temp_path("kb-ec-holder"), "test-pass").expect("open");
     let key = store
-        .generate_key_with("holder", crate::jws::KeyAlgorithm::EcdsaP256)
+        .generate_key_with("holder", algorithm)
         .expect("generate");
     let mut cnf = holder_key_confirmation(&key.public_key());
-    cnf["jwk"]["alg"] = json!("ES256");
+    cnf["jwk"]["alg"] = json!(algorithm.jose_alg());
     let sd_jwt = issued_to(cnf);
     let given = sd_jwt.digests_for_claim("given_name");
     let presented = sd_jwt
@@ -58,13 +58,32 @@ fn a_p256_holder_round_trips_through_key_binding() {
     let kb = presented.serialise().rsplit_once('~').unwrap().1.to_owned();
     assert_eq!(
         Value::Object(decoded(&kb, 0)),
-        json!({ "alg": "ES256", "typ": "kb+jwt" })
+        json!({ "alg": algorithm.jose_alg(), "typ": "kb+jwt" })
     );
     assert_eq!(
         Value::Object(decoded(&kb, 1)),
         good_claims(&presented),
         "iat, aud, nonce and the sd_hash of what was presented"
     );
+}
+
+/// A P-256 Holder, named in `cnf` with its `alg` declared: the Key Binding JWT is
+/// ES256 under that key, and the Verifier reads the payload back as it does for an
+/// Ed25519 Holder.
+#[test]
+fn a_p256_holder_round_trips_through_key_binding() {
+    assert_eq!(crate::jws::KeyAlgorithm::EcdsaP256.jose_alg(), "ES256");
+    an_ec_holder_round_trips_through_key_binding(crate::jws::KeyAlgorithm::EcdsaP256);
+}
+
+/// P-384 and P-521 Holders bind as the P-256 one does: each declares its own `alg`
+/// in `cnf` (ES384 and ES512), and the Key Binding JWT is held to it.
+#[test]
+fn p384_and_p521_holders_round_trip_through_key_binding() {
+    assert_eq!(crate::jws::KeyAlgorithm::EcdsaP384.jose_alg(), "ES384");
+    assert_eq!(crate::jws::KeyAlgorithm::EcdsaP521.jose_alg(), "ES512");
+    an_ec_holder_round_trips_through_key_binding(crate::jws::KeyAlgorithm::EcdsaP384);
+    an_ec_holder_round_trips_through_key_binding(crate::jws::KeyAlgorithm::EcdsaP521);
 }
 
 /// A P-256 Holder key whose JWK declares `EdDSA` names no key a signature can be
@@ -95,6 +114,51 @@ fn a_p256_holder_key_that_declares_eddsa_is_refused() {
         bound.disclosed_payload_with_key_binding(&policy()),
         Err(SdJwtError::UnsupportedHolderKey)
     );
+}
+
+/// An EC Holder key whose JWK declares another curve's `alg` names no key that `alg`
+/// can be held to. The Holder is refused before anything is signed, and a Verifier
+/// refuses the same `cnf` in a token that carries a Key Binding JWT.
+#[test]
+fn an_ec_holder_key_that_declares_another_curves_alg_is_refused() {
+    let store = KeyStore::open(temp_path("kb-ec-other-alg"), "test-pass").expect("open");
+    for (name, algorithm, own_alg, declared) in [
+        (
+            "p384",
+            crate::jws::KeyAlgorithm::EcdsaP384,
+            "ES384",
+            "ES256",
+        ),
+        (
+            "p521",
+            crate::jws::KeyAlgorithm::EcdsaP521,
+            "ES512",
+            "ES384",
+        ),
+    ] {
+        let key = store.generate_key_with(name, algorithm).expect("generate");
+        let mut cnf = holder_key_confirmation(&key.public_key());
+        cnf["jwk"]["alg"] = json!(declared);
+        let sd_jwt = issued_to(cnf);
+        assert_eq!(
+            sd_jwt.present_with_key_binding(&[], &binding(), &key).err(),
+            Some(SdJwtError::UnsupportedHolderKey),
+            "a {name} key declaring {declared}"
+        );
+
+        let presented = sd_jwt.present(&[]).expect("presents");
+        let bound = rebound(
+            &presented,
+            &key,
+            json!({ "alg": own_alg, "typ": "kb+jwt" }),
+            good_claims(&presented),
+        );
+        assert_eq!(
+            bound.disclosed_payload_with_key_binding(&policy()),
+            Err(SdJwtError::UnsupportedHolderKey),
+            "a {name} key declaring {declared}"
+        );
+    }
 }
 
 #[test]

@@ -79,16 +79,25 @@ pub(super) fn rfc7515_key() -> PublicKey {
 
 // ── Algorithm confusion ───────────────────────────────────────────────────────
 
-/// Two 64-byte signature formats now coexist. The key decides the algorithm, so
-/// each of these substitutions is refused, by both verification paths.
+/// Four signature formats now coexist: Ed25519, and ECDSA over P-256, P-384 and
+/// P-521. The key decides the algorithm, so a signature under any one key is
+/// accepted only under that key and under one of its own identifiers, and each
+/// substitution is refused by both verification paths.
 #[test]
 fn no_header_can_move_a_signature_to_the_other_algorithm() {
     let store = temp_store("es256-confusion", "ed");
-    store
-        .generate_key_with("p256", KeyAlgorithm::EcdsaP256)
-        .expect("generate");
-    let ed = store.load_key("ed").expect("ed");
-    let p = store.load_key("p256").expect("p256");
+    for (id, algorithm) in [
+        ("p256", KeyAlgorithm::EcdsaP256),
+        ("p384", KeyAlgorithm::EcdsaP384),
+        ("p521", KeyAlgorithm::EcdsaP521),
+    ] {
+        store.generate_key_with(id, algorithm).expect("generate");
+    }
+    let ids = ["ed", "p256", "p384", "p521"];
+    let keys: Vec<crate::keystore::KeyEntry> = ids
+        .iter()
+        .map(|id| store.load_key(id).expect("a key"))
+        .collect();
 
     let token = |alg: &str, signer: &crate::keystore::KeyEntry| {
         let input = format!(
@@ -98,29 +107,36 @@ fn no_header_can_move_a_signature_to_the_other_algorithm() {
         );
         format!("{input}.{}", B64.encode(signer.sign(input.as_bytes())))
     };
+    // The identifiers each algorithm answers to: Ed25519 has two.
+    let names = |algorithm: KeyAlgorithm| match algorithm {
+        KeyAlgorithm::Ed25519 => &["EdDSA", "Ed25519"][..],
+        KeyAlgorithm::EcdsaP256 => &["ES256"][..],
+        KeyAlgorithm::EcdsaP384 => &["ES384"][..],
+        KeyAlgorithm::EcdsaP521 => &["ES512"][..],
+    };
 
-    // Controls: each key under its own algorithm.
-    assert!(verify_jws(&token("EdDSA", &ed), &ed.public_key()).expect("ok"));
-    assert!(verify_jws(&token("ES256", &p), &p.public_key()).expect("ok"));
-    assert!(signer::verify(&store, "ed", &token("EdDSA", &ed)).expect("ok"));
-    assert!(signer::verify(&store, "p256", &token("ES256", &p)).expect("ok"));
-
-    // An Ed25519 signature labelled ES256, offered against the P-256 key and
-    // against its own key; and the reverse.
-    for (jws, key, id) in [
-        (token("ES256", &ed), p.public_key(), "p256"),
-        (token("ES256", &ed), ed.public_key(), "ed"),
-        (token("EdDSA", &p), ed.public_key(), "ed"),
-        (token("EdDSA", &p), p.public_key(), "p256"),
-        (token("Ed25519", &p), p.public_key(), "p256"),
-        (token("none", &p), p.public_key(), "p256"),
-        (token("ES384", &p), p.public_key(), "p256"),
-    ] {
-        assert!(!verify_jws(&jws, &key).expect("well-formed"), "{jws}");
-        assert!(
-            !signer::verify(&store, id, &jws).expect("well-formed"),
-            "{jws}"
-        );
+    let headers = ["EdDSA", "Ed25519", "ES256", "ES384", "ES512", "none"];
+    for (id, signer) in ids.iter().zip(&keys) {
+        for header in headers {
+            let jws = token(header, signer);
+            let own = names(signer.algorithm()).contains(&header);
+            for (other_id, other) in ids.iter().zip(&keys) {
+                // The controls are the cases where both hold: the signer's own
+                // identifier, under the signer's own key. A signature whose length is
+                // another algorithm's is malformed for this key (`Err`), and refused.
+                let expected = own && other_id == id;
+                assert_eq!(
+                    verify_jws(&jws, &other.public_key()).unwrap_or(false),
+                    expected,
+                    "{header} signed by {id}, verified under {other_id}"
+                );
+                assert_eq!(
+                    signer::verify(&store, other_id, &jws).unwrap_or(false),
+                    expected,
+                    "{header} signed by {id}, verified under {other_id} in the store"
+                );
+            }
+        }
     }
 }
 
@@ -280,29 +296,32 @@ fn a_rotation_that_keeps_the_algorithm_cannot_undo_a_concurrent_change() {
 /// can tell it from a bad signature with `downcast_ref`.
 #[test]
 fn a_wrong_length_signature_downcasts_to_its_error_under_both_algorithms() {
-    for (algorithm, jose_alg, label) in [
-        (KeyAlgorithm::Ed25519, "EdDSA", "Ed25519"),
-        (KeyAlgorithm::EcdsaP256, "ES256", "ES256"),
+    for (algorithm, jose_alg, label, expected) in [
+        (KeyAlgorithm::Ed25519, "EdDSA", "Ed25519", 64),
+        (KeyAlgorithm::EcdsaP256, "ES256", "ES256", 64),
+        (KeyAlgorithm::EcdsaP384, "ES384", "ES384", 96),
+        (KeyAlgorithm::EcdsaP521, "ES512", "ES512", 132),
     ] {
         let key = SigningMaterial::generate(algorithm).public_key();
+        let actual = expected - 1;
         let jws = format!(
             "{}.{}.{}",
             B64.encode(format!(r#"{{"alg":"{jose_alg}"}}"#)),
             B64.encode(r#"{"claim":"value"}"#),
-            B64.encode([0u8; 63]),
+            B64.encode(vec![0u8; actual]),
         );
-        let err = verify_jws(&jws, &key).expect_err("a 63-byte signature is refused");
+        let err = verify_jws(&jws, &key).expect_err("a short signature is refused");
         assert_eq!(
             err.downcast_ref::<SignatureLengthError>(),
             Some(&SignatureLengthError {
                 algorithm,
-                expected: 64,
-                actual: 63,
+                expected,
+                actual,
             })
         );
         assert_eq!(
             err.to_string(),
-            format!("{label} signature must be 64 bytes")
+            format!("{label} signature must be {expected} bytes")
         );
     }
 }
