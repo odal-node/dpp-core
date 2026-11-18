@@ -9,7 +9,8 @@ use serde_json::{Value, json};
 use super::builder::SdJwt;
 use super::key_binding::KeyBindingPolicy;
 use super::rfc9901_examples::{
-    A1_PRESENTATION, A3_ISSUED, A3_PRESENTATION, A4_PRESENTATION, S51_ISSUED, S52_PRESENTATION,
+    A1_PRESENTATION, A2_PRESENTATION, A3_ISSUED, A3_PRESENTATION, A4_PRESENTATION, S51_ISSUED,
+    S52_PRESENTATION,
 };
 use crate::jws::public_key::PublicKey;
 use crate::jws::verifier::verify_jws;
@@ -29,6 +30,7 @@ fn issuer_key() -> PublicKey {
 fn every_issuer_signature_in_the_examples_verifies_under_the_appendix_a5_key() {
     for (name, token) in [
         ("A.1", A1_PRESENTATION),
+        ("A.2", A2_PRESENTATION),
         ("A.3 issued", A3_ISSUED),
         ("A.3 presented", A3_PRESENTATION),
         ("A.4", A4_PRESENTATION),

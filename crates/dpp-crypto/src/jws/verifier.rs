@@ -4,6 +4,7 @@
 use base64::Engine;
 
 use super::algorithm::{JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
+use super::error::SignatureLengthError;
 use super::public_key::PublicKey;
 
 /// Verify a compact JWS under `key`.
@@ -33,11 +34,12 @@ pub fn verify_jws(jws: &str, key: &PublicKey) -> anyhow::Result<bool> {
         .map_err(|e| anyhow::anyhow!("base64 signature: {e}"))?;
     let expected = key.algorithm().signature_len();
     if sig_bytes.len() != expected {
-        let name = match key.algorithm() {
-            KeyAlgorithm::Ed25519 => "Ed25519",
-            KeyAlgorithm::EcdsaP256 => "ES256",
-        };
-        return Err(anyhow::anyhow!("{name} signature must be {expected} bytes"));
+        return Err(SignatureLengthError {
+            algorithm: key.algorithm(),
+            expected,
+            actual: sig_bytes.len(),
+        }
+        .into());
     }
 
     Ok(key.verify(signing_input.as_bytes(), &sig_bytes))

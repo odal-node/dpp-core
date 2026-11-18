@@ -33,7 +33,7 @@ pub use algorithm::{
     P256_CRV, is_allowed_alg,
 };
 pub use canonical::canonicalize;
-pub use error::PublicKeyError;
+pub use error::{PublicKeyError, SignatureLengthError};
 pub use public_key::PublicKey;
 pub use signer::{sign, sign_typed, verify};
 pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};

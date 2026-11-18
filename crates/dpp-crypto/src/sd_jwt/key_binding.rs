@@ -73,10 +73,14 @@ pub fn holder_key_confirmation(holder: &PublicKey) -> Value {
 /// `alg` the JWK declares, if it declares one. A declared `alg` must be the key's
 /// own.
 fn holder_key(payload: &Map<String, Value>) -> Result<(PublicKey, Option<String>), SdJwtError> {
-    let jwk = payload
-        .get("cnf")
-        .and_then(|cnf| cnf.get("jwk"))
-        .ok_or(SdJwtError::NoHolderKey)?;
+    let cnf = payload.get("cnf").ok_or(SdJwtError::NoHolderKey)?;
+    let jwk = cnf.get("jwk").ok_or(SdJwtError::NoHolderKey)?;
+    // RFC 7800 §3.1: the `cnf` value represents a single proof-of-possession
+    // key, so `jwk` is refused beside `jwe` or `jku`, which name the key another way.
+    // `kid` is not one of the three and stays allowed.
+    if cnf.get("jwe").is_some() || cnf.get("jku").is_some() {
+        return Err(SdJwtError::UnsupportedHolderKey);
+    }
     let key = PublicKey::from_jwk(jwk).ok_or(SdJwtError::UnsupportedHolderKey)?;
     let declared = match jwk.get("alg") {
         None => None,
@@ -165,8 +169,9 @@ impl SdJwt {
         }
 
         // The `alg` a JWK declares is the one a Verifier holds the signature to,
-        // so it is the one written.
-        let alg = declared.unwrap_or_else(|| holder.algorithm.jose_alg().to_owned());
+        // so it is the one written. Without a declaration, the confirmed key's own
+        // algorithm is, not the `algorithm` field of the entry, which a caller can set.
+        let alg = declared.unwrap_or_else(|| named.algorithm().jose_alg().to_owned());
         let mut header = Map::new();
         header.insert("alg".to_owned(), Value::String(alg));
         header.insert("typ".to_owned(), Value::String(KB_TYP.to_owned()));

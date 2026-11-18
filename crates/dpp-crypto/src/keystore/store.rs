@@ -205,6 +205,10 @@ impl UpgradeNeeded {
 /// tampering. A store in an older format, including the bare SHA-256 one, is
 /// refused by [`Self::open`] and upgraded in place by
 /// [`Self::open_and_migrate`]; see [`UpgradeNeeded`].
+///
+/// One writer per file at a time. Every write replaces the file from this handle's
+/// in-memory map, so a second handle on the same file overwrites the first one's
+/// writes; the store takes no cross-process lock.
 pub struct KeyStore {
     pub(crate) path: std::path::PathBuf,
     pub(crate) cipher: Aes256Gcm,
@@ -432,8 +436,10 @@ impl KeyStore {
         let (record, entry) = self.seal_new_record(material)?;
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
-            map.insert(key_id.to_owned(), record);
-            self.persist_envelope(&map)?;
+            let mut proposed = map.clone();
+            proposed.insert(key_id.to_owned(), record);
+            self.persist_envelope(&proposed)?;
+            *map = proposed;
         }
         Ok(entry)
     }

@@ -2,9 +2,20 @@
 
 use crate::keystore::KeyStore;
 
-/// A unique path under the temp dir, named for `label` with a v7 UUID.
+/// The name every test path under the temp dir shares: `test-<label>-<v7 UUID>`.
+fn unique_name(label: &str) -> String {
+    format!("test-{label}-{}", uuid::Uuid::now_v7())
+}
+
+/// A unique path under the temp dir, named for `label` with a v7 UUID; a `.json` file.
 pub(crate) fn temp_path(label: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("test-{label}-{}.json", uuid::Uuid::now_v7()))
+    std::env::temp_dir().join(format!("{}.json", unique_name(label)))
+}
+
+/// A unique directory path under the temp dir, named for `label` with a v7 UUID. The
+/// directory is not created.
+pub(crate) fn temp_dir(label: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(unique_name(label))
 }
 
 /// A fresh [`KeyStore`] at a unique temp path, with one key already generated.

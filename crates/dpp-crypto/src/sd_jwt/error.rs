@@ -69,10 +69,11 @@ pub enum SdJwtError {
     #[error("the token names no Holder key in cnf")]
     NoHolderKey,
     /// The Holder key in `cnf` is not one this crate reads, or it declares an
-    /// `alg` that is not the key's own. Three cases: the JWK is not an Ed25519
+    /// `alg` that is not the key's own. Four cases: the JWK is not an Ed25519
     /// (`OKP`) or P-256 (`EC`) key, or its coordinates are not a point on that
-    /// curve; its `alg` is present but not a string; or its `alg` names an
-    /// algorithm other than the key's.
+    /// curve; its `alg` is present but not a string; its `alg` names an algorithm
+    /// other than the key's; or `cnf` carries `jwk` beside `jwe` or `jku`, which
+    /// RFC 7800 §3.1 does not allow, since `cnf` names one key.
     #[error(
         "the Holder key in cnf is not a valid Ed25519 or P-256 key, or declares an alg that is not the key's own"
     )]

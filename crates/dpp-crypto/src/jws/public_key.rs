@@ -222,10 +222,11 @@ impl PublicKey {
     /// Whether `signature` is this key's signature over `message`, in the form its
     /// algorithm defines.
     ///
-    /// - **Ed25519:** 64 bytes, verified strictly as RFC 8032 §8 requires. Strict
-    ///   verification rejects the signature-malleability and small-order/cofactor
-    ///   edge cases that the non-strict `VerifyingKey::verify` admits, which is
-    ///   undesirable when the signature is the trust anchor.
+    /// - **Ed25519:** 64 bytes, verified strictly. This is this crate's policy, which is
+    ///   stricter than RFC 8032 §5.1.7 requires: that section permits the cofactored
+    ///   check. Strict verification rejects the signature-malleability and
+    ///   small-order/cofactor edge cases that the non-strict `VerifyingKey::verify`
+    ///   admits, which is undesirable when the signature is the trust anchor.
     /// - **ES256:** exactly 64 bytes, `R ‖ S` (RFC 7518 §3.4 makes any other length
     ///   a failure), ECDSA over SHA-256. `R` or `S` of zero or not below the group
     ///   order is refused. **A high-`S` signature is accepted**: it is lawful ECDSA,

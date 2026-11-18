@@ -3,26 +3,48 @@
 //! Sources, none of them written here:
 //! - **Wycheproof** `ecdsa_secp256r1_sha256_p1363_test.json` (C2SP), the edge-case
 //!   corpus for an IEEE P1363 (`R ‖ S`) verifier, which is the JOSE encoding.
-//!   Vendored from `testvectors_v1/` of <https://github.com/C2SP/wycheproof>, byte
+//!   Vendored from the Wycheproof repository's test vectors, byte
 //!   for byte the file at commit `878e5366008753df2064d40c49f8e2f50f9c6af7`
 //!   (2026-05-12), the last commit that changed it. SHA-256
 //!   `c60de693930e386c3a5472d08081623ef8504decc54b38ac01ec6b2a2575c986`. Licence:
-//!   Apache License 2.0, the repository's `LICENSE`.
+//!   Apache License 2.0, the same licence as this crate, whose `LICENSE` ships with
+//!   it. The upstream repository has no `NOTICE` file at that commit, so none is
+//!   reproduced.
 //! - **RFC 7515 Appendix A.3**, the IETF's ES256 JWS, reproduced as data.
 //! - **RFC 6979 Appendix A.2.5**, deterministic ECDSA over P-256, reproduced as
-//!   data. The RFC's data is reused under the IETF Trust's Legal Provisions, as the
-//!   notice at the top of `sd_jwt/rfc9901_vector_tests.rs` records.
+//!   data.
 //! - **`ring`**, a separate ECDSA implementation (BoringSSL-derived), signing and
 //!   verifying in both directions.
 //! - **The W3C VC-JOSE-COSE test suite's own fixtures**: its key files and the
 //!   signed credentials its verification tests feed an implementation. Vendored
-//!   from `tests/input/` of <https://github.com/w3c/vc-jose-cose-test-suite>. Each
+//!   from the suite's test inputs: `vm-p256.json`, `vm-ed25519.json`, and the four
+//!   credential files beside `LICENSE.md`. Each
 //!   file's git blob equals the repository's `main` as read on 2026-11-18. The last
 //!   commit that changed `vm-p256.json` and `vm-ed25519.json` is
 //!   `a3d7321314d4350667fa258293783a2fbccca4b6` (2024-12-13). The last commit that
 //!   changed the four credential tokens is `002d73018cc0b27d11086fd06598c473c9142646`
 //!   (2024-12-16).
-//!   Licence: the W3C Software and Document License, the repository's `LICENSE.md`.
+//!   Licence: the W3C Software and Document License, reproduced in
+//!   `fixtures/w3c-vc-jose-cose/LICENSE.md`.
+//!
+//! The RFC 6979 and RFC 7515 data is reused as Code Components under the IETF Trust's
+//! Legal Provisions Relating to IETF Documents. Each RFC's own notice reads:
+//!
+//! > RFC 6979, copyright (c) 2013 IETF Trust and the persons identified as the
+//! > authors of the code. All rights reserved.
+//! >
+//! > Redistribution and use in source and binary forms, with or without
+//! > modification, is permitted pursuant to, and subject to the license terms
+//! > contained in, the Simplified BSD License set forth in Section 4.c of the IETF
+//! > Trust's Legal Provisions Relating to IETF Documents
+//! > (<http://trustee.ietf.org/license-info>).
+//!
+//! > RFC 7515, copyright (c) 2015 IETF Trust and the persons identified as the
+//! > authors of the code. All rights reserved.
+//! >
+//! > Code Components extracted from this document must include Simplified BSD
+//! > License text as described in Section 4.e of the Trust Legal Provisions and are
+//! > provided without warranty as described in the Simplified BSD License.
 
 use base64::Engine;
 use serde_json::{Value, json};

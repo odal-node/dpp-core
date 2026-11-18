@@ -1,8 +1,13 @@
 use anyhow::Result;
 
 use super::entry::{KeyEntry, SigningMaterial};
-use super::store::{KeyRecord, KeyStore};
+use super::store::{KeyRecord, KeyRecordMap, KeyStore};
 use crate::jws::algorithm::KeyAlgorithm;
+
+/// How many times a rotation that keeps the algorithm picks it, generates the new
+/// key and tries the swap before it gives up. A second attempt succeeds unless
+/// another rotation changed the algorithm in between.
+const MAX_ROTATION_ATTEMPTS: usize = 3;
 
 /// Build the archived-record key for `key_id`.
 ///
@@ -17,6 +22,13 @@ fn archived_key_name(key_id: &str) -> String {
     format!("{key_id}#archived-{}", uuid::Uuid::now_v7())
 }
 
+/// The algorithm a rotation of `key_id` keeps: the current record's, or the
+/// default when the key has no record yet.
+fn algorithm_of(map: &KeyRecordMap, key_id: &str) -> KeyAlgorithm {
+    map.get(key_id)
+        .map_or_else(super::store::default_algorithm, |r| r.algorithm)
+}
+
 impl KeyStore {
     /// Archive the current key under a timestamped key so it can still be used
     /// to verify older signatures after rotation.
@@ -28,11 +40,11 @@ impl KeyStore {
             );
         }
         let mut map = self.records.write().expect("key store write lock poisoned");
-        if let Some(record) = map.get(key_id) {
-            let archived = record.clone();
-            let archive_key = archived_key_name(key_id);
-            map.insert(archive_key, archived);
-            self.persist_envelope(&map)?;
+        if let Some(record) = map.get(key_id).cloned() {
+            let mut proposed = map.clone();
+            proposed.insert(archived_key_name(key_id), record);
+            self.persist_envelope(&proposed)?;
+            *map = proposed;
         }
         Ok(())
     }
@@ -80,22 +92,35 @@ impl KeyStore {
             );
         }
 
-        // The write lock is taken before the algorithm is chosen and held through the
-        // swap, so no other rotation can change the algorithm between the choice and
-        // the install. Key generation and sealing run under the lock too; the persist
-        // below does disk I/O under it as well.
+        // Each attempt picks the algorithm, then generates and seals the new key
+        // with no lock held, so an RNG failure cannot poison the store, and only
+        // then takes the write lock. A rotation that keeps the algorithm checks,
+        // under that lock, that the algorithm it picked is still the current one,
+        // and tries again when another rotation has changed it. The new state is
+        // built on a copy of the map and installed only after the copy is saved, so
+        // a failed write leaves the handle as the file has it.
         //
-        // Bound to the new key's own fingerprint. The archived copy below keeps the
-        // one it was sealed under, which is why the binding is to the fingerprint
-        // rather than the map key it is filed at.
-        {
+        // The new key is sealed to its own fingerprint. The archived copy keeps the
+        // fingerprint it was sealed under, which is why the binding is to the
+        // fingerprint rather than the map key it is filed at.
+        for _ in 0..MAX_ROTATION_ATTEMPTS {
+            let chosen = match algorithm {
+                Some(explicit) => explicit,
+                None => {
+                    let map = self
+                        .records
+                        .read()
+                        .map_err(|_| anyhow::anyhow!("key store lock poisoned"))?;
+                    algorithm_of(&map, key_id)
+                }
+            };
+            let (new_record, entry) = self.seal_new_record(SigningMaterial::generate(chosen))?;
+
             let mut map = self.records.write().expect("key store write lock poisoned");
-            // A rotation keeps the key's algorithm unless the caller names another.
-            let algorithm = algorithm.unwrap_or_else(|| {
-                map.get(key_id)
-                    .map_or_else(super::store::default_algorithm, |r| r.algorithm)
-            });
-            let (new_record, entry) = self.seal_new_record(SigningMaterial::generate(algorithm))?;
+            if algorithm.is_none() && algorithm_of(&map, key_id) != chosen {
+                continue;
+            }
+            let mut proposed = map.clone();
             // Archive the existing current key (if any), marking it revoked when
             // this is a compromise rotation.
             if let Some(record) = map.get(key_id).cloned() {
@@ -104,22 +129,23 @@ impl KeyStore {
                     // material. A compromise must revoke every copy in the same
                     // write, or the compromised key stays in the published DID
                     // document and its signatures keep verifying.
-                    for stored in map.values_mut() {
+                    for stored in proposed.values_mut() {
                         if stored.fingerprint == record.fingerprint {
                             stored.revoked = true;
                         }
                     }
                 }
-                let archive_name = archived_key_name(key_id);
                 let archived = KeyRecord {
                     revoked: revoke_old,
                     ..record
                 };
-                map.insert(archive_name, archived);
+                proposed.insert(archived_key_name(key_id), archived);
             }
-            map.insert(key_id.to_owned(), new_record);
-            self.persist_envelope(&map)?;
-            Ok(entry)
+            proposed.insert(key_id.to_owned(), new_record);
+            self.persist_envelope(&proposed)?;
+            *map = proposed;
+            return Ok(entry);
         }
+        anyhow::bail!("concurrent rotations kept changing the algorithm of `{key_id}`; try again")
     }
 }

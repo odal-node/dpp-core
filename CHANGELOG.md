@@ -51,8 +51,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 - **`KeyEntry` no longer exposes its key material.** The public `signing_key` and
   `verifying_key` fields are removed. Migration: `entry.public_key()` for the public
-  half and `entry.sign(message)` for a signature. `fingerprint`, `revoked` and
-  `algorithm` stay public. (#586)
+  half and `entry.sign(message)` for a signature. `fingerprint` and `revoked` stay
+  public. (#586)
+
+- **`KeyEntry::algorithm` is a method, not a field**, since a writable copy could
+  disagree with the key material it describes. Migration: read `entry.algorithm()` where
+  you read `entry.algorithm`. (#587)
 
 - **`sd_jwt_vc::Issuance::holder_key` takes a `PublicKey`.** It was
   `Option<[u8; 32]>` and is now `Option<&PublicKey>`. Migration:
@@ -94,7 +98,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   §3.2. `verify_jws` names the algorithm in its wrong-length error, so a P-256 key
   reports `ES256 signature must be 64 bytes`. A key store holding a P-256 key fails
   closed in a build from before this change, so once one exists the crate cannot be
-  rolled back. (#587)
+  rolled back. An older build must not be run against the same file, even briefly: its
+  saves replace the file from its own map, which has no P-256 key. (#587)
 
 - **`KeyStore::generate_key_with(key_id, algorithm)` and `KeyStore::rotate_key_to(key_id,
   algorithm)`** create a key of either algorithm. `rotate_key` keeps the key's algorithm,
@@ -102,6 +107,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 - **`jws::ES256_ALG` and `jws::P256_CRV`**, the JOSE identifier and the JWK curve name,
   re-exported beside their Ed25519 counterparts. (#587)
+
+- **`jws::SignatureLengthError`**, the typed error a signature of the wrong length
+  returns through `anyhow`, so a caller can `downcast_ref` it and tell it from a bad
+  signature. Its text is unchanged: `Ed25519 signature must be 64 bytes` and
+  `ES256 signature must be 64 bytes`. (#587)
 
 ## [0.24.0] - 2026-11-16
 

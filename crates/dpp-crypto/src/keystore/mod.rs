@@ -24,6 +24,8 @@ mod crypto;
 mod entry;
 mod migration;
 #[cfg(test)]
+mod persist_tests;
+#[cfg(test)]
 mod rfc9106_vector_tests;
 mod rotation;
 mod store;

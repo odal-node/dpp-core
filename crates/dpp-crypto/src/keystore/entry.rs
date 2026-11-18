@@ -10,27 +10,30 @@ use crate::jws::public_key::PublicKey;
 /// The private material is not public: it is reached only through
 /// [`Self::sign`], so no caller can hold a curve-specific type and every
 /// signature this crate makes goes through one per-algorithm `match`.
-/// `algorithm` is the algorithm the key is recorded as using; it is what a
-/// verifier binds the JWS `alg` header to. The struct is `#[non_exhaustive]` so
-/// that adding an algorithm does not break downstream construction.
+/// [`Self::algorithm`] is the algorithm the key signs under; it is what a verifier
+/// binds the JWS `alg` header to. The struct is `#[non_exhaustive]` so that adding an
+/// algorithm does not break downstream construction.
 #[non_exhaustive]
 pub struct KeyEntry {
     material: SigningMaterial,
     pub fingerprint: String,
     /// Whether this key has been revoked (see `KeyRecord::revoked`).
     pub revoked: bool,
-    pub algorithm: KeyAlgorithm,
 }
 
 impl KeyEntry {
     pub(crate) fn new(material: SigningMaterial, fingerprint: String, revoked: bool) -> Self {
-        let algorithm = material.algorithm();
         Self {
             material,
             fingerprint,
             revoked,
-            algorithm,
         }
+    }
+
+    /// The algorithm the key signs under, read from the key itself.
+    #[must_use]
+    pub fn algorithm(&self) -> KeyAlgorithm {
+        self.material.algorithm()
     }
 
     /// The public half, with its algorithm.

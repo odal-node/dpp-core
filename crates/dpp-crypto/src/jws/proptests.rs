@@ -106,6 +106,45 @@ proptest! {
         let _ = super::PublicKey::from_jwk(&jwk);
     }
 
+    /// A P-256 JWK whose `x` or `y` is 31 or 33 bytes is no key, whatever else it says,
+    /// and parsing it never panics. Coordinates are 32 bytes or the key is refused.
+    #[test]
+    fn a_p256_jwk_with_a_coordinate_of_the_wrong_length_is_refused(
+        x in prop::collection::vec(any::<u8>(), 31..=33),
+        y in prop::collection::vec(any::<u8>(), 31..=33),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jwk = serde_json::json!({
+            "kty": "EC",
+            "crv": "P-256",
+            "x": b64.encode(&x),
+            "y": b64.encode(&y),
+        });
+        let key = super::PublicKey::from_jwk(&jwk);
+        if x.len() != 32 || y.len() != 32 {
+            prop_assert!(key.is_none());
+        }
+    }
+
+    /// An ES256 JWS whose signature is 63, 64 or 65 bytes, under the RFC 7515 A.3 key,
+    /// never panics, and a signature that is not 64 bytes is refused.
+    #[test]
+    fn es256_signatures_of_63_to_65_bytes_never_panic(
+        sig in prop::collection::vec(any::<u8>(), 63..=65),
+    ) {
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jws = format!(
+            "{}.{}.{}",
+            b64.encode(br#"{"alg":"ES256"}"#),
+            b64.encode(b"{}"),
+            b64.encode(&sig),
+        );
+        let verdict = verify_jws(&jws, &super::es256_tests::rfc7515_key());
+        if sig.len() != 64 {
+            prop_assert!(verdict.is_err());
+        }
+    }
+
     /// `extract_kid_from_jws` must never panic on arbitrary input.
     #[test]
     fn extract_kid_never_panics(jws in ".{0,128}") {

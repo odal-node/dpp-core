@@ -6,6 +6,7 @@ use base64::Engine;
 use serde_json::{Value, json};
 
 use super::algorithm::KeyAlgorithm;
+use super::error::SignatureLengthError;
 use super::public_key::PublicKey;
 use super::signer;
 use super::verifier::verify_jws;
@@ -199,7 +200,7 @@ fn a_p256_key_round_trips_through_the_encrypted_store() {
 
     let store = crate::keystore::KeyStore::open(&path, "pass").expect("reopen");
     let loaded = store.load_key("issuer").expect("load");
-    assert_eq!(loaded.algorithm, KeyAlgorithm::EcdsaP256);
+    assert_eq!(loaded.algorithm(), KeyAlgorithm::EcdsaP256);
     assert_eq!(loaded.public_key(), generated);
     let info = store.public_key("issuer").expect("info");
     assert_eq!(info.public_key().expect("valid"), generated);
@@ -215,15 +216,15 @@ fn a_p256_key_round_trips_through_the_encrypted_store() {
 fn rotation_keeps_or_changes_the_algorithm_as_asked() {
     let store = temp_store("es256-rotate", "issuer");
     assert_eq!(
-        store.rotate_key("issuer").expect("rotate").algorithm,
+        store.rotate_key("issuer").expect("rotate").algorithm(),
         KeyAlgorithm::Ed25519
     );
     let rotated = store
         .rotate_key_to("issuer", KeyAlgorithm::EcdsaP256)
         .expect("rotate to P-256");
-    assert_eq!(rotated.algorithm, KeyAlgorithm::EcdsaP256);
+    assert_eq!(rotated.algorithm(), KeyAlgorithm::EcdsaP256);
     assert_eq!(
-        store.rotate_key("issuer").expect("rotate").algorithm,
+        store.rotate_key("issuer").expect("rotate").algorithm(),
         KeyAlgorithm::EcdsaP256
     );
     let archived: Vec<KeyAlgorithm> = store
@@ -242,10 +243,11 @@ fn rotation_keeps_or_changes_the_algorithm_as_asked() {
 }
 
 /// A rotation that keeps the algorithm cannot undo a concurrent change of it. The
-/// algorithm is chosen under the lock the swap takes, so both serial orders of the
-/// two rotations leave the P-256 key installed. The race is timing-dependent, so the
-/// test catches a regression only some of the time (about 1 run in 10 against the
-/// old code), and it never fails on correct code.
+/// algorithm is checked under the lock the swap takes, and a rotation that finds it
+/// changed generates again, so both serial orders of the two rotations leave the P-256
+/// key installed. The race is timing-dependent, so the test catches a regression only
+/// some of the time (about 1 run in 10 against the old code), and it never fails on
+/// correct code.
 #[test]
 fn a_rotation_that_keeps_the_algorithm_cannot_undo_a_concurrent_change() {
     let store = temp_store("es256-race", "issuer");
@@ -267,9 +269,40 @@ fn a_rotation_that_keeps_the_algorithm_cannot_undo_a_concurrent_change() {
             change.join().expect("thread").expect("rotate to P-256");
         });
         assert_eq!(
-            store.load_key("issuer").expect("load").algorithm,
+            store.load_key("issuer").expect("load").algorithm(),
             KeyAlgorithm::EcdsaP256,
             "round {round}"
+        );
+    }
+}
+
+/// A signature of the wrong length is a typed error under either algorithm, so a caller
+/// can tell it from a bad signature with `downcast_ref`.
+#[test]
+fn a_wrong_length_signature_downcasts_to_its_error_under_both_algorithms() {
+    for (algorithm, jose_alg, label) in [
+        (KeyAlgorithm::Ed25519, "EdDSA", "Ed25519"),
+        (KeyAlgorithm::EcdsaP256, "ES256", "ES256"),
+    ] {
+        let key = SigningMaterial::generate(algorithm).public_key();
+        let jws = format!(
+            "{}.{}.{}",
+            B64.encode(format!(r#"{{"alg":"{jose_alg}"}}"#)),
+            B64.encode(r#"{"claim":"value"}"#),
+            B64.encode([0u8; 63]),
+        );
+        let err = verify_jws(&jws, &key).expect_err("a 63-byte signature is refused");
+        assert_eq!(
+            err.downcast_ref::<SignatureLengthError>(),
+            Some(&SignatureLengthError {
+                algorithm,
+                expected: 64,
+                actual: 63,
+            })
+        );
+        assert_eq!(
+            err.to_string(),
+            format!("{label} signature must be 64 bytes")
         );
     }
 }

@@ -1,5 +1,5 @@
 //! The Holder key an Issuer names in `cnf` (RFC 9901 clause 4.1.2, carried by the
-//! `jwk` confirmation method of RFC 7800 section 3.2). This crate reads an Ed25519
+//! `jwk` confirmation method of RFC 7800 §3.2). This crate reads an Ed25519
 //! or a P-256 key there, which must be a point on its curve, and an `alg` the JWK
 //! declares only when it is the key's own. A Holder binds a presentation only with
 //! the key the token names.
@@ -177,6 +177,49 @@ fn a_concealed_holder_key_has_to_be_presented() {
     assert!(
         presented
             .disclosed_payload_with_key_binding(&policy())
+            .is_ok()
+    );
+}
+
+/// RFC 7800 §3.1 allows one proof-of-possession key in `cnf`, so `jwk` is
+/// refused beside `jku`, which names the key by a URL instead.
+#[test]
+fn a_jwk_beside_a_jku_is_refused() {
+    let key = holder("kb-jwk-jku");
+    let mut cnf = holder_key_confirmation(&key.public_key());
+    cnf["jku"] = json!("https://keys.example/holder.jwk");
+    assert_eq!(
+        issued_to(cnf)
+            .present_with_key_binding(&[], &binding(), &key)
+            .err(),
+        Some(SdJwtError::UnsupportedHolderKey)
+    );
+}
+
+/// RFC 7800 §3.1 allows one proof-of-possession key in `cnf`, so `jwk` is
+/// refused beside `jwe`, which carries the key encrypted.
+#[test]
+fn a_jwk_beside_a_jwe_is_refused() {
+    let key = holder("kb-jwk-jwe");
+    let mut cnf = holder_key_confirmation(&key.public_key());
+    cnf["jwe"] = json!("eyJhbGciOiJSU0EtT0FFUCJ9.x.y.z.w");
+    assert_eq!(
+        issued_to(cnf)
+            .present_with_key_binding(&[], &binding(), &key)
+            .err(),
+        Some(SdJwtError::UnsupportedHolderKey)
+    );
+}
+
+/// `kid` and other members that RFC 7800 does not limit to one stay valid beside `jwk`.
+#[test]
+fn a_jwk_beside_an_unrelated_member_is_accepted() {
+    let key = holder("kb-jwk-extra");
+    let mut cnf = holder_key_confirmation(&key.public_key());
+    cnf["example-extension"] = json!("not a confirmation method");
+    assert!(
+        issued_to(cnf)
+            .present_with_key_binding(&[], &binding(), &key)
             .is_ok()
     );
 }
