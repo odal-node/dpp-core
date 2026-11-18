@@ -10,14 +10,13 @@ use aes_gcm::{
 };
 use anyhow::{Context, Result};
 use rand::Rng;
-use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use super::crypto::{
     compute_envelope_hmac, derive_aes_key_argon2, derive_aes_key_sha256, derive_integrity_key,
     verify_envelope_hmac,
 };
-use super::entry::{KeyEntry, SigningMaterial};
+use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
@@ -205,6 +204,10 @@ impl UpgradeNeeded {
 /// tampering. A store in an older format, including the bare SHA-256 one, is
 /// refused by [`Self::open`] and upgraded in place by
 /// [`Self::open_and_migrate`]; see [`UpgradeNeeded`].
+///
+/// One writer per file at a time. Every write replaces the file from this handle's
+/// in-memory map, so a second handle on the same file overwrites the first one's
+/// writes; the store takes no cross-process lock.
 pub struct KeyStore {
     pub(crate) path: std::path::PathBuf,
     pub(crate) cipher: Aes256Gcm,
@@ -412,19 +415,30 @@ impl KeyStore {
         }
     }
 
+    /// Generate an Ed25519 key under `key_id`. See [`Self::generate_key_with`].
     pub fn generate_key(&self, key_id: &str) -> Result<KeyEntry> {
+        self.generate_key_with(key_id, KeyAlgorithm::Ed25519)
+    }
+
+    /// Generate a key of `algorithm` under `key_id`, replacing any key there.
+    ///
+    /// # Errors
+    /// When the store still needs migration, or cannot be written.
+    pub fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
                  open it with `KeyStore::open_and_migrate`"
             );
         }
-        let material = SigningMaterial::generate(KeyAlgorithm::Ed25519);
+        let material = SigningMaterial::generate(algorithm);
         let (record, entry) = self.seal_new_record(material)?;
         {
             let mut map = self.records.write().expect("key store write lock poisoned");
-            map.insert(key_id.to_owned(), record);
-            self.persist_envelope(&map)?;
+            let mut proposed = map.clone();
+            proposed.insert(key_id.to_owned(), record);
+            self.persist_envelope(&proposed)?;
+            *map = proposed;
         }
         Ok(entry)
     }
@@ -436,7 +450,7 @@ impl KeyStore {
         material: SigningMaterial,
     ) -> Result<(KeyRecord, KeyEntry)> {
         let public = material.public_key();
-        let fingerprint = hex::encode(Sha256::digest(public.as_bytes()));
+        let fingerprint = fingerprint_of(&public);
         let verifying_key_hex = hex::encode(public.as_bytes());
 
         let mut nonce_bytes = [0u8; 12];

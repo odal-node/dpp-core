@@ -111,7 +111,7 @@ impl Verdict {
 
 /// Parse, then process the Disclosures: RFC 9901 clause 7.1 without step 2's
 /// signature check. The only verdict available for a token signed with an
-/// algorithm this crate does not verify, such as the RFC's own ES256 examples.
+/// algorithm this crate does not verify, such as an ES512 token.
 pub(super) fn structure(token: &str) -> Verdict {
     match SdJwt::parse(token).map(|parsed| parsed.disclosed_payload()) {
         Ok(Ok(map)) => Verdict {

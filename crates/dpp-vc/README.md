@@ -66,6 +66,72 @@ let credential = CredentialBuilder::new(
 A runnable version covering issuance and transfer is in
 [`examples/credential_and_transfer.rs`](examples/credential_and_transfer.rs).
 
+## Issuer keys: Ed25519 and the EC curves
+
+An issuer's signing key can be Ed25519, signing JWS with `EdDSA`, or an EC key on
+P-256, P-384 or P-521, signing with `ES256`, `ES384` or `ES512`. A key store makes the
+key you ask for (`KeyStore::generate_key_with`), and `rotate_key_to` moves an issuer
+from one algorithm to another. The archived key stays published under its own shape,
+so a verifier can check the signature of a token made before the rotation for as long
+as that key is published and not revoked. Keeping the key published does not keep a
+credential valid past its expiry or its revocation: those are separate checks.
+
+Each key is published with the JWK shape of its algorithm:
+
+| Key | `kty` | `crv` | `alg` | Length of `x` and `y` |
+|---|---|---|---|---|
+| Ed25519 | `OKP` | `Ed25519` | `EdDSA` | `x` only, 32 octets |
+| P-256 | `EC` | `P-256` | `ES256` | 32 octets each |
+| P-384 | `EC` | `P-384` | `ES384` | 48 octets each |
+| P-521 | `EC` | `P-521` | `ES512` | 66 octets each |
+
+In a `did:web` document, a P-256 issuer key is one verification method. The `x`, `y`
+and thumbprint values below are placeholders:
+
+```json
+{
+  "id": "did:web:issuer.example.com#urn:ietf:params:oauth:jwk-thumbprint:sha-256:<thumbprint>",
+  "type": "JsonWebKey",
+  "controller": "did:web:issuer.example.com",
+  "publicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "<43 base64url characters>",
+    "y": "<43 base64url characters>",
+    "kid": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<thumbprint>",
+    "alg": "ES256"
+  }
+}
+```
+
+In the JWT VC issuer metadata of an SD-JWT VC, the same key is one entry of
+`jwks.keys`, with `use` set to `sig`:
+
+```json
+{
+  "issuer": "https://passports.example.com",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "<43 base64url characters>",
+        "y": "<43 base64url characters>",
+        "kid": "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<thumbprint>",
+        "alg": "ES256",
+        "use": "sig"
+      }
+    ]
+  }
+}
+```
+
+A token names its key in the protected header's `kid`. In a `did:web` document that
+is the verification method's absolute DID URL, and in the SD-JWT VC metadata it is the
+thumbprint URI alone. A key that was rotated out is still listed while it is not
+revoked, so a signature it made still verifies. A revoked archived key is listed in
+neither document.
+
 ## Relationship to other crates
 
 | Crate | Role |

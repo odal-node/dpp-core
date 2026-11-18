@@ -10,10 +10,9 @@
 //! its policy, and clause 7.3 step 1 says that choice MUST NOT depend on whether a
 //! Key Binding JWT arrived, so neither looks at the token to decide.
 //!
-//! Ed25519 only, like the rest of this crate: the Holder key in `cnf` must be an
-//! Ed25519 JWK, and the Key Binding JWT is signed with it. The RFC's own examples
-//! bind with P-256 keys, so for those this crate checks the `sd_hash` and not the
-//! signature.
+//! The Holder key in `cnf` is an Ed25519 (`OKP`) JWK, or an EC (`EC`) JWK on P-256,
+//! P-384 or P-521, and the Key Binding JWT is held to that key's algorithm. The
+//! RFC's own examples bind with P-256 keys, and their Key Binding JWTs verify here.
 
 use serde_json::{Map, Value, json};
 
@@ -64,20 +63,24 @@ pub struct KeyBindingPolicy {
 }
 
 /// The `cnf` value an Issuer puts in the payload to enable Key Binding for the
-/// Holder whose Ed25519 public key is `holder` (clause 4.1.2): RFC 7800's `jwk`
+/// Holder whose public key is `holder` (clause 4.1.2): RFC 7800's `jwk`
 /// confirmation method, which the clause suggests.
 pub fn holder_key_confirmation(holder: &PublicKey) -> Value {
     json!({ "jwk": holder.jwk() })
 }
 
-/// The Holder key a processed payload names: the Ed25519 JWK in `cnf.jwk`, and the
-/// `alg` the JWK declares, if it declares one. A declared `alg` must be the key's
-/// own.
+/// The Holder key a processed payload names: the Ed25519 or EC JWK (P-256, P-384 or
+/// P-521) in `cnf.jwk`, and the `alg` the JWK declares, if it declares one. A declared
+/// `alg` must be the key's own.
 fn holder_key(payload: &Map<String, Value>) -> Result<(PublicKey, Option<String>), SdJwtError> {
-    let jwk = payload
-        .get("cnf")
-        .and_then(|cnf| cnf.get("jwk"))
-        .ok_or(SdJwtError::NoHolderKey)?;
+    let cnf = payload.get("cnf").ok_or(SdJwtError::NoHolderKey)?;
+    let jwk = cnf.get("jwk").ok_or(SdJwtError::NoHolderKey)?;
+    // RFC 7800 §3.1: the `cnf` value represents a single proof-of-possession
+    // key, so `jwk` is refused beside `jwe` or `jku`, which name the key another way.
+    // `kid` is not one of the three and stays allowed.
+    if cnf.get("jwe").is_some() || cnf.get("jku").is_some() {
+        return Err(SdJwtError::UnsupportedHolderKey);
+    }
     let key = PublicKey::from_jwk(jwk).ok_or(SdJwtError::UnsupportedHolderKey)?;
     let declared = match jwk.get("alg") {
         None => None,
@@ -149,7 +152,8 @@ impl SdJwt {
     /// What [`Self::present`] refuses. [`SdJwtError::NoHolderKey`] when the
     /// presentation names no Holder key, which is also the case when `cnf` was
     /// concealed and not chosen: the Verifier could not find the key either.
-    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is not Ed25519, and
+    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is none of Ed25519, P-256,
+    /// P-384 and P-521, and
     /// [`SdJwtError::HolderKeyMismatch`] when `holder` is not the key `cnf`
     /// names.
     pub fn present_with_key_binding(
@@ -166,8 +170,9 @@ impl SdJwt {
         }
 
         // The `alg` a JWK declares is the one a Verifier holds the signature to,
-        // so it is the one written.
-        let alg = declared.unwrap_or_else(|| holder.algorithm.jose_alg().to_owned());
+        // so it is the one written. Without a declaration, the confirmed key's own
+        // algorithm is, not the `algorithm` field of the entry, which a caller can set.
+        let alg = declared.unwrap_or_else(|| named.algorithm().jose_alg().to_owned());
         let mut header = Map::new();
         header.insert("alg".to_owned(), Value::String(alg));
         header.insert("typ".to_owned(), Value::String(KB_TYP.to_owned()));
@@ -187,7 +192,7 @@ impl SdJwt {
     /// The Holder key is taken from the processed payload's `cnf` (step 5.a), so
     /// a `cnf` that is selectively disclosable has to have been disclosed. The
     /// signature is checked against it with this crate's JWS verifier, which
-    /// refuses `none`, any algorithm but Ed25519 and any `crit` (step 5.b), and
+    /// refuses `none`, an algorithm other than the key's own and any `crit` (step 5.b), and
     /// an `alg` other than the one the JWK declares.
     ///
     /// # Errors

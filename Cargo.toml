@@ -114,6 +114,9 @@ base64       = "0.23"
 hex          = "0.4"
 sha2         = "0.11"
 ed25519-dalek = { version = "3", features = ["rand_core"] }
+p256         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
+p384         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
+p521         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 zeroize      = { version = "1", features = ["derive"] }
 aes-gcm      = "0.11"
 rand         = "0.10"

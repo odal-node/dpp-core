@@ -423,7 +423,7 @@ fn record_with_unknown_algorithm_is_refused() {
         "nonce": [2],
         "fingerprint": "fp",
         "verifying_key_hex": "aa",
-        "algorithm": "ES256",
+        "algorithm": "RS256",
     }));
     assert!(
         result.is_err(),

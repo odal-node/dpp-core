@@ -30,6 +30,8 @@
 mod builder;
 pub mod jwt;
 #[cfg(test)]
+mod jwt_algorithm_tests;
+#[cfg(test)]
 mod jwt_reason_tests;
 #[cfg(test)]
 mod jwt_tests;

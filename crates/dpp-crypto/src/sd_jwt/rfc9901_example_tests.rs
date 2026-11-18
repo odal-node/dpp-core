@@ -15,13 +15,13 @@
 //!
 //! # What these do not check
 //!
-//! The signatures. The RFC's examples are signed with ES256, which this crate
-//! does not implement, and the module does not verify the Issuer-signed JWT in
-//! any case: that is [`crate::jws::verifier`]. Sections 6.1 to 6.3 print only a
-//! payload, so those tests give it a stub JWT around it. The Key Binding JWTs at
-//! the end of A.3, A.4 and section 5.2 are carried here; their `sd_hash` is
-//! checked in `key_binding_tests.rs`, and their signatures, made with P-256 Holder
-//! keys, are not this crate's to check.
+//! The signatures. This module checks processing, not signing: it does not verify
+//! the Issuer-signed JWT, which is [`crate::jws::verifier`]'s job. Sections 6.1 to
+//! 6.3 print only a payload, so those tests give it a stub JWT around it. The Key
+//! Binding JWTs at the end of A.3, A.4 and section 5.2 are carried here, and their
+//! `sd_hash` is checked in `key_binding_tests.rs`. The signatures of every example,
+//! the Issuer's and the Key Binding JWTs' made with P-256 Holder keys, are checked
+//! in `rfc9901_es256_tests.rs`.
 
 use base64::Engine;
 use serde_json::{Map, Value, json};

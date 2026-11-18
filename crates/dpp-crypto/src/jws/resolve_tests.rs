@@ -159,10 +159,31 @@ fn a_method_not_listed_in_assertion_method_is_not_a_signer() {
     }
 }
 
-/// Only `kty: OKP, crv: Ed25519` keys resolve. The identifier is built from the
-/// same `x`, so it is the JWK's type and not the identifier that refuses.
+/// Only `kty: OKP, crv: Ed25519` keys and complete P-256 keys resolve. The identifier is
+/// built from the same `x`, so it is the JWK's type and not the identifier that refuses.
 #[test]
-fn only_an_ed25519_jwk_resolves() {
+fn only_an_ed25519_or_p256_jwk_resolves() {
+    // The control for the P-256 case: a complete key, named by its own thumbprint and
+    // an ES256 header. Removing `y` with everything else aligned must refuse it.
+    let p256 = crate::keystore::SigningMaterial::generate(KeyAlgorithm::EcdsaP256).public_key();
+    let p256_id = format!("{DID}#{}", p256.thumbprint_uri());
+    let es256_kid = token(&json!({"alg": "ES256", "kid": p256_id}));
+    let complete =
+        json!({"id": p256_id, "type": "JsonWebKey", "controller": DID, "publicKeyJwk": p256.jwk()});
+    let mut incomplete = complete.clone();
+    incomplete["publicKeyJwk"]
+        .as_object_mut()
+        .expect("an object")
+        .remove("y");
+    assert_eq!(
+        resolve_verification_key(&document(&[complete]), &es256_kid),
+        Some(p256)
+    );
+    assert_eq!(
+        resolve_verification_key(&document(&[incomplete]), &es256_kid),
+        None
+    );
+
     let key = public_key();
     let id = vm_id(&key);
     let with = |jwk: Value| {
@@ -171,7 +192,6 @@ fn only_an_ed25519_jwk_resolves() {
 
     for jwk in [
         json!({"kty": "OKP", "crv": "X25519", "x": x(&key)}),
-        json!({"kty": "EC", "crv": "P-256", "x": x(&key)}),
         json!({"x": x(&key)}),
     ] {
         assert_eq!(

@@ -1,11 +1,13 @@
-//! JWS compact serialisation signer — EdDSA over RFC 8785 (JCS) canonical bytes.
+//! JWS compact serialisation signer, under the key's own algorithm (EdDSA, ES256, ES384
+//! or ES512), over RFC 8785 (JCS) canonical bytes.
 
 use base64::Engine;
 use serde_json::Value;
 
 use crate::keystore::{KeyEntry, KeyStore};
 
-/// Produces a compact JWS with algorithm `EdDSA` over the **RFC 8785 (JCS)
+/// Produces a compact JWS, signed under the key's own algorithm (`EdDSA` for Ed25519,
+/// `ES256` for P-256, `ES384` for P-384 or `ES512` for P-521), over the **RFC 8785 (JCS)
 /// canonical** form of the JSON payload.
 ///
 /// Signing over the canonical bytes (rather than incidental serde output) is
@@ -61,7 +63,7 @@ pub fn sign_typed(
     let mut header = serde_json::Map::new();
     header.insert(
         "alg".to_owned(),
-        Value::String(key.algorithm.jose_alg().to_owned()),
+        Value::String(key.algorithm().jose_alg().to_owned()),
     );
     header.insert("kid".to_owned(), Value::String(kid.to_owned()));
     if let Some(typ) = typ {
@@ -109,7 +111,7 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     // attacker-supplied, so it may only *confirm* what the key already says —
     // it must never select the verification path. Rejects `alg:none` and every
     // substitution by the same check, and any `crit`.
-    if !super::verifier::header_admissible(&b64, parts[0], key.algorithm) {
+    if !super::verifier::header_admissible(&b64, parts[0], key.algorithm()) {
         return Ok(false);
     }
 
@@ -118,7 +120,7 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     let sig_bytes = b64
         .decode(parts[2])
         .map_err(|e| anyhow::anyhow!("base64: {e}"))?;
-    if sig_bytes.len() != key.algorithm.signature_len() {
+    if sig_bytes.len() != key.algorithm().signature_len() {
         return Err(anyhow::anyhow!("invalid signature length"));
     }
 
