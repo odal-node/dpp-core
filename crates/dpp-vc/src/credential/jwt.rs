@@ -12,9 +12,14 @@
 //! (JCS) canonical form of the credential JSON. The credential model itself is
 //! untouched: the envelope is external, and there is no `proof` member.
 //!
-//! - `alg` is `EdDSA`. `none` is rejected, and the algorithm is bound to the key
-//!   record rather than read from the attacker-supplied header. A verifier also
-//!   accepts `Ed25519`, the RFC 9864 name for the same operation.
+//! - `alg` is the signing key's algorithm: `EdDSA` for an Ed25519 key, `ES256`,
+//!   `ES384` or `ES512` for a P-256, P-384 or P-521 key. `none` is rejected, and the
+//!   algorithm is bound to the key record rather than read from the attacker-supplied
+//!   header. `authenticate_access_credential` also accepts `Ed25519`, the RFC 9864 name
+//!   for the same operation, but only where the resolved JWK declares no `alg` or
+//!   declares `Ed25519` itself (`resolve_verification_key`). The JWK this crate
+//!   publishes declares `EdDSA`, so a token that names `Ed25519` is refused against a
+//!   document this crate builds.
 //! - `kid` is the absolute DID URL of the signing key's verification method in the
 //!   issuer's `did:web` document: the issuer's DID, then `#`, then the key's
 //!   thumbprint URI. It is required, and it is stable across rotation.
@@ -58,6 +63,7 @@ use dpp_crypto::keystore::KeyStore;
 
 use super::types::DppAccessCredential;
 use super::verify::VerificationResult;
+use crate::common::media_type::{self, TypeRefusal};
 
 /// The `typ` of a VC-JWT, and the `cty` naming what it carries (VC-JOSE-COSE).
 const TYP: &str = "vc+jwt";
@@ -105,46 +111,18 @@ pub fn sign_access_credential(
     signer::sign_typed(store, key_id, &payload, &kid, Some(TYP), Some(CTY))
 }
 
-/// Whether a media-type header value names `expected`. RFC 7515 §4.1.9 lets a
-/// producer omit the `application/` prefix and has a recipient read the value as
-/// if it were there, and media types compare case-insensitively.
-fn names_media_type(value: &str, expected: &str) -> bool {
-    let value = value.to_ascii_lowercase();
-    value.strip_prefix("application/").unwrap_or(&value) == expected
-}
-
 /// The refusal, if the protected header does not type the token as a VC-JWT:
 /// `typ` must be present and name `vc+jwt`, and a `cty`, if present, must name
 /// `vc`.
 fn header_type_refusal(jws: &str) -> Option<String> {
-    use base64::Engine as _;
-    let Some(header) = jws
-        .split('.')
-        .next()
-        .and_then(|h| {
-            base64::engine::general_purpose::URL_SAFE_NO_PAD
-                .decode(h)
-                .ok()
-        })
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-    else {
-        return Some("the protected header is unreadable".to_owned());
-    };
-    let typ = header.get("typ");
-    if !typ
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|t| names_media_type(t, TYP))
-    {
-        return Some(format!(
+    Some(match media_type::header_type_refusal(jws, TYP, CTY)? {
+        TypeRefusal::Unreadable => "the protected header is unreadable".to_owned(),
+        TypeRefusal::Typ { found } => format!(
             "the token's typ is {}, not {TYP}",
-            typ.map_or_else(|| "absent".to_owned(), ToString::to_string)
-        ));
-    }
-    match header.get("cty") {
-        None => None,
-        Some(cty) if cty.as_str().is_some_and(|c| names_media_type(c, CTY)) => None,
-        Some(cty) => Some(format!("the token's cty is {cty}, not {CTY}")),
-    }
+            found.unwrap_or_else(|| "absent".to_owned())
+        ),
+        TypeRefusal::Cty { found } => format!("the token's cty is {found}, not {CTY}"),
+    })
 }
 
 /// Why a VC-JWT was not authenticated: one variant per thing an issuer would go

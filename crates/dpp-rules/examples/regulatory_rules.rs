@@ -4,6 +4,9 @@
 //!
 //! Run with: `cargo run --example regulatory_rules -p dpp-rules`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use dpp_rules::batteries::chemistry::mercury_content_prohibited;
 use dpp_rules::batteries::recycled_content::{RecycledContentInput, art8_shortfalls_2031};
 use dpp_rules::{

@@ -40,10 +40,7 @@ fn generate_then_load_roundtrip() {
     let generated = store.generate_key("issuer-1").expect("generate key");
     let loaded = store.load_key("issuer-1").expect("load key");
     assert_eq!(generated.fingerprint, loaded.fingerprint);
-    assert_eq!(
-        generated.verifying_key.as_bytes(),
-        loaded.verifying_key.as_bytes()
-    );
+    assert_eq!(generated.public_key(), loaded.public_key());
 }
 
 #[test]
@@ -52,7 +49,7 @@ fn stored_bytes_differ_from_plaintext() {
     let key = store.generate_key("issuer-enc").expect("generate");
 
     let raw_file = std::fs::read_to_string(&path).expect("read file");
-    let plaintext_hex = hex::encode(key.signing_key.as_bytes());
+    let plaintext_hex = hex::encode(key.secret_for_test().as_slice());
     assert!(
         !raw_file.contains(&plaintext_hex),
         "plaintext key bytes must not appear in the store file"
@@ -390,7 +387,13 @@ fn hmac_is_stable_across_map_insertion_order() {
 /// is byte-compatible.
 #[test]
 fn algorithm_serialises_as_its_jose_identifier() {
-    let record = KeyRecord::new(vec![1], vec![2], "fp".into(), "aa".into());
+    let record = KeyRecord::new(
+        vec![1],
+        vec![2],
+        "fp".into(),
+        "aa".into(),
+        crate::jws::KeyAlgorithm::Ed25519,
+    );
     let json = serde_json::to_value(&record).expect("serialise");
     assert_eq!(json["algorithm"], "EdDSA");
 }
@@ -420,7 +423,7 @@ fn record_with_unknown_algorithm_is_refused() {
         "nonce": [2],
         "fingerprint": "fp",
         "verifying_key_hex": "aa",
-        "algorithm": "ES256",
+        "algorithm": "RS256",
     }));
     assert!(
         result.is_err(),

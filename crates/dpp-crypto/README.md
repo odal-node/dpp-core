@@ -4,9 +4,10 @@
 [![docs.rs](https://img.shields.io/docsrs/dpp-crypto)](https://docs.rs/dpp-crypto)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](../../LICENSE)
 
-Cryptographic primitives for EU Digital Product Passports: Ed25519 key management, JWS
-signing and verification, JCS canonicalisation, JAdES baseline signature construction,
-and an AES-256-GCM encrypted keystore with Argon2id key derivation and rotation. Part of
+Cryptographic primitives for EU Digital Product Passports: key management in which every
+key carries its signature algorithm (Ed25519, or ECDSA as ES256, ES384 and ES512 on P-256, P-384 and P-521), JWS signing and
+verification, JCS canonicalisation, JAdES baseline signature construction, and an
+AES-256-GCM encrypted keystore with Argon2id key derivation and rotation. Part of
 [dpp-core](https://github.com/odal-node/dpp-core) by [Odal Node](https://odal-node.io).
 
 Pure Rust, with no I/O beyond the keystore file. It does not build for
@@ -19,11 +20,14 @@ a domain type.
 
 ## When to use this crate
 
-- You need to sign or verify passport data with Ed25519 as a compact JWS.
+- You need to sign or verify passport data as a compact JWS. Every key records its
+  algorithm: Ed25519 (`EdDSA`), P-256 (`ES256`), P-384 (`ES384`) or P-521 (`ES512`).
 - You need JCS canonicalisation, so two nodes produce byte-identical payloads before
   signing.
 - You manage signing keys at rest (generation, rotation, revocation, archival) with
   encryption and integrity protection.
+- You need to sign with a key someone else generated, given as its private JWK:
+  `KeyEntry::from_private_jwk` builds it in memory, and it is never written to a store.
 - You need to build an **ETSI TS 119 182-1 JAdES-B-B** signature whose signature value
   comes from elsewhere, typically a remote signing service. The `jades` module derives
   the signing input and assembles the compact form; it never signs.
@@ -53,12 +57,37 @@ fn sign_a_payload(store: &KeyStore) {
 }
 ```
 
-`KeyStore::open` **creates the file if it is absent**, so choose the path deliberately
-and keep it outside the source tree. A complete, runnable version including keystore
+`KeyStore::open` **accepts a path where no file exists yet and creates the file there
+on the first save**, so choose the path deliberately and keep it outside the source tree. A complete, runnable version including keystore
 setup is in [`examples/sign_and_verify.rs`](examples/sign_and_verify.rs):
 
 ```bash
 cargo run -p dpp-crypto --example sign_and_verify
+```
+
+## Signing with a key someone else generated
+
+`KeyEntry::from_private_jwk` builds a signing key from the private JWK of a key someone
+else generated. The key is held in memory and is never written to a store. The example
+below takes the `secretKeyJwk` of a published test key: the P-256 key of the W3C
+VC-JOSE-COSE suite, whose file is vendored with this crate. `sign` returns the raw
+signature, which for P-256 is the 64-octet `R ‖ S`. It is not a compact JWS.
+
+```rust
+use dpp_crypto::keystore::KeyEntry;
+use serde_json::Value;
+
+let text = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/jws/fixtures/w3c-vc-jose-cose/vm-p256.json"
+));
+let method: Value = serde_json::from_str(text).expect("a verification method");
+let entry = KeyEntry::from_private_jwk(&method["secretKeyJwk"]).expect("a valid private JWK");
+
+let message = b"a signed passport";
+let signature = entry.sign(message);
+assert_eq!(signature.len(), 64);
+assert!(entry.public_key().verify(message, &signature));
 ```
 
 ## Security notes
@@ -68,7 +97,10 @@ cargo run -p dpp-crypto --example sign_and_verify
 - `KeyStore::public_key` and `PublicKeyInfo` are public so the `did:web` builder in
   `dpp-vc` can read public key material and revocation state. Neither exposes private
   key material.
-- Signing uses `alg: "EdDSA"` with curve `Ed25519`, per RFC 8037.
+- Every key carries its algorithm. Ed25519 signs with `alg: "EdDSA"` and curve
+  `Ed25519`, per RFC 8037. P-256 signs with `alg: "ES256"`, P-384 with `"ES384"` and
+  P-521 with `"ES512"`, all with RFC 6979 deterministic nonces and low-S signatures,
+  per RFC 7518 section 3.4.
 - The `jades` module produces a **structurally conformant** JAdES-B-B signature. That
   does not make it *qualified*: under Regulation (EU) No 910/2014 a qualified signature
   needs a qualified certificate, a qualified creation device and the trust service

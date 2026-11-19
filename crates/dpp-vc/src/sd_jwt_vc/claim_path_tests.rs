@@ -24,7 +24,7 @@ fn presented(store: &KeyStore, credential: &SdJwt, chosen: &[String]) -> Map<Str
     let presentation = credential.present(&chosen).expect("present").serialise();
     verify(
         &presentation,
-        &public_key_b64(store),
+        &public_key(store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,

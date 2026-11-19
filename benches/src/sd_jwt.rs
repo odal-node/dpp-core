@@ -5,7 +5,6 @@
 //! random draw together. Issuance walks the passport with its access policy and
 //! then signs, so it is the heaviest single operation in this target.
 
-use base64::Engine;
 use chrono::{TimeZone, Utc};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use dpp_crypto::sd_jwt::{SdJwt, conceal, conceal_elements};
@@ -77,8 +76,7 @@ fn credential(c: &mut Criterion) {
     );
     let serialised = issued.serialise();
     let now = Utc.timestamp_opt(ISSUED_AT + 60, 0).unwrap();
-    let public_key = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(store.load_key(KEY_ID).unwrap().verifying_key.as_bytes());
+    let public_key = store.load_key(KEY_ID).unwrap().public_key();
 
     c.bench_function("sd_jwt_vc_verify_battery", |b| {
         b.iter(|| verify(&serialised, &public_key, &vct, now, None).unwrap());

@@ -52,3 +52,11 @@ crates/dpp-tests/fixtures/aas/environments/*.json linguist-generated
 # the NOTICE.md beside them, for the same two reasons as the AAS schemas above.
 crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** -text
 crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** linguist-vendored
+
+# The W3C VC-JOSE-COSE test suite's input files and its licence, carried verbatim,
+# with each file's SHA-256 pinned by a test in `crates/dpp-vc/src/jose`. Line-ending
+# translation would change the bytes on disk without changing the blob, so the
+# pinned hash would fail on a checkout that normalises. They are evidence, not code
+# we maintain.
+crates/dpp-vc/src/jose/fixtures/w3c-vc-jose-cose/** -text
+crates/dpp-vc/src/jose/fixtures/w3c-vc-jose-cose/** linguist-vendored

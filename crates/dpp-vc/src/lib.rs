@@ -23,8 +23,10 @@
 //! caller holds; the disclosure policy maps that `Audience` to fields.** Those
 //! are two questions and they are answered in two places.
 
+mod common;
 pub mod credential;
 pub mod did_builder;
+pub mod jose;
 pub mod jsonld;
 pub mod local_service;
 pub mod passport_credential;

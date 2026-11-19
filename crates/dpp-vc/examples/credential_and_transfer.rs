@@ -5,6 +5,9 @@
 //!
 //! Run with: `cargo run --example credential_and_transfer`
 
+// An example shows its result, so it prints.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use chrono::Utc;
 use dpp_domain::{
     OperatorRole, PassportId, ResponsibleOperator, TransferChain, TransferReason, TransferRecord,

@@ -176,6 +176,13 @@ jobs:
             echo "::endgroup::"
           done
           exit "$rc"
+      # A suppressed advisory cannot outlive the argument that suppressed it: the
+      # register checks every ignore entry's header, date, staleness and graph
+      # claim. Its self-test uses the same cargo-audit and graphs, so it runs here.
+      - name: Audit register
+        run: |
+          bash scripts/check-audit-register.sh
+          bash scripts/check-audit-register.test.sh
       # The three questions `cargo audit` cannot answer — licences, duplicate or
       # banned crates, and dependency provenance. Licences went unchecked here
       # until this job existed, which for a published Apache-2.0 library is the
@@ -227,3 +234,49 @@ jobs:
       # is a gate that goes green without running.
       - name: Plugin gate guards fail on an empty match
         run: just plugin-gates-self-test
+
+  release-checks:
+    name: Release checks refuse what they should
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The checks run when a release is cut (the pre-release hook) or a tag is
+      # pushed (release-tag.yml): the one moment a check that accepts everything
+      # would be found out. So each is proved to refuse here, on every pull
+      # request, before a release depends on it. Shell only.
+      - name: Release checks self-test
+        run: |
+          bash scripts/release-head-check.test.sh
+          bash scripts/release-tag-check.test.sh
+          bash scripts/release-crates-check.test.sh
+
+  guards:
+    name: Repository guards
+    runs-on: ubuntu-latest
+    steps:
+      # Full history with its tags: the schema freeze compares the working tree
+      # with the newest release tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Shell, jq and git only. Each guard's reasons are in its script, and each
+      # self-test proves the guard still refuses what it exists to refuse.
+      - name: A released schema version changes only in its prose
+        run: |
+          bash scripts/schema-freeze-check.sh
+          bash scripts/schema-freeze-check.test.sh
+      - name: Every fuzz target is built, run and documented
+        run: |
+          bash scripts/fuzz-targets-check.sh
+          bash scripts/fuzz-targets-check.test.sh
+      - name: Every guard script runs in CI
+        run: |
+          bash scripts/ci-guard-check.sh
+          bash scripts/ci-guard-check.test.sh
+      - name: Archive means one thing
+        run: |
+          bash scripts/vocabulary-check.sh
+          bash scripts/vocabulary-check.test.sh

@@ -1,0 +1,43 @@
+# A pushed `v*` tag must name what crates.io published: a commit on main, at the
+# version its Cargo.toml states, and the commit every published crate records.
+# The rules and their reasons are in scripts/release-tag-check.sh and
+# scripts/release-crates-check.sh.
+#
+# It runs after the publish, so it cannot stop one: `allow-branch` in Cargo.toml
+# and the pre-release hook (scripts/release-head-check.sh) do that. What it
+# catches is a tag made on the wrong commit, which would otherwise stand as the
+# name of a release it is not. On a red run, read which step failed first: a crate
+# that could not be downloaded is crates.io or the network, so re-run; only a tag
+# on the wrong commit is deleted and made again on the commit the crates record.
+name: Release tag
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: The tag names the published release
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the check asks whether the tagged commit is on main, and a
+      # shallow checkout holds no main to ask.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tag is a release of main
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: bash scripts/release-tag-check.sh
+      # `cargo metadata` lists the crates that publish, which installs the
+      # toolchain rust-toolchain.toml names on first use.
+      - name: Every published crate records the tagged commit
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: bash scripts/release-crates-check.sh

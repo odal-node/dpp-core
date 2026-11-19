@@ -9,7 +9,6 @@
 //! in the forgery.
 
 use base64::Engine;
-use ed25519_dalek::Signer;
 use serde_json::{Value, json};
 
 use super::signer;
@@ -29,16 +28,15 @@ fn forge(store: &KeyStore, header: &Value) -> String {
         b64.encode(serde_json::to_vec(header).expect("header serialises")),
         b64.encode(br#"{"claim":"value"}"#),
     );
-    let signature = key.signing_key.sign(signing_input.as_bytes());
-    format!("{signing_input}.{}", b64.encode(signature.to_bytes()))
+    let signature = key.sign(signing_input.as_bytes());
+    format!("{signing_input}.{}", b64.encode(signature))
 }
 
 /// Whether each verification path accepts `jws`: [`verify_jws`] with the raw
 /// public key, and [`signer::verify`] with the key store.
 fn accepted(store: &KeyStore, jws: &str) -> [bool; 2] {
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let key = store.load_key(KEY_ID).expect("load key");
-    let public_key = b64.encode(key.verifying_key.as_bytes());
+    let public_key = key.public_key();
     [
         verify_jws(jws, &public_key).expect("well-formed input"),
         signer::verify(store, KEY_ID, jws).expect("well-formed input"),

@@ -1,11 +1,25 @@
-//! JWS signing primitives — EdDSA over RFC 8785 (JCS) canonical bytes.
+//! JWS signing primitives — EdDSA, ES256, ES384 and ES512 over RFC 8785 (JCS)
+//! canonical bytes, each bound to the algorithm its key is recorded as using.
 
 pub mod algorithm;
 pub mod canonical;
 #[cfg(test)]
 mod crit_tests;
+mod error;
+#[cfg(test)]
+mod es256_tests;
+#[cfg(test)]
+mod es256_vector_tests;
+#[cfg(test)]
+mod es384_es512_tests;
+#[cfg(test)]
+mod es384_es512_vector_tests;
+mod header_refusal;
+#[cfg(test)]
+mod header_refusal_tests;
 #[cfg(test)]
 mod proptests;
+pub mod public_key;
 #[cfg(test)]
 mod resolve_tests;
 #[cfg(test)]
@@ -14,6 +28,8 @@ mod rfc8032_vector_tests;
 mod rfc8037_vector_tests;
 #[cfg(test)]
 mod rfc8785_vector_tests;
+#[cfg(test)]
+mod sign_typed_with_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;
@@ -22,8 +38,12 @@ mod thumbprint_tests;
 pub mod verifier;
 
 pub use algorithm::{
-    ED25519_ALG, ED25519_CRV, EDDSA_ALG, JWK_THUMBPRINT_URI_PREFIX, is_allowed_alg,
+    ED25519_ALG, ED25519_CRV, EDDSA_ALG, ES256_ALG, ES384_ALG, ES512_ALG,
+    JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, P256_CRV, P384_CRV, P521_CRV, is_allowed_alg,
 };
 pub use canonical::canonicalize;
-pub use signer::{sign, sign_typed, verify};
-pub use verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
+pub use error::{PublicKeyError, SignatureLengthError};
+pub use header_refusal::HeaderRefusal;
+pub use public_key::PublicKey;
+pub use signer::{sign, sign_typed, sign_typed_with, verify};
+pub use verifier::{extract_kid_from_jws, header_refusal, resolve_verification_key, verify_jws};

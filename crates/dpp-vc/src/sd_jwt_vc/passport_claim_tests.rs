@@ -84,7 +84,7 @@ fn the_root_holds_what_the_issuer_set_and_the_passport_sits_under_one_claim() {
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
-            holder_key: Some(holder.verifying_key.to_bytes()),
+            holder_key: Some(&holder.public_key()),
         },
     )
     .expect("issue");
@@ -137,7 +137,7 @@ fn a_passport_member_named_like_a_registered_claim_stays_in_the_passport() {
     // Read in full, and at an instant the impostor `nbf` and `exp` would refuse.
     let claims = verify(
         &credential.serialise(),
-        &public_key_b64(&store),
+        &public_key(&store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
@@ -169,7 +169,7 @@ fn the_passports_own_status_is_not_the_credentials() {
 
     let claims = verify(
         &credential.serialise(),
-        &public_key_b64(&store),
+        &public_key(&store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,

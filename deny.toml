@@ -28,8 +28,10 @@ version = 2
 yanked = "deny"
 ignore = [
     # Each entry must carry the advisory id, the reason it does not reach this
-    # workspace, and what would make it reach us. An unexplained ignore is a
-    # suppression nobody can re-audit.
+    # workspace (or, where it does, why it is accepted and until when), and what
+    # would make it reach us. An unexplained ignore is a suppression nobody can
+    # re-audit. Each one also has its block in `.cargo/audit.toml`.
+    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained, and every version is affected with no safe upgrade. It is reachable from this workspace, but no vulnerability is reported against it. Accepted until timestamps move from chrono to jiff (issue #610); expires 2027-05-17." },
 ]
 
 [licenses]

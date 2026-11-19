@@ -1,12 +1,13 @@
-//! JWS compact serialisation signer — EdDSA over RFC 8785 (JCS) canonical bytes.
+//! JWS compact serialisation signer, under the key's own algorithm (EdDSA, ES256, ES384
+//! or ES512), over RFC 8785 (JCS) canonical bytes.
 
 use base64::Engine;
-use ed25519_dalek::Signer;
 use serde_json::Value;
 
 use crate::keystore::{KeyEntry, KeyStore};
 
-/// Produces a compact JWS with algorithm `EdDSA` over the **RFC 8785 (JCS)
+/// Produces a compact JWS, signed under the key's own algorithm (`EdDSA` for Ed25519,
+/// `ES256` for P-256, `ES384` for P-384 or `ES512` for P-521), over the **RFC 8785 (JCS)
 /// canonical** form of the JSON payload.
 ///
 /// Signing over the canonical bytes (rather than incidental serde output) is
@@ -51,6 +52,22 @@ pub fn sign_typed(
     cty: Option<&str>,
 ) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
+    sign_typed_with(&key, payload, kid, typ, cty)
+}
+
+/// [`sign_typed`] with the key in hand rather than named in a store.
+///
+/// For a caller that holds a [`KeyEntry`] the store did not generate, such as one
+/// built with [`KeyEntry::from_private_jwk`]. The header and the signature are
+/// exactly [`sign_typed`]'s: for the same key, payload, `kid`, `typ` and `cty`
+/// the two return the same token.
+pub fn sign_typed_with(
+    key: &KeyEntry,
+    payload: &Value,
+    kid: &str,
+    typ: Option<&str>,
+    cty: Option<&str>,
+) -> anyhow::Result<String> {
     // Serialised rather than interpolated. `kid`, `typ` and `cty` are
     // caller-supplied, and a value containing a quote or a backslash would
     // otherwise escape the string it sits in — producing malformed JSON at best,
@@ -62,7 +79,7 @@ pub fn sign_typed(
     let mut header = serde_json::Map::new();
     header.insert(
         "alg".to_owned(),
-        Value::String(key.algorithm.jose_alg().to_owned()),
+        Value::String(key.algorithm().jose_alg().to_owned()),
     );
     header.insert("kid".to_owned(), Value::String(kid.to_owned()));
     if let Some(typ) = typ {
@@ -72,7 +89,7 @@ pub fn sign_typed(
         header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
     let canonical = super::canonical::canonicalize(payload)?;
-    Ok(sign_with_header(&key, &header, &canonical))
+    Ok(sign_with_header(key, &header, &canonical))
 }
 
 /// The compact JWS of `payload` under the protected `header`, signed with `key`.
@@ -90,8 +107,7 @@ pub(crate) fn sign_with_header(
     let payload_b64 = b64.encode(payload);
 
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let signature = key.signing_key.sign(signing_input.as_bytes());
-    let sig_b64 = b64.encode(signature.to_bytes());
+    let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()));
 
     format!("{signing_input}.{sig_b64}")
 }
@@ -111,7 +127,7 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     // attacker-supplied, so it may only *confirm* what the key already says —
     // it must never select the verification path. Rejects `alg:none` and every
     // substitution by the same check, and any `crit`.
-    if !super::verifier::header_admissible(&b64, parts[0], key.algorithm) {
+    if !super::verifier::header_admissible(jws, key.algorithm()) {
         return Ok(false);
     }
 
@@ -120,17 +136,13 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     let sig_bytes = b64
         .decode(parts[2])
         .map_err(|e| anyhow::anyhow!("base64: {e}"))?;
+    if sig_bytes.len() != key.algorithm().signature_len() {
+        return Err(anyhow::anyhow!("invalid signature length"));
+    }
 
-    let sig_arr: [u8; 64] = sig_bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("invalid signature length"))?;
-
-    let signature = ed25519_dalek::Signature::from_bytes(&sig_arr);
-
-    // Strict verification (RFC 8032 §8) — see verifier::verify_jws.
+    // Per-algorithm checks, Ed25519's strict verification included, live in one
+    // place — see `PublicKey::verify`.
     Ok(key
-        .verifying_key
-        .verify_strict(signing_input.as_bytes(), &signature)
-        .is_ok())
+        .public_key()
+        .verify(signing_input.as_bytes(), &sig_bytes))
 }

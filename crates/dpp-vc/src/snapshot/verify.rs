@@ -2,7 +2,7 @@
 
 use base64::Engine;
 use chrono::{DateTime, Duration, Utc};
-use dpp_crypto::jws::{canonical::canonicalize, verify_jws};
+use dpp_crypto::jws::{PublicKey, canonical::canonicalize, verify_jws};
 use serde_json::Value;
 
 use super::bound::SnapshotBound;
@@ -62,7 +62,7 @@ pub const CLOCK_SKEW_TOLERANCE: Duration = Duration::minutes(5);
 #[must_use]
 pub fn verify_snapshot_bound(
     document: &Value,
-    public_key_b64: &str,
+    key: &PublicKey,
     now: DateTime<Utc>,
 ) -> SnapshotBound {
     let Some(object) = document.as_object() else {
@@ -84,7 +84,7 @@ pub fn verify_snapshot_bound(
     // valid signature over other bytes says nothing about this document, and
     // matching bytes with no valid signature say nothing about who produced
     // them.
-    match verify_jws(proof, public_key_b64) {
+    match verify_jws(proof, key) {
         Ok(true) => {}
         Ok(false) => {
             return SnapshotBound::Unproven("snapshot proof does not verify".to_owned());

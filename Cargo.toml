@@ -53,6 +53,26 @@ consolidate-commits = true
 tag-name    = "v{{version}}"
 tag-prefix  = ""
 tag-message = "Release version {{version}}"
+# A crates.io publish cannot be undone, and cargo-release's default allows any
+# branch. Every step refuses another branch by name, `publish` and `tag`
+# included; `scripts/release-head-check.sh` refuses a main that is not origin's.
+allow-branch = ["main"]
+
+# ---------------------------------------------------------------------------
+# Lints every member takes with `[lints] workspace = true`. `just lint` and CI
+# run clippy with `-D warnings`, so a warning here fails the build.
+#
+# A library writes nothing to its caller's stdout or stderr: whatever it has to
+# say is a return value, and output the caller did not ask for lands in their
+# logs, their CLI's output or a wasm host that has no console. `dbg!` is a
+# debugging aid that was never meant to ship. Tests may print
+# (`allow-print-in-tests` in `.clippy.toml`), and so may an example, which says
+# so at its top: printing is what it is for.
+# ---------------------------------------------------------------------------
+[workspace.lints.clippy]
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro    = "warn"
 
 # ---------------------------------------------------------------------------
 # Shared dependency versions — crates inherit these with `workspace = true`
@@ -94,6 +114,9 @@ base64       = "0.23"
 hex          = "0.4.3"
 sha2         = "0.11.0"
 ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
+p256         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
+p384         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
+p521         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 zeroize      = { version = "1.9.0", features = ["derive"] }
 aes-gcm      = "0.11.0"
 rand         = "0.10.0"

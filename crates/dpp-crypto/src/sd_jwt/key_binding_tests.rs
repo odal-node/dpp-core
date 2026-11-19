@@ -21,13 +21,13 @@ use crate::test_support::temp_store;
 
 const NOW: i64 = 1_800_000_000;
 
-fn holder(label: &str) -> KeyEntry {
+pub(super) fn holder(label: &str) -> KeyEntry {
     temp_store(label, "holder")
         .load_key("holder")
         .expect("the key was just made")
 }
 
-fn binding() -> KeyBinding {
+pub(super) fn binding() -> KeyBinding {
     KeyBinding {
         audience: "https://verifier.example".to_owned(),
         nonce: "n-0S6_WzA2Mj".to_owned(),
@@ -35,7 +35,7 @@ fn binding() -> KeyBinding {
     }
 }
 
-fn policy() -> KeyBindingPolicy {
+pub(super) fn policy() -> KeyBindingPolicy {
     KeyBindingPolicy {
         audience: "https://verifier.example".to_owned(),
         nonce: "n-0S6_WzA2Mj".to_owned(),
@@ -46,7 +46,7 @@ fn policy() -> KeyBindingPolicy {
 }
 
 /// A token whose Issuer named `cnf`, with `given_name` and `family_name` hidden.
-fn issued_to(cnf: Value) -> SdJwt {
+pub(super) fn issued_to(cnf: Value) -> SdJwt {
     let mut claims = json!({
         "iss": "https://issuer.example",
         "given_name": "Erika",
@@ -60,22 +60,22 @@ fn issued_to(cnf: Value) -> SdJwt {
     SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures)
 }
 
-fn issued(holder: &KeyEntry) -> SdJwt {
-    issued_to(holder_key_confirmation(&holder.verifying_key.to_bytes()))
+pub(super) fn issued(holder: &KeyEntry) -> SdJwt {
+    issued_to(holder_key_confirmation(&holder.public_key()))
 }
 
-fn every_digest(sd_jwt: &SdJwt) -> Vec<String> {
+pub(super) fn every_digest(sd_jwt: &SdJwt) -> Vec<String> {
     sd_jwt.disclosures().iter().map(|d| d.digest()).collect()
 }
 
-fn decoded(jwt: &str, part: usize) -> Map<String, Value> {
+pub(super) fn decoded(jwt: &str, part: usize) -> Map<String, Value> {
     let bytes = B64.decode(jwt.split('.').nth(part).unwrap()).unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
 /// `presentation` with its Key Binding JWT replaced by one signed by `key` over
 /// `header` and `claims`, so a test can break one thing at a time.
-fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -> SdJwt {
+pub(super) fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -> SdJwt {
     let header = header.as_object().unwrap().clone();
     let kb = sign_with_header(key, &header, claims.to_string().as_bytes());
     let unbound = presentation.serialise();
@@ -83,7 +83,7 @@ fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -
     SdJwt::parse(&format!("{sd_jwt}~{kb}")).unwrap()
 }
 
-fn good_claims(presentation: &SdJwt) -> Value {
+pub(super) fn good_claims(presentation: &SdJwt) -> Value {
     json!({
         "iat": NOW,
         "aud": "https://verifier.example",
@@ -94,15 +94,6 @@ fn good_claims(presentation: &SdJwt) -> Value {
 
 fn kb_header() -> Value {
     json!({ "alg": "EdDSA", "typ": "kb+jwt" })
-}
-
-#[test]
-fn the_issuer_names_the_holder_key_with_the_jwk_confirmation_method() {
-    let key = [7u8; 32];
-    assert_eq!(
-        holder_key_confirmation(&key),
-        json!({ "jwk": { "kty": "OKP", "crv": "Ed25519", "x": B64.encode(key) } })
-    );
 }
 
 #[test]
@@ -136,7 +127,7 @@ fn a_bound_presentation_verifies_and_reads_to_what_was_chosen() {
 
 /// Clause 4.3.1, on the RFC's own data: the `sd_hash` each of its three Key
 /// Binding JWTs carries is the digest of the presentation it is attached to. The
-/// RFC's Holder keys are P-256, so their signatures are not this crate's to check.
+/// RFC's Holder keys are P-256; their signatures are checked in `rfc9901_es256_tests.rs`.
 #[test]
 fn the_rfc_s_key_binding_jwts_carry_the_sd_hash_this_crate_computes() {
     for presentation in [A3_PRESENTATION, A4_PRESENTATION, S52_PRESENTATION] {
@@ -158,70 +149,6 @@ fn a_token_without_a_key_binding_jwt_is_refused_when_one_is_required() {
     assert_eq!(
         presented.disclosed_payload_with_key_binding(&policy()),
         Err(SdJwtError::KeyBindingMissing)
-    );
-}
-
-#[test]
-fn a_holder_key_must_be_named_and_be_ed25519() {
-    let key = holder("kb-no-cnf");
-    let unnamed = issued_to(json!(null));
-    assert_eq!(
-        unnamed
-            .present_with_key_binding(&[], &binding(), &key)
-            .err(),
-        Some(SdJwtError::NoHolderKey)
-    );
-    let p256 = issued_to(json!({ "jwk": { "kty": "EC", "crv": "P-256", "x": "AA", "y": "AA" } }));
-    assert_eq!(
-        p256.present_with_key_binding(&[], &binding(), &key).err(),
-        Some(SdJwtError::UnsupportedHolderKey)
-    );
-    let mut declared = holder_key_confirmation(&key.verifying_key.to_bytes());
-    declared["jwk"]["alg"] = json!("ES256");
-    assert_eq!(
-        issued_to(declared)
-            .present_with_key_binding(&[], &binding(), &key)
-            .err(),
-        Some(SdJwtError::UnsupportedHolderKey)
-    );
-}
-
-#[test]
-fn a_holder_cannot_bind_with_a_key_the_token_does_not_name() {
-    let named = holder("kb-named");
-    let other = holder("kb-other");
-    assert_eq!(
-        issued(&named)
-            .present_with_key_binding(&[], &binding(), &other)
-            .err(),
-        Some(SdJwtError::HolderKeyMismatch)
-    );
-}
-
-/// A concealed `cnf` that is not chosen leaves the Verifier no key to check with,
-/// so the Holder is told now rather than every Verifier later.
-#[test]
-fn a_concealed_holder_key_has_to_be_presented() {
-    let key = holder("kb-concealed-cnf");
-    let mut claims = Map::new();
-    claims.insert(
-        "cnf".to_owned(),
-        holder_key_confirmation(&key.verifying_key.to_bytes()),
-    );
-    let (kept, disclosures) = conceal(&claims, |_| true).unwrap();
-    let sd_jwt = SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures);
-    assert_eq!(
-        sd_jwt.present_with_key_binding(&[], &binding(), &key).err(),
-        Some(SdJwtError::NoHolderKey)
-    );
-    let cnf = every_digest(&sd_jwt);
-    let presented = sd_jwt
-        .present_with_key_binding(&[cnf[0].as_str()], &binding(), &key)
-        .expect("binds once cnf travels");
-    assert!(
-        presented
-            .disclosed_payload_with_key_binding(&policy())
-            .is_ok()
     );
 }
 
@@ -410,7 +337,7 @@ fn the_type_is_compared_as_a_media_type() {
 #[test]
 fn a_declared_algorithm_is_the_one_written_and_held_to() {
     let key = holder("kb-declared");
-    let mut cnf = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let mut cnf = holder_key_confirmation(&key.public_key());
     cnf["jwk"]["alg"] = json!("Ed25519");
     let presented = issued_to(cnf)
         .present_with_key_binding(&[], &binding(), &key)

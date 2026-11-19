@@ -9,17 +9,16 @@ use aes_gcm::{
     aead::{Aead, KeyInit, Payload, consts::U12},
 };
 use anyhow::{Context, Result};
-use ed25519_dalek::SigningKey;
 use rand::Rng;
-use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 use super::crypto::{
     compute_envelope_hmac, derive_aes_key_argon2, derive_aes_key_sha256, derive_integrity_key,
     verify_envelope_hmac,
 };
-use super::entry::KeyEntry;
+use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
 use crate::jws::algorithm::KeyAlgorithm;
+use crate::jws::public_key::PublicKey;
 
 /// Type alias for the key-ID → record map stored in the key store.
 pub(crate) type KeyRecordMap = HashMap<String, KeyRecord>;
@@ -65,6 +64,7 @@ impl KeyRecord {
         nonce: Vec<u8>,
         fingerprint: String,
         verifying_key_hex: String,
+        algorithm: KeyAlgorithm,
     ) -> Self {
         Self {
             encrypted_signing_key,
@@ -72,7 +72,7 @@ impl KeyRecord {
             fingerprint,
             verifying_key_hex,
             revoked: false,
-            algorithm: default_algorithm(),
+            algorithm,
         }
     }
 }
@@ -108,6 +108,17 @@ impl From<&KeyRecord> for PublicKeyInfo {
 }
 
 impl PublicKeyInfo {
+    /// The recorded public key, validated as a key of the recorded algorithm.
+    ///
+    /// # Errors
+    /// If the recorded public key is not hexadecimal, or not a key of its
+    /// algorithm.
+    pub fn public_key(&self) -> Result<PublicKey> {
+        let bytes = hex::decode(&self.verifying_key_hex)
+            .context("the recorded public key is not valid hexadecimal")?;
+        PublicKey::from_bytes(self.algorithm, &bytes).context("the recorded public key")
+    }
+
     /// The key's RFC 9278 thumbprint URI.
     ///
     /// This is the key's identity on the wire: it is the fragment of the
@@ -119,9 +130,7 @@ impl PublicKeyInfo {
     /// # Errors
     /// If the recorded public key is not valid hexadecimal.
     pub fn thumbprint_uri(&self) -> Result<String> {
-        let bytes = hex::decode(&self.verifying_key_hex)
-            .context("the recorded public key is not valid hexadecimal")?;
-        Ok(self.algorithm.thumbprint_uri(&bytes))
+        Ok(self.public_key()?.thumbprint_uri())
     }
 }
 
@@ -195,6 +204,10 @@ impl UpgradeNeeded {
 /// tampering. A store in an older format, including the bare SHA-256 one, is
 /// refused by [`Self::open`] and upgraded in place by
 /// [`Self::open_and_migrate`]; see [`UpgradeNeeded`].
+///
+/// One writer per file at a time. Every write replaces the file from this handle's
+/// in-memory map, so a second handle on the same file overwrites the first one's
+/// writes; the store takes no cross-process lock.
 pub struct KeyStore {
     pub(crate) path: std::path::PathBuf,
     pub(crate) cipher: Aes256Gcm,
@@ -402,49 +415,63 @@ impl KeyStore {
         }
     }
 
+    /// Generate an Ed25519 key under `key_id`. See [`Self::generate_key_with`].
     pub fn generate_key(&self, key_id: &str) -> Result<KeyEntry> {
+        self.generate_key_with(key_id, KeyAlgorithm::Ed25519)
+    }
+
+    /// Generate a key of `algorithm` under `key_id`, replacing any key there.
+    ///
+    /// # Errors
+    /// When the store still needs migration, or cannot be written.
+    pub fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \
                  open it with `KeyStore::open_and_migrate`"
             );
         }
-        let signing_key = SigningKey::generate(&mut crate::os_rng());
-        let verifying_key = signing_key.verifying_key();
-        let fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
-        let verifying_key_hex = hex::encode(verifying_key.as_bytes());
+        let material = SigningMaterial::generate(algorithm);
+        let (record, entry) = self.seal_new_record(material)?;
+        {
+            let mut map = self.records.write().expect("key store write lock poisoned");
+            let mut proposed = map.clone();
+            proposed.insert(key_id.to_owned(), record);
+            self.persist_envelope(&proposed)?;
+            *map = proposed;
+        }
+        Ok(entry)
+    }
+
+    /// Encrypt fresh key material into a record bound to its own fingerprint,
+    /// and hand back the in-memory entry beside it. Writes nothing.
+    pub(crate) fn seal_new_record(
+        &self,
+        material: SigningMaterial,
+    ) -> Result<(KeyRecord, KeyEntry)> {
+        let public = material.public_key();
+        let fingerprint = fingerprint_of(&public);
+        let verifying_key_hex = hex::encode(public.as_bytes());
 
         let mut nonce_bytes = [0u8; 12];
         crate::os_rng().fill_bytes(&mut nonce_bytes);
         let nonce = <&Nonce<U12>>::from(&nonce_bytes);
 
-        let mut raw = signing_key.to_bytes();
+        let secret = material.secret();
         let encrypted = self
             .cipher
-            .encrypt(nonce, Self::record_payload(raw.as_ref(), &fingerprint))
+            .encrypt(nonce, Self::record_payload(secret.as_ref(), &fingerprint))
             .map_err(|_| anyhow::anyhow!("AES-GCM encrypt failed"))?;
-        raw.zeroize();
+        drop(secret);
 
         let record = KeyRecord::new(
             encrypted,
             nonce_bytes.to_vec(),
             fingerprint.clone(),
             verifying_key_hex,
+            material.algorithm(),
         );
-
-        {
-            let mut map = self.records.write().expect("key store write lock poisoned");
-            map.insert(key_id.to_owned(), record);
-            self.persist_envelope(&map)?;
-        }
-
-        Ok(KeyEntry {
-            signing_key,
-            verifying_key,
-            fingerprint,
-            revoked: false,
-            algorithm: default_algorithm(),
-        })
+        Ok((record, KeyEntry::new(material, fingerprint, false)))
     }
 
     pub fn load_key(&self, key_id: &str) -> Result<KeyEntry> {
@@ -560,28 +587,18 @@ impl KeyStore {
             self.cipher
                 .decrypt(nonce, record.encrypted_signing_key.as_ref())
         };
-        let mut raw =
-            Zeroizing::new(plaintext.map_err(|_| anyhow::anyhow!("AES-GCM decrypt failed"))?);
+        // `raw` is `Zeroizing`: the decrypted secret is cleared when it drops,
+        // including on the early return below.
+        let raw = Zeroizing::new(plaintext.map_err(|_| anyhow::anyhow!("AES-GCM decrypt failed"))?);
 
-        // `Zeroizing` on both: the intermediate array is a second copy of the
-        // private key, and the early return below used to drop `raw` without
-        // clearing it.
-        let bytes: Zeroizing<[u8; 32]> = Zeroizing::new(
-            raw.as_slice()
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("unexpected key length"))?,
-        );
-        let signing_key = SigningKey::from_bytes(&bytes);
-        let verifying_key = signing_key.verifying_key();
-        raw.zeroize();
-
-        Ok(KeyEntry {
-            fingerprint: record.fingerprint.clone(),
-            signing_key,
-            verifying_key,
-            revoked: record.revoked,
-            algorithm: record.algorithm,
-        })
+        // The record's algorithm decides how the secret is read. It is covered by
+        // the envelope HMAC, so it cannot be flipped without failing open.
+        let material = SigningMaterial::from_secret(record.algorithm, raw.as_slice())?;
+        Ok(KeyEntry::new(
+            material,
+            record.fingerprint.clone(),
+            record.revoked,
+        ))
     }
 
     pub(crate) fn persist_envelope(&self, map: &KeyRecordMap) -> Result<()> {

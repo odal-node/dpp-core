@@ -1,7 +1,8 @@
 //! Presentations bound to a Holder's key, judged with Key Binding required.
 //!
-//! RFC 9901 clauses 4.1.2, 4.3 and 7.3. The Issuer names the Holder's Ed25519 key
-//! in `cnf`, this crate's Holder binds the presentation, and every case carries
+//! RFC 9901 clauses 4.1.2, 4.3 and 7.3. The Issuer names the Holder's key in `cnf`,
+//! Ed25519 in most cases and P-256 in some, this crate's Holder binds the
+//! presentation, and every case carries
 //! the challenge a Verifier would hold it to. The controls are bound by
 //! [`SdJwt::present_with_key_binding`] itself. Every other case is one of them with
 //! one thing changed and the Key Binding JWT signed again, so that the change is
@@ -107,10 +108,18 @@ fn add(out: &mut Vec<Bound>, id: &str, clause: &'static str, token: String) {
     });
 }
 
+/// A P-256 key a Holder signs with, generated in a store of its own.
+fn p256_holder(label: &str) -> KeyEntry {
+    crate::keystore::KeyStore::open(crate::test_support::temp_path(label), "test-passphrase")
+        .expect("a store to hold the key")
+        .generate_key_with("holder", crate::jws::KeyAlgorithm::EcdsaP256)
+        .expect("generate")
+}
+
 pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
     let key = holder("sdjwt-oracle-holder");
     let stranger = holder("sdjwt-oracle-stranger");
-    let cnf = holder_key_confirmation(&key.verifying_key.to_bytes());
+    let cnf = holder_key_confirmation(&key.public_key());
     let sd_jwt = issued(issuer, Some(cnf.clone()), false);
     let all = every(&sd_jwt);
     let mut out = Vec::new();
@@ -363,7 +372,7 @@ pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
         ),
         (
             "reject/holder-key-is-p-256",
-            "this crate binds with Ed25519 keys only",
+            "RFC 9901 §4.3.2: the Key Binding JWT must validate under the key the SD-JWT names as the Holder's; this one is signed by an Ed25519 key under EdDSA, so it is refused for its algorithm, not for its key",
             Some(json!({ "jwk": p256 })),
         ),
         (
@@ -381,6 +390,44 @@ pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
             json!({ "iat": now, "aud": AUDIENCE, "nonce": NONCE, "sd_hash": presented.sd_hash() });
         add(&mut out, id, clause, bind(&presented, &key, &header, &c));
     }
+
+    // A Holder on P-256: the key `cnf` names signs its own Key Binding JWT under ES256.
+    // This crate's Holder binds it, and it must be accepted. A Key Binding JWT signed
+    // by another P-256 key must be refused.
+    let holder_p256 = p256_holder("sdjwt-oracle-p256-holder");
+    let named_p256 = issued(
+        issuer,
+        Some(holder_key_confirmation(&holder_p256.public_key())),
+        false,
+    );
+    let bound_p256 = named_p256
+        .present_with_key_binding(&[], &binding(now), &holder_p256)
+        .expect("the P-256 Holder binds");
+    add(
+        &mut out,
+        "control/holder-key-is-p-256",
+        "RFC 9901 §4.3.2: the Key Binding JWT validates under the P-256 key the SD-JWT names as the Holder's, and is ES256",
+        bound_p256.serialise(),
+    );
+    let stranger_p256 = p256_holder("sdjwt-oracle-p256-stranger");
+    let presented_p256 = named_p256.present(&[]).expect("presents");
+    let c_p256 = json!({
+        "iat": now,
+        "aud": AUDIENCE,
+        "nonce": NONCE,
+        "sd_hash": presented_p256.sd_hash(),
+    });
+    add(
+        &mut out,
+        "reject/holder-key-is-another-p-256-key",
+        "RFC 9901 §4.3.2: the Key Binding JWT must validate under the key the SD-JWT names as the Holder's, so one signed by another P-256 key is refused",
+        bind(
+            &presented_p256,
+            &stranger_p256,
+            &json!({ "alg": "ES256", "typ": "kb+jwt" }),
+            &c_p256,
+        ),
+    );
 
     // `cnf` itself selectively disclosed, and disclosed.
     let concealed = issued(issuer, Some(cnf), true);

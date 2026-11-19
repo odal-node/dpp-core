@@ -7,6 +7,9 @@
 //! ## Module layout
 //!
 //! - `entry` — [`KeyEntry`], the decrypted in-memory key handed back to callers.
+//! - `error` — [`PrivateJwkError`], why a JWK was refused as a private key.
+//! - `private_jwk` — [`KeyEntry::from_private_jwk`], which builds a key pair from the
+//!   private JWK of a key someone else generated, in memory only.
 //! - `store` — [`KeyStore`] itself: the encrypted record map and its
 //!   open/generate/load/persist paths.
 //! - `crypto`, `rotation`, `migration` — key derivation, rotation, and
@@ -22,7 +25,15 @@
 
 mod crypto;
 mod entry;
+mod error;
 mod migration;
+#[cfg(test)]
+mod persist_tests;
+mod private_jwk;
+#[cfg(test)]
+mod private_jwk_refusal_tests;
+#[cfg(test)]
+mod private_jwk_tests;
 #[cfg(test)]
 mod rfc9106_vector_tests;
 mod rotation;
@@ -31,4 +42,7 @@ mod store;
 mod tests;
 
 pub use entry::KeyEntry;
+#[cfg(test)]
+pub(crate) use entry::SigningMaterial;
+pub use error::PrivateJwkError;
 pub use store::{KeyStore, PublicKeyInfo, UpgradeNeeded};

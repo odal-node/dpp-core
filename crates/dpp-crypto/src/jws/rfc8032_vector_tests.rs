@@ -133,6 +133,16 @@ fn vectors() -> Vec<Vector> {
     ]
 }
 
+/// The public key of one of clause 7.1's tests, as lowercase hexadecimal, for the
+/// other test modules to reuse.
+pub(super) fn public_hex(name: &str) -> &'static str {
+    vectors()
+        .iter()
+        .find(|vector| vector.name == name)
+        .map(|vector| vector.public)
+        .expect("a test of RFC 8032 clause 7.1")
+}
+
 fn bytes<const N: usize>(hex_text: &str) -> [u8; N] {
     hex::decode(hex_text)
         .expect("hex")

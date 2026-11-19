@@ -75,7 +75,12 @@ fn the_rfc_key_pair_yields_the_rfc_public_jwk() {
     assert_eq!(B64.encode(public), PUBLIC_X);
 
     let rfc_jwk: Value = serde_json::from_str(PUBLIC_JWK).expect("the RFC's JWK parses");
-    assert_eq!(KeyAlgorithm::Ed25519.public_key_jwk(&public), rfc_jwk);
+    assert_eq!(
+        super::public_key::PublicKey::from_bytes(KeyAlgorithm::Ed25519, &public)
+            .expect("the RFC key")
+            .jwk(),
+        rfc_jwk
+    );
 }
 
 /// The other direction: the RFC's public JWK, placed in a DID document the way
@@ -105,8 +110,8 @@ fn the_rfc_public_jwk_is_read_as_a_did_document_key() {
     let token = format!("{header}.e30.c2ln");
 
     assert_eq!(
-        resolve_verification_key(&document, &token).as_deref(),
-        Some(PUBLIC_X)
+        resolve_verification_key(&document, &token).map(|key| B64.encode(key.as_bytes())),
+        Some(PUBLIC_X.to_owned())
     );
 }
 
@@ -128,9 +133,18 @@ fn the_rfc_signing_example_reproduces_byte_for_byte() {
 #[test]
 fn this_verifier_accepts_the_rfc_jws_and_refuses_an_altered_one() {
     let published = format!("{HEADER_B64}.{PAYLOAD_B64}.{SIGNATURE_B64}");
-    assert!(verify_jws(&published, PUBLIC_X).expect("well-formed"));
+    assert!(verify_jws(&published, &rfc_key()).expect("well-formed"));
 
     let altered_payload = B64.encode(format!("{PAYLOAD_TEXT}!"));
     let altered = format!("{HEADER_B64}.{altered_payload}.{SIGNATURE_B64}");
-    assert!(!verify_jws(&altered, PUBLIC_X).expect("well-formed"));
+    assert!(!verify_jws(&altered, &rfc_key()).expect("well-formed"));
+}
+
+/// The RFC's public key, as this crate holds one.
+fn rfc_key() -> super::public_key::PublicKey {
+    super::public_key::PublicKey::from_bytes(
+        KeyAlgorithm::Ed25519,
+        &B64.decode(PUBLIC_X).expect("base64url"),
+    )
+    .expect("the RFC's key")
 }

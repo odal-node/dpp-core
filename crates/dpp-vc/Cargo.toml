@@ -37,3 +37,6 @@ uuid        = { workspace = true }
 [dev-dependencies]
 tokio = { version = "1.40", features = ["rt", "macros"] }
 uuid  = { version = "1.14", features = ["v4"] }
+
+[lints]
+workspace = true

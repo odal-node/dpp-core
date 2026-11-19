@@ -10,10 +10,9 @@
 //! its policy, and clause 7.3 step 1 says that choice MUST NOT depend on whether a
 //! Key Binding JWT arrived, so neither looks at the token to decide.
 //!
-//! Ed25519 only, like the rest of this crate: the Holder key in `cnf` must be an
-//! Ed25519 JWK, and the Key Binding JWT is signed with it. The RFC's own examples
-//! bind with P-256 keys, so for those this crate checks the `sd_hash` and not the
-//! signature.
+//! The Holder key in `cnf` is an Ed25519 (`OKP`) JWK, or an EC (`EC`) JWK on P-256,
+//! P-384 or P-521, and the Key Binding JWT is held to that key's algorithm. The
+//! RFC's own examples bind with P-256 keys, and their Key Binding JWTs verify here.
 
 use serde_json::{Map, Value, json};
 
@@ -21,8 +20,9 @@ use super::builder::SdJwt;
 use super::disclosure::digest_of;
 use super::error::SdJwtError;
 use crate::jws::algorithm::KeyAlgorithm;
+use crate::jws::public_key::PublicKey;
 use crate::jws::signer::sign_with_header;
-use crate::jws::verifier::{jwk_ed25519_x, verify_jws};
+use crate::jws::verifier::verify_jws;
 use crate::keystore::KeyEntry;
 
 /// The `typ` of a Key Binding JWT, clause 4.3.
@@ -63,31 +63,36 @@ pub struct KeyBindingPolicy {
 }
 
 /// The `cnf` value an Issuer puts in the payload to enable Key Binding for the
-/// Holder whose Ed25519 public key is `holder_public_key` (clause 4.1.2):
-/// RFC 7800's `jwk` confirmation method, which the clause suggests.
-pub fn holder_key_confirmation(holder_public_key: &[u8]) -> Value {
-    json!({ "jwk": KeyAlgorithm::Ed25519.public_key_jwk(holder_public_key) })
+/// Holder whose public key is `holder` (clause 4.1.2): RFC 7800's `jwk`
+/// confirmation method, which the clause suggests.
+pub fn holder_key_confirmation(holder: &PublicKey) -> Value {
+    json!({ "jwk": holder.jwk() })
 }
 
-/// The Holder key a processed payload names: the `x` of an Ed25519 JWK in
-/// `cnf.jwk`, and the `alg` the JWK declares, if it declares one.
-fn holder_key(payload: &Map<String, Value>) -> Result<(String, Option<String>), SdJwtError> {
-    let jwk = payload
-        .get("cnf")
-        .and_then(|cnf| cnf.get("jwk"))
-        .ok_or(SdJwtError::NoHolderKey)?;
-    let x = jwk_ed25519_x(jwk).ok_or(SdJwtError::UnsupportedHolderKey)?;
+/// The Holder key a processed payload names: the Ed25519 or EC JWK (P-256, P-384 or
+/// P-521) in `cnf.jwk`, and the `alg` the JWK declares, if it declares one. A declared
+/// `alg` must be the key's own.
+fn holder_key(payload: &Map<String, Value>) -> Result<(PublicKey, Option<String>), SdJwtError> {
+    let cnf = payload.get("cnf").ok_or(SdJwtError::NoHolderKey)?;
+    let jwk = cnf.get("jwk").ok_or(SdJwtError::NoHolderKey)?;
+    // RFC 7800 §3.1: the `cnf` value represents a single proof-of-possession
+    // key, so `jwk` is refused beside `jwe` or `jku`, which name the key another way.
+    // `kid` is not one of the three and stays allowed.
+    if cnf.get("jwe").is_some() || cnf.get("jku").is_some() {
+        return Err(SdJwtError::UnsupportedHolderKey);
+    }
+    let key = PublicKey::from_jwk(jwk).ok_or(SdJwtError::UnsupportedHolderKey)?;
     let declared = match jwk.get("alg") {
         None => None,
         Some(alg) => {
             let alg = alg.as_str().ok_or(SdJwtError::UnsupportedHolderKey)?;
-            if KeyAlgorithm::from_jose_alg(alg) != Some(KeyAlgorithm::Ed25519) {
+            if KeyAlgorithm::from_jose_alg(alg) != Some(key.algorithm()) {
                 return Err(SdJwtError::UnsupportedHolderKey);
             }
             Some(alg.to_owned())
         }
     };
-    Ok((x, declared))
+    Ok((key, declared))
 }
 
 /// Whether a `typ` names `kb+jwt`. RFC 7515 clause 4.1.9: media types compare
@@ -147,7 +152,8 @@ impl SdJwt {
     /// What [`Self::present`] refuses. [`SdJwtError::NoHolderKey`] when the
     /// presentation names no Holder key, which is also the case when `cnf` was
     /// concealed and not chosen: the Verifier could not find the key either.
-    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is not Ed25519, and
+    /// [`SdJwtError::UnsupportedHolderKey`] for a key that is none of Ed25519, P-256,
+    /// P-384 and P-521, and
     /// [`SdJwtError::HolderKeyMismatch`] when `holder` is not the key `cnf`
     /// names.
     pub fn present_with_key_binding(
@@ -156,19 +162,17 @@ impl SdJwt {
         binding: &KeyBinding,
         holder: &KeyEntry,
     ) -> Result<Self, SdJwtError> {
-        use base64::Engine;
         let presentation = self.present(reveal_digests)?;
         let payload = presentation.disclosed_payload()?;
-        let (x, declared) = holder_key(&payload)?;
-        let ours = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .encode(holder.verifying_key.to_bytes());
-        if x != ours {
+        let (named, declared) = holder_key(&payload)?;
+        if named != holder.public_key() {
             return Err(SdJwtError::HolderKeyMismatch);
         }
 
         // The `alg` a JWK declares is the one a Verifier holds the signature to,
-        // so it is the one written.
-        let alg = declared.unwrap_or_else(|| holder.algorithm.jose_alg().to_owned());
+        // so it is the one written. Without a declaration, the confirmed key's own
+        // algorithm is, not the `algorithm` field of the entry, which a caller can set.
+        let alg = declared.unwrap_or_else(|| named.algorithm().jose_alg().to_owned());
         let mut header = Map::new();
         header.insert("alg".to_owned(), Value::String(alg));
         header.insert("typ".to_owned(), Value::String(KB_TYP.to_owned()));
@@ -188,7 +192,7 @@ impl SdJwt {
     /// The Holder key is taken from the processed payload's `cnf` (step 5.a), so
     /// a `cnf` that is selectively disclosable has to have been disclosed. The
     /// signature is checked against it with this crate's JWS verifier, which
-    /// refuses `none`, any algorithm but Ed25519 and any `crit` (step 5.b), and
+    /// refuses `none`, an algorithm other than the key's own and any `crit` (step 5.b), and
     /// an `alg` other than the one the JWK declares.
     ///
     /// # Errors
@@ -208,14 +212,14 @@ impl SdJwt {
             .key_binding_jwt()
             .ok_or(SdJwtError::KeyBindingMissing)?;
         let payload = self.disclosed_payload()?;
-        let (x, declared) = holder_key(&payload)?;
+        let (key, declared) = holder_key(&payload)?;
 
         let (header, claims) = decoded(kb).ok_or(Rejected("the JWT"))?;
         let alg = header.get("alg").and_then(Value::as_str);
         if declared.is_some() && declared.as_deref() != alg {
             return Err(Rejected("alg"));
         }
-        if !verify_jws(kb, &x).unwrap_or(false) {
+        if !verify_jws(kb, &key).unwrap_or(false) {
             return Err(Rejected("the signature"));
         }
         if !header

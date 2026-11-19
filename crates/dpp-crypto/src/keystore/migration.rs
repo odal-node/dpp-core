@@ -3,10 +3,9 @@ use aes_gcm::{
     aead::{Aead, KeyInit, consts::U12},
 };
 use anyhow::{Context, Result};
-use ed25519_dalek::SigningKey;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 use super::crypto::derive_aes_key_argon2;
 use super::store::{KeyRecord, KeyRecordMap, KeyStore};
@@ -95,14 +94,12 @@ impl KeyStore {
             // The decrypted private key is the authenticated value; the public key
             // and fingerprint beside it are plaintext metadata. Check them against
             // the private key before they are written under a fresh integrity tag.
-            let mut seed: [u8; 32] = raw
-                .as_slice()
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("stored signing key for {id} is not 32 bytes"))?;
-            let verifying_key = SigningKey::from_bytes(&seed).verifying_key();
-            seed.zeroize();
-            let derived_hex = hex::encode(verifying_key.as_bytes());
-            let derived_fingerprint = hex::encode(Sha256::digest(verifying_key.as_bytes()));
+            let public =
+                super::entry::SigningMaterial::from_secret(record.algorithm, raw.as_slice())
+                    .map_err(|e| anyhow::anyhow!("stored signing key for {id}: {e}"))?
+                    .public_key();
+            let derived_hex = hex::encode(public.as_bytes());
+            let derived_fingerprint = hex::encode(Sha256::digest(public.as_bytes()));
             anyhow::ensure!(
                 record.verifying_key_hex == derived_hex
                     && record.fingerprint == derived_fingerprint,
@@ -134,9 +131,9 @@ impl KeyStore {
             );
         }
 
-        *map = migrated;
-        self.persist_envelope(&map)
+        self.persist_envelope(&migrated)
             .context("Failed to persist migrated key store")?;
+        *map = migrated;
 
         drop(map);
         *self.needs_migration.write().expect("lock") = false;

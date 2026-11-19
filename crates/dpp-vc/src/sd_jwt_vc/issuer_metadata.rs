@@ -91,14 +91,13 @@ pub(super) fn metadata_for_keys(
 /// Clause 4.2: *"It is RECOMMENDED that the Issuer-signed JWT contains a `kid`
 /// JWT header parameter that can be used to look up the public key in the JWK
 /// Set."* [`super::issue`] writes the key's thumbprint URI as `kid`, and
-/// [`KeyAlgorithm::published_jwk`] puts the same value in the JWK, or the
+/// [`PublicKey::published_jwk`] puts the same value in the JWK, or the
 /// recommendation is met in name only — a verifier holding two keys would have no
 /// way to pick.
 ///
-/// [`KeyAlgorithm::published_jwk`]: dpp_crypto::jws::algorithm::KeyAlgorithm::published_jwk
+/// [`PublicKey::published_jwk`]: dpp_crypto::jws::PublicKey::published_jwk
 fn jwk(key: &PublicKeyInfo) -> Option<Value> {
-    let bytes = hex::decode(&key.verifying_key_hex).ok()?;
-    let mut jwk = key.algorithm.published_jwk(&bytes);
+    let mut jwk = key.public_key().ok()?.published_jwk();
     // RFC 7517 clause 4.2: these keys verify signatures and nothing else.
     jwk.as_object_mut()?
         .insert("use".to_owned(), Value::String("sig".to_owned()));

@@ -13,6 +13,204 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ## [Unreleased]
 
+### Breaking
+
+- **Verification takes a `PublicKey`, not base64 text.**
+  `jws::verifier::verify_jws` takes `&PublicKey`, a validated key that carries the
+  algorithm it is used under. Build the key once with
+  `PublicKey::from_bytes(KeyAlgorithm::Ed25519, &raw)` or `PublicKey::from_jwk(&jwk)`,
+  and pass `&key` where a base64url string was passed. A key that is not a point on
+  the curve is refused when it is built, not when a signature is checked against it.
+  (#586)
+
+- **`resolve_verification_key` returns `Option<PublicKey>`.** It returned the base64url
+  `x` of the verification method's JWK. Pass the returned key to `verify_jws` as it
+  is, or call `as_bytes()` or `jwk()` where the text was used. It also returns `None`
+  when the JWK's `x` is not a point on the curve, and when the JWS names an algorithm
+  other than the key's (`EdDSA` or `Ed25519`), even where the JWK declares no `alg`.
+  Before, such a token resolved to the key and was refused by `verify_jws`. Treat
+  `None` as the answer for those tokens. (#586)
+
+- **Invalid keys are refused where they are read.** `PublicKeyInfo::thumbprint_uri`,
+  `build_did_document` and the SD-JWT VC issuer metadata now refuse a recorded public
+  key that is not an Ed25519 point, with an error, where they derived an identifier
+  from its bytes before. A Holder key in `cnf` that is not a point is refused as
+  `SdJwtError::UnsupportedHolderKey`, where it was refused as `HolderKeyMismatch` or
+  as a bad signature before. Keys a store generates are always points, so no stored
+  key is affected unless the store was edited by hand. Migration: none. (#586)
+
+- **`sd_jwt::holder_key_confirmation` takes a `PublicKey`.** It took the raw key bytes.
+  Migration: `holder_key_confirmation(&PublicKey::from_bytes(KeyAlgorithm::Ed25519,
+  &raw)?)`, or `holder_key_confirmation(&entry.public_key())` for a key the store holds.
+  (#586)
+
+- **The raw-byte key methods on `KeyAlgorithm` are removed.** `public_key_jwk`,
+  `jwk_thumbprint`, `thumbprint_uri` and `published_jwk` took the key bytes. Migration:
+  call `jwk()`, `thumbprint()`, `thumbprint_uri()` and `published_jwk()` on a
+  `PublicKey`. The thumbprint and the JWK of an Ed25519 key are unchanged. (#586)
+
+- **`KeyEntry` no longer exposes its key material.** The public `signing_key` and
+  `verifying_key` fields are removed. Migration: `entry.public_key()` for the public
+  half and `entry.sign(message)` for a signature. `fingerprint` and `revoked` stay
+  public. (#586)
+
+- **`KeyEntry::algorithm` is a method, not a field**, since a writable copy could
+  disagree with the key material it describes. Migration: read `entry.algorithm()` where
+  you read `entry.algorithm`. (#587)
+
+- **`sd_jwt_vc::Issuance::holder_key` takes a `PublicKey`.** It was
+  `Option<[u8; 32]>` and is now `Option<&PublicKey>`. Migration:
+  `holder_key: Some(&holder.public_key())`. (#586)
+
+- **`sd_jwt_vc::verify` takes a `PublicKey`.** The second argument was the base64url
+  key. Migration: pass the `PublicKey` built as above. (#586)
+
+- **`verify_snapshot_bound` takes a `PublicKey`.** It is re-exported as
+  `dpp_vc::verify_snapshot_bound`, and its second argument was the base64url key.
+  Migration: pass the `PublicKey` built as above. (#586)
+
+- **`dpp_rules::bundle::JwsVerify::verify` replaces `verify_eddsa`, and
+  `verify_bundle` takes a `PinnedKey`.** `PinnedKey { alg, public_key_b64 }` pins
+  the publisher key together with its JOSE `alg` identifier, so the algorithm can
+  change by re-pinning. `verify_bundle`'s second argument was the base64url key.
+  `verify_bundle` refuses a manifest whose protected header `alg` is not exactly the
+  pin's `alg`, as `BadSignature`, before the verifier runs. An implementer of
+  `JwsVerify` must verify under exactly `key.alg`, and should refuse a mismatched
+  header too. Migration for an implementer: rename `verify_eddsa(jws, public_key_b64)`
+  to `verify(jws, key)`, read the key from `key.public_key_b64`, and return `Err` for
+  an `alg` you do not implement. Migration for a caller: pin under the identifier your
+  publisher writes, which `dpp-crypto` writes as `EdDSA`, and pass
+  `&PinnedKey { alg: "EdDSA", public_key_b64: &key }` where `&key` was passed. (#592)
+
+### Added
+
+- **`jws::PublicKey`, a validated public key and its algorithm.** It is built with
+  `from_bytes` or `from_jwk`, and reads back as `algorithm`, `as_bytes`, `jwk`,
+  `thumbprint`, `thumbprint_uri` and `published_jwk`. `verify` checks a signature
+  under it. (#586)
+
+- **`jws::PublicKeyError`**, why bytes were refused as a public key. (#586)
+
+- **`jws::KeyAlgorithm` is re-exported at the `jws` root**, as
+  `dpp_crypto::jws::KeyAlgorithm`. It was reachable at `jws::algorithm::KeyAlgorithm`
+  and still is. (#586)
+
+- **`keystore::PublicKeyInfo::public_key()`** returns the recorded key as a
+  `PublicKey`, validated as a key of its recorded algorithm. (#586)
+
+- **`keystore::KeyEntry::public_key()` and `sign()`**, the public half of a key pair
+  and a signature under it. (#586)
+
+- **ES256: ECDSA over P-256 with SHA-256, alongside Ed25519.** `KeyAlgorithm::EcdsaP256`
+  is written and read as `"ES256"`, in JWS headers and in the key store. Signing uses
+  RFC 6979 deterministic nonces and writes low-S signatures. Verification takes the
+  64-byte `R ‖ S` form and accepts high-S, the form the RFC 7515 Appendix A.3 example
+  uses. ECDSA is malleable, so nothing may key on signature bytes. A P-256 key is held
+  in SEC1 uncompressed form. An EC JWK is read only with `crv: P-256`, full-length `x`
+  and `y`, and a point on the curve (RFC 7518 §6.2.1); its thumbprint follows RFC 7638
+  §3.2. `verify_jws` names the algorithm in its wrong-length error, so a P-256 key
+  reports `ES256 signature must be 64 bytes`. A key store holding a P-256, P-384 or
+  P-521 key fails closed in a build from before this change, so once one exists the
+  crate cannot be rolled back. An older build must not be run against the same file,
+  even briefly: its saves replace the file from its own map, which has no such key.
+  (#587, #588)
+
+- **`KeyStore::generate_key_with(key_id, algorithm)` and `KeyStore::rotate_key_to(key_id,
+  algorithm)`** create a key of either algorithm. `rotate_key` keeps the key's algorithm,
+  and archived keys keep theirs. (#587)
+
+- **`jws::ES256_ALG` and `jws::P256_CRV`**, the JOSE identifier and the JWK curve name,
+  re-exported beside their Ed25519 counterparts. (#587)
+
+- **`jws::SignatureLengthError`**, the typed error a signature of the wrong length
+  returns through `anyhow`, so a caller can `downcast_ref` it and tell it from a bad
+  signature. Its text is unchanged for Ed25519 and ES256: `Ed25519 signature must be 64
+  bytes` and `ES256 signature must be 64 bytes`. For ES384 and ES512 it reads `ES384
+  signature must be 96 bytes` and `ES512 signature must be 132 bytes`. (#587, #588)
+
+- **ES384 and ES512: ECDSA over P-384 with SHA-384 and over P-521 with SHA-512.**
+  `KeyAlgorithm::EcdsaP384` and `KeyAlgorithm::EcdsaP521` are written and read as
+  `"ES384"` and `"ES512"`, with the rules of ES256: RFC 6979 deterministic nonces,
+  low-S signatures written, high-S accepted on verification, and `R ‖ S` of 96 and 132
+  octets (RFC 7518 §3.4). An EC JWK is read with `crv: P-384` or `P-521` and
+  full-length coordinates on the curve (RFC 7518 §6.2.1), and the curve decides the
+  algorithm. A key on either curve is held in SEC1 uncompressed form. A Holder key in a
+  Key Binding `cnf` may be on either curve. `PublicKeyError` gains `P384` and `P521`,
+  which is not a break: the enum is `non_exhaustive`. (#588)
+
+- **`jws::ES384_ALG`, `jws::ES512_ALG`, `jws::P384_CRV` and `jws::P521_CRV`**, the JOSE
+  identifiers and the JWK curve names, re-exported beside the ES256 constants. (#588)
+
+- **`keystore::KeyEntry::from_private_jwk` builds a signing key from a private JWK, in
+  memory.** It takes the `secretKeyJwk` of a key someone else generated, such as a key
+  file of the W3C VC-JOSE-COSE test suite. The `kty` and `crv` pair decides the
+  algorithm (`OKP` with `Ed25519`, or `EC` with `P-256`, `P-384` or `P-521`), and a
+  declared `alg` must name it. The public members must be the key that `d` derives
+  (RFC 7518 §6.2.2, RFC 8037 §2). Each refusal has its own `keystore::PrivateJwkError`
+  variant: no `d`, an unsupported key, an `alg` naming another key, public members that
+  are not a point on the curve, a `d` of the wrong length or not a valid scalar, and a
+  `d` that does not match the public key. The key is never written to a `KeyStore`,
+  which holds only keys it generated. (#589)
+
+- **EC issuer keys in `dpp-vc`, issued and verified end to end.** A `did:web` document,
+  the VC-JWT envelope and the SD-JWT VC issuer metadata publish and resolve P-256,
+  P-384 and P-521 keys in their own JWK shapes, under the `kid` a token names. The
+  caller selects the issuer key in each format. For a VC-JWT, `authenticate_access_credential`
+  resolves the envelope's `kid` in the DID document the caller passes in. For an SD-JWT
+  VC, `build_issuer_metadata` publishes the keys, the caller picks the one whose `kid`
+  matches the token's and reads it with `PublicKey::from_jwk`, and `verify` checks the
+  token against that key without a lookup of its own. A rotation from Ed25519 to an EC
+  key keeps the signature of every credential and passport issued before it verifiable,
+  for as long as the archived key stays published and not revoked. A token whose `kid`
+  names the other key of its document is refused. The SD-JWT VC Key Binding tests cover
+  every issuer and Holder algorithm pair, and a presentation for another audience is
+  refused for each pair. The README section "Issuer keys: Ed25519 and the EC curves"
+  shows the published shapes. (#590)
+
+- **`dpp_vc::jose`: sign and verify any W3C credential or presentation as VC-JOSE-COSE.**
+  `sign_credential` and `sign_presentation` secure a credential as a `vc+jwt` and a
+  presentation as a `vp+jwt` (W3C Securing Verifiable Credentials using JOSE and COSE,
+  §3.1), under a `KeyEntry` the caller supplies, in EdDSA, ES256, ES384 or ES512.
+  `verify_credential` and `verify_presentation` check the compact form, the header
+  (no `crit`, and `alg` is the key's, so `alg: none` is refused), the signature, `typ`
+  and `cty`, the payload, `vc` and `vp` claims, the time claims, and `iss` against the
+  credential's `issuer` (§4.1.2) and the `kid` when there is no `iss` (§4.2). Every
+  refusal is a variant of `jose::JoseError`. Three rules are the caller's to know:
+  - Verifying a presentation and verifying its credentials are two operations (VC-JOSE-COSE
+    §5.1 and §5). `verify_presentation` checks the presentation's own token and the shape
+    of each envelope, and lists the envelopes in `VerifiedPresentation::envelopes()`
+    unverified. `VerifiedPresentation::verify_credentials` verifies every credential under
+    the key the caller gives for its envelope, and fails on the first that fails;
+    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` can be verified. The
+    payload from `VerifiedPresentation::payload()` still carries each envelope's raw
+    `data:` URL, so a credential's verified claims are the ones `verify_credentials` or
+    `UnverifiedEnvelope::verify` return.
+  - Time is explicit: `now: Option<i64>`. Under `Some(now)`, `exp` and `nbf` must be
+    numbers and are held to `now` with no leeway; under `None` neither is read. `iat` is
+    never checked.
+  - Undeclared top-level members are refused at signing unless named in
+    `extension_terms`. The base vocabulary is `jose::CREDENTIAL_TERMS` and
+    `jose::PRESENTATION_TERMS`, the terms the VC Data Model 2.0 context defines, with the
+    JWT registered claim names. `vc` and `vp` are refused even when declared.
+    Signing also refuses an `iss` that is not the issuer, and an `exp` or `nbf` that is
+    not a number, as verification does. A presentation's `holder`, when present, must be
+    a URL or an object with a URL `id`, and a credential's subject object must carry a
+    claim besides its `id`. An `iss` that is not a string is refused for a presentation as
+    well. Verification ignores members it does not know.
+
+  The W3C VC-JOSE-COSE test suite's verification inputs, and its issuance inputs signed
+  with its own keys, are vendored under `crates/dpp-vc/src/jose/fixtures` and each
+  verdict is a test. (#591)
+
+- **`jws::signer::sign_typed_with(key, payload, kid, typ, cty)`** signs with a `KeyEntry`
+  in hand, such as one from `KeyEntry::from_private_jwk`. `sign_typed` loads the key from
+  the store and calls it, and the two return the same token for every algorithm. (#591)
+
+- **`jws::verifier::header_refusal(jws, expected)` and `jws::HeaderRefusal`** say why a
+  protected header may not be acted on: unreadable, carrying `crit`, or an `alg` that is
+  not the key's. `verify_jws` is unchanged: it still answers `false` for each of them,
+  and it still decides by the same function. (#591)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking

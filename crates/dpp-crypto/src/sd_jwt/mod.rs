@@ -106,6 +106,8 @@ mod select;
 #[cfg(test)]
 mod array_tests;
 #[cfg(test)]
+mod holder_key_tests;
+#[cfg(test)]
 mod holder_tests;
 #[cfg(test)]
 mod key_binding_tests;
@@ -113,6 +115,8 @@ mod key_binding_tests;
 mod oracle_tests;
 #[cfg(test)]
 mod rfc9901_array_tests;
+#[cfg(test)]
+mod rfc9901_es256_tests;
 #[cfg(test)]
 mod rfc9901_example_tests;
 #[cfg(test)]
