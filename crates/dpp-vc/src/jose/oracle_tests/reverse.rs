@@ -14,7 +14,10 @@
 //! and not from the file's say-so, and the low-S twin of each high-S signature must
 //! verify, which shows the curve order used to tell them apart is the right one.
 //! Without that a file the library had signed with low-S only would pass, and the
-//! claim that high-S is verified would be vacuous.
+//! claim that high-S is verified would be vacuous. Each algorithm also needs a
+//! credential and a presentation that verify, read from each token's own header,
+//! so that high-S signatures carried only by credentials cannot stand in for the
+//! presentation checks.
 //!
 //! ```text
 //! CHECK_JOSE_ORACLE_ISSUED=target/jose-oracle/issued.json \
@@ -27,7 +30,7 @@
 //! and fails on each way a file can be wrong, so a green run of the first means
 //! something.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
@@ -50,7 +53,9 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
     let cases = file["cases"].as_array().expect("the file holds cases");
     let mut out = Vec::new();
     let mut signatures: BTreeMap<(String, bool), usize> = BTreeMap::new();
-    let mut per_alg: BTreeMap<String, usize> = BTreeMap::new();
+    // The (kind, algorithm) pairs that verified. The algorithm is the token's own, from
+    // its protected header, and not the case's `alg` label.
+    let mut covered: BTreeSet<(&str, String)> = BTreeSet::new();
 
     for case in cases {
         let id = case["id"].as_str().unwrap_or("?");
@@ -61,18 +66,23 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
             continue;
         };
         let now = case["now"].as_i64();
-        *per_alg
-            .entry(case["alg"].as_str().unwrap_or("?").to_owned())
-            .or_default() += 1;
+        let alg = token::header(token)["alg"]
+            .as_str()
+            .unwrap_or("?")
+            .to_owned();
         tally(id, token, &key, &mut signatures, &mut out);
 
         match case["kind"].as_str() {
             Some("vc") => match verify_credential(token, &key, now) {
-                Ok(document) if document == case["document"] => {}
-                Ok(document) => out.push(format!(
-                    "{id}: read {document}, the library signed {}",
-                    case["document"]
-                )),
+                Ok(document) => {
+                    covered.insert(("vc", alg.clone()));
+                    if document != case["document"] {
+                        out.push(format!(
+                            "{id}: read {document}, the library signed {}",
+                            case["document"]
+                        ));
+                    }
+                }
                 Err(e) => out.push(format!("{id}: {e:?}")),
             },
             Some("vp") => {
@@ -83,6 +93,7 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
                         continue;
                     }
                 };
+                covered.insert(("vp", alg.clone()));
                 if verified.payload() != &case["document"] {
                     out.push(format!(
                         "{id}: read {}, the library signed {}",
@@ -124,10 +135,12 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
     }
 
     for (alg, _) in ALGORITHMS {
-        if per_alg.get(alg).copied().unwrap_or(0) == 0 {
-            out.push(format!(
-                "coverage: the file holds no token signed under {alg}"
-            ));
+        for (kind, name) in [("vc", "credential"), ("vp", "presentation")] {
+            if !covered.contains(&(kind, alg.to_owned())) {
+                out.push(format!(
+                    "coverage: the file holds no verified {name} signed under {alg}"
+                ));
+            }
         }
         if high_s::is_ecdsa(alg) {
             for (high, name) in [(true, "high-S"), (false, "low-S")] {
@@ -307,9 +320,33 @@ fn the_readback_check_accepts_high_s_and_fails_on_a_mismatch() {
         .as_array_mut()
         .expect("cases")
         .retain(|c| c["alg"] != json!("EdDSA"));
-    assert!(
-        disagreements(&no_eddsa)
-            .iter()
-            .any(|d| d.contains("no token signed under EdDSA"))
-    );
+    let wrong = disagreements(&no_eddsa);
+    for kind in ["credential", "presentation"] {
+        assert!(
+            wrong
+                .iter()
+                .any(|d| d.contains(&format!("no verified {kind} signed under EdDSA"))),
+            "{kind}: {wrong:?}"
+        );
+    }
+}
+
+/// A file with no presentation does not show that presentations verify, so each
+/// algorithm's missing presentation is named.
+#[test]
+fn a_file_without_presentations_names_each_missing_one() {
+    let mut file = selfmade();
+    file["cases"]
+        .as_array_mut()
+        .expect("cases")
+        .retain(|c| c["kind"] == json!("vc"));
+    let wrong = disagreements(&file);
+    for (alg, _) in ALGORITHMS {
+        assert!(
+            wrong
+                .iter()
+                .any(|d| d.contains(&format!("no verified presentation signed under {alg}"))),
+            "{alg}: {wrong:?}"
+        );
+    }
 }

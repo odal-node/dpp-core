@@ -84,20 +84,13 @@ const toBig = (bytes) => BigInt("0x" + (Buffer.from(bytes).toString("hex") || "0
 /** The `S` of an `R || S` signature. */
 function sOf(alg, signature) {
   const width = signature.length / 2;
-  return { width, s: toBig(signature.subarray(width)) };
+  return { s: toBig(signature.subarray(width)) };
 }
 
 /** Whether the signature's `S` is above `n / 2`: the form this crate never writes. */
 export function isHighS(alg, signature) {
   const { s } = sOf(alg, signature);
   return s > ORDERS[alg] / 2n;
-}
-
-/** `R || (n - S)`: the other valid signature over the same message. */
-export function twin(alg, signature) {
-  const { width, s } = sOf(alg, signature);
-  const hex = (ORDERS[alg] - s).toString(16).padStart(2 * width, "0");
-  return Buffer.concat([signature.subarray(0, width), Buffer.from(hex, "hex")]);
 }
 
 export const b64u = (bytes) => Buffer.from(bytes).toString("base64url");
