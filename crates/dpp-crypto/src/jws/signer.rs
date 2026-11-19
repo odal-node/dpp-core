@@ -52,6 +52,22 @@ pub fn sign_typed(
     cty: Option<&str>,
 ) -> anyhow::Result<String> {
     let key = store.load_key(key_id)?;
+    sign_typed_with(&key, payload, kid, typ, cty)
+}
+
+/// [`sign_typed`] with the key in hand rather than named in a store.
+///
+/// For a caller that holds a [`KeyEntry`] the store did not generate, such as one
+/// built with [`KeyEntry::from_private_jwk`]. The header and the signature are
+/// exactly [`sign_typed`]'s: for the same key, payload, `kid`, `typ` and `cty`
+/// the two return the same token.
+pub fn sign_typed_with(
+    key: &KeyEntry,
+    payload: &Value,
+    kid: &str,
+    typ: Option<&str>,
+    cty: Option<&str>,
+) -> anyhow::Result<String> {
     // Serialised rather than interpolated. `kid`, `typ` and `cty` are
     // caller-supplied, and a value containing a quote or a backslash would
     // otherwise escape the string it sits in — producing malformed JSON at best,
@@ -73,7 +89,7 @@ pub fn sign_typed(
         header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
     let canonical = super::canonical::canonicalize(payload)?;
-    Ok(sign_with_header(&key, &header, &canonical))
+    Ok(sign_with_header(key, &header, &canonical))
 }
 
 /// The compact JWS of `payload` under the protected `header`, signed with `key`.
@@ -111,7 +127,7 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     // attacker-supplied, so it may only *confirm* what the key already says —
     // it must never select the verification path. Rejects `alg:none` and every
     // substitution by the same check, and any `crit`.
-    if !super::verifier::header_admissible(&b64, parts[0], key.algorithm()) {
+    if !super::verifier::header_admissible(jws, key.algorithm()) {
         return Ok(false);
     }
 

@@ -167,6 +167,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   refused for each pair. The README section "Issuer keys: Ed25519 and the EC curves"
   shows the published shapes. (#590)
 
+- **`dpp_vc::jose`: sign and verify any W3C credential or presentation as VC-JOSE-COSE.**
+  `sign_credential` and `sign_presentation` secure a credential as a `vc+jwt` and a
+  presentation as a `vp+jwt` (W3C Securing Verifiable Credentials using JOSE and COSE,
+  §3.1), under a `KeyEntry` the caller supplies, in EdDSA, ES256, ES384 or ES512.
+  `verify_credential` and `verify_presentation` check the compact form, the header
+  (no `crit`, and `alg` is the key's, so `alg: none` is refused), the signature, `typ`
+  and `cty`, the payload, `vc` and `vp` claims, the time claims, and `iss` against the
+  credential's `issuer` (§4.1.2) and the `kid` when there is no `iss` (§4.2). Every
+  refusal is a variant of `jose::JoseError`. Three rules are the caller's to know:
+  - Verifying a presentation and verifying its credentials are two operations (VC-JOSE-COSE
+    §5.1 and §5). `verify_presentation` checks the presentation's own token and the shape
+    of each envelope, and lists the envelopes in `VerifiedPresentation::envelopes()`
+    unverified. `VerifiedPresentation::verify_credentials` verifies every credential under
+    the key the caller gives for its envelope, and fails on the first that fails;
+    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` can be verified. The
+    payload from `VerifiedPresentation::payload()` still carries each envelope's raw
+    `data:` URL, so a credential's verified claims are the ones `verify_credentials` or
+    `UnverifiedEnvelope::verify` return.
+  - Time is explicit: `now: Option<i64>`. Under `Some(now)`, `exp` and `nbf` must be
+    numbers and are held to `now` with no leeway; under `None` neither is read. `iat` is
+    never checked.
+  - Undeclared top-level members are refused at signing unless named in
+    `extension_terms`. The base vocabulary is `jose::CREDENTIAL_TERMS` and
+    `jose::PRESENTATION_TERMS`, the terms the VC Data Model 2.0 context defines, with the
+    JWT registered claim names. `vc` and `vp` are refused even when declared.
+    Signing also refuses an `iss` that is not the issuer, and an `exp` or `nbf` that is
+    not a number, as verification does. A presentation's `holder`, when present, must be
+    a URL or an object with a URL `id`, and a credential's subject object must carry a
+    claim besides its `id`. An `iss` that is not a string is refused for a presentation as
+    well. Verification ignores members it does not know.
+
+  The W3C VC-JOSE-COSE test suite's verification inputs, and its issuance inputs signed
+  with its own keys, are vendored under `crates/dpp-vc/src/jose/fixtures` and each
+  verdict is a test. (#591)
+
+- **`jws::signer::sign_typed_with(key, payload, kid, typ, cty)`** signs with a `KeyEntry`
+  in hand, such as one from `KeyEntry::from_private_jwk`. `sign_typed` loads the key from
+  the store and calls it, and the two return the same token for every algorithm. (#591)
+
+- **`jws::verifier::header_refusal(jws, expected)` and `jws::HeaderRefusal`** say why a
+  protected header may not be acted on: unreadable, carrying `crit`, or an `alg` that is
+  not the key's. `verify_jws` is unchanged: it still answers `false` for each of them,
+  and it still decides by the same function. (#591)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking
