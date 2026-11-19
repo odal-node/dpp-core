@@ -53,7 +53,7 @@ serde_json = { workspace = true }
 ed25519-dalek = { workspace = true }
 # `carrier_resolution` drives the repository port, whose lookups are async.
 async-trait = { workspace = true }
-tokio      = { version = "1", features = ["macros", "rt"] }
+tokio      = { version = "1.40", features = ["macros", "rt"] }
 uuid       = { workspace = true }
 semver     = { workspace = true }
 base64     = { workspace = true }

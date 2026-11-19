@@ -1,0 +1,70 @@
+name: Minimal dependencies
+
+# Tests against the oldest dependency versions the manifests allow, using
+# `cargo minimal-versions --direct`. This catches cases where a consumer's
+# locked Cargo.lock picks older transitive versions that break the code.
+#
+# `--direct` minimises only direct dependencies; transitive ones resolve
+# normally. This is the recommended mode when transitive dependencies in the
+# ecosystem have incorrect lower bounds — which is common and not our problem
+# to fix.
+#
+# Root workspace only. `plugins/` and `fuzz/` are excluded: they have separate
+# toolchains and are not published to crates.io.
+on:
+  schedule:
+    # Mondays, early, paired with newest-deps.yml.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  minimal:
+    name: Tests against minimal dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly
+          default: true
+      # No rust-cache: the resolved graph differs from the committed lockfile.
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-hack
+      - name: Install cargo-minimal-versions
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-minimal-versions
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest
+
+      - name: Check against minimal direct dependencies
+        run: |
+          cargo minimal-versions check --workspace --ignore-private --detach-path-deps --direct
+
+      - name: Tests against minimal direct dependencies
+        run: |
+          cargo minimal-versions test --workspace --ignore-private --direct --all-features
+
+      - name: Keep the resolution that failed
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: minimal-dependency-lockfiles
+          path: Cargo.lock
+          retention-days: 14

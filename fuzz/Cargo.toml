@@ -3,9 +3,9 @@
 # Run on Linux: `cargo +nightly fuzz run <target>` from the dpp-core dir.
 [package]
 name = "dpp-core-fuzz"
-version = "0.0.0"
+version = "0.24.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [package.metadata]
 cargo-fuzz = true
