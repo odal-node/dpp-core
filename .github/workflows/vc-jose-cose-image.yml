@@ -1,0 +1,72 @@
+# Builds the harness image from a release tag and publishes it to GHCR, so the W3C
+# suite's implementation list can name an image that is exactly what that release
+# built.
+#
+# It is the same image `vc-jose-cose-suite.yml` runs the suite against on every pull
+# request, built from the tagged commit, from the same Dockerfile.
+#
+# Triggered the way a release is checked, by a pushed `v*` tag
+# (`release-tag.yml`), and it runs that tag's first check before it builds: a tag
+# that is not a release of main gets no image. Nothing here publishes a crate.
+#
+# Two things only a maintainer can do, and neither is done here:
+#   - the first push creates the package private. Making it public is a setting of
+#     the package on GitHub;
+#   - nothing here submits anything to the W3C.
+name: VC-JOSE-COSE suite image
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: The image is built from the tag and pushed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The one job that writes, and only to this repository's packages.
+      packages: write # push the image to this repository's package
+    steps:
+      # Full history: the tag check asks whether the tagged commit is on main, and a
+      # shallow checkout holds no main to ask. The token is not kept; the push below
+      # logs in on its own.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tag is a release of main
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: bash scripts/release-tag-check.sh
+
+      # Tagged with the release's version and with `latest`. The suite's own compose
+      # file names the images of other implementations by `latest`.
+      - name: Build the image
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vc-jose-cose-suite"
+          docker build \
+            --file w3c-suites/vc-jose-cose/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${RELEASE_TAG#v}" \
+            --tag "${image}:${RELEASE_TAG#v}" \
+            --tag "${image}:latest" \
+            .
+
+      - name: Push the image
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vc-jose-cose-suite"
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "${image}:${RELEASE_TAG#v}"
+          docker push "${image}:latest"

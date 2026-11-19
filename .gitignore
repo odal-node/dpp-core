@@ -47,8 +47,9 @@ plugins/*/target/
 # Testing against the newest dependencies moves to the scheduled advisory run
 # rather than happening implicitly on every build.
 #
-# Three lockfiles are tracked, one per workspace: the root, `plugins/` (the ten
-# product-group crates share a workspace) and `fuzz/`.
+# Four lockfiles are tracked, one per workspace: the root, `plugins/` (the ten
+# product-group crates share a workspace), `fuzz/` and the W3C suite harness
+# under `w3c-suites/`.
 #
 # The per-plugin `plugins/*/Cargo.lock` files are **not** among them. They are
 # leftovers from before those crates shared a workspace and no longer govern

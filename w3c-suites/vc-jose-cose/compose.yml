@@ -1,0 +1,19 @@
+# Replaces `implementations/compose.yml` of the suite checkout before the run.
+#
+# The suite starts every row with `docker compose -f ./implementations/compose.yml
+# run --rm <name> ...`, and has no other way to be pointed at a different file. Its
+# own file lists the services of other implementations, most of them images pulled
+# from other people's registries. This one lists ours alone, so no other
+# implementation can start, and nothing is pulled: `pull_policy: never` makes a
+# missing image an error and not a silent run of a published one.
+#
+# The service name is the implementation's `name` in `localConfig.cjs`.
+services:
+  dpp-vc:
+    image: vc-jose-cose-suite:local
+    pull_policy: never
+    # The suite's `tests/` directory is bind-mounted and belongs to whoever ran the
+    # suite, and the verdict is written into it. The workflow passes its own ids.
+    user: "${SUITE_UID:-65532}:${SUITE_GID:-65532}"
+    volumes:
+      - ../tests:/tests
