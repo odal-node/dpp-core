@@ -211,6 +211,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   not the key's. `verify_jws` is unchanged: it still answers `false` for each of them,
   and it still decides by the same function. (#591)
 
+- **An independent JOSE library now judges the VC-JOSE-COSE tokens `dpp_vc::jose` signs,
+  and signs some for it to verify.** `jose-oracle.yml` runs `jose` 6.2.17 (panva),
+  pinned by a committed lockfile and installed with `npm ci --ignore-scripts`. It reads
+  the W3C suite's issuance inputs, rows 1 to 5, and credentials and presentations
+  under EdDSA, ES256, ES384 and ES512, all signed with the suite's keys. For each token it
+  checks the signature under the JWK published for the `kid`, that `alg` is the key's own,
+  `typ` and `cty` exactly as written, the `kid`, the payload, and each `vc+jwt` a
+  presentation envelops; its negative controls must fail first. The suite's runner reads
+  only what an implementation reports about itself, so this, and for P-521 the only
+  independent check this repository has, is the evidence for the issuing side. In the
+  other direction the library signs credentials and presentations, with high-S and low-S
+  ECDSA signatures both on purpose, and `dpp_vc::jose` verifies them: this workspace
+  signs low-S and verifies both, and the check fails if the file holds no high-S
+  signature for an algorithm. The library knows no JSON-LD and no VC Data Model, so it
+  judges the JOSE envelope and nothing else, and no conformance is claimed. (#593)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking
