@@ -20,7 +20,8 @@
 //   - the report holds no other test, no failure and no duplicate;
 //   - at least one row ran;
 //   - an issuance that succeeded left a compact JWS in `data`, which the suite does
-//     not look at.
+//     not look at: three base64url segments, and a first one that decodes to a JSON
+//     object with a string `alg`. The signature is not verified.
 //
 // The expected count is the number of rows of the enabled features. It is not a
 // constant, so it follows the feature list when a later change turns more on.
@@ -41,6 +42,35 @@ const SUITES = [
 
 const problems = [];
 const problem = (message) => problems.push(message);
+
+// The shape of an issuance's `data`: a compact JWS, checked as far as its shape goes.
+const SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+// The reason `token` is not a compact JWS, or null when its shape is one.
+function notCompactJws(token) {
+  if (typeof token !== 'string') return 'data is not a string';
+  const segments = token.split('.');
+  if (segments.length !== 3 || !segments.every((segment) => SEGMENT.test(segment))) {
+    return 'it is not three non-empty base64url segments';
+  }
+  const header = decodeHeader(segments[0]);
+  if (header === null || typeof header !== 'object' || Array.isArray(header) || typeof header.alg !== 'string') {
+    return 'its first segment does not decode to a JSON object with a string alg';
+  }
+  return null;
+}
+
+// The JSON that a base64url segment holds, or null when it is not canonical base64url
+// or not JSON. A re-encode that differs means the segment was not base64url to begin with.
+function decodeHeader(segment) {
+  const bytes = Buffer.from(segment, 'base64url');
+  if (bytes.toString('base64url') !== segment) return null;
+  try {
+    return JSON.parse(bytes.toString('utf8'));
+  } catch {
+    return null;
+  }
+}
 
 const reportPath = process.argv[2];
 if (!reportPath) {
@@ -129,11 +159,13 @@ for (const title of enabled) {
   } catch (error) {
     problem(`row ${config.number} left no readable output: ${error.message}`);
   }
+  if (output === null || typeof output !== 'object' || Array.isArray(output)) {
+    problem(`row ${config.number} left output that is not a JSON object`);
+    output = {};
+  }
   if (config.fn === 'issue' && output.result === 'success') {
-    const token = output.data;
-    if (typeof token !== 'string' || token.split('.').length !== 3) {
-      problem(`row ${config.number} issued, and its data is not a compact JWS`);
-    }
+    const why = notCompactJws(output.data);
+    if (why) problem(`row ${config.number} issued, and its data is not a compact JWS: ${why}`);
   }
   const reason = output.reason ? `  (${output.reason})` : '';
   console.log(`  ${testName}: ${output.result}, expected ${config.expected_result}${reason}`);

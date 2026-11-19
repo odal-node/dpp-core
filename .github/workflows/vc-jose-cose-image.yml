@@ -22,13 +22,25 @@ on:
 permissions:
   contents: read
 
+# Two jobs, because the two tags they write are shared differently.
+#
+# `publish` pushes the release's own version tag. No other release writes that tag, so
+# runs for different releases may run at once; runs for the same tag queue.
+#
+# `latest` then points `latest` at the highest release whose image exists, not at its
+# own release. Its runs queue in one group, and GitHub keeps only one pending run per
+# group, cancelling the older. Because every run converges `latest` on the same answer,
+# it does not matter which queued run survives, and a rerun of an older release cannot
+# move `latest` back.
 jobs:
   publish:
     name: The image is built from the tag and pushed
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: read
-      # The one job that writes, and only to this repository's packages.
       packages: write # push the image to this repository's package
     steps:
       # Full history: the tag check asks whether the tagged commit is on main, and a
@@ -45,8 +57,6 @@ jobs:
           RELEASE_COMMIT: ${{ github.sha }}
         run: bash scripts/release-tag-check.sh
 
-      # Tagged with the release's version and with `latest`. The suite's own compose
-      # file names the images of other implementations by `latest`.
       - name: Build the image
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -58,10 +68,9 @@ jobs:
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${RELEASE_TAG#v}" \
             --tag "${image}:${RELEASE_TAG#v}" \
-            --tag "${image}:latest" \
             .
 
-      - name: Push the image
+      - name: Push the version tag
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,4 +78,42 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vc-jose-cose-suite"
           echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           docker push "${image}:${RELEASE_TAG#v}"
-          docker push "${image}:latest"
+
+  latest:
+    name: latest names the highest released image
+    needs: publish
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-latest
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write # retag `latest` in this repository's package
+    steps:
+      # Only the tags are read. The token is not kept.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Release tags highest first, by version, `vMAJOR.MINOR.PATCH` only. The first one
+      # with a published image is where `latest` points, retagged in the registry
+      # without a rebuild. A higher tag with no image (its publish failed, or it is not
+      # a release of main) is passed over, so `latest` only ever names a published
+      # release.
+      - name: Point latest at the highest released image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/vc-jose-cose-suite"
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          while read -r tag; do
+            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+            if docker buildx imagetools inspect "${image}:${tag#v}" > /dev/null 2>&1; then
+              docker buildx imagetools create --tag "${image}:latest" "${image}:${tag#v}"
+              echo "latest: ${tag#v}"
+              exit 0
+            fi
+            echo "latest: ${tag} has no published image, passed over"
+          done < <(git tag --list 'v*' --sort=-v:refname)
+          echo "latest: no release has a published image; left as it was"

@@ -28,16 +28,13 @@ fn main() -> ExitCode {
 }
 
 fn answer<I: IntoIterator<Item = String>>(args: I) -> Result<(), String> {
-    let args = args::parse(args)?;
-
     // The suite reads whatever is at `--output`, so a file left by an earlier run
     // would score this one. Nothing is left: either a verdict is written below, or
-    // the run is an error with no file.
-    match fs::remove_file(&args.output) {
-        Ok(()) => {}
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-        Err(e) => return Err(format!("cannot clear {}: {e}", args.output.display())),
-    }
+    // the run is an error with no file. That includes a usage error, so the files are
+    // cleared before the arguments are parsed.
+    let args: Vec<String> = args.into_iter().collect();
+    clear_outputs(&args)?;
+    let args = args::parse(args)?;
 
     let feature = Feature::parse(&args.feature)?;
     let verdict = judge(&args, feature)?;
@@ -47,6 +44,24 @@ fn answer<I: IntoIterator<Item = String>>(args: I) -> Result<(), String> {
     let text = serde_json::to_string(&verdict.to_json()).map_err(|e| e.to_string())?;
     fs::write(&args.output, text)
         .map_err(|e| format!("cannot write {}: {e}", args.output.display()))
+}
+
+/// Removes each file that the raw arguments name after `--output`, before `parse` has
+/// judged them. A missing file is nothing to clear. A `--output` with no value after it
+/// names no file, so there is nothing to clear.
+fn clear_outputs(raw: &[String]) -> Result<(), String> {
+    for path in raw
+        .windows(2)
+        .filter(|pair| pair[0] == "--output")
+        .map(|pair| &pair[1])
+    {
+        match fs::remove_file(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("cannot clear {path}: {e}")),
+        }
+    }
+    Ok(())
 }
 
 fn judge(args: &Args, feature: Feature) -> Result<run::Verdict, String> {

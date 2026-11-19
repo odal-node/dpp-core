@@ -90,10 +90,14 @@ them to `src/feature.rs`, and must leave the suite green.
 2. builds the image from the checkout, `vc-jose-cose-suite:local`;
 3. checks out the suite at the commit named in the workflow's `SUITE_COMMIT`, the one
    place that names it, and installs it with `npm ci --ignore-scripts`;
-4. replaces the suite's `implementations/compose.yml` with `compose.yml`, which lists
+4. runs the checker's own tests, `check-run.test.mjs`, against the suite's
+   `tests/test-mapping.js`: each case builds a suite root in a temporary directory and
+   runs `check-run.mjs` in it, and the step fails if any case gets the wrong exit status
+   or message;
+5. replaces the suite's `implementations/compose.yml` with `compose.yml`, which lists
    only this implementation and never pulls an image, and adds `localConfig.cjs`;
-5. runs the suite with mocha's `json` reporter;
-6. runs `check-run.mjs` on that report.
+6. runs the suite with mocha's `json` reporter;
+7. runs `check-run.mjs` on that report.
 
 The suite's own exit status is not enough: it passes a run in which every row was
 skipped, and it skips a row for any feature its manifest does not declare `true`.
@@ -104,14 +108,19 @@ skipped, and it skips a row for any feature its manifest does not declare `true`
 - every row of a disabled feature was skipped;
 - no other implementation, row or failure is in the report;
 - at least one row ran;
-- an issuance that succeeded left a compact JWS in `data`.
+- an issuance that succeeded left a compact JWS in `data`: three non-empty base64url
+  segments, the first of which decodes to a JSON object with a string `alg`. No
+  signature is verified.
 
 The expected number of rows is the number of rows of the enabled features, read from the
 suite's own table. Today that is 16 of 35, and nothing here says so.
 
 `.github/workflows/vc-jose-cose-image.yml` builds the same image from a pushed `v*`
-tag and pushes it to `ghcr.io/<owner>/vc-jose-cose-suite`, tagged with the version and
-`latest`.
+tag and pushes it to `ghcr.io/<owner>/vc-jose-cose-suite`, tagged with the version.
+A second job then points `latest` at the highest `vMAJOR.MINOR.PATCH` release whose
+image is published, retagging it in the registry without a rebuild. It does not point
+`latest` at its own release, so a rerun of an older release cannot move `latest` back,
+and it does not matter which of several queued runs survives.
 
 ## Run it locally
 
@@ -169,4 +178,5 @@ runs the image runs it as the user that owns the directory, with `docker run --u
 | `localConfig.cjs` | The manifest that registers the implementation, and the features on |
 | `compose.yml` | Replaces the suite's compose file, with this implementation alone |
 | `check-run.mjs` | The strict reading of a run |
+| `check-run.test.mjs` | The checker's own tests, run by `node --test` |
 | `Dockerfile`, `Dockerfile.dockerignore` | The image, and the paths its build may read |
