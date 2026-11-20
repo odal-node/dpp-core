@@ -34,8 +34,8 @@ pub struct Args {
 
 /// Parse the arguments after the program name. The error is a usage message.
 ///
-/// `--sd` is kept as given, and read where it is used: the suite passes it only to the
-/// SD-JWT rows that issue.
+/// `--sd` is kept as given. `judge` refuses it unless the command issues an SD-JWT feature,
+/// which is the only kind of row the suite passes it to.
 pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Args, String> {
     let mut args = args.into_iter();
     let command = match args.next().as_deref() {

@@ -55,7 +55,8 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   array element: `credentialSubject.phoneNumbers[0]`. The harness turns each into the
   library's `ClaimPath` (`src/paths.rs`), because the library has no string syntax of its
   own. A path that is not in that syntax is an unusable input, not a verdict, and so is
-  `--sd` given to a JOSE feature. An SD-JWT issuance without `--sd` conceals nothing.
+  `--sd` given to a verification or to a JOSE feature, even as `[]`. An SD-JWT issuance
+  without `--sd` conceals nothing.
 - **A presentation is verified with `verify_presentation` only.** VC-JOSE-COSE §5.1
   defines verifying a presentation as validating its own JWT, and so for `vp+sd-jwt` with
   `verify_presentation_sd_jwt`. Row 7 envelops a

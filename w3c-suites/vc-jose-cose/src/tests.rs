@@ -240,11 +240,47 @@ mod command_line {
         assert!(refusal.contains("cannot read"), "{refusal}");
         assert!(!run.output().exists());
     }
+
+    /// `--sd` given to a JOSE issuance is an unusable input, even as an empty list. It is
+    /// refused before any file is read or written, so a file left by an earlier run is
+    /// cleared and nothing replaces it.
+    #[test]
+    fn sd_given_to_a_jose_issuance_is_an_error_with_no_file() {
+        let run = Run::new("sd-jose");
+        let input = run.write("in.json", fixture!("credential-minimal.json"));
+        let key = run.write("key.json", P256);
+        std::fs::write(run.output(), r#"{"result":"success"}"#).expect("a stale file");
+        let mut args = run.args("issue", "credential_jose", &input, &key);
+        args.extend(["--sd".to_owned(), "[]".to_owned()]);
+
+        let refusal = crate::answer(args).expect_err("no verdict");
+
+        assert!(refusal.contains("--sd"), "{refusal}");
+        assert!(!run.output().exists(), "a file was left");
+    }
+
+    /// `--sd` given to a verification is an unusable input, even as an empty list, for the
+    /// same reason as an issuance under a JOSE feature.
+    #[test]
+    fn sd_given_to_a_verification_is_an_error_with_no_file() {
+        let run = Run::new("sd-verify");
+        let token = run.write("token.txt", fixture!("credential-sdjwt-selective.txt"));
+        let key = run.write("key.json", P384);
+        std::fs::write(run.output(), r#"{"result":"success"}"#).expect("a stale file");
+        let mut args = run.args("verify", "credential_sdjwt", &token, &key);
+        args.extend(["--sd".to_owned(), "[]".to_owned()]);
+
+        let refusal = crate::answer(args).expect_err("no verdict");
+
+        assert!(refusal.contains("--sd"), "{refusal}");
+        assert!(!run.output().exists(), "a file was left");
+    }
 }
 
 mod sd_jwt {
     use super::*;
     use crate::paths::parse_sd;
+    use dpp_crypto::sd_jwt::{Disclosure, SdJwt};
 
     const P521: &str = fixture!("vm-p521.json");
 
@@ -308,13 +344,45 @@ mod sd_jwt {
             panic!("not issued")
         };
 
-        let signed = token.split('~').next().expect("a JWT");
         assert_eq!(
             token.split('~').count(),
             4,
             "two Disclosures and the closing ~"
         );
-        assert!(!signed.contains("Jane"));
+        // What a verifier reads when the holder discloses nothing: the Issuer-signed
+        // payload, with every concealed claim left out.
+        let payload = SdJwt::parse(&token)
+            .and_then(|sd_jwt| sd_jwt.present(&[]))
+            .and_then(|sd_jwt| sd_jwt.disclosed_payload())
+            .map(Value::Object)
+            .expect("a payload");
+        assert!(
+            payload["credentialSubject"].get("firstName").is_none(),
+            "{payload}"
+        );
+        assert!(
+            payload["credentialSubject"].get("lastName").is_none(),
+            "{payload}"
+        );
+
+        let fixture: Value =
+            serde_json::from_str(fixture!("credential-selective.json")).expect("JSON");
+        let disclosed: Vec<Disclosure> = token
+            .split('~')
+            .skip(1)
+            .take(2)
+            .map(|encoded| Disclosure::parse(encoded).expect("a Disclosure"))
+            .collect();
+        let mut names: Vec<&str> = disclosed.iter().filter_map(|d| d.claim_name()).collect();
+        names.sort_unstable();
+        assert_eq!(names, ["firstName", "lastName"]);
+        for disclosure in &disclosed {
+            let name = disclosure.claim_name().expect("a claim name");
+            assert_eq!(
+                disclosure.claim_value(),
+                &fixture["credentialSubject"][name]
+            );
+        }
     }
 
     #[test]

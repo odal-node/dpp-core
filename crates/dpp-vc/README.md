@@ -152,7 +152,7 @@ let credential = json!({
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential"],
     "issuer": "https://issuer.example",
-    "credentialSubject": {"id": "did:example:subject", "name": "Example"},
+    "credentialSubject": {"id": "did:example:subject", "name": "Example", "role": "manufacturer"},
     "productPassport": {"id": "urn:example:passport:1"},
 });
 
@@ -183,7 +183,8 @@ let credentials = presented.verify_credentials(Some(now), |envelope| {
 })?;
 assert_eq!(credentials.len(), 1);
 
-// The same credential as an SD-JWT, with `name` concealed. The holder chooses what to
+// The same credential as an SD-JWT, with `name` concealed. `role` stays in the clear,
+// because a subject that is only its `id` is refused. The holder chooses what to
 // disclose, and the verifier reads what it is given.
 let name = ClaimPath::claim("credentialSubject").key("name");
 let sd_jwt = sign_credential_sd_jwt(&credential, issuer_key, issuer_kid, &["productPassport"], &[name])?;
@@ -193,6 +194,16 @@ let withheld = sd_jwt.present(&[])?;
 let hidden = verify_credential_sd_jwt(&withheld.serialise(), &issuer_public, Some(now))?;
 assert!(hidden["credentialSubject"].get("name").is_none());
 # Ok(())
+# }
+#
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#     let key = KeyEntry::from_private_jwk(&json!({
+#         "kty": "OKP",
+#         "crv": "Ed25519",
+#         "d": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A",
+#         "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+#     }))?;
+#     demo(&key, &key, 1_800_000_000)
 # }
 ```
 

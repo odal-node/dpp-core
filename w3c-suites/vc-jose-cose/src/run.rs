@@ -55,7 +55,8 @@ fn key_file(text: &str) -> Result<Value, String> {
 /// `disclose` is the claims an SD-JWT conceals, which the suite gives to rows 17 to 19 as
 /// `--sd`. A JOSE feature given any is not a verdict: the suite never asks for it, and
 /// signing without concealing what was asked to be concealed would be an answer to another
-/// question.
+/// question. `judge` refuses `--sd` on a JOSE feature even when the list is empty, before
+/// this is reached.
 pub fn issue(
     feature: Feature,
     document: &str,

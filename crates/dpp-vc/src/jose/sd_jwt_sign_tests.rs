@@ -97,7 +97,7 @@ fn a_concealed_claim_is_a_digest_in_the_token_and_the_whole_document_is_what_rea
         Some(1)
     );
     assert!(payload.get("_sd").is_none());
-    assert!(!sd_jwt.jwt().contains("Example"));
+    assert!(!payload.to_string().contains("Example"));
     assert_eq!(sd_jwt.disclosures().len(), 1);
     assert_eq!(sd_jwt.disclosures()[0].claim_name(), Some("name"));
     let verified = verify_credential_sd_jwt(&sd_jwt.serialise(), &key.public_key(), None);

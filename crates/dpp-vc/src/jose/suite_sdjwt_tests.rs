@@ -78,7 +78,8 @@ fn row_17_a_basic_credential_is_issued_with_two_claims_concealed_and_verifies_ba
         Some(2)
     );
     assert_eq!(signed["credentialSubject"]["birthDate"], "1990-01-01");
-    assert!(!sd_jwt.jwt().contains("Jane"));
+    assert!(signed["credentialSubject"].get("firstName").is_none());
+    assert!(signed["credentialSubject"].get("lastName").is_none());
     let verified = verify_credential_sd_jwt(&sd_jwt.serialise(), &public_key("p384"), None);
     assert_eq!(verified.expect("verifies"), document);
 }
