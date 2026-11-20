@@ -47,14 +47,14 @@ jobs:
       # run rather than here — a nightly failure should mean something new is
       # known about the world, not that yesterday's policy still holds.
       #
-      # All three lockfiles: the root, `plugins/` and `fuzz/`. The last two are
-      # their own workspaces, so a scan run from the root reads neither, and an
+      # All four lockfiles: the root, `plugins/`, `fuzz/` and
+      # `w3c-suites/vc-jose-cose/`. The last three are their own workspaces, so a scan run from the root reads neither, and an
       # advisory against a crate only they use would reach nobody. Every one is
       # scanned before the step fails, so one run names every finding.
       - name: cargo deny check advisories
         run: |
           rc=0
-          for ws in . plugins fuzz; do
+          for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
             echo "::group::$ws"
             cargo deny --manifest-path "$ws/Cargo.toml" check advisories || rc=1
             echo "::endgroup::"
@@ -70,7 +70,7 @@ jobs:
       - name: cargo audit
         run: |
           rc=0
-          for ws in . plugins fuzz; do
+          for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
             echo "::group::$ws"
             cargo audit -f "$ws/Cargo.lock" --deny yanked || rc=1
             echo "::endgroup::"

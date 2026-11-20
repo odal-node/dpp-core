@@ -1,0 +1,156 @@
+# Runs the W3C's own VC-JOSE-COSE test suite against `dpp-vc`, through the command
+# line in `w3c-suites/vc-jose-cose/` and an image built in this job.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the DID suite
+# and the oracles are: the suite is Node and Docker, and `cargo build --workspace`
+# succeeding with no Node, no Docker and no services is a property this project
+# states publicly. Keeping the dependency here means the main gate never acquires it.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever. The run is a few minutes, so running it always
+# costs little and leaves it eligible to be required.
+#
+# What it answers: *does `dpp-vc` give the verdict the W3C suite expects, on every
+# row of the features it implements?* The suite is the working group's reading of
+# VC-JOSE-COSE, written by people other than this project's author. It does **not**
+# answer whether `dpp-vc` conforms: the suite is incomplete, no conformance is
+# claimed anywhere, and a green run here is evidence for a row of the register and
+# nothing more. A listing in the W3C's own report is never evidence either.
+#
+# Strict, because the suite alone is not. It passes a run in which every row was
+# skipped, and it skips a row for any feature its manifest does not declare `true`.
+# `check-run.mjs` reads the machine-readable report and fails unless every row of
+# every enabled feature ran and got the expected verdict, every row of a disabled
+# feature was skipped, and no other implementation ran. The enabled features are in
+# `w3c-suites/vc-jose-cose/localConfig.cjs`, the one place that says so.
+name: W3C VC-JOSE-COSE suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # The suite, pinned to a commit and moved only by a deliberate edit with a visible
+  # diff. It publishes no tags or releases, so a commit is the only exact name it
+  # has, and its `main` moves whenever an implementer is added. This is the W3C's
+  # judgement about what VC-JOSE-COSE requires: an unpinned run would turn its next
+  # change into a red build here on code that did not change. Dependabot does not
+  # watch this line. The run names the suite here and nowhere else. The inputs
+  # vendored for `dpp-vc`'s own tests name the same commit
+  # (`crates/dpp-vc/src/jose/fixtures_tests.rs`), and are moved with it.
+  SUITE_COMMIT: cf4c93ddf7e1bfef5a3e5db4b9a798b02ea778a9
+
+jobs:
+  suite:
+    name: dpp-vc gets the expected verdict on every row of the features it implements
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Neither checkout keeps the token. This job installs a few hundred npm
+      # packages and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the W3C VC-JOSE-COSE test suite
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: w3c/vc-jose-cose-test-suite
+          ref: ${{ env.SUITE_COMMIT }}
+          path: target/vc-jose-cose-test-suite
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and rustup
+      # is already on the runner, so invoking cargo selects the pinned toolchain by
+      # itself, from this directory as from the root.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: w3c-suites/vc-jose-cose
+
+      # The harness is in no workspace, so nothing else formats, lints or tests it.
+      - name: The harness is formatted, lints clean and passes its tests
+        working-directory: w3c-suites/vc-jose-cose
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      # The image is built here, from this commit, and the compose file never pulls:
+      # what the suite runs is what this commit builds, and not a published image.
+      - name: Build the image
+        run: docker build --file w3c-suites/vc-jose-cose/Dockerfile --tag vc-jose-cose-suite:local .
+
+      # From the suite's own lockfile, with install scripts off. The suite's one git
+      # dependency is named there by commit.
+      - name: Install the suite
+        working-directory: target/vc-jose-cose-test-suite
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # The checker's own tests, against the suite's `test-mapping.js` just installed.
+      # Each case runs `check-run.mjs` on a report it has made, and the step fails if
+      # the checker does not give the exit status and message that case expects.
+      - name: The checker passes its own tests
+        env:
+          SUITE_ROOT: target/vc-jose-cose-test-suite
+        run: node --test w3c-suites/vc-jose-cose/check-run.test.mjs
+
+      # The two files the suite has no other way to be given. `localConfig.cjs` is the
+      # supported way to register an implementation with its
+      # `vc-test-suite-implementations` package, and with one present only the
+      # implementations it names run. The suite starts every row with
+      # `docker compose -f ./implementations/compose.yml`, so that file is replaced by
+      # one that lists this implementation alone.
+      - name: Register the implementation
+        run: |
+          cp w3c-suites/vc-jose-cose/localConfig.cjs target/vc-jose-cose-test-suite/localConfig.cjs
+          cp w3c-suites/vc-jose-cose/compose.yml target/vc-jose-cose-test-suite/implementations/compose.yml
+
+      - name: Record what is actually being run
+        working-directory: target/vc-jose-cose-test-suite
+        run: |
+          echo "node $(node --version)"
+          git log -1 --format='w3c/vc-jose-cose-test-suite %H (%cs)'
+          docker image inspect vc-jose-cose-suite:local --format 'image {{.Id}}, user {{.Config.User}}'
+
+      # The `json` reporter, because the suite's own reporter writes an HTML page. The
+      # container runs as the runner's user: it writes its verdicts into the
+      # bind-mounted `tests/output`, which that user owns.
+      - name: Run the suite
+        id: suite
+        working-directory: target/vc-jose-cose-test-suite
+        run: |
+          SUITE_UID="$(id -u)" SUITE_GID="$(id -g)" npx mocha tests/ \
+            --reporter json --reporter-option output=report.json \
+            --timeout 150000 --preserve-symlinks
+
+      - name: Every row of every enabled feature ran and got the expected verdict
+        if: ${{ !cancelled() && steps.suite.outcome != 'skipped' }}
+        working-directory: target/vc-jose-cose-test-suite
+        run: node ../../w3c-suites/vc-jose-cose/check-run.mjs report.json
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the verdicts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vc-jose-cose-suite
+          path: |
+            target/vc-jose-cose-test-suite/report.json
+            target/vc-jose-cose-test-suite/tests/output
+          retention-days: 7

@@ -1,0 +1,9 @@
+# Only what the Dockerfile copies. Everything else in the repository stays out of
+# the build context, including `.git`, every `target/` and anything untracked.
+*
+!Cargo.toml
+!crates
+!benches
+!w3c-suites
+**/target
+**/node_modules

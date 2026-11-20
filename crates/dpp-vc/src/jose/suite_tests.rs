@@ -73,6 +73,24 @@ fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
     );
 }
 
+/// Row 7's presentation carries an `exp` of 1734397450, 17 December 2024, and the
+/// suite names no verification time. The test above passes no time, as this
+/// repository's harness for the suite does, so `exp` is not read there. Held to a
+/// clock, the presentation verifies until that second and is refused from it on, so
+/// under today's clock it is refused.
+#[test]
+fn row_7_is_refused_from_its_exp_on() {
+    const EXP: i64 = 1_734_397_450;
+    let presentation = token("presentation-jose-multiple.txt");
+    let key = public_key("p384");
+
+    assert!(verify_presentation(&presentation, &key, Some(EXP - 1)).is_ok());
+    assert!(matches!(
+        verify_presentation(&presentation, &key, Some(EXP)),
+        Err(JoseError::Expired)
+    ));
+}
+
 #[test]
 fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
     let presentation = verify_presentation(
