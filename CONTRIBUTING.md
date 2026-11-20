@@ -33,6 +33,7 @@ No Docker, database or external service is needed.
 ```bash
 git clone https://github.com/odal-node/dpp-core.git
 cd dpp-core
+just install-hooks      # pre-commit hook enforces Rule 5: green `just check` before commit
 cargo build --workspace
 cargo nextest run --workspace
 just check
@@ -40,7 +41,8 @@ just check
 
 | Command | What it runs |
 |---|---|
-| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny`, the advisory register, and the repository guards in `scripts/` with their self-tests |
+| `just install-hooks` | Install the pre-commit hook that enforces Rule 5: no commit without a green `just check` |
+| `just check` | The local gate: format, clippy, plugin format and clippy, tests, doctests (each crate's README is compiled), plugin tests, plugin gate self-test, docs, lockfile check, `cargo audit` and `cargo deny`, the advisory register, and the repository guards in `scripts/` with their self-tests — records the tree id so the pre-commit hook can verify it |
 | `just ci` | `just check` plus the Wasm cross-compiles (`wasm-build`), the plugin builds (`build-plugins`) and the test-count check (`test-count`). Run it before pushing. Hosted CI also runs jobs no recipe runs, such as the oracle suites |
 | `just test` | `cargo nextest run --workspace --all-features` (no doctests) |
 | `just test-doc` | Doctests, including the crate READMEs |
