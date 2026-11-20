@@ -155,7 +155,7 @@ tracing      = "0.1.40"
 
 # Utilities
 uuid         = { version = "1.14", features = ["v7", "serde"] }
-anyhow       = "1.0.100"
+anyhow       = "1.0.104"
 thiserror    = "2.0"
 ref-cast     = "1.0.25"
 

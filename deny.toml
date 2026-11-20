@@ -113,7 +113,6 @@ deny = [
     { name = "aws-lc-sys" },
 ]
 skip = [
-    { name = "syn" },
     { name = "getrandom", version = "0.3.4" },
     { name = "r-efi", version = "5.3.0" },
 ]

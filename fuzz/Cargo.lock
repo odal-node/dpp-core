@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "dpp-core-fuzz"
-version = "0.24.0"
+version = "0.0.0"
 dependencies = [
  "dpp-crypto",
  "dpp-digital-link",

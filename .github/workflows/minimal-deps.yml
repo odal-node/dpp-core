@@ -1,13 +1,13 @@
 name: Minimal dependencies
 
 # Tests against the oldest dependency versions the manifests allow, using
-# `cargo minimal-versions --direct`. This catches cases where a consumer's
+# `-Z direct-minimal-versions`. This catches cases where a consumer's
 # locked Cargo.lock picks older transitive versions that break the code.
 #
-# `--direct` minimises only direct dependencies; transitive ones resolve
-# normally. This is the recommended mode when transitive dependencies in the
-# ecosystem have incorrect lower bounds — which is common and not our problem
-# to fix.
+# Direct minimal versions minimises only direct dependencies; transitive ones
+# resolve normally. This is the recommended mode when transitive dependencies
+# in the ecosystem have incorrect lower bounds — which is common and not our
+# problem to fix.
 #
 # Root workspace only. `plugins/` and `fuzz/` are excluded: they have separate
 # toolchains and are not published to crates.io.
@@ -44,22 +44,22 @@ jobs:
         uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-hack
-      - name: Install cargo-minimal-versions
-        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
-        with:
-          tool: cargo-minimal-versions
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
 
+      - name: Update to minimal direct dependencies
+        run: |
+          cargo +nightly update -Z direct-minimal-versions
+
       - name: Check against minimal direct dependencies
         run: |
-          cargo minimal-versions check --workspace --ignore-private --detach-path-deps --direct
+          cargo hack check --workspace --ignore-private --all-targets --all-features
 
       - name: Tests against minimal direct dependencies
         run: |
-          cargo minimal-versions test --workspace --ignore-private --direct --all-features
+          cargo nextest run --workspace --all-features
 
       - name: Keep the resolution that failed
         if: failure()
