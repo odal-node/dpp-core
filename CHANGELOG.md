@@ -88,7 +88,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   ES384 and ES512, beside `jws`. `sign_sign1` writes a tagged message and
   `verify_sign1` returns the payload and the protected `kid`, `typ` and content type.
   `dpp-crypto` gains a CBOR dependency, `cbor4ii`, with its default features off; it
-  has no dependencies of its own. (#633)
+  has no dependencies of its own. (#639)
 
 - **`jws::PublicKey`, a validated public key and its algorithm.** It is built with
   `from_bytes` or `from_jwk`, and reads back as `algorithm`, `as_bytes`, `jwk`,
