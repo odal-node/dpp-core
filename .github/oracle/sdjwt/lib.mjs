@@ -48,12 +48,16 @@ export function hasher(data, alg) {
 
 const b64u = (bytes) => Buffer.from(bytes).toString("base64url");
 
-/** A verifier for one JWK: Ed25519 (EdDSA) or P-256 (ES256, raw r||s). */
+/** The hash each curve's JWS algorithm signs with (RFC 7518 clause 3.4): ES256, ES384, ES512. */
+const EC_DIGEST = { "P-256": "sha256", "P-384": "sha384", "P-521": "sha512" };
+
+/** A verifier for one JWK: Ed25519 (EdDSA), or P-256, P-384 or P-521 (ES256, ES384, ES512, raw r||s). */
 export function verifierFor(jwk) {
   const key = createPublicKey({ key: jwk, format: "jwk" });
   const options =
     jwk.kty === "EC" ? { key, dsaEncoding: "ieee-p1363" } : { key };
-  const digest = jwk.kty === "EC" ? "sha256" : null;
+  if (jwk.kty === "EC" && !EC_DIGEST[jwk.crv]) throw new Error(`the judge has no hash for the curve ${jwk.crv}`);
+  const digest = jwk.kty === "EC" ? EC_DIGEST[jwk.crv] : null;
   return (data, signature) =>
     cryptoVerify(digest, Buffer.from(data), options, Buffer.from(signature, "base64url"));
 }

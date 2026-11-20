@@ -20,7 +20,7 @@ fn envelope_with(type_: Value, context: Value) -> Value {
     json!({
         "@context": context,
         "type": type_,
-        "id": "data:application/vc+sd-jwt,opaque",
+        "id": "data:application/vc+cose,opaque",
     })
 }
 

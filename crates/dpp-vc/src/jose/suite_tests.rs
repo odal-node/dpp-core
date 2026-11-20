@@ -67,7 +67,11 @@ fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
                 "application/vc+jwt",
                 Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")
             ),
-            (1, "application/vc+sd-jwt", None),
+            (
+                1,
+                "application/vc+sd-jwt",
+                Some("96qBnDpvS6x8YSCH_xmnLlXZMkDhHBr8lj99u5aog7s")
+            ),
             (2, "application/vc+cose", None),
         ]
     );
@@ -111,23 +115,43 @@ fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
     assert_eq!(credential["issuer"], "https://example.issuer/vc-jose-cose");
 }
 
+/// The second envelope is a `vc+sd-jwt` signed under P-384, which `verify_credentials`
+/// verifies. Under P-256 for every envelope it is refused for its algorithm, and under
+/// P-384 for it the third, a `vc+cose`, is what the call refuses.
 #[test]
-fn row_7_verify_credentials_refuses_the_second_envelope_as_unsupported() {
+fn row_7_verify_credentials_verifies_the_sd_jwt_envelope_and_refuses_the_cose_one() {
     let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
         None,
     )
     .expect("verified");
-    let p256 = public_key("p256");
+    let (p256, p384) = (public_key("p256"), public_key("p384"));
 
-    let result = presentation.verify_credentials(None, |_| Some(p256.clone()));
+    let one_key = presentation.verify_credentials(None, |_| Some(p256.clone()));
+    let result = presentation.verify_credentials(None, |envelope| {
+        Some(if envelope.index == 1 {
+            p384.clone()
+        } else {
+            p256.clone()
+        })
+    });
 
+    assert_eq!(
+        one_key.expect_err("refused"),
+        JoseError::CredentialRefused {
+            index: 1,
+            source: Box::new(JoseError::AlgorithmMismatch {
+                header_alg: Some("ES384".to_owned()),
+                key_alg: KeyAlgorithm::EcdsaP256,
+            }),
+        }
+    );
     assert_eq!(
         result.expect_err("refused"),
         JoseError::UnsupportedEnvelopeFormat {
-            index: 1,
-            media_type: "application/vc+sd-jwt".to_owned(),
+            index: 2,
+            media_type: "application/vc+cose".to_owned(),
         }
     );
 }

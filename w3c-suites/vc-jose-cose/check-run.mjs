@@ -21,7 +21,9 @@
 //   - at least one row ran;
 //   - an issuance that succeeded left a compact JWS in `data`, which the suite does
 //     not look at: three base64url segments, and a first one that decodes to a JSON
-//     object with a string `alg`. The signature is not verified.
+//     object with a string `alg`. For the SD-JWT features it is an SD-JWT: that
+//     compact JWS, then its Disclosures, each base64url, then a closing `~`. No
+//     signature is verified.
 //
 // The expected count is the number of rows of the enabled features. It is not a
 // constant, so it follows the feature list when a later change turns more on.
@@ -56,6 +58,20 @@ function notCompactJws(token) {
   const header = decodeHeader(segments[0]);
   if (header === null || typeof header !== 'object' || Array.isArray(header) || typeof header.alg !== 'string') {
     return 'its first segment does not decode to a JSON object with a string alg';
+  }
+  return null;
+}
+
+// `<Issuer-signed JWT>~<Disclosure>~...~`: a compact JWS, then the Disclosures, then a
+// closing `~` because no Key Binding JWT follows (RFC 9901 section 4).
+function notSdJwt(token) {
+  if (typeof token !== 'string') return 'data is not a string';
+  if (!token.endsWith('~')) return 'it does not end with the `~` of an SD-JWT without Key Binding';
+  const [jwt, ...rest] = token.split('~');
+  const why = notCompactJws(jwt);
+  if (why) return `its Issuer-signed JWT: ${why}`;
+  if (!rest.slice(0, -1).every((disclosure) => SEGMENT.test(disclosure))) {
+    return 'a Disclosure is not a non-empty base64url segment';
   }
   return null;
 }
@@ -164,8 +180,13 @@ for (const title of enabled) {
     output = {};
   }
   if (config.fn === 'issue' && output.result === 'success') {
-    const why = notCompactJws(output.data);
-    if (why) problem(`row ${config.number} issued, and its data is not a compact JWS: ${why}`);
+    if (config.feature.endsWith('_sdjwt')) {
+      const why = notSdJwt(output.data);
+      if (why) problem(`row ${config.number} issued, and its data is not an SD-JWT: ${why}`);
+    } else {
+      const why = notCompactJws(output.data);
+      if (why) problem(`row ${config.number} issued, and its data is not a compact JWS: ${why}`);
+    }
   }
   const reason = output.reason ? `  (${output.reason})` : '';
   console.log(`  ${testName}: ${output.result}, expected ${config.expected_result}${reason}`);

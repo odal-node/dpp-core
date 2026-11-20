@@ -1,7 +1,7 @@
 //! Verifying a presentation secured as a VC-JOSE-COSE `vp+jwt`: its own token, and the
 //! shape of each credential it envelops.
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use dpp_crypto::jws::PublicKey;
 
@@ -32,8 +32,8 @@ use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid
 /// Each member of `verifiableCredential` must be an Enveloped Verifiable Credential (VC DM
 /// 2.0 §4.13): an object whose `type` is `EnvelopedVerifiableCredential`, alone or as a
 /// one-item array, with an `@context`, and an `id` that is a `data:` URL. A `vc+jwt`
-/// envelope's data must also be a compact JWS. Any envelope that fails these refuses the
-/// presentation with [`JoseError::MalformedEnvelope`].
+/// envelope's data must also be a compact JWS, and a `vc+sd-jwt` envelope's an SD-JWT. Any
+/// envelope that fails these refuses the presentation with [`JoseError::MalformedEnvelope`].
 ///
 /// # Errors
 ///
@@ -44,8 +44,18 @@ pub fn verify_presentation(
     now: Option<i64>,
 ) -> Result<VerifiedPresentation, JoseError> {
     let Opened { payload, kid } = open(jws, holder_key, now, PRESENTATION_TYP, PRESENTATION_CTY)?;
+    finish_presentation(payload, kid.as_deref())
+}
+
+/// What follows the outer token in every secured form: the presentation's `holder`, the
+/// holder's `kid`, its `type`, and the shape of each envelope. `payload` is the claims set
+/// of a `vp+jwt`, or an SD-JWT's once its Disclosures are applied.
+pub(crate) fn finish_presentation(
+    payload: Map<String, Value>,
+    kid: Option<&str>,
+) -> Result<VerifiedPresentation, JoseError> {
     check_holder(&payload)?;
-    check_holder_kid(&payload, kid.as_deref())?;
+    check_holder_kid(&payload, kid)?;
     check_presentation_properties(&payload)?;
 
     // JSON-LD lets a property that holds one value hold it without the array.

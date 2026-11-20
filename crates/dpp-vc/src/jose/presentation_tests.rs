@@ -239,7 +239,7 @@ fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused() {
 fn an_envelope_of_another_type_is_not_read() {
     let holder = holder();
     let members = vec![
-        foreign_envelope("application/vc+sd-jwt"),
+        foreign_envelope("text/plain"),
         foreign_envelope("application/vc+cose"),
         foreign_envelope("application/vc+cose;base64"),
     ];
@@ -253,11 +253,7 @@ fn an_envelope_of_another_type_is_not_read() {
         .collect();
     assert_eq!(
         media,
-        [
-            "application/vc+sd-jwt",
-            "application/vc+cose",
-            "application/vc+cose"
-        ]
+        ["text/plain", "application/vc+cose", "application/vc+cose"]
     );
 }
 
@@ -284,7 +280,7 @@ fn every_envelope_is_listed_in_order_with_what_it_needs() {
         );
     let members = vec![
         envelope(&issuer_token(&issuer)),
-        foreign_envelope("Application/VC+SD-JWT"),
+        foreign_envelope("Application/VC+COSE"),
         envelope(&no_kid),
         json!({"@context": "c", "type": "EnvelopedVerifiableCredential", "id": mixed_case}),
     ];
@@ -300,7 +296,7 @@ fn every_envelope_is_listed_in_order_with_what_it_needs() {
         listed,
         [
             (0, "application/vc+jwt", Some(KID)),
-            (1, "application/vc+sd-jwt", None),
+            (1, "application/vc+cose", None),
             (2, "application/vc+jwt", None),
             (3, "application/vc+jwt", Some(KID)),
         ]

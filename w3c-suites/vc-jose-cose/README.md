@@ -37,6 +37,10 @@ The key file is a `JsonWebKey` verification method with a `publicKeyJwk` and a
 | `issue`, `presentation_jose` | `sign_presentation(document, key, kid, &[])` | the same |
 | `verify`, `credential_jose` | `verify_credential(token, key, None)` | `{"result":"success"}` |
 | `verify`, `presentation_jose` | `verify_presentation(token, key, None)` | the same |
+| `issue`, `credential_sdjwt` | `sign_credential_sd_jwt(document, key, kid, &[], paths)` | `{"result":"success","data":"<SD-JWT>"}` |
+| `issue`, `presentation_sdjwt` | `sign_presentation_sd_jwt(document, key, kid, &[], paths)` | the same |
+| `verify`, `credential_sdjwt` | `verify_credential_sd_jwt(token, key, None)` | `{"result":"success"}` |
+| `verify`, `presentation_sdjwt` | `verify_presentation_sd_jwt(token, key, None)` | the same |
 
 A refusal by the library is a `failure`, with the reason in a `reason` member and on
 stderr. The process then exits 0: a refusal is the right answer to a row that expects one.
@@ -47,8 +51,15 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   method. VC-JOSE-COSE §4.2 asks for an absolute URL when the document has no `iss`.
 - **No extension terms.** A member outside the VC Data Model 2.0 vocabulary is refused
   at issuance, which is what row 5 expects.
+- **The paths.** `--sd` is a JSON array of the suite's dotted paths, with `[n]` for one
+  array element: `credentialSubject.phoneNumbers[0]`. The harness turns each into the
+  library's `ClaimPath` (`src/paths.rs`), because the library has no string syntax of its
+  own. A path that is not in that syntax is an unusable input, not a verdict, and so is
+  `--sd` given to a verification or to a JOSE feature, even as `[]`. An SD-JWT issuance
+  without `--sd` conceals nothing.
 - **A presentation is verified with `verify_presentation` only.** VC-JOSE-COSE §5.1
-  defines verifying a presentation as validating its own JWT. Row 7 envelops a
+  defines verifying a presentation as validating its own JWT, and so for `vp+sd-jwt` with
+  `verify_presentation_sd_jwt`. Row 7 envelops a
   `vc+sd-jwt` and a `vc+cose` credential and expects success, so the credentials inside
   are not verified: calling `verify_credentials` would refuse that presentation.
 - **The token is trimmed.** Some of the suite's token files end in a newline.
@@ -65,21 +76,22 @@ An input the harness cannot use, such as a key file that is not a key or a missi
 is not a verdict. The process exits 2 with the reason on stderr and writes no file, so
 the suite scores the row as an `error`. A file left at `--output` by an earlier run is
 removed first, so it cannot be read in place of this run's. The same holds for a feature
-that is not implemented: `credential_sdjwt`, `presentation_sdjwt`, `credential_cose` and
-`presentation_cose` exit 2 by name. They are never answered with `success` or
-`failure`, so a manifest that turns one on before it is built fails loudly.
+that is not implemented: `credential_cose` and `presentation_cose` exit 2 by name. They
+are never answered with `success` or `failure`, so a manifest that turns one on before it
+is built fails loudly.
 
 ## Which features run
 
 `localConfig.cjs` is the one place that says which features are on. It registers the
 implementation with the suite in the one way its `vc-test-suite-implementations` package
 supports: a `localConfig.cjs` in the root of the suite checkout, with which only the
-implementations it names run. Today `credential_jose` and `presentation_jose` are on, and
-the SD-JWT and COSE features are off. The suite's `vc+sd-jwt` and `vc+cose` forms are not
-the IETF SD-JWT VC that `dpp-vc::sd_jwt_vc` implements.
+implementations it names run. Today `credential_jose`, `presentation_jose`,
+`credential_sdjwt` and `presentation_sdjwt` are on, and the COSE features are off. The
+suite's `vc+sd-jwt` and `vc+cose` forms are not the IETF SD-JWT VC that
+`dpp-vc::sd_jwt_vc` implements.
 
-A change that builds one of the other forms sets its two features to `true` here, adds
-them to `src/feature.rs`, and must leave the suite green.
+A change that builds the COSE form sets its two features to `true` here, adds them to
+`src/feature.rs`, and must leave the suite green.
 
 ## How CI runs it
 
@@ -109,11 +121,12 @@ skipped, and it skips a row for any feature its manifest does not declare `true`
 - no other implementation, row or failure is in the report;
 - at least one row ran;
 - an issuance that succeeded left a compact JWS in `data`: three non-empty base64url
-  segments, the first of which decodes to a JSON object with a string `alg`. No
-  signature is verified.
+  segments, the first of which decodes to a JSON object with a string `alg`. For the
+  SD-JWT features it is an SD-JWT: that compact JWS, then its Disclosures, each
+  base64url, then a closing `~`. No signature is verified.
 
 The expected number of rows is the number of rows of the enabled features, read from the
-suite's own table. Today that is 16 of 35, and nothing here says so.
+suite's own table. Today that is 26 of 35, and nothing here says so.
 
 `.github/workflows/vc-jose-cose-image.yml` builds the same image from a pushed `v*`
 tag and pushes it to `ghcr.io/<owner>/vc-jose-cose-suite`, tagged with the version.

@@ -34,8 +34,8 @@ const SUITES = [
 const FEATURES = {
   credential_jose: true,
   presentation_jose: true,
-  credential_sdjwt: false,
-  presentation_sdjwt: false,
+  credential_sdjwt: true,
+  presentation_sdjwt: true,
   credential_cose: false,
   presentation_cose: false,
 };
@@ -62,12 +62,17 @@ const compactJws = (header, payload = {}) => {
   return `${encode(header)}.${encode(payload)}.c2lnbmF0dXJl`;
 };
 
+// One Disclosure, `[salt, name, value]`, as RFC 9901 section 4.2.1 encodes it.
+const DISCLOSURE = Buffer.from(JSON.stringify(['c2FsdA', 'name', 'value'])).toString('base64url');
+const sdJwt = (jws = compactJws({alg: 'ES256'})) => `${jws}~${DISCLOSURE}~`;
+
 // What a row's output file holds when the harness gave the verdict the suite expects.
 function outputFor(config) {
   if (config.expected_result !== 'success') {
     return {result: config.expected_result, reason: 'refused'};
   }
-  return config.fn === 'issue' ? {result: 'success', data: compactJws({alg: 'ES256'})} : {result: 'success'};
+  if (config.fn !== 'issue') return {result: 'success'};
+  return {result: 'success', data: config.feature.endsWith('_sdjwt') ? sdJwt() : compactJws({alg: 'ES256'})};
 }
 
 function entry(row) {
@@ -166,8 +171,8 @@ test('a feature the manifest does not declare is refused by name', () => {
 });
 
 test('a feature switched on whose rows did not run is refused', () => {
-  const declared = {...FEATURES, credential_sdjwt: true};
-  const row = ROWS.find((candidate) => candidate.config.feature === 'credential_sdjwt');
+  const declared = {...FEATURES, credential_cose: true};
+  const row = ROWS.find((candidate) => candidate.config.feature === 'credential_cose');
   assertRefused(check(suiteRoot({declared})), `enabled row did not run and pass: ${row.title}`);
 });
 
@@ -236,3 +241,34 @@ for (const [name, data, why] of issuances) {
     assertRefused(check(root), `row ${ISSUED.config.number} issued, and its data is not a compact JWS: ${why}`);
   });
 }
+
+// An SD-JWT feature's issuance must leave an SD-JWT: the compact JWS above, then its
+// Disclosures, then the closing `~`.
+const SD_ISSUED = ENABLED.find(
+  (row) => row.config.fn === 'issue' && row.config.expected_result === 'success' && row.config.feature.endsWith('_sdjwt'),
+);
+const NO_TILDE = 'it does not end with the `~` of an SD-JWT without Key Binding';
+const BAD_DISCLOSURE = 'a Disclosure is not a non-empty base64url segment';
+const sdIssuances = [
+  ['is a bare compact JWS', compactJws({alg: 'ES256'}), NO_TILDE],
+  ['has no closing ~', `${compactJws({alg: 'ES256'})}~${DISCLOSURE}`, NO_TILDE],
+  ['has an Issuer-signed JWT of ".."', '..~', 'its Issuer-signed JWT: it is not three non-empty base64url segments'],
+  ['has a Disclosure outside base64url', `${compactJws({alg: 'ES256'})}~a+b~`, BAD_DISCLOSURE],
+  ['has an empty Disclosure', `${compactJws({alg: 'ES256'})}~~${DISCLOSURE}~`, BAD_DISCLOSURE],
+  ['is not a string', 42, 'data is not a string'],
+];
+for (const [name, data, why] of sdIssuances) {
+  test(`an SD-JWT issuance that ${name} is refused`, () => {
+    const root = suiteRoot({
+      edit: (run) => run.outputs.set(outputPath(SD_ISSUED.config.number), {result: 'success', data}),
+    });
+    assertRefused(check(root), `row ${SD_ISSUED.config.number} issued, and its data is not an SD-JWT: ${why}`);
+  });
+}
+
+test('an SD-JWT issuance with no Disclosures is accepted', () => {
+  const root = suiteRoot({
+    edit: (run) => run.outputs.set(outputPath(SD_ISSUED.config.number), {result: 'success', data: `${compactJws({alg: 'ES256'})}~`}),
+  });
+  assert.equal(check(root).status, 0);
+});

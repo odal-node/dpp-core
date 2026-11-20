@@ -181,7 +181,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     of each envelope, and lists the envelopes in `VerifiedPresentation::envelopes()`
     unverified. `VerifiedPresentation::verify_credentials` verifies every credential under
     the key the caller gives for its envelope, and fails on the first that fails;
-    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` can be verified. The
+    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` and a `vc+sd-jwt` can be verified. The
     payload from `VerifiedPresentation::payload()` still carries each envelope's raw
     `data:` URL, so a credential's verified claims are the ones `verify_credentials` or
     `UnverifiedEnvelope::verify` return.
@@ -226,6 +226,35 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   signs low-S and verifies both, and the check fails if the file holds no high-S
   signature for an algorithm. The library knows no JSON-LD and no VC Data Model, so it
   judges the JOSE envelope and nothing else, and no conformance is claimed. (#593)
+
+- **`dpp_vc::jose`: sign and verify a credential or presentation as an SD-JWT.**
+  `sign_credential_sd_jwt` and `sign_presentation_sd_jwt` secure a credential as a
+  `vc+sd-jwt` and a presentation as a `vp+sd-jwt` (VC-JOSE-COSE §3.2), concealing the claims
+  the caller names as `dpp_crypto::sd_jwt::ClaimPath`s, and return the `SdJwt` with its
+  Disclosures. `verify_credential_sd_jwt` and `verify_presentation_sd_jwt` verify the
+  combined format `<JWT>~<Disclosure>~...~`. The header rules and the signature are those of
+  the `vc+jwt` form, applied to the Issuer-signed JWT; the Disclosures are then applied
+  (RFC 9901 clause 7.1), and every other check of the `vc+jwt` form is made on the processed
+  payload, which is the JWT Claims Set of §5.2. Every refusal is a `JoseError` variant:
+  `MalformedSdJwt`, `InvalidDisclosures`, `KeyBindingUnsupported`, `DisclosedCriticalClaim`,
+  `UnconcealableClaim`, `DisclosurePathNotFound` and `ReservedSdJwtMember`. Rules to know:
+  - A signer refuses a path that starts at `@context`, `type`, `credentialStatus`,
+    `credentialSchema` or `relatedResource` (§3.2.1: "SHOULD be disclosed"), or at `iss`,
+    `aud`, `exp`, `nbf` or `cnf` (RFC 9901 clause 9.7), and a path that selects nothing. A
+    verifier refuses a token in which one of those five arrived in a Disclosure.
+  - A claim that was concealed and not disclosed is absent to the checks, so a required one
+    is refused. `type` concealed and disclosed, as the suite's own presentation has it, is
+    read as if it had been in the clear.
+  - A token that carries a Key Binding JWT is refused: checking one needs a policy that RFC
+    9901 clause 7.3 leaves to the verifier.
+  - `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials` now verify a
+    `vc+sd-jwt` envelope, and `verify_presentation` refuses a `vc+sd-jwt` envelope whose
+    data is not an SD-JWT. A `vc+cose` envelope is still not verified.
+
+  The W3C test suite's rows 17 to 26 are vendored with their pins, and each verdict is a
+  test. The independent SD-JWT oracle, with both of its libraries, judges the tokens this
+  crate issues as `vc+sd-jwt` and `vp+sd-jwt`, among them the issuances of rows 17 to 19.
+  No conformance is claimed. (#632)
 
 ## [0.24.0] - 2026-11-16
 

@@ -58,7 +58,7 @@ fn row_3_a_presentation_with_a_malformed_envelope_is_issued_and_then_refused() {
 
 /// Row 4's presentation holds a `vc+jwt` signed under P-256 and a `vc+sd-jwt` and a
 /// `vc+cose`. The presentation verifies under its own key and lists the three
-/// envelopes. Only the `vc+jwt` can be verified here, and it verifies under P-256.
+/// envelopes. Only the `vc+jwt` and the `vc+sd-jwt` can be verified here, under P-256 and P-384.
 #[test]
 fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let presentation = json("presentation-multiple.json");
@@ -86,9 +86,14 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
             .verify(&public_key("p256"), None)
             .is_ok()
     );
+    assert!(
+        verified.envelopes()[1]
+            .verify(&public_key("p384"), None)
+            .is_ok()
+    );
     assert!(matches!(
-        verified.envelopes()[1].verify(&public_key("p256"), None),
-        Err(JoseError::UnsupportedEnvelopeFormat { index: 1, .. })
+        verified.envelopes()[2].verify(&public_key("p256"), None),
+        Err(JoseError::UnsupportedEnvelopeFormat { index: 2, .. })
     ));
 }
 

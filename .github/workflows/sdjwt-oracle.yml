@@ -31,7 +31,12 @@
 #   5. the same files are regenerated to show they are reproducible;
 #   6. the same corpus and credentials, judged by the Kotlin library, and the
 #      tokens and credentials it issues read by `dpp_crypto` and `dpp_vc`
-#      (`.github/oracle/sdjwt-jvm`).
+#      (`.github/oracle/sdjwt-jvm`);
+#   7. the W3C credentials and presentations `dpp_vc::jose` secures as `vc+sd-jwt`
+#      and `vp+sd-jwt` (VC-JOSE-COSE section 3.2), among them the three issuance
+#      inputs of the W3C suite, judged by both libraries for the signature under the
+#      published key, the Disclosures and their digests, `typ` and `cty`, and the
+#      processed payload against the document (`vc-sd-jwt.mjs`, `VcSdJwtOracle.kt`).
 #
 # What it does **not** answer, and the register row says so. The original order of
 # the claims (RFC 9901 clause 4.2.4.1) cannot be seen by any verifier; what is
@@ -112,6 +117,13 @@ jobs:
       - name: Judge the credentials
         run: node .github/oracle/sdjwt/credentials.mjs
 
+      - name: Build the VC-JOSE-COSE SD-JWTs
+        id: vc-sd-jwt-corpus
+        run: EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::sd_jwt_oracle_tests
+
+      - name: Judge the VC-JOSE-COSE SD-JWTs
+        run: node .github/oracle/sdjwt/vc-sd-jwt.mjs
+
       - name: Have the independent implementation issue
         run: node .github/oracle/sdjwt/issue.mjs
 
@@ -181,6 +193,10 @@ jobs:
       - name: Judge the credentials with it
         if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' && steps.vc-corpus.outcome == 'success' }}
         run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.SdJwtJvmOracleKt target/sdjwt-oracle/credentials.json
+
+      - name: Judge the VC-JOSE-COSE SD-JWTs with it
+        if: ${{ !cancelled() && steps.kt-jars.outcome == 'success' && steps.vc-sd-jwt-corpus.outcome == 'success' }}
+        run: java -cp ".github/oracle/sdjwt-jvm/target/classes:.github/oracle/sdjwt-jvm/target/lib/*" io.odalnode.oracle.VcSdJwtOracleKt target/sdjwt-oracle/vc-sd-jwt.json
 
       - name: Have it issue
         id: kt-issue

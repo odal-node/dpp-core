@@ -12,6 +12,7 @@ use std::{fs, io};
 
 mod args;
 mod feature;
+mod paths;
 mod run;
 
 use args::{Args, Command};
@@ -65,12 +66,20 @@ fn clear_outputs(raw: &[String]) -> Result<(), String> {
 }
 
 fn judge(args: &Args, feature: Feature) -> Result<run::Verdict, String> {
+    // `--sd` is an unusable input unless the command issues an SD-JWT feature. An empty
+    // list is refused too, because the flag was given, which is not the same as no flag.
+    if args.sd.is_some() && !(args.command == Command::Issue && feature.is_sd_jwt()) {
+        return Err("--sd applies only to issuing an SD-JWT feature".to_owned());
+    }
     let read = |path: &std::path::Path| {
         fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))
     };
     let (input, key) = (read(&args.input)?, read(&args.key)?);
     match args.command {
-        Command::Issue => run::issue(feature, &input, &key),
+        Command::Issue => {
+            let disclose = args.sd.as_deref().map(paths::parse_sd).transpose()?;
+            run::issue(feature, &input, &key, &disclose.unwrap_or_default())
+        }
         Command::Verify => run::verify(feature, &input, &key),
     }
 }
