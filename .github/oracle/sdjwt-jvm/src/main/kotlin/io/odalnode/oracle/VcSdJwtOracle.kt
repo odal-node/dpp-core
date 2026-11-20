@@ -10,6 +10,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import java.io.File
 import java.util.Base64
 import kotlin.system.exitProcess
@@ -27,6 +28,14 @@ import kotlin.system.exitProcess
  * against the claims this crate reads and against the document the token was made from,
  * with the concealed claims that were not presented taken out. The TypeScript judge also
  * recomputes each digest itself; this one leaves that to the library.
+ *
+ * A case with a `challenge` is a presentation bound to the Holder's key, which the signer
+ * wrote as `cnf`. It is judged with Key Binding required, at that challenge, through
+ * [judgeBound]: the library's own `KeyBindingVerifier.mustBePresentAndValid` takes the Holder
+ * key from `cnf` and checks the Key Binding JWT, and `verify` checks `sd_hash` and the `iat`
+ * window. The case's `accepts` is the verdict every reader must reach: the controls are
+ * accepted, and the negative controls (a wrong nonce, a wrong audience, an `sd_hash` that
+ * belongs to another presentation, and no Key Binding JWT) must be refused.
  *
  * Every check is the library's or Nimbus's own, and the judge holds no cryptography.
  * Reports every failure and exits non-zero if there is one.
@@ -79,8 +88,19 @@ fun main(args: Array<String>) {
         val alg = case.getValue("alg").jsonPrimitive.content
         algs += alg
 
-        // A token this crate issues carries no Key Binding JWT: the last segment is empty.
-        if (token.substringAfterLast('~').isNotEmpty()) failures += "$id: the token carries a Key Binding JWT"
+        // The challenge, for a case bound to a Holder and judged with Key Binding required.
+        val challenge = case["challenge"]?.jsonObject?.let {
+            Challenge(
+                it.getValue("nonce").jsonPrimitive.content,
+                it.getValue("aud").jsonPrimitive.content,
+                it.getValue("now").jsonPrimitive.long,
+                it.getValue("window").jsonPrimitive.long,
+            )
+        }
+        val mustAccept = case["accepts"]?.jsonPrimitive?.boolean ?: true
+
+        // A token this crate issues to no Holder carries no Key Binding JWT: the last segment is empty.
+        if (challenge == null && token.substringAfterLast('~').isNotEmpty()) failures += "$id: the token carries a Key Binding JWT"
 
         val header = headerOf(token)
         fun headerIs(member: String, expected: String) {
@@ -95,10 +115,18 @@ fun main(args: Array<String>) {
         headerIs("typ", if (kind == "credential") "vc+sd-jwt" else "vp+sd-jwt")
         headerIs("cty", if (kind == "credential") "vc" else "vp")
 
-        when (val outcome = judge(token, verifierFor(case.getValue("jwk").jsonObject))) {
+        val verifier = verifierFor(case.getValue("jwk").jsonObject)
+        val judged = if (challenge == null) judge(token, verifier) else judgeBound(token, verifier, challenge)
+        val ours = case.getValue("ours").jsonObject
+        if (!mustAccept) {
+            // A negative control: the library and this crate must both refuse it.
+            if (judged is Outcome.Accepted) failures += "$id: the library accepts a token that must be refused"
+            if (ours.getValue("accepts").jsonPrimitive.boolean) failures += "$id: this crate accepts a token that must be refused"
+            continue
+        }
+        when (val outcome = judged) {
             is Outcome.Refused -> failures += "$id: refused (${outcome.why})"
             is Outcome.Accepted -> {
-                val ours = case.getValue("ours").jsonObject
                 if (!ours.getValue("accepts").jsonPrimitive.boolean) {
                     failures += "$id: this crate refuses its own token (${ours["error"]})"
                 } else if (!same(outcome.claims, ours.getValue("payload"))) {

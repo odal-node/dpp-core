@@ -13,6 +13,8 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
 use dpp_crypto::keystore::{KeyEntry, KeyStore};
 
+use crate::jose::{KeyBindingRequirement, VerifyOptions};
+
 /// Every algorithm a key can be generated under, in the order a test loops over.
 pub(crate) const EVERY_ALGORITHM: [KeyAlgorithm; 4] = [
     KeyAlgorithm::Ed25519,
@@ -38,6 +40,17 @@ pub(crate) fn temp_store_with(label: &str, key_id: &str, algorithm: KeyAlgorithm
         .generate_key_with(key_id, algorithm)
         .expect("generate key");
     store
+}
+
+// ── VC-JOSE-COSE verification choices ─────────────────────────────────────────
+
+/// Key Binding is not required, which is the choice most tests make: the one under test is
+/// another.
+pub(crate) const NOT_REQUIRED: KeyBindingRequirement = KeyBindingRequirement::NotRequired;
+
+/// The options of a test that gives a `now` or none, and no audience.
+pub(crate) fn at(now: Option<i64>) -> VerifyOptions<'static> {
+    now.map_or_else(VerifyOptions::new, |now| VerifyOptions::new().at(now))
 }
 
 // ── VC-JOSE-COSE suite inputs and fixtures ────────────────────────────────────

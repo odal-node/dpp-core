@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
+use super::VerifyOptions;
 use super::{JoseError, verify_credential};
 use crate::test_support::{credential, forge, generated, with_credential, with_header};
 
@@ -18,7 +19,7 @@ fn key() -> KeyEntry {
 }
 
 fn verify(token: &str, key: &KeyEntry) -> Result<Value, JoseError> {
-    verify_credential(token, &key.public_key(), None)
+    verify_credential(token, &key.public_key(), VerifyOptions::new())
 }
 
 // ── §4.1.2: `iss` is the issuer ───────────────────────────────────────────────

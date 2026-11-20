@@ -35,12 +35,12 @@ The key file is a `JsonWebKey` verification method with a `publicKeyJwk` and a
 |---|---|---|
 | `issue`, `credential_jose` | `sign_credential(document, key, kid, &[])` | `{"result":"success","data":"<compact JWS>"}` |
 | `issue`, `presentation_jose` | `sign_presentation(document, key, kid, &[])` | the same |
-| `verify`, `credential_jose` | `verify_credential(token, key, None)` | `{"result":"success"}` |
-| `verify`, `presentation_jose` | `verify_presentation(token, key, None)` | the same |
-| `issue`, `credential_sdjwt` | `sign_credential_sd_jwt(document, key, kid, &[], paths)` | `{"result":"success","data":"<SD-JWT>"}` |
-| `issue`, `presentation_sdjwt` | `sign_presentation_sd_jwt(document, key, kid, &[], paths)` | the same |
-| `verify`, `credential_sdjwt` | `verify_credential_sd_jwt(token, key, None)` | `{"result":"success"}` |
-| `verify`, `presentation_sdjwt` | `verify_presentation_sd_jwt(token, key, None)` | the same |
+| `verify`, `credential_jose` | `verify_credential(token, key, options)` | `{"result":"success"}` |
+| `verify`, `presentation_jose` | `verify_presentation(token, key, options)` | the same |
+| `issue`, `credential_sdjwt` | `sign_credential_sd_jwt(document, key, kid, &[], paths, None)` | `{"result":"success","data":"<SD-JWT>"}` |
+| `issue`, `presentation_sdjwt` | `sign_presentation_sd_jwt(document, key, kid, &[], paths, None)` | the same |
+| `verify`, `credential_sdjwt` | `verify_credential_sd_jwt(token, key, options, &binding)` | `{"result":"success"}` |
+| `verify`, `presentation_sdjwt` | `verify_presentation_sd_jwt(token, key, options, &binding)` | the same |
 
 A refusal by the library is a `failure`, with the reason in a `reason` member and on
 stderr. The process then exits 0: a refusal is the right answer to a row that expects one.
@@ -63,7 +63,10 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   `vc+sd-jwt` and a `vc+cose` credential and expects success, so the credentials inside
   are not verified: calling `verify_credentials` would refuse that presentation.
 - **The token is trimmed.** Some of the suite's token files end in a newline.
-- **No time.** `now` is `None`, so `exp` and `nbf` are not read. The suite's
+- **No audience and no Key Binding.** `options` is `VerifyOptions::new()`, with no
+  audience, and `binding` is `KeyBindingRequirement::NotRequired`. None of the suite's
+  inputs carries `aud`, `cnf` or a Key Binding JWT, and the suite names no verifier.
+- **No time.** `options` carries no `now`, so `exp` and `nbf` are not read. The suite's
   presentations carry an `exp` in December 2024. Under the clock, row 7 would be
   refused for its age, and rows 14 and 16, which expect a refusal for a media type and
   an envelope, would be refused for their age and pass for the wrong reason. The suite

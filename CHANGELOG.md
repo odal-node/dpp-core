@@ -82,6 +82,50 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   publisher writes, which `dpp-crypto` writes as `EdDSA`, and pass
   `&PinnedKey { alg: "EdDSA", public_key_b64: &key }` where `&key` was passed. (#592)
 
+- **`dpp_vc::jose` verifiers take the audience, and the SD-JWT verifiers take a Key Binding
+  decision.** Every verifier (`verify_credential`, `verify_presentation`,
+  `verify_credential_sd_jwt`, `verify_presentation_sd_jwt`, `UnverifiedEnvelope::verify` and
+  `VerifiedPresentation::verify_credentials`) takes a `VerifyOptions` where it took
+  `now: Option<i64>`: `VerifyOptions::new().at(now).for_audience(audience)`. RFC 7519 §4.1.3
+  says a JWT whose `aud` does not name the principal processing it "MUST be rejected", so a
+  token whose `aud`, a string or an array of strings, does not name the audience is refused
+  (`JoseError::AudienceMismatch`), so is one that carries `aud` when no audience is given,
+  and so is an `aud` of another shape (`JoseError::MalformedAudience`). It applies to the
+  processed payload of a `vc+sd-jwt` and `vp+sd-jwt` and to every envelope. The SD-JWT
+  verifiers, `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials` also
+  take a `&KeyBindingRequirement`, with no default, because RFC 9901 §9.5 says "Verifiers
+  MUST decide whether Key Binding is required for a particular use case before verifying a
+  credential". `NotRequired` ignores a Key Binding JWT the token carries (§7.3 steps 3 and
+  4). `Required(KeyBindingPolicy)` applies §7.3 step 5 through
+  `SdJwt::disclosed_payload_with_key_binding`, with the Holder key in the `cnf` of the
+  processed payload, and refuses a token with no Key Binding JWT
+  (`JoseError::KeyBindingMissing`), as it does a `vc+jwt` envelope, which cannot carry one,
+  or one that fails a check (`JoseError::KeyBindingRefused`). Migration: pass `VerifyOptions::new()` for `None` and
+  `VerifyOptions::new().at(now)` for `Some(now)`, and `&KeyBindingRequirement::NotRequired`
+  where a token carries no Key Binding JWT. A caller whose tokens carry `aud` passes the
+  audience it identifies as. (#637)
+
+- **`sign_credential_sd_jwt` and `sign_presentation_sd_jwt` take an optional holder key.**
+  A new last argument, `Option<&PublicKey>`: when given, the payload carries `cnf` naming it
+  as `dpp_crypto::sd_jwt::holder_key_confirmation` writes it (VC-JOSE-COSE §4.1.3, RFC 7800
+  §3.2). `cnf` stays in the clear. A document that already carries `cnf` is refused with a
+  key (`JoseError::ConfirmationClaimPresent`). Migration: pass `None`. (#637)
+
+- **`dpp_vc::jose` signers refuse an `iat` that is not a number.** RFC 7519 §4.1.6 makes
+  `iat` a NumericDate, and the signers refuse one that is not, as
+  `JoseError::MalformedTemporalClaim`, as they refuse `exp` and `nbf`. Verification still
+  does not read `iat`, so the W3C suite's credentials, which carry it as a date string,
+  verify. Migration: sign a number. (#637)
+
+- **`JoseError::KeyBindingUnsupported` and `JoseError::DisclosedCriticalClaim` are removed.** A token
+  that carries a Key Binding JWT is no longer refused for it: it is read as an SD-JWT when
+  Key Binding is not required, and checked when it is. A claim among `iss`, `aud`, `exp`,
+  `nbf` and `cnf` that arrived in a Disclosure is no longer refused for the way it travelled:
+  RFC 9901 §9.7 puts the duty not to make it selectively disclosable on the Issuer, and §7.1
+  step 6 has the verifier check it in the processed payload, so a disclosed `exp` in the
+  past is refused as expired and a disclosed `aud` entry is part of the `aud` the audience
+  is compared with. The signers still refuse to conceal those five. (#637)
+
 ### Added
 
 - **`jws::PublicKey`, a validated public key and its algorithm.** It is built with
@@ -185,9 +229,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     payload from `VerifiedPresentation::payload()` still carries each envelope's raw
     `data:` URL, so a credential's verified claims are the ones `verify_credentials` or
     `UnverifiedEnvelope::verify` return.
-  - Time is explicit: `now: Option<i64>`. Under `Some(now)`, `exp` and `nbf` must be
-    numbers and are held to `now` with no leeway; under `None` neither is read. `iat` is
-    never checked.
+  - Time and audience are explicit, in a `VerifyOptions`. Under a `now`, `exp` and `nbf` must
+    be numbers and are held to `now` with no leeway; without one neither is read. `iat` is
+    never checked when verifying. A token whose `aud` does not name the audience is refused.
   - Undeclared top-level members are refused at signing unless named in
     `extension_terms`. The base vocabulary is `jose::CREDENTIAL_TERMS` and
     `jose::PRESENTATION_TERMS`, the terms the VC Data Model 2.0 context defines, with the
@@ -236,17 +280,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the `vc+jwt` form, applied to the Issuer-signed JWT; the Disclosures are then applied
   (RFC 9901 clause 7.1), and every other check of the `vc+jwt` form is made on the processed
   payload, which is the JWT Claims Set of §5.2. Every refusal is a `JoseError` variant:
-  `MalformedSdJwt`, `InvalidDisclosures`, `KeyBindingUnsupported`, `DisclosedCriticalClaim`,
+  `MalformedSdJwt`, `InvalidDisclosures`, `KeyBindingMissing`, `KeyBindingRefused`,
   `UnconcealableClaim`, `DisclosurePathNotFound` and `ReservedSdJwtMember`. Rules to know:
   - A signer refuses a path that starts at `@context`, `type`, `credentialStatus`,
     `credentialSchema` or `relatedResource` (§3.2.1: "SHOULD be disclosed"), or at `iss`,
     `aud`, `exp`, `nbf` or `cnf` (RFC 9901 clause 9.7), and a path that selects nothing. A
-    verifier refuses a token in which one of those five arrived in a Disclosure.
+    verifier checks a claim that arrived in a Disclosure as one in the clear.
   - A claim that was concealed and not disclosed is absent to the checks, so a required one
     is refused. `type` concealed and disclosed, as the suite's own presentation has it, is
     read as if it had been in the clear.
-  - A token that carries a Key Binding JWT is refused: checking one needs a policy that RFC
-    9901 clause 7.3 leaves to the verifier.
+  - Whether Key Binding is required is the caller's decision, with no default (RFC 9901
+    clause 7.3 and §9.5): a `KeyBindingRequirement` is passed to every SD-JWT verifier.
   - `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials` now verify a
     `vc+sd-jwt` envelope, and `verify_presentation` refuses a `vc+sd-jwt` envelope whose
     data is not an SD-JWT. A `vc+cose` envelope is still not verified.

@@ -7,6 +7,7 @@ use dpp_crypto::jws::PublicKey;
 
 use super::envelope_shape::inspect;
 use super::error::JoseError;
+use super::options::VerifyOptions;
 use super::properties::{check_holder, check_presentation_properties};
 use super::verified_presentation::VerifiedPresentation;
 use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid, open};
@@ -24,10 +25,15 @@ use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid
 /// `holder_key` is the holder's verification key for the outer token, with the same meaning
 /// as in [`verify_credential`](super::verify_credential). The checks run in this order,
 /// refusing at the first that fails: the outer token (compact form, header,
-/// signature, `typ` and `cty`, payload and its `@context`, `vc` and `vp`, and the time
-/// claims under `Some(now)`), the presentation's `holder`, when present, which must be a
+/// signature, `typ` and `cty`, payload and its `@context`, `vc` and `vp`, the time
+/// claims under a `now`, and the audience), the presentation's `holder`, when present, which must be a
 /// URL or an object with a URL `id` (VC DM 2.0 §4.13), the holder's `kid` (§4.2), the
 /// presentation's `type` (VC DM 2.0 §4.13), and then each envelope in order.
+///
+/// `options` is as for [`verify_credential`](super::verify_credential): the `now` and the
+/// audience apply to the presentation's own token, and a presentation whose `aud` does not name
+/// the audience is refused. The credentials it envelops are checked, later, against the options
+/// given there.
 ///
 /// Each member of `verifiableCredential` must be an Enveloped Verifiable Credential (VC DM
 /// 2.0 §4.13): an object whose `type` is `EnvelopedVerifiableCredential`, alone or as a
@@ -41,9 +47,10 @@ use super::verify::{Opened, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid
 pub fn verify_presentation(
     jws: &str,
     holder_key: &PublicKey,
-    now: Option<i64>,
+    options: VerifyOptions<'_>,
 ) -> Result<VerifiedPresentation, JoseError> {
-    let Opened { payload, kid } = open(jws, holder_key, now, PRESENTATION_TYP, PRESENTATION_CTY)?;
+    let Opened { payload, kid } =
+        open(jws, holder_key, options, PRESENTATION_TYP, PRESENTATION_CTY)?;
     finish_presentation(payload, kid.as_deref())
 }
 

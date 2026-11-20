@@ -28,6 +28,16 @@
  *   hidden claims             A concealed string does not appear in the payload as
  *                             signed.
  *   order                     Every `_sd` array is in ascending order (clause 4.2.4.1).
+ *   Key Binding               A case with a `challenge` is a presentation bound to the
+ *                             Holder's key, which the signer wrote as `cnf`, and is judged
+ *                             with Key Binding required at that challenge: the library
+ *                             takes the Holder key from `cnf` and checks the Key Binding
+ *                             JWT's signature, `typ`, `sd_hash`, nonce, audience and `iat`
+ *                             window. The case's `accepts` is the verdict every reader
+ *                             must reach. The controls are accepted; the negative controls
+ *                             (a wrong nonce, a wrong audience, an `sd_hash` that belongs
+ *                             to another presentation, and no Key Binding JWT at all)
+ *                             must be refused by the library and by this crate.
  *
  * **RFC 9901 level, and the VC-JOSE-COSE media types.** The library knows nothing
  * of `vc+sd-jwt`: what is judged against section 3.2 is checked here, from the
@@ -39,7 +49,15 @@
 
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { ascending, judge, libraryVersion, same, sdArrays, verifyingInstance } from "./lib.mjs";
+import {
+  ascending,
+  judge,
+  keyBindingOptions,
+  libraryVersion,
+  same,
+  sdArrays,
+  verifyingInstance,
+} from "./lib.mjs";
 
 const corpusPath = process.argv[2] ?? "target/sdjwt-oracle/vc-sd-jwt.json";
 const corpus = JSON.parse(readFileSync(corpusPath, "utf8"));
@@ -100,6 +118,20 @@ const instanceFor = (c) => verifyingInstance(c.jwk, c.alg);
       problems.push("a Disclosure that matches no digest was accepted");
     }
   }
+  // Key Binding has to be able to fail too: the bound control, another nonce.
+  const boundControl = corpus.cases.find((c) => c.id === "bound/vc-ed25519/valid");
+  if (!boundControl) {
+    problems.push("the corpus has no bound control");
+  } else {
+    const options = keyBindingOptions(boundControl.challenge);
+    if (!(await judge(instanceFor(boundControl), boundControl.token, options)).accepts) {
+      problems.push("a bound control is refused, so nothing it refuses with Key Binding means anything");
+    }
+    const replayed = { ...options, keyBindingNonce: "another nonce" };
+    if ((await judge(instanceFor(boundControl), boundControl.token, replayed)).accepts) {
+      problems.push("a bound control was accepted at another nonce");
+    }
+  }
   if (ascending(["b", "a"]) || !ascending(["a", "b"])) problems.push("the ascending check is wrong on a plain list");
   if (problems.length) {
     console.error("NEGATIVE CONTROLS FAILED; the judge cannot be trusted:");
@@ -114,10 +146,15 @@ const instanceFor = (c) => verifyingInstance(c.jwk, c.alg);
 const algs = new Set();
 let withDisclosures = 0;
 let orderArrays = 0;
+let boundCases = 0;
+let refusedAsRequired = 0;
 for (const c of corpus.cases) {
   algs.add(c.alg);
   const { jwt, last, disclosures } = split(c.token);
-  if (last !== "") fail(c.id, "the token carries a Key Binding JWT, and this crate issues none");
+  // A Key Binding JWT is the Holder's, so only a case bound to a Holder carries one.
+  const bound = c.challenge !== undefined;
+  if (!bound && last !== "") fail(c.id, "the token carries a Key Binding JWT, and this crate issues none");
+  if (bound) boundCases++;
 
   // The header: section 3.2 says SHOULD for `typ` and `cty`, and this crate writes both.
   const header = decode(jwt.split(".")[0]);
@@ -161,8 +198,15 @@ for (const c of corpus.cases) {
     }
   }
 
-  // The library.
-  const theirs = await judge(instanceFor(c), c.token);
+  // The library, with Key Binding required when the case names a challenge.
+  const theirs = await judge(instanceFor(c), c.token, bound ? keyBindingOptions(c.challenge) : {});
+  if (bound && c.accepts === false) {
+    // A negative control: every reader must refuse it, for the rule it breaks.
+    if (theirs.accepts) fail(c.id, "the library accepts a token that must be refused");
+    if (c.ours.accepts) fail(c.id, "this crate accepts a token that must be refused");
+    refusedAsRequired++;
+    continue;
+  }
   if (!theirs.accepts) {
     fail(c.id, `the library refuses it: ${theirs.error}`);
     continue;
@@ -177,6 +221,7 @@ for (const id of ["suite/row-17/issued", "suite/row-18/issued", "suite/row-19/is
 }
 
 console.log(`${corpus.cases.length} tokens, ${withDisclosures} with Disclosures; algorithms ${[...algs].sort().join(", ")}`);
+console.log(`Key Binding required: ${boundCases} bound cases, ${refusedAsRequired} of them negative controls refused by the library and by this crate`);
 console.log(`claim order (clause 4.2.4.1): ${orderArrays} _sd arrays of two or more digests; each strictly ascending`);
 
 if (failures.length) {
