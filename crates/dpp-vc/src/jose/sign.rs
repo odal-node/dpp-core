@@ -107,7 +107,7 @@ pub fn sign_presentation(
     seal(presentation, key, kid, PRESENTATION_TYP, PRESENTATION_CTY)
 }
 
-fn object<'a>(
+pub(super) fn object<'a>(
     document: &'a Value,
     what: &'static str,
 ) -> Result<&'a Map<String, Value>, JoseError> {

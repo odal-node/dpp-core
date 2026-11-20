@@ -99,6 +99,20 @@ pub(crate) fn open(
     typ: &'static str,
     cty: &'static str,
 ) -> Result<Opened, JoseError> {
+    let payload = open_token(jws, key, typ, cty)?;
+    claims_of(payload, jws, now)
+}
+
+/// The first half of [`open`]: the compact form, the header, the signature, `typ` and
+/// `cty`, and the payload as a JSON object. The SD-JWT form runs this over its
+/// Issuer-signed JWT, and reads the claims from the payload once its Disclosures are
+/// applied.
+pub(crate) fn open_token(
+    jws: &str,
+    key: &PublicKey,
+    typ: &'static str,
+    cty: &'static str,
+) -> Result<Map<String, Value>, JoseError> {
     if jws.split('.').count() != 3 {
         return Err(JoseError::NotCompactJws);
     }
@@ -159,6 +173,17 @@ pub(crate) fn open(
             reason: "not a JSON object".to_owned(),
         });
     };
+    Ok(payload)
+}
+
+/// The second half of [`open`], over the claims set: its `@context`, `vc` and `vp`, and
+/// the time claims under `Some(now)`. `jws` is the token whose protected header names the
+/// `kid`.
+pub(crate) fn claims_of(
+    payload: Map<String, Value>,
+    jws: &str,
+    now: Option<i64>,
+) -> Result<Opened, JoseError> {
     check_context(&payload)?;
     for name in ["vc", "vp"] {
         if payload.contains_key(name) {

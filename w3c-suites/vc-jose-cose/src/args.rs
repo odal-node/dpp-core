@@ -25,14 +25,17 @@ pub struct Args {
     pub key: PathBuf,
     /// One of the suite's six feature names, as given.
     pub feature: String,
+    /// The paths to conceal: the JSON array `--sd` carried, as given. Only the SD-JWT
+    /// rows that issue have one.
+    pub sd: Option<String>,
     /// Where the verdict is written.
     pub output: PathBuf,
 }
 
 /// Parse the arguments after the program name. The error is a usage message.
 ///
-/// `--sd` is accepted and ignored: the suite passes it only to SD-JWT rows, and a
-/// feature this harness does not implement is refused later, by name.
+/// `--sd` is kept as given, and read where it is used: the suite passes it only to the
+/// SD-JWT rows that issue.
 pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Args, String> {
     let mut args = args.into_iter();
     let command = match args.next().as_deref() {
@@ -46,17 +49,14 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Args, String> {
         None => return Err("no command: expected issue or verify".to_owned()),
     };
 
-    let (mut input, mut key, mut feature, mut output) = (None, None, None, None);
+    let (mut input, mut key, mut feature, mut output, mut sd) = (None, None, None, None, None);
     while let Some(flag) = args.next() {
         let slot = match flag.as_str() {
             "--input" => &mut input,
             "--key" => &mut key,
             "--feature" => &mut feature,
             "--output" => &mut output,
-            "--sd" => {
-                args.next().ok_or_else(|| "--sd needs a value".to_owned())?;
-                continue;
-            }
+            "--sd" => &mut sd,
             other => return Err(format!("unknown argument `{other}`")),
         };
         let value = args.next().ok_or_else(|| format!("{flag} needs a value"))?;
@@ -72,6 +72,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Args, String> {
         input: PathBuf::from(required(input, "--input")?),
         key: PathBuf::from(required(key, "--key")?),
         feature: required(feature, "--feature")?,
+        sd,
         output: PathBuf::from(required(output, "--output")?),
     })
 }
@@ -106,9 +107,9 @@ mod tests {
         assert_eq!(args.output, PathBuf::from("/tests/output/6-dpp-vc.json"));
     }
 
-    /// An SD-JWT issuance row carries `--sd` with a JSON array; it is read past.
+    /// An SD-JWT issuance row carries `--sd` with a JSON array, which is kept as given.
     #[test]
-    fn the_sd_flag_is_accepted_and_ignored() {
+    fn the_sd_flag_is_kept_as_given() {
         let args = parse_all(&[
             "issue",
             "--input",
@@ -126,6 +127,29 @@ mod tests {
 
         assert_eq!(args.command, Command::Issue);
         assert_eq!(args.feature, "credential_sdjwt");
+        assert_eq!(
+            args.sd.as_deref(),
+            Some(r#"["credentialSubject.firstName"]"#)
+        );
+    }
+
+    #[test]
+    fn the_sd_flag_is_absent_when_the_suite_gives_none() {
+        let args = parse_all(&[
+            "verify",
+            "--input",
+            "i",
+            "--key",
+            "k",
+            "--feature",
+            "credential_jose",
+            "--output",
+            "o",
+        ])
+        .expect("parses");
+
+        assert_eq!(args.sd, None);
+        assert!(parse_all(&["issue", "--sd"]).is_err());
     }
 
     #[test]

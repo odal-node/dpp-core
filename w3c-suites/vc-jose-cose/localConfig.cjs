@@ -8,7 +8,7 @@
 // The suite skips a row whose feature is `false`, and `check-run.mjs` holds the run
 // to this list: every row of a `true` feature must run and get the verdict the suite
 // expects, and every row of a `false` feature must be skipped. A change that adds the
-// SD-JWT or COSE forms flips its two features here, and the suite must stay green.
+// COSE form flips its two features here, and the suite must stay green.
 module.exports = {
   implementations: [
     {
@@ -18,8 +18,8 @@ module.exports = {
         features: {
           credential_jose: true,
           presentation_jose: true,
-          credential_sdjwt: false,
-          presentation_sdjwt: false,
+          credential_sdjwt: true,
+          presentation_sdjwt: true,
           credential_cose: false,
           presentation_cose: false,
         },

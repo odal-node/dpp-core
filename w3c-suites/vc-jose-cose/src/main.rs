@@ -12,6 +12,7 @@ use std::{fs, io};
 
 mod args;
 mod feature;
+mod paths;
 mod run;
 
 use args::{Args, Command};
@@ -70,7 +71,10 @@ fn judge(args: &Args, feature: Feature) -> Result<run::Verdict, String> {
     };
     let (input, key) = (read(&args.input)?, read(&args.key)?);
     match args.command {
-        Command::Issue => run::issue(feature, &input, &key),
+        Command::Issue => {
+            let disclose = args.sd.as_deref().map(paths::parse_sd).transpose()?;
+            run::issue(feature, &input, &key, &disclose.unwrap_or_default())
+        }
         Command::Verify => run::verify(feature, &input, &key),
     }
 }

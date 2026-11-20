@@ -43,7 +43,7 @@ pub(crate) fn temp_store_with(label: &str, key_id: &str, algorithm: KeyAlgorithm
 // ── VC-JOSE-COSE suite inputs and fixtures ────────────────────────────────────
 
 /// Every vendored file, by its name in the suite.
-pub(crate) const FILES: [(&str, &str); 19] = [
+pub(crate) const FILES: [(&str, &str); 29] = [
     (
         "credential-minimal.json",
         include_str!("jose/fixtures/w3c-vc-jose-cose/credential-minimal.json"),
@@ -115,6 +115,46 @@ pub(crate) const FILES: [(&str, &str); 19] = [
     (
         "vm-p521.json",
         include_str!("jose/fixtures/w3c-vc-jose-cose/vm-p521.json"),
+    ),
+    (
+        "credential-selective.json",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-selective.json"),
+    ),
+    (
+        "credential-nested-selective.json",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-nested-selective.json"),
+    ),
+    (
+        "presentation-selective.json",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-selective.json"),
+    ),
+    (
+        "credential-sdjwt-selective.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-sdjwt-selective.txt"),
+    ),
+    (
+        "credential-sdjwt-nested.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-sdjwt-nested.txt"),
+    ),
+    (
+        "presentation-sdjwt-selective.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-sdjwt-selective.txt"),
+    ),
+    (
+        "credential-sdjwt-bad-signature.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-sdjwt-bad-signature.txt"),
+    ),
+    (
+        "credential-sdjwt-bad-media-type.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-sdjwt-bad-media-type.txt"),
+    ),
+    (
+        "presentation-sdjwt-bad-media-type.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-sdjwt-bad-media-type.txt"),
+    ),
+    (
+        "presentation-sdjwt-bad-credential.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-sdjwt-bad-credential.txt"),
     ),
     (
         "LICENSE.md",
@@ -258,4 +298,53 @@ pub(crate) fn with_credential(key: &KeyEntry, change: impl FnOnce(&mut Value)) -
     let mut document = credential();
     change(&mut document);
     forge(key, &credential_header(key), &document)
+}
+
+// ── SD-JWT forms ──────────────────────────────────────────────────────────────
+
+/// The protected header `sign_credential_sd_jwt` writes for `key`.
+pub(crate) fn sd_credential_header(key: &KeyEntry) -> Value {
+    json!({"alg": key.algorithm().jose_alg(), "kid": KID, "typ": "vc+sd-jwt", "cty": "vc"})
+}
+
+/// The protected header `sign_presentation_sd_jwt` writes for `key`.
+pub(crate) fn sd_presentation_header(key: &KeyEntry) -> Value {
+    json!({"alg": key.algorithm().jose_alg(), "kid": KID, "typ": "vp+sd-jwt", "cty": "vp"})
+}
+
+/// An SD-JWT whose Issuer-signed JWT carries a genuine signature by `key` over `header` and
+/// `payload`, with `disclosures` appended as they are, matched against the payload or not.
+pub(crate) fn forge_sd(
+    key: &KeyEntry,
+    header: &Value,
+    payload: &Value,
+    disclosures: &[dpp_crypto::sd_jwt::Disclosure],
+) -> String {
+    dpp_crypto::sd_jwt::SdJwt::new(forge(key, header, payload), disclosures.to_vec()).serialise()
+}
+
+/// An SD-JWT over `document` in which each top-level member named in `conceal` is a
+/// Disclosure, signed by `key` under `header`. Every Disclosure travels.
+pub(crate) fn forge_sd_concealing(
+    key: &KeyEntry,
+    header: &Value,
+    document: &Value,
+    conceal: &[&str],
+) -> String {
+    let (kept, disclosures) =
+        dpp_crypto::sd_jwt::conceal(document.as_object().expect("an object"), |name| {
+            conceal.contains(&name)
+        })
+        .expect("conceals");
+    let payload = dpp_crypto::sd_jwt::build_payload(kept, !disclosures.is_empty());
+    forge_sd(key, header, &payload, &disclosures)
+}
+
+/// An Enveloped Verifiable Credential holding `sd_jwt` as a `vc+sd-jwt`.
+pub(crate) fn sd_envelope(sd_jwt: &str) -> Value {
+    json!({
+        "@context": "https://www.w3.org/ns/credentials/v2",
+        "type": "EnvelopedVerifiableCredential",
+        "id": format!("data:application/vc+sd-jwt,{sd_jwt}"),
+    })
 }

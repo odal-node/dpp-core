@@ -12,14 +12,18 @@ use serde_json::{Value, json};
 
 use dpp_crypto::jws::PublicKey;
 use dpp_crypto::keystore::KeyEntry;
-use dpp_vc::jose::{sign_credential, sign_presentation, verify_credential, verify_presentation};
+use dpp_crypto::sd_jwt::ClaimPath;
+use dpp_vc::jose::{
+    sign_credential, sign_credential_sd_jwt, sign_presentation, sign_presentation_sd_jwt,
+    verify_credential, verify_credential_sd_jwt, verify_presentation, verify_presentation_sd_jwt,
+};
 
 use crate::feature::Feature;
 
 /// The library's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
-    /// It signed, with this compact JWS, or it verified (`None`).
+    /// It signed, with this compact JWS or SD-JWT, or it verified (`None`).
     Success(Option<String>),
     /// It refused, and this is why.
     Failure(String),
@@ -47,7 +51,20 @@ fn key_file(text: &str) -> Result<Value, String> {
 /// which VC-JOSE-COSE §4.2 asks for when the document has no `iss`. No extension
 /// term is declared, so a document with a member outside the VC Data Model 2.0
 /// vocabulary is refused, which is what the suite's row 5 expects.
-pub fn issue(feature: Feature, document: &str, key_text: &str) -> Result<Verdict, String> {
+///
+/// `disclose` is the claims an SD-JWT conceals, which the suite gives to rows 17 to 19 as
+/// `--sd`. A JOSE feature given any is not a verdict: the suite never asks for it, and
+/// signing without concealing what was asked to be concealed would be an answer to another
+/// question.
+pub fn issue(
+    feature: Feature,
+    document: &str,
+    key_text: &str,
+    disclose: &[ClaimPath],
+) -> Result<Verdict, String> {
+    if !feature.is_sd_jwt() && !disclose.is_empty() {
+        return Err("--sd applies to the SD-JWT features only".to_owned());
+    }
     let document: Value =
         serde_json::from_str(document).map_err(|e| format!("the input is not JSON: {e}"))?;
     let key_file = key_file(key_text)?;
@@ -60,6 +77,12 @@ pub fn issue(feature: Feature, document: &str, key_text: &str) -> Result<Verdict
     let signed = match feature {
         Feature::CredentialJose => sign_credential(&document, &key, kid, &[]),
         Feature::PresentationJose => sign_presentation(&document, &key, kid, &[]),
+        Feature::CredentialSdJwt => {
+            sign_credential_sd_jwt(&document, &key, kid, &[], disclose).map(|t| t.serialise())
+        }
+        Feature::PresentationSdJwt => {
+            sign_presentation_sd_jwt(&document, &key, kid, &[], disclose).map(|t| t.serialise())
+        }
     };
     Ok(match signed {
         Ok(token) => Verdict::Success(Some(token)),
@@ -72,7 +95,8 @@ pub fn issue(feature: Feature, document: &str, key_text: &str) -> Result<Verdict
 /// A presentation is verified with `verify_presentation` and nothing more:
 /// VC-JOSE-COSE §5.1 defines verifying a presentation as validating its own JWT, and
 /// the suite's row 7 envelops a `vc+sd-jwt` and a `vc+cose` it expects to succeed.
-/// The credentials inside are not verified.
+/// The credentials inside are not verified. A `vp+sd-jwt` is verified the same way, with
+/// `verify_presentation_sd_jwt`.
 ///
 /// No time is passed (`now` is `None`), so `exp` and `nbf` are not read. The suite's
 /// presentations carry an `exp` in December 2024, so under the clock row 7 would be
@@ -89,6 +113,8 @@ pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verd
     Ok(match feature {
         Feature::CredentialJose => verify_credential(token, &key, None).map(|_| ()),
         Feature::PresentationJose => verify_presentation(token, &key, None).map(|_| ()),
+        Feature::CredentialSdJwt => verify_credential_sd_jwt(token, &key, None).map(|_| ()),
+        Feature::PresentationSdJwt => verify_presentation_sd_jwt(token, &key, None).map(|_| ()),
     }
     .map_or_else(
         |refusal| Verdict::Failure(refusal.to_string()),

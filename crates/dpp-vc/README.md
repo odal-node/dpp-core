@@ -30,7 +30,8 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   the key the caller has already chosen. Fetching the metadata, deciding whether to
   trust it, and picking the key are your application's job, and so is the network policy.
 - You sign or verify **any** W3C credential or presentation as a VC-JOSE-COSE
-  `vc+jwt` or `vp+jwt`, with a key you supply. See `jose`.
+  `vc+jwt` or `vp+jwt`, or as an SD-JWT, `vc+sd-jwt` or `vp+sd-jwt`, with a key you
+  supply. See `jose`.
 
 ## What this crate does not cover
 
@@ -138,7 +139,11 @@ neither document.
 
 ```rust
 use dpp_crypto::keystore::KeyEntry;
-use dpp_vc::jose::{sign_credential, sign_presentation, verify_credential, verify_presentation};
+use dpp_crypto::sd_jwt::ClaimPath;
+use dpp_vc::jose::{
+    sign_credential, sign_credential_sd_jwt, sign_presentation, verify_credential,
+    verify_credential_sd_jwt, verify_presentation,
+};
 use serde_json::json;
 
 # fn demo(issuer_key: &KeyEntry, holder_key: &KeyEntry, now: i64) -> Result<(), Box<dyn std::error::Error>> {
@@ -177,6 +182,16 @@ let credentials = presented.verify_credentials(Some(now), |envelope| {
     (envelope.kid.as_deref() == Some(issuer_kid)).then(|| issuer_public.clone())
 })?;
 assert_eq!(credentials.len(), 1);
+
+// The same credential as an SD-JWT, with `name` concealed. The holder chooses what to
+// disclose, and the verifier reads what it is given.
+let name = ClaimPath::claim("credentialSubject").key("name");
+let sd_jwt = sign_credential_sd_jwt(&credential, issuer_key, issuer_kid, &["productPassport"], &[name])?;
+let disclosed = verify_credential_sd_jwt(&sd_jwt.serialise(), &issuer_public, Some(now))?;
+assert_eq!(disclosed["credentialSubject"]["name"], "Example");
+let withheld = sd_jwt.present(&[])?;
+let hidden = verify_credential_sd_jwt(&withheld.serialise(), &issuer_public, Some(now))?;
+assert!(hidden["credentialSubject"].get("name").is_none());
 # Ok(())
 # }
 ```
@@ -184,7 +199,8 @@ assert_eq!(credentials.len(), 1);
 `jose` signs and verifies a credential or a presentation of any shape, given as
 JSON, as a compact JWS: `vc+jwt` for a credential and `vp+jwt` for a presentation
 (W3C Securing Verifiable Credentials using JOSE and COSE, Recommendation of 15 May
-2025, §3.1). It resolves no key and performs no I/O. You hand it the signing key when
+2025, §3.1), or as an SD-JWT, `vc+sd-jwt` and `vp+sd-jwt` (§3.2), where you name the
+claims to conceal by path. It resolves no key and performs no I/O. You hand it the signing key when
 you sign, the holder's public key to verify a presentation, and each issuer's public
 key to verify that issuer's credential, under EdDSA, ES256, ES384 or ES512. This is a
 different path from the access credential above, which is one typed document verified
@@ -199,7 +215,7 @@ Three rules are the caller's to know:
   each envelope (§3.1.2), and returns the envelopes unverified. Verify the credentials
   with `verify_credentials`, which needs a key for every envelope and fails on the
   first one that fails, or with `UnverifiedEnvelope::verify`, one at a time. Only a
-  `vc+jwt` can be verified: a `vc+sd-jwt` or a `vc+cose` envelope makes
+  `vc+jwt` and a `vc+sd-jwt` can be verified: a `vc+cose` envelope makes
   `verify_credentials` fail.
 - **Time is the `now` you pass.** `Some(seconds)` holds `exp` and `nbf` to it, with
   no leeway, and refuses one that is not a number. `None` reads neither. `iat` is
@@ -211,6 +227,20 @@ Three rules are the caller's to know:
   `vc` and `vp` are refused even then. Signing also refuses what verification would
   refuse: an `iss` that is not the issuer, and an `exp` or `nbf` that is not a number.
   Verification ignores members it does not know.
+
+Four more are the SD-JWT form's:
+
+- **A signer refuses to conceal what a verifier needs.** A path that starts at
+  `@context`, `type`, `credentialStatus`, `credentialSchema` or `relatedResource`
+  (§3.2.1: "SHOULD be disclosed"), or at `iss`, `aud`, `exp`, `nbf` or `cnf` (RFC 9901
+  clause 9.7), is refused. A path that selects nothing is refused too.
+- **The checks read what was disclosed.** Verification applies the Disclosures first and
+  then holds the result to the rules of the `vc+jwt` form. A required claim that was
+  concealed and not disclosed is absent, and refused for it.
+- **A token with a Key Binding JWT is refused**, since checking one needs an audience, a
+  nonce and a window that this crate takes no policy for.
+- **A member named `_sd`, `_sd_alg` or `...` cannot be signed,** because a reader would
+  take it for the mechanism.
 
 ## Relationship to other crates
 

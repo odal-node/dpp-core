@@ -78,7 +78,7 @@ fn an_envelope_of_another_format_cannot_be_verified_here() {
     let holder = holder();
     let key = issuer().public_key();
 
-    for media_type in ["application/vc+sd-jwt", "application/vc+cose", "text/plain"] {
+    for media_type in ["application/vc+cose", "text/plain"] {
         let verified = present(&holder, vec![foreign_envelope(media_type)]).expect("verifies");
         let unsupported = JoseError::UnsupportedEnvelopeFormat {
             index: 0,
@@ -250,7 +250,7 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
         &holder,
         vec![
             signed_by(&issuer),
-            foreign_envelope("application/vc+sd-jwt"),
+            foreign_envelope("application/vc+cose"),
             signed_by(&issuer),
         ],
     )
@@ -265,7 +265,7 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
         listed,
         [
             (0, "application/vc+jwt"),
-            (1, "application/vc+sd-jwt"),
+            (1, "application/vc+cose"),
             (2, "application/vc+jwt"),
         ]
     );
