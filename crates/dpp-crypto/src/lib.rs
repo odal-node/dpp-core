@@ -1,5 +1,5 @@
 //! `dpp-crypto` — cryptographic primitives: Ed25519 signing, JWS compact
-//! serialisation, and the encrypted keystore.
+//! serialisation, `COSE_Sign1`, and the encrypted keystore.
 //!
 //! All modules are pure (no I/O, no network). The crate compiles to `std` for
 //! the node and to `wasm32` (where conditional) for plugin guests.
@@ -13,6 +13,7 @@
 //!
 //! [`dpp-vc`]: https://docs.rs/dpp-vc
 
+pub mod cose;
 pub mod jades;
 pub mod jws;
 pub mod keystore;
