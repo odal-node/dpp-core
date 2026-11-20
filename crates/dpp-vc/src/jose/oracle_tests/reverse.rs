@@ -9,15 +9,15 @@
 //!
 //! This crate signs the lower `S` of an ECDSA signature and verifies both. Node's
 //! ECDSA does not normalise, so the library's output holds high-S signatures, and
-//! this check holds the file to it: each ECDSA algorithm must have at least one
-//! high-S signature and at least one low-S one, counted here from the signatures
-//! and not from the file's say-so, and the low-S twin of each high-S signature must
-//! verify, which shows the curve order used to tell them apart is the right one.
-//! Without that a file the library had signed with low-S only would pass, and the
-//! claim that high-S is verified would be vacuous. Each algorithm also needs a
-//! credential and a presentation that verify, read from each token's own header,
-//! so that high-S signatures carried only by credentials cannot stand in for the
-//! presentation checks.
+//! this check holds the file to it: under each ECDSA algorithm, credentials and
+//! presentations must each carry at least one high-S signature and at least one
+//! low-S one, counted here from the signatures and not from the file's say-so, and
+//! the low-S twin of each high-S signature must verify, which shows the curve order
+//! used to tell them apart is the right one. Without that a file the library had
+//! signed with low-S only would pass, and the claim that high-S is verified would be
+//! vacuous. The forms are counted per kind, so high-S credentials cannot stand in
+//! for high-S presentations. Each algorithm also needs a credential and a
+//! presentation that verify, read from each token's own header.
 //!
 //! ```text
 //! CHECK_JOSE_ORACLE_ISSUED=target/jose-oracle/issued.json \
@@ -39,20 +39,25 @@ use super::{high_s, token};
 use crate::jose::{verify_credential, verify_presentation};
 use dpp_crypto::jws::PublicKey;
 
+/// How many ECDSA signatures of each form a file holds: (kind, algorithm, high-S),
+/// where the kind is `credential` or `presentation` and an enveloped credential is a
+/// credential.
+type Forms = BTreeMap<(&'static str, String, bool), usize>;
+
 /// Every way `file` disagrees with this crate, and how many signatures of each form
-/// (algorithm, high-S) it holds.
+/// it holds.
 ///
 /// `file` is `{ "keys": { <kid>: <public JWK> }, "cases": [...] }`. A case is
 /// `{ "id", "kind": "vc" | "vp", "alg", "kid", "token", "document", "now"?,
 /// "envelopes"? }`, where `document` is what the library signed, `now` is the
 /// instant a Verifier checks `exp` and `nbf` at, and `envelopes` lists the
 /// credentials of a presentation as `{ "index", "kid", "token", "document" }`.
-fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
+fn read_back(file: &Value) -> (Vec<String>, Forms) {
     let keys = file["keys"].as_object().expect("the file lists its keys");
     let key_of = |kid: &str| keys.get(kid).and_then(PublicKey::from_jwk);
     let cases = file["cases"].as_array().expect("the file holds cases");
     let mut out = Vec::new();
-    let mut signatures: BTreeMap<(String, bool), usize> = BTreeMap::new();
+    let mut signatures = Forms::new();
     // The (kind, algorithm) pairs that verified. The algorithm is the token's own, from
     // its protected header, and not the case's `alg` label.
     let mut covered: BTreeSet<(&str, String)> = BTreeSet::new();
@@ -70,7 +75,12 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
             .as_str()
             .unwrap_or("?")
             .to_owned();
-        tally(id, token, &key, &mut signatures, &mut out);
+        let kind = if case["kind"] == json!("vp") {
+            "presentation"
+        } else {
+            "credential"
+        };
+        tally(id, kind, token, &key, &mut signatures, &mut out);
 
         match case["kind"].as_str() {
             Some("vc") => match verify_credential(token, &key, now) {
@@ -113,7 +123,14 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
                     let inner_kid = envelope["kid"].as_str().expect("an envelope kid");
                     match key_of(inner_kid) {
                         Some(inner_key) => {
-                            tally(id, inner, &inner_key, &mut signatures, &mut out);
+                            tally(
+                                id,
+                                "credential",
+                                inner,
+                                &inner_key,
+                                &mut signatures,
+                                &mut out,
+                            );
                         }
                         None => out.push(format!("{id}: no key for the kid {inner_kid}")),
                     }
@@ -143,16 +160,18 @@ fn read_back(file: &Value) -> (Vec<String>, BTreeMap<(String, bool), usize>) {
             }
         }
         if high_s::is_ecdsa(alg) {
-            for (high, name) in [(true, "high-S"), (false, "low-S")] {
-                if signatures
-                    .get(&(alg.to_owned(), high))
-                    .copied()
-                    .unwrap_or(0)
-                    == 0
-                {
-                    out.push(format!(
-                        "coverage: the file holds no {name} {alg} signature"
-                    ));
+            for kind in ["credential", "presentation"] {
+                for (high, name) in [(true, "high-S"), (false, "low-S")] {
+                    if signatures
+                        .get(&(kind, alg.to_owned(), high))
+                        .copied()
+                        .unwrap_or(0)
+                        == 0
+                    {
+                        out.push(format!(
+                            "coverage: the file holds no {name} {alg} signature on a {kind}"
+                        ));
+                    }
                 }
             }
         }
@@ -168,9 +187,10 @@ fn disagreements(file: &Value) -> Vec<String> {
 /// `S` for the same `R` verifies as well.
 fn tally(
     id: &str,
+    kind: &'static str,
     token: &str,
     key: &PublicKey,
-    signatures: &mut BTreeMap<(String, bool), usize>,
+    signatures: &mut Forms,
     out: &mut Vec<String>,
 ) {
     let alg = token::header(token)["alg"]
@@ -182,7 +202,7 @@ fn tally(
     }
     let signature = token::signature(token);
     let high = high_s::is_high_s(&alg, &signature);
-    *signatures.entry((alg.clone(), high)).or_default() += 1;
+    *signatures.entry((kind, alg.clone(), high)).or_default() += 1;
     let (input, _) = token.rsplit_once('.').expect("a compact JWS");
     if !key.verify(input.as_bytes(), &high_s::twin(&alg, &signature)) {
         out.push(format!(
@@ -217,9 +237,9 @@ fn what_an_independent_library_signed_reads_back_here() {
             .iter()
             .map(|c| c["envelopes"].as_array().map_or(0, Vec::len))
             .sum::<usize>();
-    for ((alg, high), n) in &signatures {
+    for ((kind, alg, high), n) in &signatures {
         eprintln!(
-            "{alg}: {n} {} signatures",
+            "{alg}: {n} {} signatures on a {kind}",
             if *high { "high-S" } else { "low-S" }
         );
     }
@@ -291,13 +311,39 @@ fn the_readback_check_accepts_high_s_and_fails_on_a_mismatch() {
         .retain(|c| c["id"].as_str().is_some_and(|id| !id.ends_with("/1")));
     let wrong = disagreements(&low_only);
     for alg in ["ES256", "ES384", "ES512"] {
+        for kind in ["credential", "presentation"] {
+            assert!(
+                wrong
+                    .iter()
+                    .any(|d| d.contains(&format!("no high-S {alg} signature on a {kind}"))),
+                "{alg} {kind}: {wrong:?}"
+            );
+        }
+    }
+
+    // High-S credentials do not stand in for high-S presentations: with only the
+    // high-S presentations gone, each ECDSA algorithm's is named, and nothing else.
+    let mut no_high_presentation = file.clone();
+    no_high_presentation["cases"]
+        .as_array_mut()
+        .expect("cases")
+        .retain(|c| {
+            let id = c["id"].as_str().unwrap_or_default();
+            !(c["kind"] == json!("vp") && id.ends_with("/1"))
+        });
+    let wrong = disagreements(&no_high_presentation);
+    for alg in ["ES256", "ES384", "ES512"] {
         assert!(
             wrong
                 .iter()
-                .any(|d| d.contains(&format!("no high-S {alg} signature"))),
+                .any(|d| d.contains(&format!("no high-S {alg} signature on a presentation"))),
             "{alg}: {wrong:?}"
         );
     }
+    assert!(
+        wrong.iter().all(|d| d.contains("on a presentation")),
+        "only the presentations are named: {wrong:?}"
+    );
 
     // The kid resolves to the key of another algorithm.
     let mut crossed = file.clone();

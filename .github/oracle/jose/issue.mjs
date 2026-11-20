@@ -85,9 +85,18 @@ const shapes = () => {
 
 const cases = [];
 const problems = [];
-/** How many ECDSA signatures each algorithm has made, to alternate high and low. */
-const made = Object.fromEntries(Object.keys(ALGORITHMS).map((a) => [a, 0]));
-const wantHigh = (alg) => (isEcdsa(alg) ? made[alg]++ % 2 === 0 : undefined);
+/**
+ * How many ECDSA signatures each algorithm has made for each media type, to alternate
+ * high and low. Counted per type, so credentials and presentations each get both
+ * forms, whatever order the signing runs in.
+ */
+const made = {};
+const wantHigh = (alg, typ) => {
+  if (!isEcdsa(alg)) return undefined;
+  const key = `${alg} ${typ}`;
+  made[key] ??= 0;
+  return made[key]++ % 2 === 0;
+};
 
 /** Verifies what the library issued, as the library, with the algorithm pinned. */
 async function selfCheck(id, token, alg) {
@@ -99,7 +108,7 @@ async function selfCheck(id, token, alg) {
 }
 
 async function issue(id, alg, kid, typ, cty, document) {
-  const token = await sign(keys[alg].secretJwk, alg, { alg, kid, typ, cty }, document, wantHigh(alg));
+  const token = await sign(keys[alg].secretJwk, alg, { alg, kid, typ, cty }, document, wantHigh(alg, typ));
   await selfCheck(id, token, alg);
   return token;
 }
