@@ -37,6 +37,7 @@ ignore = [
 [licenses]
 version = 2
 unused-allowed-license = "allow"
+unused-license-exception = "allow"
 # Permissive only. This is not a preference: an Apache-2.0 crate that pulls a
 # reciprocal or copyleft dependency into a consumer's graph changes that
 # consumer's obligations without telling them.
@@ -111,7 +112,10 @@ deny = [
     { name = "rustls" },
     { name = "aws-lc-sys" },
 ]
-skip = []
+skip = [
+    { name = "getrandom", version = "0.3.4" },
+    { name = "r-efi", version = "5.3.0" },
+]
 skip-tree = []
 
 [sources]
