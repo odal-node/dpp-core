@@ -1,0 +1,132 @@
+# Judges the VC-JOSE-COSE tokens this workspace emits with an independent JOSE
+# library, and has this workspace verify what that library signs.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the SD-JWT,
+# AAS, GS1 and JSON-LD oracles are: this needs Node and npm, and `cargo build
+# --workspace` succeeding with no Node, no JVM, no native toolchain and no services
+# is a property this project states publicly. Keeping the dependency here means the
+# main gate never acquires it.
+#
+# What it answers: *does a JOSE implementation with no code and no author in common
+# with `dpp_vc::jose` verify the credentials and presentations we sign, and do we
+# verify the ones it signs?* The W3C VC-JOSE-COSE test suite cannot answer that. Its
+# runner reads only the `result` an implementation reports about itself, so every
+# issuance row of its report is self-attested. And for P-521 this is the only
+# independent check this repository has, since `ring` does not implement that curve.
+#
+# The library is `jose` (panva). It does the JWS processing and the signature check
+# through the Web Crypto API of Node, which is OpenSSL, so it shares no code with the
+# RustCrypto stack `dpp-crypto` signs with.
+#
+# Checks, in order, each a step so a failure names itself:
+#
+#   1. the corpus: the suite's issuance inputs (rows 1 to 5) and credentials and
+#      presentations under EdDSA, ES256, ES384 and ES512, signed with the suite's
+#      keys by `dpp_vc::jose`, built by a cargo test;
+#   2. the library judges every token (`judge.mjs`): the signature under the JWK
+#      published for the `kid`, `alg` the key's own, `typ` and `cty` exactly as
+#      written, the `kid`, the payload, and each `vc+jwt` a presentation envelops,
+#      after negative controls that must fail;
+#   3. the library signs credentials and presentations under all four algorithms
+#      (`issue.mjs`), with high-S and low-S ECDSA signatures on purpose;
+#   4. `dpp_vc::jose` verifies what it signed, and holds the file to having both
+#      forms of signature;
+#   5. both files are made again to show they are reproducible.
+#
+# What it does **not** answer, and the register row says so. The library knows no
+# JSON-LD, no VC Data Model 2.0, no `@context` rule and no rule on undeclared
+# members, so it says nothing about whether a credential is a good one: it judges
+# the JOSE envelope. The `vc+sd-jwt` and `vc+cose` forms of VC-JOSE-COSE do not exist
+# in this workspace, so nothing here judges them. Nothing here is evidence of
+# conformance to VC-JOSE-COSE: the register's conformance cell for it stays "No".
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever.
+name: JOSE oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  judge:
+    name: VC-JOSE-COSE tokens are read the same way by an independent JOSE library
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept. This job installs third-party code that touches
+      # signing, and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      # From the committed lockfile, with install scripts off. The library is
+      # somebody else's judgement about what RFC 7515 and RFC 7518 require, and an
+      # unpinned upgrade would turn their tightening into our red build on code that
+      # did not change. `npm ci` fails if the lockfile and `package.json` disagree or
+      # a tarball's sha512 does not match. Moving the pin is a deliberate edit with a
+      # visible diff: change `package.json`, regenerate the lockfile, and cite the
+      # new version in the register row. Dependabot does not watch it.
+      - name: Install the independent implementation
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix .github/oracle/jose
+
+      - name: Record what is actually being run
+        run: |
+          echo "node $(node --version)"
+          node -p "'jose ' + require('./.github/oracle/jose/node_modules/jose/package.json').version"
+
+      - name: Build the corpus from our own issuer
+        run: EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::emit
+
+      - name: Judge the corpus
+        run: node .github/oracle/jose/judge.mjs
+
+      - name: Have the independent implementation sign
+        run: node .github/oracle/jose/issue.mjs
+
+      - name: Verify what it signed
+        run: CHECK_JOSE_ORACLE_ISSUED=target/jose-oracle/issued.json cargo test -p dpp-vc --lib jose::oracle_tests::reverse -- --nocapture
+
+      # Our own signatures are RFC 6979 deterministic, so the corpus must be byte for
+      # byte the same. The library's are not: Ed25519 is, and ECDSA draws a fresh
+      # nonce for every signature, so for those `same.mjs` compares what each
+      # signature covers and its form, low-S or high-S, which `issue.mjs` fixes on
+      # purpose. A difference means a library changed what it writes, which is worth
+      # knowing before it is a failure.
+      - name: Make both files again and compare
+        run: |
+          sha256sum target/jose-oracle/corpus.json > target/jose-oracle/first.sha256
+          cp target/jose-oracle/issued.json target/jose-oracle/issued-first.json
+          EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::emit
+          sha256sum --check target/jose-oracle/first.sha256
+          node .github/oracle/jose/issue.mjs target/jose-oracle/issued-again.json
+          node .github/oracle/jose/same.mjs target/jose-oracle/issued-first.json target/jose-oracle/issued-again.json
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the corpus
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: jose-oracle
+          path: target/jose-oracle
+          retention-days: 7
