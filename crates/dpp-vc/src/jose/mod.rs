@@ -156,6 +156,8 @@ mod fixtures_tests;
 #[cfg(test)]
 mod issuer_tests;
 #[cfg(test)]
+mod oracle_tests;
+#[cfg(test)]
 mod presentation_tests;
 #[cfg(test)]
 mod properties_tests;
