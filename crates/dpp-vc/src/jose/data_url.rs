@@ -70,7 +70,12 @@ fn percent_decode(data: &str) -> Option<Vec<u8>> {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' {
+            // Two hex digits (RFC 3986 §2.1), checked before parsing: `from_str_radix` also
+            // reads a leading `+`.
             let hex = data.get(i + 1..i + 3)?;
+            if !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return None;
+            }
             out.push(u8::from_str_radix(hex, 16).ok()?);
             i += 3;
         } else {

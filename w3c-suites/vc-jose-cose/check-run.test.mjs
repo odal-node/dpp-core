@@ -73,6 +73,7 @@ const cborBytes = (bytes) => Buffer.concat([Buffer.from([0x40 + bytes.length]), 
 const coseBytes = ({
   tag = [0xd2],
   array = [0x84],
+  protectedItem = cborBytes(Buffer.from([0xa1, 0x01, 0x26])),
   unprotected = [0xa0],
   payloadItem = cborBytes(Buffer.from('{}')),
   tail = [],
@@ -80,7 +81,7 @@ const coseBytes = ({
   Buffer.concat([
     Buffer.from(tag),
     Buffer.from(array),
-    cborBytes(Buffer.from([0xa1, 0x01, 0x26])),
+    protectedItem,
     Buffer.from(unprotected),
     payloadItem,
     Buffer.from([0x58, 0x40]),
@@ -320,6 +321,8 @@ const COSE_ISSUED = ENABLED.find(
 const NOT_BASE64 = 'it is not base64 of the standard alphabet with no padding';
 const NOT_CANONICAL = 'it is not canonical base64';
 const NOT_AN_ARRAY = 'it does not decode to a CBOR array of four items, tagged 18 or not';
+const NOT_A_MAP = 'its protected header is not empty and not one encoded CBOR map';
+const NOT_WELL_FORMED = 'the message ends inside an item or holds one that is not well formed';
 const coseIssuances = [
   ['is not a string', 42, 'data is not a string'],
   ['is padded', coseBytes().toString('base64').padEnd(Math.ceil(coseText().length / 4) * 4, '='), NOT_BASE64],
@@ -338,6 +341,11 @@ const coseIssuances = [
   ['has a detached payload', coseText({payloadItem: Buffer.from([0xf6])}), 'its payload is not a byte string'],
   ['has bytes after the array', coseText({tail: [0x00]}), 'bytes follow the COSE_Sign1 array'],
   ['ends inside the signature', unpadded(coseBytes().subarray(0, -3)), 'the message ends inside an item'],
+  // RFC 9052 section 3: the protected header is empty or the encoding of one header map.
+  ['has a protected header that holds an integer', coseText({protectedItem: cborBytes(Buffer.from([0x01]))}), NOT_A_MAP],
+  ['has bytes after its protected header map', coseText({protectedItem: cborBytes(Buffer.from([0xa1, 0x01, 0x26, 0x00]))}), NOT_A_MAP],
+  // RFC 8949 section 3.3: a simple value below 32 in the two-byte form is not well formed.
+  ['writes false in two bytes', coseText({unprotected: [0xa1, 0x18, 0x63, 0xf8, 0x14]}), NOT_WELL_FORMED],
 ];
 for (const [name, data, why] of coseIssuances) {
   test(`a COSE issuance that ${name} is refused`, () => {
@@ -353,6 +361,37 @@ test('an untagged COSE_Sign1 is accepted, since RFC 9052 section 4.2 allows it',
     edit: (run) => run.outputs.set(outputPath(COSE_ISSUED.config.number), {result: 'success', data: coseText({tag: []})}),
   });
   assert.equal(check(root).status, 0);
+});
+
+test('an empty protected header, and a simple value written in two bytes from 32 up, are accepted', () => {
+  for (const data of [
+    coseText({protectedItem: Buffer.from([0x40])}),
+    coseText({unprotected: [0xa1, 0x18, 0x63, 0xf8, 0x20]}),
+  ]) {
+    const root = suiteRoot({
+      edit: (run) => run.outputs.set(outputPath(COSE_ISSUED.config.number), {result: 'success', data}),
+    });
+    assert.equal(check(root).status, 0, data);
+  }
+});
+
+// The report says the row passed, and its output file must say the same: a verdict that
+// differs means the two files are not of one run, and the token in the output is not the one
+// the suite judged.
+test('an output whose verdict is not the one the row expects is refused, whatever the report says', () => {
+  const refusedRow = ENABLED.find((row) => row.config.expected_result === 'failure');
+  for (const [row, result] of [
+    [COSE_ISSUED, 'failure'],
+    [refusedRow, 'success'],
+  ]) {
+    const root = suiteRoot({
+      edit: (run) => run.outputs.set(outputPath(row.config.number), {result}),
+    });
+    assertRefused(
+      check(root),
+      `row ${row.config.number} left the verdict ${result}, and the row expects ${row.config.expected_result}`,
+    );
+  }
 });
 
 test('a COSE issuance is not judged as a compact JWS, nor a JOSE one as COSE', () => {

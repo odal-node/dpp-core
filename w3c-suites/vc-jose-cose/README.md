@@ -52,8 +52,12 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
 - **The key.** `issue` builds the signing key from `secretKeyJwk`, and `verify` the
   verification key from `publicKeyJwk`.
 - **The `kid`.** The key file's `id`, which is the absolute URL of its verification
-  method. VC-JOSE-COSE §4.2 asks for an absolute URL when the document has no `iss`, and the
-  signers hold the `kid` to that, as no verifier does.
+  method. VC-JOSE-COSE §4.2 asks for an absolute URL when the issuer or holder is identified
+  by a URL and there is no `iss`, and the signers hold the `kid` to that, as no verifier does.
+  A JOSE or SD-JWT token that carries `iss` may carry a bare `kid` (a credential's `iss` must
+  be its issuer). A COSE signer writes no `iss`, and a member named `iss` in the document
+  exempts nothing, so a COSE issuance whose issuer or holder is a URL always needs the
+  absolute form.
 - **No extension terms.** A member outside the VC Data Model 2.0 vocabulary is refused
   at issuance, which is what row 5 expects.
 - **The paths.** `--sd` is a JSON array of the suite's dotted paths, with `[n]` for one
@@ -66,11 +70,12 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   defines verifying a presentation as validating its own JWT, and so for `vp+sd-jwt` with
   `verify_presentation_sd_jwt`, and §5.3 as the `COSE_Sign1` process on the presentation
   itself, so for `vp+cose` with `verify_presentation_cose`. Each judges the presentation's
-  envelopes as envelopes, and none opens what is inside one. Row 7 envelops a
+  envelopes as envelopes, and none verifies what is inside one: of it, each reads only a
+  `kid` hint from a `vc+jwt` or `vc+sd-jwt` envelope, unverified. Row 7 envelops a `vc+jwt`, a
   `vc+sd-jwt` and a `vc+cose` credential and expects success, and row 31's one envelope is a
   `vc+jwt` whose data is `<header>.<payload>....` and is no compact JWS, and expects success
-  too, so the credentials inside are not verified: calling `verify_credentials` would refuse
-  both presentations.
+  too, so the credentials inside are not verified. `verify_credentials` would verify row 7's
+  three under their own keys, and refuse row 31's, whose data cannot be read.
 - **COSE files are base64 text.** A COSE input is read as the suite writes its own: the
   standard alphabet with no padding, perhaps with a final newline, and an issued COSE message
   is written the same way, in `data`. Text that is not base64 at all is a refusal and not a

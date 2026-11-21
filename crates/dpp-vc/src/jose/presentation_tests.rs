@@ -218,7 +218,18 @@ fn a_malformed_envelope_is_refused() {
 #[test]
 fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused_when_its_credential_is_verified() {
     let holder = holder();
-    let token = issuer_token(&generated(KeyAlgorithm::Ed25519));
+    let issuer = generated(KeyAlgorithm::Ed25519);
+    let key = issuer.public_key();
+    let token = issuer_token(&issuer);
+    // The control: under the issuer's own key the untouched token verifies, so each refusal
+    // below is for its data and not for a key that could never have verified it.
+    assert!(
+        verify_members(&holder, vec![envelope(&token)])
+            .expect("verifies")
+            .envelopes()[0]
+            .verify(&key, VerifyOptions::new(), &NOT_REQUIRED)
+            .is_ok()
+    );
     let (header, rest) = token.split_once('.').expect("segments");
     let (payload, _) = rest.split_once('.').expect("segments");
     // A header segment whose length is 1 modulo 4, which no base64url text has: the
@@ -234,7 +245,6 @@ fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused_when_its_credential_is_ve
         format!("{bad_header}.{payload}.AA"),
         String::new(),
     ];
-    let key = generated(KeyAlgorithm::Ed25519).public_key();
     for data in bad {
         let verified = verify_members(&holder, vec![envelope(&data)])
             .unwrap_or_else(|e| panic!("the envelope is well formed: {e}: {data}"));

@@ -94,6 +94,9 @@ pub(crate) fn inspect(index: usize, value: &Value) -> Result<UnverifiedEnvelope,
 /// refuse, and always for a `vc+cose`, whose header is read only once its signature has
 /// verified.
 fn kid_hint(media_type: &str, data: &EnvelopeData) -> Option<String> {
+    if media_type != VC_JWT && media_type != VC_SD_JWT {
+        return None;
+    }
     let text = decode_text(&data.data, data.base64).ok()?;
     match media_type {
         VC_JWT => extract_kid_from_jws(&text),

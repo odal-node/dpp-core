@@ -39,7 +39,7 @@ fn it_agrees_with_the_padded_and_unpadded_encodings_of_every_short_input() {
     let unpadded = base64::engine::general_purpose::STANDARD_NO_PAD;
     let bytes: Vec<u8> = (0..=255).collect();
     for length in 0..=64 {
-        let input = &bytes[length..length + 64.min(256 - length)];
+        let input = &bytes[..length];
         assert_eq!(
             forgiving_base64_decode(&standard.encode(input)).as_deref(),
             Some(input)
@@ -157,6 +157,20 @@ fn percent_escapes_are_decoded_before_base64_is() {
     // Without `;base64` the escapes are the bytes.
     assert_eq!(decode_data("YW%49=", false), Ok(b"YWI=".to_vec()));
     assert_eq!(decode_data("a%20b", false), Ok(b"a b".to_vec()));
+}
+
+/// RFC 3986 §2.1: a percent escape is "%" HEXDIG HEXDIG, in either case. `u8::from_str_radix`
+/// also reads a leading `+`, so `%+A` would otherwise become a line feed, which the base64
+/// decoder then removes as whitespace.
+#[test]
+fn a_percent_escape_is_exactly_two_hex_digits() {
+    let refused = Err("a percent escape that is not two hex digits");
+    for data in ["YWJj%+A", "%+a", "%-1", "% A", "%A", "%"] {
+        assert_eq!(decode_data(data, true), refused, "{data}");
+        assert_eq!(decode_data(data, false), refused, "{data}");
+    }
+    assert_eq!(decode_data("YWJj%0A", true), Ok(b"abc".to_vec()));
+    assert_eq!(decode_data("%0a%0A", false), Ok(b"\n\n".to_vec()));
 }
 
 #[test]

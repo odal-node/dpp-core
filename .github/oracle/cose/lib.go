@@ -119,6 +119,10 @@ func privateKeyOf(j jwk) (crypto.Signer, error) {
 		return nil, err
 	}
 	if j.Kty == "OKP" {
+		// NewKeyFromSeed panics on a seed of any other length.
+		if len(d) != ed25519.SeedSize {
+			return nil, fmt.Errorf("an Ed25519 seed of %d bytes", len(d))
+		}
 		return ed25519.NewKeyFromSeed(d), nil
 	}
 	pub, err := publicKeyOf(j)
@@ -157,7 +161,7 @@ func loadKey(dir, file string) (*Key, error) {
 	}
 	priv, err := privateKeyOf(body.SecretKeyJwk)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", file, err)
 	}
 	return &Key{ID: body.ID, Thumbprint: pubJwk.Kid, Name: name, Alg: alg, JWK: body.PublicKeyJwk, Pub: pub, Priv: priv}, nil
 }

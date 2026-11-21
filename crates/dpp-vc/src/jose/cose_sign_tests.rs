@@ -95,6 +95,44 @@ fn something_that_is_not_an_object_is_refused() {
     );
 }
 
+/// RFC 8785 writes every number as an IEEE 754 double, so an integer beyond ±(2^53 − 1) would
+/// be signed as a different number. Both COSE signers refuse one, nested or not, as the
+/// `vc+jwt` signer does, and the largest exact integer signs and reads back unchanged.
+#[test]
+fn an_integer_a_double_cannot_hold_exactly_is_refused_at_signing() {
+    const INEXACT: u64 = 9_007_199_254_740_993;
+    const EXACT: u64 = 9_007_199_254_740_991;
+    fn refused<T>(result: Result<T, JoseError>) -> bool {
+        matches!(result, Err(JoseError::Signing { .. }))
+    }
+
+    let mut document = credential();
+    document["credentialSubject"]["serialNumber"] = json!(INEXACT);
+    assert!(refused(sign_credential_cose(
+        &document,
+        &issuer(),
+        KID,
+        &[]
+    )));
+    assert!(refused(sign_credential(&document, &issuer(), KID, &[])));
+
+    let envelope =
+        cose_envelope(&sign_credential_cose(&credential(), &issuer(), KID, &[]).expect("signs"));
+    let mut document = presentation(vec![envelope]);
+    document["batch"] = json!({ "serial": [INEXACT] });
+    assert!(refused(sign_presentation_cose(
+        &document,
+        &holder(),
+        KID,
+        &["batch"]
+    )));
+
+    let mut document = credential();
+    document["credentialSubject"]["serialNumber"] = json!(EXACT);
+    let signed = sign_credential_cose(&document, &issuer(), KID, &[]).expect("exact");
+    assert_eq!(verify_vc(&signed), Ok(document));
+}
+
 /// An undeclared member is refused at signing, as for the other forms, and a declared one signs.
 #[test]
 fn an_undeclared_member_is_refused_unless_it_is_declared() {

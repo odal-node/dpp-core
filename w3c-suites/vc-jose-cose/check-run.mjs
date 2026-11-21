@@ -68,8 +68,9 @@ function notCompactJws(token) {
 
 // The head of the CBOR item at `at`: its major type, its argument, and where the item's content
 // starts. `null` for a head that is cut short or is an indefinite length or a reserved form,
-// which the harness never writes. The argument is a Number, which is exact for every length a
-// message of this size can have.
+// which the harness never writes, and for a simple value below 32 in the two-byte form, which
+// RFC 8949 section 3.3 calls not well formed. The argument is a Number, which is exact for
+// every length a message of this size can have.
 function cborHead(bytes, at) {
   if (at >= bytes.length) return null;
   const major = bytes[at] >> 5;
@@ -78,6 +79,7 @@ function cborHead(bytes, at) {
   const width = {24: 1, 25: 2, 26: 4, 27: 8}[info];
   if (width === undefined || at + 1 + width > bytes.length) return null;
   const argument = Number(BigInt('0x' + bytes.subarray(at + 1, at + 1 + width).toString('hex')));
+  if (major === 7 && info === 24 && argument < 32) return null;
   return {major, argument, next: at + 1 + width};
 }
 
@@ -104,8 +106,9 @@ const COSE_TEXT = /^[A-Za-z0-9+/]+$/;
 
 // The reason `token` is not the text of a COSE_Sign1 (RFC 9052 section 4.2), or null when it is
 // one as far as the head bytes say: tagged 18 or not, an array of four items that are a byte
-// string (the protected header), a map (the unprotected header), a byte string (the payload) and
-// a byte string (the signature), and nothing after them.
+// string (the protected header) that is empty or holds one encoded map and nothing after it
+// (RFC 9052 section 3), a map (the unprotected header), a byte string (the payload) and a byte
+// string (the signature), and nothing after them.
 function notCose(token) {
   if (typeof token !== 'string') return 'data is not a string';
   if (!COSE_TEXT.test(token)) return 'it is not base64 of the standard alphabet with no padding';
@@ -129,12 +132,21 @@ function notCose(token) {
     [2, 'its payload is not a byte string'],
     [2, 'its signature is not a byte string'],
   ];
-  for (const [major, why] of items) {
+  const cutShort = 'the message ends inside an item or holds one that is not well formed';
+  for (const [index, [major, why]] of items.entries()) {
     head = cborHead(bytes, at);
-    if (head === null) return 'the message ends inside an item';
+    if (head === null) return cutShort;
     if (head.major !== major) return why;
-    at = cborSkip(bytes, at);
-    if (at === null) return 'the message ends inside an item';
+    const end = cborSkip(bytes, at);
+    if (end === null) return cutShort;
+    if (index === 0 && end > head.next) {
+      const header = bytes.subarray(head.next, end);
+      const map = cborHead(header, 0);
+      if (map === null || map.major !== 5 || cborSkip(header, 0) !== header.length) {
+        return 'its protected header is not empty and not one encoded CBOR map';
+      }
+    }
+    at = end;
   }
   if (at !== bytes.length) return 'bytes follow the COSE_Sign1 array';
   return null;
@@ -256,6 +268,11 @@ for (const title of enabled) {
   if (output === null || typeof output !== 'object' || Array.isArray(output)) {
     problem(`row ${config.number} left output that is not a JSON object`);
     output = {};
+  }
+  // The report says the row passed. Its output file must say the same, or the two are not of
+  // one run, and a token in the output is not the one the suite judged.
+  if (output.result !== config.expected_result) {
+    problem(`row ${config.number} left the verdict ${output.result}, and the row expects ${config.expected_result}`);
   }
   if (config.fn === 'issue' && output.result === 'success') {
     if (config.feature.endsWith('_cose')) {

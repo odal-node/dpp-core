@@ -43,7 +43,9 @@ use super::vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS, check_members_cose
 ///
 /// # Errors
 ///
-/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the signer failed.
+/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the signer failed,
+/// which includes an integer beyond ±(2^53 − 1) anywhere in the document: RFC 8785 writes
+/// numbers as IEEE 754 doubles, so it would be signed as another number.
 pub fn sign_credential_cose(
     credential: &Value,
     key: &KeyEntry,
@@ -70,7 +72,9 @@ pub fn sign_credential_cose(
 ///
 /// # Errors
 ///
-/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the signer failed.
+/// A [`JoseError`] naming what was refused, or [`JoseError::Signing`] when the signer failed,
+/// which includes an integer beyond ±(2^53 − 1) anywhere in the document: RFC 8785 writes
+/// numbers as IEEE 754 doubles, so it would be signed as another number.
 pub fn sign_presentation_cose(
     presentation: &Value,
     key: &KeyEntry,
@@ -99,7 +103,9 @@ fn seal(
     typ: &str,
     cty: &str,
 ) -> Result<Vec<u8>, JoseError> {
-    let payload = serde_jcs::to_vec(document).map_err(|e| JoseError::Signing {
+    // The canonicalizer the `vc+jwt` signer uses, which refuses an integer that an RFC 8785
+    // double cannot hold exactly rather than sign a different number.
+    let payload = dpp_crypto::jws::canonicalize(document).map_err(|e| JoseError::Signing {
         reason: e.to_string(),
     })?;
     sign_sign1(

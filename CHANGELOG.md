@@ -321,6 +321,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
     a claims set. A member named `exp`, `iss` or `aud` is an undeclared term at signing, and
     `vc` and `vp` are refused at signing only as undeclared terms: VC-JOSE-COSE §1.1.2.1 is
     stated for a JWT Claims Set. A verifier refuses neither.
+  - An integer beyond ±(2^53 − 1) is refused at signing (`JoseError::Signing`), as the
+    `vc+jwt` signer refuses it: RFC 8785 writes every number as an IEEE 754 double, so it
+    would be signed as another number.
   - The signers write protected `alg`, `kid` (the UTF-8 bytes of the identifier given), `typ`
     `application/vc+cose` or `application/vp+cose`, and content type `application/vc` or
     `application/vp`, and no CWT claim. The verifier holds `typ` and the content type to the
@@ -353,8 +356,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   verification process": every verifier here is given its key, so it has no document to hold
   the `kid` against. `verify_credential`, `verify_presentation`, the SD-JWT verifiers and the
   COSE verifiers accept a bare thumbprint `kid` where they refused it, which the W3C suite's
-  COSE rows 29 and 31 need. `iss`, when present, must still be the issuer (§4.1.2). The signers
-  still refuse such a `kid` (`KidNotAbsolute`), in all three forms, so the tokens this crate
+  COSE rows 29 and 31 need. A credential's `iss`, when present, must still be its issuer
+  (§4.1.2); a presentation's is not compared with its holder. The signers still refuse such a `kid` (`KidNotAbsolute`), in all three forms, so the tokens this crate
   writes stay strict. This relaxes a refusal and breaks no caller that did not depend on it.
   (#633)
 
@@ -366,8 +369,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   operations, so what is inside an envelope is read when the credential is verified, by
   `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials`, which refuse
   content that cannot be read, wrapped in `JoseError::CredentialRefused`, with the variant that
-  says why. The W3C suite's row 31 envelops a `vc+jwt` whose data is no compact JWS and expects
-  the presentation to verify. (#633)
+  says why. Of what is inside, the presentation's verifier reads only the protected header's
+  `kid` of a `vc+jwt` or `vc+sd-jwt` envelope, as a hint that is not verified and is absent when
+  the data cannot be read. The W3C suite's row 31 envelops a `vc+jwt` whose data is no compact
+  JWS and expects the presentation to verify. (#633)
 
 - **The base64 of a `data:` URL is read with the WHATWG Infra Standard's "forgiving-base64
   decode"**, which removes ASCII whitespace, drops up to two trailing `=` from a text whose
