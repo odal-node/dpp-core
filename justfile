@@ -304,6 +304,27 @@ ci-guard-check:
 ci-guard-check-self-test:
     bash scripts/ci-guard-check.test.sh
 
+# Record the tree id of the current working tree.
+#
+# Runs at the end of `just check` so the pre-commit hook can prove the committed
+# tree is the one that passed the gate. Uses a temporary index, so the real
+# index is left untouched.
+check-tree:
+    bash scripts/check-tree.sh
+
+# Prove check-tree and the pre-commit hook work together.
+check-tree-self-test:
+    bash scripts/check-tree.test.sh
+
+# Install the git hooks directory.
+#
+# Sets `core.hooksPath` to `.githooks/` so git picks up the pre-commit hook
+# that enforces Rule 5 of CLAUDE.md: never commit before a green `just check`.
+# `--no-verify` still bypasses the hook, and CI remains the gate of record.
+install-hooks:
+    git config core.hooksPath .githooks
+    @echo "Hooks installed. Pre-commit will refuse a commit whose tree has not passed \`just check\`."
+
 # "Archive" means EN 18221 clause 4.2 version archiving, and never a status.
 vocabulary-check:
     bash scripts/vocabulary-check.sh
@@ -393,7 +414,8 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit
+# `check-tree` runs last so it only records the tree when every other gate passed.
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit check-tree-self-test check-tree
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That

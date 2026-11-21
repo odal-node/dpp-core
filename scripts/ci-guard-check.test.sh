@@ -21,6 +21,7 @@ scaffold() {
     local root="$1"
     mkdir -p "$root/scripts" "$root/.github/workflows"
     touch "$root/scripts/a-check.sh" "$root/scripts/a-check.test.sh" \
+        "$root/scripts/check-tree.sh" \
         "$root/scripts/release-head-check.sh"
     cat > "$root/.github/workflows/ci.yml" <<'EOF'
 jobs:
