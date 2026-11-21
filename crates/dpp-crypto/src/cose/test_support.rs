@@ -181,7 +181,9 @@ pub(super) fn message(
     unprotected: &[u8],
     payload: &[u8],
 ) -> Vec<u8> {
-    let signature = key.sign(&to_be_signed(protected, payload).expect("a Sig_structure"));
+    let signature = key
+        .sign(&to_be_signed(protected, payload).expect("a Sig_structure"))
+        .expect("an unrevoked key signs");
     tag(
         18,
         &array(&[
@@ -212,7 +214,9 @@ pub(super) fn from_items(
     payload_item: &[u8],
     payload_bytes: &[u8],
 ) -> Vec<u8> {
-    let signature = key.sign(&to_be_signed(protected, payload_bytes).expect("a Sig_structure"));
+    let signature = key
+        .sign(&to_be_signed(protected, payload_bytes).expect("a Sig_structure"))
+        .expect("an unrevoked key signs");
     tag(
         18,
         &array(&[

@@ -93,7 +93,8 @@ pub struct VerifiedSign1 {
 /// what it must be depends on how the message is verified.
 ///
 /// # Errors
-/// [`CoseError::Encode`], which writing to memory does not raise.
+/// [`CoseError::KeyRevoked`] if `key` is revoked, and [`CoseError::Encode`], which
+/// writing to memory does not raise.
 pub fn sign_sign1(
     key: &KeyEntry,
     payload: &[u8],
@@ -102,7 +103,7 @@ pub fn sign_sign1(
     content_type: Option<&str>,
 ) -> Result<Vec<u8>, CoseError> {
     let protected = encode_protected(key, kid, typ, content_type)?;
-    let signature = key.sign(&to_be_signed(&protected, payload)?);
+    let signature = key.sign(&to_be_signed(&protected, payload)?)?;
 
     let mut out = Out::default();
     out.0.push(SIGN1_TAG_BYTE);

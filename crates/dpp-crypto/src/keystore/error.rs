@@ -31,3 +31,18 @@ pub enum PrivateJwkError {
     #[error("the private member `d` does not belong to the JWK's public key")]
     KeyPairMismatch,
 }
+
+/// A revoked key was asked to sign.
+///
+/// A key is revoked when it is compromised, and a revoked key signs nothing. Every
+/// signature this crate makes passes through [`KeyEntry::sign`](super::KeyEntry::sign),
+/// which refuses one. The remedy is a new current key:
+/// [`KeyStore::revoke_and_rotate`](super::KeyStore::revoke_and_rotate) issues one and
+/// keeps the revoked key archived as revoked, so it stays out of every published key set.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("key {fingerprint} is revoked; give it a successor with `KeyStore::revoke_and_rotate`")]
+#[non_exhaustive]
+pub struct KeyRevoked {
+    /// The revoked key's fingerprint, the hex SHA-256 of its public key.
+    pub fingerprint: String,
+}

@@ -147,7 +147,7 @@ pub(super) fn forge_with_unprotected(
         bstr(&[]),
         bstr(payload),
     ]);
-    let signature = key.sign(&to_be_signed);
+    let signature = key.sign(&to_be_signed).expect("an unrevoked key signs");
     [
         vec![0xd2],
         array(&[

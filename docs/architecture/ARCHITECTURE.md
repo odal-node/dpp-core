@@ -281,7 +281,9 @@ Builds `did:web` documents from the KeyStore state:
 - `build_did_document(store, base_url, key_id)`: the full DID document, with one
   `JsonWebKey` verification method per key, identified by the DID and the key's RFC 9278
   thumbprint URI. The current key comes first and alone in `authentication`; it and every
-  non-revoked archived key are in `assertionMethod`.
+  non-revoked archived key are in `assertionMethod`. A revoked key is listed nowhere, the
+  current one included: with no current key there is no `authentication`, and with no key
+  at all no `verificationMethod` or `assertionMethod`, never an empty one.
 
 ### LocalIdentityService
 

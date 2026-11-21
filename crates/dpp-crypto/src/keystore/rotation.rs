@@ -53,6 +53,9 @@ impl KeyStore {
     /// signatures still verify) and install a fresh current key, in a **single**
     /// persisted write. Use for routine/hygiene rotation. Returns the new key.
     ///
+    /// A current key that is already revoked is archived revoked: a rotation never
+    /// makes a revoked key valid again.
+    ///
     /// Unlike calling [`archive_key`](Self::archive_key) then
     /// [`generate_key`](Self::generate_key), there is no intermediate on-disk
     /// state where the archive exists but the new key does not (identity I4).
@@ -135,8 +138,11 @@ impl KeyStore {
                         }
                     }
                 }
+                // A key revoked already stays revoked: a hygiene rotation of a
+                // revoked current key must not archive it as a valid one, or it
+                // would be published again and its signatures would verify.
                 let archived = KeyRecord {
-                    revoked: revoke_old,
+                    revoked: revoke_old || record.revoked,
                     ..record
                 };
                 proposed.insert(archived_key_name(key_id), archived);

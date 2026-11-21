@@ -28,7 +28,9 @@ fn forge(store: &KeyStore, header: &Value) -> String {
         b64.encode(serde_json::to_vec(header).expect("header serialises")),
         b64.encode(br#"{"claim":"value"}"#),
     );
-    let signature = key.sign(signing_input.as_bytes());
+    let signature = key
+        .sign(signing_input.as_bytes())
+        .expect("an unrevoked key signs");
     format!("{signing_input}.{}", b64.encode(signature))
 }
 

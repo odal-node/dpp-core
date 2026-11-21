@@ -134,6 +134,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the CWT claims, whose times are floating-point numbers, so it is `PartialEq` and no longer
   `Eq`. (#633)
 
+- **A revoked key signs nothing.** `KeyEntry::sign` returns `Result<Vec<u8>, KeyRevoked>`
+  and refuses a key whose `revoked` flag is set, with an error that names its fingerprint and
+  `KeyStore::revoke_and_rotate`. Every signature `dpp-crypto` makes passes through it, so
+  `jws::sign`, `jws::sign_typed`, `jws::sign_typed_with`, `cose::sign_sign1`
+  (`CoseError::KeyRevoked`) and `SdJwt::present_with_key_binding` (`SdJwtError::KeyRevoked`)
+  refuse one too, and so do the `dpp-vc` signers built on them; `jws::verify` refuses to
+  verify under one. Before, a revoked current key went on signing, whatever the published
+  documents said. Migration: handle the `Result` where `KeyEntry::sign` is called, with `?`,
+  or with `expect` for a key that is not revoked, such as one from `from_private_jwk`. A
+  store's own calls never leave its current key revoked; a store whose file does is given a
+  current key that signs by `revoke_and_rotate`. (#623)
+
 ### Added
 
 - **`dpp_crypto::cose`: `COSE_Sign1` signing and verification** under EdDSA, ES256,
@@ -389,6 +401,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   checked. A Key Binding JWT is a JWT, and RFC 7797 §7 forbids a JWT to use `b64` with a
   `false` value; the `dpp_vc::jose` verifiers already refused one in a `vc+jwt`. A `b64`
   of `true`, which names the ordinary encoding, is still read. (#637)
+
+- **The DID document no longer lists a revoked current key.** `build_did_document` read
+  `revoked` only on archived keys, so a store whose current key was revoked published it as
+  the first verification method and in `authentication`, vouching for a key the SD-JWT VC
+  issuer metadata already left out. The current key is now listed only when it is not
+  revoked, so the two documents publish the same keys. With no current key there is no
+  `authentication`, since DID Core 1.0 §5.3.1 allows no empty one, and with no key at all
+  there is no `verificationMethod` or `assertionMethod` either. A store reaches this state
+  only from its file: one written before key stores carried an integrity tag, opened with
+  `KeyStore::open_and_migrate`. The W3C DID suite now runs over both documents. (#623)
+
+- **A rotation never makes a revoked key valid again.** `KeyStore::rotate_key` archived the
+  current key as not revoked whatever its flag, so a hygiene rotation of a revoked current
+  key put it back in the DID document and the issuer metadata, and its signatures verified
+  again. A revoked key is now archived revoked. (#623)
 
 ## [0.24.0] - 2026-11-16
 

@@ -132,8 +132,8 @@ In the JWT VC issuer metadata of an SD-JWT VC, the same key is one entry of
 A token names its key in the protected header's `kid`. In a `did:web` document that
 is the verification method's absolute DID URL, and in the SD-JWT VC metadata it is the
 thumbprint URI alone. A key that was rotated out is still listed while it is not
-revoked, so a signature it made still verifies. A revoked archived key is listed in
-neither document.
+revoked, so a signature it made still verifies. A revoked key is listed in neither
+document, the current one included, and signs nothing.
 
 ## Any credential and presentation, as VC-JOSE-COSE
 

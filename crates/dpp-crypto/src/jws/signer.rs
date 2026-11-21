@@ -4,7 +4,7 @@
 use base64::Engine;
 use serde_json::Value;
 
-use crate::keystore::{KeyEntry, KeyStore};
+use crate::keystore::{KeyEntry, KeyRevoked, KeyStore};
 
 /// Produces a compact JWS, signed under the key's own algorithm (`EdDSA` for Ed25519,
 /// `ES256` for P-256, `ES384` for P-384 or `ES512` for P-521), over the **RFC 8785 (JCS)
@@ -61,6 +61,10 @@ pub fn sign_typed(
 /// built with [`KeyEntry::from_private_jwk`]. The header and the signature are
 /// exactly [`sign_typed`]'s: for the same key, payload, `kid`, `typ` and `cty`
 /// the two return the same token.
+///
+/// # Errors
+/// [`KeyRevoked`] if `key` is revoked, and an error if `payload` has no RFC 8785
+/// canonical form.
 pub fn sign_typed_with(
     key: &KeyEntry,
     payload: &Value,
@@ -89,7 +93,7 @@ pub fn sign_typed_with(
         header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
     let canonical = super::canonical::canonicalize(payload)?;
-    Ok(sign_with_header(key, &header, &canonical))
+    Ok(sign_with_header(key, &header, &canonical)?)
 }
 
 /// The compact JWS of `payload` under the protected `header`, signed with `key`.
@@ -97,22 +101,30 @@ pub fn sign_typed_with(
 /// For a caller that has already built the header from values it controls, as
 /// [`sign_typed`] does and as an SD-JWT Key Binding JWT does, whose header carries
 /// `alg` and `typ` and no `kid` (RFC 9901 clause 4.3).
+///
+/// # Errors
+/// [`KeyRevoked`] if `key` is revoked.
 pub(crate) fn sign_with_header(
     key: &KeyEntry,
     header: &serde_json::Map<String, Value>,
     payload: &[u8],
-) -> String {
+) -> Result<String, KeyRevoked> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header_b64 = b64.encode(Value::Object(header.clone()).to_string());
     let payload_b64 = b64.encode(payload);
 
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()));
+    let sig_b64 = b64.encode(key.sign(signing_input.as_bytes())?);
 
-    format!("{signing_input}.{sig_b64}")
+    Ok(format!("{signing_input}.{sig_b64}"))
 }
 
 /// Verify a compact JWS produced by [`sign`] using the key store.
+///
+/// # Errors
+/// If `key_id` names no key, if the key is revoked ([`KeyRevoked`]), or if the
+/// signature is not base64url of the algorithm's length. A revoked key is refused
+/// rather than used, because every key set built from the store leaves it out.
 pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool> {
     let parts: Vec<&str> = jws.splitn(3, '.').collect();
     if parts.len() != 3 {
@@ -122,6 +134,12 @@ pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool>
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
     let key = store.load_key(key_id)?;
+    if key.revoked {
+        return Err(KeyRevoked {
+            fingerprint: key.fingerprint.clone(),
+        }
+        .into());
+    }
 
     // Bind `alg` to the key record, never the other way round. The header is
     // attacker-supplied, so it may only *confirm* what the key already says —

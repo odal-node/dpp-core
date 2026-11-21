@@ -307,7 +307,10 @@ pub(crate) fn forge_raw(key: &KeyEntry, header: &Value, payload_segment: &str) -
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header = b64.encode(serde_json::to_vec(header).expect("serialises"));
     let input = format!("{header}.{payload_segment}");
-    format!("{input}.{}", b64.encode(key.sign(input.as_bytes())))
+    format!(
+        "{input}.{}",
+        b64.encode(key.sign(input.as_bytes()).expect("an unrevoked key signs"))
+    )
 }
 
 /// An Enveloped Verifiable Credential holding `message` as a `vc+cose`, written as this crate

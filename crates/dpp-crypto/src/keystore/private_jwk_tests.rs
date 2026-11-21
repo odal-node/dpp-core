@@ -121,7 +121,7 @@ fn each_suite_key_signs_what_its_public_jwk_verifies() {
         let entry = KeyEntry::from_private_jwk(&secret(name)).expect(name);
         let verifier = PublicKey::from_jwk(&public(name)).expect("a key");
         let message = format!("{name}: a signed passport").into_bytes();
-        let signature = entry.sign(&message);
+        let signature = entry.sign(&message).expect("an unrevoked key signs");
         assert!(verifier.verify(&message, &signature), "{name}");
         assert!(!verifier.verify(b"another message", &signature), "{name}");
     }

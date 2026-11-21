@@ -955,6 +955,7 @@ dependencies = [
 name = "dpp-vc"
 version = "0.24.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "async-trait",
  "base64",

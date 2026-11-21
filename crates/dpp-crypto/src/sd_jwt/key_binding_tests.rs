@@ -77,7 +77,8 @@ pub(super) fn decoded(jwt: &str, part: usize) -> Map<String, Value> {
 /// `header` and `claims`, so a test can break one thing at a time.
 pub(super) fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -> SdJwt {
     let header = header.as_object().unwrap().clone();
-    let kb = sign_with_header(key, &header, claims.to_string().as_bytes());
+    let kb = sign_with_header(key, &header, claims.to_string().as_bytes())
+        .expect("an unrevoked key signs");
     let unbound = presentation.serialise();
     let (sd_jwt, _) = unbound.rsplit_once('~').unwrap();
     SdJwt::parse(&format!("{sd_jwt}~{kb}")).unwrap()
