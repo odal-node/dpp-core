@@ -29,6 +29,7 @@ jobs:
           - digital_link_parse
           - plugin_abi_envelope
           - jws_verify
+          - cose_sign1_verify
           - sd_jwt_parse
           - status_list_decode
           - passport_from_stored
