@@ -72,6 +72,10 @@ jobs:
           path: target/vc-jose-cose-test-suite
           persist-credentials: false
 
+      # Node 24, not the latest LTS (26): the suite's pinned lockfile has mocha 10.7.3,
+      # whose bundled yargs 16 fails to load on Node 26 ("require is not defined in ES
+      # module scope") before any row runs. Move to the latest LTS once the suite's
+      # pinned commit carries a mocha that loads on it. The suite's files stay unpatched.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"

@@ -33,9 +33,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Python 3.14, not the latest stable (3.15): PyYAML 6.0.3, the latest, publishes no
+      # 3.15 wheel, and building it from its sdist fetches its build tools without hash
+      # checks. 3.14 keeps every installed file hash-locked. Move to the latest stable
+      # once PyYAML publishes a wheel for it.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       # Pinned exactly, with hashes, for the tools and everything they pull in.
       # This is somebody else's judgement about what the metamodel permits, and
