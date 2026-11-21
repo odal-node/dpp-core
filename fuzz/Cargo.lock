@@ -213,6 +213,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
 
 [[package]]
+name = "cbor4ii"
+version = "1.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdf8ceac45b2b267e889b7210129e47d3b82f3020877f24473ea0fc055488ffa"
+
+[[package]]
 name = "cc"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -518,6 +524,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "base64",
+ "cbor4ii",
  "chrono",
  "ed25519-dalek",
  "flate2",

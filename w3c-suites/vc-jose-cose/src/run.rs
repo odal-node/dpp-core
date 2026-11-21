@@ -14,8 +14,9 @@ use dpp_crypto::jws::PublicKey;
 use dpp_crypto::keystore::KeyEntry;
 use dpp_crypto::sd_jwt::ClaimPath;
 use dpp_vc::jose::{
-    sign_credential, sign_credential_sd_jwt, sign_presentation, sign_presentation_sd_jwt,
-    verify_credential, verify_credential_sd_jwt, verify_presentation, verify_presentation_sd_jwt,
+    KeyBindingRequirement, VerifyOptions, sign_credential, sign_credential_sd_jwt,
+    sign_presentation, sign_presentation_sd_jwt, verify_credential, verify_credential_sd_jwt,
+    verify_presentation, verify_presentation_sd_jwt,
 };
 
 use crate::feature::Feature;
@@ -79,10 +80,11 @@ pub fn issue(
         Feature::CredentialJose => sign_credential(&document, &key, kid, &[]),
         Feature::PresentationJose => sign_presentation(&document, &key, kid, &[]),
         Feature::CredentialSdJwt => {
-            sign_credential_sd_jwt(&document, &key, kid, &[], disclose).map(|t| t.serialise())
+            sign_credential_sd_jwt(&document, &key, kid, &[], disclose, None).map(|t| t.serialise())
         }
         Feature::PresentationSdJwt => {
-            sign_presentation_sd_jwt(&document, &key, kid, &[], disclose).map(|t| t.serialise())
+            sign_presentation_sd_jwt(&document, &key, kid, &[], disclose, None)
+                .map(|t| t.serialise())
         }
     };
     Ok(match signed {
@@ -99,11 +101,14 @@ pub fn issue(
 /// The credentials inside are not verified. A `vp+sd-jwt` is verified the same way, with
 /// `verify_presentation_sd_jwt`.
 ///
-/// No time is passed (`now` is `None`), so `exp` and `nbf` are not read. The suite's
+/// No time is passed, so `exp` and `nbf` are not read. The suite's
 /// presentations carry an `exp` in December 2024, so under the clock row 7 would be
 /// refused for its age, and rows 14 and 16, which expect a refusal for an envelope,
 /// would be refused for their age instead and pass for the wrong reason. The suite
 /// states no verification time.
+///
+/// No audience is passed either, and Key Binding is not required: none of the suite's
+/// inputs carries `aud`, `cnf` or a Key Binding JWT, and the suite names no verifier.
 pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verdict, String> {
     let key_file = key_file(key_text)?;
     let key = PublicKey::from_jwk(&key_file["publicKeyJwk"])
@@ -111,11 +116,18 @@ pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verd
     // Some of the suite's token files end in a newline, which is no part of the token.
     let token = token_text.trim();
 
+    let options = VerifyOptions::new();
+    let binding = KeyBindingRequirement::NotRequired;
+
     Ok(match feature {
-        Feature::CredentialJose => verify_credential(token, &key, None).map(|_| ()),
-        Feature::PresentationJose => verify_presentation(token, &key, None).map(|_| ()),
-        Feature::CredentialSdJwt => verify_credential_sd_jwt(token, &key, None).map(|_| ()),
-        Feature::PresentationSdJwt => verify_presentation_sd_jwt(token, &key, None).map(|_| ()),
+        Feature::CredentialJose => verify_credential(token, &key, options).map(|_| ()),
+        Feature::PresentationJose => verify_presentation(token, &key, options).map(|_| ()),
+        Feature::CredentialSdJwt => {
+            verify_credential_sd_jwt(token, &key, options, &binding).map(|_| ())
+        }
+        Feature::PresentationSdJwt => {
+            verify_presentation_sd_jwt(token, &key, options, &binding).map(|_| ())
+        }
     }
     .map_or_else(
         |refusal| Verdict::Failure(refusal.to_string()),

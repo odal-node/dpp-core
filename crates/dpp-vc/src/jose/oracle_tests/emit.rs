@@ -18,9 +18,11 @@ use serde_json::{Value, json};
 
 use super::keys::{self, ALGORITHMS};
 use super::{high_s, token};
+use crate::jose::VerifyOptions;
 use crate::jose::{
     JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{credential, envelope, json as suite_json, presentation};
 
 /// One token and what the judge needs to know about it.
@@ -200,12 +202,12 @@ fn the_corpus_is_complete_and_this_crate_verifies_every_token_in_it() {
         let key = keys::public(alg);
         match text(case, "kind") {
             "vc" => assert_eq!(
-                verify_credential(token, &key, None).as_ref(),
+                verify_credential(token, &key, VerifyOptions::new()).as_ref(),
                 Ok(&case["document"]),
                 "{id}"
             ),
             _ if id == "suite/row-3" => assert_eq!(
-                verify_presentation(token, &key, None).map(|_| ()),
+                verify_presentation(token, &key, VerifyOptions::new()).map(|_| ()),
                 Err(JoseError::MalformedEnvelope {
                     index: 0,
                     reason: "the vc+jwt data is not a compact JWS".to_owned(),
@@ -213,13 +215,15 @@ fn the_corpus_is_complete_and_this_crate_verifies_every_token_in_it() {
                 "{id}"
             ),
             _ => {
-                let verified = verify_presentation(token, &key, None).expect(id);
+                let verified = verify_presentation(token, &key, VerifyOptions::new()).expect(id);
                 assert_eq!(verified.payload(), &case["document"], "{id}");
                 // Every enveloped credential in a presentation of this crate's own
                 // verifies under the key its `kid` names.
                 if case["group"] == json!("presentation") {
                     let credentials = verified
-                        .verify_credentials(None, |e| Some(key_for(e.kid.as_deref()?)))
+                        .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |e| {
+                            Some(key_for(e.kid.as_deref()?))
+                        })
                         .expect(id);
                     assert_eq!(credentials.len(), verified.envelopes().len(), "{id}");
                 }

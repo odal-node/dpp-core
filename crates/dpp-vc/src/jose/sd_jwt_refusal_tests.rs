@@ -7,9 +7,11 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::sd_jwt::{ClaimPath, SdJwt};
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential_sd_jwt, sign_presentation_sd_jwt, verify_presentation_sd_jwt,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{KID, credential, generated, presentation};
 
 fn segment(token: &str, index: usize) -> Value {
@@ -34,6 +36,7 @@ fn sign(document: &Value, disclose: &[ClaimPath]) -> Result<SdJwt, JoseError> {
         KID,
         &[],
         disclose,
+        None,
     )
 }
 
@@ -72,6 +75,7 @@ fn a_claim_that_must_stay_in_the_clear_is_refused_by_name() {
             KID,
             &["cnf"],
             &[path(&json!([name]))],
+            None,
         );
 
         assert_eq!(
@@ -132,6 +136,7 @@ fn a_presentation_may_conceal_its_holder_and_one_envelope_and_not_its_type() {
             path(&json!(["holder"])),
             path(&json!(["verifiableCredential", 0])),
         ],
+        None,
     )
     .expect("signs");
 
@@ -141,7 +146,7 @@ fn a_presentation_may_conceal_its_holder_and_one_envelope_and_not_its_type() {
     assert!(payload["verifiableCredential"][0]["..."].is_string());
     for name in ["type", "@context"] {
         assert_eq!(
-            sign_presentation_sd_jwt(&document, &key, KID, &[], &[path(&json!([name]))])
+            sign_presentation_sd_jwt(&document, &key, KID, &[], &[path(&json!([name]))], None)
                 .map(|_| ()),
             Err(JoseError::UnconcealableClaim {
                 name: name.to_owned()
@@ -221,9 +226,9 @@ fn what_sign_credential_refuses_is_refused_here() {
 fn a_kid_that_is_not_an_absolute_url_is_refused_without_an_iss() {
     let key = generated(KeyAlgorithm::Ed25519);
 
-    let credential = sign_credential_sd_jwt(&credential(), &key, "thumbprint", &[], &[]);
+    let credential = sign_credential_sd_jwt(&credential(), &key, "thumbprint", &[], &[], None);
     let presentation =
-        sign_presentation_sd_jwt(&presentation(vec![]), &key, "thumbprint", &[], &[]);
+        sign_presentation_sd_jwt(&presentation(vec![]), &key, "thumbprint", &[], &[], None);
 
     let expected = Err(JoseError::KidNotAbsolute {
         kid: Some("thumbprint".to_owned()),
@@ -237,11 +242,11 @@ fn something_that_is_not_an_object_is_refused() {
     let key = generated(KeyAlgorithm::Ed25519);
 
     assert_eq!(
-        sign_credential_sd_jwt(&json!([]), &key, KID, &[], &[]).map(|_| ()),
+        sign_credential_sd_jwt(&json!([]), &key, KID, &[], &[], None).map(|_| ()),
         Err(JoseError::NotAnObject { what: "credential" })
     );
     assert_eq!(
-        sign_presentation_sd_jwt(&json!("p"), &key, KID, &[], &[]).map(|_| ()),
+        sign_presentation_sd_jwt(&json!("p"), &key, KID, &[], &[], None).map(|_| ()),
         Err(JoseError::NotAnObject {
             what: "presentation"
         })
@@ -253,10 +258,16 @@ fn a_presentation_signed_as_an_sd_jwt_verifies_back_with_its_holder_concealed() 
     let key = generated(KeyAlgorithm::EcdsaP256);
     let document = presentation(vec![]);
 
-    let sd_jwt = sign_presentation_sd_jwt(&document, &key, KID, &[], &[path(&json!(["holder"]))])
-        .expect("signs");
+    let sd_jwt =
+        sign_presentation_sd_jwt(&document, &key, KID, &[], &[path(&json!(["holder"]))], None)
+            .expect("signs");
 
-    let verified =
-        verify_presentation_sd_jwt(&sd_jwt.serialise(), &key.public_key(), None).expect("verifies");
+    let verified = verify_presentation_sd_jwt(
+        &sd_jwt.serialise(),
+        &key.public_key(),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
+    .expect("verifies");
     assert_eq!(verified.payload(), &document);
 }

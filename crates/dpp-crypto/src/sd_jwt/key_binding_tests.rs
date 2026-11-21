@@ -179,11 +179,32 @@ fn each_check_of_step_5_refuses_on_its_own() {
         rejected(rebound(&presented, &key, kb_header(), claims.clone())),
         None
     );
+    // A `b64` of `true` names the ordinary encoding (RFC 7797 §3), so it is read as one.
+    assert_eq!(
+        rejected(rebound(
+            &presented,
+            &key,
+            json!({ "alg": "EdDSA", "typ": "kb+jwt", "b64": true }),
+            claims.clone(),
+        )),
+        None
+    );
 
     for (sd_jwt, why) in [
         (
             rebound(&presented, &stranger, kb_header(), claims.clone()),
             "the signature",
+        ),
+        // RFC 7797 §7: a JWT MUST NOT use `b64` with a `false` value. The payload here is
+        // still base64url-encoded, so the signature over it is valid.
+        (
+            rebound(
+                &presented,
+                &key,
+                json!({ "alg": "EdDSA", "typ": "kb+jwt", "b64": false }),
+                claims.clone(),
+            ),
+            "b64",
         ),
         (
             rebound(

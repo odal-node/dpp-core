@@ -60,3 +60,10 @@ crates/dpp-tests/fixtures/jades/ts-119-182-1-v1.2.1/** linguist-vendored
 # we maintain.
 crates/dpp-vc/src/jose/fixtures/w3c-vc-jose-cose/** -text
 crates/dpp-vc/src/jose/fixtures/w3c-vc-jose-cose/** linguist-vendored
+
+# The same suite's COSE input files, the four key files they are verified under and
+# the licence, carried verbatim in `dpp-crypto`, with each file's SHA-256 pinned by a
+# test in `crates/dpp-crypto/src/cose`. The same `-text` reasoning applies: the
+# inputs are base64 or hex text whose bytes the pin covers.
+crates/dpp-crypto/src/cose/fixtures/** -text
+crates/dpp-crypto/src/cose/fixtures/** linguist-vendored

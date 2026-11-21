@@ -9,10 +9,12 @@ use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 use dpp_crypto::sd_jwt::ClaimPath;
 
+use super::VerifyOptions;
 use super::{
     JoseError, VerifiedPresentation, sign_credential, sign_credential_sd_jwt, sign_presentation,
     sign_presentation_sd_jwt, verify_presentation, verify_presentation_sd_jwt,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{
     KID, credential, envelope, foreign_envelope, forge, generated, presentation,
     sd_credential_header, sd_envelope,
@@ -29,7 +31,7 @@ fn issuer() -> KeyEntry {
 /// An SD-JWT of the credential, signed by `issuer`, with its `name` concealed.
 fn sd_by(issuer: &KeyEntry) -> String {
     let name = ClaimPath::from_json(&json!(["credentialSubject", "name"])).expect("a path");
-    sign_credential_sd_jwt(&credential(), issuer, KID, &[], &[name])
+    sign_credential_sd_jwt(&credential(), issuer, KID, &[], &[name], None)
         .expect("signs")
         .serialise()
 }
@@ -37,15 +39,20 @@ fn sd_by(issuer: &KeyEntry) -> String {
 /// A presentation of `members`, signed as a `vp+jwt` by `holder` and verified.
 fn present_jwt(holder: &KeyEntry, members: Vec<Value>) -> Result<VerifiedPresentation, JoseError> {
     let token = sign_presentation(&presentation(members), holder, KID, &[]).expect("signs");
-    verify_presentation(&token, &holder.public_key(), None)
+    verify_presentation(&token, &holder.public_key(), VerifyOptions::new())
 }
 
 /// The same, signed as a `vp+sd-jwt`.
 fn present_sd(holder: &KeyEntry, members: Vec<Value>) -> Result<VerifiedPresentation, JoseError> {
-    let token = sign_presentation_sd_jwt(&presentation(members), holder, KID, &[], &[])
+    let token = sign_presentation_sd_jwt(&presentation(members), holder, KID, &[], &[], None)
         .expect("signs")
         .serialise();
-    verify_presentation_sd_jwt(&token, &holder.public_key(), None)
+    verify_presentation_sd_jwt(
+        &token,
+        &holder.public_key(),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
 }
 
 type Present = fn(&KeyEntry, Vec<Value>) -> Result<VerifiedPresentation, JoseError>;
@@ -71,7 +78,7 @@ fn a_vc_sd_jwt_envelope_is_listed_with_its_kid_and_verifies_under_the_issuers_ke
             .collect();
         assert_eq!(listed, [(0, "application/vc+sd-jwt", Some(KID))], "{outer}");
         let credential = verified.envelopes()[0]
-            .verify(&issuer.public_key(), None)
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
             .expect("verifies");
         assert_eq!(credentials_name(&credential), Some("Example"), "{outer}");
     }
@@ -93,7 +100,7 @@ fn verify_credentials_verifies_a_vc_jwt_and_a_vc_sd_jwt_each_under_its_own_key()
         .expect("verifies");
 
         let credentials = verified
-            .verify_credentials(None, |e| {
+            .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |e| {
                 Some(if e.media_type == "application/vc+jwt" {
                     jwt_issuer.public_key()
                 } else {
@@ -112,7 +119,9 @@ fn an_envelope_is_verified_strictly_and_a_failure_names_it() {
     for (outer, present) in BOTH {
         let verified = present(&holder, vec![sd_envelope(&sd_by(&issuer))]).expect("verifies");
 
-        let refused = verified.verify_credentials(None, |_| Some(other.public_key()));
+        let refused = verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| {
+            Some(other.public_key())
+        });
 
         assert_eq!(
             refused,
@@ -124,7 +133,7 @@ fn an_envelope_is_verified_strictly_and_a_failure_names_it() {
         );
         assert_eq!(
             verified.envelopes()[0]
-                .verify(&other.public_key(), None)
+                .verify(&other.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
                 .map(|_| ()),
             Err(JoseError::CredentialRefused {
                 index: 0,
@@ -149,12 +158,16 @@ fn an_envelope_is_held_to_the_now_given() {
 
     assert!(
         verified.envelopes()[0]
-            .verify(&issuer.public_key(), None)
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
     assert_eq!(
         verified.envelopes()[0]
-            .verify(&issuer.public_key(), Some(1_000))
+            .verify(
+                &issuer.public_key(),
+                VerifyOptions::new().at(1_000),
+                &NOT_REQUIRED
+            )
             .map(|_| ()),
         Err(JoseError::CredentialRefused {
             index: 0,
@@ -163,8 +176,11 @@ fn an_envelope_is_held_to_the_now_given() {
     );
 }
 
+/// RFC 9901 §7.3 steps 3 and 4: when Key Binding is not required, a token that carries a
+/// Key Binding JWT is processed as an SD-JWT, and the Key Binding JWT is not read. This one
+/// is not even a valid Key Binding JWT, and is ignored.
 #[test]
-fn an_envelope_with_a_key_binding_jwt_is_refused_when_it_is_verified() {
+fn an_envelope_with_a_key_binding_jwt_is_verified_as_an_sd_jwt_when_binding_is_not_required() {
     let (holder, issuer) = (holder(), issuer());
     let kb = forge(
         &issuer,
@@ -174,14 +190,10 @@ fn an_envelope_with_a_key_binding_jwt_is_refused_when_it_is_verified() {
     let with_kb = format!("{}{kb}", sd_by(&issuer));
     let verified = present_jwt(&holder, vec![sd_envelope(&with_kb)]).expect("verifies");
 
-    assert_eq!(
+    assert!(
         verified.envelopes()[0]
-            .verify(&issuer.public_key(), None)
-            .map(|_| ()),
-        Err(JoseError::CredentialRefused {
-            index: 0,
-            source: Box::new(JoseError::KeyBindingUnsupported)
-        })
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
+            .is_ok()
     );
 }
 
@@ -240,7 +252,7 @@ fn a_vc_sd_jwt_envelope_may_be_percent_encoded_or_base64() {
         assert_eq!(verified.envelopes()[0].kid.as_deref(), Some(KID));
         assert!(
             verified.envelopes()[0]
-                .verify(&issuer.public_key(), None)
+                .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
                 .is_ok()
         );
     }
@@ -260,7 +272,7 @@ fn a_vc_sd_jwt_envelope_without_a_kid_lists_none() {
     assert_eq!(verified.envelopes()[0].kid, None);
     assert!(
         verified.envelopes()[0]
-            .verify(&issuer.public_key(), None)
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
 }
@@ -278,7 +290,9 @@ fn another_format_is_still_listed_and_still_not_verified() {
     let verified = present_jwt(&holder, members).expect("verifies");
 
     assert_eq!(
-        verified.verify_credentials(None, |_| Some(issuer.public_key())),
+        verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| Some(
+            issuer.public_key()
+        )),
         Err(JoseError::UnsupportedEnvelopeFormat {
             index: 1,
             media_type: "application/vc+cose".to_owned(),
@@ -292,7 +306,7 @@ fn no_key_for_a_vc_sd_jwt_envelope_names_its_kid() {
     let verified = present_jwt(&holder, vec![sd_envelope(&sd_by(&issuer))]).expect("verifies");
 
     assert_eq!(
-        verified.verify_credentials(None, |_| None),
+        verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| None),
         Err(JoseError::CredentialKeyUnknown {
             index: 0,
             kid: Some(KID.to_owned()),

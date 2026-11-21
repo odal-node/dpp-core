@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 
 use dpp_crypto::jws::KeyAlgorithm;
 
+use super::VerifyOptions;
 use super::{JoseError, sign_presentation, verify_presentation};
 use crate::test_support::{KID, generated, presentation};
 
@@ -28,7 +29,7 @@ fn envelope_with(type_: Value, context: Value) -> Value {
 fn verify_alone(member: Value) -> Result<(), JoseError> {
     let holder = generated(KeyAlgorithm::Ed25519);
     let token = sign_presentation(&presentation(vec![member]), &holder, KID, &[]).expect("signs");
-    verify_presentation(&token, &holder.public_key(), None)
+    verify_presentation(&token, &holder.public_key(), VerifyOptions::new())
         .map(|verified| assert_eq!(verified.envelopes().len(), 1))
 }
 

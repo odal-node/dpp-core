@@ -36,7 +36,11 @@
 #      and `vp+sd-jwt` (VC-JOSE-COSE section 3.2), among them the three issuance
 #      inputs of the W3C suite, judged by both libraries for the signature under the
 #      published key, the Disclosures and their digests, `typ` and `cty`, and the
-#      processed payload against the document (`vc-sd-jwt.mjs`, `VcSdJwtOracle.kt`).
+#      processed payload against the document (`vc-sd-jwt.mjs`, `VcSdJwtOracle.kt`);
+#      and the ones bound to a Holder's key, judged with Key Binding required, with
+#      negative controls (a wrong nonce, a wrong audience, an `sd_hash` that belongs to
+#      another presentation, no Key Binding JWT) that both libraries and this crate
+#      must refuse.
 #
 # What it does **not** answer, and the register row says so. The original order of
 # the claims (RFC 9901 clause 4.2.4.1) cannot be seen by any verifier; what is
@@ -79,7 +83,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
@@ -143,8 +147,8 @@ jobs:
 
       # The second implementation. The same corpus, the same credentials and the
       # same reader, so a disagreement between the two libraries is a clause to
-      # read and not a difference of inputs. Temurin 17 is the library's own
-      # target, and what the JAdES oracle uses.
+      # read and not a difference of inputs. Temurin 25 is the latest LTS, and
+      # what the JAdES oracle uses.
       #
       # It runs whether or not the first judge passed. A disagreement is when the
       # second verdict is most needed, to tell a defect here from one library's
@@ -155,7 +159,7 @@ jobs:
         if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "25"
           cache: maven
 
       # `-C` fails the build on an artefact whose checksum is not the
