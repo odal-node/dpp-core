@@ -42,6 +42,84 @@ pub(crate) fn temp_store_with(label: &str, key_id: &str, algorithm: KeyAlgorithm
     store
 }
 
+// ── Signing while the key rotates ─────────────────────────────────────────────
+
+/// How many rotations [`sign_while_rotating`] waits for while it signs.
+const ROTATIONS_WHILE_SIGNING: usize = 20;
+
+/// How many threads [`sign_while_rotating`] signs on at once.
+const SIGNERS: usize = 4;
+
+/// Sign with `sign` on [`SIGNERS`] threads while another thread rotates `key_id` in
+/// `store`, and return every token once [`ROTATIONS_WHILE_SIGNING`] rotations have
+/// completed since signing began.
+///
+/// For the signers that take the `kid` from the key: each must take it and the
+/// signature from one load of the key, or a rotation between the two reads gives a
+/// token the replaced key's `kid` and the new key's signature. A rotation holds the
+/// store's write lock while it saves the file, so one thread signing alone is nearly
+/// always past both reads when the next rotation takes it; with several signing at
+/// once, some are between the two. Each rotation is a [`KeyStore::rotate_key`],
+/// which archives the replaced key, so every key that signed a token is still
+/// published when the rotations stop.
+///
+/// Signing starts once the first rotation has completed. The test fails if a
+/// rotation fails or a signer panics.
+pub(crate) fn sign_while_rotating<T: Send>(
+    store: &KeyStore,
+    key_id: &str,
+    sign: impl Fn() -> T + Sync,
+) -> Vec<T> {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    /// Raises the flag when dropped, so the signers stop however the rotating thread
+    /// ends, a failed rotation included, and its panic then reaches the test.
+    struct StopOnDrop<'a>(&'a AtomicBool);
+    impl Drop for StopOnDrop<'_> {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let stop = AtomicBool::new(false);
+    let rotations = AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        let (stop, rotations, sign) = (&stop, &rotations, &sign);
+        scope.spawn(move || {
+            let _stop_signers = StopOnDrop(stop);
+            while !stop.load(Ordering::SeqCst) {
+                store.rotate_key(key_id).expect("rotate the key");
+                rotations.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        while rotations.load(Ordering::SeqCst) == 0 && !stop.load(Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        let first = rotations.load(Ordering::SeqCst);
+        let signers: Vec<_> = (0..SIGNERS)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut signed = Vec::new();
+                    while !stop.load(Ordering::SeqCst)
+                        && rotations.load(Ordering::SeqCst) - first < ROTATIONS_WHILE_SIGNING
+                    {
+                        signed.push(sign());
+                    }
+                    signed
+                })
+            })
+            .collect();
+        // Every signer is joined before the rotations stop, and they stop before a
+        // signer's panic is passed on, so the scope never waits on a rotating thread.
+        let signed: Vec<_> = signers.into_iter().map(|s| s.join()).collect();
+        stop.store(true, Ordering::SeqCst);
+        signed
+            .into_iter()
+            .flat_map(|s| s.expect("a signer panicked"))
+            .collect()
+    })
+}
+
 // ── VC-JOSE-COSE verification choices ─────────────────────────────────────────
 
 /// Key Binding is not required, which is the choice most tests make: the one under test is

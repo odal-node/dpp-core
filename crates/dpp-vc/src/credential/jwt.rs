@@ -72,7 +72,7 @@ const CTY: &str = "vc";
 /// Sign a credential into its VC-JWT wire form, using `key_id` from `store`.
 ///
 /// The payload is the JCS canonical form of `credential`, applied by
-/// [`signer::sign_typed`], so an issuer cannot accidentally sign a differently
+/// [`signer::sign_typed_with`], so an issuer cannot accidentally sign a differently
 /// ordered serialisation of the same document. The header carries
 /// `typ: vc+jwt` and `cty: vc`.
 ///
@@ -91,11 +91,13 @@ const CTY: &str = "vc";
 /// the credential's `issuer`, which is the issuer's DID, followed by the signing
 /// key's thumbprint URI. That is the identifier [`build_did_document`] gives the
 /// key, so it resolves in the issuer's document for as long as the key is in it.
+/// The key is loaded once and both the `kid` and the signature come from it, so a
+/// credential signed while the key rotates names the key that signed it.
 ///
 /// # Errors
-/// Propagates key-store and signing failures from [`signer::sign_typed`], fails
-/// if `key_id` names no key, and fails if the credential cannot be serialised to
-/// JSON.
+/// Fails if `key_id` names no key or the key store cannot load it, propagates
+/// signing failures from [`signer::sign_typed_with`], and fails if the credential
+/// cannot be serialised to JSON.
 ///
 /// [`build_did_document`]: crate::did_builder::build_did_document
 pub fn sign_access_credential(
@@ -104,11 +106,15 @@ pub fn sign_access_credential(
     key_id: &str,
 ) -> anyhow::Result<String> {
     let payload = serde_json::to_value(credential)?;
-    let key = store
-        .public_key(key_id)
-        .ok_or_else(|| anyhow::anyhow!("no key found for {key_id}"))?;
-    let kid = format!("{}#{}", credential.issuer, key.thumbprint_uri()?);
-    signer::sign_typed(store, key_id, &payload, &kid, Some(TYP), Some(CTY))
+    // Loaded once: the `kid` and the signature come from the same key, so a
+    // rotation cannot come between them.
+    let key = store.load_key(key_id)?;
+    let kid = format!(
+        "{}#{}",
+        credential.issuer,
+        key.public_key().thumbprint_uri()
+    );
+    signer::sign_typed_with(&key, &payload, &kid, Some(TYP), Some(CTY))
 }
 
 /// The refusal, if the protected header does not type the token as a VC-JWT:

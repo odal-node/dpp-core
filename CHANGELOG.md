@@ -390,6 +390,18 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `false` value; the `dpp_vc::jose` verifiers already refused one in a `vc+jwt`. A `b64`
   of `true`, which names the ordinary encoding, is still read. (#637)
 
+- **A token signed while its key rotates names the key that signed it.**
+  `LocalIdentityService::sign_passport`, `sign_access_credential` and
+  `sd_jwt_vc::issue` read the key store twice: once for the thumbprint in the `kid`,
+  and once to load the key that signs. A rotation between the two reads gave the
+  token the replaced key's `kid` and the new key's signature, which no verifier
+  accepts, so a passport signed in that moment stayed unverifiable. Each now loads the
+  key once and takes both from it, signing with
+  `jws::sign_typed_with`. With four threads signing while another rotates the key,
+  every token now verifies against the keys published once the rotations stop; with
+  the two reads, each of the three signers produced such a token in each of three
+  runs. Migration: none. (#622)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking
