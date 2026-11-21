@@ -415,7 +415,7 @@ jades-oracle:
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
 # `check-tree` runs last so it only records the tree when every other gate passed.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit check-tree check-tree-self-test
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit check-tree-self-test check-tree
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That
