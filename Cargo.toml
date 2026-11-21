@@ -103,6 +103,11 @@ serde_jcs    = "0.2"
 # GZIP — decoding W3C Bitstring Status List `encodedList` (pure, no infra)
 flate2       = "1"
 
+# CBOR (RFC 8949): the codec under `dpp-crypto`'s COSE_Sign1. A codec only:
+# `COSE_Sign1` and its header rules are written in `dpp-crypto`. Default features
+# are off, which leaves no dependency of its own (`half` and `serde` are optional).
+cbor4ii      = { version = "1.2.5", default-features = false }
+
 # Date/time
 chrono       = { version = "0.4", features = ["serde"] }
 
