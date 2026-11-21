@@ -100,3 +100,44 @@ fn a_credential_signed_before_a_rotation_to_an_ec_key_authenticates_after_it() {
         }
     }
 }
+
+/// A credential signed while the issuer's key rotates names the key that signed it,
+/// and authenticates against the document published once the rotations stop.
+///
+/// `sign_access_credential` takes the `kid` and the signature from one load of the
+/// key. With two reads, a rotation between them gave a credential the replaced key's
+/// `kid` and the new key's signature, and the document refused it.
+#[test]
+fn credentials_signed_while_the_key_rotates_authenticate_against_the_document_published_after() {
+    let store = temp_store("jwt-while-rotating", KEY_ID);
+    let input = credential_from(ISSUER_DID);
+
+    let credentials = crate::test_support::sign_while_rotating(&store, KEY_ID, || {
+        sign_access_credential(&input, &store, KEY_ID).expect("sign while the key rotates")
+    });
+    let doc = build_did_document(&store, BASE_URL, KEY_ID).expect("did document");
+
+    let kids: std::collections::BTreeSet<String> = credentials
+        .iter()
+        .map(|jws| {
+            header_of(jws)["kid"]
+                .as_str()
+                .expect("the token names a kid")
+                .to_owned()
+        })
+        .collect();
+    assert!(
+        kids.len() > 1,
+        "the credentials were signed under more than one key: {}",
+        kids.len()
+    );
+    for (i, jws) in credentials.iter().enumerate() {
+        authenticate_access_credential(jws, &doc).unwrap_or_else(|e| {
+            panic!(
+                "credential {i} of {} names {} and does not authenticate: {e:?}",
+                credentials.len(),
+                header_of(jws)["kid"]
+            )
+        });
+    }
+}
