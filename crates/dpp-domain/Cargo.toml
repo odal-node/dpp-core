@@ -20,12 +20,12 @@ serde_json  = { workspace = true }
 serde_with  = { workspace = true }
 # v7+serde+js: v7 generates time-sortable UUIDs (B-tree friendly); js enables
 # getrandom's JS backend so crypto.getRandomValues is used on wasm32-unknown-unknown.
-uuid        = { version = "1", features = ["v7", "serde", "js"] }
+uuid        = { version = "1.14", features = ["v7", "serde", "js"] }
 chrono      = { workspace = true }
 thiserror   = { workspace = true }
 async-trait = { workspace = true }
 
-semver      = "1"
+semver      = { workspace = true }
 
 # Excluded from `wasm32-unknown-unknown`. The reason recorded here was that
 # jsonschema pulls blocking reqwest — which was true, and is no longer: the
@@ -36,6 +36,11 @@ semver      = "1"
 # embedded schemas, which today they cannot.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 jsonschema  = { workspace = true }
+# Raise transitive dependency floors so minimal-versions resolves compilable versions.
+# fluent-uri (via jsonschema -> referencing) requires ref-cast >= 1.0.25 for ref_cast_custom.
+# icu_locid_transform requires yoke >= 0.8.4 for consistent Yokeable trait bounds.
+ref-cast    = { workspace = true }
+yoke        = "0.8.4"
 
 [features]
 # The obligation calendar reads dated schedule entries out of a verified signed
@@ -54,7 +59,7 @@ serde_json = { workspace = true }
 # Builds the payload segment of a JWS-shaped manifest, so the calendar's bundle
 # tests drive the real `verify_bundle`.
 base64     = { workspace = true }
-tokio      = { version = "1", features = ["macros", "rt"] }
+tokio      = { version = "1.40", features = ["macros", "rt"] }
 sha2       = { workspace = true }
 hex        = { workspace = true }
 proptest   = { workspace = true }

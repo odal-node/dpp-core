@@ -96,12 +96,12 @@ dpp-tests         = { path = "crates/dpp-tests", version = "0.24.0" }
 
 # Serialisation
 serde        = { version = "1.0.229", features = ["derive"] }
-serde_json   = "1"
-serde_with   = "3"
+serde_json   = "1.0.145"
+serde_with   = "3.0"
 # RFC 8785 JSON Canonicalization Scheme (JCS) — the signing/content-binding contract
 serde_jcs    = "0.2"
 # GZIP — decoding W3C Bitstring Status List `encodedList` (pure, no infra)
-flate2       = "1"
+flate2       = "1.0.34"
 
 # CBOR (RFC 8949): the codec under `dpp-crypto`'s COSE_Sign1. A codec only:
 # `COSE_Sign1` and its header rules are written in `dpp-crypto`. Default features
@@ -109,22 +109,22 @@ flate2       = "1"
 cbor4ii      = { version = "1.2.5", default-features = false }
 
 # Date/time
-chrono       = { version = "0.4", features = ["serde"] }
+chrono       = { version = "0.4.38", features = ["serde"] }
 
 # Async
-async-trait  = "0.1"
+async-trait  = "0.1.88"
 
 # Identity & cryptography
 base64       = "0.23"
-hex          = "0.4"
-sha2         = "0.11"
-ed25519-dalek = { version = "3", features = ["rand_core"] }
+hex          = "0.4.3"
+sha2         = "0.11.0"
+ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
 p256         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 p384         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 p521         = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
-zeroize      = { version = "1", features = ["derive"] }
-aes-gcm      = "0.11"
-rand         = "0.10"
+zeroize      = { version = "1.9.0", features = ["derive"] }
+aes-gcm      = "0.11.0"
+rand         = "0.10.0"
 
 # Schema validation.
 #
@@ -150,24 +150,25 @@ rand         = "0.10"
 # those rather than fail, which is a validator quietly accepting what it was
 # asked to reject.
 jsonschema   = { version = "0.61.2", default-features = false, features = ["idna"] }
-semver       = "1"
+semver       = "1.0"
 
 # Property-based testing (dev-only)
-proptest     = "1"
+proptest     = "1.0"
 
 # Telemetry
-tracing      = "0.1"
+tracing      = "0.1.40"
 
 # Utilities
-uuid         = { version = "1", features = ["v7", "serde"] }
+uuid         = { version = "1.14", features = ["v7", "serde"] }
 anyhow       = "1.0.104"
-thiserror    = "2"
+thiserror    = "2.0"
+ref-cast     = "1.0.25"
 
 # KDF
-argon2       = "0.6"
+argon2       = "0.6.0"
 
 # MAC
-hmac         = "0.13"
+hmac         = "0.13.0"
 
 # Benchmarking
 criterion    = { version = "0.8", features = ["html_reports"] }
