@@ -15,9 +15,10 @@ pub enum CoseError {
     /// string (RFC 9052 §1.5). The text says where.
     #[error("not a COSE_Sign1 message: {0}")]
     Malformed(&'static str),
-    /// An array or map of the message has an indefinite length. RFC 9052 does not
-    /// forbid reading one; this crate does, in the structures it reads.
-    #[error("an indefinite-length array or map in a COSE_Sign1 message")]
+    /// An array, map, byte string or text string that this crate reads in the message
+    /// has an indefinite length. RFC 9052 does not forbid reading one; this crate does,
+    /// in the structures it reads.
+    #[error("an indefinite-length array, map or string in a COSE_Sign1 message")]
     IndefiniteLength,
     /// The message carries a CBOR tag other than 18, the tag of `COSE_Sign1`
     /// (RFC 9052 §4.2).

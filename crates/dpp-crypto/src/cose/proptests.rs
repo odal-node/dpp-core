@@ -1,5 +1,5 @@
-//! Property tests for the header path: an unknown label may carry any well-formed
-//! value, and no input makes verification panic.
+//! Property tests for the header path: an unknown label may carry any value of the kinds
+//! the codec steps over, nested, and no input makes verification panic.
 
 use proptest::prelude::*;
 

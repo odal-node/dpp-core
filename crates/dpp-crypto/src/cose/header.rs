@@ -64,8 +64,9 @@ pub(super) struct Bucket<'a> {
 ///   header, and this crate understands no critical parameter).
 /// - The values of `alg`, content type, `kid` and `typ` must have the types of
 ///   RFC 9052 §3.1 and RFC 9596 §2, and are refused otherwise.
-/// - The value of any other label is stepped over, whatever it is, as RFC 9052 §3
-///   leaves a recipient free to ignore a parameter it does not know.
+/// - The value of any other label is stepped over unread (`cbor::skip` says what that
+///   accepts), as RFC 9052 §3 leaves a recipient free to ignore a parameter it does not
+///   know.
 pub(super) fn read_bucket<'a>(reader: &mut Reader<'a>) -> Result<Bucket<'a>, CoseError> {
     let pairs = cbor::read_map_len(reader, "a header map")?;
     let mut bucket = Bucket::default();

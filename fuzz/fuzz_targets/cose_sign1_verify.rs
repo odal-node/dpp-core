@@ -1,9 +1,9 @@
 #![no_main]
-//! Fuzz `COSE_Sign1` verification — a credential or presentation secured with COSE
+//! Fuzz `COSE_Sign1` verification. A credential or presentation secured with COSE
 //! arrives as untrusted CBOR, and unknown header parameters are stepped over, which
 //! means reading any value an attacker nests in one.
 //! Property: `verify_sign1` returns `Ok` or `Err` for any bytes, never panics, and
-//! never reports a message as verified that the key did not sign — under a key of
+//! never reports a message as verified that the key did not sign. It runs under a key of
 //! each algorithm, so the fuzzer can also try to move a signature from one algorithm
 //! to another.
 

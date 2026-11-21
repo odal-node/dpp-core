@@ -160,8 +160,9 @@ pub(super) fn to_be_signed(protected: &[u8], payload: &[u8]) -> Result<Vec<u8>, 
 /// The message is read in the tagged form (tag 18) or the untagged one, which
 /// RFC 9052 §4.2 says depends on context. It is refused unless **all** of these hold:
 ///
-/// - it is one well-formed `COSE_Sign1` array of four items, with nothing after it
-///   and no indefinite-length array or map in it;
+/// - it is one well-formed `COSE_Sign1` array of four items, with nothing after it,
+///   and none of the arrays, maps and strings this crate reads in it has an indefinite
+///   length (a value that is stepped over, below, may);
 /// - in each header map, no label appears twice (RFC 9052 §3: "the message MUST be
 ///   rejected as malformed", compared as values, not as encodings), and every label
 ///   is an integer or a text string;
@@ -180,8 +181,14 @@ pub(super) fn to_be_signed(protected: &[u8], payload: &[u8]) -> Result<Vec<u8>, 
 ///   JWS: it is lawful ECDSA, so nothing may use signature bytes as an identifier.
 ///
 /// Header parameters this crate does not know are ignored (RFC 9052 §3.1 leaves the
-/// application to understand what it needs), and any well-formed CBOR value is
-/// stepped over.
+/// application to understand what it needs), and their values are stepped over
+/// unread: integers, strings, arrays, maps and tags, of definite or indefinite
+/// length, nested up to 256 levels, and the simple values `false`, `true`, `null` and
+/// `undefined` and the floats. Any other simple value (RFC 8949 §3.3) is refused as
+/// [`CoseError::Malformed`], and so is deeper nesting. Some items that RFC 8949
+/// §3.2.3 does not call well formed, such as an indefinite-length string whose chunks
+/// are not strings, are stepped over too, which is harmless only because a value
+/// stepped over is never read.
 ///
 /// # Errors
 /// [`CoseError`], naming the first rule the message breaks.
