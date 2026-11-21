@@ -4,6 +4,7 @@
 use base64::Engine as _;
 use serde_json::Value;
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
@@ -31,7 +32,8 @@ fn a_credential_round_trips_under_every_algorithm() {
         assert_eq!(header["typ"], "vc+jwt");
         assert_eq!(header["cty"], "vc");
         assert_eq!(header["kid"], KID);
-        let verified = verify_credential(&token, &key.public_key(), None).expect("verifies");
+        let verified =
+            verify_credential(&token, &key.public_key(), VerifyOptions::new()).expect("verifies");
         assert_eq!(verified, credential(), "{alg}");
     }
 }
@@ -47,7 +49,8 @@ fn a_presentation_round_trips_under_every_algorithm() {
         let header = header_of(&token);
         assert_eq!(header["typ"], "vp+jwt");
         assert_eq!(header["cty"], "vp");
-        let verified = verify_presentation(&token, &key.public_key(), None).expect("verifies");
+        let verified =
+            verify_presentation(&token, &key.public_key(), VerifyOptions::new()).expect("verifies");
         assert_eq!(verified.payload(), &holder, "{algorithm:?}");
     }
 }
@@ -62,8 +65,12 @@ fn a_key_of_another_algorithm_refuses_the_token() {
             if verifier == signer {
                 continue;
             }
-            let refused = verify_credential(&token, &generated(verifier).public_key(), None)
-                .expect_err("refused");
+            let refused = verify_credential(
+                &token,
+                &generated(verifier).public_key(),
+                VerifyOptions::new(),
+            )
+            .expect_err("refused");
             assert_eq!(
                 refused,
                 JoseError::AlgorithmMismatch {

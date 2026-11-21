@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
@@ -36,8 +37,8 @@ fn credential_refused(document: &Value) -> JoseError {
     let key = key();
     let signed = sign_credential(document, &key, KID, &[]).expect_err("refused at signing");
     let token = forge(&key, &credential_header(&key), document);
-    let verified =
-        verify_credential(&token, &key.public_key(), None).expect_err("refused at verification");
+    let verified = verify_credential(&token, &key.public_key(), VerifyOptions::new())
+        .expect_err("refused at verification");
     assert_eq!(signed, verified);
     signed
 }
@@ -47,8 +48,8 @@ fn presentation_refused(document: &Value) -> JoseError {
     let key = key();
     let signed = sign_presentation(document, &key, KID, &[]).expect_err("refused at signing");
     let token = forge(&key, &presentation_header(&key), document);
-    let verified =
-        verify_presentation(&token, &key.public_key(), None).expect_err("refused at verification");
+    let verified = verify_presentation(&token, &key.public_key(), VerifyOptions::new())
+        .expect_err("refused at verification");
     assert_eq!(signed, verified);
     signed
 }
@@ -79,7 +80,7 @@ fn a_context_set_that_begins_with_the_v2_url_is_accepted() {
         );
         let token = forge(&key, &credential_header(&key), &document);
         assert!(
-            verify_credential(&token, &key.public_key(), None).is_ok(),
+            verify_credential(&token, &key.public_key(), VerifyOptions::new()).is_ok(),
             "{context}"
         );
     }
@@ -364,12 +365,12 @@ fn a_holder_that_is_a_url_needs_an_absolute_kid_on_verification() {
     let absolute = outer(&key, KID, &presentation(Vec::new()));
 
     assert_eq!(
-        verify_presentation(&bare, &key.public_key(), None).map(|_| ()),
+        verify_presentation(&bare, &key.public_key(), VerifyOptions::new()).map(|_| ()),
         Err(JoseError::KidNotAbsolute {
             kid: Some(THUMBPRINT.to_owned())
         })
     );
-    assert!(verify_presentation(&absolute, &key.public_key(), None).is_ok());
+    assert!(verify_presentation(&absolute, &key.public_key(), VerifyOptions::new()).is_ok());
 }
 
 #[test]
@@ -383,7 +384,11 @@ fn a_holder_object_with_a_url_id_counts_as_a_url() {
         Err(JoseError::KidNotAbsolute { .. })
     ));
     assert!(matches!(
-        verify_presentation(&outer(&key, THUMBPRINT, &document), &key.public_key(), None),
+        verify_presentation(
+            &outer(&key, THUMBPRINT, &document),
+            &key.public_key(),
+            VerifyOptions::new()
+        ),
         Err(JoseError::KidNotAbsolute { .. })
     ));
 }
@@ -401,8 +406,12 @@ fn a_bare_kid_is_fine_with_an_iss_or_without_a_holder() {
 
     for document in [with_iss, no_holder] {
         assert!(
-            verify_presentation(&outer(&key, THUMBPRINT, &document), &key.public_key(), None)
-                .is_ok(),
+            verify_presentation(
+                &outer(&key, THUMBPRINT, &document),
+                &key.public_key(),
+                VerifyOptions::new()
+            )
+            .is_ok(),
             "{document}"
         );
     }
@@ -451,8 +460,12 @@ fn an_iss_that_is_not_a_string_is_refused_for_a_presentation() {
             "{iss}"
         );
         assert_eq!(
-            verify_presentation(&outer(&key, THUMBPRINT, &document), &key.public_key(), None)
-                .map(|_| ()),
+            verify_presentation(
+                &outer(&key, THUMBPRINT, &document),
+                &key.public_key(),
+                VerifyOptions::new()
+            )
+            .map(|_| ()),
             Err(refused),
             "{iss}"
         );

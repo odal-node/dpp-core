@@ -5,6 +5,7 @@ use serde_json::Value;
 use dpp_crypto::jws::PublicKey;
 
 use super::error::JoseError;
+use super::options::{KeyBindingRequirement, VerifyOptions};
 use super::sd_jwt_verify::verify_credential_sd_jwt;
 use super::verify::verify_credential;
 
@@ -57,15 +58,25 @@ impl UnverifiedEnvelope {
     /// Verify the credential this envelope carries under `issuer_key`, with every check of
     /// [`verify_credential`](super::verify_credential), or of
     /// [`verify_credential_sd_jwt`](super::verify_credential_sd_jwt) for a `vc+sd-jwt`, and
-    /// `now` as they take it.
+    /// `options` as they take them. `binding` is the choice RFC 9901 §9.5 leaves to the
+    /// verifier. A `vc+sd-jwt` is held to it. A `vc+jwt` cannot carry a Key Binding JWT, so
+    /// where binding is required it is refused, as RFC 9901 §7.3 step 2 refuses an SD-JWT
+    /// presented without one, and where it is not, it is verified as a `vc+jwt`.
     ///
     /// # Errors
     ///
     /// [`JoseError::UnsupportedEnvelopeFormat`] when the envelope is neither a `vc+jwt` nor a
     /// `vc+sd-jwt`, which are the formats this crate verifies.
+    /// [`JoseError::CredentialRefused`] with [`JoseError::KeyBindingMissing`] for a `vc+jwt`
+    /// when binding is required.
     /// [`JoseError::CredentialRefused`], naming this envelope and the check the credential
     /// failed, for one that does not verify.
-    pub fn verify(&self, issuer_key: &PublicKey, now: Option<i64>) -> Result<Value, JoseError> {
+    pub fn verify(
+        &self,
+        issuer_key: &PublicKey,
+        options: VerifyOptions<'_>,
+        binding: &KeyBindingRequirement,
+    ) -> Result<Value, JoseError> {
         let Some(token) = self.token.as_deref() else {
             return Err(JoseError::UnsupportedEnvelopeFormat {
                 index: self.index,
@@ -73,9 +84,11 @@ impl UnverifiedEnvelope {
             });
         };
         let verified = if self.media_type == VC_SD_JWT {
-            verify_credential_sd_jwt(token, issuer_key, now)
+            verify_credential_sd_jwt(token, issuer_key, options, binding)
+        } else if matches!(binding, KeyBindingRequirement::Required(_)) {
+            Err(JoseError::KeyBindingMissing)
         } else {
-            verify_credential(token, issuer_key, now)
+            verify_credential(token, issuer_key, options)
         };
         verified.map_err(|source| JoseError::CredentialRefused {
             index: self.index,

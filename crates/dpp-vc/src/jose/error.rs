@@ -70,6 +70,11 @@ pub enum JoseError {
         /// The reserved name.
         name: &'static str,
     },
+    /// A holder key was given to an SD-JWT signer, and the document already carries `cnf`.
+    /// The signer writes `cnf` from the key (RFC 7800 §3.1) and does not overwrite one the
+    /// caller wrote.
+    #[error("the document already carries cnf, so no holder key can be added")]
+    ConfirmationClaimPresent,
     /// The key could not sign the document.
     #[error("signing failed: {reason}")]
     Signing {
@@ -90,11 +95,20 @@ pub enum JoseError {
         /// What the reader reported.
         reason: String,
     },
-    /// The token carries a Key Binding JWT. A verifier of this crate reads an SD-JWT
-    /// and not an SD-JWT+KB: RFC 9901 clause 4 says a verifier that expects an SD-JWT
-    /// finds the last segment empty, and the crate takes no Key Binding policy.
-    #[error("the SD-JWT carries a Key Binding JWT, which is not verified here")]
-    KeyBindingUnsupported,
+    /// Key Binding is required, and the token carries no Key Binding JWT (RFC 9901 §7.3
+    /// step 2), or is a `vc+jwt` envelope, which cannot carry one. Whether Key Binding is
+    /// required is the caller's choice, and the presence of the Key Binding JWT never
+    /// changes it.
+    #[error("Key Binding is required and the token carries no Key Binding JWT")]
+    KeyBindingMissing,
+    /// Key Binding is required, and the token does not satisfy it (RFC 9901 §7.3 step 5):
+    /// the processed payload names no usable Holder key in `cnf`, or the Key Binding JWT
+    /// failed a check. The reason names the check, and no claim value.
+    #[error("the Key Binding is refused: {reason}")]
+    KeyBindingRefused {
+        /// What the check reported.
+        reason: String,
+    },
     /// The Disclosures do not process against the signed payload (RFC 9901 clause 7.1):
     /// one matches no digest, a digest repeats, a Disclosure would overwrite a claim in the
     /// clear, `_sd_alg` names an unsupported hash, and so on. The reason is the reader's
@@ -103,18 +117,6 @@ pub enum JoseError {
     InvalidDisclosures {
         /// What the reader reported.
         reason: String,
-    },
-    /// `iss`, `aud`, `exp`, `nbf` or `cnf` reached the processed payload from a Disclosure.
-    /// RFC 9901 clause 9.7 says an Issuer must not make them selectively disclosable, since
-    /// a Holder that need not disclose `exp` can present an expired credential as one that
-    /// never expires. A Disclosure that was withheld cannot be seen, so this refuses only
-    /// the case where it was not.
-    #[error(
-        "{name} arrived in a Disclosure, and an Issuer must not make it selectively disclosable"
-    )]
-    DisclosedCriticalClaim {
-        /// The claim.
-        name: &'static str,
     },
     /// The protected header carries `crit`. No critical extension is understood
     /// (RFC 7515 §4.1.11), so none is accepted.
@@ -213,11 +215,24 @@ pub enum JoseError {
     },
     /// `exp` or `nbf` is present and is not a JSON number, so it cannot be read as a
     /// time. Refused rather than ignored, because ignoring a malformed `exp` would
-    /// read as no expiry.
+    /// read as no expiry. A signer refuses an `iat` that is not a number for the same
+    /// reason, since RFC 7519 §4.1.6 makes it a NumericDate; a verifier does not read it.
     #[error("{claim} is not a NumericDate")]
     MalformedTemporalClaim {
-        /// `"exp"` or `"nbf"`.
+        /// `"exp"`, `"nbf"` or, at signing, `"iat"`.
         claim: &'static str,
+    },
+    /// `aud` is present and is neither a string nor an array of strings (RFC 7519
+    /// §4.1.3).
+    #[error("aud is neither a string nor an array of strings")]
+    MalformedAudience,
+    /// The token carries `aud`, and it does not name the audience the caller identified as,
+    /// or the caller gave none (RFC 7519 §4.1.3: the JWT "MUST be rejected"). The `aud` of
+    /// the token is not repeated here.
+    #[error("the token's aud does not name the audience this verifier identifies as")]
+    AudienceMismatch {
+        /// The audience the caller identified as, or `None` when it gave none.
+        audience: Option<String>,
     },
     /// `exp` has been reached (RFC 7519 §4.1.4).
     #[error("the token has expired")]

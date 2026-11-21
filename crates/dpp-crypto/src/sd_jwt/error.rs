@@ -85,7 +85,8 @@ pub enum SdJwtError {
     /// The Key Binding JWT failed one of the checks of clause 7.3 step 5, named
     /// here: `alg` or the signature (5.b, 5.c), `typ` (5.d), `iat` (5.e), `nonce`
     /// or `aud` (5.f), `sd_hash` (5.g), or the JWT itself, its `exp` or its `nbf`
-    /// (5.h).
+    /// (5.h); or `b64`, for a header that sets it to `false`, which RFC 7797 §7
+    /// forbids in a JWT.
     #[error("the Key Binding JWT is not valid: {0}")]
     KeyBindingRejected(&'static str),
     /// The JWT payload is not a JSON object.

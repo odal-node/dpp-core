@@ -9,8 +9,10 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::jws::canonical::canonicalize;
 
+use super::VerifyOptions;
 use super::{
-    JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
+    JoseError, sign_credential, sign_credential_sd_jwt, sign_presentation,
+    sign_presentation_sd_jwt, verify_credential, verify_presentation,
 };
 use crate::test_support::{
     KID, credential, credential_header, forge, generated, presentation, presentation_header,
@@ -184,7 +186,7 @@ fn a_bare_kid_is_fine_when_the_credential_has_an_iss() {
 
     let token = sign_credential(&document, &key, THUMBPRINT, &[]).expect("signs");
 
-    assert!(verify_credential(&token, &key.public_key(), None).is_ok());
+    assert!(verify_credential(&token, &key.public_key(), VerifyOptions::new()).is_ok());
 }
 
 /// An issuer that is not a URL is refused for the issuer itself (VC DM 2.0 §4.7), so
@@ -250,7 +252,7 @@ fn an_iss_that_is_not_the_issuer_is_refused_at_signing() {
     );
     let token = forge(&key, &credential_header(&key), &document);
     assert_eq!(
-        verify_credential(&token, &key.public_key(), None),
+        verify_credential(&token, &key.public_key(), VerifyOptions::new()),
         Err(refused)
     );
 
@@ -274,7 +276,7 @@ fn an_iss_that_is_not_a_string_is_refused_at_signing() {
     ));
     let token = forge(&key, &credential_header(&key), &document);
     assert!(matches!(
-        verify_credential(&token, &key.public_key(), Some(NOW)),
+        verify_credential(&token, &key.public_key(), VerifyOptions::new().at(NOW)),
         Err(JoseError::MalformedPayload { .. })
     ));
 }
@@ -303,7 +305,7 @@ fn an_exp_or_nbf_that_is_not_a_number_is_refused_at_signing() {
             );
             let token = forge(&key, &credential_header(&key), &document);
             assert_eq!(
-                verify_credential(&token, &key.public_key(), Some(NOW)),
+                verify_credential(&token, &key.public_key(), VerifyOptions::new().at(NOW)),
                 Err(refused),
                 "{claim}: {value}"
             );
@@ -332,7 +334,72 @@ fn an_exp_that_is_not_a_number_is_refused_at_presentation_signing() {
     );
     let token = forge(&key, &presentation_header(&key), &document);
     assert_eq!(
-        verify_presentation(&token, &key.public_key(), Some(NOW)).map(|_| ()),
+        verify_presentation(&token, &key.public_key(), VerifyOptions::new().at(NOW)).map(|_| ()),
         Err(refused)
     );
+}
+
+/// RFC 7519 §4.1.6: "Its value MUST be a number containing a NumericDate value." So signing
+/// refuses an `iat` that is not one, exactly as it refuses `exp` and `nbf`, in the `vc+jwt`
+/// and SD-JWT forms of a credential and of a presentation. Verification does not read `iat`
+/// (see `iat_in_any_form_is_accepted`), because the suite's credentials carry a date string.
+#[test]
+fn an_iat_that_is_not_a_number_is_refused_at_signing() {
+    let key = generated(KeyAlgorithm::Ed25519);
+    let refused = JoseError::MalformedTemporalClaim { claim: "iat" };
+    for value in [
+        json!("2025-01-01T00:00:00Z"),
+        json!(null),
+        json!(true),
+        json!([1_700_000_000]),
+        json!({}),
+    ] {
+        let mut vc = credential();
+        vc["iat"] = value.clone();
+        let mut vp = presentation(Vec::new());
+        vp["iat"] = value.clone();
+
+        assert_eq!(
+            sign_credential(&vc, &key, KID, &[]),
+            Err(refused.clone()),
+            "{value}"
+        );
+        assert_eq!(
+            sign_presentation(&vp, &key, KID, &[]),
+            Err(refused.clone()),
+            "{value}"
+        );
+        assert_eq!(
+            sign_credential_sd_jwt(&vc, &key, KID, &[], &[], None).map(|_| ()),
+            Err(refused.clone()),
+            "{value}"
+        );
+        assert_eq!(
+            sign_presentation_sd_jwt(&vp, &key, KID, &[], &[], None).map(|_| ()),
+            Err(refused.clone()),
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn an_iat_that_is_a_number_is_signed() {
+    let key = generated(KeyAlgorithm::Ed25519);
+    for value in [json!(1_700_000_000), json!(1_700_000_000.5), json!(0)] {
+        let mut vc = credential();
+        vc["iat"] = value.clone();
+        let mut vp = presentation(Vec::new());
+        vp["iat"] = value.clone();
+
+        assert!(sign_credential(&vc, &key, KID, &[]).is_ok(), "{value}");
+        assert!(sign_presentation(&vp, &key, KID, &[]).is_ok(), "{value}");
+        assert!(
+            sign_credential_sd_jwt(&vc, &key, KID, &[], &[], None).is_ok(),
+            "{value}"
+        );
+        assert!(
+            sign_presentation_sd_jwt(&vp, &key, KID, &[], &[], None).is_ok(),
+            "{value}"
+        );
+    }
 }
