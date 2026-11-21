@@ -25,6 +25,7 @@ cd "$ROOT"
 
 # "<script>|<why it does not run in CI>"
 local_only=(
+  "check-tree.sh|records the working tree id for the local pre-commit hook; CI does not use hooks and has no commits to gate"
   "release-head-check.sh|the pre-release hook runs it, on the machine that publishes: it compares that checkout with origin, and a pull request has nothing to release. CI runs its self-test"
 )
 
