@@ -79,7 +79,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
@@ -143,8 +143,8 @@ jobs:
 
       # The second implementation. The same corpus, the same credentials and the
       # same reader, so a disagreement between the two libraries is a clause to
-      # read and not a difference of inputs. Temurin 17 is the library's own
-      # target, and what the JAdES oracle uses.
+      # read and not a difference of inputs. Temurin 25 is the latest LTS, and
+      # what the JAdES oracle uses.
       #
       # It runs whether or not the first judge passed. A disagreement is when the
       # second verdict is most needed, to tell a defect here from one library's
@@ -155,7 +155,7 @@ jobs:
         if: ${{ !cancelled() && steps.corpus.outcome == 'success' }}
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "25"
           cache: maven
 
       # `-C` fails the build on an artefact whose checksum is not the

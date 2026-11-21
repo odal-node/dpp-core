@@ -24,7 +24,7 @@
   <name>SD-JWT second oracle</name>
 
   <properties>
-    <maven.compiler.release>17</maven.compiler.release>
+    <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!--
@@ -44,7 +44,7 @@
       run on an Ed25519 Holder key.
     -->
     <eudi.sdjwt.version>0.20.2</eudi.sdjwt.version>
-    <kotlin.version>2.2.21</kotlin.version>
+    <kotlin.version>2.4.21</kotlin.version>
     <coroutines.version>1.10.2</coroutines.version>
     <serialization.version>1.9.0</serialization.version>
     <nimbus.version>10.9</nimbus.version>
@@ -109,7 +109,7 @@
           </execution>
         </executions>
         <configuration>
-          <jvmTarget>17</jvmTarget>
+          <jvmTarget>25</jvmTarget>
         </configuration>
       </plugin>
 

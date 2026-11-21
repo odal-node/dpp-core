@@ -2,7 +2,7 @@ ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478 *annotations-13
 82a027b86541f58d1f9ee020cdf6bebe82acc7a267d3c53a2ea5cd6335932bbd *error_prone_annotations-2.22.0.jar
 4960206fa244020d7ee7f4feadd283f3bc77d45c79ba9ec13dd077e43c5b4b3a *eudi-lib-jvm-sdjwt-kt-0.20.2.jar
 766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7 *jsr305-3.0.2.jar
-6558a3d233da56a20934b32159f9db5f86ed5816ef098f78a2c223dc6abb79dd *kotlin-stdlib-2.2.21.jar
+bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3 *kotlin-stdlib-2.4.21.jar
 5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd *kotlinx-coroutines-core-jvm-1.10.2.jar
 d65dee3cafa6f7bfaefedb493fc68b5c63abe750734fb8af92fac7a0d3101457 *kotlinx-coroutines-slf4j-1.10.2.jar
 3da805e9da2ff3cb119f744dcd11de6a18e32a5b933518f17418ba5795cfa775 *kotlinx-io-bytestring-jvm-0.8.0.jar
