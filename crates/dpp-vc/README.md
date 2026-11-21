@@ -30,8 +30,8 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   the key the caller has already chosen. Fetching the metadata, deciding whether to
   trust it, and picking the key are your application's job, and so is the network policy.
 - You sign or verify **any** W3C credential or presentation as a VC-JOSE-COSE
-  `vc+jwt` or `vp+jwt`, or as an SD-JWT, `vc+sd-jwt` or `vp+sd-jwt`, with a key you
-  supply. See `jose`.
+  `vc+jwt` or `vp+jwt`, as an SD-JWT, `vc+sd-jwt` or `vp+sd-jwt`, or as a
+  `COSE_Sign1`, `vc+cose` or `vp+cose`, with a key you supply. See `jose`.
 
 ## What this crate does not cover
 
@@ -215,9 +215,10 @@ assert!(hidden["credentialSubject"].get("name").is_none());
 
 `jose` signs and verifies a credential or a presentation of any shape, given as
 JSON, as a compact JWS: `vc+jwt` for a credential and `vp+jwt` for a presentation
-(W3C Securing Verifiable Credentials using JOSE and COSE, Recommendation of 15 May
-2025, §3.1), or as an SD-JWT, `vc+sd-jwt` and `vp+sd-jwt` (§3.2), where you name the
-claims to conceal by path. It resolves no key and performs no I/O. You hand it the signing key when
+(W3C Securing Verifiable Credentials using JOSE and COSE, Recommendation of 13 October
+2026, §3.1), as an SD-JWT, `vc+sd-jwt` and `vp+sd-jwt` (§3.2), where you name the
+claims to conceal by path, or as a `COSE_Sign1`, `vc+cose` and `vp+cose` (§3.3). It
+resolves no key and performs no I/O. You hand it the signing key when
 you sign, the holder's public key to verify a presentation, and each issuer's public
 key to verify that issuer's credential, under EdDSA, ES256, ES384 or ES512. This is a
 different path from the access credential above, which is one typed document verified
@@ -227,13 +228,15 @@ Four rules are the caller's to know:
 
 - **Verifying a presentation and verifying its credentials are two operations.**
   VC-JOSE-COSE §5.1 defines verifying a presentation secured with JOSE as validating
-  its own JWT, and §5 assumes the key is found before verification begins.
-  `verify_presentation` therefore checks the presentation's token and the shape of
-  each envelope (§3.1.2), and returns the envelopes unverified. Verify the credentials
+  its own JWT, §5.3 defines it for COSE as the `COSE_Sign1` process on the presentation
+  itself, and §5 assumes the key is found before verification begins.
+  `verify_presentation`, `verify_presentation_sd_jwt` and `verify_presentation_cose`
+  therefore check the presentation's token and the shape of each envelope (§3.1.2,
+  §3.2.2, §3.3.2), and return the envelopes unverified. Verify the credentials
   with `verify_credentials`, which needs a key for every envelope and fails on the
-  first one that fails, or with `UnverifiedEnvelope::verify`, one at a time. Only a
-  `vc+jwt` and a `vc+sd-jwt` can be verified: a `vc+cose` envelope makes
-  `verify_credentials` fail.
+  first one that fails, or with `UnverifiedEnvelope::verify`, one at a time. A
+  `vc+jwt`, a `vc+sd-jwt` and a `vc+cose` can be verified: an envelope of any other
+  format makes `verify_credentials` fail.
 - **Time is the `now` you pass.** `VerifyOptions::at(seconds)` holds `exp` and `nbf` to
   it, with no leeway, and refuses one that is not a number. Without it neither is
   read. `iat` is never checked when verifying, because the specification says it
@@ -267,14 +270,33 @@ Five more are the SD-JWT form's:
   takes a `KeyBindingRequirement`. `NotRequired` ignores a Key Binding JWT the token
   carries, as §7.3 steps 3 and 4 say. `Required(policy)` checks it as step 5 says, under
   the key in the token's `cnf`, with the audience, nonce and window of the policy, and
-  refuses a token that has no Key Binding JWT, and a `vc+jwt` envelope, which cannot
-  carry one. The signers take an optional holder key and write it as `cnf`.
+  refuses a token that has no Key Binding JWT, and a `vc+jwt` or `vc+cose` envelope,
+  which cannot carry one. The signers take an optional holder key and write it as `cnf`.
 - **A claim that was disclosed is checked as one in the clear.** A disclosed `exp` in the
   past is refused as expired when your `VerifyOptions` carry a `now`, as one in the clear
   is, and a disclosed `aud` entry is part of the `aud` your audience is compared with. RFC 9901 clause 9.7 puts the duty not to conceal them on the
   issuer, and the signer here refuses to.
 - **A member named `_sd`, `_sd_alg` or `...` cannot be signed,** because a reader would
   take it for the mechanism.
+
+Four more are the COSE form's:
+
+- **The payload is the document, not a claims set.** §3.3.1 and §3.3.2 say the
+  unsecured credential or presentation "is the unencoded COSE_Sign1 payload". So the
+  COSE signers allow only the vocabulary and the `extension_terms` you pass: a JWT claim
+  name such as `exp` or `iss` is an undeclared member like any other, and `vc` and `vp`
+  are refused only as undeclared members, since §1.1.2.1 is stated for a JWT Claims Set.
+- **Time, audience and issuer come from the CWT claims.** `exp`, `nbf`, `aud` and `iss`
+  are read from the CWT Claims header parameter of the protected header (§3.3.3, RFC
+  9597) and checked as the same claims are in the `vc+jwt` form. The signers write none,
+  and the parameter is refused in the unprotected header, where nothing protects it.
+- **`typ` is required.** It must name `vc+cose` or `vp+cose`, and the content type, when
+  present, `vc` or `vp`, each with or without `application/`, though §3.3.1 and §3.3.2
+  say SHOULD for both.
+- **An envelope's base64 is read forgivingly.** A `vc+cose` envelope is
+  `data:application/vc+cose;base64,<base64>` (§3.3.1), and its base64 is read with the
+  WHATWG Infra Standard's "forgiving-base64 decode", so padding is optional and ASCII
+  whitespace is removed: the W3C suite's own envelope has no padding.
 
 ## Relationship to other crates
 
