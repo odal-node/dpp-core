@@ -6,7 +6,7 @@ use dpp_crypto::jws::PublicKey;
 
 use super::error::JoseError;
 use super::options::{KeyBindingRequirement, VerifyOptions};
-use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT, VC_SD_JWT};
+use super::unverified_envelope::{UnverifiedEnvelope, VC_COSE, VC_JWT, VC_SD_JWT};
 
 /// A presentation whose own token verified. Its signature and claims were checked; the
 /// credentials it envelops were **not**.
@@ -45,7 +45,7 @@ impl VerifiedPresentation {
         &self.payload
     }
 
-    /// Every envelope of `verifiableCredential`, in order. Each was shape-checked and is
+    /// Every envelope of `verifiableCredential`, in order. Each was judged as an envelope and is
     /// NOT verified.
     pub fn envelopes(&self) -> &[UnverifiedEnvelope] {
         &self.envelopes
@@ -67,7 +67,7 @@ impl VerifiedPresentation {
     ///
     /// # Errors
     ///
-    /// [`JoseError::UnsupportedEnvelopeFormat`] for an envelope that is neither a `vc+jwt` nor a `vc+sd-jwt`;
+    /// [`JoseError::UnsupportedEnvelopeFormat`] for an envelope that is none of `vc+jwt`, `vc+sd-jwt` and `vc+cose`;
     /// [`JoseError::CredentialKeyUnknown`] for an envelope with no key;
     /// [`JoseError::CredentialRefused`] for a credential that fails a check.
     pub fn verify_credentials<F>(
@@ -82,7 +82,7 @@ impl VerifiedPresentation {
         self.envelopes
             .iter()
             .map(|envelope| {
-                if envelope.media_type != VC_JWT && envelope.media_type != VC_SD_JWT {
+                if ![VC_JWT, VC_SD_JWT, VC_COSE].contains(&envelope.media_type.as_str()) {
                     return Err(JoseError::UnsupportedEnvelopeFormat {
                         index: envelope.index,
                         media_type: envelope.media_type.clone(),

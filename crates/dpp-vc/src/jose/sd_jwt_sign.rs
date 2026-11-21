@@ -15,7 +15,8 @@ use super::properties::{
 use super::sd_jwt_verify::{CREDENTIAL_SD_JWT_TYP, PRESENTATION_SD_JWT_TYP};
 use super::sign::object;
 use super::verify::{
-    CREDENTIAL_CTY, PRESENTATION_CTY, check_holder_kid, check_issuer, check_temporal_claims,
+    CREDENTIAL_CTY, PRESENTATION_CTY, check_holder_iss, check_holder_kid, check_issuer, check_kid,
+    check_temporal_claims,
 };
 use super::vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS, check_members};
 
@@ -89,7 +90,8 @@ pub fn sign_credential_sd_jwt(
     check_members(document, &CREDENTIAL_TERMS, extension_terms)?;
     check_context(document)?;
     check_temporal_claims(document)?;
-    check_issuer(document, Some(kid))?;
+    check_issuer(document)?;
+    check_kid(document, kid)?;
     check_credential_properties(document)?;
     seal(
         document,
@@ -131,7 +133,8 @@ pub fn sign_presentation_sd_jwt(
     check_context(document)?;
     check_temporal_claims(document)?;
     check_holder(document)?;
-    check_holder_kid(document, Some(kid))?;
+    check_holder_iss(document)?;
+    check_holder_kid(document, kid)?;
     check_presentation_properties(document)?;
     seal(
         document,

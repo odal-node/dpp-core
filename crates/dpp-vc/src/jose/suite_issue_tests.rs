@@ -42,27 +42,31 @@ fn row_2_a_credential_with_every_optional_field_is_issued_and_verifies_back() {
 /// Row 3's presentation embeds a `vc+jwt` envelope whose protected-header segment is
 /// 89 characters, which is not a base64url length: it begins `yJraWQ` where a JSON
 /// object's encoding begins `eyJraWQ`. Issuing succeeds, since envelopes are not
-/// parsed at issuance, as the suite expects. Verifying the result is refused, as a
-/// malformed envelope, because the envelope is not a compact JWS.
+/// parsed at issuance, as the suite expects. The presentation verifies, since verifying a
+/// presentation judges its envelopes and not what is inside them. The credential inside is
+/// refused when it is verified, because its header is not readable.
 #[test]
-fn row_3_a_presentation_with_a_malformed_envelope_is_issued_and_then_refused() {
+fn row_3_a_presentation_with_an_unreadable_credential_is_issued_and_verifies_and_the_credential_is_refused()
+ {
     let presentation = json("presentation-single.json");
 
     let token = sign_presentation(&presentation, &signing_key("p256"), &key_id("p256"), &[])
         .expect("issued: envelopes are not parsed at issuance");
 
+    let verified = verify_presentation(&token, &public_key("p256"), VerifyOptions::new())
+        .expect("the envelope is well formed, and its content is not read");
     assert_eq!(
-        verify_presentation(&token, &public_key("p256"), VerifyOptions::new()).map(|_| ()),
-        Err(JoseError::MalformedEnvelope {
+        verified.envelopes()[0].verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED),
+        Err(JoseError::CredentialRefused {
             index: 0,
-            reason: "the vc+jwt data is not a compact JWS".to_owned(),
+            source: Box::new(JoseError::UnreadableHeader),
         })
     );
 }
 
 /// Row 4's presentation holds a `vc+jwt` signed under P-256 and a `vc+sd-jwt` and a
 /// `vc+cose`. The presentation verifies under its own key and lists the three
-/// envelopes. Only the `vc+jwt` and the `vc+sd-jwt` can be verified here, under P-256 and P-384.
+/// envelopes. All three verify, under P-256, P-384 and P-256: the `vc+cose` is row 29's.
 #[test]
 fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let presentation = json("presentation-multiple.json");
@@ -96,10 +100,11 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
             .verify(&public_key("p384"), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
-    assert!(matches!(
-        verified.envelopes()[2].verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED),
-        Err(JoseError::UnsupportedEnvelopeFormat { index: 2, .. })
-    ));
+    assert!(
+        verified.envelopes()[2]
+            .verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED)
+            .is_ok()
+    );
 }
 
 /// Row 5 carries two members that are in no VC Data Model 2.0 vocabulary, and the

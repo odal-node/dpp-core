@@ -80,7 +80,7 @@ fn an_envelope_of_another_format_cannot_be_verified_here() {
     let holder = holder();
     let key = issuer().public_key();
 
-    for media_type in ["application/vc+cose", "text/plain"] {
+    for media_type in ["application/vc+ld+json", "text/plain"] {
         let verified = present(&holder, vec![foreign_envelope(media_type)]).expect("verifies");
         let unsupported = JoseError::UnsupportedEnvelopeFormat {
             index: 0,

@@ -4,6 +4,7 @@ use cbor4ii::core::utils::SliceReader;
 
 use super::algorithm::cose_alg;
 use super::cbor::{self, Out, Reader};
+use super::cwt::CwtClaims;
 use super::error::CoseError;
 use super::header::{self, Alg, Bucket, Media};
 use crate::jws::{PublicKey, SignatureLengthError};
@@ -56,7 +57,7 @@ impl From<Media<'_>> for ContentType {
 /// Every value here comes from the **protected** header, which the signature covers.
 /// A `kid` or content type that sits only in the unprotected header is not returned:
 /// nothing authenticates it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct VerifiedSign1 {
     /// The payload, which the signature covers.
@@ -69,6 +70,9 @@ pub struct VerifiedSign1 {
     pub typ: Option<ContentType>,
     /// The content type of the payload (label 3), which the caller compares too.
     pub content_type: Option<ContentType>,
+    /// The registered CWT claims of the CWT Claims header parameter (label 15), read from the
+    /// protected header only (RFC 9597 §2). Empty when the message carries none.
+    pub cwt_claims: CwtClaims,
 }
 
 /// Signs `payload` as a tagged `COSE_Sign1` under `key`'s own algorithm (EdDSA,
@@ -169,7 +173,8 @@ pub(super) fn to_be_signed(protected: &[u8], payload: &[u8]) -> Result<Vec<u8>, 
 /// - no label is in both maps (RFC 9052 §3);
 /// - neither header carries `crit`, which this crate does not understand, as the JWS
 ///   verifier does not (RFC 9052 §3.1);
-/// - `typ` is not in the unprotected header (RFC 9596 §2);
+/// - `typ` is not in the unprotected header (RFC 9596 §2), and nor is the CWT Claims header
+///   parameter (RFC 9597 §1: nothing there is protected, so no claim may be used);
 /// - the **protected** header carries `alg`, and it is the algorithm of `key` (see
 ///   [`super::algorithm::cose_alg`]). The key decides the algorithm and the header may
 ///   only confirm it, so a header cannot move a signature to another algorithm;
@@ -179,6 +184,10 @@ pub(super) fn to_be_signed(protected: &[u8], payload: &[u8]) -> Result<Vec<u8>, 
 ///   signature over the `Sig_structure` of RFC 9052 §4.4, built from the protected
 ///   header **as received**. A high-`S` ECDSA signature is accepted, as it is for a
 ///   JWS: it is lawful ECDSA, so nothing may use signature bytes as an identifier.
+///
+/// The CWT Claims header parameter (15) of the protected header is read as [`CwtClaims`]: a
+/// map whose keys are each once, integers or text, and whose `iss`, `sub`, `aud`, `exp`, `nbf`
+/// and `iat` have the types of RFC 8392 §4. Any other claim is stepped over (RFC 8392 §3).
 ///
 /// Header parameters this crate does not know are ignored (RFC 9052 §3.1 leaves the
 /// application to understand what it needs), and their values are stepped over
@@ -233,6 +242,7 @@ pub fn verify_sign1(message: &[u8], key: &PublicKey) -> Result<VerifiedSign1, Co
         kid: protected.kid.map(<[u8]>::to_vec),
         typ: protected.typ.map(ContentType::from),
         content_type: protected.content_type.map(ContentType::from),
+        cwt_claims: protected.cwt_claims.unwrap_or_default(),
     })
 }
 
@@ -259,6 +269,9 @@ fn check_headers(
 ) -> Result<(), CoseError> {
     if unprotected.typ.is_some() {
         return Err(CoseError::TypeNotProtected);
+    }
+    if unprotected.cwt_claims.is_some() {
+        return Err(CoseError::CwtClaimsNotProtected);
     }
     if protected
         .labels

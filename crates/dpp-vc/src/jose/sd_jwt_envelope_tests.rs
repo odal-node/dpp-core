@@ -58,13 +58,6 @@ fn present_sd(holder: &KeyEntry, members: Vec<Value>) -> Result<VerifiedPresenta
 type Present = fn(&KeyEntry, Vec<Value>) -> Result<VerifiedPresentation, JoseError>;
 const BOTH: [(&str, Present); 2] = [("vp+jwt", present_jwt), ("vp+sd-jwt", present_sd)];
 
-fn malformed(reason: &str) -> Result<(), JoseError> {
-    Err(JoseError::MalformedEnvelope {
-        index: 0,
-        reason: reason.to_owned(),
-    })
-}
-
 #[test]
 fn a_vc_sd_jwt_envelope_is_listed_with_its_kid_and_verifies_under_the_issuers_key() {
     let (holder, issuer) = (holder(), issuer());
@@ -199,8 +192,10 @@ fn an_envelope_with_a_key_binding_jwt_is_verified_as_an_sd_jwt_when_binding_is_n
 
 // ── the shape of the data ─────────────────────────────────────────────────────
 
+/// The presentation is verified by judging its envelopes, so data that is not an SD-JWT does
+/// not stop it. The credential is refused when it is verified, and the refusal says why.
 #[test]
-fn a_vc_sd_jwt_envelope_whose_data_is_not_an_sd_jwt_is_malformed() {
+fn a_vc_sd_jwt_envelope_whose_data_is_not_an_sd_jwt_is_refused_when_its_credential_is_verified() {
     let holder = holder();
     let issuer = issuer();
     let sd = sd_by(&issuer);
@@ -217,13 +212,30 @@ fn a_vc_sd_jwt_envelope_whose_data_is_not_an_sd_jwt_is_malformed() {
     ] {
         let member = sd_envelope(&data);
         for (outer, present) in BOTH {
-            assert_eq!(
-                present(&holder, vec![member.clone()]).map(|_| ()),
-                malformed("the vc+sd-jwt data is not an SD-JWT"),
-                "{outer} {data:?}"
+            let verified = present(&holder, vec![member.clone()])
+                .unwrap_or_else(|e| panic!("{outer} {data:?}: {e}"));
+            let refused = verified.envelopes()[0]
+                .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
+                .expect_err("refused");
+            assert!(
+                matches!(refused, JoseError::CredentialRefused { index: 0, .. }),
+                "{outer} {data:?}: {refused:?}"
             );
         }
     }
+    // Data that cannot be decoded at all says so, and data that decodes to text says what it is not.
+    let verified = present_jwt(&holder, vec![sd_envelope("%zz")]).expect("verifies");
+    assert!(matches!(
+        verified.envelopes()[0].verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED),
+        Err(JoseError::CredentialRefused { source, .. })
+            if matches!(*source, JoseError::UnreadableEnvelopeData { .. })
+    ));
+    let verified = present_jwt(&holder, vec![sd_envelope("opaque")]).expect("verifies");
+    assert!(matches!(
+        verified.envelopes()[0].verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED),
+        Err(JoseError::CredentialRefused { source, .. })
+            if matches!(*source, JoseError::MalformedSdJwt { .. })
+    ));
 }
 
 /// A `data:` URL's data is percent-decoded, and base64-decoded first under `;base64`, as
@@ -277,15 +289,12 @@ fn a_vc_sd_jwt_envelope_without_a_kid_lists_none() {
     );
 }
 
-/// Only a `vc+jwt` and a `vc+sd-jwt` are verified. The others are listed as they were, and
-/// refused when the credentials are verified.
+/// Only a `vc+jwt`, a `vc+sd-jwt` and a `vc+cose` are verified. The others are listed as they
+/// were, and refused when the credentials are verified.
 #[test]
 fn another_format_is_still_listed_and_still_not_verified() {
     let (holder, issuer) = (holder(), issuer());
-    let members = vec![
-        sd_envelope(&sd_by(&issuer)),
-        foreign_envelope("application/vc+cose"),
-    ];
+    let members = vec![sd_envelope(&sd_by(&issuer)), foreign_envelope("text/plain")];
 
     let verified = present_jwt(&holder, members).expect("verifies");
 
@@ -295,7 +304,7 @@ fn another_format_is_still_listed_and_still_not_verified() {
         )),
         Err(JoseError::UnsupportedEnvelopeFormat {
             index: 1,
-            media_type: "application/vc+cose".to_owned(),
+            media_type: "text/plain".to_owned(),
         })
     );
 }
