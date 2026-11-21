@@ -1,8 +1,7 @@
-//! The suite's six features, and the four this harness implements.
+//! The suite's six features, all of which this harness implements.
 
 /// A feature this harness implements. The suite skips a row whose feature the
-/// implementation's manifest declares `false`, so the other two are never asked
-/// for in a correct run.
+/// implementation's manifest declares `false`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Feature {
     /// A credential secured as a `vc+jwt` (VC-JOSE-COSE §3.1.1).
@@ -13,23 +12,23 @@ pub enum Feature {
     CredentialSdJwt,
     /// A presentation secured as a `vp+sd-jwt` (VC-JOSE-COSE §3.2.2).
     PresentationSdJwt,
+    /// A credential secured as a `vc+cose` (VC-JOSE-COSE §3.3.1).
+    CredentialCose,
+    /// A presentation secured as a `vp+cose` (VC-JOSE-COSE §3.3.2).
+    PresentationCose,
 }
 
-/// The features of `tests/test-mapping.js` that are not implemented: the COSE secured
-/// forms (VC-JOSE-COSE §3.3).
-const NOT_IMPLEMENTED: [&str; 2] = ["credential_cose", "presentation_cose"];
-
 impl Feature {
-    /// The feature the suite named, or why this harness will not answer for it.
+    /// The feature the suite named, or why this harness will not answer for it: it is not
+    /// one of the suite's six.
     pub fn parse(name: &str) -> Result<Self, String> {
         match name {
             "credential_jose" => Ok(Self::CredentialJose),
             "presentation_jose" => Ok(Self::PresentationJose),
             "credential_sdjwt" => Ok(Self::CredentialSdJwt),
             "presentation_sdjwt" => Ok(Self::PresentationSdJwt),
-            n if NOT_IMPLEMENTED.contains(&n) => Err(format!(
-                "the feature {n} is not implemented, and its manifest entry must say false"
-            )),
+            "credential_cose" => Ok(Self::CredentialCose),
+            "presentation_cose" => Ok(Self::PresentationCose),
             n => Err(format!("unknown feature `{n}`")),
         }
     }
@@ -38,6 +37,12 @@ impl Feature {
     pub fn is_sd_jwt(self) -> bool {
         matches!(self, Self::CredentialSdJwt | Self::PresentationSdJwt)
     }
+
+    /// Whether the feature secures a document with COSE, whose input and output files are
+    /// base64 text of the `COSE_Sign1` message.
+    pub fn is_cose(self) -> bool {
+        matches!(self, Self::CredentialCose | Self::PresentationCose)
+    }
 }
 
 #[cfg(test)]
@@ -45,23 +50,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_four_jose_and_sd_jwt_features_are_implemented() {
-        assert_eq!(
-            Feature::parse("credential_jose"),
-            Ok(Feature::CredentialJose)
-        );
-        assert_eq!(
-            Feature::parse("presentation_jose"),
-            Ok(Feature::PresentationJose)
-        );
-        assert_eq!(
-            Feature::parse("credential_sdjwt"),
-            Ok(Feature::CredentialSdJwt)
-        );
-        assert_eq!(
-            Feature::parse("presentation_sdjwt"),
-            Ok(Feature::PresentationSdJwt)
-        );
+    fn all_six_features_are_implemented() {
+        for (name, feature) in [
+            ("credential_jose", Feature::CredentialJose),
+            ("presentation_jose", Feature::PresentationJose),
+            ("credential_sdjwt", Feature::CredentialSdJwt),
+            ("presentation_sdjwt", Feature::PresentationSdJwt),
+            ("credential_cose", Feature::CredentialCose),
+            ("presentation_cose", Feature::PresentationCose),
+        ] {
+            assert_eq!(Feature::parse(name), Ok(feature), "{name}");
+        }
     }
 
     #[test]
@@ -70,15 +69,22 @@ mod tests {
         assert!(Feature::PresentationSdJwt.is_sd_jwt());
         assert!(!Feature::CredentialJose.is_sd_jwt());
         assert!(!Feature::PresentationJose.is_sd_jwt());
+        assert!(!Feature::CredentialCose.is_sd_jwt());
+        assert!(!Feature::PresentationCose.is_sd_jwt());
     }
 
     #[test]
-    fn the_cose_features_are_refused_by_name_and_not_answered() {
-        for name in NOT_IMPLEMENTED {
-            let refusal = Feature::parse(name).expect_err("not implemented");
-            assert!(refusal.contains(name), "{refusal}");
-            assert!(refusal.contains("not implemented"), "{refusal}");
-        }
-        assert!(Feature::parse("credential_jwt").is_err());
+    fn only_the_cose_features_read_and_write_base64() {
+        assert!(Feature::CredentialCose.is_cose());
+        assert!(Feature::PresentationCose.is_cose());
+        assert!(!Feature::CredentialJose.is_cose());
+        assert!(!Feature::CredentialSdJwt.is_cose());
+    }
+
+    #[test]
+    fn a_feature_the_suite_does_not_have_is_refused_by_name() {
+        let refusal = Feature::parse("credential_jwt").expect_err("unknown");
+        assert!(refusal.contains("credential_jwt"), "{refusal}");
+        assert!(Feature::parse("").is_err());
     }
 }

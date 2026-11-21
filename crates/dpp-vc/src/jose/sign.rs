@@ -10,8 +10,8 @@ use super::properties::{
     check_context, check_credential_properties, check_holder, check_presentation_properties,
 };
 use super::verify::{
-    CREDENTIAL_CTY, CREDENTIAL_TYP, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_kid,
-    check_issuer, check_temporal_claims,
+    CREDENTIAL_CTY, CREDENTIAL_TYP, PRESENTATION_CTY, PRESENTATION_TYP, check_holder_iss,
+    check_holder_kid, check_issuer, check_kid, check_temporal_claims,
 };
 use super::vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS, check_members};
 
@@ -64,7 +64,8 @@ pub fn sign_credential(
     check_members(document, &CREDENTIAL_TERMS, extension_terms)?;
     check_context(document)?;
     check_temporal_claims(document)?;
-    check_issuer(document, Some(kid))?;
+    check_issuer(document)?;
+    check_kid(document, kid)?;
     check_credential_properties(document)?;
     seal(credential, key, kid, CREDENTIAL_TYP, CREDENTIAL_CTY)
 }
@@ -105,7 +106,8 @@ pub fn sign_presentation(
     check_context(document)?;
     check_temporal_claims(document)?;
     check_holder(document)?;
-    check_holder_kid(document, Some(kid))?;
+    check_holder_iss(document)?;
+    check_holder_kid(document, kid)?;
     check_presentation_properties(document)?;
     seal(presentation, key, kid, PRESENTATION_TYP, PRESENTATION_CTY)
 }

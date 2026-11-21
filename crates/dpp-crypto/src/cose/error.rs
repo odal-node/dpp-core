@@ -46,6 +46,12 @@ pub enum CoseError {
     /// RFC 9596 §2 says it MUST NOT be.
     #[error("the typ header parameter is in the unprotected header")]
     TypeNotProtected,
+    /// The CWT Claims header parameter (label 15) is in the unprotected header. RFC 9597 §1
+    /// says recipients "MUST NOT use the information in the CWT Claims header parameter
+    /// beyond the integrity protection or authentication afforded to the CWT Claims
+    /// header", and nothing protects the unprotected header, so no claim there is read.
+    #[error("the CWT Claims header parameter is in the unprotected header")]
+    CwtClaimsNotProtected,
     /// The protected header carries no `alg`, and neither does the unprotected one.
     #[error("the protected header carries no alg")]
     MissingAlgorithm,

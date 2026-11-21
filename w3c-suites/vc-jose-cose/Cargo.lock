@@ -2057,6 +2057,7 @@ dependencies = [
 name = "vc-jose-cose-suite"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "dpp-crypto",
  "dpp-vc",
  "serde_json",

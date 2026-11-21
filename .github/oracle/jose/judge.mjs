@@ -21,7 +21,7 @@
  *
  * For a presentation, each `vc+jwt` it envelops is judged the same way under the key
  * its own `kid` names. An envelope of another media type is counted and not judged:
- * `vc+sd-jwt` and `vc+cose` are not implemented here. Row 3 of the suite embeds an
+ * a `vc+sd-jwt` is the SD-JWT oracles' to judge and a `vc+cose` the COSE oracle's. Row 3 of the suite embeds an
  * envelope that is not a compact JWS, by the suite's making; the outer token is
  * judged, and the inner one must be unreadable to the library too, which is the
  * evidence that the suite's input, and not this crate, is what is malformed.

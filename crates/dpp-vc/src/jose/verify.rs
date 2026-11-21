@@ -4,7 +4,7 @@
 use base64::Engine as _;
 use serde_json::{Map, Value};
 
-use dpp_crypto::jws::verifier::{extract_kid_from_jws, header_refusal, verify_jws};
+use dpp_crypto::jws::verifier::{header_refusal, verify_jws};
 use dpp_crypto::jws::{HeaderRefusal, PublicKey};
 
 use super::absolute_url::is_absolute_url;
@@ -21,13 +21,6 @@ pub(crate) const CREDENTIAL_CTY: &str = "vc";
 /// The `typ` of a secured presentation, and its `cty` (VC-JOSE-COSE §3.1.2).
 pub(crate) const PRESENTATION_TYP: &str = "vp+jwt";
 pub(crate) const PRESENTATION_CTY: &str = "vp";
-
-/// A token that passed every check of its own, before anything is read out of it:
-/// the claims set, and the `kid` its protected header names.
-pub(crate) struct Opened {
-    pub(crate) payload: Map<String, Value>,
-    pub(crate) kid: Option<String>,
-}
 
 /// Verify a credential secured as a `vc+jwt` (VC-JOSE-COSE §3.1.1), and return the
 /// credential it carries.
@@ -52,10 +45,10 @@ pub(crate) struct Opened {
 /// 6. under a `now`, the time claims, below;
 /// 7. `aud`, if present, names the audience the caller identifies as, below;
 /// 8. `iss`, if present, equals the credential's `issuer`, or its `id` when the
-///    issuer is an object (§4.1.2); and when `iss` is absent and the issuer is a
-///    URL, the `kid` is an absolute URL (§4.2). That the `kid` names a verification
-///    method of the issuer is the caller's, since this function has no identifier
-///    document to look it up in;
+///    issuer is an object (§4.1.2). The `kid` is not held to an absolute URL when
+///    there is no `iss`: §4.2 opens "When using controlled identifier documents with
+///    this specification", and this function is given the key. A signer does hold
+///    its `kid` to it;
 /// 9. the credential's `type` names `VerifiableCredential`, its `issuer` is a URL or
 ///    an object with a URL `id`, and its `credentialSubject` is an object or a
 ///    non-empty array of objects (VC DM 2.0 §4.5, §4.7, §4.8).
@@ -100,8 +93,8 @@ pub fn verify_credential(
     key: &PublicKey,
     options: VerifyOptions<'_>,
 ) -> Result<Value, JoseError> {
-    let Opened { payload, kid } = open(jws, key, options, CREDENTIAL_TYP, CREDENTIAL_CTY)?;
-    check_issuer(&payload, kid.as_deref())?;
+    let payload = open(jws, key, options, CREDENTIAL_TYP, CREDENTIAL_CTY)?;
+    check_issuer(&payload)?;
     check_credential_properties(&payload)?;
     Ok(Value::Object(payload))
 }
@@ -116,9 +109,9 @@ pub(crate) fn open(
     options: VerifyOptions<'_>,
     typ: &'static str,
     cty: &'static str,
-) -> Result<Opened, JoseError> {
+) -> Result<Map<String, Value>, JoseError> {
     let payload = open_token(jws, key, typ, cty)?;
-    claims_of(payload, jws, options)
+    claims_of(payload, options)
 }
 
 /// The first half of [`open`]: the compact form, the header, the signature, `typ` and
@@ -195,13 +188,11 @@ pub(crate) fn open_token(
 }
 
 /// The second half of [`open`], over the claims set: its `@context`, `vc` and `vp`, the
-/// time claims under a `now`, and the audience. `jws` is the token whose protected header
-/// names the `kid`.
+/// time claims under a `now`, and the audience.
 pub(crate) fn claims_of(
     payload: Map<String, Value>,
-    jws: &str,
     options: VerifyOptions<'_>,
-) -> Result<Opened, JoseError> {
+) -> Result<Map<String, Value>, JoseError> {
     check_context(&payload)?;
     for name in ["vc", "vp"] {
         if payload.contains_key(name) {
@@ -212,10 +203,7 @@ pub(crate) fn claims_of(
         check_time(&payload, now)?;
     }
     check_audience(&payload, options.audience)?;
-    Ok(Opened {
-        payload,
-        kid: extract_kid_from_jws(jws),
-    })
+    Ok(payload)
 }
 
 /// Whether the protected header sets `b64` to the boolean `false` (RFC 7797 §7). The
@@ -272,13 +260,20 @@ fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
         let Some(seconds) = numeric_date(payload, claim)? else {
             continue;
         };
-        match claim {
-            "exp" if now >= seconds => return Err(JoseError::Expired),
-            "nbf" if now < seconds => return Err(JoseError::NotYetValid),
-            _ => {}
-        }
+        check_instant(claim, seconds, now)?;
     }
     Ok(())
+}
+
+/// One time claim against `now`: `exp` of `seconds` has been reached when `now` is not before
+/// it (RFC 7519 §4.1.4), and `nbf` of `seconds` has not been when `now` is before it (§4.1.5).
+/// Any other claim name passes. Exact, with no leeway.
+pub(crate) fn check_instant(claim: &str, seconds: f64, now: f64) -> Result<(), JoseError> {
+    match claim {
+        "exp" if now >= seconds => Err(JoseError::Expired),
+        "nbf" if now < seconds => Err(JoseError::NotYetValid),
+        _ => Ok(()),
+    }
 }
 
 /// `aud` against the audience the caller identifies as (RFC 7519 §4.1.3). A token with no
@@ -304,6 +299,26 @@ fn check_audience(payload: &Map<String, Value>, audience: Option<&str>) -> Resul
         }
         _ => return Err(JoseError::MalformedAudience),
     };
+    audience_outcome(named, audience)
+}
+
+/// The `aud` of a CWT Claims header parameter against the audience the caller identifies as,
+/// by the rule of [`check_audience`]: no `aud` passes, and one passes only when one of its
+/// entries is equal to `audience`. The entries are text strings already.
+pub(crate) fn check_cwt_audience(
+    aud: Option<&[String]>,
+    audience: Option<&str>,
+) -> Result<(), JoseError> {
+    match aud {
+        None => Ok(()),
+        Some(entries) => audience_outcome(
+            entries.iter().any(|entry| audience == Some(entry.as_str())),
+            audience,
+        ),
+    }
+}
+
+fn audience_outcome(named: bool, audience: Option<&str>) -> Result<(), JoseError> {
     if named {
         Ok(())
     } else {
@@ -325,45 +340,61 @@ fn holder_of(presentation: &Map<String, Value>) -> Option<&str> {
     presentation.get("holder").and_then(id_of)
 }
 
-/// `iss` against the credential's issuer (§4.1.2), and, when there is no `iss`,
-/// [`check_kid`]. Signing runs this too, so a credential whose `iss` names another
-/// issuer is not signed.
-pub(crate) fn check_issuer(
-    credential: &Map<String, Value>,
-    kid: Option<&str>,
-) -> Result<(), JoseError> {
-    let issuer = issuer_of(credential);
-    match credential.get("iss") {
-        Some(iss) => {
-            let Some(iss) = iss.as_str() else {
-                return Err(JoseError::MalformedPayload {
-                    reason: "iss is not a string".to_owned(),
-                });
-            };
-            if Some(iss) != issuer {
-                return Err(JoseError::IssuerMismatch {
-                    iss: iss.to_owned(),
-                    issuer: issuer.map(str::to_owned),
-                });
-            }
-        }
-        None => check_kid(credential, kid)?,
-    }
-    Ok(())
+/// `iss` of a claims set against the credential's issuer (§4.1.2): an `iss` that is present
+/// must be a string and equal the `issuer`, or its `id` when the issuer is an object. A
+/// credential with no `iss` passes. Signing runs this too, so a credential whose `iss` names
+/// another issuer is not signed.
+///
+/// The `kid` is not read. §4.2 opens "When using controlled identifier documents with this
+/// specification", and §5 assumes the key was found before verification begins, so a verifier
+/// given its key by the caller has no document to hold the `kid` against. A signer does hold
+/// its own tokens to [`check_kid`].
+pub(crate) fn check_issuer(credential: &Map<String, Value>) -> Result<(), JoseError> {
+    let iss = match credential.get("iss") {
+        None => return Ok(()),
+        Some(iss) => iss.as_str().ok_or_else(|| JoseError::MalformedPayload {
+            reason: "iss is not a string".to_owned(),
+        })?,
+    };
+    check_issuer_claim(credential, iss)
 }
 
-/// When a credential has no `iss` and its issuer is identified by a URL, the `kid`
-/// must be an absolute URL (VC-JOSE-COSE §4.2), since nothing else says where the
-/// issuer's key is to be found. A DID, an `https` URL and a URN are all absolute
-/// URLs here, and a bare key thumbprint is not.
-///
-/// Only the absolute form is checked. That the URL names a verification method
-/// listed in the issuer's identifier document needs the document, and this crate
-/// fetches none.
-pub(crate) fn check_kid(
+/// An `iss` that is known to be a string against the credential's issuer (§4.1.2). The
+/// claims set of a `vc+jwt` carries it as a member, and a `vc+cose` as a CWT claim.
+pub(crate) fn check_issuer_claim(
     credential: &Map<String, Value>,
-    kid: Option<&str>,
+    iss: &str,
 ) -> Result<(), JoseError> {
+    let issuer = issuer_of(credential);
+    if Some(iss) == issuer {
+        Ok(())
+    } else {
+        Err(JoseError::IssuerMismatch {
+            iss: iss.to_owned(),
+            issuer: issuer.map(str::to_owned),
+        })
+    }
+}
+
+/// A presentation's `iss`, when present, must be a string (RFC 7519 §4.1.1). It is not
+/// compared with the holder: §4.1.2 states the `iss` rule for the credential's issuer only.
+pub(crate) fn check_holder_iss(presentation: &Map<String, Value>) -> Result<(), JoseError> {
+    match presentation.get("iss") {
+        Some(iss) if !iss.is_string() => Err(JoseError::MalformedPayload {
+            reason: "iss is not a string".to_owned(),
+        }),
+        _ => Ok(()),
+    }
+}
+
+/// What a signer holds its own credential to, which a verifier does not: when it has no `iss`
+/// and its issuer is identified by a URL, the `kid` must be an absolute URL (VC-JOSE-COSE
+/// §4.2), since nothing else says where the issuer's key is to be found. A DID, an `https`
+/// URL and a URN are all absolute URLs here, and a bare key thumbprint is not.
+///
+/// Only the absolute form is checked. That the URL names a verification method listed in the
+/// issuer's identifier document needs the document, and this crate fetches none.
+pub(crate) fn check_kid(credential: &Map<String, Value>, kid: &str) -> Result<(), JoseError> {
     check_kid_of(credential, issuer_of(credential), kid)
 }
 
@@ -371,33 +402,45 @@ pub(crate) fn check_kid(
 /// by a URL, the `kid` must be an absolute URL (VC-JOSE-COSE §4.2, the second rule).
 pub(crate) fn check_holder_kid(
     presentation: &Map<String, Value>,
-    kid: Option<&str>,
+    kid: &str,
 ) -> Result<(), JoseError> {
     check_kid_of(presentation, holder_of(presentation), kid)
 }
 
 /// The `kid` rule of §4.2 for the party a token names, which is the issuer of a
-/// credential or the holder of a presentation. An `iss` that is present must be a string
-/// (RFC 7519 §4.1.1), and an `iss` of any other type is refused before the rule is read,
-/// so a `null` or a number cannot switch the rule off.
+/// credential or the holder of a presentation. An `iss` that is present passes.
 fn check_kid_of(
     document: &Map<String, Value>,
     party: Option<&str>,
-    kid: Option<&str>,
+    kid: &str,
 ) -> Result<(), JoseError> {
-    match document.get("iss") {
-        Some(iss) if !iss.is_string() => {
-            return Err(JoseError::MalformedPayload {
-                reason: "iss is not a string".to_owned(),
-            });
-        }
-        Some(_) => return Ok(()),
-        None => {}
+    if document.contains_key("iss") {
+        return Ok(());
     }
-    if party.is_some_and(is_absolute_url) && !kid.is_some_and(is_absolute_url) {
+    require_absolute_kid(party, kid)
+}
+
+/// A token with no `iss` whose issuer or holder, `party`, is identified by a URL needs a
+/// `kid` that is an absolute URL (VC-JOSE-COSE §4.2).
+fn require_absolute_kid(party: Option<&str>, kid: &str) -> Result<(), JoseError> {
+    if party.is_some_and(is_absolute_url) && !is_absolute_url(kid) {
         return Err(JoseError::KidNotAbsolute {
-            kid: kid.map(str::to_owned),
+            kid: kid.to_owned(),
         });
     }
     Ok(())
+}
+
+/// [`check_kid`] for a credential secured with COSE, whose signer writes no `iss`: the document
+/// is not a claims set, so a member of that name is a term like any other and exempts nothing.
+pub(crate) fn check_cose_kid(credential: &Map<String, Value>, kid: &str) -> Result<(), JoseError> {
+    require_absolute_kid(issuer_of(credential), kid)
+}
+
+/// [`check_holder_kid`] for a presentation secured with COSE: see [`check_cose_kid`].
+pub(crate) fn check_cose_holder_kid(
+    presentation: &Map<String, Value>,
+    kid: &str,
+) -> Result<(), JoseError> {
+    require_absolute_kid(holder_of(presentation), kid)
 }

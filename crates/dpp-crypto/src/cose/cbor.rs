@@ -143,6 +143,39 @@ fn definite_header(
     Ok(())
 }
 
+/// Whether the next item is a floating-point number (major type 7, additional
+/// information 25, 26 or 27).
+pub(super) fn next_is_float(reader: &mut Reader<'_>) -> Result<bool, CoseError> {
+    Ok(matches!(peek(reader)?, 0xf9..=0xfb))
+}
+
+/// Reads a floating-point number of any of the three widths RFC 8949 §3.3 gives, as an
+/// `f64`. A half-precision value is widened exactly.
+pub(super) fn read_float(reader: &mut Reader<'_>, what: &'static str) -> Result<f64, CoseError> {
+    let malformed = |_| CoseError::Malformed(what);
+    match peek(reader)? {
+        0xf9 => types::F16::decode(reader)
+            .map(|types::F16(bits)| half_to_f64(bits))
+            .map_err(malformed),
+        0xfa => f32::decode(reader).map(f64::from).map_err(malformed),
+        0xfb => f64::decode(reader).map_err(malformed),
+        _ => Err(CoseError::Malformed(what)),
+    }
+}
+
+/// An IEEE 754 binary16 value (RFC 8949 Appendix D) as an `f64`.
+fn half_to_f64(bits: u16) -> f64 {
+    let sign = if bits & 0x8000 == 0 { 1.0 } else { -1.0 };
+    let exponent = i32::from((bits >> 10) & 0x1f);
+    let mantissa = f64::from(bits & 0x3ff);
+    match exponent {
+        0 => sign * mantissa * 2.0_f64.powi(-24),
+        0x1f if mantissa == 0.0 => sign * f64::INFINITY,
+        0x1f => f64::NAN,
+        _ => sign * (1024.0 + mantissa) * 2.0_f64.powi(exponent - 25),
+    }
+}
+
 /// Reads a definite-length byte string, borrowed from the input.
 pub(super) fn read_bytes<'a>(
     reader: &mut Reader<'a>,

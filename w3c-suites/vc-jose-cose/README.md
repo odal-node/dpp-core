@@ -41,6 +41,10 @@ The key file is a `JsonWebKey` verification method with a `publicKeyJwk` and a
 | `issue`, `presentation_sdjwt` | `sign_presentation_sd_jwt(document, key, kid, &[], paths, None)` | the same |
 | `verify`, `credential_sdjwt` | `verify_credential_sd_jwt(token, key, options, &binding)` | `{"result":"success"}` |
 | `verify`, `presentation_sdjwt` | `verify_presentation_sd_jwt(token, key, options, &binding)` | the same |
+| `issue`, `credential_cose` | `sign_credential_cose(document, key, kid, &[])` | `{"result":"success","data":"<base64 of the COSE_Sign1>"}` |
+| `issue`, `presentation_cose` | `sign_presentation_cose(document, key, kid, &[])` | the same |
+| `verify`, `credential_cose` | `verify_credential_cose(bytes, key, options)` | `{"result":"success"}` |
+| `verify`, `presentation_cose` | `verify_presentation_cose(bytes, key, options)` | the same |
 
 A refusal by the library is a `failure`, with the reason in a `reason` member and on
 stderr. The process then exits 0: a refusal is the right answer to a row that expects one.
@@ -48,7 +52,8 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
 - **The key.** `issue` builds the signing key from `secretKeyJwk`, and `verify` the
   verification key from `publicKeyJwk`.
 - **The `kid`.** The key file's `id`, which is the absolute URL of its verification
-  method. VC-JOSE-COSE §4.2 asks for an absolute URL when the document has no `iss`.
+  method. VC-JOSE-COSE §4.2 asks for an absolute URL when the document has no `iss`, and the
+  signers hold the `kid` to that, as no verifier does.
 - **No extension terms.** A member outside the VC Data Model 2.0 vocabulary is refused
   at issuance, which is what row 5 expects.
 - **The paths.** `--sd` is a JSON array of the suite's dotted paths, with `[n]` for one
@@ -59,9 +64,20 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   without `--sd` conceals nothing.
 - **A presentation is verified with `verify_presentation` only.** VC-JOSE-COSE §5.1
   defines verifying a presentation as validating its own JWT, and so for `vp+sd-jwt` with
-  `verify_presentation_sd_jwt`. Row 7 envelops a
-  `vc+sd-jwt` and a `vc+cose` credential and expects success, so the credentials inside
-  are not verified: calling `verify_credentials` would refuse that presentation.
+  `verify_presentation_sd_jwt`, and §5.3 as the `COSE_Sign1` process on the presentation
+  itself, so for `vp+cose` with `verify_presentation_cose`. Each judges the presentation's
+  envelopes as envelopes, and none opens what is inside one. Row 7 envelops a
+  `vc+sd-jwt` and a `vc+cose` credential and expects success, and row 31's one envelope is a
+  `vc+jwt` whose data is `<header>.<payload>....` and is no compact JWS, and expects success
+  too, so the credentials inside are not verified: calling `verify_credentials` would refuse
+  both presentations.
+- **COSE files are base64 text.** A COSE input is read as the suite writes its own: the
+  standard alphabet with no padding, perhaps with a final newline, and an issued COSE message
+  is written the same way, in `data`. Text that is not base64 at all is a refusal and not a
+  missing verdict, since it is the input that is wrong, as a JSON document in place of a
+  token is. **Row 30 is row 29's bytes written as hex, which is also valid base64**, so
+  the text decodes, and what it decodes to is not a `COSE_Sign1`: that is why the library
+  refuses it. The harness has no hex detection, and adds none.
 - **The token is trimmed.** Some of the suite's token files end in a newline.
 - **No audience and no Key Binding.** `options` is `VerifyOptions::new()`, with no
   audience, and `binding` is `KeyBindingRequirement::NotRequired`. None of the suite's
@@ -79,22 +95,18 @@ An input the harness cannot use, such as a key file that is not a key or a missi
 is not a verdict. The process exits 2 with the reason on stderr and writes no file, so
 the suite scores the row as an `error`. A file left at `--output` by an earlier run is
 removed first, so it cannot be read in place of this run's. The same holds for a feature
-that is not implemented: `credential_cose` and `presentation_cose` exit 2 by name. They
-are never answered with `success` or `failure`, so a manifest that turns one on before it
-is built fails loudly.
+the suite does not have, which exits 2 by name, and for `--sd` given to anything but the
+issuance of an SD-JWT feature, the COSE features included.
 
 ## Which features run
 
 `localConfig.cjs` is the one place that says which features are on. It registers the
 implementation with the suite in the one way its `vc-test-suite-implementations` package
 supports: a `localConfig.cjs` in the root of the suite checkout, with which only the
-implementations it names run. Today `credential_jose`, `presentation_jose`,
-`credential_sdjwt` and `presentation_sdjwt` are on, and the COSE features are off. The
-suite's `vc+sd-jwt` and `vc+cose` forms are not the IETF SD-JWT VC that
+implementations it names run. All six features are on: `credential_jose`,
+`presentation_jose`, `credential_sdjwt`, `presentation_sdjwt`, `credential_cose` and
+`presentation_cose`. The suite's `vc+sd-jwt` form is not the IETF SD-JWT VC that
 `dpp-vc::sd_jwt_vc` implements.
-
-A change that builds the COSE form sets its two features to `true` here, adds them to
-`src/feature.rs`, and must leave the suite green.
 
 ## How CI runs it
 
@@ -126,10 +138,14 @@ skipped, and it skips a row for any feature its manifest does not declare `true`
 - an issuance that succeeded left a compact JWS in `data`: three non-empty base64url
   segments, the first of which decodes to a JSON object with a string `alg`. For the
   SD-JWT features it is an SD-JWT: that compact JWS, then its Disclosures, each
-  base64url, then a closing `~`. No signature is verified.
+  base64url, then a closing `~`. For the COSE features it is the base64 of a `COSE_Sign1`,
+  in the standard alphabet with no padding, and `check-run.mjs` reads its CBOR head bytes
+  with no dependency: an optional tag 18, an array of four items, which are a byte string
+  (the protected header), a map (the unprotected header), a byte string (the payload) and a
+  byte string (the signature), and nothing after them. No signature is verified.
 
 The expected number of rows is the number of rows of the enabled features, read from the
-suite's own table. Today that is 26 of 35, and nothing here says so.
+suite's own table. Today that is 35 of 35, and nothing here says so.
 
 `.github/workflows/vc-jose-cose-image.yml` builds the same image from a pushed `v*`
 tag and pushes it to `ghcr.io/<owner>/vc-jose-cose-suite`, tagged with the version.
@@ -140,7 +156,7 @@ and it does not matter which of several queued runs survives.
 
 ## Run it locally
 
-Docker and Node 22 or later are needed. From the repository root:
+Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. From the repository root:
 
 ```bash
 docker build --file w3c-suites/vc-jose-cose/Dockerfile --tag vc-jose-cose-suite:local .

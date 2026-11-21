@@ -1,0 +1,153 @@
+# Judges the VC-JOSE-COSE messages this workspace secures with COSE with an independent
+# COSE library, and has this workspace verify what that library signs.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the JOSE, SD-JWT,
+# AAS, GS1 and JSON-LD oracles are: this needs Go, and `cargo build --workspace`
+# succeeding with no Node, no JVM, no Go, no native toolchain and no services is a
+# property this project states publicly. Keeping the dependency here means the main gate
+# never acquires it.
+#
+# What it answers: *does a COSE implementation with no code and no author in common with
+# `dpp_vc::jose` and `dpp_crypto::cose` verify the credentials and presentations we sign,
+# and do we verify the ones it signs?* The W3C VC-JOSE-COSE test suite cannot answer that.
+# Its runner reads only the `result` an implementation reports about itself, so every
+# issuance row of its report is self-attested. And for P-521 this is the only independent
+# check on COSE this repository has, since `ring` does not implement that curve.
+#
+# The library is `github.com/veraison/go-cose`, with its CBOR codec
+# `github.com/fxamacker/cbor`. It is Go, and shares no code with the RustCrypto stack and
+# the hand-written `COSE_Sign1` layer that `dpp-crypto` signs with.
+#
+# Checks, in order, each a step so a failure names itself:
+#
+#   1. the corpus: the suite's COSE issuance inputs (rows 27 and 28), and credentials and
+#      presentations under EdDSA, ES256, ES384 and ES512, signed with the suite's keys by
+#      `dpp_vc::jose`, including presentations that envelop `vc+cose` credentials, built by
+#      a cargo test;
+#   2. the library judges every message (`go run . judge`): the signature under the JWK
+#      published for the `kid`, `alg` the key's own, `typ` and the content type exactly as
+#      written, the `kid`, the payload, an empty unprotected header, no CWT claims, and each
+#      envelope a presentation holds, after negative controls that must fail first, and
+#      with a floor on what the corpus holds. It also judges the suite's own COSE inputs,
+#      rows 29 to 35, under their keys: the two that must verify do, and each other is
+#      refused for the one check that names its fault;
+#   3. the library signs credentials and presentations under all four algorithms
+#      (`go run . issue`), with high-S and low-S ECDSA signatures on purpose, and a
+#      credential that carries CWT claims;
+#   4. `dpp_vc::jose` verifies what it signed, and holds the file to having both forms of
+#      signature;
+#   5. the corpus is made again to show it is reproducible, and the library signs again.
+#
+# What it does **not** answer, and the register row says so. The library knows no JSON-LD,
+# no VC Data Model 2.0, no `@context` rule and no rule on undeclared members, so it says
+# nothing about whether a credential is a good one: it judges the COSE envelope. Nothing
+# here is evidence of conformance to VC-JOSE-COSE: the register's conformance cell for it
+# stays "No".
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that does not
+# touch its paths, so it can never be made a required check without blocking every other PR
+# forever.
+name: COSE oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  judge:
+    name: VC-JOSE-COSE messages are read the same way by an independent COSE library
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept. This job downloads third-party code that touches signing,
+      # and nothing here ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Go the module names: `go 1.27` in its `go.mod`, which resolves to the latest
+      # stable 1.27 release. No toolchain is downloaded behind the action's back.
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: .github/oracle/cose/go.mod
+          cache-dependency-path: .github/oracle/cose/go.sum
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      # From the committed `go.sum`, which pins every module by hash, with the checksum
+      # database left on. The library is somebody else's judgement about what RFC 9052 and
+      # RFC 9053 require, and an unpinned upgrade would turn their tightening into our red
+      # build on code that did not change. `-mod=readonly` fails if `go.sum` and `go.mod`
+      # disagree, and `go mod verify` fails if a downloaded module does not match its hash.
+      # Moving the pin is a deliberate edit with a visible diff: change `go.mod`, run
+      # `go mod tidy`, and cite the new version in the register row. Dependabot does not
+      # watch it.
+      - name: Fetch and verify the independent implementation
+        working-directory: .github/oracle/cose
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Record what is actually being run
+        working-directory: .github/oracle/cose
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          go version
+          go list -m all
+
+      - name: Build the corpus from our own issuer
+        run: EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::cose_emit
+
+      - name: Judge the corpus and the suite's own inputs
+        working-directory: .github/oracle/cose
+        env:
+          GOFLAGS: -mod=readonly
+        run: go run . judge ../../../target/cose-oracle/corpus.json ../../../crates/dpp-vc/src/jose/fixtures/w3c-vc-jose-cose
+
+      - name: Have the independent implementation sign
+        working-directory: .github/oracle/cose
+        env:
+          GOFLAGS: -mod=readonly
+        run: go run . issue ../../../target/cose-oracle/issued.json
+
+      - name: Verify what it signed
+        run: CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued.json cargo test -p dpp-vc --lib jose::oracle_tests::cose_reverse -- --nocapture
+
+      # Our own signatures are RFC 6979 deterministic, so the corpus must be byte for byte
+      # the same. The library's are not: ECDSA draws a fresh nonce for every signature. So
+      # for those the check is that a second signing, with both forms of signature again,
+      # reads back here as well.
+      - name: Make both files again
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          (cd target/cose-oracle && sha256sum corpus.json > first.sha256)
+          EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::cose_emit
+          (cd target/cose-oracle && sha256sum --check first.sha256)
+          (cd .github/oracle/cose && go run . issue ../../../target/cose-oracle/issued-again.json)
+          CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued-again.json cargo test -p dpp-vc --lib jose::oracle_tests::cose_reverse -- --nocapture
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the corpus
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cose-oracle
+          path: target/cose-oracle
+          retention-days: 7

@@ -7,6 +7,11 @@
 //! this crate is the check that is not circular, and for P-521 it is the only one
 //! this repository has, since `ring` does not implement that curve.
 //!
+//! The `cose_` modules are the same for the COSE form, and the Rust side of
+//! `.github/workflows/cose-oracle.yml`: [`cose_emit`] builds its corpus, [`cose_reverse`]
+//! reads what `go-cose` signed, and [`cose_message`] reads a `COSE_Sign1` apart. [`keys`] and
+//! [`high_s`] are shared.
+//!
 //! - [`emit`] builds the corpus: the suite's issuance inputs, and credentials and
 //!   presentations, under EdDSA, ES256, ES384 and ES512, signed with the suite's
 //!   own keys. It writes the corpus out when `EMIT_JOSE_CORPUS` is set.
@@ -20,6 +25,9 @@
 //! is complete and that this crate reads it back, so an ordinary `just check` gets
 //! that coverage without producing files.
 
+mod cose_emit;
+mod cose_message;
+mod cose_reverse;
 mod emit;
 mod high_s;
 mod keys;

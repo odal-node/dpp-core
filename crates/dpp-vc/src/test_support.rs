@@ -56,7 +56,7 @@ pub(crate) fn at(now: Option<i64>) -> VerifyOptions<'static> {
 // ── VC-JOSE-COSE suite inputs and fixtures ────────────────────────────────────
 
 /// Every vendored file, by its name in the suite.
-pub(crate) const FILES: [(&str, &str); 29] = [
+pub(crate) const FILES: [(&str, &str); 37] = [
     (
         "credential-minimal.json",
         include_str!("jose/fixtures/w3c-vc-jose-cose/credential-minimal.json"),
@@ -170,6 +170,38 @@ pub(crate) const FILES: [(&str, &str); 29] = [
         include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-sdjwt-bad-credential.txt"),
     ),
     (
+        "credential-cose-minimal.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-cose-minimal.txt"),
+    ),
+    (
+        "credential-cose-minimal-not-base64.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-cose-minimal-not-base64.txt"),
+    ),
+    (
+        "credential-cose-bad-signature.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-cose-bad-signature.txt"),
+    ),
+    (
+        "credential-cose-bad-media-type.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/credential-cose-bad-media-type.txt"),
+    ),
+    (
+        "presentation-cose-single.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-cose-single.txt"),
+    ),
+    (
+        "presentation-cose-bad-credential.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-cose-bad-credential.txt"),
+    ),
+    (
+        "presentation-cose-bad-media-type.txt",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/presentation-cose-bad-media-type.txt"),
+    ),
+    (
+        "vm-did-ed25519.json",
+        include_str!("jose/fixtures/w3c-vc-jose-cose/vm-did-ed25519.json"),
+    ),
+    (
         "LICENSE.md",
         include_str!("jose/fixtures/w3c-vc-jose-cose/LICENSE.md"),
     ),
@@ -194,7 +226,16 @@ pub(crate) fn token(name: &str) -> String {
     file(name).trim_end().to_owned()
 }
 
-/// The key file of `algorithm`: `p256`, `p384`, `p521` or `ed25519`.
+/// A vendored COSE input read as the base64 the suite writes: the standard alphabet with no
+/// padding, in a file that may end in a newline. Decoded with the strict engine of the
+/// `base64` crate, so a file that is not that shape fails here and not in the test.
+pub(crate) fn cose_input(name: &str) -> Vec<u8> {
+    base64::engine::general_purpose::STANDARD_NO_PAD
+        .decode(file(name).trim_end())
+        .unwrap_or_else(|e| panic!("{name} is not unpadded base64: {e}"))
+}
+
+/// The key file of `algorithm`: `p256`, `p384`, `p521`, `ed25519` or `did-ed25519`.
 pub(crate) fn key_file(algorithm: &str) -> Value {
     json(&format!("vm-{algorithm}.json"))
 }
@@ -267,6 +308,19 @@ pub(crate) fn forge_raw(key: &KeyEntry, header: &Value, payload_segment: &str) -
     let header = b64.encode(serde_json::to_vec(header).expect("serialises"));
     let input = format!("{header}.{payload_segment}");
     format!("{input}.{}", b64.encode(key.sign(input.as_bytes())))
+}
+
+/// An Enveloped Verifiable Credential holding `message` as a `vc+cose`, written as this crate
+/// writes a `data:` URL: padded standard base64 with no whitespace (RFC 2397, RFC 2045).
+pub(crate) fn cose_envelope(message: &[u8]) -> Value {
+    json!({
+        "@context": "https://www.w3.org/ns/credentials/v2",
+        "type": "EnvelopedVerifiableCredential",
+        "id": format!(
+            "data:application/vc+cose;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(message)
+        ),
+    })
 }
 
 /// An Enveloped Verifiable Credential holding `token` as a `vc+jwt`.

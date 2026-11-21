@@ -4,11 +4,10 @@
 //
 // `name` is the compose service in `compose.yml` and the name in every output file.
 //
-// The features are what `dpp-vc` implements today, and the one place that says so.
+// The features are what `dpp-vc` implements today, and the one place that says so: all six.
 // The suite skips a row whose feature is `false`, and `check-run.mjs` holds the run
 // to this list: every row of a `true` feature must run and get the verdict the suite
-// expects, and every row of a `false` feature must be skipped. A change that adds the
-// COSE form flips its two features here, and the suite must stay green.
+// expects, and every row of a `false` feature must be skipped.
 module.exports = {
   implementations: [
     {
@@ -20,8 +19,8 @@ module.exports = {
           presentation_jose: true,
           credential_sdjwt: true,
           presentation_sdjwt: true,
-          credential_cose: false,
-          presentation_cose: false,
+          credential_cose: true,
+          presentation_cose: true,
         },
       },
     },

@@ -212,8 +212,11 @@ fn a_malformed_envelope_is_refused() {
     }
 }
 
+/// A presentation is verified by judging its envelopes, and the content of a `vc+jwt` envelope is
+/// read when the credential is verified. Verifying the presentation succeeds whatever the data
+/// is, and verifying the credential is refused, wrapped in `CredentialRefused`.
 #[test]
-fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused() {
+fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused_when_its_credential_is_verified() {
     let holder = holder();
     let token = issuer_token(&generated(KeyAlgorithm::Ed25519));
     let (header, rest) = token.split_once('.').expect("segments");
@@ -231,16 +234,35 @@ fn a_vc_jwt_whose_data_is_not_a_compact_jws_is_refused() {
         format!("{bad_header}.{payload}.AA"),
         String::new(),
     ];
+    let key = generated(KeyAlgorithm::Ed25519).public_key();
     for data in bad {
-        assert_eq!(
-            verify_members(&holder, vec![envelope(&data)]).map(|_| ()),
-            malformed(0, "the vc+jwt data is not a compact JWS"),
+        let verified = verify_members(&holder, vec![envelope(&data)])
+            .unwrap_or_else(|e| panic!("the envelope is well formed: {e}: {data}"));
+        assert!(
+            matches!(
+                verified.envelopes()[0].verify(&key, VerifyOptions::new(), &NOT_REQUIRED),
+                Err(JoseError::CredentialRefused { index: 0, .. })
+            ),
             "{data}"
+        );
+    }
+    // The first two are not even three segments.
+    for data in [header.to_owned(), format!("{header}.{payload}")] {
+        assert_eq!(
+            verify_members(&holder, vec![envelope(&data)])
+                .expect("verifies")
+                .envelopes()[0]
+                .verify(&key, VerifyOptions::new(), &NOT_REQUIRED),
+            Err(JoseError::CredentialRefused {
+                index: 0,
+                source: Box::new(JoseError::NotCompactJws),
+            })
         );
     }
 }
 
-/// Other media types are held only to being a `data:` URL: their content is not read.
+/// An envelope is held only to being a `data:` URL: its content is not read when the
+/// presentation is verified, whatever its media type, a `vc+cose` included.
 #[test]
 fn an_envelope_of_another_type_is_not_read() {
     let holder = holder();

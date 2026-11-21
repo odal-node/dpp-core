@@ -231,7 +231,7 @@ fn a_kid_that_is_not_an_absolute_url_is_refused_without_an_iss() {
         sign_presentation_sd_jwt(&presentation(vec![]), &key, "thumbprint", &[], &[], None);
 
     let expected = Err(JoseError::KidNotAbsolute {
-        kid: Some("thumbprint".to_owned()),
+        kid: "thumbprint".to_owned(),
     });
     assert_eq!(credential.map(|_| ()), expected);
     assert_eq!(presentation.map(|_| ()), expected);

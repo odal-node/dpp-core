@@ -85,14 +85,33 @@ pub(crate) fn check_members(
             return Err(JoseError::ReservedClaim { name });
         }
     }
+    undeclared(document, |name| {
+        base.contains(&name) || REGISTERED_CLAIMS.contains(&name) || extension_terms.contains(&name)
+    })
+}
+
+/// The same refusal for a document that is the payload of a `COSE_Sign1`, which is not a
+/// JWT Claims Set: only `base` and `extension_terms` are allowed. The JWT registered claim
+/// names are not, since a COSE signer writes no claim into the document, and `vc` and `vp`
+/// are refused as the undeclared terms they are, not by the rule of VC-JOSE-COSE §1.1.2.1,
+/// which is stated for a JWT Claims Set.
+pub(crate) fn check_members_cose(
+    document: &Map<String, Value>,
+    base: &[&str],
+    extension_terms: &[&str],
+) -> Result<(), JoseError> {
+    undeclared(document, |name| {
+        base.contains(&name) || extension_terms.contains(&name)
+    })
+}
+
+fn undeclared(
+    document: &Map<String, Value>,
+    allowed: impl Fn(&str) -> bool,
+) -> Result<(), JoseError> {
     let names: Vec<String> = document
         .keys()
-        .filter(|name| {
-            let name = name.as_str();
-            !(base.contains(&name)
-                || REGISTERED_CLAIMS.contains(&name)
-                || extension_terms.contains(&name))
-        })
+        .filter(|name| !allowed(name.as_str()))
         .cloned()
         .collect();
     if names.is_empty() {

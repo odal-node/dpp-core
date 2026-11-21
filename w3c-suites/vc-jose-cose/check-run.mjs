@@ -22,8 +22,12 @@
 //   - an issuance that succeeded left a compact JWS in `data`, which the suite does
 //     not look at: three base64url segments, and a first one that decodes to a JSON
 //     object with a string `alg`. For the SD-JWT features it is an SD-JWT: that
-//     compact JWS, then its Disclosures, each base64url, then a closing `~`. No
-//     signature is verified.
+//     compact JWS, then its Disclosures, each base64url, then a closing `~`. For
+//     the COSE features it is the base64 of a COSE_Sign1, in the form the suite's own
+//     COSE inputs have (the standard alphabet, no padding), read by its CBOR head
+//     bytes: an optional tag 18, an array of four items, and a byte string, a map, a
+//     byte string and a byte string in them, with nothing after. No signature is
+//     verified.
 //
 // The expected count is the number of rows of the enabled features. It is not a
 // constant, so it follows the feature list when a later change turns more on.
@@ -59,6 +63,80 @@ function notCompactJws(token) {
   if (header === null || typeof header !== 'object' || Array.isArray(header) || typeof header.alg !== 'string') {
     return 'its first segment does not decode to a JSON object with a string alg';
   }
+  return null;
+}
+
+// The head of the CBOR item at `at`: its major type, its argument, and where the item's content
+// starts. `null` for a head that is cut short or is an indefinite length or a reserved form,
+// which the harness never writes. The argument is a Number, which is exact for every length a
+// message of this size can have.
+function cborHead(bytes, at) {
+  if (at >= bytes.length) return null;
+  const major = bytes[at] >> 5;
+  const info = bytes[at] & 0x1f;
+  if (info < 24) return {major, argument: info, next: at + 1};
+  const width = {24: 1, 25: 2, 26: 4, 27: 8}[info];
+  if (width === undefined || at + 1 + width > bytes.length) return null;
+  const argument = Number(BigInt('0x' + bytes.subarray(at + 1, at + 1 + width).toString('hex')));
+  return {major, argument, next: at + 1 + width};
+}
+
+// The position after the CBOR item at `at`, or null when it is cut short.
+function cborSkip(bytes, at) {
+  const head = cborHead(bytes, at);
+  if (head === null) return null;
+  const {major, argument} = head;
+  let next = head.next;
+  if (major === 2 || major === 3) return next + argument <= bytes.length ? next + argument : null;
+  if (major === 4 || major === 5) {
+    for (let i = 0; i < argument * (major === 5 ? 2 : 1); i += 1) {
+      next = cborSkip(bytes, next);
+      if (next === null) return null;
+    }
+    return next;
+  }
+  if (major === 6) return cborSkip(bytes, next);
+  return next;
+}
+
+// The base64 the suite writes its COSE inputs in: the standard alphabet with no padding.
+const COSE_TEXT = /^[A-Za-z0-9+/]+$/;
+
+// The reason `token` is not the text of a COSE_Sign1 (RFC 9052 section 4.2), or null when it is
+// one as far as the head bytes say: tagged 18 or not, an array of four items that are a byte
+// string (the protected header), a map (the unprotected header), a byte string (the payload) and
+// a byte string (the signature), and nothing after them.
+function notCose(token) {
+  if (typeof token !== 'string') return 'data is not a string';
+  if (!COSE_TEXT.test(token)) return 'it is not base64 of the standard alphabet with no padding';
+  const bytes = Buffer.from(token, 'base64');
+  if (bytes.toString('base64').replace(/=+$/, '') !== token) return 'it is not canonical base64';
+
+  let at = 0;
+  let head = cborHead(bytes, at);
+  if (head !== null && head.major === 6) {
+    if (head.argument !== 18) return 'it carries a CBOR tag other than 18';
+    at = head.next;
+    head = cborHead(bytes, at);
+  }
+  if (head === null || head.major !== 4 || head.argument !== 4) {
+    return 'it does not decode to a CBOR array of four items, tagged 18 or not';
+  }
+  at = head.next;
+  const items = [
+    [2, 'its protected header is not a byte string'],
+    [5, 'its unprotected header is not a CBOR map'],
+    [2, 'its payload is not a byte string'],
+    [2, 'its signature is not a byte string'],
+  ];
+  for (const [major, why] of items) {
+    head = cborHead(bytes, at);
+    if (head === null) return 'the message ends inside an item';
+    if (head.major !== major) return why;
+    at = cborSkip(bytes, at);
+    if (at === null) return 'the message ends inside an item';
+  }
+  if (at !== bytes.length) return 'bytes follow the COSE_Sign1 array';
   return null;
 }
 
@@ -180,7 +258,10 @@ for (const title of enabled) {
     output = {};
   }
   if (config.fn === 'issue' && output.result === 'success') {
-    if (config.feature.endsWith('_sdjwt')) {
+    if (config.feature.endsWith('_cose')) {
+      const why = notCose(output.data);
+      if (why) problem(`row ${config.number} issued, and its data is not a COSE_Sign1: ${why}`);
+    } else if (config.feature.endsWith('_sdjwt')) {
       const why = notSdJwt(output.data);
       if (why) problem(`row ${config.number} issued, and its data is not an SD-JWT: ${why}`);
     } else {

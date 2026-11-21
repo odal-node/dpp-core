@@ -1,13 +1,13 @@
 //! VC-JOSE-COSE: any W3C Verifiable Credential or Verifiable Presentation, secured
-//! as a compact JWS or as an SD-JWT.
+//! as a compact JWS, as an SD-JWT, or with COSE.
 //!
 //! Implements **Securing Verifiable Credentials using JOSE and COSE**, W3C
-//! Recommendation of 15 May 2025 (`REC-vc-jose-cose-20250515`), for the JOSE and SD-JWT
-//! forms: a credential is a `vc+jwt` (§3.1.1) and a presentation is a `vp+jwt`
-//! (§3.1.2), each a compact JWS (RFC 7515) whose payload is the credential or
-//! presentation itself, or a `vc+sd-jwt` (§3.2.1) and a `vp+sd-jwt` (§3.2.2), each an
-//! SD-JWT (RFC 9901) whose JWT Claims Set is the credential or presentation. The
-//! specification's COSE (§3.3) secured form is not implemented here.
+//! Recommendation of 15 May 2025 (`REC-vc-jose-cose-20250515`): a credential is a
+//! `vc+jwt` (§3.1.1) and a presentation is a `vp+jwt` (§3.1.2), each a compact JWS
+//! (RFC 7515) whose payload is the credential or presentation itself; a `vc+sd-jwt`
+//! (§3.2.1) and a `vp+sd-jwt` (§3.2.2), each an SD-JWT (RFC 9901) whose JWT Claims Set is
+//! the credential or presentation; or a `vc+cose` (§3.3.1) and a `vp+cose` (§3.3.2), each
+//! a `COSE_Sign1` (RFC 9052) whose payload is the credential or presentation itself.
 //! [`crate::sd_jwt_vc`] is a different format, the IETF SD-JWT VC profile.
 //!
 //! **No conformance is claimed.** What was read and what each part is checked
@@ -52,9 +52,18 @@
 //! and refuses at the first failed check, in this order: compact form, protected
 //! header (readable, no `crit`, no `b64` of `false`, `alg` is the key's, so `alg:
 //! none` is refused), signature, `typ` and `cty`, payload and its `@context`, `vc`
-//! and `vp`, time, the issuer binding of §4.1.2 and the `kid` of §4.2, then the
-//! credential's `type`, `issuer` and `credentialSubject`. Every refusal is a variant
-//! of [`JoseError`].
+//! and `vp`, time, the audience, the issuer binding of §4.1.2, then the credential's
+//! `type`, `issuer` and `credentialSubject`. Every refusal is a variant of [`JoseError`].
+//!
+//! **The `kid` is a hint, and no verifier holds it to a form.** §4.2 asks for an absolute
+//! URL as the `kid` when there is no `iss` and the issuer is a URL, but it opens "When using
+//! controlled identifier documents with this specification", and §5 assumes key discovery "has
+//! succeeded prior to beginning the verification process". A verifier here is given its key,
+//! so it has no document to hold the `kid` against, and a token whose `kid` is a bare
+//! thumbprint verifies, in every form. `iss`, when present, must still be the issuer. The
+//! signers keep the rule: a `kid` that is not an absolute URL is refused
+//! ([`JoseError::KidNotAbsolute`]) when there is no `iss` and the issuer, or the holder of a
+//! presentation, is a URL, so the tokens this crate writes stay strict.
 //!
 //! **Time is explicit.** A [`VerifyOptions`] carries `now`, seconds since the epoch.
 //! Under a `now`, `exp` must be a number and `now` before it, and `nbf` must be a
@@ -75,14 +84,20 @@
 //!
 //! Verifying a presentation and verifying the credentials it envelops are two
 //! operations. VC-JOSE-COSE §5.1 defines verifying a presentation secured with JOSE as
-//! validating its own JWT (RFC 7519), and §5 says key discovery is assumed to have
-//! succeeded before each document is verified. So [`verify_presentation`] checks the
-//! presentation's outer token completely, then the shape of every envelope (§3.1.2),
-//! and returns a [`VerifiedPresentation`] whose envelopes are **not** verified. Each
-//! credential is verified afterwards, under the key the caller has for its issuer: one at
-//! a time with [`UnverifiedEnvelope::verify`], or all of them with
-//! [`VerifiedPresentation::verify_credentials`], which fails if any one fails. Only a
-//! `vc+jwt` and a `vc+sd-jwt` can be verified, so an envelope of another format makes
+//! validating its own JWT (RFC 7519), §5.3 defines it for COSE as the `COSE_Sign1`
+//! process on the presentation itself, and §5 says key discovery is assumed to have
+//! succeeded before each document is verified. So [`verify_presentation`],
+//! [`verify_presentation_sd_jwt`] and [`verify_presentation_cose`] check the presentation's
+//! own token completely, then judge each envelope **as an envelope**: its `type`, its
+//! `@context`, and that its `id` is a `data:` URL with a media type (§3.1.2, §3.2.2, §3.3.2;
+//! VC DM 2.0 §4.13). They do not read what is inside it, a compact JWS, an SD-JWT or a
+//! `COSE_Sign1`. They return a [`VerifiedPresentation`] whose envelopes are **not**
+//! verified. Each credential is verified afterwards, under the key the caller has for its
+//! issuer: one at a time with [`UnverifiedEnvelope::verify`], or all of them with
+//! [`VerifiedPresentation::verify_credentials`], which fails if any one fails. That is where
+//! the content is read, and where content that cannot be read is refused, wrapped in
+//! [`JoseError::CredentialRefused`] with the variant that says why. Only a `vc+jwt`, a
+//! `vc+sd-jwt` and a `vc+cose` can be verified, so an envelope of another format makes
 //! `verify_credentials` fail with `UnsupportedEnvelopeFormat`. §5.4 asks for further
 //! validation once verification succeeds; the checks this crate does not make are listed
 //! below.
@@ -98,7 +113,7 @@
 //!
 //! - **The checks run on the processed payload.** VC-JOSE-COSE §5.2 says to convert the
 //!   SD-JWT payload back into the JWT Claims Set. So `@context`, `type`, `issuer`, `holder`,
-//!   `credentialSubject`, `iss`, the time claims and the `kid` rule are read from the claims
+//!   `credentialSubject`, `iss` and the time claims are read from the claims
 //!   once the Disclosures are applied, with the rules of the `vc+jwt` form, and the header
 //!   rules are read from the Issuer-signed JWT. A claim that was concealed and not disclosed
 //!   is absent, and a required one that is absent is refused.
@@ -124,7 +139,7 @@
 //! - **A member named `_sd`, `_sd_alg` or `...`** is refused at signing: a reader would take
 //!   it for the mechanism and remove it (RFC 9901 clauses 4.1.1 and 4.2.1).
 //! - **Presentations** are verified as in the `vp+jwt` form: the presentation's own SD-JWT,
-//!   then the shape of each envelope, then nothing inside an envelope. A `vc+sd-jwt` envelope
+//!   then each envelope as an envelope, then nothing inside it. A `vc+sd-jwt` envelope
 //!   (`data:application/vc+sd-jwt,<sd-jwt>`) is verified by
 //!   [`UnverifiedEnvelope::verify`] and by [`VerifiedPresentation::verify_credentials`],
 //!   under the key the caller supplies, as strictly as a credential given on its own.
@@ -145,18 +160,52 @@
 //! [`NotRequired`]: KeyBindingRequirement::NotRequired
 //! [`Required`]: KeyBindingRequirement::Required
 //!
+//! # The COSE form
+//!
+//! [`sign_credential_cose`] and [`sign_presentation_cose`] take what the `vc+jwt` signers
+//! take and return the tagged `COSE_Sign1`. [`verify_credential_cose`] and
+//! [`verify_presentation_cose`] take its bytes, the key and the [`VerifyOptions`].
+//!
+//! - **The payload is the document.** §3.3.1: "The unsecured verifiable credential is the
+//!   unencoded COSE_Sign1 payload". It is the UTF-8 JSON of the document, in RFC 8785 canonical
+//!   form when signed, and it is not a claims set: nothing is written into it, and no JWT claim
+//!   is read out of it. A member named `exp` or `iss` is an undeclared term at signing like
+//!   any other, [`CREDENTIAL_TERMS`] and `extension_terms` are all that is allowed, and `vc` and
+//!   `vp` are refused at signing as undeclared terms and not by §1.1.2.1, which is stated for
+//!   a JWT Claims Set. The same VC Data Model 2.0 checks as the other two forms apply.
+//! - **Headers.** The signer writes the protected `alg` (the key's), `kid` (the UTF-8 bytes of
+//!   the identifier given), `typ` (16) `application/vc+cose` or `application/vp+cose`, and the
+//!   content type (3) `application/vc` or `application/vp`. The verifier holds `typ` and the
+//!   content type to the policy the `vc+jwt` form applies to `typ` and `cty`: `typ` required, each
+//!   value naming the media type with or without the `application/` prefix, though §3.3.1 says
+//!   SHOULD for both.
+//! - **CWT claims** (§3.3.3, RFC 9597, RFC 8392) are read from the CWT Claims header parameter of
+//!   the protected header. The signers write none. `iss` must be the issuer (§4.1.2), `exp` and
+//!   `nbf` are checked under the `now` of [`VerifyOptions`], and `aud` follows the audience rule
+//!   above, each as the same JWT claim is in the `vc+jwt` form. The parameter is refused in the
+//!   unprotected header, where nothing protects it.
+//! - **Envelopes.** A `vc+cose` credential in a presentation is
+//!   `data:application/vc+cose;base64,<base64>` (§3.3.1). The base64 is read with the WHATWG
+//!   Infra Standard's "forgiving-base64 decode" and not RFC 2045's, which pads: the W3C suite's
+//!   own envelope has no padding. Where Key Binding is required a `vc+cose` envelope is refused,
+//!   as a `vc+jwt` envelope is, since it cannot carry a Key Binding JWT.
+//!
 //! # What is deliberately absent
 //!
 //! - **JSON-LD expansion.** `@context` is checked against the VC Data Model 2.0 context
 //!   set (§4.3), and nothing is fetched or expanded: this crate does no network access.
 //! - **Key discovery.** §4.2 leaves how a verifier finds a key to the verifier, and
-//!   this crate does not check that a `kid` names a method the issuer controls.
+//!   this crate does not check that a `kid` names a method the issuer controls, or that it
+//!   is an absolute URL.
 //! - **`credentialStatus` and `credentialSchema` checks** (§5.4 SHOULD), and the
 //!   credential's validity period.
 //! - **`crit`.** Any `crit` is refused, which is stricter than RFC 7515 §4.1.11,
 //!   since no critical extension is understood.
 
 mod absolute_url;
+mod cose_sign;
+mod cose_verify;
+mod data_url;
 mod disclose;
 mod envelope_shape;
 pub mod error;
@@ -176,7 +225,19 @@ mod algorithm_tests;
 #[cfg(test)]
 mod audience_tests;
 #[cfg(test)]
+mod cose_claims_tests;
+#[cfg(test)]
+mod cose_envelope_tests;
+#[cfg(test)]
+mod cose_sign_tests;
+#[cfg(test)]
+mod cose_support;
+#[cfg(test)]
+mod cose_verify_tests;
+#[cfg(test)]
 mod credentials_tests;
+#[cfg(test)]
+mod data_url_tests;
 #[cfg(test)]
 mod envelope_shape_tests;
 #[cfg(test)]
@@ -206,6 +267,8 @@ mod sd_jwt_verify_tests;
 #[cfg(test)]
 mod sign_tests;
 #[cfg(test)]
+mod suite_cose_tests;
+#[cfg(test)]
 mod suite_issue_tests;
 #[cfg(test)]
 mod suite_sdjwt_tests;
@@ -218,6 +281,8 @@ mod verify_tests;
 #[cfg(test)]
 mod vocabulary_tests;
 
+pub use cose_sign::{sign_credential_cose, sign_presentation_cose};
+pub use cose_verify::{verify_credential_cose, verify_presentation_cose};
 pub use error::JoseError;
 pub use options::{KeyBindingRequirement, VerifyOptions};
 pub use presentation::verify_presentation;

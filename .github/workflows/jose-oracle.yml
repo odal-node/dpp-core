@@ -36,9 +36,10 @@
 # What it does **not** answer, and the register row says so. The library knows no
 # JSON-LD, no VC Data Model 2.0, no `@context` rule and no rule on undeclared
 # members, so it says nothing about whether a credential is a good one: it judges
-# the JOSE envelope. The `vc+sd-jwt` and `vc+cose` forms of VC-JOSE-COSE do not exist
-# in this workspace, so nothing here judges them. Nothing here is evidence of
-# conformance to VC-JOSE-COSE: the register's conformance cell for it stays "No".
+# the JOSE envelope. The `vc+sd-jwt` form is judged by the SD-JWT oracles and the
+# `vc+cose` form by the COSE oracle, so nothing here judges them. Nothing here is
+# evidence of conformance to VC-JOSE-COSE: the register's conformance cell for it
+# stays "No".
 #
 # Deliberately **not** path-filtered. A filtered check never reports on a PR that
 # does not touch its paths, so it can never be made a required check without
