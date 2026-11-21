@@ -1,8 +1,9 @@
 //! VC-JOSE-COSE: any W3C Verifiable Credential or Verifiable Presentation, secured
 //! as a compact JWS, as an SD-JWT, or with COSE.
 //!
-//! Implements **Securing Verifiable Credentials using JOSE and COSE**, W3C
-//! Recommendation of 15 May 2025 (`REC-vc-jose-cose-20250515`): a credential is a
+//! Implements **Securing Verifiable Credentials using JOSE and COSE**, the W3C
+//! Recommendation of 13 October 2026 (`REC-vc-jose-cose-20261013`), whose normative
+//! text is that of the 15 May 2025 edition: a credential is a
 //! `vc+jwt` (§3.1.1) and a presentation is a `vp+jwt` (§3.1.2), each a compact JWS
 //! (RFC 7515) whose payload is the credential or presentation itself; a `vc+sd-jwt`
 //! (§3.2.1) and a `vp+sd-jwt` (§3.2.2), each an SD-JWT (RFC 9901) whose JWT Claims Set is
