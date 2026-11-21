@@ -51,8 +51,8 @@ const ROTATIONS_WHILE_SIGNING: usize = 20;
 const SIGNERS: usize = 4;
 
 /// Sign with `sign` on [`SIGNERS`] threads while another thread rotates `key_id` in
-/// `store`, and return every token once [`ROTATIONS_WHILE_SIGNING`] rotations have
-/// completed since signing began.
+/// `store`, and return every token once each thread has seen [`ROTATIONS_WHILE_SIGNING`]
+/// rotations complete after its own first token.
 ///
 /// For the signers that take the `kid` from the key: each must take it and the
 /// signature from one load of the key, or a rotation between the two reads gives a
@@ -63,8 +63,10 @@ const SIGNERS: usize = 4;
 /// which archives the replaced key, so every key that signed a token is still
 /// published when the rotations stop.
 ///
-/// Signing starts once the first rotation has completed. The test fails if a
-/// rotation fails or a signer panics.
+/// Signing starts once the first rotation has completed. Each thread counts from its own
+/// first token, so a thread that starts late still signs on both sides of a rotation,
+/// and so tokens under more than one key are not left to the scheduler. The test fails
+/// if a rotation fails or a signer panics.
 pub(crate) fn sign_while_rotating<T: Send>(
     store: &KeyStore,
     key_id: &str,
@@ -95,11 +97,13 @@ pub(crate) fn sign_while_rotating<T: Send>(
         while rotations.load(Ordering::SeqCst) == 0 && !stop.load(Ordering::SeqCst) {
             std::thread::yield_now();
         }
-        let first = rotations.load(Ordering::SeqCst);
         let signers: Vec<_> = (0..SIGNERS)
             .map(|_| {
                 scope.spawn(move || {
-                    let mut signed = Vec::new();
+                    // Counted from this thread's own first token, so however late the
+                    // thread starts, its tokens span the rotations that follow it.
+                    let mut signed = vec![sign()];
+                    let first = rotations.load(Ordering::SeqCst);
                     while !stop.load(Ordering::SeqCst)
                         && rotations.load(Ordering::SeqCst) - first < ROTATIONS_WHILE_SIGNING
                     {
