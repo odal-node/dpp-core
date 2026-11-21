@@ -48,8 +48,9 @@ pub(crate) const PRESENTATION_SD_JWT_TYP: &str = "vp+sd-jwt";
 /// # Disclosed validity claims
 ///
 /// A claim that arrived in a Disclosure is checked as one in the clear, because step 4 reads
-/// the processed payload: a disclosed `exp` in the past is refused as expired, and an `aud`
-/// entry that was disclosed is part of the `aud` the audience is compared with. RFC 9901
+/// the processed payload: a disclosed `exp` in the past is refused as expired when the
+/// options carry a `now`, as one in the clear is, and an `aud` entry that was disclosed is
+/// part of the `aud` the audience is compared with. RFC 9901
 /// §9.7 puts the duty not to make `iss`, `aud`, `exp`, `nbf` or `cnf` selectively disclosable
 /// on the Issuer, and §7.1 step 6 has the verifier check them in the processed payload, so
 /// this verifier does not refuse a token for the way a claim travelled.

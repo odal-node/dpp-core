@@ -123,8 +123,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `nbf` and `cnf` that arrived in a Disclosure is no longer refused for the way it travelled:
   RFC 9901 §9.7 puts the duty not to make it selectively disclosable on the Issuer, and §7.1
   step 6 has the verifier check it in the processed payload, so a disclosed `exp` in the
-  past is refused as expired and a disclosed `aud` entry is part of the `aud` the audience
-  is compared with. The signers still refuse to conceal those five. (#637)
+  past is refused as expired when the verifier is given a `now`, as one in the clear is,
+  and a disclosed `aud` entry is part of the `aud` the audience is compared with. The
+  signers still refuse to conceal those five. (#637)
 
 ### Added
 
@@ -299,6 +300,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   test. The independent SD-JWT oracle, with both of its libraries, judges the tokens this
   crate issues as `vc+sd-jwt` and `vp+sd-jwt`, among them the issuances of rows 17 to 19.
   No conformance is claimed. (#632)
+
+### Fixed
+
+- **`SdJwt::disclosed_payload_with_key_binding` refuses a Key Binding JWT whose header sets
+  `b64` to `false`,** as `SdJwtError::KeyBindingRejected("b64")`, before its signature is
+  checked. A Key Binding JWT is a JWT, and RFC 7797 §7 forbids a JWT to use `b64` with a
+  `false` value; the `dpp_vc::jose` verifiers already refused one in a `vc+jwt`. A `b64`
+  of `true`, which names the ordinary encoding, is still read. (#637)
 
 ## [0.24.0] - 2026-11-16
 

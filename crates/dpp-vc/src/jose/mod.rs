@@ -110,9 +110,10 @@
 //!   make selectively disclosable. A verifier does not refuse a token for the way a claim
 //!   travelled: one of those that was disclosed is checked as it is in the clear, since
 //!   the checks read the processed payload (clause 7.1 step 6), so a disclosed `exp` in the
-//!   past is refused as expired. One that was withheld cannot be seen. A verifier does not
-//!   refuse a token for concealing `type` or the others in §3.2.1, which are a SHOULD: the
-//!   suite's own presentation conceals `type`.
+//!   past is refused as expired when the caller gives a `now`, as one in the clear is.
+//!   One that was withheld cannot be seen. A verifier does not refuse a token for
+//!   concealing `type` or the others in §3.2.1, which are a SHOULD: the suite's own
+//!   presentation conceals `type`.
 //! - **Paths.** A path names an object member by its name, and an array element by its
 //!   position in the document as the issuer wrote it. `null` stands for every element,
 //!   and each must hold the rest of the path. A path that selects nothing is refused, so a

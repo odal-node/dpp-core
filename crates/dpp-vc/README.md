@@ -270,8 +270,8 @@ Five more are the SD-JWT form's:
   refuses a token that has no Key Binding JWT, and a `vc+jwt` envelope, which cannot
   carry one. The signers take an optional holder key and write it as `cnf`.
 - **A claim that was disclosed is checked as one in the clear.** A disclosed `exp` in the
-  past is refused as expired, and a disclosed `aud` entry is part of the `aud` your
-  audience is compared with. RFC 9901 clause 9.7 puts the duty not to conceal them on the
+  past is refused as expired when your `VerifyOptions` carry a `now`, as one in the clear
+  is, and a disclosed `aud` entry is part of the `aud` your audience is compared with. RFC 9901 clause 9.7 puts the duty not to conceal them on the
   issuer, and the signer here refuses to.
 - **A member named `_sd`, `_sd_alg` or `...` cannot be signed,** because a reader would
   take it for the mechanism.
