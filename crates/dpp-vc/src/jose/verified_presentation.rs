@@ -5,7 +5,8 @@ use serde_json::Value;
 use dpp_crypto::jws::PublicKey;
 
 use super::error::JoseError;
-use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT};
+use super::options::{KeyBindingRequirement, VerifyOptions};
+use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT, VC_SD_JWT};
 
 /// A presentation whose own token verified. Its signature and claims were checked; the
 /// credentials it envelops were **not**.
@@ -36,7 +37,7 @@ impl VerifiedPresentation {
     /// verified.
     ///
     /// The payload still carries each envelope's raw `data:` URL, unverified: the compact
-    /// JWS of a `vc+jwt` is in it as text. Reading the payload therefore gives the
+    /// JWS of a `vc+jwt`, or the SD-JWT of a `vc+sd-jwt`, is in it as text. Reading the payload therefore gives the
     /// credentials as they arrived, not their verified claims. A credential's verified
     /// claims are what [`verify_credentials`](Self::verify_credentials) or
     /// [`UnverifiedEnvelope::verify`] return.
@@ -54,19 +55,25 @@ impl VerifiedPresentation {
     /// `issuer_key` gives for it.
     ///
     /// `issuer_key` is asked once per envelope and answers `None` when the caller has no
-    /// key for it. Every envelope must be a `vc+jwt`: an envelope of another format fails
+    /// key for it. Every envelope must be a `vc+jwt` or a `vc+sd-jwt`: one of another format fails
     /// with [`JoseError::UnsupportedEnvelopeFormat`] before the key is asked for. The first
     /// envelope that fails fails the whole call, so a presentation with one bad credential
     /// is refused as a whole.
     ///
+    /// `options` and `binding` are those of [`UnverifiedEnvelope::verify`], applied to every
+    /// envelope: each credential's `aud` must name the audience, each `vc+sd-jwt` is held to
+    /// `binding`, and where binding is required a `vc+jwt`, which cannot carry a Key Binding
+    /// JWT, is refused.
+    ///
     /// # Errors
     ///
-    /// [`JoseError::UnsupportedEnvelopeFormat`] for an envelope that is not a `vc+jwt`;
+    /// [`JoseError::UnsupportedEnvelopeFormat`] for an envelope that is neither a `vc+jwt` nor a `vc+sd-jwt`;
     /// [`JoseError::CredentialKeyUnknown`] for an envelope with no key;
     /// [`JoseError::CredentialRefused`] for a credential that fails a check.
     pub fn verify_credentials<F>(
         &self,
-        now: Option<i64>,
+        options: VerifyOptions<'_>,
+        binding: &KeyBindingRequirement,
         mut issuer_key: F,
     ) -> Result<Vec<Value>, JoseError>
     where
@@ -75,7 +82,7 @@ impl VerifiedPresentation {
         self.envelopes
             .iter()
             .map(|envelope| {
-                if envelope.media_type != VC_JWT {
+                if envelope.media_type != VC_JWT && envelope.media_type != VC_SD_JWT {
                     return Err(JoseError::UnsupportedEnvelopeFormat {
                         index: envelope.index,
                         media_type: envelope.media_type.clone(),
@@ -85,7 +92,7 @@ impl VerifiedPresentation {
                     index: envelope.index,
                     kid: envelope.kid.clone(),
                 })?;
-                envelope.verify(&key, now)
+                envelope.verify(&key, options, binding)
             })
             .collect()
     }

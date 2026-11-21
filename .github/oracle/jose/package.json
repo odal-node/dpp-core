@@ -1,0 +1,11 @@
+{
+  "name": "jose-oracle",
+  "private": true,
+  "description": "CI-only. Pins the independent JOSE implementation (RFC 7515 and RFC 7518) used to judge dpp-vc::jose. Never a dependency of any published crate.",
+  "engines": {
+    "node": ">=26"
+  },
+  "dependencies": {
+    "jose": "6.2.17"
+  }
+}

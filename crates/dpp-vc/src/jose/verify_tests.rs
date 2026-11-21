@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
+use super::VerifyOptions;
 use super::{JoseError, sign_credential, verify_credential};
 use crate::test_support::{
     KID, credential, credential_header, forge, forge_raw, generated, with_credential, with_header,
@@ -21,7 +22,7 @@ fn key() -> KeyEntry {
 }
 
 fn verify(token: &str, key: &KeyEntry) -> Result<Value, JoseError> {
-    verify_credential(token, &key.public_key(), None)
+    verify_credential(token, &key.public_key(), VerifyOptions::new())
 }
 
 /// The control: the forgery with nothing wrong verifies, so every refusal below is
@@ -357,7 +358,12 @@ fn iat_in_any_form_is_accepted() {
     ] {
         let token = with_credential(&key, |c| c["iat"] = iat.clone());
         assert_eq!(
-            verify_credential(&token, &key.public_key(), Some(2_000_000_000)).map(|_| ()),
+            verify_credential(
+                &token,
+                &key.public_key(),
+                VerifyOptions::new().at(2_000_000_000)
+            )
+            .map(|_| ()),
             Ok(()),
             "{iat}"
         );

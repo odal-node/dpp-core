@@ -6,15 +6,18 @@
 //! Enveloped Verifiable Credentials says the object's `@context` MUST be present,
 //! its `id` MUST be a `data:` URL, and its `type` MUST be
 //! `EnvelopedVerifiableCredential`. A `vc+jwt` envelope's data must in addition be
-//! a compact JWS (§3.1.2: the credentials are "secured using JWS").
+//! a compact JWS (§3.1.2: the credentials are "secured using JWS"), and a `vc+sd-jwt`
+//! envelope's data must be an SD-JWT in the combined format of RFC 9901 clause 4 (§3.2.2:
+//! "These credentials are secured using SD-JWT").
 
 use base64::Engine as _;
 use serde_json::Value;
 
 use dpp_crypto::jws::verifier::extract_kid_from_jws;
+use dpp_crypto::sd_jwt::SdJwt;
 
 use super::error::JoseError;
-use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT};
+use super::unverified_envelope::{UnverifiedEnvelope, VC_JWT, VC_SD_JWT};
 
 /// The `type` of an Enveloped Verifiable Credential object.
 const ENVELOPED: &str = "EnvelopedVerifiableCredential";
@@ -22,7 +25,7 @@ const ENVELOPED: &str = "EnvelopedVerifiableCredential";
 /// Check the envelope at `index`, and keep what [`verify_credentials`](super::VerifiedPresentation::verify_credentials)
 /// needs.
 ///
-/// Only a `vc+jwt` envelope's data is read. For any other media type the `id` is
+/// Only the data of a `vc+jwt` and a `vc+sd-jwt` envelope is read. For any other media type the `id` is
 /// held to being a `data:` URL and nothing more, since this crate cannot read the
 /// format.
 pub(crate) fn inspect(index: usize, value: &Value) -> Result<UnverifiedEnvelope, JoseError> {
@@ -72,12 +75,22 @@ pub(crate) fn inspect(index: usize, value: &Value) -> Result<UnverifiedEnvelope,
     let url = split_data_url(id).ok_or_else(|| malformed("id is not a data: URL"))?;
     let media_type = url.media_type;
 
-    if media_type != VC_JWT {
-        return Ok(UnverifiedEnvelope::new(index, media_type, None, None));
-    }
-    let token = token_of(url.data, url.base64)
-        .ok_or_else(|| malformed("the vc+jwt data is not a compact JWS"))?;
-    let kid = extract_kid_from_jws(&token);
+    let (token, jws) = match media_type.as_str() {
+        VC_JWT => {
+            let token = token_of(url.data, url.base64)
+                .ok_or_else(|| malformed("the vc+jwt data is not a compact JWS"))?;
+            let jws = token.clone();
+            (token, jws)
+        }
+        VC_SD_JWT => {
+            let token = sd_jwt_of(url.data, url.base64)
+                .ok_or_else(|| malformed("the vc+sd-jwt data is not an SD-JWT"))?;
+            let jws = token.split('~').next().unwrap_or_default().to_owned();
+            (token, jws)
+        }
+        _ => return Ok(UnverifiedEnvelope::new(index, media_type, None, None)),
+    };
+    let kid = extract_kid_from_jws(&jws);
     Ok(UnverifiedEnvelope::new(index, media_type, kid, Some(token)))
 }
 
@@ -119,22 +132,41 @@ fn split_data_url(id: &str) -> Option<DataUrl<'_>> {
 /// base64-decoded first when the URL says `;base64`. The registered media type is
 /// written with the JWS as the data itself, which is the form the suite uses.
 fn token_of(data: &str, base64: bool) -> Option<String> {
+    let token = decoded_text(data, base64)?;
+    is_compact_jws(&token).then_some(token)
+}
+
+/// The SD-JWT in the data of a `vc+sd-jwt` `data:` URL, decoded as [`token_of`] decodes
+/// it: the combined format of RFC 9901 clause 4, whose Issuer-signed JWT is a compact JWS.
+/// The Disclosures are read and not matched against the JWT, which verification does.
+fn sd_jwt_of(data: &str, base64: bool) -> Option<String> {
+    let text = decoded_text(data, base64)?;
+    let sd_jwt = SdJwt::parse(&text).ok()?;
+    is_compact_jws(sd_jwt.jwt()).then_some(text)
+}
+
+/// The data of a `data:` URL as text: percent-decoded, and base64-decoded first when the
+/// URL says `;base64`.
+fn decoded_text(data: &str, base64: bool) -> Option<String> {
     let mut bytes = percent_decode(data)?;
     if base64 {
         bytes = base64::engine::general_purpose::STANDARD
             .decode(bytes)
             .ok()?;
     }
-    let token = String::from_utf8(bytes).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+/// Three non-empty base64url segments joined by dots.
+fn is_compact_jws(token: &str) -> bool {
     let segments: Vec<&str> = token.split('.').collect();
-    let all_base64url = segments.len() == 3
+    segments.len() == 3
         && segments.iter().all(|segment| {
             !segment.is_empty()
                 && base64::engine::general_purpose::URL_SAFE_NO_PAD
                     .decode(segment)
                     .is_ok()
-        });
-    all_base64url.then_some(token)
+        })
 }
 
 /// `data` with its `%XX` escapes decoded, or `None` when an escape is not two hex

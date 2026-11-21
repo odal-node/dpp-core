@@ -193,7 +193,8 @@ impl SdJwt {
     /// a `cnf` that is selectively disclosable has to have been disclosed. The
     /// signature is checked against it with this crate's JWS verifier, which
     /// refuses `none`, an algorithm other than the key's own and any `crit` (step 5.b), and
-    /// an `alg` other than the one the JWK declares.
+    /// an `alg` other than the one the JWK declares. A header that sets `b64` to `false` is
+    /// refused before any of these, since RFC 7797 §7 forbids it in a JWT.
     ///
     /// # Errors
     ///
@@ -215,6 +216,11 @@ impl SdJwt {
         let (key, declared) = holder_key(&payload)?;
 
         let (header, claims) = decoded(kb).ok_or(Rejected("the JWT"))?;
+        // A Key Binding JWT is a JWT (clause 4.3), and RFC 7797 §7: "JSON Web Tokens [JWT]
+        // MUST NOT use "b64" with a "false" value".
+        if header.get("b64") == Some(&Value::Bool(false)) {
+            return Err(Rejected("b64"));
+        }
         let alg = header.get("alg").and_then(Value::as_str);
         if declared.is_some() && declared.as_deref() != alg {
             return Err(Rejected("alg"));

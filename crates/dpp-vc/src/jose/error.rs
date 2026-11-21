@@ -42,6 +42,39 @@ pub enum JoseError {
         /// The `kid` that was given, if there was one.
         kid: Option<String>,
     },
+    /// A disclosure path names a claim that must stay in the clear: `@context`, `type`,
+    /// `credentialStatus`, `credentialSchema` or `relatedResource`, which VC-JOSE-COSE §3.2
+    /// says "SHOULD be disclosed", or `iss`, `aud`, `exp`, `nbf` or `cnf`, which RFC 9901
+    /// clause 9.7 forbids an Issuer to make selectively disclosable. The path is refused
+    /// whether it names the claim or a part of it.
+    #[error("{name} must not be selectively disclosable")]
+    UnconcealableClaim {
+        /// The top-level claim the path starts at.
+        name: String,
+    },
+    /// A disclosure path selects nothing in the document: a member it does not have, a
+    /// position past the end of an array, a step into a value that holds no members, or a
+    /// `null` step over an empty array or over an element that lacks the rest of the path.
+    /// Refused, and not ignored, so a claim the issuer meant to conceal is never signed in
+    /// the clear. The path is given in its JSON form and names no value.
+    #[error("the document holds no claim at {path}")]
+    DisclosurePathNotFound {
+        /// The path, as `ClaimPath` writes it.
+        path: String,
+    },
+    /// The document has a member named `_sd`, `_sd_alg` or `...`, which SD-JWT reserves
+    /// (RFC 9901 clauses 4.1.1 and 4.2.1). A reader would take it for the mechanism and
+    /// remove it, so what it verifies would not be the document that was signed.
+    #[error("the member name {name} is reserved by SD-JWT")]
+    ReservedSdJwtMember {
+        /// The reserved name.
+        name: &'static str,
+    },
+    /// A holder key was given to an SD-JWT signer, and the document already carries `cnf`.
+    /// The signer writes `cnf` from the key (RFC 7800 §3.1) and does not overwrite one the
+    /// caller wrote.
+    #[error("the document already carries cnf, so no holder key can be added")]
+    ConfirmationClaimPresent,
     /// The key could not sign the document.
     #[error("signing failed: {reason}")]
     Signing {
@@ -54,6 +87,37 @@ pub enum JoseError {
     /// The protected header is not base64url, or not a JSON object.
     #[error("the protected header is unreadable")]
     UnreadableHeader,
+    /// The SD-JWT is not in the combined format of RFC 9901 clause 4: not
+    /// `<JWT>~<Disclosure>~...~`, or a Disclosure that cannot be read, or a last segment
+    /// that is not a JWT. The reason is the reader's own words and names no claim value.
+    #[error("not a readable SD-JWT: {reason}")]
+    MalformedSdJwt {
+        /// What the reader reported.
+        reason: String,
+    },
+    /// Key Binding is required, and the token carries no Key Binding JWT (RFC 9901 §7.3
+    /// step 2), or is a `vc+jwt` envelope, which cannot carry one. Whether Key Binding is
+    /// required is the caller's choice, and the presence of the Key Binding JWT never
+    /// changes it.
+    #[error("Key Binding is required and the token carries no Key Binding JWT")]
+    KeyBindingMissing,
+    /// Key Binding is required, and the token does not satisfy it (RFC 9901 §7.3 step 5):
+    /// the processed payload names no usable Holder key in `cnf`, or the Key Binding JWT
+    /// failed a check. The reason names the check, and no claim value.
+    #[error("the Key Binding is refused: {reason}")]
+    KeyBindingRefused {
+        /// What the check reported.
+        reason: String,
+    },
+    /// The Disclosures do not process against the signed payload (RFC 9901 clause 7.1):
+    /// one matches no digest, a digest repeats, a Disclosure would overwrite a claim in the
+    /// clear, `_sd_alg` names an unsupported hash, and so on. The reason is the reader's
+    /// own words and names no claim value.
+    #[error("the Disclosures are refused: {reason}")]
+    InvalidDisclosures {
+        /// What the reader reported.
+        reason: String,
+    },
     /// The protected header carries `crit`. No critical extension is understood
     /// (RFC 7515 §4.1.11), so none is accepted.
     #[error("the protected header carries crit, and no critical extension is supported")]
@@ -89,7 +153,7 @@ pub enum JoseError {
     /// `typ` or `cty` does not type the token as the credential or presentation
     /// that was asked for.
     ///
-    /// `typ` is required, and names `vc+jwt` for a credential or `vp+jwt` for a
+    /// `typ` is required, and names `vc+jwt` (`vc+sd-jwt` for an SD-JWT) for a credential or `vp+jwt` (`vp+sd-jwt`) for a
     /// presentation, with or without the `application/` prefix (RFC 7515 §4.1.9).
     /// `cty`, when present, names `vc` or `vp`.
     #[error(
@@ -151,11 +215,24 @@ pub enum JoseError {
     },
     /// `exp` or `nbf` is present and is not a JSON number, so it cannot be read as a
     /// time. Refused rather than ignored, because ignoring a malformed `exp` would
-    /// read as no expiry.
+    /// read as no expiry. A signer refuses an `iat` that is not a number for the same
+    /// reason, since RFC 7519 §4.1.6 makes it a NumericDate; a verifier does not read it.
     #[error("{claim} is not a NumericDate")]
     MalformedTemporalClaim {
-        /// `"exp"` or `"nbf"`.
+        /// `"exp"`, `"nbf"` or, at signing, `"iat"`.
         claim: &'static str,
+    },
+    /// `aud` is present and is neither a string nor an array of strings (RFC 7519
+    /// §4.1.3).
+    #[error("aud is neither a string nor an array of strings")]
+    MalformedAudience,
+    /// The token carries `aud`, and it does not name the audience the caller identified as,
+    /// or the caller gave none (RFC 7519 §4.1.3: the JWT "MUST be rejected"). The `aud` of
+    /// the token is not repeated here.
+    #[error("the token's aud does not name the audience this verifier identifies as")]
+    AudienceMismatch {
+        /// The audience the caller identified as, or `None` when it gave none.
+        audience: Option<String>,
     },
     /// `exp` has been reached (RFC 7519 §4.1.4).
     #[error("the token has expired")]
@@ -185,7 +262,7 @@ pub enum JoseError {
         reason: String,
     },
     /// `verify_credentials` was given no key for an envelope. Its `kid` is the `kid` the
-    /// envelope's protected header names, when it is a `vc+jwt` that names one.
+    /// envelope's protected header names, when it is a `vc+jwt` or a `vc+sd-jwt` that names one.
     #[error(
         "no key for envelope {index} (kid {})",
         .kid.as_deref().unwrap_or("(none)")
@@ -193,18 +270,19 @@ pub enum JoseError {
     CredentialKeyUnknown {
         /// The envelope's position.
         index: usize,
-        /// The `kid` its protected header names, for a `vc+jwt`.
+        /// The `kid` its protected header names, for a `vc+jwt` or a `vc+sd-jwt`.
         kid: Option<String>,
     },
-    /// An envelope is not a `vc+jwt`, the only format this crate verifies.
-    #[error("envelope {index} is {media_type}, and only vc+jwt can be verified here")]
+    /// An envelope is neither a `vc+jwt` nor a `vc+sd-jwt`, the only formats this crate
+    /// verifies.
+    #[error("envelope {index} is {media_type}, and only vc+jwt and vc+sd-jwt can be verified here")]
     UnsupportedEnvelopeFormat {
         /// The envelope's position.
         index: usize,
         /// The media type its `id` names.
         media_type: String,
     },
-    /// A `vc+jwt` envelope failed one of the checks of a credential.
+    /// A `vc+jwt` or `vc+sd-jwt` envelope failed one of the checks of a credential.
     #[error("envelope {index} was refused: {source}")]
     CredentialRefused {
         /// The envelope's position.

@@ -34,6 +34,7 @@ serde            = { workspace = true }
 serde_json       = { workspace = true }
 serde_jcs        = { workspace = true }
 flate2           = { workspace = true }
+cbor4ii          = { workspace = true }
 anyhow           = { workspace = true }
 tracing          = { workspace = true }
 uuid             = { workspace = true }

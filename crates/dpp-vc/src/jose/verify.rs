@@ -9,6 +9,7 @@ use dpp_crypto::jws::{HeaderRefusal, PublicKey};
 
 use super::absolute_url::is_absolute_url;
 use super::error::JoseError;
+use super::options::VerifyOptions;
 use super::properties::{check_context, check_credential_properties, id_of};
 use crate::common::media_type::{self, TypeRefusal};
 
@@ -48,13 +49,14 @@ pub(crate) struct Opened {
 ///    (RFC 7515 §4.1.9, with or without the `application/` prefix);
 /// 5. the payload is a JSON object whose `@context` is the VC Data Model 2.0 context
 ///    set (VC DM 2.0 §4.3), and carries neither `vc` nor `vp` (§1.1.2.1, §3.1.3);
-/// 6. under `Some(now)`, the time claims, below;
-/// 7. `iss`, if present, equals the credential's `issuer`, or its `id` when the
+/// 6. under a `now`, the time claims, below;
+/// 7. `aud`, if present, names the audience the caller identifies as, below;
+/// 8. `iss`, if present, equals the credential's `issuer`, or its `id` when the
 ///    issuer is an object (§4.1.2); and when `iss` is absent and the issuer is a
 ///    URL, the `kid` is an absolute URL (§4.2). That the `kid` names a verification
 ///    method of the issuer is the caller's, since this function has no identifier
 ///    document to look it up in;
-/// 8. the credential's `type` names `VerifiableCredential`, its `issuer` is a URL or
+/// 9. the credential's `type` names `VerifiableCredential`, its `issuer` is a URL or
 ///    an object with a URL `id`, and its `credentialSubject` is an object or a
 ///    non-empty array of objects (VC DM 2.0 §4.5, §4.7, §4.8).
 ///
@@ -62,16 +64,28 @@ pub(crate) struct Opened {
 ///
 /// # Time
 ///
-/// `now` is seconds since the Unix epoch, supplied rather than read, as in
+/// `options` carries `now`, seconds since the Unix epoch, supplied rather than read, as in
 /// [`sd_jwt_vc::verify`](crate::sd_jwt_vc::verify): a result that depends on a
 /// hidden clock cannot be reproduced.
 ///
-/// - **`Some(now)`**: `exp`, if present, must be a JSON number and `now` must be
+/// - **A `now`**: `exp`, if present, must be a JSON number and `now` must be
 ///   before it (RFC 7519 §4.1.4); `nbf`, if present, must be a JSON number and
 ///   `now` must not be before it (RFC 7519 §4.1.5). A value that is not a number is
 ///   refused, not skipped. There is no leeway: the comparison is exact, as in
 ///   `sd_jwt_vc::verify`.
-/// - **`None`**: no check of `exp` or `nbf`, and not their type either.
+/// - **No `now`**: no check of `exp` or `nbf`, and not their type either.
+///
+/// # Audience
+///
+/// `options` also carries the audience the caller identifies as. RFC 7519 §4.1.3 says
+/// "If the principal processing the claim does not identify itself with a value in the
+/// "aud" claim when this claim is present, then the JWT MUST be rejected." So a token with
+/// an `aud` is accepted only when it names that audience, as a string or as one entry of an
+/// array of strings, compared as the case-sensitive strings §4.1.3 says they are
+/// ([`JoseError::AudienceMismatch`]). Under no audience, a token that carries `aud` is
+/// refused. An `aud` that is neither a string nor an array of strings is refused
+/// ([`JoseError::MalformedAudience`]) before any comparison. A token with no `aud` is
+/// accepted under either.
 ///
 /// `iat` is never checked, in either case. VC-JOSE-COSE §3.1.3 says `iat` and
 /// `exp` describe the signature, not the credential, and the suite's credentials
@@ -81,8 +95,12 @@ pub(crate) struct Opened {
 /// # Errors
 ///
 /// A [`JoseError`] naming the first check the token failed.
-pub fn verify_credential(jws: &str, key: &PublicKey, now: Option<i64>) -> Result<Value, JoseError> {
-    let Opened { payload, kid } = open(jws, key, now, CREDENTIAL_TYP, CREDENTIAL_CTY)?;
+pub fn verify_credential(
+    jws: &str,
+    key: &PublicKey,
+    options: VerifyOptions<'_>,
+) -> Result<Value, JoseError> {
+    let Opened { payload, kid } = open(jws, key, options, CREDENTIAL_TYP, CREDENTIAL_CTY)?;
     check_issuer(&payload, kid.as_deref())?;
     check_credential_properties(&payload)?;
     Ok(Value::Object(payload))
@@ -91,14 +109,28 @@ pub fn verify_credential(jws: &str, key: &PublicKey, now: Option<i64>) -> Result
 /// Everything about a token that does not depend on whether it carries a credential
 /// or a presentation, in the order [`verify_credential`] lists: the compact form,
 /// the header, the signature, `typ` and `cty`, the payload and its `@context`,
-/// `vc` and `vp`, and the time claims.
+/// `vc` and `vp`, the time claims and the audience.
 pub(crate) fn open(
     jws: &str,
     key: &PublicKey,
-    now: Option<i64>,
+    options: VerifyOptions<'_>,
     typ: &'static str,
     cty: &'static str,
 ) -> Result<Opened, JoseError> {
+    let payload = open_token(jws, key, typ, cty)?;
+    claims_of(payload, jws, options)
+}
+
+/// The first half of [`open`]: the compact form, the header, the signature, `typ` and
+/// `cty`, and the payload as a JSON object. The SD-JWT form runs this over its
+/// Issuer-signed JWT, and reads the claims from the payload once its Disclosures are
+/// applied.
+pub(crate) fn open_token(
+    jws: &str,
+    key: &PublicKey,
+    typ: &'static str,
+    cty: &'static str,
+) -> Result<Map<String, Value>, JoseError> {
     if jws.split('.').count() != 3 {
         return Err(JoseError::NotCompactJws);
     }
@@ -159,15 +191,27 @@ pub(crate) fn open(
             reason: "not a JSON object".to_owned(),
         });
     };
+    Ok(payload)
+}
+
+/// The second half of [`open`], over the claims set: its `@context`, `vc` and `vp`, the
+/// time claims under a `now`, and the audience. `jws` is the token whose protected header
+/// names the `kid`.
+pub(crate) fn claims_of(
+    payload: Map<String, Value>,
+    jws: &str,
+    options: VerifyOptions<'_>,
+) -> Result<Opened, JoseError> {
     check_context(&payload)?;
     for name in ["vc", "vp"] {
         if payload.contains_key(name) {
             return Err(JoseError::ReservedClaim { name });
         }
     }
-    if let Some(now) = now {
+    if let Some(now) = options.now {
         check_time(&payload, now)?;
     }
+    check_audience(&payload, options.audience)?;
     Ok(Opened {
         payload,
         kid: extract_kid_from_jws(jws),
@@ -204,9 +248,11 @@ fn numeric_date(
 }
 
 /// `exp` and `nbf`, when present, must be JSON numbers. Verification refuses one that is
-/// not, under a `now`, so signing refuses it too; no time is compared here.
+/// not, under a `now`, so signing refuses it too; no time is compared here. `iat` must be
+/// one as well (RFC 7519 §4.1.6: "Its value MUST be a number containing a NumericDate
+/// value"), and signing refuses one that is not, though verification does not read it.
 pub(crate) fn check_temporal_claims(payload: &Map<String, Value>) -> Result<(), JoseError> {
-    for claim in ["exp", "nbf"] {
+    for claim in ["exp", "nbf", "iat"] {
         numeric_date(payload, claim)?;
     }
     Ok(())
@@ -233,6 +279,38 @@ fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
         }
     }
     Ok(())
+}
+
+/// `aud` against the audience the caller identifies as (RFC 7519 §4.1.3). A token with no
+/// `aud` passes. One with an `aud` passes only when it names `audience`: the `aud` is a
+/// string, or an array of strings of which one is equal to it, compared exactly. An `aud`
+/// of any other shape is refused first, so a `null` or a number cannot read as no `aud`,
+/// and an array with one entry that is not a string is refused whatever else it holds.
+fn check_audience(payload: &Map<String, Value>, audience: Option<&str>) -> Result<(), JoseError> {
+    let Some(aud) = payload.get("aud") else {
+        return Ok(());
+    };
+    let named = match aud {
+        Value::String(one) => audience == Some(one.as_str()),
+        Value::Array(entries) => {
+            let mut named = false;
+            for entry in entries {
+                let Value::String(entry) = entry else {
+                    return Err(JoseError::MalformedAudience);
+                };
+                named |= audience == Some(entry.as_str());
+            }
+            named
+        }
+        _ => return Err(JoseError::MalformedAudience),
+    };
+    if named {
+        Ok(())
+    } else {
+        Err(JoseError::AudienceMismatch {
+            audience: audience.map(str::to_owned),
+        })
+    }
 }
 
 /// The issuer of a credential: its `issuer` when that is a string, or its `id` when

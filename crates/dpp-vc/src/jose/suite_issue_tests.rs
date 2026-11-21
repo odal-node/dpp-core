@@ -8,9 +8,11 @@
 //! file. Rows 3 and 5 are the two the brief singled out, and each is explained where
 //! it is tested.
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{json, key_id, public_key, signing_key};
 
 #[test]
@@ -20,7 +22,8 @@ fn row_1_a_basic_credential_is_issued_and_verifies_back() {
     let token =
         sign_credential(&credential, &signing_key("p256"), &key_id("p256"), &[]).expect("issued");
 
-    let verified = verify_credential(&token, &public_key("p256"), None).expect("verifies");
+    let verified =
+        verify_credential(&token, &public_key("p256"), VerifyOptions::new()).expect("verifies");
     assert_eq!(verified, credential);
 }
 
@@ -31,7 +34,8 @@ fn row_2_a_credential_with_every_optional_field_is_issued_and_verifies_back() {
     let token =
         sign_credential(&credential, &signing_key("p384"), &key_id("p384"), &[]).expect("issued");
 
-    let verified = verify_credential(&token, &public_key("p384"), None).expect("verifies");
+    let verified =
+        verify_credential(&token, &public_key("p384"), VerifyOptions::new()).expect("verifies");
     assert_eq!(verified, credential);
 }
 
@@ -48,7 +52,7 @@ fn row_3_a_presentation_with_a_malformed_envelope_is_issued_and_then_refused() {
         .expect("issued: envelopes are not parsed at issuance");
 
     assert_eq!(
-        verify_presentation(&token, &public_key("p256"), None).map(|_| ()),
+        verify_presentation(&token, &public_key("p256"), VerifyOptions::new()).map(|_| ()),
         Err(JoseError::MalformedEnvelope {
             index: 0,
             reason: "the vc+jwt data is not a compact JWS".to_owned(),
@@ -58,7 +62,7 @@ fn row_3_a_presentation_with_a_malformed_envelope_is_issued_and_then_refused() {
 
 /// Row 4's presentation holds a `vc+jwt` signed under P-256 and a `vc+sd-jwt` and a
 /// `vc+cose`. The presentation verifies under its own key and lists the three
-/// envelopes. Only the `vc+jwt` can be verified here, and it verifies under P-256.
+/// envelopes. Only the `vc+jwt` and the `vc+sd-jwt` can be verified here, under P-256 and P-384.
 #[test]
 fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let presentation = json("presentation-multiple.json");
@@ -66,7 +70,8 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     let token = sign_presentation(&presentation, &signing_key("p521"), &key_id("p521"), &[])
         .expect("issued");
 
-    let verified = verify_presentation(&token, &public_key("p521"), None).expect("verifies");
+    let verified =
+        verify_presentation(&token, &public_key("p521"), VerifyOptions::new()).expect("verifies");
     assert_eq!(verified.payload(), &presentation);
     let listed: Vec<(usize, &str)> = verified
         .envelopes()
@@ -83,12 +88,17 @@ fn row_4_a_presentation_of_three_formats_is_issued_and_verifies_back() {
     );
     assert!(
         verified.envelopes()[0]
-            .verify(&public_key("p256"), None)
+            .verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED)
+            .is_ok()
+    );
+    assert!(
+        verified.envelopes()[1]
+            .verify(&public_key("p384"), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
     assert!(matches!(
-        verified.envelopes()[1].verify(&public_key("p256"), None),
-        Err(JoseError::UnsupportedEnvelopeFormat { index: 1, .. })
+        verified.envelopes()[2].verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED),
+        Err(JoseError::UnsupportedEnvelopeFormat { index: 2, .. })
     ));
 }
 

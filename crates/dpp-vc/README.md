@@ -30,7 +30,8 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   the key the caller has already chosen. Fetching the metadata, deciding whether to
   trust it, and picking the key are your application's job, and so is the network policy.
 - You sign or verify **any** W3C credential or presentation as a VC-JOSE-COSE
-  `vc+jwt` or `vp+jwt`, with a key you supply. See `jose`.
+  `vc+jwt` or `vp+jwt`, or as an SD-JWT, `vc+sd-jwt` or `vp+sd-jwt`, with a key you
+  supply. See `jose`.
 
 ## What this crate does not cover
 
@@ -138,7 +139,11 @@ neither document.
 
 ```rust
 use dpp_crypto::keystore::KeyEntry;
-use dpp_vc::jose::{sign_credential, sign_presentation, verify_credential, verify_presentation};
+use dpp_crypto::sd_jwt::ClaimPath;
+use dpp_vc::jose::{
+    KeyBindingRequirement, VerifyOptions, sign_credential, sign_credential_sd_jwt,
+    sign_presentation, verify_credential, verify_credential_sd_jwt, verify_presentation,
+};
 use serde_json::json;
 
 # fn demo(issuer_key: &KeyEntry, holder_key: &KeyEntry, now: i64) -> Result<(), Box<dyn std::error::Error>> {
@@ -147,14 +152,16 @@ let credential = json!({
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential"],
     "issuer": "https://issuer.example",
-    "credentialSubject": {"id": "did:example:subject", "name": "Example"},
+    "credentialSubject": {"id": "did:example:subject", "name": "Example", "role": "manufacturer"},
     "productPassport": {"id": "urn:example:passport:1"},
 });
 
 // `productPassport` is not a VC term, so the signer is told to expect it.
 let token = sign_credential(&credential, issuer_key, issuer_kid, &["productPassport"])?;
 let issuer_public = issuer_key.public_key();
-let verified = verify_credential(&token, &issuer_public, Some(now))?;
+// The options carry the time and the audience this verifier identifies as.
+let options = VerifyOptions::new().at(now).for_audience("https://verifier.example");
+let verified = verify_credential(&token, &issuer_public, options)?;
 assert_eq!(verified["issuer"], "https://issuer.example");
 
 let presentation = json!({
@@ -169,28 +176,54 @@ let presentation = json!({
 let vp = sign_presentation(&presentation, holder_key, "https://holder.example/keys#1", &[])?;
 
 // Verify the presentation's own token. Its credentials are listed, not verified.
-let presented = verify_presentation(&vp, &holder_key.public_key(), Some(now))?;
+let presented = verify_presentation(&vp, &holder_key.public_key(), options)?;
 assert_eq!(presented.envelopes().len(), 1);
 
 // Verify each credential under the key of its issuer's `kid`. `None` refuses the set.
-let credentials = presented.verify_credentials(Some(now), |envelope| {
+let credentials = presented.verify_credentials(options, &KeyBindingRequirement::NotRequired, |envelope| {
     (envelope.kid.as_deref() == Some(issuer_kid)).then(|| issuer_public.clone())
 })?;
 assert_eq!(credentials.len(), 1);
+
+// The same credential as an SD-JWT, with `name` concealed. `role` stays in the clear,
+// because a subject that is only its `id` is refused. The holder chooses what to
+// disclose, and the verifier reads what it is given.
+let name = ClaimPath::claim("credentialSubject").key("name");
+// Key Binding is the verifier's decision, and there is no default: here it is not required.
+// Give a holder key instead of `None` to write it as `cnf`, and pass
+// `KeyBindingRequirement::Required(policy)` to require the holder's proof of it.
+let not_bound = KeyBindingRequirement::NotRequired;
+let sd_jwt = sign_credential_sd_jwt(&credential, issuer_key, issuer_kid, &["productPassport"], &[name], None)?;
+let disclosed = verify_credential_sd_jwt(&sd_jwt.serialise(), &issuer_public, options, &not_bound)?;
+assert_eq!(disclosed["credentialSubject"]["name"], "Example");
+let withheld = sd_jwt.present(&[])?;
+let hidden = verify_credential_sd_jwt(&withheld.serialise(), &issuer_public, options, &not_bound)?;
+assert!(hidden["credentialSubject"].get("name").is_none());
 # Ok(())
+# }
+#
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#     let key = KeyEntry::from_private_jwk(&json!({
+#         "kty": "OKP",
+#         "crv": "Ed25519",
+#         "d": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A",
+#         "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+#     }))?;
+#     demo(&key, &key, 1_800_000_000)
 # }
 ```
 
 `jose` signs and verifies a credential or a presentation of any shape, given as
 JSON, as a compact JWS: `vc+jwt` for a credential and `vp+jwt` for a presentation
 (W3C Securing Verifiable Credentials using JOSE and COSE, Recommendation of 15 May
-2025, §3.1). It resolves no key and performs no I/O. You hand it the signing key when
+2025, §3.1), or as an SD-JWT, `vc+sd-jwt` and `vp+sd-jwt` (§3.2), where you name the
+claims to conceal by path. It resolves no key and performs no I/O. You hand it the signing key when
 you sign, the holder's public key to verify a presentation, and each issuer's public
 key to verify that issuer's credential, under EdDSA, ES256, ES384 or ES512. This is a
 different path from the access credential above, which is one typed document verified
 through a `did:web` document. No conformance is claimed.
 
-Three rules are the caller's to know:
+Four rules are the caller's to know:
 
 - **Verifying a presentation and verifying its credentials are two operations.**
   VC-JOSE-COSE §5.1 defines verifying a presentation secured with JOSE as validating
@@ -199,18 +232,49 @@ Three rules are the caller's to know:
   each envelope (§3.1.2), and returns the envelopes unverified. Verify the credentials
   with `verify_credentials`, which needs a key for every envelope and fails on the
   first one that fails, or with `UnverifiedEnvelope::verify`, one at a time. Only a
-  `vc+jwt` can be verified: a `vc+sd-jwt` or a `vc+cose` envelope makes
+  `vc+jwt` and a `vc+sd-jwt` can be verified: a `vc+cose` envelope makes
   `verify_credentials` fail.
-- **Time is the `now` you pass.** `Some(seconds)` holds `exp` and `nbf` to it, with
-  no leeway, and refuses one that is not a number. `None` reads neither. `iat` is
-  never checked, because the specification says it describes the signature, and a
-  credential's own `validFrom` and `validUntil` are yours to check.
+- **Time is the `now` you pass.** `VerifyOptions::at(seconds)` holds `exp` and `nbf` to
+  it, with no leeway, and refuses one that is not a number. Without it neither is
+  read. `iat` is never checked when verifying, because the specification says it
+  describes the signature, and a credential's own `validFrom` and `validUntil` are
+  yours to check. Signing refuses an `iat` that is not a number (RFC 7519 §4.1.6).
+- **The audience is the one you identify as.** RFC 7519 §4.1.3 says a JWT whose `aud`
+  does not name the principal processing it "MUST be rejected". `for_audience` gives
+  the value you identify with. A token whose `aud`, a string or an array of strings,
+  does not name it is refused, so is one that carries `aud` when you gave none, and so
+  is an `aud` of any other shape. It applies to the credentials in a presentation's
+  envelopes as well, through the options you pass to `verify_credentials`.
 - **Undeclared top-level members are refused at signing.** A member must be a term
   of the VC Data Model 2.0 vocabulary, a JWT registered claim name (`iss`, `sub`,
   `aud`, `exp`, `nbf`, `iat`, `jti`), or named in the `extension_terms` you pass.
   `vc` and `vp` are refused even then. Signing also refuses what verification would
   refuse: an `iss` that is not the issuer, and an `exp` or `nbf` that is not a number.
   Verification ignores members it does not know.
+
+Five more are the SD-JWT form's:
+
+- **A signer refuses to conceal what a verifier needs.** A path that starts at
+  `@context`, `type`, `credentialStatus`, `credentialSchema` or `relatedResource`
+  (§3.2.1: "SHOULD be disclosed"), or at `iss`, `aud`, `exp`, `nbf` or `cnf` (RFC 9901
+  clause 9.7), is refused. A path that selects nothing is refused too.
+- **The checks read what was disclosed.** Verification applies the Disclosures first and
+  then holds the result to the rules of the `vc+jwt` form. A required claim that was
+  concealed and not disclosed is absent, and refused for it.
+- **Whether Key Binding is required is your decision, and there is no default.** RFC 9901
+  §9.5 says verifiers "MUST decide whether Key Binding is required for a particular use
+  case before verifying a credential", so every SD-JWT verifier, and the envelope path,
+  takes a `KeyBindingRequirement`. `NotRequired` ignores a Key Binding JWT the token
+  carries, as §7.3 steps 3 and 4 say. `Required(policy)` checks it as step 5 says, under
+  the key in the token's `cnf`, with the audience, nonce and window of the policy, and
+  refuses a token that has no Key Binding JWT, and a `vc+jwt` envelope, which cannot
+  carry one. The signers take an optional holder key and write it as `cnf`.
+- **A claim that was disclosed is checked as one in the clear.** A disclosed `exp` in the
+  past is refused as expired when your `VerifyOptions` carry a `now`, as one in the clear
+  is, and a disclosed `aud` entry is part of the `aud` your audience is compared with. RFC 9901 clause 9.7 puts the duty not to conceal them on the
+  issuer, and the signer here refuses to.
+- **A member named `_sd`, `_sd_alg` or `...` cannot be signed,** because a reader would
+  take it for the mechanism.
 
 ## Relationship to other crates
 

@@ -47,8 +47,9 @@ plugins/*/target/
 # Testing against the newest dependencies moves to the scheduled advisory run
 # rather than happening implicitly on every build.
 #
-# Three lockfiles are tracked, one per workspace: the root, `plugins/` (the ten
-# product-group crates share a workspace) and `fuzz/`.
+# Four lockfiles are tracked, one per workspace: the root, `plugins/` (the ten
+# product-group crates share a workspace), `fuzz/` and the W3C suite harness
+# under `w3c-suites/`.
 #
 # The per-plugin `plugins/*/Cargo.lock` files are **not** among them. They are
 # leftovers from before those crates shared a workspace and no longer govern
@@ -92,6 +93,9 @@ keys.json
 
 # The independent SD-JWT oracle's dependencies (CI-only; see .github/workflows/sdjwt-oracle.yml)
 .github/oracle/sdjwt/node_modules/
+
+# The independent JOSE oracle's dependencies (CI-only; see .github/workflows/jose-oracle.yml)
+.github/oracle/jose/node_modules/
 
 # The second SD-JWT oracle's Maven output: classes and the resolved jar set (CI-only)
 .github/oracle/sdjwt-jvm/target/

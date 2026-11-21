@@ -14,7 +14,9 @@
 use dpp_crypto::jws::verifier::verify_jws;
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
 
+use super::VerifyOptions;
 use super::{JoseError, verify_credential, verify_presentation};
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{public_key, token};
 
 /// The suite's verdict for a verification: success when the function returned.
@@ -31,7 +33,7 @@ fn row_6_a_basic_credential_verifies() {
     let result = verify_credential(
         &token("credential-jose-minimal.txt"),
         &public_key("p256"),
-        None,
+        VerifyOptions::new(),
     );
 
     assert_eq!(harness(&result), "success");
@@ -49,7 +51,7 @@ fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
     let result = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
     );
 
     assert_eq!(harness(&result), "success");
@@ -67,10 +69,32 @@ fn row_7_the_presentation_verifies_and_lists_its_three_envelopes_unverified() {
                 "application/vc+jwt",
                 Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")
             ),
-            (1, "application/vc+sd-jwt", None),
+            (
+                1,
+                "application/vc+sd-jwt",
+                Some("96qBnDpvS6x8YSCH_xmnLlXZMkDhHBr8lj99u5aog7s")
+            ),
             (2, "application/vc+cose", None),
         ]
     );
+}
+
+/// Row 7's presentation carries an `exp` of 1734397450, 17 December 2024, and the
+/// suite names no verification time. The test above passes no time, as this
+/// repository's harness for the suite does, so `exp` is not read there. Held to a
+/// clock, the presentation verifies until that second and is refused from it on, so
+/// under today's clock it is refused.
+#[test]
+fn row_7_is_refused_from_its_exp_on() {
+    const EXP: i64 = 1_734_397_450;
+    let presentation = token("presentation-jose-multiple.txt");
+    let key = public_key("p384");
+
+    assert!(verify_presentation(&presentation, &key, VerifyOptions::new().at(EXP - 1)).is_ok());
+    assert!(matches!(
+        verify_presentation(&presentation, &key, VerifyOptions::new().at(EXP)),
+        Err(JoseError::Expired)
+    ));
 }
 
 #[test]
@@ -78,7 +102,7 @@ fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
     let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
     )
     .expect("verified");
 
@@ -88,28 +112,49 @@ fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
         Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")
     );
     let credential = first
-        .verify(&public_key("p256"), None)
+        .verify(&public_key("p256"), VerifyOptions::new(), &NOT_REQUIRED)
         .expect("the vc+jwt verifies under P-256");
     assert_eq!(credential["issuer"], "https://example.issuer/vc-jose-cose");
 }
 
+/// The second envelope is a `vc+sd-jwt` signed under P-384, which `verify_credentials`
+/// verifies. Under P-256 for every envelope it is refused for its algorithm, and under
+/// P-384 for it the third, a `vc+cose`, is what the call refuses.
 #[test]
-fn row_7_verify_credentials_refuses_the_second_envelope_as_unsupported() {
+fn row_7_verify_credentials_verifies_the_sd_jwt_envelope_and_refuses_the_cose_one() {
     let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
     )
     .expect("verified");
-    let p256 = public_key("p256");
+    let (p256, p384) = (public_key("p256"), public_key("p384"));
 
-    let result = presentation.verify_credentials(None, |_| Some(p256.clone()));
+    let one_key = presentation
+        .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| Some(p256.clone()));
+    let result = presentation.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |envelope| {
+        Some(if envelope.index == 1 {
+            p384.clone()
+        } else {
+            p256.clone()
+        })
+    });
 
+    assert_eq!(
+        one_key.expect_err("refused"),
+        JoseError::CredentialRefused {
+            index: 1,
+            source: Box::new(JoseError::AlgorithmMismatch {
+                header_alg: Some("ES384".to_owned()),
+                key_alg: KeyAlgorithm::EcdsaP256,
+            }),
+        }
+    );
     assert_eq!(
         result.expect_err("refused"),
         JoseError::UnsupportedEnvelopeFormat {
-            index: 1,
-            media_type: "application/vc+sd-jwt".to_owned(),
+            index: 2,
+            media_type: "application/vc+cose".to_owned(),
         }
     );
 }
@@ -119,11 +164,11 @@ fn row_7_with_no_key_for_the_first_envelope_the_credentials_are_refused() {
     let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
     )
     .expect("verified");
 
-    let result = presentation.verify_credentials(None, |_| None);
+    let result = presentation.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| None);
 
     assert_eq!(
         result.expect_err("refused"),
@@ -139,7 +184,7 @@ fn row_8_a_credential_whose_iss_is_its_issuer_verifies() {
     let result = verify_credential(
         &token("credential-issuer-match-signed.txt"),
         &public_key("ed25519"),
-        None,
+        VerifyOptions::new(),
     );
 
     assert_eq!(harness(&result), "success");
@@ -153,7 +198,7 @@ fn row_8_a_credential_whose_iss_is_its_issuer_verifies() {
 #[test]
 fn row_9_is_refused_because_its_algorithm_is_not_the_keys() {
     let file = "credential-jose-unknown-extensions.txt";
-    let result = verify_credential(&token(file), &public_key("ed25519"), None);
+    let result = verify_credential(&token(file), &public_key("ed25519"), VerifyOptions::new());
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -163,7 +208,7 @@ fn row_9_is_refused_because_its_algorithm_is_not_the_keys() {
             key_alg: KeyAlgorithm::Ed25519,
         }
     );
-    assert!(verify_credential(&token(file), &public_key("p521"), None).is_ok());
+    assert!(verify_credential(&token(file), &public_key("p521"), VerifyOptions::new()).is_ok());
 }
 
 #[test]
@@ -171,8 +216,8 @@ fn rows_10_and_11_json_that_is_not_a_token_is_refused() {
     let ed25519 = public_key("ed25519");
     for file in ["credential-minimal.json", "presentation-single.json"] {
         let raw = crate::test_support::file(file);
-        let credential = verify_credential(raw, &ed25519, None);
-        let presentation = verify_presentation(raw, &ed25519, None);
+        let credential = verify_credential(raw, &ed25519, VerifyOptions::new());
+        let presentation = verify_presentation(raw, &ed25519, VerifyOptions::new());
 
         assert_eq!(harness(&credential), "failure", "{file}");
         assert_eq!(harness(&presentation), "failure", "{file}");
@@ -194,7 +239,7 @@ fn row_12_a_bad_signature_is_refused() {
     let result = verify_credential(
         &token("credential-jose-bad-signature.txt"),
         &public_key("ed25519"),
-        None,
+        VerifyOptions::new(),
     );
 
     assert_eq!(harness(&result), "failure");
@@ -212,7 +257,11 @@ fn row_13_a_credential_with_a_bad_media_type_is_refused_for_its_typ() {
         &key
     ));
 
-    let result = verify_credential(&token("credential-jose-bad-media-type.txt"), &key, None);
+    let result = verify_credential(
+        &token("credential-jose-bad-media-type.txt"),
+        &key,
+        VerifyOptions::new(),
+    );
 
     assert_eq!(harness(&result), "failure");
     // `cty` is bad too, and `typ` is read first.
@@ -234,7 +283,11 @@ fn row_14_a_presentation_with_a_bad_media_type_is_refused_for_its_typ() {
         &key
     ));
 
-    let result = verify_presentation(&token("presentation-jose-bad-media-type.txt"), &key, None);
+    let result = verify_presentation(
+        &token("presentation-jose-bad-media-type.txt"),
+        &key,
+        VerifyOptions::new(),
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -252,7 +305,11 @@ fn row_15_a_credential_with_vc_and_vp_claims_is_refused_for_them() {
     let key = public_key("ed25519");
     assert!(signature_is_valid("credential-jose-vc-vp-claims.txt", &key));
 
-    let result = verify_credential(&token("credential-jose-vc-vp-claims.txt"), &key, None);
+    let result = verify_credential(
+        &token("credential-jose-vc-vp-claims.txt"),
+        &key,
+        VerifyOptions::new(),
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -272,7 +329,11 @@ fn row_16_an_envelope_that_is_not_a_data_url_is_refused() {
         &key
     ));
 
-    let result = verify_presentation(&token("presentation-jose-bad-credential.txt"), &key, None);
+    let result = verify_presentation(
+        &token("presentation-jose-bad-credential.txt"),
+        &key,
+        VerifyOptions::new(),
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(

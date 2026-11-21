@@ -33,7 +33,8 @@
 #      runs cargo-audit and cargo-deny alike, and an ID ignored only in
 #      deny.toml would be a suppression with none of the above
 #
-# The one register covers all three workspaces (`.`, `plugins/`, `fuzz/`):
+# The one register covers all four workspaces (`.`, `plugins/`, `fuzz/`,
+# `w3c-suites/vc-jose-cose/`):
 # `just audit` reads each lockfile with this `.cargo/audit.toml`. So an entry is
 # stale only when no lockfile raises it, and a graph claim must hold in every
 # workspace with every feature on, since a consumer of a published crate can
@@ -47,7 +48,7 @@ cd "$REPO_ROOT"
 
 AUDIT_TOML="${1:-.cargo/audit.toml}"
 DENY_TOML="${2:-deny.toml}"
-WORKSPACES=(. plugins fuzz)
+WORKSPACES=(. plugins fuzz w3c-suites/vc-jose-cose)
 STATUS=0
 fail() { echo "FAIL: $*" >&2; STATUS=1; }
 

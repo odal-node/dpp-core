@@ -9,9 +9,11 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
+use super::VerifyOptions;
 use super::{
     JoseError, VerifiedPresentation, sign_credential, sign_presentation, verify_presentation,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{
     KID, credential, credential_header, envelope, foreign_envelope, forge, generated, presentation,
 };
@@ -28,7 +30,7 @@ fn issuer() -> KeyEntry {
 /// listed, and none is verified.
 fn present(holder: &KeyEntry, members: Vec<Value>) -> Result<VerifiedPresentation, JoseError> {
     let token = sign_presentation(&presentation(members), holder, KID, &[]).expect("signs");
-    verify_presentation(&token, &holder.public_key(), None)
+    verify_presentation(&token, &holder.public_key(), VerifyOptions::new())
 }
 
 /// The envelope of a credential signed by `issuer`.
@@ -60,7 +62,7 @@ fn an_envelope_with_no_key_refuses_the_credentials_and_names_it() {
     let verified =
         present(&holder, vec![signed_by(&issuer), signed_by(&issuer)]).expect("verifies");
 
-    let refused = verified.verify_credentials(None, |envelope| {
+    let refused = verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |envelope| {
         (envelope.index == 0).then(|| issuer.public_key())
     });
 
@@ -78,7 +80,7 @@ fn an_envelope_of_another_format_cannot_be_verified_here() {
     let holder = holder();
     let key = issuer().public_key();
 
-    for media_type in ["application/vc+sd-jwt", "application/vc+cose", "text/plain"] {
+    for media_type in ["application/vc+cose", "text/plain"] {
         let verified = present(&holder, vec![foreign_envelope(media_type)]).expect("verifies");
         let unsupported = JoseError::UnsupportedEnvelopeFormat {
             index: 0,
@@ -86,13 +88,15 @@ fn an_envelope_of_another_format_cannot_be_verified_here() {
         };
 
         assert_eq!(
-            verified.envelopes()[0].verify(&key, None).map(|_| ()),
+            verified.envelopes()[0]
+                .verify(&key, VerifyOptions::new(), &NOT_REQUIRED)
+                .map(|_| ()),
             Err(unsupported.clone()),
             "{media_type}"
         );
         assert_eq!(
             verified
-                .verify_credentials(None, |_| Some(key.clone()))
+                .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| Some(key.clone()))
                 .map(|_| ()),
             Err(unsupported),
             "{media_type}"
@@ -136,7 +140,7 @@ fn verify_presentation_does_not_verify_an_envelope_that_would_fail() {
         present(&holder, vec![envelope(&broken)]).expect("the envelope's shape is right");
 
     assert!(matches!(
-        verified.envelopes()[0].verify(&signer.public_key(), None),
+        verified.envelopes()[0].verify(&signer.public_key(), VerifyOptions::new(), &NOT_REQUIRED),
         Err(JoseError::CredentialRefused { index: 0, .. })
     ));
 }
@@ -148,7 +152,9 @@ fn a_vc_jwt_signed_by_another_key_refuses_the_presentation() {
     let verified =
         present(&holder, vec![signed_by(&issuer), signed_by(&imposter)]).expect("verifies");
 
-    let refused = verified.verify_credentials(None, |_| Some(issuer.public_key()));
+    let refused = verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| {
+        Some(issuer.public_key())
+    });
 
     assert_eq!(
         refused.map(|_| ()),
@@ -162,7 +168,8 @@ fn a_key_of_the_wrong_algorithm_refuses_with_the_inner_reason() {
     let wrong = generated(KeyAlgorithm::EcdsaP384).public_key();
     let verified = present(&holder, vec![signed_by(&issuer)]).expect("verifies");
 
-    let refused = verified.verify_credentials(None, |_| Some(wrong.clone()));
+    let refused =
+        verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| Some(wrong.clone()));
 
     assert_eq!(
         refused.map(|_| ()),
@@ -220,7 +227,9 @@ fn the_inner_token_goes_through_every_credential_check() {
         let verified =
             present(&holder, vec![envelope(&inner)]).expect("the envelope's shape is right");
 
-        let refused = verified.verify_credentials(None, |_| Some(issuer.public_key()));
+        let refused = verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| {
+            Some(issuer.public_key())
+        });
 
         assert_eq!(refused.map(|_| ()), refused_inner(0, reason));
     }
@@ -234,7 +243,9 @@ fn an_inner_token_that_cannot_be_checked_at_all_refuses_with_its_reason() {
     let verified = present(&holder, vec![envelope(&format!("{signing_input}.AA"))])
         .expect("the envelope's shape is right");
 
-    let refused = verified.verify_credentials(None, |_| Some(issuer.public_key()));
+    let refused = verified.verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| {
+        Some(issuer.public_key())
+    });
 
     assert!(matches!(
         refused,
@@ -250,7 +261,7 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
         &holder,
         vec![
             signed_by(&issuer),
-            foreign_envelope("application/vc+sd-jwt"),
+            foreign_envelope("application/vc+cose"),
             signed_by(&issuer),
         ],
     )
@@ -265,18 +276,18 @@ fn every_envelope_of_a_mixed_presentation_is_listed_in_order() {
         listed,
         [
             (0, "application/vc+jwt"),
-            (1, "application/vc+sd-jwt"),
+            (1, "application/vc+cose"),
             (2, "application/vc+jwt"),
         ]
     );
     assert!(
         verified.envelopes()[0]
-            .verify(&issuer.public_key(), None)
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
     assert!(
         verified.envelopes()[2]
-            .verify(&issuer.public_key(), None)
+            .verify(&issuer.public_key(), VerifyOptions::new(), &NOT_REQUIRED)
             .is_ok()
     );
 }
@@ -295,7 +306,7 @@ fn verify_credentials_returns_every_payload_in_envelope_order() {
     let mut asked = Vec::new();
 
     let payloads = verified
-        .verify_credentials(None, |envelope| {
+        .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |envelope| {
             asked.push(envelope.index);
             Some(issuer.public_key())
         })
@@ -323,7 +334,9 @@ fn the_payload_still_carries_each_envelope_raw_and_unverified() {
     assert_eq!(verified.envelopes().len(), 1);
     assert_eq!(
         verified
-            .verify_credentials(None, |_| Some(issuer.public_key()))
+            .verify_credentials(VerifyOptions::new(), &NOT_REQUIRED, |_| Some(
+                issuer.public_key()
+            ))
             .expect("verifies")[0]["id"],
         credential()["id"]
     );

@@ -3,7 +3,7 @@
 //!
 //! The files under `fixtures/w3c-vc-jose-cose` are the input files of the W3C
 //! VC-JOSE-COSE test suite at commit `cf4c93ddf7e1bfef5a3e5db4b9a798b02ea778a9`:
-//! 14 credentials, presentations and tokens, and the four verification-method files
+//! 24 credentials, presentations and tokens, and the four verification-method files
 //! that carry the suite's keys. The suite is not ours. Its files are used under the
 //! W3C Software and Document License, whose text, and the suite's statement of it,
 //! is `LICENSE.md` beside them.
@@ -20,7 +20,7 @@ use crate::test_support::{FILES, file};
 
 /// File name, Git blob at the suite commit (empty for the licence, which is not a
 /// suite blob), SHA-256.
-const PINS: [(&str, &str, &str); 19] = [
+const PINS: [(&str, &str, &str); 29] = [
     (
         "credential-minimal.json",
         "6433f8ba94c018de1978f3251e9133356b32e156",
@@ -110,6 +110,56 @@ const PINS: [(&str, &str, &str); 19] = [
         "vm-p521.json",
         "aac5c45870df4d4681b71f0df6efbb65cd7c0990",
         "61760b4b4bafe49d68b6780acae3a0fd9e264959b8327b3f072e78a757a9ab3a",
+    ),
+    (
+        "credential-selective.json",
+        "8a72f043fe40c0255bffdd0b5cc7dcafa354cb29",
+        "5c201ed1ab5216f3ae8eee412dd90008aacf33657bcded7378f0b77f7d68cf82",
+    ),
+    (
+        "credential-nested-selective.json",
+        "99bc1e5b03d7707cdc82b452697626b00d076141",
+        "458168beb99165327c2fa5d6bc926878f50ebf8c583c32166647cc3aa33b17ac",
+    ),
+    (
+        "presentation-selective.json",
+        "013ffa8f636175e39726e478c794ab649ae39fa7",
+        "7d6ea237f42bdf5c70e1a6148ffb24ee8181606a50ec14d8ac1c141addc0880f",
+    ),
+    (
+        "credential-sdjwt-selective.txt",
+        "81b868ffd70b084eec84ef6eaa1e73f696ca7741",
+        "a10dbe3263cca7537e99ffcc9afed82fdfc8513566f09ab601ff9f2d8fbdc8bf",
+    ),
+    (
+        "credential-sdjwt-nested.txt",
+        "cc21213d9ea93b8f72ca15a1dedda594980fd42f",
+        "6007e8c7a6f5e8eb422364119f09d323b1ad77552fef2604c6c6141c99c19d8f",
+    ),
+    (
+        "presentation-sdjwt-selective.txt",
+        "1cc3a0a7a6ebbd8bb89b2549eae38887a3276fd4",
+        "7c37549c25a8796bae7463a97755d9c74c1921d256c98dd280eb0d238a96c7f4",
+    ),
+    (
+        "credential-sdjwt-bad-signature.txt",
+        "e01b0b1c7035ebdf8573e024f330b67ac9fb5409",
+        "b0af77fd5d7c72f5e5e7f75cc02af266ecb1705e1ee38a8b95e9dd08b26f1637",
+    ),
+    (
+        "credential-sdjwt-bad-media-type.txt",
+        "e04ad4782ff2e484f8559524b7628baa14cef842",
+        "bc0fc5631a712059a83f0619d0fc4e61683c87ed18e560c30b5862a7795a2821",
+    ),
+    (
+        "presentation-sdjwt-bad-media-type.txt",
+        "b4a6ced238c127f92e926327af049633cdd0d0d2",
+        "56f30bc449f1a124b587698603fb290ac00efcde5e120617b124dfa714b73b89",
+    ),
+    (
+        "presentation-sdjwt-bad-credential.txt",
+        "f43e1573c201e9c7f68df24eaef1264cdde7ec0c",
+        "eb21b918a0320a5ac76812200b0a980e4ab5c4a31cceceb74755c5adbb52384c",
     ),
     (
         "LICENSE.md",

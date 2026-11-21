@@ -38,10 +38,13 @@ use super::vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS, check_members};
 ///   `issuer` (or its `id` when the issuer is an object) (§4.1.2).
 /// - A `kid` that is not an absolute URL when the credential has no `iss` and its
 ///   issuer is a URL (§4.2).
-/// - An `exp` or `nbf` that is present and is not a JSON number (RFC 7519 §2).
+/// - An `exp` or `nbf` that is present and is not a JSON number (RFC 7519 §2), and an `iat`
+///   that is not one (RFC 7519 §4.1.6: "Its value MUST be a number containing a NumericDate
+///   value"). Verification does not read `iat`, and accepts the string a suite's credential
+///   carries.
 ///
-/// Each of these is what [`verify_credential`](super::verify_credential) refuses for the
-/// same document, under the same error. Signing compares no time, so an `exp` or `nbf`
+/// Each of these but the `iat` is what [`verify_credential`](super::verify_credential) refuses
+/// for the same document, under the same error. Signing compares no time, so an `exp` or `nbf`
 /// that is a number is signed whatever `now` a verifier later uses.
 ///
 /// `iat`, `exp` and `nbf` are the caller's to put in the credential, or not: this
@@ -107,7 +110,7 @@ pub fn sign_presentation(
     seal(presentation, key, kid, PRESENTATION_TYP, PRESENTATION_CTY)
 }
 
-fn object<'a>(
+pub(super) fn object<'a>(
     document: &'a Value,
     what: &'static str,
 ) -> Result<&'a Map<String, Value>, JoseError> {

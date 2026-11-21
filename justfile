@@ -58,15 +58,16 @@ fmt-check:
 # explicitly allowed — but nothing had ever looked, which for a crate other
 # people vendor is the part that mattered.
 #
-# 🚨 All three workspaces, not the root alone. `plugins/` and `fuzz/` have their
-# own lockfiles and manifests, and a scan of the root reads neither: both were
-# unchecked for advisories, licences and bans until this looped over them. Every
+# 🚨 All four workspaces, not the root alone. `plugins/`, `fuzz/` and
+# `w3c-suites/vc-jose-cose/` have their own lockfiles and manifests, and a scan of
+# the root reads none of them: the first two were unchecked for advisories,
+# licences and bans until this looped over them. Every
 # workspace is scanned before the recipe fails, so one run names every finding.
 audit:
     #!/usr/bin/env bash
     set -uo pipefail
     rc=0
-    for ws in . plugins fuzz; do
+    for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
         echo "== $ws"
         cargo audit -f "$ws/Cargo.lock" --deny yanked || rc=1
         cargo deny --manifest-path "$ws/Cargo.toml" check bans licenses sources || rc=1
@@ -84,19 +85,19 @@ audit:
 # the daily advisory run keep scanning the **old** graph — authoritative-looking
 # and wrong, which is the failure this whole branch is about. `--locked` fails
 # instead of silently re-resolving. Regenerate with `just lock-regen`, never by
-# hand. One per workspace, matching the three tracked lockfiles.
+# hand. One per workspace, matching the four tracked lockfiles.
 lock-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    for ws in . plugins fuzz; do
+    for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
         (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null) || {
             echo "ERROR: $ws/Cargo.lock does not match $ws/Cargo.toml. Run 'just lock-regen' and commit the lockfile."
             exit 1
         }
     done
-    echo "3 lockfiles match their manifests."
+    echo "4 lockfiles match their manifests."
 
-# Bring all three lockfiles back in line with their manifests, moving only what a
+# Bring all four lockfiles back in line with their manifests, moving only what a
 # changed requirement forces.
 #
 # The repair for `lock-check`. A manifest edit (a Dependabot bump of a version in
@@ -113,13 +114,13 @@ lock-check:
 lock-regen:
     #!/usr/bin/env bash
     set -euo pipefail
-    for ws in . plugins fuzz; do
+    for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
         (cd "$ws" && cargo update --workspace)
     done
 
 # The `pre-release-hook` in `crates/dpp-tests/Cargo.toml`, run by cargo-release
 # before it commits or publishes anything: refuse a checkout that is not
-# origin's main, then relock the two workspaces beside this one.
+# origin's main, then relock the three workspaces beside this one.
 pre-release: release-head-check relock
 
 # Refuse a release from anything but main as origin has it. Runs in a dry run
@@ -127,20 +128,20 @@ pre-release: release-head-check relock
 release-head-check:
     bash scripts/release-head-check.sh
 
-# Re-resolve the lockfiles of the two workspaces beside this one, after a version
-# moved. `plugins/` and `fuzz/` record the version of the workspace crates they
-# take by path, and cargo-release only sees this workspace, so it leaves both
-# lockfiles stale and `lock-check` red. It is the second step of `pre-release`;
+# Re-resolve the lockfiles of the three workspaces beside this one, after a version
+# moved. `plugins/`, `fuzz/` and `w3c-suites/vc-jose-cose/` record the version of the
+# workspace crates they take by path, and cargo-release only sees this workspace, so
+# it leaves all three lockfiles stale and `lock-check` red. It is the second step of `pre-release`;
 # it runs under `cargo release --dry-run` too, so it does nothing there. By
 # hand: `just relock`.
 relock:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ "${DRY_RUN:-false}" = "true" ]; then
-        echo "dry run: leaving the plugins and fuzz lockfiles alone."
+        echo "dry run: leaving the plugins, fuzz and w3c-suites lockfiles alone."
         exit 0
     fi
-    for ws in plugins fuzz; do
+    for ws in plugins fuzz w3c-suites/vc-jose-cose; do
         (cd "$ws" && cargo update --workspace)
     done
 
@@ -303,6 +304,27 @@ ci-guard-check:
 ci-guard-check-self-test:
     bash scripts/ci-guard-check.test.sh
 
+# Record the tree id of the current working tree.
+#
+# Runs at the end of `just check` so the pre-commit hook can prove the committed
+# tree is the one that passed the gate. Uses a temporary index, so the real
+# index is left untouched.
+check-tree:
+    bash scripts/check-tree.sh
+
+# Prove check-tree and the pre-commit hook work together.
+check-tree-self-test:
+    bash scripts/check-tree.test.sh
+
+# Install the git hooks directory.
+#
+# Sets `core.hooksPath` to `.githooks/` so git picks up the pre-commit hook
+# that enforces Rule 5 of CLAUDE.md: never commit before a green `just check`.
+# `--no-verify` still bypasses the hook, and CI remains the gate of record.
+install-hooks:
+    git config core.hooksPath .githooks
+    @echo "Hooks installed. Pre-commit will refuse a commit whose tree has not passed \`just check\`."
+
 # "Archive" means EN 18221 clause 4.2 version archiving, and never a status.
 vocabulary-check:
     bash scripts/vocabulary-check.sh
@@ -392,7 +414,8 @@ jades-oracle:
 #
 # The private-material scan is deliberately absent: it was removed pending a
 # redesign, so nothing here checks for a leak into this public repository.
-check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit
+# `check-tree` runs last so it only records the tree when every other gate passed.
+check: fmt-check lint fmt-check-plugins lint-plugins test test-doc test-plugins plugin-gates-self-test changelog-check-self-test release-checks-self-test schema-freeze-check schema-freeze-check-self-test fuzz-targets-check fuzz-targets-check-self-test ci-guard-check ci-guard-check-self-test vocabulary-check vocabulary-check-self-test doc lock-check audit check-tree-self-test check-tree
 
 # `check` is a subset of CI: it never cross-compiles, so the two WASM jobs and
 # the orphaned-tests guard can fail in CI on a change that passed locally. That

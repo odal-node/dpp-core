@@ -8,6 +8,7 @@ use serde_json::json;
 
 use dpp_crypto::jws::KeyAlgorithm;
 
+use super::VerifyOptions;
 use super::{
     CREDENTIAL_TERMS, JoseError, PRESENTATION_TERMS, sign_credential, sign_presentation,
     verify_credential, verify_presentation,
@@ -72,7 +73,7 @@ fn a_declared_extension_term_signs_and_an_undeclared_one_beside_it_does_not() {
     let token =
         sign_credential(&document, &key, KID, &["productPassport", "other"]).expect("signs");
     assert_eq!(
-        verify_credential(&token, &key.public_key(), None).expect("verifies"),
+        verify_credential(&token, &key.public_key(), VerifyOptions::new()).expect("verifies"),
         document
     );
 }
@@ -85,7 +86,7 @@ fn the_jwt_registered_claim_names_need_no_declaration() {
     }
     document["exp"] = json!(1_900_000_000);
     document["nbf"] = json!(1_700_000_000);
-    document["iat"] = json!("2025-01-01T00:00:00Z");
+    document["iat"] = json!(1_700_000_000);
 
     assert!(sign_credential(&document, &key(), KID, &[]).is_ok());
 
@@ -156,7 +157,8 @@ fn verification_ignores_members_it_does_not_understand() {
     );
     assert!(sign_credential(&document, &key, KID, &[]).is_err());
 
-    let verified = verify_credential(&forged, &key.public_key(), None).expect("verifies");
+    let verified =
+        verify_credential(&forged, &key.public_key(), VerifyOptions::new()).expect("verifies");
 
     assert_eq!(verified["badExtension"], json!({"huh": "what?"}));
 
@@ -167,5 +169,5 @@ fn verification_ignores_members_it_does_not_understand() {
         &crate::test_support::presentation_header(&key),
         &holder,
     );
-    assert!(verify_presentation(&forged, &key.public_key(), None).is_ok());
+    assert!(verify_presentation(&forged, &key.public_key(), VerifyOptions::new()).is_ok());
 }
