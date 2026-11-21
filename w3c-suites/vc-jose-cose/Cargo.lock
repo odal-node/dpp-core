@@ -530,12 +530,14 @@ dependencies = [
  "chrono",
  "dpp-rules",
  "jsonschema",
+ "ref-cast",
  "semver",
  "serde",
  "serde_json",
  "serde_with",
  "thiserror",
  "uuid",
+ "yoke",
 ]
 
 [[package]]
