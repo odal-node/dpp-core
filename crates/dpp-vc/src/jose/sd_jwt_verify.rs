@@ -1,6 +1,6 @@
 //! Verifying a credential or a presentation secured as a VC-JOSE-COSE SD-JWT.
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use dpp_crypto::jws::PublicKey;
 use dpp_crypto::sd_jwt::{SdJwt, SdJwtError};
@@ -11,7 +11,7 @@ use super::presentation::finish_presentation;
 use super::properties::check_credential_properties;
 use super::verified_presentation::VerifiedPresentation;
 use super::verify::{
-    CREDENTIAL_CTY, Opened, PRESENTATION_CTY, check_issuer, claims_of, open_token,
+    CREDENTIAL_CTY, PRESENTATION_CTY, check_holder_iss, check_issuer, claims_of, open_token,
 };
 
 /// The `typ` of a credential secured as an SD-JWT, and of a presentation (VC-JOSE-COSE
@@ -37,9 +37,8 @@ pub(crate) const PRESENTATION_SD_JWT_TYP: &str = "vp+sd-jwt";
 ///    required, the checks of §7.3 step 5 ([`JoseError::KeyBindingMissing`] and
 ///    [`JoseError::KeyBindingRefused`]), below;
 /// 4. on the processed payload, which is the JWT Claims Set VC-JOSE-COSE §5.2 says to
-///    convert it back to: `@context`, `vc` and `vp`, the time claims, the audience, `iss`
-///    and the `kid`, and the credential's `type`, `issuer` and `credentialSubject`, as for a
-///    `vc+jwt`.
+///    convert it back to: `@context`, `vc` and `vp`, the time claims, the audience and `iss`,
+///    and the credential's `type`, `issuer` and `credentialSubject`, as for a `vc+jwt`.
 ///
 /// What comes back holds the claims the Disclosures supplied, and lacks every claim the
 /// holder did not disclose. A credential whose `credentialSubject` was concealed and not
@@ -75,7 +74,7 @@ pub fn verify_credential_sd_jwt(
     options: VerifyOptions<'_>,
     binding: &KeyBindingRequirement,
 ) -> Result<Value, JoseError> {
-    let Opened { payload, kid } = open_sd_jwt(
+    let payload = open_sd_jwt(
         sd_jwt,
         key,
         options,
@@ -83,7 +82,7 @@ pub fn verify_credential_sd_jwt(
         CREDENTIAL_SD_JWT_TYP,
         CREDENTIAL_CTY,
     )?;
-    check_issuer(&payload, kid.as_deref())?;
+    check_issuer(&payload)?;
     check_credential_properties(&payload)?;
     Ok(Value::Object(payload))
 }
@@ -95,9 +94,9 @@ pub fn verify_credential_sd_jwt(
 /// presentation's own SD-JWT is verified as [`verify_credential_sd_jwt`] verifies a
 /// credential's, with `typ` naming `vp+sd-jwt`, `options` and `binding` as it takes them
 /// (the Key Binding, when required, is the Holder's over the presentation, with the Holder
-/// key in the presentation's own `cnf`), then the presentation's `holder`, `kid` and `type`,
-/// then each envelope's shape. A `vc+jwt` or `vc+sd-jwt` envelope's data must be readable as
-/// one. No envelope is verified: use
+/// key in the presentation's own `cnf`), then the presentation's `holder` and `type`, then
+/// each envelope as an envelope: its `type`, `@context` and `data:` URL `id`. What is inside an
+/// envelope is not read. No envelope is verified: use
 /// [`VerifiedPresentation::verify_credentials`] or [`UnverifiedEnvelope::verify`](super::UnverifiedEnvelope::verify).
 ///
 /// # Errors
@@ -109,7 +108,7 @@ pub fn verify_presentation_sd_jwt(
     options: VerifyOptions<'_>,
     binding: &KeyBindingRequirement,
 ) -> Result<VerifiedPresentation, JoseError> {
-    let Opened { payload, kid } = open_sd_jwt(
+    let payload = open_sd_jwt(
         sd_jwt,
         holder_key,
         options,
@@ -117,7 +116,8 @@ pub fn verify_presentation_sd_jwt(
         PRESENTATION_SD_JWT_TYP,
         PRESENTATION_CTY,
     )?;
-    finish_presentation(payload, kid.as_deref())
+    check_holder_iss(&payload)?;
+    finish_presentation(payload)
 }
 
 /// Steps 1 to 4 of [`verify_credential_sd_jwt`] up to the claims checks that follow in the
@@ -131,7 +131,7 @@ fn open_sd_jwt(
     binding: &KeyBindingRequirement,
     typ: &'static str,
     cty: &'static str,
-) -> Result<Opened, JoseError> {
+) -> Result<Map<String, Value>, JoseError> {
     let parsed = SdJwt::parse(sd_jwt).map_err(|e| JoseError::MalformedSdJwt {
         reason: e.to_string(),
     })?;
@@ -148,7 +148,7 @@ fn open_sd_jwt(
             .disclosed_payload_with_key_binding(policy)
             .map_err(key_binding_refusal)?,
     };
-    claims_of(processed, parsed.jwt(), options)
+    claims_of(processed, options)
 }
 
 /// What [`SdJwt::disclosed_payload_with_key_binding`] refused, as a [`JoseError`]: the

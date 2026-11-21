@@ -356,20 +356,15 @@ fn a_credential_subject_with_a_claim_besides_its_id_is_accepted() {
 
 // ── the holder's `kid` when there is no `iss` (VC-JOSE-COSE §4.2) ─────────────
 
-/// When the holder is identified by a URL and `iss` is absent, the outer token's `kid`
-/// must be an absolute URL. This is checked on verification too, not only at signing.
+/// When the holder is identified by a URL and `iss` is absent, a signer holds its `kid` to an
+/// absolute URL, and a verifier, which is given its key, does not.
 #[test]
-fn a_holder_that_is_a_url_needs_an_absolute_kid_on_verification() {
+fn a_holder_that_is_a_url_verifies_with_a_bare_kid() {
     let key = key();
     let bare = outer(&key, THUMBPRINT, &presentation(Vec::new()));
     let absolute = outer(&key, KID, &presentation(Vec::new()));
 
-    assert_eq!(
-        verify_presentation(&bare, &key.public_key(), VerifyOptions::new()).map(|_| ()),
-        Err(JoseError::KidNotAbsolute {
-            kid: Some(THUMBPRINT.to_owned())
-        })
-    );
+    assert!(verify_presentation(&bare, &key.public_key(), VerifyOptions::new()).is_ok());
     assert!(verify_presentation(&absolute, &key.public_key(), VerifyOptions::new()).is_ok());
 }
 
@@ -383,14 +378,14 @@ fn a_holder_object_with_a_url_id_counts_as_a_url() {
         sign_presentation(&document, &key, THUMBPRINT, &[]),
         Err(JoseError::KidNotAbsolute { .. })
     ));
-    assert!(matches!(
+    assert!(
         verify_presentation(
             &outer(&key, THUMBPRINT, &document),
             &key.public_key(),
             VerifyOptions::new()
-        ),
-        Err(JoseError::KidNotAbsolute { .. })
-    ));
+        )
+        .is_ok()
+    );
 }
 
 #[test]

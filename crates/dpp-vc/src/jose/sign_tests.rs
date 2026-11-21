@@ -128,7 +128,7 @@ fn a_bare_kid_is_refused_when_there_is_no_iss_and_the_issuer_is_a_url() {
     assert_eq!(
         sign_credential(&credential(), &key, THUMBPRINT, &[]),
         Err(JoseError::KidNotAbsolute {
-            kid: Some(THUMBPRINT.to_owned())
+            kid: THUMBPRINT.to_owned()
         })
     );
 }
@@ -212,7 +212,7 @@ fn the_kid_rule_applies_to_a_presentations_holder_as_to_a_credentials_issuer() {
     assert_eq!(
         sign_presentation(&presentation(Vec::new()), &key, THUMBPRINT, &[]),
         Err(JoseError::KidNotAbsolute {
-            kid: Some(THUMBPRINT.to_owned())
+            kid: THUMBPRINT.to_owned()
         })
     );
     assert!(sign_presentation(&presentation(Vec::new()), &key, KID, &[]).is_ok());

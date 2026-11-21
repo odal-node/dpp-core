@@ -110,8 +110,11 @@ fn an_iss_that_is_not_a_string_is_refused() {
 
 // ── §4.2: the `kid` when there is no `iss` ────────────────────────────────────
 
+/// §4.2 opens "When using controlled identifier documents with this specification", and a
+/// verifier here is given its key, so it holds the `kid` against no document. The suite's own
+/// COSE rows 29 and 31 are bare thumbprints with no `iss`, and expect success.
 #[test]
-fn without_an_iss_a_url_issuer_needs_an_absolute_kid() {
+fn without_an_iss_a_bare_or_absent_kid_verifies_for_a_url_issuer() {
     let key = key();
     let bare = with_header(&key, |h| {
         h["kid"] = json!("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU")
@@ -120,16 +123,8 @@ fn without_an_iss_a_url_issuer_needs_an_absolute_kid() {
         h.as_object_mut().expect("an object").remove("kid");
     });
 
-    assert_eq!(
-        verify(&bare, &key),
-        Err(JoseError::KidNotAbsolute {
-            kid: Some("73voMXFNmNlOEpuYCSJlh8eN0dscykoO6gBukgRS1uU".to_owned())
-        })
-    );
-    assert_eq!(
-        verify(&absent, &key),
-        Err(JoseError::KidNotAbsolute { kid: None })
-    );
+    assert!(verify(&bare, &key).is_ok());
+    assert!(verify(&absent, &key).is_ok());
     assert!(verify(&with_header(&key, |_| {}), &key).is_ok());
 }
 

@@ -10,13 +10,16 @@
 
 use serde_json::{Value, json};
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
 use dpp_crypto::jws::PublicKey;
 use dpp_crypto::keystore::KeyEntry;
 use dpp_crypto::sd_jwt::ClaimPath;
 use dpp_vc::jose::{
-    KeyBindingRequirement, VerifyOptions, sign_credential, sign_credential_sd_jwt,
-    sign_presentation, sign_presentation_sd_jwt, verify_credential, verify_credential_sd_jwt,
-    verify_presentation, verify_presentation_sd_jwt,
+    KeyBindingRequirement, VerifyOptions, sign_credential, sign_credential_cose,
+    sign_credential_sd_jwt, sign_presentation, sign_presentation_cose, sign_presentation_sd_jwt,
+    verify_credential, verify_credential_cose, verify_credential_sd_jwt, verify_presentation,
+    verify_presentation_cose, verify_presentation_sd_jwt,
 };
 
 use crate::feature::Feature;
@@ -24,7 +27,8 @@ use crate::feature::Feature;
 /// The library's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
-    /// It signed, with this compact JWS or SD-JWT, or it verified (`None`).
+    /// It signed, with this compact JWS, SD-JWT or base64 text of a `COSE_Sign1`, or it
+    /// verified (`None`).
     Success(Option<String>),
     /// It refused, and this is why.
     Failure(String),
@@ -53,6 +57,9 @@ fn key_file(text: &str) -> Result<Value, String> {
 /// term is declared, so a document with a member outside the VC Data Model 2.0
 /// vocabulary is refused, which is what the suite's row 5 expects.
 ///
+/// A COSE feature writes the message as base64 text, in the form the suite's own COSE inputs
+/// have: the standard alphabet with no padding and no line breaks.
+///
 /// `disclose` is the claims an SD-JWT conceals, which the suite gives to rows 17 to 19 as
 /// `--sd`. A JOSE feature given any is not a verdict: the suite never asks for it, and
 /// signing without concealing what was asked to be concealed would be an answer to another
@@ -67,6 +74,9 @@ pub fn issue(
     if !feature.is_sd_jwt() && !disclose.is_empty() {
         return Err("--sd applies to the SD-JWT features only".to_owned());
     }
+    let cose_text = |message: Result<Vec<u8>, dpp_vc::jose::JoseError>| {
+        message.map(|bytes| STANDARD_NO_PAD.encode(bytes))
+    };
     let document: Value =
         serde_json::from_str(document).map_err(|e| format!("the input is not JSON: {e}"))?;
     let key_file = key_file(key_text)?;
@@ -86,6 +96,8 @@ pub fn issue(
             sign_presentation_sd_jwt(&document, &key, kid, &[], disclose, None)
                 .map(|t| t.serialise())
         }
+        Feature::CredentialCose => cose_text(sign_credential_cose(&document, &key, kid, &[])),
+        Feature::PresentationCose => cose_text(sign_presentation_cose(&document, &key, kid, &[])),
     };
     Ok(match signed {
         Ok(token) => Verdict::Success(Some(token)),
@@ -107,6 +119,14 @@ pub fn issue(
 /// would be refused for their age instead and pass for the wrong reason. The suite
 /// states no verification time.
 ///
+/// A COSE feature's input is base64 text, read as the suite writes it (standard alphabet, no
+/// padding, perhaps a final newline). Text that is not base64 is the input's fault and not the
+/// harness's, as a JSON document in place of a token is, so it is a refusal. Text that is base64
+/// of something that is not a `COSE_Sign1` is refused by the library, which is what row 30
+/// meets: its hex is also base64, and nothing here tests for hex. A presentation is verified
+/// with `verify_presentation_cose` and nothing more, as for the JOSE form, so row 31's `vc+jwt`
+/// envelope is judged as an envelope and not opened.
+///
 /// No audience is passed either, and Key Binding is not required: none of the suite's
 /// inputs carries `aud`, `cnf` or a Key Binding JWT, and the suite names no verifier.
 pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verdict, String> {
@@ -119,6 +139,21 @@ pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verd
     let options = VerifyOptions::new();
     let binding = KeyBindingRequirement::NotRequired;
 
+    if feature.is_cose() {
+        let bytes = match STANDARD_NO_PAD.decode(token.trim_end_matches('=')) {
+            Ok(bytes) => bytes,
+            Err(e) => return Ok(Verdict::Failure(format!("the input is not base64: {e}"))),
+        };
+        let verified = match feature {
+            Feature::CredentialCose => verify_credential_cose(&bytes, &key, options).map(|_| ()),
+            _ => verify_presentation_cose(&bytes, &key, options).map(|_| ()),
+        };
+        return Ok(verified.map_or_else(
+            |refusal| Verdict::Failure(refusal.to_string()),
+            |()| Verdict::Success(None),
+        ));
+    }
+
     Ok(match feature {
         Feature::CredentialJose => verify_credential(token, &key, options).map(|_| ()),
         Feature::PresentationJose => verify_presentation(token, &key, options).map(|_| ()),
@@ -127,6 +162,9 @@ pub fn verify(feature: Feature, token_text: &str, key_text: &str) -> Result<Verd
         }
         Feature::PresentationSdJwt => {
             verify_presentation_sd_jwt(token, &key, options, &binding).map(|_| ())
+        }
+        Feature::CredentialCose | Feature::PresentationCose => {
+            unreachable!("a COSE feature returned above")
         }
     }
     .map_or_else(

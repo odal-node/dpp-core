@@ -19,9 +19,7 @@ use serde_json::{Value, json};
 use super::keys::{self, ALGORITHMS};
 use super::{high_s, token};
 use crate::jose::VerifyOptions;
-use crate::jose::{
-    JoseError, sign_credential, sign_presentation, verify_credential, verify_presentation,
-};
+use crate::jose::{sign_credential, sign_presentation, verify_credential, verify_presentation};
 use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{credential, envelope, json as suite_json, presentation};
 
@@ -204,14 +202,6 @@ fn the_corpus_is_complete_and_this_crate_verifies_every_token_in_it() {
             "vc" => assert_eq!(
                 verify_credential(token, &key, VerifyOptions::new()).as_ref(),
                 Ok(&case["document"]),
-                "{id}"
-            ),
-            _ if id == "suite/row-3" => assert_eq!(
-                verify_presentation(token, &key, VerifyOptions::new()).map(|_| ()),
-                Err(JoseError::MalformedEnvelope {
-                    index: 0,
-                    reason: "the vc+jwt data is not a compact JWS".to_owned(),
-                }),
                 "{id}"
             ),
             _ => {

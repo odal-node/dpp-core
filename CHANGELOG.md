@@ -127,6 +127,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and a disclosed `aud` entry is part of the `aud` the audience is compared with. The
   signers still refuse to conceal those five. (#637)
 
+- **`JoseError::KidNotAbsolute` carries the `kid` as text, and `VerifiedSign1` is no longer
+  `Eq`.** Only a signer raises `KidNotAbsolute` now (see Changed), and always with the `kid` it
+  was given, so its field is a `String` where it was an `Option<String>`. Migration: match
+  `KidNotAbsolute { kid }` and use `kid` as text. `dpp_crypto::cose::VerifiedSign1` carries
+  the CWT claims, whose times are floating-point numbers, so it is `PartialEq` and no longer
+  `Eq`. (#633)
+
 ### Added
 
 - **`dpp_crypto::cose`: `COSE_Sign1` signing and verification** under EdDSA, ES256,
@@ -225,14 +232,13 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `verify_credential` and `verify_presentation` check the compact form, the header
   (no `crit`, and `alg` is the key's, so `alg: none` is refused), the signature, `typ`
   and `cty`, the payload, `vc` and `vp` claims, the time claims, and `iss` against the
-  credential's `issuer` (§4.1.2) and the `kid` when there is no `iss` (§4.2). Every
-  refusal is a variant of `jose::JoseError`. Three rules are the caller's to know:
+  credential's `issuer` (§4.1.2). Every refusal is a variant of `jose::JoseError`. Three rules are the caller's to know:
   - Verifying a presentation and verifying its credentials are two operations (VC-JOSE-COSE
-    §5.1 and §5). `verify_presentation` checks the presentation's own token and the shape
-    of each envelope, and lists the envelopes in `VerifiedPresentation::envelopes()`
+    §5.1 and §5). `verify_presentation` checks the presentation's own token and judges
+    each envelope as an envelope (see Changed), and lists the envelopes in `VerifiedPresentation::envelopes()`
     unverified. `VerifiedPresentation::verify_credentials` verifies every credential under
     the key the caller gives for its envelope, and fails on the first that fails;
-    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt` and a `vc+sd-jwt` can be verified. The
+    `UnverifiedEnvelope::verify` verifies one. Only a `vc+jwt`, a `vc+sd-jwt` and a `vc+cose` can be verified. The
     payload from `VerifiedPresentation::payload()` still carries each envelope's raw
     `data:` URL, so a credential's verified claims are the ones `verify_credentials` or
     `UnverifiedEnvelope::verify` return.
@@ -299,13 +305,82 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   - Whether Key Binding is required is the caller's decision, with no default (RFC 9901
     clause 7.3 and §9.5): a `KeyBindingRequirement` is passed to every SD-JWT verifier.
   - `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials` now verify a
-    `vc+sd-jwt` envelope, and `verify_presentation` refuses a `vc+sd-jwt` envelope whose
-    data is not an SD-JWT. A `vc+cose` envelope is still not verified.
+    `vc+sd-jwt` envelope.
 
   The W3C test suite's rows 17 to 26 are vendored with their pins, and each verdict is a
   test. The independent SD-JWT oracle, with both of its libraries, judges the tokens this
   crate issues as `vc+sd-jwt` and `vp+sd-jwt`, among them the issuances of rows 17 to 19.
   No conformance is claimed. (#632)
+
+- **`dpp_vc::jose`: credentials and presentations secured with COSE, as `vc+cose` and
+  `vp+cose`** (VC-JOSE-COSE §3.3). `sign_credential_cose` and `sign_presentation_cose` take
+  what the `vc+jwt` signers take and return a tagged `COSE_Sign1`; `verify_credential_cose`
+  and `verify_presentation_cose` take its bytes, the key and the `VerifyOptions`. Rules to know:
+  - The payload is the document as UTF-8 JSON (§3.3.1: "The unsecured verifiable credential
+    is the unencoded COSE_Sign1 payload"), in RFC 8785 canonical form when signed, and is not
+    a claims set. A member named `exp`, `iss` or `aud` is an undeclared term at signing, and
+    `vc` and `vp` are refused at signing only as undeclared terms: VC-JOSE-COSE §1.1.2.1 is
+    stated for a JWT Claims Set. A verifier refuses neither.
+  - An integer beyond ±(2^53 − 1) is refused at signing (`JoseError::Signing`), as the
+    `vc+jwt` signer refuses it: RFC 8785 writes every number as an IEEE 754 double, so it
+    would be signed as another number.
+  - The signers write protected `alg`, `kid` (the UTF-8 bytes of the identifier given), `typ`
+    `application/vc+cose` or `application/vp+cose`, and content type `application/vc` or
+    `application/vp`, and no CWT claim. The verifier holds `typ` and the content type to the
+    policy the `vc+jwt` form applies to `typ` and `cty`, though §3.3.1 says SHOULD for both.
+  - `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials` verify a
+    `vc+cose` envelope, `data:application/vc+cose;base64,<base64>`, under the issuer's key. Where
+    Key Binding is required a `vc+cose` envelope is refused, as a `vc+jwt` envelope is.
+  - New `JoseError` variants: `Cose`, which carries the `CoseError`, and
+    `UnreadableEnvelopeData`.
+
+  The W3C test suite's rows 27 to 35 are vendored with their pins and each verdict is a test,
+  and the suite now runs all 35 rows with none skipped. An independent COSE implementation,
+  `go-cose` in Go, judges the messages this crate signs and signs the ones it verifies, in
+  `cose-oracle.yml`. No conformance is claimed. (#633)
+
+- **`dpp_crypto::cose` reads the CWT Claims header parameter** (label 15, RFC 9597) from the
+  protected header, and `VerifiedSign1::cwt_claims` returns `iss`, `sub`, `aud`, `exp`, `nbf`
+  and `iat` as `CwtClaims` (RFC 8392 §4). The parameter is refused in the unprotected header
+  (`CoseError::CwtClaimsNotProtected`), since RFC 9597 §1 says a recipient "MUST NOT use the
+  information in the CWT Claims header parameter beyond the integrity protection or
+  authentication afforded". A repeated claim key, a claim of the wrong type, a tagged value
+  and a time that is not finite are refused, and other claims are ignored. `dpp_vc::jose`
+  applies `iss`, `exp`, `nbf` and `aud` as it applies the same JWT claims. (#633)
+
+### Changed
+
+- **A verifier no longer holds the `kid` to an absolute URL when there is no `iss`.**
+  VC-JOSE-COSE §4.2 opens "When using controlled identifier documents with this
+  specification", and §5 assumes key discovery "has succeeded prior to beginning the
+  verification process": every verifier here is given its key, so it has no document to hold
+  the `kid` against. `verify_credential`, `verify_presentation`, the SD-JWT verifiers and the
+  COSE verifiers accept a bare thumbprint `kid` where they refused it, which the W3C suite's
+  COSE rows 29 and 31 need. A credential's `iss`, when present, must still be its issuer
+  (§4.1.2); a presentation's is not compared with its holder. The signers still refuse such a `kid` (`KidNotAbsolute`), in all three forms, so the tokens this crate
+  writes stay strict. This relaxes a refusal and breaks no caller that did not depend on it.
+  (#633)
+
+- **A presentation's verifier judges its envelopes as envelopes, and no more.**
+  `verify_presentation`, `verify_presentation_sd_jwt` and `verify_presentation_cose` check an
+  envelope's `type`, its `@context` and that its `id` is a `data:` URL, and no longer refuse a
+  `vc+jwt` envelope whose data is not a compact JWS or a `vc+sd-jwt` envelope whose data is not
+  an SD-JWT. VC-JOSE-COSE §5.1 makes verifying a presentation and verifying its credentials two
+  operations, so what is inside an envelope is read when the credential is verified, by
+  `UnverifiedEnvelope::verify` and `VerifiedPresentation::verify_credentials`, which refuse
+  content that cannot be read, wrapped in `JoseError::CredentialRefused`, with the variant that
+  says why. Of what is inside, the presentation's verifier reads only the protected header's
+  `kid` of a `vc+jwt` or `vc+sd-jwt` envelope, as a hint that is not verified and is absent when
+  the data cannot be read. The W3C suite's row 31 envelops a `vc+jwt` whose data is no compact
+  JWS and expects the presentation to verify. (#633)
+
+- **The base64 of a `data:` URL is read with the WHATWG Infra Standard's "forgiving-base64
+  decode"**, which removes ASCII whitespace, drops up to two trailing `=` from a text whose
+  length is a multiple of four, and refuses a length of one modulo four and any character
+  outside the standard alphabet. It is more forgiving than RFC 2045, which pads. The W3C
+  suite's own presentation (row 7) envelops a `vc+cose` whose base64 has no padding and ends in
+  a line feed, and expects success. A `vc+jwt` or `vc+sd-jwt` envelope in `;base64` form is
+  read the same way. (#633)
 
 ### Fixed
 

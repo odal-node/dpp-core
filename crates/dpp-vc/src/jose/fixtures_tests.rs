@@ -3,7 +3,7 @@
 //!
 //! The files under `fixtures/w3c-vc-jose-cose` are the input files of the W3C
 //! VC-JOSE-COSE test suite at commit `cf4c93ddf7e1bfef5a3e5db4b9a798b02ea778a9`:
-//! 24 credentials, presentations and tokens, and the four verification-method files
+//! 31 credentials, presentations and tokens, and the five verification-method files
 //! that carry the suite's keys. The suite is not ours. Its files are used under the
 //! W3C Software and Document License, whose text, and the suite's statement of it,
 //! is `LICENSE.md` beside them.
@@ -20,7 +20,7 @@ use crate::test_support::{FILES, file};
 
 /// File name, Git blob at the suite commit (empty for the licence, which is not a
 /// suite blob), SHA-256.
-const PINS: [(&str, &str, &str); 29] = [
+const PINS: [(&str, &str, &str); 37] = [
     (
         "credential-minimal.json",
         "6433f8ba94c018de1978f3251e9133356b32e156",
@@ -160,6 +160,46 @@ const PINS: [(&str, &str, &str); 29] = [
         "presentation-sdjwt-bad-credential.txt",
         "f43e1573c201e9c7f68df24eaef1264cdde7ec0c",
         "eb21b918a0320a5ac76812200b0a980e4ab5c4a31cceceb74755c5adbb52384c",
+    ),
+    (
+        "credential-cose-minimal.txt",
+        "b37ea9311dc5a1539b6a24e6aa7f2e1d148e17c6",
+        "9fcf0feca6d3a7b4f30c0ea05b9c28ca937c5c85804d535f9ba26db187898858",
+    ),
+    (
+        "credential-cose-minimal-not-base64.txt",
+        "04e8ecd8ed904ab37027d4f8cb3764582224e871",
+        "c72388c39456851a4010d2ab084bebda6dd9e2d0f18deec599bebc45dfe0faf1",
+    ),
+    (
+        "credential-cose-bad-signature.txt",
+        "b3d483a4fb649edb102d747937758961076c3821",
+        "a639313a3fc839af7db9fdd7e1eac8f1f52ec4fefba142f937d3d5589c8c8b32",
+    ),
+    (
+        "credential-cose-bad-media-type.txt",
+        "d2306428d0c3d9105878ed2b6d0fafecc3ec4638",
+        "c273604f83befa1d371483a07aea3c064095618e4215a910ffd653ae361a06bf",
+    ),
+    (
+        "presentation-cose-single.txt",
+        "e02ce4ae01bb352bdc9912d72ef735aafaeffd11",
+        "3e38c4289a9da1df1e7c9025207521d8199b351970ba72e12d7985d004c2e250",
+    ),
+    (
+        "presentation-cose-bad-credential.txt",
+        "321cc78cf237773c1531efe7d2405537219fd14a",
+        "bac192c09d8374b01111fece892a5e2b1d3fd3b4c5fe00b053187d5f532bee9f",
+    ),
+    (
+        "presentation-cose-bad-media-type.txt",
+        "7cf07edc39ff137e1ef49e5b384964aac4f8b6ad",
+        "a3022908887351988ef744dbd019dbe7d6a1112afe5477d40c5ca2b67c3cdd41",
+    ),
+    (
+        "vm-did-ed25519.json",
+        "301cc78ea0d8b61418197328460b8f56f4928459",
+        "c27e23c7bd5c1f9429bf7386765868f5b43fb36da88d1e7b4607fc220f006606",
     ),
     (
         "LICENSE.md",

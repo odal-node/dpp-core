@@ -1,5 +1,6 @@
 //! How signing or verifying a VC-JOSE-COSE credential or presentation fails.
 
+use dpp_crypto::cose::CoseError;
 use dpp_crypto::jws::KeyAlgorithm;
 
 /// Why a credential or presentation was not signed, or why a token was refused.
@@ -34,13 +35,15 @@ pub enum JoseError {
         /// `"vc"` or `"vp"`.
         name: &'static str,
     },
-    /// `iss` is absent, the issuer of a credential or the holder of a presentation is
-    /// identified by a URL, and the `kid` is not an absolute URL (VC-JOSE-COSE §4.2).
-    /// `None` when a verified token has no `kid` at all.
-    #[error("kid {} is not an absolute URL, and the token has no iss", .kid.as_deref().unwrap_or("(none)"))]
+    /// A signer was given a `kid` that is not an absolute URL, for a credential or
+    /// presentation that carries no `iss` and whose issuer or holder is identified by a URL
+    /// (VC-JOSE-COSE §4.2). Only signing refuses it: §4.2 opens "When using controlled
+    /// identifier documents with this specification", and a verifier here is given its key by
+    /// the caller and so holds the `kid` against no document.
+    #[error("kid {kid} is not an absolute URL, and the token has no iss")]
     KidNotAbsolute {
-        /// The `kid` that was given, if there was one.
-        kid: Option<String>,
+        /// The `kid` that was given.
+        kid: String,
     },
     /// A disclosure path names a claim that must stay in the clear: `@context`, `type`,
     /// `credentialStatus`, `credentialSchema` or `relatedResource`, which VC-JOSE-COSE §3.2
@@ -116,6 +119,21 @@ pub enum JoseError {
     #[error("the Disclosures are refused: {reason}")]
     InvalidDisclosures {
         /// What the reader reported.
+        reason: String,
+    },
+    /// The `COSE_Sign1` message of a `vc+cose` or `vp+cose` was refused: it is not one, a header
+    /// rule failed, or its signature does not verify. The [`CoseError`] names the rule and
+    /// carries no bytes of the message.
+    #[error("the COSE_Sign1 message is refused: {0}")]
+    Cose(#[from] CoseError),
+    /// The data of an envelope's `data:` URL cannot be decoded: a percent escape that is not
+    /// two hex digits, `;base64` data that is not base64 as the WHATWG Infra Standard's
+    /// "forgiving-base64 decode" reads it, or text that is not UTF-8. Raised when the credential
+    /// is verified, not when the presentation is: the presentation's verification judges the
+    /// envelope and not its content.
+    #[error("the envelope's data cannot be decoded: {reason}")]
+    UnreadableEnvelopeData {
+        /// What was wrong with it. It names no byte of the data.
         reason: String,
     },
     /// The protected header carries `crit`. No critical extension is understood
@@ -273,16 +291,18 @@ pub enum JoseError {
         /// The `kid` its protected header names, for a `vc+jwt` or a `vc+sd-jwt`.
         kid: Option<String>,
     },
-    /// An envelope is neither a `vc+jwt` nor a `vc+sd-jwt`, the only formats this crate
+    /// An envelope is none of `vc+jwt`, `vc+sd-jwt` and `vc+cose`, the only formats this crate
     /// verifies.
-    #[error("envelope {index} is {media_type}, and only vc+jwt and vc+sd-jwt can be verified here")]
+    #[error(
+        "envelope {index} is {media_type}, and only vc+jwt, vc+sd-jwt and vc+cose can be verified here"
+    )]
     UnsupportedEnvelopeFormat {
         /// The envelope's position.
         index: usize,
         /// The media type its `id` names.
         media_type: String,
     },
-    /// A `vc+jwt` or `vc+sd-jwt` envelope failed one of the checks of a credential.
+    /// A `vc+jwt`, `vc+sd-jwt` or `vc+cose` envelope failed one of the checks of a credential.
     #[error("envelope {index} was refused: {source}")]
     CredentialRefused {
         /// The envelope's position.

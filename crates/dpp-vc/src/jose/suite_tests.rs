@@ -117,11 +117,11 @@ fn row_7_the_vc_jwt_envelope_verifies_under_p256() {
     assert_eq!(credential["issuer"], "https://example.issuer/vc-jose-cose");
 }
 
-/// The second envelope is a `vc+sd-jwt` signed under P-384, which `verify_credentials`
-/// verifies. Under P-256 for every envelope it is refused for its algorithm, and under
-/// P-384 for it the third, a `vc+cose`, is what the call refuses.
+/// The second envelope is a `vc+sd-jwt` signed under P-384, and the third a `vc+cose` signed
+/// under P-256, whose base64 has no padding and ends in a line feed. Under P-256 for every
+/// envelope the second is refused for its algorithm, and under P-384 for it, all three verify.
 #[test]
-fn row_7_verify_credentials_verifies_the_sd_jwt_envelope_and_refuses_the_cose_one() {
+fn row_7_verify_credentials_verifies_all_three_envelopes_under_their_keys() {
     let presentation = verify_presentation(
         &token("presentation-jose-multiple.txt"),
         &public_key("p384"),
@@ -150,12 +150,11 @@ fn row_7_verify_credentials_verifies_the_sd_jwt_envelope_and_refuses_the_cose_on
             }),
         }
     );
+    let credentials = result.expect("all three verify");
+    assert_eq!(credentials.len(), 3);
     assert_eq!(
-        result.expect_err("refused"),
-        JoseError::UnsupportedEnvelopeFormat {
-            index: 2,
-            media_type: "application/vc+cose".to_owned(),
-        }
+        credentials[2]["issuer"],
+        "https://example.issuer/vc-jose-cose"
     );
 }
 

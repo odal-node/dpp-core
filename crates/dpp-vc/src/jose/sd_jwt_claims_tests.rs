@@ -138,10 +138,11 @@ fn a_reserved_claim_hidden_in_a_disclosure_is_refused_when_it_is_disclosed() {
     );
 }
 
-/// Section 4.2: with no `iss` and an issuer that is a URL, the `kid` must be an absolute
-/// URL. The rule is about the key discovery of the token, so it holds for this form too.
+/// Section 4.2 opens "When using controlled identifier documents with this specification",
+/// and a verifier here is given its key, so a `kid` that is not an absolute URL verifies, as it
+/// does for a `vc+jwt`. The signer refuses it: see `sd_jwt_refusal_tests`.
 #[test]
-fn without_an_iss_a_kid_that_is_not_an_absolute_url_is_refused() {
+fn without_an_iss_a_kid_that_is_not_an_absolute_url_verifies() {
     let key = key();
     let mut header = sd_credential_header(&key);
     header["kid"] = json!("96qBnDpvS6x8YSCH_xmnLlXZMkDhHBr8lj99u5aog7s");
@@ -150,12 +151,7 @@ fn without_an_iss_a_kid_that_is_not_an_absolute_url_is_refused() {
     with_iss["iss"] = json!("https://issuer.example");
     let with_iss = forge_sd(&key, &header, &with_iss, &[]);
 
-    assert_eq!(
-        verify(&without_iss, &key),
-        Err(JoseError::KidNotAbsolute {
-            kid: Some("96qBnDpvS6x8YSCH_xmnLlXZMkDhHBr8lj99u5aog7s".to_owned())
-        })
-    );
+    assert!(verify(&without_iss, &key).is_ok());
     assert!(verify(&with_iss, &key).is_ok());
 }
 
@@ -431,12 +427,7 @@ fn a_presentation_is_held_to_vp_sd_jwt_and_to_the_presentation_rules() {
         h["kid"] = json!("thumbprint");
         h
     };
-    assert_eq!(
-        verify_vp(&forged(&header, &presentation(vec![])), &key).map(|_| ()),
-        Err(JoseError::KidNotAbsolute {
-            kid: Some("thumbprint".to_owned())
-        })
-    );
+    assert!(verify_vp(&forged(&header, &presentation(vec![])), &key).is_ok());
 }
 
 /// An envelope that was concealed and not disclosed is not in the presentation; one that

@@ -8,6 +8,7 @@
 use std::collections::BTreeSet;
 
 use super::cbor::{self, Reader};
+use super::cwt::{self, CwtClaims};
 use super::error::CoseError;
 
 /// Header labels this crate reads (RFC 9052 §3.1, Table 3; RFC 9596 §4.1).
@@ -15,6 +16,7 @@ const ALG: i128 = 1;
 const CRIT: i128 = 2;
 const CONTENT_TYPE: i128 = 3;
 const KID: i128 = 4;
+const CWT_CLAIMS: i128 = 15;
 const TYP: i128 = 16;
 
 /// A header label: an integer or a text string (RFC 9052 §1.5).
@@ -48,6 +50,7 @@ pub(super) struct Bucket<'a> {
     pub(super) kid: Option<&'a [u8]>,
     pub(super) content_type: Option<Media<'a>>,
     pub(super) typ: Option<Media<'a>>,
+    pub(super) cwt_claims: Option<CwtClaims>,
     /// Every label of the map, for the check that no label is in both buckets.
     pub(super) labels: BTreeSet<Label<'a>>,
 }
@@ -63,7 +66,9 @@ pub(super) struct Bucket<'a> {
 /// - `crit` is refused wherever it is (RFC 9052 §3.1 puts it in the protected
 ///   header, and this crate understands no critical parameter).
 /// - The values of `alg`, content type, `kid` and `typ` must have the types of
-///   RFC 9052 §3.1 and RFC 9596 §2, and are refused otherwise.
+///   RFC 9052 §3.1 and RFC 9596 §2, and are refused otherwise. The CWT Claims
+///   parameter (15, RFC 9597 §2) must be a map of claims that [`cwt::read_claims`]
+///   accepts.
 /// - The value of any other label is stepped over unread (`cbor::skip` says what that
 ///   accepts), as RFC 9052 §3 leaves a recipient free to ignore a parameter it does not
 ///   know.
@@ -88,6 +93,7 @@ pub(super) fn read_bucket<'a>(reader: &mut Reader<'a>) -> Result<Bucket<'a>, Cos
             Label::Integer(TYP) => {
                 bucket.typ = Some(read_media(reader, "the typ header parameter")?);
             }
+            Label::Integer(CWT_CLAIMS) => bucket.cwt_claims = Some(cwt::read_claims(reader)?),
             _ => cbor::skip(reader)?,
         }
     }
