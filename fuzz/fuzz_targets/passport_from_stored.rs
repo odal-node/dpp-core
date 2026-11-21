@@ -6,9 +6,9 @@
 
 use std::sync::OnceLock;
 
+use dpp_domain::Passport;
 use dpp_domain::catalog::ProductGroupCatalog;
 use dpp_domain::schemas::LensRegistry;
-use dpp_domain::Passport;
 use libfuzzer_sys::fuzz_target;
 
 fn registries() -> &'static (LensRegistry, ProductGroupCatalog) {

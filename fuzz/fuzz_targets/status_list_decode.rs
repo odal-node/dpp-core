@@ -9,11 +9,11 @@ use dpp_vc::status_list::StatusList;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    if let Ok(encoded) = std::str::from_utf8(data) {
-        if let Ok(list) = StatusList::from_encoded_list(encoded) {
-            for index in [0, 1, 7, 8, 131_071, usize::MAX] {
-                let _ = list.get(index);
-            }
+    if let Ok(encoded) = std::str::from_utf8(data)
+        && let Ok(list) = StatusList::from_encoded_list(encoded)
+    {
+        for index in [0, 1, 7, 8, 131_071, usize::MAX] {
+            let _ = list.get(index);
         }
     }
 });
