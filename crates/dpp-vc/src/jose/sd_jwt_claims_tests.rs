@@ -6,12 +6,15 @@ use serde_json::{Value, json};
 
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
-use dpp_crypto::sd_jwt::{ClaimPath, SdJwt};
+use dpp_crypto::sd_jwt::{ClaimPath, SdJwt, build_payload, conceal_elements};
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential_sd_jwt, sign_presentation_sd_jwt, verify_credential_sd_jwt,
     verify_presentation_sd_jwt,
 };
+use crate::test_support::NOT_REQUIRED;
+use crate::test_support::at;
 use crate::test_support::{
     KID, credential, forge_sd, forge_sd_concealing, generated, presentation, sd_credential_header,
     sd_presentation_header,
@@ -24,7 +27,12 @@ fn key() -> KeyEntry {
 }
 
 fn verify(token: &str, key: &KeyEntry) -> Result<Value, JoseError> {
-    verify_credential_sd_jwt(token, &key.public_key(), None)
+    verify_credential_sd_jwt(
+        token,
+        &key.public_key(),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
 }
 
 /// A change to a document.
@@ -153,36 +161,123 @@ fn without_an_iss_a_kid_that_is_not_an_absolute_url_is_refused() {
 
 // ── the claims RFC 9901 clause 9.7 keeps out of Disclosures ───────────────────
 
+/// A token that conceals `exp`, `nbf` or `aud`: our signer refuses to make one (RFC 9901
+/// clause 9.7), so it is built with the lower-level builder.
+fn disclosed(key: &KeyEntry, name: &str, value: Value) -> String {
+    let mut document = credential();
+    document[name] = value;
+    forge_sd_concealing(key, &sd_credential_header(key), &document, &[name])
+}
+
+/// An SD-JWT over `document` in which the entry of its `aud` at `position` is a Disclosure.
+fn forge_sd_concealing_aud_entry(key: &KeyEntry, document: &Value, position: usize) -> String {
+    let mut document = document.as_object().expect("an object").clone();
+    let entries = document["aud"].as_array().expect("an array").clone();
+    let (kept, disclosures) = conceal_elements(&entries, |at, _| at == position);
+    document.insert("aud".to_owned(), Value::Array(kept));
+    let payload = build_payload(document, true);
+    forge_sd(key, &sd_credential_header(key), &payload, &disclosures)
+}
+
+/// §7.1 step 6 has the verifier check the claims in the processed payload, so a claim that
+/// arrived in a Disclosure is checked as one in the clear: an `exp` in the past is refused.
 #[test]
-fn a_claim_that_must_not_be_selectively_disclosable_is_refused_when_it_was() {
+fn a_disclosed_exp_in_the_past_is_refused_as_expired() {
     let key = key();
-    for (name, value) in [
-        ("iss", json!("https://issuer.example")),
-        ("aud", json!("https://verifier.example")),
-        ("exp", json!(4_000_000_000_u64)),
-        ("nbf", json!(1_000_000_000_u64)),
-        ("cnf", json!({"kid": "k"})),
-    ] {
-        let mut document = credential();
-        document[name] = value;
+    let token = disclosed(&key, "exp", json!(NOW - 1));
 
-        let token = forge_sd_concealing(&key, &sd_credential_header(&key), &document, &[name]);
+    let refused = verify_credential_sd_jwt(
+        &token,
+        &key.public_key(),
+        VerifyOptions::new().at(NOW),
+        &NOT_REQUIRED,
+    );
 
-        let name: &'static str = ["iss", "aud", "exp", "nbf", "cnf"]
-            .into_iter()
-            .find(|n| *n == name)
-            .expect("listed");
-        assert_eq!(
-            verify(&token, &key),
-            Err(JoseError::DisclosedCriticalClaim { name }),
-            "{name}"
-        );
-    }
+    assert_eq!(refused, Err(JoseError::Expired));
+}
+
+#[test]
+fn a_disclosed_future_exp_is_accepted() {
+    let key = key();
+    let token = disclosed(&key, "exp", json!(NOW + 1));
+
+    let verified = verify_credential_sd_jwt(
+        &token,
+        &key.public_key(),
+        VerifyOptions::new().at(NOW),
+        &NOT_REQUIRED,
+    )
+    .expect("verifies");
+
+    assert_eq!(verified["exp"], json!(NOW + 1));
+}
+
+#[test]
+fn a_disclosed_nbf_in_the_future_is_refused_as_not_yet_valid() {
+    let key = key();
+    let token = disclosed(&key, "nbf", json!(NOW + 1));
+
+    let refused = verify_credential_sd_jwt(
+        &token,
+        &key.public_key(),
+        VerifyOptions::new().at(NOW),
+        &NOT_REQUIRED,
+    );
+
+    assert_eq!(refused, Err(JoseError::NotYetValid));
+}
+
+/// RFC 9901 §9.7: "issuers MAY allow individual entries in the array to be selectively
+/// disclosable". The entry is part of the processed payload's `aud`, and the audience is
+/// compared with that.
+#[test]
+fn a_disclosed_aud_entry_naming_the_audience_is_accepted() {
+    let key = key();
+    let mut document = credential();
+    document["aud"] = json!(["https://other.example", "https://verifier.example"]);
+    let sd_jwt = forge_sd_concealing_aud_entry(&key, &document, 1);
+
+    let verified = verify_credential_sd_jwt(
+        &sd_jwt,
+        &key.public_key(),
+        VerifyOptions::new().for_audience("https://verifier.example"),
+        &NOT_REQUIRED,
+    );
+
+    assert!(verified.is_ok(), "{verified:?}");
+}
+
+/// A whole `aud` that arrived in a Disclosure is read as one in the clear.
+#[test]
+fn a_disclosed_aud_is_compared_with_the_audience() {
+    let key = key();
+    let token = disclosed(&key, "aud", json!("https://verifier.example"));
+
+    let named = verify_credential_sd_jwt(
+        &token,
+        &key.public_key(),
+        VerifyOptions::new().for_audience("https://verifier.example"),
+        &NOT_REQUIRED,
+    );
+    let other = verify_credential_sd_jwt(
+        &token,
+        &key.public_key(),
+        VerifyOptions::new().for_audience("https://elsewhere.example"),
+        &NOT_REQUIRED,
+    );
+
+    assert!(named.is_ok());
+    assert_eq!(
+        other,
+        Err(JoseError::AudienceMismatch {
+            audience: Some("https://elsewhere.example".to_owned())
+        })
+    );
 }
 
 /// What cannot be seen is not refused: a Disclosure that was withheld leaves no trace but
-/// its digest. The refusal above is for the case where the holder did disclose it, and an
-/// Issuer that follows clause 9.7 never makes the case arise.
+/// its digest. A verifier cannot tell it from a claim that was never there, which is why
+/// RFC 9901 clause 9.7 puts the duty on the Issuer, and our signer refuses to conceal one.
 #[test]
 fn a_withheld_exp_is_not_seen() {
     let key = key();
@@ -197,7 +292,15 @@ fn a_withheld_exp_is_not_seen() {
     .expect("parses");
     let withheld = SdJwt::new(full.jwt().to_owned(), vec![]).serialise();
 
-    assert!(verify_credential_sd_jwt(&withheld, &key.public_key(), Some(NOW)).is_ok());
+    assert!(
+        verify_credential_sd_jwt(
+            &withheld,
+            &key.public_key(),
+            VerifyOptions::new().at(NOW),
+            &NOT_REQUIRED
+        )
+        .is_ok()
+    );
 }
 
 // ── time ──────────────────────────────────────────────────────────────────────
@@ -209,7 +312,9 @@ fn time_is_held_to_the_now_given() {
     document["exp"] = json!(NOW);
     document["nbf"] = json!(NOW - 100);
     let token = forge_sd(&key, &sd_credential_header(&key), &document, &[]);
-    let at = |now| verify_credential_sd_jwt(&token, &key.public_key(), now).map(|_| ());
+    let at = |now| {
+        verify_credential_sd_jwt(&token, &key.public_key(), at(now), &NOT_REQUIRED).map(|_| ())
+    };
 
     assert_eq!(at(Some(NOW - 1)), Ok(()));
     assert_eq!(at(Some(NOW)), Err(JoseError::Expired));
@@ -218,7 +323,13 @@ fn time_is_held_to_the_now_given() {
     document["exp"] = json!("soon");
     let malformed = forge_sd(&key, &sd_credential_header(&key), &document, &[]);
     assert_eq!(
-        verify_credential_sd_jwt(&malformed, &key.public_key(), Some(NOW)).map(|_| ()),
+        verify_credential_sd_jwt(
+            &malformed,
+            &key.public_key(),
+            VerifyOptions::new().at(NOW),
+            &NOT_REQUIRED
+        )
+        .map(|_| ()),
         Err(JoseError::MalformedTemporalClaim { claim: "exp" })
     );
 }
@@ -239,6 +350,7 @@ fn only_what_the_holder_discloses_comes_back() {
             path(&json!(["credentialSubject", "name"])),
             path(&json!(["credentialSubject", "email"])),
         ],
+        None,
     )
     .expect("signs");
     let email = sd_jwt.digests_for_claim("email");
@@ -258,17 +370,22 @@ fn only_what_the_holder_discloses_comes_back() {
 // ── presentations ─────────────────────────────────────────────────────────────
 
 fn verify_vp(token: &str, key: &KeyEntry) -> Result<super::VerifiedPresentation, JoseError> {
-    verify_presentation_sd_jwt(token, &key.public_key(), None)
+    verify_presentation_sd_jwt(
+        token,
+        &key.public_key(),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
 }
 
 #[test]
 fn a_presentation_is_verified_as_its_own_token_and_lists_its_envelopes() {
     let key = key();
     let issuer = generated(KeyAlgorithm::Ed25519);
-    let inner = sign_credential_sd_jwt(&credential(), &issuer, KID, &[], &[]).expect("signs");
+    let inner = sign_credential_sd_jwt(&credential(), &issuer, KID, &[], &[], None).expect("signs");
     let document = presentation(vec![crate::test_support::sd_envelope(&inner.serialise())]);
 
-    let sd_jwt = sign_presentation_sd_jwt(&document, &key, KID, &[], &[]).expect("signs");
+    let sd_jwt = sign_presentation_sd_jwt(&document, &key, KID, &[], &[], None).expect("signs");
     let verified = verify_vp(&sd_jwt.serialise(), &key).expect("verifies");
 
     assert_eq!(verified.payload(), &document);
@@ -328,7 +445,7 @@ fn a_presentation_is_held_to_vp_sd_jwt_and_to_the_presentation_rules() {
 fn a_concealed_envelope_is_checked_when_it_is_disclosed_and_absent_when_it_is_not() {
     let key = key();
     let issuer = generated(KeyAlgorithm::Ed25519);
-    let inner = sign_credential_sd_jwt(&credential(), &issuer, KID, &[], &[]).expect("signs");
+    let inner = sign_credential_sd_jwt(&credential(), &issuer, KID, &[], &[], None).expect("signs");
     let document = presentation(vec![crate::test_support::sd_envelope(&inner.serialise())]);
     let sd_jwt = sign_presentation_sd_jwt(
         &document,
@@ -339,6 +456,7 @@ fn a_concealed_envelope_is_checked_when_it_is_disclosed_and_absent_when_it_is_no
             path(&json!(["holder"])),
             path(&json!(["verifiableCredential", 0])),
         ],
+        None,
     )
     .expect("signs");
 

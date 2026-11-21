@@ -17,6 +17,13 @@
 //! under the suite's own keys, so what the suite asks this crate to issue is what the
 //! other implementations read.
 //!
+//! It also holds presentations bound to a Holder's key: the signer writes the key as `cnf`, the
+//! Holder binds a presentation with a Key Binding JWT carrying a nonce, an audience and the
+//! `sd_hash`, and each is judged with Key Binding **required**, at the challenge the case
+//! names. The controls are accepted by this crate and by both libraries. The negative controls
+//! each break one rule, and each must be refused by all three: a wrong nonce, a wrong audience,
+//! an `sd_hash` that belongs to another presentation, and a token with no Key Binding JWT.
+//!
 //! Without the variable the test still runs, and still checks that this crate reads every
 //! token back to the claims it expects, so an ordinary `just check` gets that coverage
 //! without producing files.
@@ -27,13 +34,19 @@ use serde_json::{Value, json};
 
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
-use dpp_crypto::sd_jwt::{ClaimPath, SdJwt};
+use dpp_crypto::sd_jwt::{ClaimPath, SdJwt, holder_key_confirmation};
 
+use super::VerifyOptions;
 use super::{
-    sign_credential_sd_jwt, sign_presentation_sd_jwt, verify_credential_sd_jwt,
-    verify_presentation_sd_jwt,
+    KeyBindingRequirement, sign_credential_sd_jwt, sign_presentation_sd_jwt,
+    verify_credential_sd_jwt, verify_presentation_sd_jwt,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{KID, credential, generated, json, key_id, public_key, signing_key};
+
+mod bound;
+
+use bound::{NOW, issued_to_holders, policy};
 
 fn path(segments: &Value) -> ClaimPath {
     ClaimPath::from_json(segments).expect("a path")
@@ -92,6 +105,9 @@ struct Issued {
     document: Value,
     concealed: Vec<Value>,
     sd_jwt: SdJwt,
+    /// The Holder whose key the token names in `cnf`, when it was issued to one. `document`
+    /// then holds that `cnf`, since a verifier reads it.
+    holder: Option<KeyEntry>,
 }
 
 impl Issued {
@@ -102,17 +118,7 @@ impl Issued {
         document: Value,
         concealed: &Value,
     ) -> Self {
-        let sd_jwt =
-            sign_credential_sd_jwt(&document, &key, &kid, &[], &paths(concealed)).expect("issued");
-        Self {
-            id,
-            presentation: false,
-            key,
-            kid,
-            document,
-            concealed: concealed.as_array().expect("an array").clone(),
-            sd_jwt,
-        }
+        Self::issue(id, false, key, kid, document, concealed, None)
     }
 
     fn presentation(
@@ -122,16 +128,38 @@ impl Issued {
         document: Value,
         concealed: &Value,
     ) -> Self {
-        let sd_jwt = sign_presentation_sd_jwt(&document, &key, &kid, &[], &paths(concealed))
-            .expect("issued");
+        Self::issue(id, true, key, kid, document, concealed, None)
+    }
+
+    fn issue(
+        id: &'static str,
+        presentation: bool,
+        key: KeyEntry,
+        kid: String,
+        mut document: Value,
+        concealed: &Value,
+        holder: Option<KeyEntry>,
+    ) -> Self {
+        let public = holder.as_ref().map(KeyEntry::public_key);
+        let claims = paths(concealed);
+        let sd_jwt = if presentation {
+            sign_presentation_sd_jwt(&document, &key, &kid, &[], &claims, public.as_ref())
+        } else {
+            sign_credential_sd_jwt(&document, &key, &kid, &[], &claims, public.as_ref())
+        }
+        .expect("issued");
+        if let Some(public) = &public {
+            document["cnf"] = holder_key_confirmation(public);
+        }
         Self {
             id,
-            presentation: true,
+            presentation,
             key,
             kid,
             document,
             concealed: concealed.as_array().expect("an array").clone(),
             sd_jwt,
+            holder,
         }
     }
 
@@ -162,14 +190,24 @@ impl Issued {
         (token, without(&self.document, &hidden))
     }
 
-    /// What this crate reads from `token`.
-    fn ours(&self, token: &SdJwt) -> Value {
+    /// What this crate reads from `token`, with Key Binding required when `bound`, at the
+    /// policy of the challenge.
+    fn ours(&self, token: &SdJwt, bound: bool) -> Value {
         let public = self.key.public_key();
         let text = token.serialise();
-        let read = if self.presentation {
-            verify_presentation_sd_jwt(&text, &public, None).map(|p| p.payload().clone())
+        let (options, binding) = if bound {
+            (
+                VerifyOptions::new().at(NOW),
+                KeyBindingRequirement::Required(policy()),
+            )
         } else {
-            verify_credential_sd_jwt(&text, &public, None)
+            (VerifyOptions::new(), NOT_REQUIRED)
+        };
+        let read = if self.presentation {
+            verify_presentation_sd_jwt(&text, &public, options, &binding)
+                .map(|p| p.payload().clone())
+        } else {
+            verify_credential_sd_jwt(&text, &public, options, &binding)
         };
         match read {
             Ok(payload) => json!({"accepts": true, "payload": payload}),
@@ -178,6 +216,10 @@ impl Issued {
     }
 
     fn case(&self, label: &str, token: &SdJwt, expected: &Value) -> Value {
+        self.case_of(label, token, expected, false)
+    }
+
+    fn case_of(&self, label: &str, token: &SdJwt, expected: &Value, bound: bool) -> Value {
         let (typ, cty) = if self.presentation {
             ("vp+sd-jwt", "vp")
         } else {
@@ -195,7 +237,7 @@ impl Issued {
             "document": self.document,
             "concealed": self.concealed,
             "expected": expected,
-            "ours": self.ours(token),
+            "ours": self.ours(token, bound),
         })
     }
 
@@ -338,6 +380,9 @@ fn cases() -> Vec<Value> {
         };
         cases.extend(row.cases(&partial));
     }
+    for row in issued_to_holders() {
+        cases.extend(row.bound_cases());
+    }
     cases
 }
 
@@ -345,11 +390,19 @@ fn cases() -> Vec<Value> {
 fn this_crate_reads_every_token_it_issues_back_to_the_claims_expected() {
     let cases = cases();
 
-    assert_eq!(cases.len(), 18, "the cases that are issued and presented");
+    assert_eq!(
+        cases.len(),
+        25,
+        "the cases that are issued, presented and bound"
+    );
     for case in &cases {
         let id = &case["id"];
-        assert_eq!(case["ours"]["accepts"], true, "{id}: {}", case["ours"]);
-        assert_eq!(case["ours"]["payload"], case["expected"], "{id}");
+        // A case with no `accepts` is one every reader must accept.
+        let accepts = case.get("accepts").unwrap_or(&json!(true)).clone();
+        assert_eq!(case["ours"]["accepts"], accepts, "{id}: {}", case["ours"]);
+        if accepts == json!(true) {
+            assert_eq!(case["ours"]["payload"], case["expected"], "{id}");
+        }
     }
     let ids: Vec<&str> = cases.iter().filter_map(|c| c["id"].as_str()).collect();
     for row in [

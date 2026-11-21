@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
+use super::VerifyOptions;
 use super::{JoseError, verify_credential, verify_presentation};
+use crate::test_support::NOT_REQUIRED;
+use crate::test_support::at;
 use crate::test_support::{
     credential, credential_header, envelope, forge, generated, presentation, presentation_header,
 };
@@ -27,7 +30,7 @@ fn credential_with(key: &KeyEntry, claim: &str, value: Value) -> String {
 }
 
 fn verify(token: &str, key: &KeyEntry, now: Option<i64>) -> Result<Value, JoseError> {
-    verify_credential(token, &key.public_key(), now)
+    verify_credential(token, &key.public_key(), at(now))
 }
 
 // ── exp ───────────────────────────────────────────────────────────────────────
@@ -142,10 +145,10 @@ fn the_suites_presentation_has_expired_and_is_refused_only_under_some_now() {
     let key = public_key("p384");
     let file = token("presentation-jose-multiple.txt");
 
-    assert!(verify_presentation(&file, &key, None).is_ok());
-    assert!(verify_presentation(&file, &key, Some(1_734_397_449)).is_ok());
+    assert!(verify_presentation(&file, &key, VerifyOptions::new()).is_ok());
+    assert!(verify_presentation(&file, &key, VerifyOptions::new().at(1_734_397_449)).is_ok());
     assert_eq!(
-        verify_presentation(&file, &key, Some(1_789_000_000)).map(|_| ()),
+        verify_presentation(&file, &key, VerifyOptions::new().at(1_789_000_000)).map(|_| ()),
         Err(JoseError::Expired)
     );
 }
@@ -160,8 +163,10 @@ fn an_envelope_is_held_to_the_same_now() {
         &presentation_header(&holder),
         &presentation(vec![envelope(&inner)]),
     );
-    let verified = verify_presentation(&outer, &holder.public_key(), None).expect("verifies");
-    let verify_inner = |now| verified.verify_credentials(now, |_| Some(issuer.public_key()));
+    let verified =
+        verify_presentation(&outer, &holder.public_key(), VerifyOptions::new()).expect("verifies");
+    let verify_inner =
+        |now| verified.verify_credentials(at(now), &NOT_REQUIRED, |_| Some(issuer.public_key()));
 
     assert!(verify_inner(Some(NOW - 1)).is_ok());
     assert_eq!(
@@ -184,11 +189,11 @@ fn the_outer_time_is_checked_before_any_envelope() {
     let outer = forge(&holder, &presentation_header(&holder), &document);
 
     assert_eq!(
-        verify_presentation(&outer, &holder.public_key(), Some(NOW)).map(|_| ()),
+        verify_presentation(&outer, &holder.public_key(), VerifyOptions::new().at(NOW)).map(|_| ()),
         Err(JoseError::Expired)
     );
     assert!(matches!(
-        verify_presentation(&outer, &holder.public_key(), None).map(|_| ()),
+        verify_presentation(&outer, &holder.public_key(), VerifyOptions::new()).map(|_| ()),
         Err(JoseError::MalformedEnvelope { index: 0, .. })
     ));
 }

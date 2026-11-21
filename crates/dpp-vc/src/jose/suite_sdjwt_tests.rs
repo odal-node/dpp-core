@@ -18,10 +18,12 @@ use dpp_crypto::jws::verifier::verify_jws;
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
 use dpp_crypto::sd_jwt::{ClaimPath, SdJwt};
 
+use super::VerifyOptions;
 use super::{
     JoseError, sign_credential_sd_jwt, sign_presentation_sd_jwt, verify_credential_sd_jwt,
     verify_presentation_sd_jwt,
 };
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{forge_raw, json, key_id, public_key, signing_key, token};
 
 fn harness<T>(result: &Result<T, JoseError>) -> &'static str {
@@ -68,6 +70,7 @@ fn row_17_a_basic_credential_is_issued_with_two_claims_concealed_and_verifies_ba
             ["credentialSubject", "firstName"],
             ["credentialSubject", "lastName"]
         ])),
+        None,
     );
 
     assert_eq!(harness(&issued), "success");
@@ -80,7 +83,12 @@ fn row_17_a_basic_credential_is_issued_with_two_claims_concealed_and_verifies_ba
     assert_eq!(signed["credentialSubject"]["birthDate"], "1990-01-01");
     assert!(signed["credentialSubject"].get("firstName").is_none());
     assert!(signed["credentialSubject"].get("lastName").is_none());
-    let verified = verify_credential_sd_jwt(&sd_jwt.serialise(), &public_key("p384"), None);
+    let verified = verify_credential_sd_jwt(
+        &sd_jwt.serialise(),
+        &public_key("p384"),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
     assert_eq!(verified.expect("verifies"), document);
 }
 
@@ -100,6 +108,7 @@ fn row_18_a_complex_credential_is_issued_with_nested_members_and_an_element_conc
             ["credentialSubject", "address", "city"],
             ["credentialSubject", "phoneNumbers", 0]
         ])),
+        None,
     );
 
     assert_eq!(harness(&issued), "success");
@@ -121,7 +130,12 @@ fn row_18_a_complex_credential_is_issued_with_nested_members_and_an_element_conc
             .map(|o| o.keys().cloned().collect::<Vec<_>>()),
         "the same members are in the clear as in the suite's own token"
     );
-    let verified = verify_credential_sd_jwt(&sd_jwt.serialise(), &public_key("p521"), None);
+    let verified = verify_credential_sd_jwt(
+        &sd_jwt.serialise(),
+        &public_key("p521"),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
     assert_eq!(verified.expect("verifies"), document);
 }
 
@@ -137,6 +151,7 @@ fn row_19_a_presentation_is_issued_with_its_holder_and_envelope_concealed() {
         &key_id("p384"),
         &[],
         &paths(&json!([["holder"], ["verifiableCredential", 0]])),
+        None,
     );
 
     assert_eq!(harness(&issued), "success");
@@ -145,8 +160,13 @@ fn row_19_a_presentation_is_issued_with_its_holder_and_envelope_concealed() {
     assert!(signed.get("holder").is_none());
     assert!(signed["verifiableCredential"][0]["..."].is_string());
     assert_eq!(sd_jwt.disclosures().len(), 2);
-    let verified = verify_presentation_sd_jwt(&sd_jwt.serialise(), &public_key("p384"), None)
-        .expect("verifies");
+    let verified = verify_presentation_sd_jwt(
+        &sd_jwt.serialise(),
+        &public_key("p384"),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
+    .expect("verifies");
     assert_eq!(verified.payload(), &document);
     let envelope = &verified.envelopes()[0];
     assert_eq!(envelope.media_type, "application/vc+sd-jwt");
@@ -155,7 +175,7 @@ fn row_19_a_presentation_is_issued_with_its_holder_and_envelope_concealed() {
         Some("96qBnDpvS6x8YSCH_xmnLlXZMkDhHBr8lj99u5aog7s")
     );
     let credential = envelope
-        .verify(&public_key("p384"), None)
+        .verify(&public_key("p384"), VerifyOptions::new(), &NOT_REQUIRED)
         .expect("verifies");
     assert_eq!(credential["credentialSubject"]["birthDate"], "1990-01-01");
 }
@@ -167,7 +187,8 @@ fn row_20_a_basic_credential_verifies() {
     let result = verify_credential_sd_jwt(
         &token("credential-sdjwt-selective.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
     );
 
     assert_eq!(harness(&result), "success");
@@ -184,7 +205,8 @@ fn row_21_a_complex_credential_verifies_with_its_nested_members_and_element() {
     let result = verify_credential_sd_jwt(
         &token("credential-sdjwt-nested.txt"),
         &public_key("p521"),
-        None,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
     );
 
     assert_eq!(harness(&result), "success");
@@ -203,7 +225,8 @@ fn row_22_a_presentation_verifies_and_lists_its_envelope_unverified() {
     let result = verify_presentation_sd_jwt(
         &token("presentation-sdjwt-selective.txt"),
         &public_key("p384"),
-        None,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
     );
 
     assert_eq!(harness(&result), "success");
@@ -227,7 +250,7 @@ fn row_22_a_presentation_verifies_and_lists_its_envelope_unverified() {
         )]
     );
     let credential = presentation.envelopes()[0]
-        .verify(&public_key("ed25519"), None)
+        .verify(&public_key("ed25519"), VerifyOptions::new(), &NOT_REQUIRED)
         .expect("the vc+jwt verifies under Ed25519");
     assert_eq!(credential["issuer"], "https://example.issuer/vc-jose-cose");
 }
@@ -235,7 +258,12 @@ fn row_22_a_presentation_verifies_and_lists_its_envelope_unverified() {
 #[test]
 fn row_23_a_bad_signature_is_refused() {
     let key = public_key("p384");
-    let result = verify_credential_sd_jwt(&token("credential-sdjwt-bad-signature.txt"), &key, None);
+    let result = verify_credential_sd_jwt(
+        &token("credential-sdjwt-bad-signature.txt"),
+        &key,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -260,8 +288,12 @@ fn row_24_a_credential_with_a_bad_media_type_is_refused_for_its_typ() {
         &key
     ));
 
-    let result =
-        verify_credential_sd_jwt(&token("credential-sdjwt-bad-media-type.txt"), &key, None);
+    let result = verify_credential_sd_jwt(
+        &token("credential-sdjwt-bad-media-type.txt"),
+        &key,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
 
     assert_eq!(harness(&result), "failure");
     // `cty` is bad too, and `typ` is read first.
@@ -283,8 +315,12 @@ fn row_25_a_presentation_with_a_bad_media_type_is_refused_for_its_typ() {
         &key
     ));
 
-    let result =
-        verify_presentation_sd_jwt(&token("presentation-sdjwt-bad-media-type.txt"), &key, None);
+    let result = verify_presentation_sd_jwt(
+        &token("presentation-sdjwt-bad-media-type.txt"),
+        &key,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -309,8 +345,12 @@ fn row_26_a_presentation_with_an_invalid_credential_is_refused() {
         &key
     ));
 
-    let result =
-        verify_presentation_sd_jwt(&token("presentation-sdjwt-bad-credential.txt"), &key, None);
+    let result = verify_presentation_sd_jwt(
+        &token("presentation-sdjwt-bad-credential.txt"),
+        &key,
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    );
 
     assert_eq!(harness(&result), "failure");
     assert_eq!(
@@ -346,7 +386,13 @@ fn row_26_a_presentation_with_an_invalid_credential_is_refused() {
         original.disclosures().to_vec(),
     );
     assert_eq!(
-        verify_presentation_sd_jwt(&resigned.serialise(), &key, None).map(|_| ()),
+        verify_presentation_sd_jwt(
+            &resigned.serialise(),
+            &key,
+            VerifyOptions::new(),
+            &NOT_REQUIRED
+        )
+        .map(|_| ()),
         Err(JoseError::MalformedEnvelope {
             index: 0,
             reason: "id is not a data: URL".to_owned(),

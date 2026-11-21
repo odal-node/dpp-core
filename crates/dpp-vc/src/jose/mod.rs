@@ -42,8 +42,9 @@
 //! the discipline is an issuer's, not a verifier's.
 //!
 //! Signing also refuses what verification would refuse for the same document: an `iss`
-//! that is not the issuer, and an `exp` or `nbf` that is not a JSON number. No time is
-//! compared at signing.
+//! that is not the issuer, and an `exp` or `nbf` that is not a JSON number. It refuses an
+//! `iat` that is not a number too (RFC 7519 §4.1.6), though verification does not read `iat`.
+//! No time is compared at signing.
 //!
 //! # Verifying a credential
 //!
@@ -55,12 +56,20 @@
 //! credential's `type`, `issuer` and `credentialSubject`. Every refusal is a variant
 //! of [`JoseError`].
 //!
-//! **Time is explicit.** `now: Option<i64>`, seconds since the epoch. Under
-//! `Some(now)`, `exp` must be a number and `now` before it, and `nbf` must be a
-//! number and not after `now`, with no leeway, as in `sd_jwt_vc::verify`. Under
-//! `None` neither claim is read. `iat` is never checked: §3.1.3 says it describes
+//! **Time is explicit.** A [`VerifyOptions`] carries `now`, seconds since the epoch.
+//! Under a `now`, `exp` must be a number and `now` before it, and `nbf` must be a
+//! number and not after `now`, with no leeway, as in `sd_jwt_vc::verify`. With none
+//! neither claim is read. `iat` is never checked: §3.1.3 says it describes
 //! the signature, not the credential. A credential's own `validFrom` and
 //! `validUntil` are the caller's to check.
+//!
+//! **The audience is explicit too.** The same [`VerifyOptions`] carries the audience the
+//! caller identifies as. RFC 7519 §4.1.3 says a JWT "MUST be rejected" when the principal
+//! processing it "does not identify itself with a value in the "aud" claim when this claim
+//! is present". So a token whose `aud`, a string or an array of strings, does not name the
+//! audience is refused; a caller that gives none is refused any token that carries `aud`; an
+//! `aud` of another shape is refused. The same rule runs on the processed payload of an
+//! SD-JWT and on every envelope a presentation holds.
 //!
 //! # Verifying a presentation
 //!
@@ -84,7 +93,8 @@
 //! signers take, and the claims to conceal as [`ClaimPath`](dpp_crypto::sd_jwt::ClaimPath)s,
 //! and return the [`SdJwt`](dpp_crypto::sd_jwt::SdJwt) with every Disclosure.
 //! [`verify_credential_sd_jwt`] and [`verify_presentation_sd_jwt`] take its combined
-//! format, `<JWT>~<Disclosure>~...~`, and the key.
+//! format, `<JWT>~<Disclosure>~...~`, the key, the [`VerifyOptions`] and a
+//! [`KeyBindingRequirement`], for which there is no default.
 //!
 //! - **The checks run on the processed payload.** VC-JOSE-COSE §5.2 says to convert the
 //!   SD-JWT payload back into the JWT Claims Set. So `@context`, `type`, `issuer`, `holder`,
@@ -97,9 +107,12 @@
 //!   disclosable", and names `@context`, `type`, `credentialStatus`, `credentialSchema` and
 //!   `relatedResource`. A signer here refuses a path that starts at one of them, and at
 //!   `iss`, `aud`, `exp`, `nbf` and `cnf`, which RFC 9901 clause 9.7 forbids an Issuer to
-//!   make selectively disclosable. A verifier refuses a token whose Disclosures supply one
-//!   of those five, and cannot see one that was withheld. A verifier does not refuse a token
-//!   for concealing `type` or the others in §3.2.1, which are a SHOULD: the suite's own
+//!   make selectively disclosable. A verifier does not refuse a token for the way a claim
+//!   travelled: one of those that was disclosed is checked as it is in the clear, since
+//!   the checks read the processed payload (clause 7.1 step 6), so a disclosed `exp` in the
+//!   past is refused as expired when the caller gives a `now`, as one in the clear is.
+//!   One that was withheld cannot be seen. A verifier does not refuse a token for
+//!   concealing `type` or the others in §3.2.1, which are a SHOULD: the suite's own
 //!   presentation conceals `type`.
 //! - **Paths.** A path names an object member by its name, and an array element by its
 //!   position in the document as the issuer wrote it. `null` stands for every element,
@@ -115,9 +128,22 @@
 //!   (`data:application/vc+sd-jwt,<sd-jwt>`) is verified by
 //!   [`UnverifiedEnvelope::verify`] and by [`VerifiedPresentation::verify_credentials`],
 //!   under the key the caller supplies, as strictly as a credential given on its own.
-//! - **No Key Binding.** A token that carries a Key Binding JWT is refused, because
-//!   verifying one needs a policy (RFC 9901 clause 7.3): the audience, the nonce and a
-//!   window. See [`JoseError::KeyBindingUnsupported`].
+//! - **Key Binding is the verifier's decision, and has no default.** RFC 9901 §9.5 says
+//!   "Verifiers MUST decide whether Key Binding is required for a particular use case before
+//!   verifying a credential", and §7.3 step 1 that the decision "MUST NOT be based on whether
+//!   or not a Key Binding JWT is provided by the Holder". So every SD-JWT verifier, and the
+//!   envelope path, takes a [`KeyBindingRequirement`]. [`NotRequired`] reads a token as an
+//!   SD-JWT and ignores a Key Binding JWT it carries (§7.3 steps 3 and 4).
+//!   [`Required`] applies the checks of §7.3 step 5 with a
+//!   [`KeyBindingPolicy`](dpp_crypto::sd_jwt::KeyBindingPolicy), the audience, the nonce
+//!   and the window, to the Key Binding JWT, under the Holder key in the processed payload's
+//!   `cnf`, and refuses a token with no Key Binding JWT or no `cnf`. The signers take an
+//!   optional holder key and write it as `cnf` (VC-JOSE-COSE §4.1.3, RFC 7800 §3.2);
+//!   the holder binds a presentation with
+//!   [`SdJwt::present_with_key_binding`](dpp_crypto::sd_jwt::SdJwt::present_with_key_binding).
+//!
+//! [`NotRequired`]: KeyBindingRequirement::NotRequired
+//! [`Required`]: KeyBindingRequirement::Required
 //!
 //! # What is deliberately absent
 //!
@@ -129,12 +155,12 @@
 //!   credential's validity period.
 //! - **`crit`.** Any `crit` is refused, which is stricter than RFC 7515 §4.1.11,
 //!   since no critical extension is understood.
-//! - **Key Binding** of an SD-JWT, for the reason given above.
 
 mod absolute_url;
 mod disclose;
 mod envelope_shape;
 pub mod error;
+mod options;
 mod presentation;
 mod properties;
 mod sd_jwt_sign;
@@ -148,6 +174,8 @@ mod vocabulary;
 #[cfg(test)]
 mod algorithm_tests;
 #[cfg(test)]
+mod audience_tests;
+#[cfg(test)]
 mod credentials_tests;
 #[cfg(test)]
 mod envelope_shape_tests;
@@ -155,6 +183,8 @@ mod envelope_shape_tests;
 mod fixtures_tests;
 #[cfg(test)]
 mod issuer_tests;
+#[cfg(test)]
+mod key_binding_tests;
 #[cfg(test)]
 mod oracle_tests;
 #[cfg(test)]
@@ -189,6 +219,7 @@ mod verify_tests;
 mod vocabulary_tests;
 
 pub use error::JoseError;
+pub use options::{KeyBindingRequirement, VerifyOptions};
 pub use presentation::verify_presentation;
 pub use sd_jwt_sign::{sign_credential_sd_jwt, sign_presentation_sd_jwt};
 pub use sd_jwt_verify::{verify_credential_sd_jwt, verify_presentation_sd_jwt};

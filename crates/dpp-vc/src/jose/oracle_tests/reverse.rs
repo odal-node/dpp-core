@@ -37,6 +37,8 @@ use serde_json::{Value, json};
 use super::keys::{self, ALGORITHMS};
 use super::{high_s, token};
 use crate::jose::{verify_credential, verify_presentation};
+use crate::test_support::NOT_REQUIRED;
+use crate::test_support::at;
 use dpp_crypto::jws::PublicKey;
 
 /// How many ECDSA signatures of each form a file holds: (kind, algorithm, high-S),
@@ -83,7 +85,7 @@ fn read_back(file: &Value) -> (Vec<String>, Forms) {
         tally(id, kind, token, &key, &mut signatures, &mut out);
 
         match case["kind"].as_str() {
-            Some("vc") => match verify_credential(token, &key, now) {
+            Some("vc") => match verify_credential(token, &key, at(now)) {
                 Ok(document) => {
                     covered.insert(("vc", alg.clone()));
                     if document != case["document"] {
@@ -96,7 +98,7 @@ fn read_back(file: &Value) -> (Vec<String>, Forms) {
                 Err(e) => out.push(format!("{id}: {e:?}")),
             },
             Some("vp") => {
-                let verified = match verify_presentation(token, &key, now) {
+                let verified = match verify_presentation(token, &key, at(now)) {
                     Ok(verified) => verified,
                     Err(e) => {
                         out.push(format!("{id}: {e:?}"));
@@ -135,7 +137,9 @@ fn read_back(file: &Value) -> (Vec<String>, Forms) {
                         None => out.push(format!("{id}: no key for the kid {inner_kid}")),
                     }
                 }
-                match verified.verify_credentials(now, |e| key_of(e.kid.as_deref()?)) {
+                match verified
+                    .verify_credentials(at(now), &NOT_REQUIRED, |e| key_of(e.kid.as_deref()?))
+                {
                     Ok(read) => {
                         let signed: Vec<&Value> = listed.iter().map(|e| &e["document"]).collect();
                         if read.iter().collect::<Vec<_>>() != signed {

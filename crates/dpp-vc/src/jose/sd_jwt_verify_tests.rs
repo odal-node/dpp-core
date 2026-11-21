@@ -11,7 +11,9 @@ use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 use dpp_crypto::sd_jwt::{Disclosure, SdJwt};
 
+use super::VerifyOptions;
 use super::{JoseError, sign_credential_sd_jwt, verify_credential, verify_credential_sd_jwt};
+use crate::test_support::NOT_REQUIRED;
 use crate::test_support::{
     KID, credential, forge, forge_sd, forge_sd_concealing, generated, sd_credential_header,
 };
@@ -21,7 +23,12 @@ fn key() -> KeyEntry {
 }
 
 fn verify(token: &str, key: &KeyEntry) -> Result<Value, JoseError> {
-    verify_credential_sd_jwt(token, &key.public_key(), None)
+    verify_credential_sd_jwt(
+        token,
+        &key.public_key(),
+        VerifyOptions::new(),
+        &NOT_REQUIRED,
+    )
 }
 
 /// The control: a token with nothing wrong verifies, so every refusal below is the thing
@@ -69,14 +76,14 @@ fn a_token_with_no_dots_in_its_jwt_is_not_a_compact_jws() {
 #[test]
 fn the_two_forms_are_not_taken_for_each_other() {
     let key = key();
-    let sd = sign_credential_sd_jwt(&credential(), &key, KID, &[], &[]).expect("signs");
+    let sd = sign_credential_sd_jwt(&credential(), &key, KID, &[], &[], None).expect("signs");
     let jws = super::sign_credential(&credential(), &key, KID, &[]).expect("signs");
 
     assert!(matches!(
         verify(&jws, &key),
         Err(JoseError::MalformedSdJwt { .. })
     ));
-    assert!(verify_credential(&sd.serialise(), &key.public_key(), None).is_err());
+    assert!(verify_credential(&sd.serialise(), &key.public_key(), VerifyOptions::new()).is_err());
 }
 
 // ── the Issuer-signed JWT ─────────────────────────────────────────────────────
@@ -176,8 +183,11 @@ fn a_signature_that_does_not_verify_is_refused_before_the_disclosures_are_read()
 
 // ── Key Binding ───────────────────────────────────────────────────────────────
 
+/// When Key Binding is not required, a Key Binding JWT the token carries is not read
+/// (RFC 9901 §7.3 steps 3 and 4), so the token verifies as it does without it. The Issuer's
+/// signature is still checked first.
 #[test]
-fn a_token_that_carries_a_key_binding_jwt_is_refused_for_it() {
+fn a_key_binding_jwt_is_ignored_when_binding_is_not_required() {
     let key = key();
     let signed = forge(&key, &sd_credential_header(&key), &credential());
     let kb = forge(
@@ -186,10 +196,7 @@ fn a_token_that_carries_a_key_binding_jwt_is_refused_for_it() {
         &json!({"nonce": "n"}),
     );
 
-    assert_eq!(
-        verify(&format!("{signed}~{kb}"), &key),
-        Err(JoseError::KeyBindingUnsupported)
-    );
+    assert_eq!(verify(&format!("{signed}~{kb}"), &key), Ok(credential()));
     let other = generated(KeyAlgorithm::EcdsaP256);
     assert_eq!(
         verify(&format!("{signed}~{kb}"), &other),
