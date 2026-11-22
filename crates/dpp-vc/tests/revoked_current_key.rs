@@ -26,7 +26,7 @@ use dpp_vc::{
 #[path = "key_store_support/legacy_store.rs"]
 mod legacy_store;
 
-use legacy_store::{KEY_ONE, KEY_TWO, PASSPHRASE, with_revoked_current};
+use legacy_store::{PASSPHRASE, with_revoked_current};
 
 const KEY_ID: &str = "issuer";
 const BASE_URL: &str = "https://revoked-current.example";
@@ -173,7 +173,7 @@ async fn every_signer_refuses(store: &Arc<KeyStore>) {
 /// names no `authentication`, and `revoke_and_rotate` recovers.
 #[tokio::test]
 async fn a_revoked_current_key_signs_nothing_and_neither_document_publishes_it() {
-    let path = with_revoked_current("revoked-current", KEY_ID, &KEY_ONE, Some(&KEY_TWO));
+    let path = with_revoked_current("revoked-current", KEY_ID, true);
     let store = open(&path);
     let revoked = current_key(&store);
 
@@ -240,7 +240,7 @@ async fn a_revoked_current_key_signs_nothing_and_neither_document_publishes_it()
 /// hygiene rotation recovers too, and keeps the revoked key revoked.
 #[tokio::test]
 async fn a_store_whose_only_key_is_revoked_publishes_none() {
-    let path = with_revoked_current("only-revoked", KEY_ID, &KEY_ONE, None);
+    let path = with_revoked_current("only-revoked", KEY_ID, false);
     let store = open(&path);
     let revoked = current_key(&store);
 

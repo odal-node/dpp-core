@@ -126,6 +126,28 @@ fn a_bound_presentation_verifies_and_reads_to_what_was_chosen() {
     );
 }
 
+/// The Holder signs the Key Binding JWT, and the Holder's key is a separate door from
+/// the Issuer's: a revoked Holder key is refused with `KeyRevoked`, and the same key
+/// unrevoked binds, so the refusal is the flag and nothing else.
+#[test]
+fn a_revoked_holder_key_binds_nothing() {
+    let mut key = holder("kb-revoked-holder");
+    let sd_jwt = issued(&key);
+
+    sd_jwt
+        .present_with_key_binding(&[], &binding(), &key)
+        .expect("the unrevoked key binds");
+
+    key.revoked = true;
+    let refused = sd_jwt
+        .present_with_key_binding(&[], &binding(), &key)
+        .expect_err("a revoked Holder key refuses");
+    assert!(
+        matches!(&refused, SdJwtError::KeyRevoked(r) if r.fingerprint == key.fingerprint),
+        "{refused:?}"
+    );
+}
+
 /// Clause 4.3.1, on the RFC's own data: the `sd_hash` each of its three Key
 /// Binding JWTs carries is the digest of the presentation it is attached to. The
 /// RFC's Holder keys are P-256; their signatures are checked in `rfc9901_es256_tests.rs`.

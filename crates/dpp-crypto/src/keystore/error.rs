@@ -36,7 +36,10 @@ pub enum PrivateJwkError {
 ///
 /// A key is revoked when it is compromised, and a revoked key signs nothing. Every
 /// signature this crate makes passes through [`KeyEntry::sign`](super::KeyEntry::sign),
-/// which refuses one. The remedy is a new current key:
+/// which refuses one. It reads the
+/// `revoked` flag the entry carries, which [`KeyStore::load_key`](super::KeyStore::load_key)
+/// copies when it loads: an entry loaded before the revocation keeps its copy and
+/// still signs, so load the key again after revoking it. The remedy is a new current key:
 /// [`KeyStore::revoke_and_rotate`](super::KeyStore::revoke_and_rotate) issues one and
 /// keeps the revoked key archived as revoked, so it stays out of every published key set.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

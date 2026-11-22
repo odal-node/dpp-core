@@ -139,6 +139,11 @@ A revoked key signs nothing. `KeyEntry::sign`, which every signature passes thro
 JWS, a `COSE_Sign1` and an SD-JWT Key Binding JWT alike, refuses it with `KeyRevoked`,
 which names `KeyStore::revoke_and_rotate` as the way to a key that signs.
 
+The refusal reads the `revoked` flag a `KeyEntry` carries, and `KeyStore::load_key` copies
+the flag into an owned entry when it loads. An entry loaded before `revoke_and_rotate`
+runs keeps its copy and still signs, so a process that holds one must load the key
+again after a revocation.
+
 `EdDSA` is the identifier RFC 9864 deprecates in favour of `Ed25519`. It is still the one
 written, because the European Commission's DSS validator maps only `EdDSA` for JOSE and
 the W3C VC-JOSE-COSE test suite signs with it. Verification accepts both.

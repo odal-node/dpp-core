@@ -41,6 +41,9 @@ uuid  = { version = "1.14", features = ["v4"] }
 # one way a store with a revoked current key opens (`tests/key_store_support`).
 # Already in the workspace graph through `dpp-crypto`.
 aes-gcm = { workspace = true }
+# Generates the throwaway keys that store holds, so no key material is committed.
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
 
 [lints]
 workspace = true

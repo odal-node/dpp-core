@@ -157,12 +157,8 @@ fn produce(scenario: &Scenario) -> Value {
             (store, path)
         }
         Start::RevokedCurrent { with_archived_key } => {
-            let path = legacy_store::with_revoked_current(
-                "did-suite-input",
-                KEY_ID,
-                &legacy_store::KEY_ONE,
-                with_archived_key.then_some(&legacy_store::KEY_TWO),
-            );
+            let path =
+                legacy_store::with_revoked_current("did-suite-input", KEY_ID, with_archived_key);
             let store = KeyStore::open_and_migrate(&path, legacy_store::PASSPHRASE)
                 .expect("open and seal the keystore");
             (store, path)
