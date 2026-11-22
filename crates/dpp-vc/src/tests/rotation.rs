@@ -159,7 +159,9 @@ fn sign_with(key: &KeyEntry, payload: &serde_json::Value, kid: &str) -> String {
     let header = json!({ "alg": key.algorithm().jose_alg(), "kid": kid });
     let body = dpp_crypto::jws::canonicalize(payload).expect("canonical payload");
     let signing_input = format!("{}.{}", b64.encode(header.to_string()), b64.encode(body));
-    let signature = key.sign(signing_input.as_bytes());
+    let signature = key
+        .sign(signing_input.as_bytes())
+        .expect("an unrevoked key signs");
     format!("{signing_input}.{}", b64.encode(signature))
 }
 

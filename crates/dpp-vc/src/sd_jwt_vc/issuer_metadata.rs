@@ -49,10 +49,11 @@ pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Op
 /// The metadata document for a current key and its archived predecessors.
 ///
 /// Separate from [`build_issuer_metadata`] so both revocation branches can be
-/// tested. A store's public API never leaves its *current* key revoked —
-/// `revoke_and_rotate` archives the revoked key and issues a fresh one — so the
-/// branch below that guards against it is unreachable through the store, and a
-/// guard nothing can reach is a guard nothing checks.
+/// tested on their own. A store's own calls never leave its *current* key revoked —
+/// `revoke_and_rotate` archives the revoked key and issues a fresh one — but a store
+/// whose file says so opens: one written before key stores carried an integrity tag,
+/// sealed by `KeyStore::open_and_migrate`. The DID document builder leaves the same
+/// keys out.
 pub(super) fn metadata_for_keys(
     issuer: &str,
     current: &PublicKeyInfo,

@@ -71,7 +71,8 @@ cargo run -p dpp-crypto --example sign_and_verify
 else generated. The key is held in memory and is never written to a store. The example
 below takes the `secretKeyJwk` of a published test key: the P-256 key of the W3C
 VC-JOSE-COSE suite, whose file is vendored with this crate. `sign` returns the raw
-signature, which for P-256 is the 64-octet `R ‖ S`. It is not a compact JWS.
+signature, which for P-256 is the 64-octet `R ‖ S`. It is not a compact JWS. It refuses
+a revoked key with `KeyRevoked`; a key built from a JWK is not revoked.
 
 ```rust
 use dpp_crypto::keystore::KeyEntry;
@@ -85,7 +86,7 @@ let method: Value = serde_json::from_str(text).expect("a verification method");
 let entry = KeyEntry::from_private_jwk(&method["secretKeyJwk"]).expect("a valid private JWK");
 
 let message = b"a signed passport";
-let signature = entry.sign(message);
+let signature = entry.sign(message).expect("a key built from a JWK is not revoked");
 assert_eq!(signature.len(), 64);
 assert!(entry.public_key().verify(message, &signature));
 ```

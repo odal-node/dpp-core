@@ -77,7 +77,8 @@ pub(super) fn decoded(jwt: &str, part: usize) -> Map<String, Value> {
 /// `header` and `claims`, so a test can break one thing at a time.
 pub(super) fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -> SdJwt {
     let header = header.as_object().unwrap().clone();
-    let kb = sign_with_header(key, &header, claims.to_string().as_bytes());
+    let kb = sign_with_header(key, &header, claims.to_string().as_bytes())
+        .expect("an unrevoked key signs");
     let unbound = presentation.serialise();
     let (sd_jwt, _) = unbound.rsplit_once('~').unwrap();
     SdJwt::parse(&format!("{sd_jwt}~{kb}")).unwrap()
@@ -122,6 +123,28 @@ fn a_bound_presentation_verifies_and_reads_to_what_was_chosen() {
         Value::Object(decoded(&kb, 1)),
         good_claims(&presented),
         "iat, aud, nonce and the sd_hash of what was presented"
+    );
+}
+
+/// The Holder signs the Key Binding JWT, and the Holder's key is a separate door from
+/// the Issuer's: a revoked Holder key is refused with `KeyRevoked`, and the same key
+/// unrevoked binds, so the refusal is the flag and nothing else.
+#[test]
+fn a_revoked_holder_key_binds_nothing() {
+    let mut key = holder("kb-revoked-holder");
+    let sd_jwt = issued(&key);
+
+    sd_jwt
+        .present_with_key_binding(&[], &binding(), &key)
+        .expect("the unrevoked key binds");
+
+    key.revoked = true;
+    let refused = sd_jwt
+        .present_with_key_binding(&[], &binding(), &key)
+        .expect_err("a revoked Holder key refuses");
+    assert!(
+        matches!(&refused, SdJwtError::KeyRevoked(r) if r.fingerprint == key.fingerprint),
+        "{refused:?}"
     );
 }
 

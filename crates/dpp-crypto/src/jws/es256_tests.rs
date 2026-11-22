@@ -105,7 +105,14 @@ fn no_header_can_move_a_signature_to_the_other_algorithm() {
             B64.encode(format!(r#"{{"alg":"{alg}"}}"#)),
             B64.encode(r#"{"claim":"value"}"#)
         );
-        format!("{input}.{}", B64.encode(signer.sign(input.as_bytes())))
+        format!(
+            "{input}.{}",
+            B64.encode(
+                signer
+                    .sign(input.as_bytes())
+                    .expect("an unrevoked key signs")
+            )
+        )
     };
     // The identifiers each algorithm answers to: Ed25519 has two.
     let names = |algorithm: KeyAlgorithm| match algorithm {

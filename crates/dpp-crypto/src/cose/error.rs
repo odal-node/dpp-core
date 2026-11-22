@@ -76,4 +76,7 @@ pub enum CoseError {
     /// and it is kept so that no path panics.
     #[error("the COSE_Sign1 message could not be written")]
     Encode,
+    /// The signing key is revoked, and a revoked key signs nothing.
+    #[error(transparent)]
+    KeyRevoked(#[from] crate::keystore::KeyRevoked),
 }

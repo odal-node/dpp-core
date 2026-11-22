@@ -19,7 +19,7 @@
 //! Identifiers v1.0 together with `Multikey`. DID 1.1 defines its key properties
 //! by reference to that specification.
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use dpp_crypto::keystore::{KeyStore, PublicKeyInfo};
 
@@ -44,6 +44,21 @@ pub fn did_for(base_url: &str) -> String {
 /// been revoked are appended as secondary verification methods so that
 /// signatures produced with rotated keys remain verifiable. Every method is
 /// listed in `assertionMethod`; only the primary is in `authentication`.
+///
+/// **A revoked key is never listed, the current one included**, so the document
+/// publishes the same keys as [`build_issuer_metadata`]. A store's own calls never
+/// leave its current key revoked, but a store whose file says so opens: one written
+/// before key stores carried an integrity tag, sealed by
+/// [`KeyStore::open_and_migrate`]. Such a key signs nothing either
+/// ([`KeyRevoked`](dpp_crypto::keystore::KeyRevoked)).
+///
+/// With no current key, `authentication` is left out rather than empty: DID Core
+/// 1.0 §5.3.1 says that if it is present, "the associated value MUST be a set of
+/// one or more verification methods", and §5.3.2 says the same of `assertionMethod`.
+/// With no key at all, `verificationMethod` and `assertionMethod` are left out too,
+/// and the document holds its `@context` and `id` alone.
+///
+/// [`build_issuer_metadata`]: crate::sd_jwt_vc::build_issuer_metadata
 pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> anyhow::Result<Value> {
     if !store.has_key(key_id) {
         store.generate_key(key_id)?;
@@ -57,10 +72,13 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
         .ok_or_else(|| anyhow::anyhow!("no key found for {key_id}"))?;
 
     let did = did_for(base_url);
-    let primary = verification_method(&did, &current)?;
-    let primary_vm_id = primary["id"].clone();
-
-    let mut verification_methods = vec![primary];
+    let mut verification_methods = Vec::new();
+    let mut authentication = None;
+    if !current.revoked {
+        let primary = verification_method(&did, &current)?;
+        authentication = Some(primary["id"].clone());
+        verification_methods.push(primary);
+    }
 
     // Revoked keys are excluded entirely — neither a verification method nor an
     // assertionMethod — so signatures they produced no longer verify.
@@ -72,20 +90,34 @@ pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> any
         verification_methods.push(verification_method(&did, &archived_key)?);
     }
 
-    let assertion_methods: Vec<&Value> = verification_methods.iter().map(|vm| &vm["id"]).collect();
-
-    let doc = json!({
-        "@context": [
+    let mut doc = Map::new();
+    doc.insert(
+        "@context".to_owned(),
+        json!([
             "https://www.w3.org/ns/did/v1",
             "https://www.w3.org/ns/cid/v1"
-        ],
-        "id": did,
-        "verificationMethod": verification_methods,
-        "authentication": [primary_vm_id],
-        "assertionMethod": assertion_methods
-    });
+        ]),
+    );
+    doc.insert("id".to_owned(), Value::String(did));
+    if let Some(primary) = authentication {
+        doc.insert("authentication".to_owned(), json!([primary]));
+    }
+    if !verification_methods.is_empty() {
+        let assertion_methods: Vec<Value> = verification_methods
+            .iter()
+            .map(|vm| vm["id"].clone())
+            .collect();
+        doc.insert(
+            "assertionMethod".to_owned(),
+            Value::Array(assertion_methods),
+        );
+        doc.insert(
+            "verificationMethod".to_owned(),
+            Value::Array(verification_methods),
+        );
+    }
 
-    Ok(doc)
+    Ok(Value::Object(doc))
 }
 
 /// One verification method: a `JsonWebKey` identified by its own thumbprint.

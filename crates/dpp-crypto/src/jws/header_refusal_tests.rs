@@ -160,7 +160,10 @@ fn verify_jws_refuses_exactly_what_header_refusal_refuses() {
             B64.encode(serde_json::to_vec(header).expect("serialises")),
             B64.encode(b"{}")
         );
-        format!("{input}.{}", B64.encode(key.sign(input.as_bytes())))
+        format!(
+            "{input}.{}",
+            B64.encode(key.sign(input.as_bytes()).expect("an unrevoked key signs"))
+        )
     };
 
     for (header, refused) in [

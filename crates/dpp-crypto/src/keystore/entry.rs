@@ -6,6 +6,8 @@ use zeroize::Zeroizing;
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
+use super::error::KeyRevoked;
+
 /// A decrypted key pair.
 ///
 /// The private material is not public: it is reached only through
@@ -45,9 +47,22 @@ impl KeyEntry {
 
     /// Sign `message` under this key's algorithm and return the raw signature:
     /// 64 bytes for Ed25519 and ES256, 96 for ES384 and 132 for ES512 (`R ‖ S`, low-`S`).
-    #[must_use]
-    pub fn sign(&self, message: &[u8]) -> Vec<u8> {
-        self.material.sign(message)
+    ///
+    /// Every signature this crate makes passes through here: a JWS, a `COSE_Sign1`
+    /// and an SD-JWT's Key Binding JWT alike.
+    ///
+    /// # Errors
+    ///
+    /// [`KeyRevoked`] if the key is revoked. Every key set built from a key store
+    /// leaves a revoked key out, so a signature by one is a signature no verifier
+    /// should accept.
+    pub fn sign(&self, message: &[u8]) -> Result<Vec<u8>, KeyRevoked> {
+        if self.revoked {
+            return Err(KeyRevoked {
+                fingerprint: self.fingerprint.clone(),
+            });
+        }
+        Ok(self.material.sign(message))
     }
 
     /// The secret, for tests that prove it never leaks into output or logs.

@@ -955,6 +955,7 @@ dependencies = [
 name = "dpp-vc"
 version = "0.24.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "async-trait",
  "base64",
@@ -962,8 +963,10 @@ dependencies = [
  "dpp-crypto",
  "dpp-domain",
  "dpp-vocab",
+ "ed25519-dalek",
  "flate2",
  "hex",
+ "rand",
  "serde",
  "serde_jcs",
  "serde_json",

@@ -82,6 +82,9 @@ pub enum SdJwtError {
     /// `cnf` names. Every Verifier would refuse the result (clause 7.3 step 5.c).
     #[error("the signing key is not the Holder key the token names")]
     HolderKeyMismatch,
+    /// The Holder key is revoked, and a revoked key signs nothing.
+    #[error(transparent)]
+    KeyRevoked(#[from] crate::keystore::KeyRevoked),
     /// The Key Binding JWT failed one of the checks of clause 7.3 step 5, named
     /// here: `alg` or the signature (5.b, 5.c), `typ` (5.d), `iat` (5.e), `nonce`
     /// or `aud` (5.f), `sd_hash` (5.g), or the JWT itself, its `exp` or its `nbf`

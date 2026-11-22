@@ -82,7 +82,11 @@ fn signer_verify_rejects_non_eddsa_alg() {
     for alg in ["none", "HS256", "RS256"] {
         let header_b64 = b64.encode(format!(r#"{{"alg":"{alg}","kid":"x"}}"#));
         let signing_input = format!("{header_b64}.{payload_b64}");
-        let sig_b64 = b64.encode(loaded.sign(signing_input.as_bytes()));
+        let sig_b64 = b64.encode(
+            loaded
+                .sign(signing_input.as_bytes())
+                .expect("an unrevoked key signs"),
+        );
         let jws = format!("{signing_input}.{sig_b64}");
         assert!(
             !super::signer::verify(&store, "t6", &jws).unwrap(),

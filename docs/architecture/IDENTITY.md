@@ -72,11 +72,13 @@ Every issuer has one DID document. `dpp_vc::did_builder` builds it from the
 ```
 
 - `verificationMethod`: the current key first, then every archived key that has not been
-  revoked, so earlier signatures remain verifiable. A **revoked** key is removed, so its
-  signatures stop verifying.
+  revoked, so earlier signatures remain verifiable. A **revoked** key is removed, the
+  current one included, so its signatures stop verifying.
 - `assertionMethod`: every listed key. This is the relationship a signature is checked
   against.
-- `authentication`: the current key only.
+- `authentication`: the current key only, and left out when the current key is revoked.
+  DID Core 1.0 §5.3.1 and §5.3.2 allow neither `authentication` nor `assertionMethod` to
+  be empty, so a property with no key to list is left out, and so is `verificationMethod`.
 - Each method is a `JsonWebKey` (W3C Controlled Identifiers v1.0) whose JWK carries its
   own `kid` and the `alg` the key signs under.
 
@@ -132,6 +134,15 @@ Rotation does not invalidate existing signatures:
 3. Signing input: `base64url(header) || "." || base64url(payload)`.
 4. Sign with Ed25519.
 5. Compact serialisation: `{header_b64}.{payload_b64}.{signature_b64}`.
+
+A revoked key signs nothing. `KeyEntry::sign`, which every signature passes through, a
+JWS, a `COSE_Sign1` and an SD-JWT Key Binding JWT alike, refuses it with `KeyRevoked`,
+which names `KeyStore::revoke_and_rotate` as the way to a key that signs.
+
+The refusal reads the `revoked` flag a `KeyEntry` carries, and `KeyStore::load_key` copies
+the flag into an owned entry when it loads. An entry loaded before `revoke_and_rotate`
+runs keeps its copy and still signs, so a process that holds one must load the key
+again after a revocation.
 
 `EdDSA` is the identifier RFC 9864 deprecates in favour of `Ed25519`. It is still the one
 written, because the European Commission's DSS validator maps only `EdDSA` for JOSE and

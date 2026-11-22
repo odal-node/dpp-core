@@ -96,7 +96,8 @@ fn binding(now: i64) -> KeyBinding {
 /// and `claims`.
 fn bind(presentation: &SdJwt, key: &KeyEntry, header: &Value, claims: &Value) -> String {
     let header: Map<String, Value> = header.as_object().expect("an object").clone();
-    let kb = sign_with_header(key, &header, claims.to_string().as_bytes());
+    let kb = sign_with_header(key, &header, claims.to_string().as_bytes())
+        .expect("an unrevoked key signs");
     format!("{}{kb}", presentation.serialise())
 }
 

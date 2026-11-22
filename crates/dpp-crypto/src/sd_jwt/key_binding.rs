@@ -155,7 +155,7 @@ impl SdJwt {
     /// [`SdJwtError::UnsupportedHolderKey`] for a key that is none of Ed25519, P-256,
     /// P-384 and P-521, and
     /// [`SdJwtError::HolderKeyMismatch`] when `holder` is not the key `cnf`
-    /// names.
+    /// names, and [`SdJwtError::KeyRevoked`] when `holder` is revoked.
     pub fn present_with_key_binding(
         &self,
         reveal_digests: &[&str],
@@ -182,7 +182,7 @@ impl SdJwt {
             "nonce": binding.nonce,
             "sd_hash": presentation.sd_hash(),
         });
-        let jwt = sign_with_header(holder, &header, claims.to_string().as_bytes());
+        let jwt = sign_with_header(holder, &header, claims.to_string().as_bytes())?;
         Ok(presentation.bound(jwt))
     }
 
