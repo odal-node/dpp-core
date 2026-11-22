@@ -294,3 +294,37 @@ fn a_rotation_to_an_ec_key_keeps_every_credential_verifiable() {
         }
     }
 }
+
+/// A credential issued while the issuer's key rotates names the key that signed it,
+/// and verifies under the key the issuer metadata publishes for that `kid` once the
+/// rotations stop.
+///
+/// `issue` takes the `kid` and the signature from one load of the key. With two
+/// reads, a rotation between them gave a credential the replaced key's `kid` and the
+/// new key's signature, and the published key under that `kid` refused it.
+#[test]
+fn credentials_issued_while_the_key_rotates_verify_under_the_metadata_published_after() {
+    let store = temp_store("sd-jwt-vc-while-rotating", KEY_ID);
+
+    let credentials = crate::test_support::sign_while_rotating(&store, KEY_ID, || issued(&store));
+    let metadata = build_issuer_metadata(&store, ISSUER, KEY_ID).expect("metadata");
+
+    let kids: std::collections::BTreeSet<String> =
+        credentials.iter().map(|c| kid_of(c.jwt())).collect();
+    assert!(
+        kids.len() > 1,
+        "the credentials were issued under more than one key: {}",
+        kids.len()
+    );
+    for (i, credential) in credentials.iter().enumerate() {
+        let kid = kid_of(credential.jwt());
+        let key = PublicKey::from_jwk(published_jwk(&metadata, &kid))
+            .expect("the published key reads back");
+        verify(&credential.serialise(), &key, &vct(), now(), None).unwrap_or_else(|e| {
+            panic!(
+                "credential {i} of {} names {kid} and does not verify under it: {e:?}",
+                credentials.len()
+            )
+        });
+    }
+}

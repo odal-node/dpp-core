@@ -25,8 +25,14 @@ use crate::keystore::{KeyEntry, KeyRevoked, KeyStore};
 /// verifier.** A token verified through a DID document carries the absolute DID
 /// URL of the verification method: `did:web:<host>#<thumbprint URI>`. An SD-JWT
 /// VC carries the key's thumbprint URI alone, which is what the issuer metadata's
-/// key set names. [`crate::keystore::PublicKeyInfo::thumbprint_uri`] gives the
-/// part both have in common.
+/// key set names. The thumbprint URI is the part both have in common.
+///
+/// **Take the `kid` from the key that signs.** A caller that reads the thumbprint
+/// from the store ([`crate::keystore::PublicKeyInfo::thumbprint_uri`]) and then
+/// signs here reads the key twice, and a rotation between the two reads gives the
+/// token the replaced key's `kid` and the new key's signature, which no verifier
+/// accepts. Load the key once with [`KeyStore::load_key`], take the thumbprint from
+/// [`KeyEntry::public_key`], and sign with [`sign_typed_with`].
 ///
 /// The curve is *not* emitted as a JOSE header parameter: RFC 8037 defines
 /// `crv` as a JWK member, not a registered header parameter. It lives on the

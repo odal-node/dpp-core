@@ -25,11 +25,10 @@ use crate::passport_credential::build_passport_credential;
 /// published key and the signing key are then the same store's, and there is no
 /// network-reachable signing endpoint to attack.
 ///
-/// That is not one atomic read. `sign_passport` reads the key's thumbprint for the
-/// `kid` (`store.public_key`), and then `signer::sign` loads the key again to sign. A
-/// passport signed while its key rotates between those two reads can carry the
-/// replaced key's `kid` with a signature made by the new key. Verification refuses
-/// that passport, so a caller keeps key rotation and passport issuance apart.
+/// `sign_passport` loads the key once and takes both the `kid` and the signature
+/// from it, so a passport signed while its key rotates names the key that signed
+/// it. A rotation that archives that key, rather than revoking it, leaves the
+/// passport verifiable against the DID document published afterwards.
 pub struct LocalIdentityService {
     store: Arc<KeyStore>,
     key_id: String,
@@ -58,17 +57,17 @@ impl IdentityPort for LocalIdentityService {
         let payload_hash = hex::encode(Sha256::digest(&canonical));
 
         // The `kid` is the absolute DID URL of the signing key's verification
-        // method, which is the identifier `build_did_document` gives that key.
+        // method, which is the identifier `build_did_document` gives that key. It
+        // is taken from the key that signs, loaded once, so a rotation cannot come
+        // between the two.
         let issuer_did = did_for(&self.base_url);
-        let thumbprint = self
+        let key = self
             .store
-            .public_key(&self.key_id)
-            .ok_or_else(|| DppError::Signing(format!("no key found for {}", self.key_id)))?
-            .thumbprint_uri()
+            .load_key(&self.key_id)
             .map_err(|e| DppError::Signing(e.to_string()))?;
-        let kid = format!("{issuer_did}#{thumbprint}");
+        let kid = format!("{issuer_did}#{}", key.public_key().thumbprint_uri());
 
-        let jws = signer::sign(&self.store, &self.key_id, payload, &kid)
+        let jws = signer::sign_typed_with(&key, payload, &kid, None, None)
             .map_err(|e| DppError::Signing(e.to_string()))?;
 
         let passport_vc = build_passport_credential(issuer_did.clone(), passport_id, payload_hash);

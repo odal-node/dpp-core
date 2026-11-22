@@ -116,13 +116,14 @@ pub fn issue(
     let jwt_payload = build_payload(claims, !disclosures.is_empty());
     // The `kid` is the key's thumbprint URI, which is the `kid` of its entry in
     // the issuer metadata's key set (clause 4.2) and not the DID URL a
-    // `did:web` verifier would use: this profile names no DID method.
-    let kid = store
-        .public_key(key_id)
-        .ok_or_else(|| SdJwtVcError::Signing(format!("no key found for {key_id}")))?
-        .thumbprint_uri()
+    // `did:web` verifier would use: this profile names no DID method. It is taken
+    // from the key that signs, loaded once, so a rotation cannot come between the
+    // two.
+    let key = store
+        .load_key(key_id)
         .map_err(|e| SdJwtVcError::Signing(e.to_string()))?;
-    let jwt = dpp_crypto::jws::sign_typed(store, key_id, &jwt_payload, &kid, Some(TYP), None)
+    let kid = key.public_key().thumbprint_uri();
+    let jwt = dpp_crypto::jws::sign_typed_with(&key, &jwt_payload, &kid, Some(TYP), None)
         .map_err(|e| SdJwtVcError::Signing(e.to_string()))?;
 
     Ok(SdJwt::new(jwt, disclosures))

@@ -280,3 +280,60 @@ fn a_token_whose_kid_names_the_other_key_of_its_document_is_refused() {
         }
     }
 }
+
+/// The `kid` a compact JWS names, as a verifier reads it.
+fn kid_named(jws: &str) -> String {
+    dpp_crypto::jws::verifier::extract_kid_from_jws(jws).expect("the token names a kid")
+}
+
+/// The output of a future that awaits nothing, as `sign_passport`'s does: it signs
+/// in process. Polled once on this thread, so many threads can sign at once without
+/// a runtime each.
+fn without_waiting<F: std::future::Future>(future: F) -> F::Output {
+    let mut future = std::pin::pin!(future);
+    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+    match future.as_mut().poll(&mut context) {
+        std::task::Poll::Ready(output) => output,
+        std::task::Poll::Pending => panic!("the future waited"),
+    }
+}
+
+/// A passport signed while its key rotates names the key that signed it, and
+/// verifies against the DID document published once the rotations stop.
+///
+/// `sign_passport` takes the `kid` and the signature from one load of the key. With
+/// two reads, a rotation between them gave a passport the replaced key's `kid` and
+/// the new key's signature, and the document refused it.
+#[test]
+fn passports_signed_while_the_key_rotates_verify_against_the_document_published_after() {
+    let store = Arc::new(rotation_store("passport-while-rotating"));
+    let svc = LocalIdentityService::new(
+        Arc::clone(&store),
+        "issuer".to_owned(),
+        ROTATION_BASE_URL.to_owned(),
+    );
+    let payload = json!({"product": "battery", "status": "draft"});
+
+    let passports = crate::test_support::sign_while_rotating(&store, "issuer", || {
+        without_waiting(svc.sign_passport(PassportId::new(), &payload))
+            .expect("sign while the key rotates")
+            .jws
+    });
+    let doc = did_document(&store);
+
+    let kids: std::collections::BTreeSet<String> =
+        passports.iter().map(|jws| kid_named(jws)).collect();
+    assert!(
+        kids.len() > 1,
+        "the passports were signed under more than one key: {}",
+        kids.len()
+    );
+    for (i, jws) in passports.iter().enumerate() {
+        assert!(
+            verifies_in(&doc, jws),
+            "passport {i} of {} names {} and does not verify under it",
+            passports.len(),
+            kid_named(jws)
+        );
+    }
+}
