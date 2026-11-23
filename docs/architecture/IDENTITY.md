@@ -155,6 +155,11 @@ again after a revocation.
 written, because the European Commission's DSS validator maps only `EdDSA` for JOSE and
 the W3C VC-JOSE-COSE test suite signs with it. Verification accepts both.
 
+COSE is the same, for all four key algorithms: `COSE_Sign1` writes the polymorphic `alg`
+(`-8`, `-7`, `-35`, `-36`) and verification also accepts the fully specified one RFC 9864
+registers for the same key (`-19`, `-9`, `-51`, `-52`). A value that belongs to another key
+is refused, as it was before.
+
 ### Verification
 
 `dpp_crypto::jws::verifier` is the single place JWS verification lives:

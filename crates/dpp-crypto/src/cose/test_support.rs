@@ -83,9 +83,16 @@ pub(super) fn key_pair(algorithm: &str) -> KeyEntry {
     KeyEntry::from_private_jwk(&key_file(algorithm)["secretKeyJwk"]).expect("a private key")
 }
 
-/// The four algorithms' file names, with each one's COSE `alg`.
+/// The four algorithms' file names, with each one's COSE `alg`: the polymorphic value
+/// this crate writes (RFC 9053 §2.1, §2.2).
 pub(super) const ALGORITHMS: [(&str, i64); 4] =
     [("ed25519", -8), ("p256", -7), ("p384", -35), ("p521", -36)];
+
+/// The same four, in the same order, with each one's fully specified COSE `alg`
+/// (RFC 9864 §4.2.1: Ed25519, ESP256, ESP384, ESP512). Written out as numbers and not
+/// taken from the constants the verifier uses, so that a wrong constant fails here.
+pub(super) const FULLY_SPECIFIED: [(&str, i64); 4] =
+    [("ed25519", -19), ("p256", -9), ("p384", -51), ("p521", -52)];
 
 // ── CBOR written by hand, so that a test can write what the library would not ─
 
