@@ -4,9 +4,12 @@
 //! The CBOR is read and written by `cbor4ii`, as a codec only. The structure, the
 //! `Sig_structure` that is signed, and the header rules are written here, as they
 //! are for a JWS: `alg` is bound to the key, `crit` is refused, and `typ` and the
-//! content type are returned for the caller to judge. Signing and verification
-//! go through the same key types as a JWS, so a key signs under one algorithm in
-//! both formats, and ECDSA signatures are made low-`S` and verified either way.
+//! content type are returned for the caller to judge. `alg` is written as the
+//! polymorphic value of RFC 9053 and read as that or the fully specified value of
+//! RFC 9864, each for the key's own algorithm only (see [`algorithm`]). Signing and
+//! verification go through the same key types as a JWS, so a key signs under one
+//! algorithm in both formats, and ECDSA signatures are made low-`S` and verified
+//! either way.
 //!
 //! The message is read in the tagged form (tag 18) or the untagged one, and written
 //! tagged. A detached payload is refused.
@@ -43,7 +46,7 @@ mod suite_tests;
 #[cfg(test)]
 mod test_support;
 
-pub use algorithm::cose_alg;
+pub use algorithm::{accepts_cose_alg, cose_alg};
 pub use cwt::CwtClaims;
 pub use error::CoseError;
 pub use sign1::{ContentType, VerifiedSign1, sign_sign1, verify_sign1};

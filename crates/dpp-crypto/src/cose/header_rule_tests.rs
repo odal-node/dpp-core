@@ -5,11 +5,13 @@
 //! test. Each rule has a control, the same message without the defect, which must
 //! verify: a rule that refused everything would otherwise pass.
 
+use super::algorithm::accepts_cose_alg;
 use super::error::CoseError;
 use super::sign1::{ContentType, verify_sign1};
 use super::test_support::{
-    NULL, P256_ALG, array, bstr, key_pair, map, message, nint, no_unprotected, ok, ordinary,
-    protected_with, public_key, signer, tstr, uint, verify,
+    ALGORITHMS, FULLY_SPECIFIED, NULL, P256_ALG, array, bstr, key_pair, map, message, nint,
+    no_unprotected, ok, ordinary, protected_map, protected_with, public_key, signer, tstr, uint,
+    verify,
 };
 
 #[test]
@@ -185,19 +187,92 @@ fn an_alg_of_another_type_is_refused() {
     }
 }
 
-/// An Ed25519 key signs with -8 only. The fully specified -19 of RFC 9864 is not read.
+/// Under each key, `alg` is one of two values: the polymorphic one this crate writes,
+/// and the fully specified one RFC 9864 registers for the same key. Every other value
+/// is a mismatch, and that includes both values of each other key. The signature is
+/// good in every message, so only the header is under test, and each key's two values
+/// are the controls of the rest.
 #[test]
-fn ed25519_is_eddsa_minus_8_and_nothing_else() {
-    let key = key_pair("ed25519");
-    let verify_ed = |alg: i64| {
-        verify_sign1(
-            &message(&key, &map(&[(uint(1), nint(alg))]), &no_unprotected(), b"p"),
-            &public_key("ed25519"),
-        )
-    };
-    assert!(verify_ed(-8).is_ok());
-    assert_eq!(verify_ed(-19), Err(CoseError::AlgorithmMismatch));
-    assert_eq!(verify_ed(-7), Err(CoseError::AlgorithmMismatch));
+fn a_key_accepts_its_own_two_values_and_no_others() {
+    let every: Vec<i64> = ALGORITHMS
+        .iter()
+        .chain(FULLY_SPECIFIED.iter())
+        .map(|(_, alg)| *alg)
+        // `-6` is direct, `-37` is PS256, and `0` and `1` are not registered for signing.
+        .chain([-6, -37, 0, 1])
+        .collect();
+    assert_eq!(every.len(), 12);
+
+    for ((name, written), (same, fully_specified)) in ALGORITHMS.into_iter().zip(FULLY_SPECIFIED) {
+        assert_eq!(name, same, "the two tables are in one order");
+        let key = key_pair(name);
+        let public = public_key(name);
+        for &alg in &every {
+            let accepted = alg == written || alg == fully_specified;
+            let outcome = verify_sign1(
+                &message(&key, &protected_map(alg), &no_unprotected(), b"p"),
+                &public,
+            );
+            assert_eq!(
+                outcome.is_ok(),
+                accepted,
+                "{name} key, alg {alg}: {outcome:?}"
+            );
+            if !accepted {
+                assert_eq!(
+                    outcome.err(),
+                    Some(CoseError::AlgorithmMismatch),
+                    "{name} key, alg {alg}"
+                );
+            }
+            assert_eq!(
+                accepts_cose_alg(public.algorithm(), alg),
+                accepted,
+                "{name} key, alg {alg}"
+            );
+        }
+    }
+}
+
+/// What the header says does not change what the verifier returns: the same payload
+/// and `kid` come back under either value.
+#[test]
+fn either_value_returns_the_same_message() {
+    for ((name, written), (_, fully_specified)) in ALGORITHMS.into_iter().zip(FULLY_SPECIFIED) {
+        let key = key_pair(name);
+        let verify_under = |alg: i64| {
+            verify_sign1(
+                &message(&key, &protected_map(alg), &no_unprotected(), b"payload"),
+                &public_key(name),
+            )
+            .unwrap_or_else(|e| panic!("{name} under {alg}: {e:?}"))
+        };
+        assert_eq!(
+            verify_under(written),
+            verify_under(fully_specified),
+            "{name}"
+        );
+    }
+}
+
+/// An `alg` in the unprotected header is not read under the fully specified value
+/// either, because nothing there is protected: it is refused as it is for `-7`.
+#[test]
+fn a_fully_specified_alg_in_the_unprotected_header_is_refused() {
+    for (name, alg) in FULLY_SPECIFIED {
+        let key = key_pair(name);
+        let protected = map(&[(uint(4), bstr(b"key-1"))]);
+        let unprotected = map(&[(uint(1), nint(alg))]);
+        assert_eq!(
+            verify_sign1(
+                &message(&key, &protected, &unprotected, b"p"),
+                &public_key(name)
+            )
+            .err(),
+            Some(CoseError::AlgorithmNotProtected),
+            "{name}"
+        );
+    }
 }
 
 // ── crit, typ, content type ───────────────────────────────────────────────────

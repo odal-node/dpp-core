@@ -408,6 +408,16 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Changed
 
+- **`dpp_crypto::cose` reads RFC 9864's fully specified `alg` values.** `verify_sign1`
+  accepts `-9` (ESP256), `-51` (ESP384), `-52` (ESP512) and `-19` (Ed25519) beside the
+  polymorphic `-7`, `-35`, `-36` and `-8`, each for its own key's algorithm only: `-9` on a
+  P-384 key, or `-19` on a P-256 one, is still `AlgorithmMismatch`. A COSE message from an
+  issuer that follows the RFC, which deprecates the polymorphic values, is no longer
+  refused. What is written does not change: `sign_sign1` still writes `-7`, `-35`, `-36` and
+  `-8`, which the W3C VC-JOSE-COSE test suite's inputs carry. `accepts_cose_alg` is new, and
+  `cose::algorithm` gains `ESP256_ALG`, `ESP384_ALG`, `ESP512_ALG` and `ED25519_ALG`. This
+  is the COSE side of the choice #370 made for JOSE. (#657)
+
 - **The minimum supported Rust version is 1.100, from 1.99.** The toolchain this
   repository builds and tests with moves to 1.100.0, the latest stable release,
   and `rust-version` follows it, so CI still enforces the floor every crate's
