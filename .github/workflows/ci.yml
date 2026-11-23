@@ -77,7 +77,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   features:
-    name: Each feature builds on its own
+    name: Every feature combination builds
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,10 +95,11 @@ jobs:
       # no consumer gets, and unifies features across the workspace, so a crate that
       # uses a dependency's feature without declaring it compiles here and fails for
       # whoever builds it alone. cargo-hack builds each package separately, once with
-      # no features and once with each feature on its own. `--no-dev-deps` keeps a
-      # dev-dependency from supplying a feature the crate itself does not declare.
+      # no features and once with every combination of its features. `--no-dev-deps`
+      # keeps a dev-dependency from supplying a feature the crate itself does not
+      # declare.
       - name: cargo hack check
-        run: cargo hack check --workspace --each-feature --no-dev-deps
+        run: cargo hack check --workspace --feature-powerset --no-dev-deps
 
   test:
     name: Tests (unit + integration)
