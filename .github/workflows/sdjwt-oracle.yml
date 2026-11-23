@@ -89,6 +89,8 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # From the committed lockfile, with install scripts off. The library is
       # somebody else's judgement about what RFC 9901 requires, and an unpinned

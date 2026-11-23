@@ -54,6 +54,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: wasm
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build dpp-registry (wasm32)
         working-directory: crates/dpp-registry
@@ -80,6 +81,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: wasm-plugins
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Discovered rather than listed. The ten steps that used to stand here
       # named `plugins/sector-*` and went stale the moment the directories were
