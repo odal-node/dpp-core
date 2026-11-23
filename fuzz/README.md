@@ -17,6 +17,7 @@ property: any input returns `Ok` or `Err` (or `Some` or `None`), never a panic.
 | `cose_sign1_verify` | `verify_sign1` on `COSE_Sign1` bytes, against a key nobody can sign for, so a message that verifies is a failure too; its unknown header parameters carry any CBOR value, which the target reaches | A credential or presentation secured with COSE |
 | `sd_jwt_parse` | `SdJwt::parse` and `Disclosure::parse` | A holder's selectively disclosed presentation |
 | `status_list_decode` | `StatusList::from_encoded_list` (base64url, then gzip) and `get` | A credential issuer's revocation list |
+| `token_status_list_decode` | `TokenStatusList::from_encoded_within` (base64url, then zlib, at each width the draft allows and one it does not), `get` and `set`, and `StatusReference::from_claims` | A status issuer's list and a credential's `status` claim |
 | `passport_from_stored` | `Passport::from_stored`, through the direct shape and the lens chain | A stored or fetched passport document |
 | `identifier_parse` | The GTIN, GLN, commodity code, CN category, ICD, web URL, DID and calendar date parsers, and `ProductIdentifier` from JSON | Spreadsheet rows and API bodies |
 | `schema_validate` | Any JSON against the newest schema of every product group | A create body |

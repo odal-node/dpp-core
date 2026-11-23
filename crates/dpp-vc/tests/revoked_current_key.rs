@@ -106,7 +106,10 @@ fn sd_jwt_vc(store: &KeyStore) -> Result<dpp_crypto::sd_jwt::SdJwt, dpp_vc::SdJw
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, "2.6.0"),
             issued_at: 1_789_000_000,
+            expires_at: Some(1_789_000_000 + 31_536_000),
+            not_before: None,
             holder_key: None,
+            status: None,
         },
     )
 }

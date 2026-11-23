@@ -11,11 +11,13 @@ use super::{Issuance, SdJwtVcError, issue, vct_for};
 use crate::test_support::temp_store;
 
 /// Both claims are OPTIONAL in the profile, so their absence means "no bound"
-/// and must not be read as "expired".
+/// and must not be read as "expired". [`issue`] writes one with no `exp` only beside a
+/// status reference, and none with neither, so this is a credential somebody else's
+/// issuer made.
 #[test]
 fn a_credential_without_exp_or_nbf_is_unbounded() {
     let store = temp_store("sdjwtvc-unbounded", KEY_ID);
-    let credential = issued(&store).serialise();
+    let credential = credential_with(&store, &[]);
 
     assert!(check(&store, &credential, Utc.timestamp_opt(0, 0).unwrap()).is_ok());
     assert!(
@@ -98,13 +100,17 @@ fn a_temporal_claim_that_is_not_a_numericdate_is_refused() {
 /// RFC 9901 clause 9.7 names the claims an issuer MUST NOT make selectively
 /// disclosable. The ones `issue` sets are written straight into the root and only
 /// the passport is walked for concealment, so none can be a disclosure, whatever
-/// a policy or a schema says. Asserted over a bound credential, which has all four.
+/// a policy or a schema says. Asserted over a credential that has every one of them.
 #[test]
 fn the_claims_the_issuer_sets_are_never_disclosable() {
     let store = temp_store("sdjwtvc-critical", KEY_ID);
     let holder = temp_store("sdjwtvc-critical-holder", "holder")
         .load_key("holder")
         .expect("the key was just generated");
+    let reference = crate::token_status_list::StatusReference {
+        idx: 7,
+        uri: "https://status.example/1".to_owned(),
+    };
     let credential = issue(
         &store,
         KEY_ID,
@@ -114,7 +120,10 @@ fn the_claims_the_issuer_sets_are_never_disclosable() {
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: Some(ISSUED_AT),
             holder_key: Some(&holder.public_key()),
+            status: Some(&reference),
         },
     )
     .expect("issue");
@@ -123,7 +132,7 @@ fn the_claims_the_issuer_sets_are_never_disclosable() {
         !credential.disclosures().is_empty(),
         "control: the fixture conceals something, so there is a Disclosure to hide a claim in"
     );
-    for claim in ["iss", "vct", "iat", "cnf"] {
+    for claim in ["iss", "vct", "iat", "exp", "nbf", "cnf", "status"] {
         assert!(
             credential.digests_for_claim(claim).is_empty(),
             "{claim} was issued as a disclosure, so a holder can withhold it"
@@ -273,7 +282,10 @@ fn a_passport_member_sharing_a_registered_claim_name_is_concealed_at_every_depth
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue")

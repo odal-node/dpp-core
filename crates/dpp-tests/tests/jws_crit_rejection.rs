@@ -217,7 +217,10 @@ fn sd_jwt_vc_under(store: &KeyStore, vct: &str, header: &Value) -> String {
             issuer: "https://passports.operator.example",
             vct,
             issued_at: 1_789_000_000,
+            expires_at: Some(1_789_000_000 + 31_536_000),
+            not_before: None,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue");

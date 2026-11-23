@@ -56,7 +56,10 @@ fn issue_payload(store: &dpp_crypto::keystore::KeyStore, payload: &Value) -> SdJ
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue")
@@ -69,7 +72,7 @@ fn the_root_holds_what_the_issuer_set_and_the_passport_sits_under_one_claim() {
     let unbound = signed_claims(&issued(&store));
     assert_eq!(
         root_names(&unbound),
-        BTreeSet::from(["iss", "vct", "iat", "_sd_alg", PASSPORT_CLAIM])
+        BTreeSet::from(["iss", "vct", "iat", "exp", "_sd_alg", PASSPORT_CLAIM])
     );
 
     let holder = temp_store("sdjwtvc-root-holder", "holder")
@@ -84,13 +87,16 @@ fn the_root_holds_what_the_issuer_set_and_the_passport_sits_under_one_claim() {
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: Some(&holder.public_key()),
+            status: None,
         },
     )
     .expect("issue");
     assert_eq!(
         root_names(&signed_claims(&bound)),
-        BTreeSet::from(["iss", "vct", "iat", "cnf", "_sd_alg", PASSPORT_CLAIM])
+        BTreeSet::from(["iss", "vct", "iat", "exp", "cnf", "_sd_alg", PASSPORT_CLAIM])
     );
 }
 
@@ -130,7 +136,7 @@ fn a_passport_member_named_like_a_registered_claim_stays_in_the_passport() {
 
     assert_eq!(
         root_names(&signed_claims(&credential)),
-        BTreeSet::from(["iss", "vct", "iat", "_sd_alg", PASSPORT_CLAIM]),
+        BTreeSet::from(["iss", "vct", "iat", "exp", "_sd_alg", PASSPORT_CLAIM]),
         "a passport member reached the root of the credential"
     );
 

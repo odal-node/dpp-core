@@ -13,6 +13,14 @@ pub enum SdJwtVcError {
     /// The payload handed to [`super::issue`] was not a JSON object.
     #[error("payload is not a JSON object")]
     PayloadNotAnObject,
+    /// The credential [`super::issue`] was asked for would never verify: its `exp` is
+    /// not after its `iat`, or its `nbf` is not before its `exp`.
+    #[error("the validity window is empty: exp must be after iat, and nbf before exp")]
+    EmptyValidityWindow,
+    /// The credential [`super::issue`] was asked for has no `exp` and no status
+    /// reference, so nothing short of revoking the Issuer's key could ever end it.
+    #[error("the credential has no exp and no status reference, so nothing could end it")]
+    Unbounded,
     /// The key store refused to sign.
     #[error("signing failed: {0}")]
     Signing(String),
@@ -38,14 +46,15 @@ pub enum SdJwtVcError {
     /// sub-claim of one, arrived in a Disclosure.
     #[error("claim '{0}' was selectively disclosed, which clause 2.2.2.3 forbids")]
     DisclosedClaim(&'static str),
-    /// `status` is present and is not a JSON object.
+    /// `status` is present and is not a reference to a Token Status List: it is not
+    /// a JSON object, or its `status_list` is not an object of a non-negative
+    /// `idx` and a `uri`.
     ///
-    /// Clause 2.2.2.3 registers `status` for a reference to a Token Status List,
-    /// and draft-ietf-oauth-status-list-21 section 6.2 gives its value as an
-    /// object. Nothing here follows the reference yet, so a value that is not one
-    /// cannot be read as a status at all, and passing it by would let a string
-    /// stand where a status mechanism is expected.
-    #[error("claim 'status' is not an object")]
+    /// Clause 2.2.2.3 registers `status` for that reference, and
+    /// draft-ietf-oauth-status-list-21 section 6.2 gives its value. A value that is
+    /// not one cannot be read as a status at all, and passing it by would let a
+    /// string stand where a status mechanism is expected.
+    #[error("claim 'status' is not a reference to a status list")]
     MalformedStatus,
     /// A temporal claim is present but is not a JWT `NumericDate`.
     ///

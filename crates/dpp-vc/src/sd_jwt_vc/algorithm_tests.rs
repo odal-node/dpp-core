@@ -102,7 +102,10 @@ fn presented(store: &KeyStore, holder: &KeyEntry) -> String {
             issuer: ISSUER,
             vct: &vct(),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: Some(&holder.public_key()),
+            status: None,
         },
     )
     .expect("issue");

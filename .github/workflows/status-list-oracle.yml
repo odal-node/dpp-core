@@ -1,0 +1,116 @@
+# Judges the Status List Tokens this workspace reads and refuses with an independent
+# implementation of the IETF Token Status List, and has this workspace read what that
+# implementation issues.
+#
+# Its own workflow rather than a job in `ci.yml`, for the same reason the SD-JWT, AAS,
+# GS1 and JSON-LD oracles are: this needs Node and npm, and `cargo build --workspace`
+# succeeding with no Node, no JVM, no native toolchain and no services is a property
+# this project states publicly. Keeping the dependencies here means the main gate
+# never acquires them.
+#
+# What it answers: *does an implementation with no code and no author in common with
+# `dpp_vc::token_status_list` read the tokens we accept to the entries we say they
+# hold, refuse the ones we refuse, and do we read the tokens it issues?* The Rust
+# tests hold the module to this repository's own reading of
+# draft-ietf-oauth-status-list-21 and to the draft's own examples. A misreading the
+# author made twice passes both. The library is `@owf/token-status-list`, TypeScript,
+# from the OpenWallet Foundation, the successor of `@sd-jwt/jwt-status-list`.
+#
+# Checks, in order, each a step so a failure names itself:
+#
+#   1. the corpus: 34 Status List Tokens built by our code. Seventeen this crate
+#      accepts (every width of 1, 2, 4 and 8 bits under EdDSA, ES256, ES384 and
+#      ES512, and the draft's own example) and seventeen it refuses, each for one
+#      reason (typ, sub against uri, exp, a claim's type, ttl, bits, a padded `lst`,
+#      a gzip `lst`, an index past the list, a signature by another key). The
+#      library, with Node's `crypto` checking each signature, must read the first
+#      to the entries we give and refuse the second (`judge.mjs`), and read the
+#      four lists of the draft's Appendix C as the draft prints them;
+#   2. it issues tokens (`issue.mjs`): every width under every algorithm, claims left
+#      out and put in, and the draft's list of 2^20 entries;
+#   3. `dpp_vc` verifies them and reads every entry.
+#
+# What it does **not** answer. Nothing here is evidence of conformance to the Token
+# Status List, which is an Internet-Draft. The library does not verify a signature
+# itself: Node's `crypto` does, in `lib.mjs`, and that is said wherever this oracle is
+# cited. The CBOR and COSE form, which the library reads, is not built here and so
+# not judged.
+#
+# Deliberately **not** path-filtered. A filtered check never reports on a PR that
+# does not touch its paths, so it can never be made a required check without
+# blocking every other PR forever.
+name: Token Status List oracle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# See ci.yml for why `push` is main-only and `pull_request` carries no branch
+# filter (a filter excludes stacked PRs from CI entirely).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  judge:
+    name: Status List Tokens are read the same way by an independent implementation
+    runs-on: ubuntu-latest
+    steps:
+      # The token is not kept. This job installs third-party code, and nothing here
+      # ever pushes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # From the committed lockfile, with install scripts off. The library is somebody
+      # else's judgement about what the draft requires, and an unpinned upgrade would
+      # turn their tightening into our red build on code that did not change. `npm ci`
+      # fails if the lockfile and `package.json` disagree or a tarball's sha512 does
+      # not match. Moving the pin is a deliberate edit with a visible diff: change
+      # `package.json`, regenerate the lockfile, and cite the new version in the
+      # register row. Dependabot opens that edit, and it is not merged blind.
+      - name: Install the independent implementation
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix .github/oracle/tokenstatuslist
+
+      - name: Record what is actually being run
+        run: |
+          echo "node $(node --version)"
+          node -p "'@owf/token-status-list ' + require('./.github/oracle/tokenstatuslist/node_modules/@owf/token-status-list/package.json').version"
+          ls .github/oracle/tokenstatuslist/node_modules/@owf
+
+      - name: Build the corpus from our own reader
+        run: EMIT_STATUS_LIST_CORPUS=1 cargo test -p dpp-tests --test status_list_oracle_corpus
+
+      - name: Judge the corpus
+        run: node .github/oracle/tokenstatuslist/judge.mjs
+
+      - name: Have the independent implementation issue
+        run: node .github/oracle/tokenstatuslist/issue.mjs
+
+      - name: Read what it issued
+        run: CHECK_STATUS_LIST_ORACLE_ISSUED=target/status-list-oracle/issued.json cargo test -p dpp-tests --test status_list_oracle_corpus what_an_independent
+
+      # What failed, in a form that can be read without rerunning anything.
+      - name: Keep the corpus
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: status-list-oracle
+          path: target/status-list-oracle
+          retention-days: 7
