@@ -97,6 +97,13 @@ store.generate_key(&key_id)?;             // new Ed25519 key pair
 let key = store.load_key(&key_id)?;       // load an existing key
 ```
 
+A store has one handle at a time. `open` takes an exclusive lock on `<store file>.lock`
+and holds it until the handle is dropped, or the process ends; a second `open` of the file,
+here or in another process, is refused at once with `KeyStoreLocked`, and the caller retries
+if it means to wait. The lock is on a sibling file because each write renames a temp file
+over the store. A build older than the lock takes none, so never run one against a file a
+newer build has open.
+
 ### Key identifiers
 
 A key is identified by its RFC 7638 SHA-256 thumbprint, written as an RFC 9278 URI:

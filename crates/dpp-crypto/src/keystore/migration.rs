@@ -19,6 +19,15 @@ impl KeyStore {
     /// public one that accepts a store [`UpgradeNeeded`](super::UpgradeNeeded)
     /// names: every store written before V4, Argon2id ones included. For a store
     /// already in the current format it is identical to a single `open` call.
+    ///
+    /// Locks the file as `open` does, and keeps the one lock through the upgrade and
+    /// the re-open, so no other handle can open the file between them.
+    ///
+    /// # Errors
+    ///
+    /// [`KeyStoreLocked`](super::KeyStoreLocked) if another handle on the file is open,
+    /// in this process or another; otherwise as `open`, except that a store that
+    /// predates a current security property is upgraded and not refused.
     pub fn open_and_migrate(path: impl AsRef<std::path::Path>, passphrase: &str) -> Result<Self> {
         // The permissive door: this is the one function allowed to open a store
         // that predates a current security property, because it is the one that
@@ -27,8 +36,10 @@ impl KeyStore {
         if store.migrate_if_needed(passphrase)? {
             // Re-open strictly. The upgraded file must satisfy `open` on its own
             // terms — if it does not, the migration did not finish the job and
-            // saying so beats handing back a store nobody checked.
-            Self::open(path, passphrase)
+            // saying so beats handing back a store nobody checked. The lock moves
+            // to the new handle and is not released in between, so the file is
+            // never open without one.
+            Self::open_strictly(path, passphrase, store.lock)
         } else {
             Ok(store)
         }

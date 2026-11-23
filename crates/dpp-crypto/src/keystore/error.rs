@@ -1,4 +1,10 @@
 //! Errors of the keystore module.
+//!
+// LAYOUT-DEVIATION: rule 1 counts three public types as a file that is no longer about
+// one thing, but it is a rule about types that have gravity. None of these three has an
+// `impl` block or a serde derive, and each runs 15 to 30 lines with its docs. Each is one
+// way the key store refuses, and rule 14 asks for a module's failure modes to be read in
+// one file without reading the module.
 
 /// Why a JWK was refused as a private key.
 ///
@@ -30,6 +36,29 @@ pub enum PrivateJwkError {
     /// The public key that `d` derives is not the public key in `x` and `y`.
     #[error("the private member `d` does not belong to the JWK's public key")]
     KeyPairMismatch,
+}
+
+/// A key store file is already open, in this process or another.
+///
+/// [`KeyStore::open`](super::KeyStore::open) and
+/// [`KeyStore::open_and_migrate`](super::KeyStore::open_and_migrate) hold an exclusive
+/// lock on a file beside the store for as long as the handle lives, so a store has one
+/// writer. They are returned inside an `anyhow::Error`: recover this with
+/// `error.downcast_ref::<KeyStoreLocked>()`.
+///
+/// The open is refused at once and is not retried. A host that restarts while the old
+/// process is still shutting down opens the store again itself, once the old handle is
+/// gone.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "key store is open elsewhere: {} is locked by another handle, in this process or \
+     another, and a store has one writer at a time",
+    .lock_path.display()
+)]
+#[non_exhaustive]
+pub struct KeyStoreLocked {
+    /// The lock file, `<store file>.lock`, in the store's own directory.
+    pub lock_path: std::path::PathBuf,
 }
 
 /// A revoked key was asked to sign.

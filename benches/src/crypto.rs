@@ -98,7 +98,10 @@ fn keystore_benchmarks(c: &mut Criterion) {
     let mut group = c.benchmark_group("keystore");
     group.sample_size(10);
     group.bench_function("open_existing", |b| {
-        b.iter(|| KeyStore::open(&path, "bench-pass").unwrap());
+        // Dropped inside the routine. A store holds its file's lock until it is
+        // dropped, and `iter` keeps what the routine returns alive until the batch
+        // ends, so returning it would make the second open of the batch refuse.
+        b.iter(|| drop(KeyStore::open(&path, "bench-pass").unwrap()));
     });
     group.finish();
 }

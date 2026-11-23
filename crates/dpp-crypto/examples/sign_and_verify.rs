@@ -48,4 +48,6 @@ fn main() {
     println!("  segments: {segments} (header.payload.signature)");
 
     std::fs::remove_file(&path).ok();
+    // The lock file the open made beside it, which is left behind when a handle drops.
+    std::fs::remove_file(path.with_extension("json.lock")).ok();
 }

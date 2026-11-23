@@ -58,7 +58,11 @@ fn sign_a_payload(store: &KeyStore) {
 ```
 
 `KeyStore::open` **accepts a path where no file exists yet and creates the file there
-on the first save**, so choose the path deliberately and keep it outside the source tree. A complete, runnable version including keystore
+on the first save**, so choose the path deliberately and keep it outside the source tree.
+The directory has to exist. Opening also takes an exclusive lock on `<path>.lock`, beside
+the store, and holds it until the `KeyStore` is dropped: a second `open` of the same file,
+in this process or another, fails with `KeyStoreLocked` instead of risking a lost key, so
+share one handle (an `Arc<KeyStore>`) and do not open the file twice. A complete, runnable version including keystore
 setup is in [`examples/sign_and_verify.rs`](examples/sign_and_verify.rs):
 
 ```bash
