@@ -50,9 +50,6 @@ dpp-registry        = { workspace = true }
 # `-p dpp-tests` build must not depend on that.
 dpp-rules           = { workspace = true, features = ["bundle"] }
 serde_json = { workspace = true }
-# `jws_crit_rejection` signs a header `dpp-crypto` will not write, which needs
-# the signing primitive itself. Already in the workspace graph.
-ed25519-dalek = { workspace = true }
 # `carrier_resolution` drives the repository port, whose lookups are async.
 async-trait = { workspace = true }
 tokio      = { version = "1.40", features = ["macros", "rt"] }

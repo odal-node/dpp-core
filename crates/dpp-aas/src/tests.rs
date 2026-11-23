@@ -8,7 +8,7 @@ use crate::identity::AssetIdentity;
 /// all, so it has no product identifier — and that is not a defective fixture,
 /// it is the case the `Named` arm exists for. A helper that papered over it by
 /// inventing a GTIN would be the old behaviour wearing a new type.
-fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
+fn identity_of(p: &Passport) -> AssetIdentity<'_> {
     AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
         name: "assetKey",
         value: "urn:odal-node:test-asset:1",
@@ -21,7 +21,8 @@ use dpp_domain::unsold_goods::UnsoldGoodsReport;
 use dpp_domain::{
     BatteryChemistry, BatteryData, BatteryType, CarbonFootprint, CarbonFootprintClass, FibreEntry,
     Gtin, HazardSymbol, ManufacturerInfo, MaterialComposition, MaterialEntry, Passport, PassportId,
-    PassportStatus, ProductGroup, ProductGroupData, RepairabilityScore, TextileData,
+    PassportStatus, ProductGroup, ProductGroupCatalog, ProductGroupData, ProductionRoute,
+    RepairabilityScore, SteelData, TextileData,
 };
 use serde_json::json;
 
@@ -67,7 +68,7 @@ fn sample_unsold_goods_report() -> UnsoldGoodsReport {
 }
 
 fn minimal_passport(product_group: ProductGroup) -> Passport {
-    let schema_version = dpp_domain::ProductGroupCatalog::new()
+    let schema_version = ProductGroupCatalog::new()
         .get(product_group.catalog_key())
         .map_or_else(|| "1.0.0".to_owned(), |d| d.current_schema_version.clone());
     Passport {
@@ -310,9 +311,7 @@ fn shell_has_correct_asset_information() {
 /// label, inside a URN whose namespace-specific string is another URI scheme.
 #[test]
 fn the_asset_id_is_named_after_the_scheme_that_issued_it() {
-    use dpp_domain::identifier::ProductIdentifier;
-
-    let gs1 = ProductIdentifier::gs1(dpp_domain::Gtin::parse("09506000134352").unwrap());
+    let gs1 = ProductIdentifier::gs1(Gtin::parse("09506000134352").unwrap());
     let link = ProductIdentifier::identification_link("https://id.acme.example.com/b/1").unwrap();
     let did = ProductIdentifier::did("did:web:acme.example.com:b:1").unwrap();
 
@@ -417,7 +416,7 @@ fn a_scheme_issued_identity_cannot_carry_whitespace() {
 
     assert!(ProductIdentifier::identification_link("https://acme.example.com/a b").is_err());
     assert!(ProductIdentifier::did("did:web:acme.example.com:a b").is_err());
-    assert!(dpp_domain::Gtin::parse("0950600013 52").is_err());
+    assert!(Gtin::parse("0950600013 52").is_err());
 }
 
 #[test]
@@ -694,7 +693,7 @@ fn restricted_audience_receives_the_restricted_battery_field() {
     let (_, submodels) = build_aas_from_passport(
         &passport,
         identity_of(&passport),
-        dpp_domain::Audience::LegitimateInterest,
+        Audience::LegitimateInterest,
     )
     .expect("buildable");
 
@@ -1009,15 +1008,15 @@ fn a_line_with_no_derogation_projects_no_reason_element() {
 #[test]
 fn a_product_group_without_a_typed_mapper_still_carries_its_data() {
     let mut passport = minimal_passport(ProductGroup::Steel);
-    passport.product_group_data = Some(ProductGroupData::Steel(dpp_domain::SteelData {
-        product_identifier: dpp_domain::ProductIdentifier::gs1(
-            dpp_domain::Gtin::parse("09506000134352").expect("valid gtin"),
+    passport.product_group_data = Some(ProductGroupData::Steel(SteelData {
+        product_identifier: ProductIdentifier::gs1(
+            Gtin::parse("09506000134352").expect("valid gtin"),
         ),
         co2e_per_tonne_steel: 1.8,
         recycled_scrap_content_pct: 62.0,
         product_category: "flat".into(),
         country_of_origin: "DE".into(),
-        production_route: dpp_domain::ProductionRoute::ElectricArc,
+        production_route: ProductionRoute::ElectricArc,
         annual_production_tonnes: None,
     }));
 
@@ -1281,7 +1280,7 @@ fn the_point_1_conditions_and_safety_data_project() {
 /// clause 5 scheme derives — the defect `AssetIdentity` exists to remove.
 #[test]
 fn an_unsold_goods_export_refuses_an_asset_name_a_scheme_derives() {
-    for reserved in crate::RESERVED_ASSET_ID_NAMES {
+    for reserved in RESERVED_ASSET_ID_NAMES {
         let refused = build_unsold_goods_environment(
             &sample_unsold_goods_report(),
             reserved,
@@ -1289,7 +1288,7 @@ fn an_unsold_goods_export_refuses_an_asset_name_a_scheme_derives() {
         )
         .expect_err("a reserved name is refused");
         assert!(
-            matches!(refused, crate::AasError::ReservedAssetIdName(_)),
+            matches!(refused, AasError::ReservedAssetIdName(_)),
             "{reserved}: {refused:?}"
         );
     }
@@ -1302,7 +1301,7 @@ fn an_unsold_goods_export_refuses_an_asset_value_that_cannot_appear_in_a_uri() {
         build_unsold_goods_environment(&sample_unsold_goods_report(), "assetKey", "two words")
             .expect_err("whitespace cannot appear in a URI");
     assert!(
-        matches!(refused, crate::AasError::UnusableAssetIdentity(_)),
+        matches!(refused, AasError::UnusableAssetIdentity(_)),
         "{refused:?}"
     );
 }

@@ -651,7 +651,7 @@ fn the_eu_recognised_form_actually_emits_x5c() {
             .expect("one certificate"),
     );
     let bytes = header.to_json_bytes().expect("header builds");
-    let protected: serde_json::Map<String, serde_json::Value> =
+    let protected: serde_json::Map<String, Value> =
         serde_json::from_slice(&bytes).expect("the protected header is a JSON object");
 
     assert!(

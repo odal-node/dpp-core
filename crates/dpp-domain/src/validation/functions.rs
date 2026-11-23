@@ -312,7 +312,6 @@ fn push_svhc(substances: Option<&[SvhcSubstance]>, errors: &mut Vec<FieldError>)
 ///
 /// Callers wanting both — the publish path — want this. Callers wanting only the
 /// record's own consistency want [`Passport::validate`].
-#[must_use = "a validation result that is discarded has validated nothing"]
 pub fn validate_passport(passport: &Passport) -> Result<(), DppError> {
     let mut errors = match passport.validate() {
         Ok(()) => Vec::new(),

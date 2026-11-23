@@ -412,8 +412,9 @@ fn this_crate_reads_every_token_it_issues_back_to_the_claims_expected() {
     ] {
         assert!(ids.contains(&row), "{row}");
     }
-    assert!(
-        public_key("p384").algorithm() == KeyAlgorithm::EcdsaP384,
+    assert_eq!(
+        public_key("p384").algorithm(),
+        KeyAlgorithm::EcdsaP384,
         "the suite's P-384 key"
     );
 }

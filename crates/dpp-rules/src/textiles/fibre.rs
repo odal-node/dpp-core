@@ -64,7 +64,7 @@ pub fn validate_fibre_composition(fibres: &[FibreInput<'_>]) -> Result<(), Strin
 mod tests {
     use super::*;
 
-    fn fibre<'a>(name: &'a str, pct: f64) -> FibreInput<'a> {
+    fn fibre(name: &str, pct: f64) -> FibreInput<'_> {
         FibreInput {
             fibre: name,
             pct,

@@ -16,7 +16,7 @@ mod dispatch;
 mod electronics;
 mod textile;
 
-use dpp_domain::Passport;
+use dpp_domain::{Passport, ProductGroupData};
 
 use crate::model::{AasCollection, AasReference, AasSemId, AasSubmodel, AasSubmodelElement};
 use crate::property::{double_property, string_property};
@@ -55,7 +55,7 @@ pub(super) fn build_product_identification_submodel(passport: &Passport) -> AasS
     if let Some(identifier) = passport
         .product_group_data
         .as_ref()
-        .and_then(dpp_domain::ProductGroupData::product_identifier)
+        .and_then(ProductGroupData::product_identifier)
     {
         elements.push(string_property(
             "productIdentifier",

@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
+use crate::product_group::{SvhcSubstance, payload::ProductGroupPayload};
 
 /// A single surfactant ingredient in a detergent product.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,8 +52,8 @@ pub struct DetergentData {
     pub biodegradable: Option<bool>,
 }
 
-impl crate::product_group::payload::ProductGroupPayload for DetergentData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+impl ProductGroupPayload for DetergentData {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 
@@ -63,7 +64,7 @@ impl crate::product_group::payload::ProductGroupPayload for DetergentData {
 
     /// This act's schema declares no substances-of-concern field. Detergent
     /// hazards are carried by the surfactant and ingredient fields instead.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+    fn svhc_substances(&self) -> Option<&[SvhcSubstance]> {
         None
     }
 

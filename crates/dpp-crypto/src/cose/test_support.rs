@@ -236,7 +236,7 @@ pub(super) fn verify(message: &[u8]) -> Result<VerifiedSign1, CoseError> {
     verify_sign1(message, &public_key("p256"))
 }
 
-pub(super) fn signer() -> crate::keystore::KeyEntry {
+pub(super) fn signer() -> KeyEntry {
     key_pair("p256")
 }
 

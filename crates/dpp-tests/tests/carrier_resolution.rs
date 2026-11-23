@@ -35,16 +35,6 @@ impl PassportRepository for Store {
         self.0.lock().expect("unpoisoned").push(passport.clone());
         Ok(passport)
     }
-    async fn list(
-        &self,
-        _status: Option<PassportStatus>,
-        _q: Option<&str>,
-        _facility_id: Option<&str>,
-        _limit: u32,
-        _offset: u32,
-    ) -> Result<Vec<Passport>, DppError> {
-        Ok(self.0.lock().expect("unpoisoned").clone())
-    }
     async fn find_by_id(&self, _id: PassportId) -> Result<Option<Passport>, DppError> {
         unreachable!("not used by carrier resolution")
     }
@@ -63,6 +53,16 @@ impl PassportRepository for Store {
         _status: PassportStatus,
     ) -> Result<Passport, DppError> {
         unreachable!("not used by carrier resolution")
+    }
+    async fn list(
+        &self,
+        _status: Option<PassportStatus>,
+        _q: Option<&str>,
+        _facility_id: Option<&str>,
+        _limit: u32,
+        _offset: u32,
+    ) -> Result<Vec<Passport>, DppError> {
+        Ok(self.0.lock().expect("unpoisoned").clone())
     }
     async fn count(
         &self,

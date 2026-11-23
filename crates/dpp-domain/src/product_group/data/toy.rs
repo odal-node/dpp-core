@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
+use crate::product_group::payload::ProductGroupPayload;
 
 use super::common::SvhcSubstance;
 
@@ -33,8 +34,8 @@ pub struct ToyData {
     pub repairability_info: Option<String>,
 }
 
-impl crate::product_group::payload::ProductGroupPayload for ToyData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+impl ProductGroupPayload for ToyData {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 
@@ -44,7 +45,7 @@ impl crate::product_group::payload::ProductGroupPayload for ToyData {
     }
 
     /// This group's schema carries a REACH candidate-list declaration.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+    fn svhc_substances(&self) -> Option<&[SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
 

@@ -9,7 +9,7 @@ use crate::ruleset::Effectivity;
 
 /// The wall-clock date, used only where the question genuinely is "what can be
 /// computed today" — a readiness view, never a compliance determination.
-fn today() -> chrono::NaiveDate {
+fn today() -> NaiveDate {
     Utc::now().date_naive()
 }
 use chrono::{NaiveDate, Utc};
@@ -245,7 +245,7 @@ fn status_map_agrees_with_resolve_recycled_content_today() {
             continue;
         }
         let resolves_today =
-            crate::ruleset_registry::resolve_recycled_content(entry.product_category, today)
+            resolve_recycled_content(entry.product_category, today)
                 .is_assessed();
         match entry.status_on(today) {
             CalculatorStatus::Active { .. } => assert!(

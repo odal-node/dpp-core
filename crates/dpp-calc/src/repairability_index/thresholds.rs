@@ -137,6 +137,10 @@ impl Ruleset for Eu2023_1669Ruleset {
         })
     }
 
+    fn regulatory_basis(&self) -> &RegulatoryBasis {
+        &BASIS
+    }
+
     /// # Panics
     ///
     /// Never: every weight and boundary is a finite `f64` literal.
@@ -147,10 +151,6 @@ impl Ruleset for Eu2023_1669Ruleset {
             .and_then(|p| p.with(PART_WEIGHTS_FOLDABLE_GROUP, &PART_WEIGHTS_FOLDABLE))
             .and_then(|p| p.with(CLASS_BOUNDARIES_GROUP, &CLASS_BOUNDARIES))
             .expect("EU 2023/1669 weights and boundaries are finite literals")
-    }
-
-    fn regulatory_basis(&self) -> &RegulatoryBasis {
-        &BASIS
     }
 }
 

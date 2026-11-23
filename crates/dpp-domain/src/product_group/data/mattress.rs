@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
+use crate::product_group::payload::ProductGroupPayload;
 
 use super::common::SvhcSubstance;
 
@@ -60,8 +61,8 @@ pub struct MattressData {
     pub end_of_life_instructions: Option<String>,
 }
 
-impl crate::product_group::payload::ProductGroupPayload for MattressData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+impl ProductGroupPayload for MattressData {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 
@@ -71,7 +72,7 @@ impl crate::product_group::payload::ProductGroupPayload for MattressData {
     }
 
     /// This group's schema carries a REACH candidate-list declaration.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+    fn svhc_substances(&self) -> Option<&[SvhcSubstance]> {
         self.svhc_substances.as_deref()
     }
 
