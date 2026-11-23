@@ -38,7 +38,57 @@ pub enum CarrierQualifier<'a> {
     Serial(Cow<'a, str>),
 }
 
+/// The level a [`CarrierQualifier`] claims, without the value it carries.
+///
+/// For a caller that needs to tell the three apart and has no use for the batch
+/// or the serial: counting the labels scanned at each level, or choosing a
+/// code path, or a metric label. A caller that re-declares the three names
+/// restates what `granularity` and the qualifier already decided, and a level
+/// added to one is then missing from the other.
+///
+/// [`CarrierQualifier::level`] gives the level of a qualifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CarrierLevel {
+    /// The GTIN alone: every unit of a model.
+    Model,
+    /// AI 10: one production run.
+    Batch,
+    /// AI 21: one unit.
+    Serial,
+}
+
+impl CarrierLevel {
+    /// Every level, from the coarsest to the finest.
+    pub const ALL: [Self; 3] = [Self::Model, Self::Batch, Self::Serial];
+
+    /// The level as a lowercase word: `model`, `batch` or `serial`. Stable, so it
+    /// can be a metric label or a log field.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Model => "model",
+            Self::Batch => "batch",
+            Self::Serial => "serial",
+        }
+    }
+}
+
 impl CarrierQualifier<'_> {
+    /// The level this qualifier claims, without its value.
+    ///
+    /// Answered here for the reason [`ai_element`](Self::ai_element) is: the enum
+    /// is `#[non_exhaustive]`, so a match from another crate needs a wildcard, and
+    /// a wildcard would file a future level under one of these three.
+    #[must_use]
+    pub fn level(&self) -> CarrierLevel {
+        match self {
+            Self::Model => CarrierLevel::Model,
+            Self::Batch(_) => CarrierLevel::Batch,
+            Self::Serial(_) => CarrierLevel::Serial,
+        }
+    }
+
     /// The GS1 element this qualifier prints after the GTIN, as
     /// `(application identifier, value)`, or `None` for [`Self::Model`], which
     /// prints nothing.

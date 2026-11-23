@@ -130,3 +130,38 @@ fn validate_leaves_the_lot_free_where_no_carrier_prints_it() {
         assert!(p.validate().is_ok(), "{level:?}");
     }
 }
+
+/// The level of a qualifier is the qualifier without its value: one for one, and
+/// `ALL` is in step with the three, coarsest first.
+#[test]
+fn a_qualifier_reports_its_level_without_its_value() {
+    use super::CarrierLevel;
+
+    assert_eq!(CarrierQualifier::Model.level(), CarrierLevel::Model);
+    assert_eq!(
+        CarrierQualifier::Batch(Cow::Borrowed("B-1")).level(),
+        CarrierLevel::Batch
+    );
+    assert_eq!(
+        CarrierQualifier::Serial(Cow::Borrowed("S-1")).level(),
+        CarrierLevel::Serial
+    );
+    assert_eq!(
+        CarrierLevel::ALL,
+        [
+            CarrierLevel::Model,
+            CarrierLevel::Batch,
+            CarrierLevel::Serial
+        ]
+    );
+}
+
+/// The words are lowercase and fixed: they are used as metric labels, where a
+/// rename splits a series.
+#[test]
+fn a_level_is_named_in_lowercase() {
+    use super::CarrierLevel;
+
+    let words: Vec<&str> = CarrierLevel::ALL.iter().map(|l| l.as_str()).collect();
+    assert_eq!(words, ["model", "batch", "serial"]);
+}

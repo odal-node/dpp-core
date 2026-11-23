@@ -175,3 +175,33 @@ async fn a_poisoned_lock_still_lets_a_record_be_erased() {
         .expect("erasure survives a poisoned lock");
     assert_eq!(receipt.record, id);
 }
+
+/// A receipt is put on a wire by whoever answers an erasure, so its keys are
+/// fixed here: camelCase, the record as a bare string, nothing of the content.
+#[test]
+fn a_receipt_serialises_camel_case_and_reads_back() {
+    use super::ErasureReceipt;
+    use chrono::{TimeZone, Utc};
+
+    let receipt = ErasureReceipt {
+        record: PersonalDataRecordId::new("rec-1"),
+        passport_id: PassportId::new(),
+        field: FIELD.to_owned(),
+        erased_at: Utc.with_ymd_and_hms(2026, 11, 23, 10, 0, 0).unwrap(),
+    };
+
+    let wire = serde_json::to_value(&receipt).expect("serialises");
+    let mut keys: Vec<&str> = wire
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["erasedAt", "field", "passportId", "record"]);
+    assert_eq!(wire["record"], "rec-1");
+    assert_eq!(wire["erasedAt"], "2026-11-23T10:00:00Z");
+
+    let back: ErasureReceipt = serde_json::from_value(wire).expect("reads back");
+    assert_eq!(back, receipt);
+}

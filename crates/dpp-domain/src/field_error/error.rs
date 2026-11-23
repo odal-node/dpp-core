@@ -5,8 +5,14 @@
 //! [`crate::error::dpp::DppError`] can carry structured validation detail on
 //! every target, including `wasm32`.
 
+use serde::{Deserialize, Serialize};
+
 /// A single field-level validation failure.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// Serialisable as `{"field": …, "message": …}`: it is what a caller reports to
+/// the person who sent the input, and a caller that declares its own copy to put
+/// it on a wire has two types for one fact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FieldError {
     /// JSON pointer path to the failing field, e.g. `"/gtin"` or
     /// `"/fibreComposition/0/pct"`. Empty when the failure is not tied to a
