@@ -94,6 +94,9 @@ keys.json
 # The independent SD-JWT oracle's dependencies (CI-only; see .github/workflows/sdjwt-oracle.yml)
 .github/oracle/sdjwt/node_modules/
 
+# The independent Token Status List oracle's dependencies (CI-only; see .github/workflows/status-list-oracle.yml)
+.github/oracle/tokenstatuslist/node_modules/
+
 # The independent JOSE oracle's dependencies (CI-only; see .github/workflows/jose-oracle.yml)
 .github/oracle/jose/node_modules/
 

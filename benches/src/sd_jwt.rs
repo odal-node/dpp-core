@@ -63,6 +63,7 @@ fn credential(c: &mut Criterion) {
         vct: &vct,
         issued_at: ISSUED_AT,
         holder_key: None,
+        status: None,
     };
 
     c.bench_function("sd_jwt_vc_issue_battery", |b| {

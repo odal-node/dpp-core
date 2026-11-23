@@ -146,7 +146,34 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   store's own calls never leave its current key revoked; a store whose file does is given a
   current key that signs by `revoke_and_rotate`. (#623)
 
+- **`sd_jwt_vc::Issuance` has a `status` field, and `verify` reads the reference
+  more closely.** `status` is an `Option<&StatusReference>`, the reference an issued
+  credential carries to its entry in a Token Status List. **Migration:** add
+  `status: None` to each `Issuance` literal to issue as before. `sd_jwt_vc::verify`
+  refused a `status` that was not an object; it now also refuses one whose
+  `status_list` is not an object of a non-negative integer `idx` and a non-empty
+  string `uri`, as `SdJwtVcError::MalformedStatus`. (#654)
+
 ### Added
+
+- **`dpp_vc::token_status_list`: a status mechanism for issued SD-JWT VCs.** The IETF
+  Token Status List of draft-ietf-oauth-status-list-21: `TokenStatusList`, the list of
+  1, 2, 4 or 8 bits per entry, which reads and writes the `lst` text (zlib, then
+  unpadded base64url) and refuses a list that expands past a budget;
+  `StatusReference`, the `status` claim an issued credential carries, which
+  `sd_jwt_vc::issue` writes when `Issuance::status` names one; and `StatusListToken`,
+  the check a verifier makes. `StatusListToken::verify` takes the signed
+  `statuslist+jwt`, a key and the time, and `status` answers `Status::Valid`,
+  `Revoked` or `Suspended` for a reference, after the token's `sub` has been matched
+  to the reference's `uri`. A list that is expired, signed by another key, for another
+  URI, or too short for the index, answers nothing. Fetching, caching and publishing a
+  list need a host and are not here, and neither is the CBOR form. The draft is not an
+  RFC and no conformance is claimed; the standards register says so. It is tested on
+  the draft's own examples and its Appendix C lists, and against an independent
+  implementation, `@owf/token-status-list`, which reads the tokens this crate accepts,
+  refuses the ones it refuses, and issues tokens this crate reads
+  (`status-list-oracle.yml`). The list decoder and the reference reader are fuzzed
+  (`token_status_list_decode`). (#654)
 
 - **`dpp_crypto::cose`: `COSE_Sign1` signing and verification** under EdDSA, ES256,
   ES384 and ES512, beside `jws`. `sign_sign1` writes a tagged message and

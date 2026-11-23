@@ -7,6 +7,8 @@ use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal, holder_key_c
 use dpp_domain::Disclosure as DisclosureClass;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
 
+use crate::token_status_list::StatusReference;
+
 use super::error::SdJwtVcError;
 use super::{PASSPORT_CLAIM, TYP};
 
@@ -36,15 +38,27 @@ pub struct Issuance<'a> {
     /// carry a Key Binding JWT signed by this key. `None` issues a credential that
     /// anyone holding a copy can present as their own (RFC 9901 clause 9.5).
     pub holder_key: Option<&'a dpp_crypto::jws::PublicKey>,
+    /// Where the credential's status is kept, so that it can be withdrawn after it
+    /// is issued.
+    ///
+    /// Written as `status`, with the `status_list` of draft-ietf-oauth-status-list-21
+    /// section 6.2, which clause 2.2.2.3 of the profile registers the claim for and
+    /// clause 2.4 tells a Verifier to check. It is never concealed. `None` issues a
+    /// credential nobody can withdraw: it verifies until its key is revoked.
+    ///
+    /// The entry it names has to be kept in a list the status issuer publishes; that
+    /// is not done here.
+    pub status: Option<&'a StatusReference>,
 }
 
 /// Build and sign an SD-JWT VC over `payload`.
 ///
 /// The passport sits under one claim, [`PASSPORT_CLAIM`]. The root holds the
 /// claims the Issuer sets (`iss`, `vct`, `iat`, and `cnf` when a Holder key is
-/// named) and nothing else, so no passport member can be read as a registered
-/// claim of the credential. The passport has a lifecycle `status`; at the root
-/// that name is the profile's reference to a Token Status List.
+/// named, `status` when a status reference is) and nothing else, so no passport
+/// member can be read as a registered claim of the credential. The passport has a
+/// lifecycle `status`; at the root that name is the profile's reference to a Token
+/// Status List.
 ///
 /// Every claim of the passport the policy classifies as anything other than
 /// [`DisclosureClass::Public`] is concealed — at every depth, in both scopes.
@@ -74,8 +88,10 @@ pub struct Issuance<'a> {
 ///
 /// # Errors
 ///
-/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object, and
-/// [`SdJwtVcError::Signing`] if the key store cannot sign.
+/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object,
+/// [`SdJwtVcError::MalformedStatus`] if the status reference is one [`verify`](super::verify)
+/// would refuse, an empty `uri`, and [`SdJwtVcError::Signing`] if the key store cannot
+/// sign.
 pub fn issue(
     store: &KeyStore,
     key_id: &str,
@@ -86,6 +102,14 @@ pub fn issue(
     let Some(object) = payload.as_object() else {
         return Err(SdJwtVcError::PayloadNotAnObject);
     };
+    // `verify` holds `status` to a reference it can read. `StatusReference` has public
+    // fields, so one it cannot read, an empty `uri`, could otherwise be signed into
+    // a credential this crate then refuses. Held to the same reading before signing.
+    if let Some(reference) = credential.status {
+        let mut written = Map::new();
+        written.insert("status".to_owned(), reference.to_claim());
+        StatusReference::from_claims(&written).map_err(|_| SdJwtVcError::MalformedStatus)?;
+    }
 
     let mut claims = Map::new();
     // Clause 2.2.2: `iss` identifies the issuer and, being an HTTPS URI, selects
@@ -100,6 +124,11 @@ pub fn issue(
     // Disclosure.
     if let Some(key) = credential.holder_key {
         claims.insert("cnf".to_owned(), holder_key_confirmation(key));
+    }
+    // Clause 2.2.2.3: never in a Disclosure, and in the clear here because the root
+    // is written directly.
+    if let Some(reference) = credential.status {
+        claims.insert("status".to_owned(), reference.to_claim());
     }
 
     let mut disclosures = Vec::new();

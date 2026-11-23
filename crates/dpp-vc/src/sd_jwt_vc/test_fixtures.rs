@@ -75,6 +75,7 @@ pub(super) fn issued(store: &KeyStore) -> dpp_crypto::sd_jwt::SdJwt {
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue")

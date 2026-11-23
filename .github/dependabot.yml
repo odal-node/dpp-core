@@ -72,6 +72,7 @@ updates:
     directories:
       - "/.github/scripts"
       - "/.github/oracle/sdjwt"
+      - "/.github/oracle/tokenstatuslist"
     schedule:
       interval: weekly
       day: monday

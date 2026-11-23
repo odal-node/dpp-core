@@ -115,6 +115,7 @@ fn the_claims_the_issuer_sets_are_never_disclosable() {
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
             holder_key: Some(&holder.public_key()),
+            status: None,
         },
     )
     .expect("issue");
@@ -274,6 +275,7 @@ fn a_passport_member_sharing_a_registered_claim_name_is_concealed_at_every_depth
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue")

@@ -63,7 +63,9 @@
 //! # What it reads
 //!
 //! Every `.rs`, `.md`, `.toml`, `.json`, `.yml` and `.yaml` file in the
-//! repository, plus `.gitattributes` and `justfile`. It skips build output and
+//! repository, plus `.gitattributes` and `justfile`. It skips build output,
+//! installed packages (`node_modules`, which a CI oracle's `npm ci` fills with
+//! other people's READMEs, none of them this repository citing anything) and
 //! hidden directories other than `.github`. Three files and one directory are
 //! skipped:
 //!
@@ -329,7 +331,7 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
             .unwrap_or_default();
         if path.is_dir() {
             let hidden = name.starts_with('.') && name != ".github";
-            if !hidden && name != "target" {
+            if !hidden && name != "target" && name != "node_modules" {
                 walk(&path, out);
             }
         } else if NAMED_FILES.contains(&name)

@@ -32,6 +32,7 @@ jobs:
           - cose_sign1_verify
           - sd_jwt_parse
           - status_list_decode
+          - token_status_list_decode
           - passport_from_stored
           - identifier_parse
           - schema_validate
