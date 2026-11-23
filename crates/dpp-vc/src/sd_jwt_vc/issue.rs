@@ -31,6 +31,30 @@ pub struct Issuance<'a> {
     pub vct: &'a str,
     /// `iat`, in seconds since the epoch.
     pub issued_at: i64,
+    /// `exp`, in seconds since the epoch: the instant at which the credential stops
+    /// verifying (RFC 7519 clause 4.1.4). It has to be after [`Self::issued_at`].
+    ///
+    /// Optional, as the profile has it (clause 2.2.2), but a credential has to be
+    /// able to end. With `None` there has to be a [`Self::status`] to end it by, and
+    /// without one [`issue`] refuses with [`SdJwtVcError::Unbounded`]: a credential
+    /// with neither verifies until its key is revoked, whatever happens to the
+    /// passport it was issued from. OpenID4VC HAIP 1.0 clause 6.1 asks an Issuer that
+    /// limits validity to use `exp`, a `status`, or both; here the limit is not the
+    /// Issuer's to skip.
+    ///
+    /// With one, `exp` is the longest a Verifier that never looks at a status list can
+    /// be misled by a credential the Issuer has since withdrawn, so it should be as
+    /// short as the passport's use allows. A passport has to stay available after its
+    /// operator has ceased (ESPR Art. 11(e)), and a credential that has expired cannot
+    /// be issued again by one that has: how long to make it is the Issuer's to weigh.
+    ///
+    /// Written at the root and never concealed, since a Holder who could withhold it
+    /// could turn an expired credential into an unbounded one (RFC 9901 clause 9.7).
+    pub expires_at: Option<i64>,
+    /// `nbf`, in seconds since the epoch: the instant before which the credential does
+    /// not verify. `None` writes no `nbf`. With an [`Self::expires_at`] it has to be
+    /// before it. Written at the root, and never concealed.
+    pub not_before: Option<i64>,
     /// The Holder's public key (Ed25519, P-256, P-384 or P-521), to bind the credential to.
     ///
     /// Written as `cnf` with RFC 7800's `jwk` confirmation method, which clause
@@ -44,7 +68,7 @@ pub struct Issuance<'a> {
     /// Written as `status`, with the `status_list` of draft-ietf-oauth-status-list-21
     /// section 6.2, which clause 2.2.2.3 of the profile registers the claim for and
     /// clause 2.4 tells a Verifier to check. It is never concealed. `None` issues a
-    /// credential nobody can withdraw: it verifies until its key is revoked.
+    /// credential nobody can withdraw before [`Self::expires_at`].
     ///
     /// The entry it names has to be kept in a list the status issuer publishes; that
     /// is not done here.
@@ -54,9 +78,9 @@ pub struct Issuance<'a> {
 /// Build and sign an SD-JWT VC over `payload`.
 ///
 /// The passport sits under one claim, [`PASSPORT_CLAIM`]. The root holds the
-/// claims the Issuer sets (`iss`, `vct`, `iat`, and `cnf` when a Holder key is
-/// named, `status` when a status reference is) and nothing else, so no passport
-/// member can be read as a registered claim of the credential. The passport has a
+/// claims the Issuer sets (`iss`, `vct`, `iat`, and `exp`, `nbf`, `cnf` and `status`
+/// when they are given) and nothing else, so no passport member can be read as a
+/// registered claim of the credential. The passport has a
 /// lifecycle `status`; at the root that name is the profile's reference to a Token
 /// Status List.
 ///
@@ -88,8 +112,11 @@ pub struct Issuance<'a> {
 ///
 /// # Errors
 ///
-/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object, and
-/// [`SdJwtVcError::Signing`] if the key store cannot sign.
+/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object,
+/// [`SdJwtVcError::EmptyValidityWindow`] if the credential would expire when it is
+/// issued or before it starts, [`SdJwtVcError::Unbounded`] if it has neither an `exp`
+/// nor a status reference, and [`SdJwtVcError::Signing`] if the key store cannot
+/// sign.
 pub fn issue(
     store: &KeyStore,
     key_id: &str,
@@ -100,6 +127,23 @@ pub fn issue(
     let Some(object) = payload.as_object() else {
         return Err(SdJwtVcError::PayloadNotAnObject);
     };
+    match credential.expires_at {
+        // A credential that expires when it is issued, or before it starts, verifies
+        // nowhere. That is a mistake of the Issuer's, and a Holder would find it at
+        // the first presentation, so it is refused here.
+        Some(expires_at) => {
+            if expires_at <= credential.issued_at
+                || credential
+                    .not_before
+                    .is_some_and(|not_before| not_before >= expires_at)
+            {
+                return Err(SdJwtVcError::EmptyValidityWindow);
+            }
+        }
+        // With no `exp`, only a status list can end it.
+        None if credential.status.is_none() => return Err(SdJwtVcError::Unbounded),
+        None => {}
+    }
 
     let mut claims = Map::new();
     // Clause 2.2.2: `iss` identifies the issuer and, being an HTTPS URI, selects
@@ -110,6 +154,14 @@ pub fn issue(
     );
     claims.insert("vct".to_owned(), Value::String(credential.vct.to_owned()));
     claims.insert("iat".to_owned(), Value::Number(credential.issued_at.into()));
+    // Clause 2.2.2, and RFC 9901 clause 9.7, which names both: written at the root,
+    // where nothing below walks for concealment, so neither can be a Disclosure.
+    if let Some(expires_at) = credential.expires_at {
+        claims.insert("exp".to_owned(), Value::Number(expires_at.into()));
+    }
+    if let Some(not_before) = credential.not_before {
+        claims.insert("nbf".to_owned(), Value::Number(not_before.into()));
+    }
     // Clause 2.2.2.3: REQUIRED when Key Binding is to be supported, and never in a
     // Disclosure.
     if let Some(key) = credential.holder_key {

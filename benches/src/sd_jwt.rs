@@ -62,6 +62,8 @@ fn credential(c: &mut Criterion) {
         issuer: ISSUER,
         vct: &vct,
         issued_at: ISSUED_AT,
+        expires_at: Some(ISSUED_AT + 31_536_000),
+        not_before: None,
         holder_key: None,
         status: None,
     };

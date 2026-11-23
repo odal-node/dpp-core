@@ -13,7 +13,7 @@
  *                             claims this crate reads.
  *   the passport              The credential as issued must reveal exactly the
  *                             passport that went in, under the `passport` claim,
- *                             plus the `iss`, `vct` and `iat` the issuer sets at
+ *                             plus the `iss`, `vct`, `iat` and `exp` the issuer sets at
  *                             the root. Concealment that lost or invented a claim
  *                             shows here, and so does a passport member that
  *                             reached the root.

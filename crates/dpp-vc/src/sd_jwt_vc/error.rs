@@ -13,6 +13,14 @@ pub enum SdJwtVcError {
     /// The payload handed to [`super::issue`] was not a JSON object.
     #[error("payload is not a JSON object")]
     PayloadNotAnObject,
+    /// The credential [`super::issue`] was asked for would never verify: its `exp` is
+    /// not after its `iat`, or its `nbf` is not before its `exp`.
+    #[error("the validity window is empty: exp must be after iat, and nbf before exp")]
+    EmptyValidityWindow,
+    /// The credential [`super::issue`] was asked for has no `exp` and no status
+    /// reference, so nothing short of revoking the Issuer's key could ever end it.
+    #[error("the credential has no exp and no status reference, so nothing could end it")]
+    Unbounded,
     /// The key store refused to sign.
     #[error("signing failed: {0}")]
     Signing(String),

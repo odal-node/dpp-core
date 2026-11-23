@@ -35,6 +35,8 @@ fn issued_with(store: &KeyStore, status: Option<&StatusReference>, passport: &Va
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: None,
             status,
         },

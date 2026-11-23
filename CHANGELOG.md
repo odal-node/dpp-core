@@ -154,7 +154,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `status_list` is not an object of a non-negative integer `idx` and a non-empty
   string `uri`, as `SdJwtVcError::MalformedStatus`. (#654)
 
+- **`sd_jwt_vc::Issuance` has an expiry, and a credential has to be able to end.** It
+  gains `expires_at: Option<i64>`, written as `exp`, and `not_before: Option<i64>`,
+  written as `nbf`. `issue` refuses a credential with neither an `exp` nor a `status`
+  reference as `SdJwtVcError::Unbounded`: it would verify until its key is revoked,
+  whatever happens to the passport it came from. It also refuses an empty window, an
+  `exp` that is not after `iat` or an `nbf` that is not before `exp`, as
+  `SdJwtVcError::EmptyValidityWindow`. **Migration:** set `expires_at` to the instant the
+  credential should stop verifying, or give it a `status` reference, and set
+  `not_before: None` to write no `nbf`. A credential issued before this change has
+  neither and still verifies, so issue it again. (#659)
+
 ### Added
+
+- **An issued SD-JWT VC can expire.** `sd_jwt_vc::issue` writes `exp` and `nbf` when they
+  are given, at the root, where neither is ever concealed (RFC 9901 clause 9.7): a Holder
+  cannot leave either out of a presentation or change it without breaking the
+  signature, and `verify` refuses the credential from its `exp` on. Tested on what this
+  crate issues. A credential may have no `exp` only beside a `status` reference, as
+  OpenID4VC HAIP 1.0 clause 6.1 has it for an Issuer that limits validity, so it is
+  withdrawn by the list, or by its `exp`, or by both. (#659)
 
 - **`dpp_vc::token_status_list`: a status mechanism for issued SD-JWT VCs.** The IETF
   Token Status List of draft-ietf-oauth-status-list-21: `TokenStatusList`, the list of

@@ -20,6 +20,9 @@ pub(super) const SCHEMA_VERSION: &str = "2.6.0";
 /// The fixture's `iat`. A fixed instant, so nothing here depends on the wall
 /// clock and the validity-window tests can name a moment either side of it.
 pub(super) const ISSUED_AT: i64 = 1_789_000_000;
+/// The fixture's `exp`: a year after `iat`, far enough that a test of another claim
+/// is not a test of this one.
+pub(super) const EXPIRES_AT: i64 = ISSUED_AT + 31_536_000;
 
 pub(super) fn now() -> DateTime<Utc> {
     Utc.timestamp_opt(ISSUED_AT + 60, 0).unwrap()
@@ -74,6 +77,8 @@ pub(super) fn issued(store: &KeyStore) -> dpp_crypto::sd_jwt::SdJwt {
             issuer: ISSUER,
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
             holder_key: None,
             status: None,
         },
