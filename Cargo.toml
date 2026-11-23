@@ -26,7 +26,7 @@ authors     = ["Odal Node <dev@odal-node.io>"]
 license     = "Apache-2.0"
 repository  = "https://github.com/odal-node/dpp-core"
 homepage    = "https://odal-node.io"
-rust-version = "1.99"
+rust-version = "1.100"
 
 # ---------------------------------------------------------------------------
 # Debug-build profile
