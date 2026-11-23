@@ -57,7 +57,8 @@ pub enum PrivateJwkError {
 )]
 #[non_exhaustive]
 pub struct KeyStoreLocked {
-    /// The lock file, `<store file>.lock`, in the store's own directory.
+    /// The lock file, `<store file>.lock`, beside the store file once any symlink to it
+    /// is resolved.
     pub lock_path: std::path::PathBuf,
 }
 

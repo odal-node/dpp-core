@@ -7,9 +7,9 @@
 //! ## Module layout
 //!
 //! - `entry` — [`KeyEntry`], the decrypted in-memory key handed back to callers.
-//! - `error` — [`PrivateJwkError`], why a JWK was refused as a private key, and
+//! - `error`: [`PrivateJwkError`], why a JWK was refused as a private key, and
 //!   [`KeyStoreLocked`], why a store was refused because it is open elsewhere.
-//! - `lock` — the exclusive lock on `<store file>.lock` that gives a store one handle.
+//! - `lock`: the exclusive lock on `<store file>.lock` that gives a store one handle.
 //! - `private_jwk` — [`KeyEntry::from_private_jwk`], which builds a key pair from the
 //!   private JWK of a key someone else generated, in memory only.
 //! - `store` — [`KeyStore`] itself: the encrypted record map and its

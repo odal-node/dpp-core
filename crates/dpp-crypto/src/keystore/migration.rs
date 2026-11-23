@@ -39,7 +39,7 @@ impl KeyStore {
             // saying so beats handing back a store nobody checked. The lock moves
             // to the new handle and is not released in between, so the file is
             // never open without one.
-            Self::open_strictly(path, passphrase, store.lock)
+            Self::open_strictly(passphrase, store.lock)
         } else {
             Ok(store)
         }

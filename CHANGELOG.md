@@ -177,7 +177,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   as an `Arc<KeyStore>`. A host whose restart overlaps the old process retries the open.
   The directory of the store must now exist when it is opened, where a missing one failed at
   the first save; and a platform that cannot lock files refuses the open, since an unlocked
-  store is the defect. The lock file stays in place after the handle is dropped. A build
+  store is the defect. The store file is resolved before it is locked, so a relative path, an
+  absolute one, a `..` and a symlink to the file are one store, and the handle saves through
+  the resolved path: a save replaces the file a symlink points at, where it replaced the
+  symlink. A store file cannot be named `*.lock`, which is the name of a lock file, and such
+  a path is refused when it is opened. The lock file stays in place after the handle is dropped. A build
   older than this one takes no lock, so it can still open the file beside a newer build and
   save over it: never run one against a file a newer build has open. (#624)
 

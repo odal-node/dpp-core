@@ -130,6 +130,87 @@ fn two_spellings_of_one_path_are_one_lock() {
     KeyStore::open(&roundabout, PASSPHRASE).expect("free once the first is dropped");
 }
 
+/// A symlink to a store file is that store, whichever name opens it first. The handle also
+/// saves through the resolved path: a save renames a temp file over the store, which
+/// would replace the link and leave the file it named behind.
+#[cfg(unix)]
+#[test]
+fn a_symlink_to_a_store_file_is_one_store_with_the_file() {
+    let dir = temp_dir("lock-symlink");
+    std::fs::create_dir_all(&dir).expect("make the directory");
+    let target = dir.join("keys.json");
+    let link = dir.join("current.json");
+    let store = KeyStore::open(&target, PASSPHRASE).expect("open");
+    store.generate_key("issuer").expect("generate");
+    drop(store);
+    std::os::unix::fs::symlink(&target, &link).expect("make the link");
+
+    // The file first: the link is refused, with the file's lock.
+    let first = KeyStore::open(&target, PASSPHRASE).expect("open the file");
+    assert_eq!(
+        refused(KeyStore::open(&link, PASSPHRASE)).lock_path,
+        sibling_lock(&target)
+    );
+    drop(first);
+
+    // The link first: the file is refused, and a save keeps the link a link.
+    let through_link = KeyStore::open(&link, PASSPHRASE).expect("open the link");
+    assert_eq!(
+        refused(KeyStore::open(&target, PASSPHRASE)).lock_path,
+        sibling_lock(&target)
+    );
+    through_link.generate_key("added").expect("generate");
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .expect("the link is still there")
+            .file_type()
+            .is_symlink(),
+        "a save through the link replaced the link"
+    );
+    drop(through_link);
+    let reopened = KeyStore::open(&target, PASSPHRASE).expect("reopen the file");
+    assert!(
+        reopened.has_key("issuer") && reopened.has_key("added"),
+        "the save went to the file the link names"
+    );
+}
+
+/// A store file named like a lock file is refused, whichever store holds the lock. A store
+/// saved over `keys.lock` would replace the lock file of the store `keys`, and leave that
+/// store's lock on a file nothing opens, so a second handle on `keys` would be let in.
+#[test]
+fn a_store_file_cannot_be_named_like_a_lock_file() {
+    let dir = temp_dir("lock-reserved");
+    std::fs::create_dir_all(&dir).expect("make the directory");
+    let keys = dir.join("keys");
+    let first = KeyStore::open(&keys, PASSPHRASE).expect("open");
+
+    let Err(refusal) = KeyStore::open(dir.join("keys.lock"), PASSPHRASE) else {
+        panic!("a store was opened on another store's lock file");
+    };
+    assert!(
+        refusal.downcast_ref::<KeyStoreLocked>().is_none(),
+        "refused for its name, not for the lock: {refusal:#}"
+    );
+    assert!(
+        format!("{refusal:#}").contains("cannot be a key store file"),
+        "{refusal:#}"
+    );
+    assert!(
+        !dir.join("keys.lock.lock").exists(),
+        "the refused open made no lock file of its own"
+    );
+
+    // The lock on `keys` is intact, and a save does not disturb it.
+    first.generate_key("issuer").expect("generate");
+    assert_eq!(
+        refused(KeyStore::open(&keys, PASSPHRASE)).lock_path,
+        sibling_lock(&keys)
+    );
+    // The control: a name that merely contains `lock` is a store like any other.
+    KeyStore::open(dir.join("lock.json"), PASSPHRASE).expect("a store named lock.json");
+}
+
 /// An open that fails after it has the lock lets go of it: a wrong passphrase must not
 /// leave the file locked for the one that is right.
 #[test]

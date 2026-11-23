@@ -223,6 +223,11 @@ impl UpgradeNeeded {
 /// file is left in place when the handle is dropped, since removing it would race an
 /// open, and it holds nothing.
 ///
+/// The store file is resolved before it is locked, so a relative path, an absolute one,
+/// a `..` and a symlink to the file are one store, and the handle reads and saves
+/// through the resolved path: a save replaces the file a link points at, and not the
+/// link. A store file cannot be named `*.lock`, which is the name of a lock file.
+///
 /// What this does not stop: a build older than the lock takes none, so it can open
 /// the file beside a newer build and save over what the newer one wrote since. It
 /// does refuse, on open, a file that holds a record of an algorithm it does not
@@ -283,15 +288,13 @@ impl KeyStore {
     /// points at `open_and_migrate`.
     pub fn open(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
         let lock = StoreLock::acquire(path.as_ref())?;
-        Self::open_strictly(path, passphrase, lock)
+        Self::open_strictly(passphrase, lock)
     }
 
-    /// [`Self::open`], under a lock that is already held. A failure drops the lock.
-    pub(crate) fn open_strictly(
-        path: impl AsRef<Path>,
-        passphrase: &str,
-        lock: StoreLock,
-    ) -> Result<Self> {
+    /// [`Self::open`], under a lock that is already held, on the file the lock is for.
+    /// A failure drops the lock.
+    pub(crate) fn open_strictly(passphrase: &str, lock: StoreLock) -> Result<Self> {
+        let path = lock.store_path().to_owned();
         let store = Self::read_store(path, passphrase, lock)?;
         if let Some(reason) = store.upgrade_needed {
             anyhow::bail!(
@@ -308,10 +311,12 @@ impl KeyStore {
     /// doors, and this is deliberately not a third.
     pub(crate) fn open_permissively(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
         let lock = StoreLock::acquire(path.as_ref())?;
+        let path = lock.store_path().to_owned();
         Self::read_store(path, passphrase, lock)
     }
 
-    /// Read the store at `path`, or make a new one, holding `lock` on it.
+    /// Read the store at `path`, or make a new one, holding `lock` on it. `path` is the
+    /// one the lock settled on, and is what the handle reads and saves through.
     fn read_store(path: impl AsRef<Path>, passphrase: &str, lock: StoreLock) -> Result<Self> {
         if path.as_ref().exists() {
             let bytes = std::fs::read(&path).context("Failed to read key store file")?;
