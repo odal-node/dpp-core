@@ -79,7 +79,7 @@ before a round-trip. A runnable version is in
 
 ## Minimum Rust version
 
-1.99, enforced in CI.
+1.100, enforced in CI.
 
 ## Licence
 

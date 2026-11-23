@@ -8,7 +8,7 @@ version = "0.0.0"
 description = "The command line the W3C VC-JOSE-COSE test suite calls, over dpp-vc"
 publish = false
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.100"
 
 [dependencies]
 base64 = "0.23"

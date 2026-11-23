@@ -83,7 +83,7 @@ write a new plugin.
 
 ## Minimum Rust version
 
-1.99, enforced in CI.
+1.100, enforced in CI.
 
 ## Licence
 
