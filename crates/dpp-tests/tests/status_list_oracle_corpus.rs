@@ -119,7 +119,7 @@ fn claims(list: &TokenStatusList) -> Value {
         "iat": ISSUED_AT,
         "exp": ISSUED_AT + 86_400,
         "ttl": 43_200,
-        "status_list": { "bits": list.bits(), "lst": list.encode() },
+        "status_list": { "bits": list.bits(), "lst": list.encode().expect("compresses") },
     })
 }
 
@@ -245,7 +245,7 @@ fn corpus(signers: &Signers) -> Vec<Value> {
             &with(
                 base.clone(),
                 "status_list",
-                Some(json!({ "bits": 3, "lst": list.encode() })),
+                Some(json!({ "bits": 3, "lst": list.encode().expect("compresses") })),
             ),
         ),
         plain(
@@ -253,10 +253,13 @@ fn corpus(signers: &Signers) -> Vec<Value> {
             &with(
                 base.clone(),
                 "status_list",
-                Some(json!({ "bits": 0, "lst": list.encode() })),
+                Some(json!({ "bits": 0, "lst": list.encode().expect("compresses") })),
             ),
         ),
-        plain("lst is padded", &lst(format!("{}==", list.encode()))),
+        plain(
+            "lst is padded",
+            &lst(format!("{}==", list.encode().expect("compresses"))),
+        ),
         plain("lst is gzip", &lst(B64.encode(GZIP_OF_ONE_ZERO_BYTE))),
         plain("lst is not zlib", &lst(B64.encode(b"this is not zlib"))),
     ]);

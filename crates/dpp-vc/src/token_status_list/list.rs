@@ -108,15 +108,18 @@ impl TokenStatusList {
 
     /// The `lst` of a Status List Token: this list compressed at the highest level,
     /// as section 4.1 recommends, and encoded as unpadded base64url.
-    #[must_use]
-    pub fn encode(&self) -> String {
+    ///
+    /// # Errors
+    ///
+    /// [`TokenStatusListError::Compression`] if the compressor fails. Writing into
+    /// memory is not expected to, but the compressor's interface can, and a library
+    /// path does not assume it cannot.
+    pub fn encode(&self) -> Result<String, TokenStatusListError> {
+        let compression = |e: std::io::Error| TokenStatusListError::Compression(e.to_string());
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
-        // Writing into a `Vec` cannot fail.
-        encoder
-            .write_all(&self.bytes)
-            .expect("a Vec accepts every write");
-        let compressed = encoder.finish().expect("a Vec accepts every write");
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(compressed)
+        encoder.write_all(&self.bytes).map_err(compression)?;
+        let compressed = encoder.finish().map_err(compression)?;
+        Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(compressed))
     }
 
     /// The width of one entry, 1, 2, 4 or 8.

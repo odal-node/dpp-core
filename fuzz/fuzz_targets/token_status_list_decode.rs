@@ -1,5 +1,5 @@
 #![no_main]
-//! Fuzz Token Status List decoding — a credential's list is fetched from the status
+//! Fuzz Token Status List decoding. A credential's list is fetched from the status
 //! issuer's URL, and its `lst` is base64url text that inflates with zlib, so the
 //! encoding, the width and the compressed size are the status issuer's to choose. The
 //! reference a credential carries is whatever its issuer wrote.

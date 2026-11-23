@@ -16,6 +16,9 @@ pub enum TokenStatusListError {
     /// `lst` decoded, and what it holds is not a zlib stream.
     #[error("lst is not a zlib stream: {0}")]
     NotZlib(String),
+    /// The compressor failed writing a list.
+    #[error("the list could not be compressed: {0}")]
+    Compression(String),
     /// The list decompresses to more bytes than the caller allows.
     ///
     /// DEFLATE expands a small input by about three orders of magnitude, and the
@@ -63,6 +66,15 @@ pub enum TokenStatusListError {
     /// The token's `exp` has been reached.
     #[error("status list token has expired")]
     Expired,
+    /// The token's `nbf` has not been reached.
+    ///
+    /// RFC 7519 clause 4.1.5: the token MUST NOT be accepted before it.
+    #[error("status list token is not valid yet")]
+    NotYetValid,
+    /// The token's protected header sets `b64` to false (RFC 7797), so its payload is
+    /// not the base64url of the claims this crate reads.
+    #[error("status list token has an unencoded payload (b64 is false)")]
+    UnencodedPayload,
     /// The token is the list of another URI than the one the credential names.
     ///
     /// Section 8.3 step 4a: `sub` MUST be equal to the `uri` of the reference.

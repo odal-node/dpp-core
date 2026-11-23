@@ -88,8 +88,10 @@ pub struct Issuance<'a> {
 ///
 /// # Errors
 ///
-/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object, and
-/// [`SdJwtVcError::Signing`] if the key store cannot sign.
+/// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object,
+/// [`SdJwtVcError::MalformedStatus`] if the status reference is one [`verify`](super::verify)
+/// would refuse, an empty `uri`, and [`SdJwtVcError::Signing`] if the key store cannot
+/// sign.
 pub fn issue(
     store: &KeyStore,
     key_id: &str,
@@ -100,6 +102,14 @@ pub fn issue(
     let Some(object) = payload.as_object() else {
         return Err(SdJwtVcError::PayloadNotAnObject);
     };
+    // `verify` holds `status` to a reference it can read. `StatusReference` has public
+    // fields, so one it cannot read, an empty `uri`, could otherwise be signed into
+    // a credential this crate then refuses. Held to the same reading before signing.
+    if let Some(reference) = credential.status {
+        let mut written = Map::new();
+        written.insert("status".to_owned(), reference.to_claim());
+        StatusReference::from_claims(&written).map_err(|_| SdJwtVcError::MalformedStatus)?;
+    }
 
     let mut claims = Map::new();
     // Clause 2.2.2: `iss` identifies the issuer and, being an HTTPS URI, selects

@@ -1,4 +1,4 @@
-//! Token Status List — how a credential is withdrawn after it has been issued.
+//! Token Status List: how a credential is withdrawn after it has been issued.
 //!
 //! Implements the list, the reference a credential carries to it, and the check a
 //! verifier makes, of **draft-ietf-oauth-status-list-21** (Token Status List), read
