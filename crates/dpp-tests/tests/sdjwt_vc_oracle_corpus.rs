@@ -18,7 +18,7 @@
 //!
 //! `.github/oracle/sdjwt/credentials.mjs` reads the corpus. For the credential as
 //! issued, it must arrive at the passport that went in, under `passport`, plus the
-//! three claims the issuer adds at the root (`iss`, `vct`, `iat`). For the
+//! four claims the issuer adds at the root (`iss`, `vct`, `iat`, `exp`). For the
 //! presentations built from it, it must agree with this crate. The signature is
 //! checked there with Node's `crypto`, and the `kid` is recomputed from the public
 //! key.
@@ -191,12 +191,13 @@ fn verdict(token: &str, issuer: &Issuer, vct: &str, policy: Option<&KeyBindingPo
 
 /// The claims a credential issued from `passport` must reveal in full: the
 /// passport, under [`PASSPORT_CLAIM`], and the claims the issuer sets: `iss`,
-/// `vct`, `iat`, and `cnf` when it names a Holder.
+/// `vct`, `iat`, `exp`, and `cnf` when it names a Holder.
 fn full_disclosure_of(passport: &Value, vct: &str, cnf: Option<Value>) -> Value {
     let mut claims = Map::new();
     claims.insert("iss".to_owned(), json!(ISSUER));
     claims.insert("vct".to_owned(), json!(vct));
     claims.insert("iat".to_owned(), json!(ISSUED_AT));
+    claims.insert("exp".to_owned(), json!(ISSUED_AT + 31_536_000));
     if let Some(cnf) = cnf {
         claims.insert("cnf".to_owned(), cnf);
     }
@@ -245,6 +246,8 @@ fn issue_for(
             issuer: ISSUER,
             vct,
             issued_at: ISSUED_AT,
+            expires_at: Some(ISSUED_AT + 31_536_000),
+            not_before: None,
             holder_key: bound.then_some(&holder),
             status: None,
         },
@@ -443,7 +446,7 @@ fn every_product_group_has_a_credential_that_reads_back_to_its_passport() {
 fn no_credential_carries_a_claim_at_its_root_that_the_issuer_did_not_set() {
     let issuer = Issuer::new();
     let cases = corpus(&issuer);
-    let set_by_the_issuer = ["iss", "vct", "iat", "cnf", PASSPORT_CLAIM];
+    let set_by_the_issuer = ["iss", "vct", "iat", "exp", "cnf", PASSPORT_CLAIM];
 
     let mut stray = Vec::new();
     for case in &cases {

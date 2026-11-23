@@ -47,8 +47,8 @@
 //! # Where the passport sits
 //!
 //! Under one claim, [`PASSPORT_CLAIM`]. The root of the credential holds what
-//! [`issue`] sets (`iss`, `vct`, `iat`, and `cnf` for a bound credential) and
-//! nothing of the passport's.
+//! [`issue`] sets (`iss`, `vct`, `iat`, `exp`, and `nbf`, `cnf` and `status` when
+//! they are given) and nothing of the passport's.
 //!
 //! The alternative was to merge the passport's root members into the credential's
 //! claims. That leaves the credential's claim names to the passport schema, and
@@ -121,20 +121,35 @@
 //!
 //! # Withdrawing a credential
 //!
-//! The profile's clause 2.2.2.3 registers an OPTIONAL `status` claim, *"the
-//! information on how to read the status of the Verifiable Credential"*, by
-//! reference to the IETF Token Status List draft, and clause 2.4 says a verifier
-//! SHOULD check it when present.
+//! A credential has to be able to end, and [`issue`] refuses one that cannot: it
+//! needs an `exp`, a status reference, or both, or it fails with
+//! [`SdJwtVcError::Unbounded`]. The profile makes each optional (clause 2.2.2), and a
+//! credential with neither verifies until its key is revoked, whatever happens to the
+//! passport it was issued from. OpenID4VC HAIP 1.0 clause 6.1 asks an Issuer that
+//! limits validity to use one or both; here the limit is not the Issuer's to skip,
+//! though its length is.
 //!
-//! [`issue`] writes that claim when [`Issuance::status`] names a
+//! **It ends.** [`Issuance::expires_at`], when given, is written as `exp`. It is the
+//! longest a Verifier that never asks about status can be misled by a credential the
+//! Issuer has since withdrawn, so it should be as short as the passport's use allows,
+//! and the passport has to stay available after its operator has ceased (ESPR Art.
+//! 11(e)), which a credential that has expired cannot be issued again to serve.
+//! [`Issuance::not_before`] is written as `nbf` when given. Both sit at the root and
+//! are never concealed (RFC 9901 clause 9.7), so a Holder cannot leave either out of
+//! a presentation, and [`verify`] enforces them.
+//!
+//! **It is withdrawn early.** The profile's clause 2.2.2.3 registers an OPTIONAL
+//! `status` claim, *"the information on how to read the status of the Verifiable
+//! Credential"*, by reference to the IETF Token Status List draft, and clause 2.4
+//! says a verifier SHOULD check it when present. [`issue`] writes that claim when
+//! [`Issuance::status`] names a
 //! [`StatusReference`](crate::token_status_list::StatusReference): an index into a
 //! list the status issuer publishes. [`verify`] holds the claim to its shape
 //! (draft-ietf-oauth-status-list-21 section 6.2) and returns it, and the check
 //! itself, which needs the list and so a fetch, is
-//! [`token_status_list`](crate::token_status_list). A credential issued with no
-//! reference verifies until its key is revoked: suspending, retiring or
-//! superseding the passport it was issued from changes nothing about it. [`issue`]
-//! sets no `exp` either, so a reference is the only way to withdraw one.
+//! [`token_status_list`](crate::token_status_list). A credential issued with an
+//! `exp` and no reference cannot be withdrawn before it: suspending, retiring or
+//! superseding the passport it was issued from changes nothing about it until then.
 //!
 //! The list is not published here. The status issuer needs somewhere to host it,
 //! and until it does, a reference points at nothing a verifier can fetch.
@@ -149,6 +164,8 @@ mod verify;
 mod algorithm_tests;
 #[cfg(test)]
 mod claim_path_tests;
+#[cfg(test)]
+mod expiry_tests;
 #[cfg(test)]
 mod issuer_metadata_tests;
 #[cfg(test)]
