@@ -48,6 +48,8 @@ fn a_failed_save_leaves_the_handle_and_the_file_as_they_were() {
         "nor is an archive that was not saved"
     );
 
+    // One handle per file: the first has to go before the file is opened again.
+    drop(store);
     let reopened = KeyStore::open(&path, "test-passphrase").expect("reopen");
     assert_eq!(
         reopened.load_key("issuer").expect("load").fingerprint,
