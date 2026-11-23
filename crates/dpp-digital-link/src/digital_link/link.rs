@@ -17,7 +17,7 @@ use super::value::check_value;
 /// The path is a **primary key** followed by that key's own qualifiers. Which
 /// AIs may open a path, and which qualifiers each accepts in what order, comes
 /// from GS1's Barcode Syntax Dictionary rather than from anything encoded here
-/// — see [`crate::ai_spec`] and [`crate::qualifier_position`].
+/// — see [`ai_spec`] and [`qualifier_position`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct DigitalLink {
     /// Base resolver URL including any path prefix before the primary-key

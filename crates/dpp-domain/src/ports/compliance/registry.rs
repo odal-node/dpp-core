@@ -1,4 +1,4 @@
-//! [`ComplianceRegistry`](crate::ports::compliance::ComplianceRegistry) — dispatch to the strategy for a product group.
+//! [`ComplianceRegistry`] — dispatch to the strategy for a product group.
 
 use chrono::NaiveDate;
 
@@ -14,7 +14,7 @@ use crate::product_group::ProductGroupData;
 /// simply wire a different `Arc<dyn ComplianceRegistry>` at startup.
 pub trait ComplianceRegistry: Send + Sync {
     /// Run compliance calculation for the given product group and data, under the law
-    /// in force on `law_in_force_on` — see [`ComplianceStrategy::compute`](crate::ports::compliance::ComplianceStrategy::compute),
+    /// in force on `law_in_force_on` — see [`ComplianceStrategy::compute`](super::ComplianceStrategy::compute),
     /// whose contract for that date this passes through unchanged.
     ///
     /// Returns `ComplianceErrorKind::UnknownProductGroup` if no strategy is registered

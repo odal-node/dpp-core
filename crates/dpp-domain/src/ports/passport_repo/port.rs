@@ -368,7 +368,7 @@ pub trait PassportRepository: Send + Sync {
     /// natural index is on `supersedes_id`, so a real store should override this
     /// with a single indexed read.
     ///
-    /// [`PROTECTED_PATCH_FIELDS`]: super::PROTECTED_PATCH_FIELDS
+    /// [`PROTECTED_PATCH_FIELDS`]
     async fn find_superseding(&self, id: PassportId) -> Result<Option<Passport>, DppError> {
         let claimants: Vec<Passport> = self
             .list(None, None, None, u32::MAX, 0)

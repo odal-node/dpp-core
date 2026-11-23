@@ -122,8 +122,8 @@ fn a_group_with_no_identifier_still_yields_no_identity() {
 fn two_units_of_one_batch_are_two_identities() {
     let unit = |serial: &str| {
         let mut p = crate::test_support::sample_passport();
-        p.product_group = crate::ProductGroup::Battery;
-        p.product_group_data = Some(crate::ProductGroupData::Battery(Box::new(
+        p.product_group = ProductGroup::Battery;
+        p.product_group_data = Some(ProductGroupData::Battery(Box::new(
             crate::test_support::sample_battery_data(),
         )));
         p.batch_id = Some("LOT-A".into());
@@ -145,8 +145,8 @@ fn two_units_of_one_batch_are_two_identities() {
 #[test]
 fn a_batch_record_and_a_unit_of_it_are_two_identities() {
     let mut batch = crate::test_support::sample_passport();
-    batch.product_group = crate::ProductGroup::Battery;
-    batch.product_group_data = Some(crate::ProductGroupData::Battery(Box::new(
+    batch.product_group = ProductGroup::Battery;
+    batch.product_group_data = Some(ProductGroupData::Battery(Box::new(
         crate::test_support::sample_battery_data(),
     )));
     batch.batch_id = Some("LOT-A".into());

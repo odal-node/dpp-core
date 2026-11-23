@@ -202,7 +202,7 @@ async fn ghost_seal_returns_placeholder() {
     let req = SealRequest {
         payload_hash: "abc123def456".into(),
         mode: SealMode::ProviderSeal,
-        key_ref: crate::seal::SealCredentialRef {
+        key_ref: SealCredentialRef {
             qtsp_id: "test-qtsp".into(),
             credential_id: "cred-001".into(),
         },

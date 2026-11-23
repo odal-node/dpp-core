@@ -1,4 +1,4 @@
-//! [`ExpectedLifetime`](crate::product_group::ExpectedLifetime) — the declared lifetime figures under Annex XIII.
+//! [`ExpectedLifetime`] — the declared lifetime figures under Annex XIII.
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};

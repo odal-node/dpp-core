@@ -17,7 +17,7 @@
 //! These do not form a ranking. An `Authority` sees conformity test reports
 //! that a `LegitimateInterest` holder does not, and a `LegitimateInterest`
 //! holder sees individual-item data that an `Authority` does not. See
-//! [`Audience::may_see`](dpp_domain::Audience::may_see).
+//! [`Audience::may_see`].
 //!
 //! ## Credential lifecycle
 //!

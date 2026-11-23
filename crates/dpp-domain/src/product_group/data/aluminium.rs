@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
-use crate::product_group::{ProductionRoute, SvhcSubstance};
 use crate::product_group::payload::ProductGroupPayload;
+use crate::product_group::{ProductionRoute, SvhcSubstance};
 
 /// Aluminium product group data for EU ESPR carbon intensity reporting.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

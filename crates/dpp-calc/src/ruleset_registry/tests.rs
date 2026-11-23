@@ -244,9 +244,7 @@ fn status_map_agrees_with_resolve_recycled_content_today() {
         if entry.methodology != "recycled-content-art8" {
             continue;
         }
-        let resolves_today =
-            resolve_recycled_content(entry.product_category, today)
-                .is_assessed();
+        let resolves_today = resolve_recycled_content(entry.product_category, today).is_assessed();
         match entry.status_on(today) {
             CalculatorStatus::Active { .. } => assert!(
                 resolves_today,
@@ -340,7 +338,7 @@ fn an_ended_ruleset_is_expired_not_yet_to_come() {
         Effectivity::closed(date(2020, 1, 1), date(2024, 12, 31)),
         Some("successor"),
     );
-    let got = super::resolve::resolve(&[("cat", ended)], "cat", date(2026, 1, 1));
+    let got = resolve::resolve(&[("cat", ended)], "cat", date(2026, 1, 1));
     let Assessability::Expired {
         ruleset_id,
         until,
@@ -363,7 +361,7 @@ fn a_ruleset_awaiting_an_act_is_undetermined_not_out_of_scope() {
         Effectivity::pending("an act not yet adopted", None),
         None,
     );
-    let got = super::resolve::resolve(&[("cat", waiting)], "cat", date(2026, 1, 1));
+    let got = resolve::resolve(&[("cat", waiting)], "cat", date(2026, 1, 1));
     assert!(
         matches!(
             got,
@@ -388,7 +386,7 @@ fn a_dated_ruleset_outranks_one_awaiting_an_act_and_one_that_ended() {
     let dated = row("dated", Effectivity::open(date(2030, 1, 1)), None);
     let all = [("cat", ended), ("cat", waiting), ("cat", dated)];
 
-    let got = super::resolve::resolve(&all, "cat", date(2026, 1, 1));
+    let got = resolve::resolve(&all, "cat", date(2026, 1, 1));
     assert!(
         matches!(
             got,
@@ -400,7 +398,7 @@ fn a_dated_ruleset_outranks_one_awaiting_an_act_and_one_that_ended() {
         "got {got:?}"
     );
 
-    let got = super::resolve::resolve(&all[..2], "cat", date(2026, 1, 1));
+    let got = resolve::resolve(&all[..2], "cat", date(2026, 1, 1));
     assert!(
         matches!(
             got,

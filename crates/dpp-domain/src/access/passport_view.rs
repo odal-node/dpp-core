@@ -145,7 +145,7 @@ pub fn redact_passport(passport: &Passport, audience: Audience) -> PassportView 
 /// Whether `audience` may see the product-group field that a personal-data
 /// statement is keyed by. A statement is visible only when that field is: every
 /// key on the way to it must be visible, and the filter makes that same walk.
-/// Shared with [`super::filter_by_audience`], so the two cannot disagree.
+/// Shared with [`filter_by_audience`], so the two cannot disagree.
 pub(super) fn may_see_personal_data_field(
     policy: &ProductGroupAccessPolicy,
     audience: Audience,

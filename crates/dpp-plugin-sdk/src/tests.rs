@@ -169,7 +169,7 @@ fn read_input_never_dereferences_truncated_pointer_on_host() {
     // On a 64-bit host a 32-bit ABI pointer is a truncated address; read_input
     // must return an empty slice rather than dereferencing it, so a plugin's
     // native test suite cannot trigger memory unsafety through the raw ABI.
-    let bytes = unsafe { crate::abi::read_input(0xDEAD_BEEF, 16) };
+    let bytes = unsafe { abi::read_input(0xDEAD_BEEF, 16) };
     assert!(
         bytes.is_empty(),
         "must not deref a truncated pointer on host"
@@ -181,7 +181,7 @@ fn read_input_never_dereferences_truncated_pointer_on_host() {
 fn host_alloc_does_not_hand_out_truncated_pointer_on_host() {
     // A real 64-bit heap address cannot be represented in u32, so host_alloc
     // returns null instead of a truncated (un-freeable) pointer.
-    assert_eq!(crate::abi::host_alloc(8), 0);
+    assert_eq!(abi::host_alloc(8), 0);
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn macro_input_exports_pack_error_envelope_for_empty_input() {
 
 fn pi_errors(identifier: Value) -> Vec<(String, String)> {
     let input = json!({ "productIdentifier": identifier });
-    match crate::validate::Validator::new(&input)
+    match validate::Validator::new(&input)
         .require_product_identifier("productIdentifier")
         .finish()
     {
@@ -329,7 +329,7 @@ fn a_carrier_shaped_value_with_nothing_to_resolve_is_refused() {
 /// The messages the plugin reports for `identifier`, in order.
 fn pi_messages(identifier: Value) -> Vec<String> {
     let input = json!({ "productIdentifier": identifier });
-    match crate::validate::Validator::new(&input)
+    match validate::Validator::new(&input)
         .require_product_identifier("productIdentifier")
         .finish()
     {
@@ -400,7 +400,7 @@ fn an_unmapped_scheme_is_refused_rather_than_skipped() {
 #[test]
 fn an_absent_or_headless_identifier_is_refused() {
     let empty = json!({});
-    let missing = match crate::validate::Validator::new(&empty)
+    let missing = match validate::Validator::new(&empty)
         .require_product_identifier("productIdentifier")
         .finish()
     {

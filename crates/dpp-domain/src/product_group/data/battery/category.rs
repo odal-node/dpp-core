@@ -1,4 +1,4 @@
-//! [`BatteryType`](crate::product_group::BatteryType) — the Regulation (EU) 2023/1542 Art. 3 battery category.
+//! [`BatteryType`] — the Regulation (EU) 2023/1542 Art. 3 battery category.
 
 use serde::{Deserialize, Serialize};
 

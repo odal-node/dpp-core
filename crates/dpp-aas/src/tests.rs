@@ -361,7 +361,7 @@ fn a_caller_chosen_key_may_not_impersonate_a_scheme() {
     // Without this the escape hatch reproduces the original defect exactly:
     // `Named { name: "gtin", value: <a DID> }` is the old behaviour spelled out.
     let passport = minimal_passport(ProductGroup::Textile);
-    for reserved in crate::identity::RESERVED_ASSET_ID_NAMES {
+    for reserved in RESERVED_ASSET_ID_NAMES {
         let identity = AssetIdentity::Named {
             name: reserved,
             value: "did:web:acme.example.com:b:1",
@@ -1156,7 +1156,7 @@ fn a_product_group_field_the_declared_version_does_not_know_is_dropped() {
     )));
 
     let mut document = serde_json::to_value(&passport).expect("serialises");
-    document["productGroupData"]["smuggledField"] = serde_json::json!("should not survive");
+    document["productGroupData"]["smuggledField"] = json!("should not survive");
     let smuggled: Passport = serde_json::from_value(document).expect("round-trips via Other keys");
 
     for audience in [

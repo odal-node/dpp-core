@@ -39,7 +39,7 @@ pub(super) const PRESENTATION_COSE_TYP: &str = "vp+cose";
 /// Checks, in order, refusing at the first that fails:
 ///
 /// 1. the message verifies under `key` as RFC 9052 §4.4 says, with the header rules of
-///    [`dpp_crypto::cose::verify_sign1`] ([`JoseError::Cose`]);
+///    [`verify_sign1`] ([`JoseError::Cose`]);
 /// 2. `typ` is present and names `vc+cose`, and the content type, if present, names `vc`, each
 ///    with or without the `application/` prefix and without regard to case. This is the policy
 ///    the `vc+jwt` form applies to its `typ` and `cty`, though §3.3.1 says SHOULD for both

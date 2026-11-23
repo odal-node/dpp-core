@@ -33,7 +33,7 @@ pub const OWN_NAMESPACE: &str = "urn:odal-node:";
 ///
 /// # Why `is_own` deliberately does not cover this
 ///
-/// [`is_own`](super::is_own) governs AAS `semanticId` values, where the URN form
+/// [`is_own`] governs AAS `semanticId` values, where the URN form
 /// is the only one this project mints. Widening it to admit an `https://` prefix
 /// would make every `https://` semanticId — including another authority's —
 /// one character of hostname away from being classified as ours, in the check

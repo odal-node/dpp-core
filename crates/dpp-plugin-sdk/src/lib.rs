@@ -21,11 +21,11 @@
 //! |--------|-----------|----------------|
 //! | `alloc` | `(len: u32) -> u32` | pointer to `len` bytes |
 //! | `dealloc` | `(ptr: u32, len: u32)` | — |
-//! | `metadata` | `() -> u64` | [`PluginMeta`](dpp_plugin_traits::PluginMeta) |
-//! | `describe` | `() -> u64` | [`PluginCapabilities`](dpp_plugin_traits::PluginCapabilities) |
-//! | `validate` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](dpp_plugin_traits::AbiResult) (`ok: null` / `error`) |
-//! | `calculate_metrics` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](dpp_plugin_traits::AbiResult) (`ok: PluginResult`) |
-//! | `generate_passport` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](dpp_plugin_traits::AbiResult) (`ok: payload`) |
+//! | `metadata` | `() -> u64` | [`PluginMeta`](traits::PluginMeta) |
+//! | `describe` | `() -> u64` | [`PluginCapabilities`](traits::PluginCapabilities) |
+//! | `validate` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](traits::AbiResult) (`ok: null` / `error`) |
+//! | `calculate_metrics` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](traits::AbiResult) (`ok: PluginResult`) |
+//! | `generate_passport` | `(ptr: u32, len: u32) -> u64` | [`AbiResult`](traits::AbiResult) (`ok: payload`) |
 //!
 //! Every `-> u64` return packs the output buffer as `(out_ptr << 32) | out_len`.
 //! The host reads the JSON, then frees the buffer via `dealloc`.
@@ -72,7 +72,7 @@ pub use entry::{
 
 /// Generate the full Wasm ABI for a product group plugin.
 ///
-/// `$plugin` must implement [`DppProductGroupPlugin`](dpp_plugin_traits::DppProductGroupPlugin)
+/// `$plugin` must implement [`DppProductGroupPlugin`](traits::DppProductGroupPlugin)
 /// and [`Default`] (plugins are deterministic and stateless, so the instance is
 /// constructed per call). Invoke once at the crate root:
 ///

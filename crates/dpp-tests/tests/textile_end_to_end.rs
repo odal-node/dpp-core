@@ -146,7 +146,10 @@ fn textile_passport_to_aas_submodel() {
     assert!(!submodel.submodel_elements.is_empty());
     // Verify it round-trips through JSON
     let aas_json = serde_json::to_value(&submodel).unwrap();
-    assert_eq!(aas_json["idShort"].as_str().unwrap(), "DigitalProductPassport");
+    assert_eq!(
+        aas_json["idShort"].as_str().unwrap(),
+        "DigitalProductPassport"
+    );
 }
 
 #[test]

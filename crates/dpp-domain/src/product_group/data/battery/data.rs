@@ -513,7 +513,7 @@ pub struct BatteryData {
 }
 
 impl crate::product_group::payload::ProductGroupPayload for BatteryData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 

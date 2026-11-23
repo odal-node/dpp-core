@@ -59,9 +59,7 @@ pub(crate) fn sample_payload() -> RegistrationPayload {
         jws_signature: Some("eyJhbGciOiJFZERTQSJ9...".into()),
         commodity_code: Some("85076000".into()),
         backup_url: Some("https://backup.example.com/dpp/abc.json".into()),
-        service_provider: Some(crate::ServiceProviderReference::named(
-            "Example Backup GmbH",
-        )),
+        service_provider: Some(ServiceProviderReference::named("Example Backup GmbH")),
     }
 }
 
@@ -995,7 +993,7 @@ fn every_wire_constant_declares_a_basis() {
     // And nothing in the table that the crate does not declare, so a renamed
     // constant cannot leave a stale entry behind vouching for a dead route.
     assert_eq!(
-        crate::ENDPOINT_BASIS.len(),
+        ENDPOINT_BASIS.len(),
         9,
         "the table grew or shrank without this test being told"
     );
@@ -1051,8 +1049,8 @@ fn each_route_carries_the_tier_its_prose_claims() {
 /// expected outcome.
 #[test]
 fn an_undeclared_route_has_no_basis_rather_than_a_default_one() {
-    assert_eq!(crate::endpoint::basis_of("/registrations"), None);
-    assert_eq!(crate::endpoint::basis_of(""), None);
+    assert_eq!(endpoint::basis_of("/registrations"), None);
+    assert_eq!(endpoint::basis_of(""), None);
 }
 
 /// The dashboard sorts by `<field>,<direction>`, and the one value the client
@@ -1062,7 +1060,7 @@ fn an_undeclared_route_has_no_basis_rather_than_a_default_one() {
 /// descending direction.
 #[test]
 fn the_newest_first_sort_is_a_field_and_a_direction() {
-    let (field, direction) = crate::endpoint::TASKS_SORT_NEWEST_FIRST
+    let (field, direction) = endpoint::TASKS_SORT_NEWEST_FIRST
         .split_once(',')
         .expect("a sort is a field, a comma and a direction");
     assert_eq!(field, "submittedAt");
@@ -1078,7 +1076,7 @@ fn the_newest_first_sort_is_a_field_and_a_direction() {
 /// status anyone has seen is the replayed-key 409.
 #[test]
 fn every_assumed_status_says_it_is_assumed() {
-    use crate::EuRegistryErrorKind as Kind;
+    use EuRegistryErrorKind as Kind;
 
     let with_status = [
         (Kind::Unauthorized, 401),
@@ -1087,9 +1085,9 @@ fn every_assumed_status_says_it_is_assumed() {
         (Kind::NotFound, 404),
         (Kind::RegistryInternalError, 500),
     ];
-    for (kind, expected) in with_status {
+    for (kind, expected) in &with_status {
         let (status, basis) = kind.http_status().expect("this kind is a response");
-        assert_eq!(status, expected, "{kind:?}");
+        assert_eq!(status, *expected, "{kind:?}");
         assert!(
             !basis.is_observed(),
             "{kind:?} claims an observed status; only the replayed-key 409 is observed"
@@ -1098,7 +1096,7 @@ fn every_assumed_status_says_it_is_assumed() {
 
     // No response, so no status to report. Inventing one would put a number on
     // the wire that no registry chose.
-    for kind in [Kind::ConnectionFailed, Kind::Timeout, Kind::InvalidResponse] {
+    for kind in &[Kind::ConnectionFailed, Kind::Timeout, Kind::InvalidResponse] {
         assert_eq!(kind.http_status(), None, "{kind:?} describes no response");
     }
 }
@@ -1106,10 +1104,10 @@ fn every_assumed_status_says_it_is_assumed() {
 /// The one status with something behind it.
 #[test]
 fn the_replayed_key_status_is_the_only_observed_one() {
-    assert_eq!(crate::STATUS_IDEMPOTENCY_KEY_REUSED, 409);
-    assert!(crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.is_observed());
+    assert_eq!(STATUS_IDEMPOTENCY_KEY_REUSED, 409);
+    assert!(STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.is_observed());
     assert_eq!(
-        crate::STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.observed_on(),
+        STATUS_IDEMPOTENCY_KEY_REUSED_BASIS.observed_on(),
         Some("2026-10-20")
     );
 }

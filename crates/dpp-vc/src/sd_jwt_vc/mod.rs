@@ -108,7 +108,7 @@
 //!
 //! - **`x5c` issuance.** Clause 2.5's other key-discovery mechanism makes the
 //!   issuer the subject of an end-entity certificate. See
-//!   [`issuer_metadata::build_issuer_metadata`] for why that is not this
+//!   [`build_issuer_metadata`] for why that is not this
 //!   module's decision to make.
 //! - **Type Metadata.** Clause 5 lets a `vct` publish per-claim `sd` and
 //!   `mandatory` rules that a verifier then enforces. That maps closely onto the

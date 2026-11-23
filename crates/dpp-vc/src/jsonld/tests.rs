@@ -174,7 +174,9 @@ fn every_compact_term_expands_to_a_permitted_iri() {
         .iter()
         .filter_map(|(term, target)| {
             let target = target.as_str()?;
-            target.starts_with("http").then(|| (term.clone(), target.to_owned()))
+            target
+                .starts_with("http")
+                .then(|| (term.clone(), target.to_owned()))
         })
         .collect();
 

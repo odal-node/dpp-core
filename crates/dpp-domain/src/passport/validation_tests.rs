@@ -150,7 +150,7 @@ fn v02_fields_round_trip() {
     p.retention_until = Some(Utc::now() + chrono::Duration::days(3650));
     p.product_id = Some(Uuid::now_v7());
     p.operator_identifier = Some("DE12345678".to_owned());
-    p.facility = Some(crate::passport::FacilitySnapshot {
+    p.facility = Some(FacilitySnapshot {
         scheme: "national".to_owned(),
         value: "FAC-001".to_owned(),
         name: "Plant One".to_owned(),

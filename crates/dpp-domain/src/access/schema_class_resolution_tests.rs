@@ -60,8 +60,7 @@ fn every_declared_property_resolves_to_its_own_class() {
             let json_text = registry
                 .get(product_group, version)
                 .expect("the registry listed it");
-            let schema: serde_json::Value =
-                serde_json::from_str(json_text).expect("schema is valid JSON");
+            let schema: Value = serde_json::from_str(json_text).expect("schema is valid JSON");
             let policy = ProductGroupAccessPolicy::from_schema(
                 product_group,
                 &version.to_string(),
@@ -313,7 +312,7 @@ fn declared_paths(
         return;
     };
 
-    if let Some(pointer) = object.get("$ref").and_then(serde_json::Value::as_str)
+    if let Some(pointer) = object.get("$ref").and_then(Value::as_str)
         && let Some(target) = pointer.strip_prefix('#').and_then(|p| root.pointer(p))
         && !active_refs.iter().any(|seen| seen == pointer)
     {
@@ -328,7 +327,7 @@ fn declared_paths(
             child.push(name.clone());
             if let Some(class) = prop
                 .get("x-disclosure")
-                .and_then(serde_json::Value::as_str)
+                .and_then(Value::as_str)
                 .and_then(parse_class)
             {
                 visit(&child, class, floor);
