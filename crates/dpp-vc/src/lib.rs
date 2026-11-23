@@ -1,7 +1,8 @@
 //! `dpp-vc` — the trust layer: who may read a passport, and how that is proven.
 //!
 //! W3C Verifiable Credentials, `did:web` documents, Bitstring Status List
-//! revocation, and the JSON-LD context those are expressed in.
+//! revocation, the IETF Token Status List an SD-JWT VC points at, and the JSON-LD
+//! context those are expressed in.
 //!
 //! Pure (no I/O, no network). Not a `wasm32-unknown-unknown` target: it depends
 //! on [`dpp_crypto`], whose RNG requires a platform entropy source.
@@ -33,6 +34,7 @@ pub mod passport_credential;
 pub mod sd_jwt_vc;
 pub mod snapshot;
 pub mod status_list;
+pub mod token_status_list;
 
 #[cfg(test)]
 mod test_support;

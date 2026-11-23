@@ -246,6 +246,7 @@ fn issue_for(
             vct,
             issued_at: ISSUED_AT,
             holder_key: bound.then_some(&holder),
+            status: None,
         },
     )
     .unwrap_or_else(|e| panic!("issuing a credential for {vct}: {e:?}"))

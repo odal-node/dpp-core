@@ -39,6 +39,7 @@ fn bound(store: &KeyStore, holder: &KeyEntry) -> SdJwt {
             vct: &vct(),
             issued_at: ISSUED_AT,
             holder_key: Some(&holder.public_key()),
+            status: None,
         },
     )
     .expect("issue")

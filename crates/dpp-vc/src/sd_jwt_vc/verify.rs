@@ -5,6 +5,9 @@ use serde_json::{Map, Value};
 
 use dpp_crypto::sd_jwt::{KeyBindingPolicy, SdJwt};
 
+use crate::common::jwt::jwt_part;
+use crate::token_status_list::StatusReference;
+
 use super::TYP;
 use super::error::SdJwtVcError;
 
@@ -36,9 +39,15 @@ const NEVER_DISCLOSED: [&str; 8] = [
 /// Checks, in order: the issuer's signature over the token; `typ`; the
 /// disclosure mechanism, which refuses any disclosure that matches nothing; Key
 /// Binding, as `key_binding` asks; that no claim clause 2.2.2.3 keeps out of
-/// Disclosures arrived in one; that a `status`, if present, is an object; the
-/// presence of `iss` and `vct`; `vct` against what the caller expected; and the
-/// validity window.
+/// Disclosures arrived in one; that a `status`, if present, is an object and any
+/// `status_list` in it is an index and a URI; the presence of `iss` and `vct`; `vct`
+/// against what the caller expected; and the validity window.
+///
+/// **The status itself is not looked up.** That needs the list, which is fetched.
+/// Read the reference with
+/// [`StatusReference::from_claims`](crate::token_status_list::StatusReference::from_claims)
+/// from what comes back, and check it with
+/// [`StatusListToken`](crate::token_status_list::StatusListToken).
 ///
 /// What comes back is every claim of the credential. A credential [`issue`](super::issue)
 /// made holds its passport under [`PASSPORT_CLAIM`](super::PASSPORT_CLAIM) and
@@ -119,16 +128,13 @@ pub fn verify(
     }
 
     // The profile registers `status` for a reference to a Token Status List
-    // (clause 2.2.2.3), whose value is an object (draft-ietf-oauth-status-list-21
-    // section 6.2). The reference is not followed, so the shape is all that can be
-    // held to. Without it a string, which is what a passport's own lifecycle
-    // `status` is, would pass for the claim a Verifier is told to check.
-    if payload
-        .get("status")
-        .is_some_and(|status| !status.is_object())
-    {
-        return Err(SdJwtVcError::MalformedStatus);
-    }
+    // (clause 2.2.2.3), whose value is an object holding a `status_list` of an
+    // index and a URI (draft-ietf-oauth-status-list-21 section 6.2). The reference
+    // is not followed here, since that is a fetch, so the shape is what can be held
+    // to. Without it a string, which is what a passport's own lifecycle `status` is,
+    // would pass for the claim a Verifier is told to check, and so would a reference
+    // nobody could look up.
+    StatusReference::from_claims(&payload).map_err(|_| SdJwtVcError::MalformedStatus)?;
 
     // Presence is not enough: `contains_key` accepts `"iss": null`, a number or
     // an array, and the credential would then verify while naming no issuer at
@@ -200,18 +206,4 @@ fn check_validity_window(
         }
     }
     Ok(())
-}
-
-/// Part `index` of a compact JWS, the protected header (0) or the payload (1), as
-/// a JSON object.
-fn jwt_part(jwt: &str, index: usize) -> Option<Map<String, Value>> {
-    use base64::Engine;
-    let part = jwt.split('.').nth(index)?;
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(part)
-        .ok()?;
-    match serde_json::from_slice(&bytes).ok()? {
-        Value::Object(map) => Some(map),
-        _ => None,
-    }
 }

@@ -17,6 +17,8 @@ because it depends on `dpp-crypto`, whose RNG needs a platform entropy source.
   authorised repairer, a recycler, a market-surveillance authority.
 - You publish or resolve a `did:web` document for a manufacturer or operator.
 - You check whether a credential has been revoked against a Bitstring Status List.
+- You check whether an SD-JWT VC has been revoked or suspended against a Token Status List
+  (`dpp_vc::token_status_list`), a draft that is not yet an RFC.
 - You build the JSON-LD envelope for a passport or a credential.
 - You read a *copy* of a passport's public view and need to know whether its time
   bound still holds. See `snapshot`.

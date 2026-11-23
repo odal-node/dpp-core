@@ -57,6 +57,7 @@ fn issue_payload(store: &dpp_crypto::keystore::KeyStore, payload: &Value) -> SdJ
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue")
@@ -85,6 +86,7 @@ fn the_root_holds_what_the_issuer_set_and_the_passport_sits_under_one_claim() {
             vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             issued_at: ISSUED_AT,
             holder_key: Some(&holder.public_key()),
+            status: None,
         },
     )
     .expect("issue");

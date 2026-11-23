@@ -218,6 +218,7 @@ fn sd_jwt_vc_under(store: &KeyStore, vct: &str, header: &Value) -> String {
             vct,
             issued_at: 1_789_000_000,
             holder_key: None,
+            status: None,
         },
     )
     .expect("issue");
