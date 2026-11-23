@@ -161,7 +161,7 @@ fn a_qualifier_from_another_primary_key_is_refused() {
 /// report zero — but a future refactor could make the first silent.
 #[test]
 fn the_primary_key_set_comes_from_the_dictionary() {
-    let keys: Vec<&str> = super::syntax_dictionary::dictionary()
+    let keys: Vec<&str> = dictionary()
         .values()
         .filter(|s| s.dl_primary_key)
         .map(|s| s.ai.as_str())
@@ -352,7 +352,7 @@ fn every_cset_82_symbol_is_admitted_in_a_serial() {
     let symbols = "!\"%&'()*+,-./:;<=>?_";
     let uri = format!(
         "https://id.example.com/01/09506000134352/21/{}",
-        super::codec::percent_encode(symbols)
+        codec::percent_encode(symbols)
     );
     let parsed = DigitalLink::parse(&uri).expect("every CSET 82 symbol is admitted");
     assert_eq!(parsed.serial(), Some(symbols));

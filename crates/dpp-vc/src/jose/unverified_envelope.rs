@@ -69,9 +69,9 @@ impl UnverifiedEnvelope {
     }
 
     /// Verify the credential this envelope carries under `issuer_key`, with every check of
-    /// [`verify_credential`](super::verify_credential),
-    /// [`verify_credential_sd_jwt`](super::verify_credential_sd_jwt) for a `vc+sd-jwt`, or
-    /// [`verify_credential_cose`](super::verify_credential_cose) for a `vc+cose`, and
+    /// [`verify_credential`],
+    /// [`verify_credential_sd_jwt`] for a `vc+sd-jwt`, or
+    /// [`verify_credential_cose`] for a `vc+cose`, and
     /// `options` as they take them. `binding` is the choice RFC 9901 §9.5 leaves to the
     /// verifier. A `vc+sd-jwt` is held to it. A `vc+jwt` and a `vc+cose` cannot carry a Key
     /// Binding JWT, so where binding is required they are refused, as RFC 9901 §7.3 step 2

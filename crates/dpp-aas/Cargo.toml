@@ -23,7 +23,6 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
-uuid   = { workspace = true }
 
 [lints]
 workspace = true

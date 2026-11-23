@@ -137,7 +137,7 @@ impl ComplianceStrategy for PassthroughTextileStrategy {
 /// The error for a strategy handed data for a different product group.
 ///
 /// A dispatch bug rather than bad user input, but it is reported as
-/// [`ComplianceErrorKind::InvalidInput`](crate::compliance::ComplianceErrorKind::InvalidInput) because from the strategy's position
+/// [`ComplianceErrorKind::InvalidInput`](compliance::ComplianceErrorKind::InvalidInput) because from the strategy's position
 /// that is exactly what it received, and because the alternative — panicking on
 /// a mismatch — would make a routing mistake in a host take the process down.
 fn wrong_product_group(expected: &str, got: &ProductGroupData) -> ComplianceError {

@@ -3,7 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
-use crate::product_group::ProductionRoute;
+use crate::product_group::payload::ProductGroupPayload;
+use crate::product_group::{ProductionRoute, SvhcSubstance};
 
 /// Iron and Steel product group data for EU ESPR carbon intensity reporting.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -27,8 +28,8 @@ pub struct SteelData {
     pub annual_production_tonnes: Option<f64>,
 }
 
-impl crate::product_group::payload::ProductGroupPayload for SteelData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+impl ProductGroupPayload for SteelData {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 
@@ -38,7 +39,7 @@ impl crate::product_group::payload::ProductGroupPayload for SteelData {
     }
 
     /// This act's schema declares no substances-of-concern field.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+    fn svhc_substances(&self) -> Option<&[SvhcSubstance]> {
         None
     }
 

@@ -11,7 +11,7 @@ fn registry_loads_all_embedded_schemas() {
     // the per-product-group list that used to sit here went stale the first
     // time a schema version landed, which is the whole failure this asserts
     // against: `new()` must load every embedded schema, whatever there are.
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len());
+    assert_eq!(reg.len(), embedded::EMBEDDED.len());
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn register_new_schema_succeeds() {
     let mut reg = VersionedSchemaRegistry::new();
     let schema = r#"{"type": "object", "properties": {"gtin": {"type": "string"}}}"#;
     assert!(reg.register("plastics", "1.0.0", schema.to_owned()).is_ok());
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
+    assert_eq!(reg.len(), embedded::EMBEDDED.len() + 1);
 
     let entry = reg
         .get_entry("plastics", &"1.0.0".parse().unwrap())
@@ -159,7 +159,7 @@ fn register_or_replace_new_returns_false() {
         .register_or_replace("plastics", "1.0.0", schema.to_owned())
         .unwrap();
     assert!(!replaced);
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
+    assert_eq!(reg.len(), embedded::EMBEDDED.len() + 1);
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn register_or_replace_existing_returns_true() {
         .register_or_replace("battery", "1.0.0", new_schema.to_owned())
         .unwrap();
     assert!(replaced);
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len()); // count unchanged
+    assert_eq!(reg.len(), embedded::EMBEDDED.len()); // count unchanged
     assert!(
         reg.get("battery", &"1.0.0".parse().unwrap())
             .unwrap()
@@ -195,11 +195,11 @@ fn unregister_runtime_schema_succeeds() {
     let schema = r#"{"type": "object"}"#;
     reg.register("plastics", "1.0.0", schema.to_owned())
         .unwrap();
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len() + 1);
+    assert_eq!(reg.len(), embedded::EMBEDDED.len() + 1);
 
     let removed = reg.unregister("plastics", &"1.0.0".parse().unwrap());
     assert!(removed);
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len());
+    assert_eq!(reg.len(), embedded::EMBEDDED.len());
     assert!(reg.get("plastics", &"1.0.0".parse().unwrap()).is_none());
 }
 
@@ -208,7 +208,7 @@ fn unregister_embedded_schema_does_nothing() {
     let mut reg = VersionedSchemaRegistry::new();
     let removed = reg.unregister("battery", &"1.0.0".parse().unwrap());
     assert!(!removed);
-    assert_eq!(reg.len(), super::embedded::EMBEDDED.len()); // still there
+    assert_eq!(reg.len(), embedded::EMBEDDED.len()); // still there
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn unregister_nonexistent_returns_false() {
 /// a case.
 #[test]
 fn every_embedded_schema_announces_its_own_version() {
-    for schema in super::embedded::EMBEDDED {
+    for schema in embedded::EMBEDDED {
         let parsed: serde_json::Value =
             serde_json::from_str(schema.json).expect("embedded schema is valid JSON");
         let group = schema.product_group;

@@ -103,7 +103,7 @@ pub(super) fn fixture_identifier() -> ProductIdentifier {
 /// identifier. `sample_passport` deliberately has none.
 pub(super) fn identified_passport(name: &str) -> Passport {
     Passport {
-        product_group: crate::ProductGroup::Battery,
+        product_group: ProductGroup::Battery,
         product_group_data: Some(crate::ProductGroupData::Battery(Box::new(
             crate::test_support::sample_battery_data(),
         ))),

@@ -127,7 +127,7 @@ fn textile_passport_serialisation_round_trip() {
     if let Some(ProductGroupData::Textile(td)) = &back.product_group_data {
         assert_eq!(td.fibre_composition.len(), 2);
         assert_eq!(td.country_of_origin, "BD");
-        assert!(td.svhc_substances.as_ref().unwrap().len() == 1);
+        assert_eq!(td.svhc_substances.as_ref().unwrap().len(), 1);
     } else {
         panic!("expected TextileData after round-trip");
     }
@@ -146,7 +146,10 @@ fn textile_passport_to_aas_submodel() {
     assert!(!submodel.submodel_elements.is_empty());
     // Verify it round-trips through JSON
     let aas_json = serde_json::to_value(&submodel).unwrap();
-    assert!(aas_json["idShort"].as_str().unwrap() == "DigitalProductPassport");
+    assert_eq!(
+        aas_json["idShort"].as_str().unwrap(),
+        "DigitalProductPassport"
+    );
 }
 
 #[test]

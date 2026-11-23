@@ -1,8 +1,9 @@
-//! What [`is_absolute_web_url`](super::identifier::is_absolute_web_url) and
-//! [`check_did`](super::identifier::check_did) accept, and the values the
+//! What [`is_absolute_web_url`] and
+//! [`check_did`] accept, and the values the
 //! plugin tier used to let through before both tiers shared them.
 
 use super::identifier::*;
+use alloc::format;
 
 #[test]
 fn an_absolute_web_url_needs_a_host() {
@@ -252,7 +253,7 @@ fn an_ai_21_serial_is_one_to_twenty_cset_82_characters() {
         ' ', '#', '$', '@', '[', '\\', ']', '^', '`', '{', '|', '}', '~',
     ] {
         assert_eq!(
-            check_gs1_serial(&alloc::format!("SN{outside}1")),
+            check_gs1_serial(&format!("SN{outside}1")),
             Err(Gs1ValueRejection::OutsideCset82(outside)),
             "{outside:?} is not in CSET 82"
         );

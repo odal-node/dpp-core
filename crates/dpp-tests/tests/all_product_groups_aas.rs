@@ -1746,9 +1746,7 @@ fn committed_environments_match_what_the_mappers_produce() {
     // the **reference implementation** over whatever it finds, so committing
     // one is the difference between "our vendored schema copy accepts it" and
     // "aas-core accepts it".
-    let self_issued =
-        dpp_domain::identifier::ProductIdentifier::did("did:web:acme.example.com:b:1")
-            .expect("a valid DID");
+    let self_issued = ProductIdentifier::did("did:web:acme.example.com:b:1").expect("a valid DID");
 
     for (product_group, data, version) in cases {
         let key = product_group.catalog_key().to_owned();
@@ -1951,12 +1949,9 @@ fn public_aas_projection_emits_no_non_public_field() {
         checked_any_non_public = true;
 
         let passport = base(product_group, data, version);
-        let (_, submodels) = build_aas_from_passport(
-            &passport,
-            identity_of(&passport),
-            dpp_domain::Audience::Public,
-        )
-        .expect("a public projection is buildable");
+        let (_, submodels) =
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("a public projection is buildable");
         let emitted = emitted_id_shorts(&submodels);
 
         for field in &non_public {
@@ -1981,12 +1976,9 @@ fn public_aas_projection_still_carries_public_fields() {
     for (product_group, data, version, _) in all_product_group_cases() {
         let key = product_group.catalog_key().to_owned();
         let passport = base(product_group, data, version);
-        let (_, submodels) = build_aas_from_passport(
-            &passport,
-            identity_of(&passport),
-            dpp_domain::Audience::Public,
-        )
-        .expect("buildable");
+        let (_, submodels) =
+            build_aas_from_passport(&passport, identity_of(&passport), Audience::Public)
+                .expect("buildable");
         assert!(
             !emitted_id_shorts(&submodels).is_empty(),
             "product_group '{key}': the public projection carries no fields at all"

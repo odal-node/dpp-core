@@ -217,7 +217,7 @@ pub(super) fn read_integer(reader: &mut Reader<'_>, what: &'static str) -> Resul
 /// Steps over one item of any kind, nested ones included.
 pub(super) fn skip(reader: &mut Reader<'_>) -> Result<(), CoseError> {
     IgnoredAny::decode(reader)
-        .map(|IgnoredAny| ())
+        .map(|_ignored| ())
         .map_err(|_| CoseError::Malformed("a header value that is not well formed CBOR"))
 }
 

@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::identifier::ProductIdentifier;
+use crate::product_group::{SvhcSubstance, payload::ProductGroupPayload};
 
 /// Construction products product group data for EU CPR 2024/3110 compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -31,8 +32,8 @@ pub struct ConstructionData {
     pub ce_marking: Option<bool>,
 }
 
-impl crate::product_group::payload::ProductGroupPayload for ConstructionData {
-    fn product_identifier(&self) -> Option<&crate::identifier::ProductIdentifier> {
+impl ProductGroupPayload for ConstructionData {
+    fn product_identifier(&self) -> Option<&ProductIdentifier> {
         Some(&self.product_identifier)
     }
 
@@ -42,7 +43,7 @@ impl crate::product_group::payload::ProductGroupPayload for ConstructionData {
     }
 
     /// This act's schema declares no substances-of-concern field.
-    fn svhc_substances(&self) -> Option<&[crate::product_group::SvhcSubstance]> {
+    fn svhc_substances(&self) -> Option<&[SvhcSubstance]> {
         None
     }
 

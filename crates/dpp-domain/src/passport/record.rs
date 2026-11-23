@@ -1259,9 +1259,7 @@ impl Passport {
         };
         use dpp_rules::common::date::CalendarDate;
 
-        let Some(crate::product_group::ProductGroupData::Battery(battery)) =
-            self.product_group_data.as_ref()
-        else {
+        let Some(ProductGroupData::Battery(battery)) = self.product_group_data.as_ref() else {
             return false;
         };
 
@@ -1337,7 +1335,7 @@ impl Passport {
             MissingFact, mandatory_fields, undetermined_fields,
         };
 
-        if self.product_group != crate::product_group::ProductGroup::Battery {
+        if self.product_group != ProductGroup::Battery {
             return Ok(());
         }
         let Some(data) = self.product_group_data.as_ref() else {
@@ -1449,7 +1447,7 @@ impl Passport {
     /// battery is taken to have been on the market before that operation.
     fn content_facts(
         &self,
-        data: &crate::product_group::ProductGroupData,
+        data: &ProductGroupData,
     ) -> Result<dpp_rules::batteries::battery_facts::BatteryFacts, crate::field_error::FieldError>
     {
         use crate::product_group::{BatteryStatus, ProductGroupData};

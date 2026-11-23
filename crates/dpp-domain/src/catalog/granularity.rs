@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// exists and converts from this type rather than the other way round.
 ///
 /// No `Default`, deliberately: an act that has not fixed a level is
-/// [`Option::None`] on the instrument, not a guess at item level. Defaulting
+/// [`None`] on the instrument, not a guess at item level. Defaulting
 /// here would silently answer a question only a delegated act can answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

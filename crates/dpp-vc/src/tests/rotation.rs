@@ -5,6 +5,7 @@
 //! rotation still verifies against the DID document afterwards, and a revoked
 //! key's signature does not. `dpp-vc` is where they can see both halves.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use base64::Engine;
@@ -289,7 +290,7 @@ fn kid_named(jws: &str) -> String {
 /// The output of a future that awaits nothing, as `sign_passport`'s does: it signs
 /// in process. Polled once on this thread, so many threads can sign at once without
 /// a runtime each.
-fn without_waiting<F: std::future::Future>(future: F) -> F::Output {
+fn without_waiting<F: Future>(future: F) -> F::Output {
     let mut future = std::pin::pin!(future);
     let mut context = std::task::Context::from_waker(std::task::Waker::noop());
     match future.as_mut().poll(&mut context) {

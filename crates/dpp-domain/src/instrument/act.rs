@@ -8,8 +8,7 @@ use super::customer_personal_data::CustomerPersonalData;
 use super::kind::InstrumentKind;
 use super::obligation::PassportObligation;
 use super::status::InstrumentStatus;
-use crate::catalog::granularity::Granularity;
-use crate::catalog::retention::RetentionBasis;
+use crate::catalog::{Granularity, RetentionBasis};
 
 /// One EU legal act, with the product groups it reaches.
 ///

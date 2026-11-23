@@ -53,7 +53,7 @@ impl EolEvent {
     /// `ban_applies` is the caller's answer to
     /// [`destruction_ban_applies`](crate::unsold_goods::destruction_ban_applies),
     /// which needs what a passport does not hold: whether the product was unsold and
-    /// the operator's size. Only a [`Point`](super::Derogation::Point) counts as a
+    /// the operator's size. Only a [`Point`](Derogation::Point) counts as a
     /// derogation; a legacy free-text citation is not one, so an old event for a
     /// destruction the ban reaches is reported rather than taken on trust.
     ///

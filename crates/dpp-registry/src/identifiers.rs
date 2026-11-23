@@ -45,7 +45,7 @@
 //! with symmetric shape (scheme + value + metadata), and share the
 //! country-code / checksum validation helpers below.
 
-use dpp_domain::{ActorIdentifier, ActorIdentifierError, ActorPosition};
+use dpp_domain::{ActorIdentifier, ActorIdentifierError, ActorPosition, Gln, Gtin};
 use serde::{Deserialize, Serialize};
 
 use super::basis::RegistryBasis;
@@ -100,12 +100,12 @@ impl ProductIdentifier {
             ));
         }
         if self.scheme == "gtin" {
-            dpp_domain::Gtin::parse(&self.value)
-                .map(|_| ())
-                .map_err(|e| RegistryValidationError::InvalidGtin {
+            Gtin::parse(&self.value).map(|_| ()).map_err(|e| {
+                RegistryValidationError::InvalidGtin {
                     value: self.value.clone(),
                     reason: format!("{e:?}"),
-                })?;
+                }
+            })?;
         }
         Ok(())
     }
@@ -190,12 +190,12 @@ impl FacilityIdentifier {
             ));
         }
         if self.scheme == "gln" {
-            dpp_domain::Gln::parse(&self.value)
-                .map(|_| ())
-                .map_err(|e| RegistryValidationError::InvalidGln {
+            Gln::parse(&self.value).map(|_| ()).map_err(|e| {
+                RegistryValidationError::InvalidGln {
                     value: self.value.clone(),
                     reason: format!("{e:?}"),
-                })?;
+                }
+            })?;
         }
         Ok(())
     }

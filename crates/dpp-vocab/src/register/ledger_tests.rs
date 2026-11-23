@@ -153,8 +153,9 @@ fn every_listed_term_is_well_formed_and_consistent_with_its_record() {
                 !crate::namespace::is_own(&term.iri),
                 "{at} is in our own namespace and needs no reading"
             );
-            assert!(
-                v.namespace_iri.as_deref() != Some(term.iri.as_str()),
+            assert_ne!(
+                v.namespace_iri.as_deref(),
+                Some(term.iri.as_str()),
                 "{at} is the namespace itself, which names the vocabulary and no term"
             );
             for (field, text) in [("source", &term.source), ("finding", &term.finding)] {

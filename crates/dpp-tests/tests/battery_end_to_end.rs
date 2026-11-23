@@ -39,7 +39,7 @@ use dpp_vc::credential::{
 /// unmodelled product group is reduced to its discriminant before any mapper
 /// runs. Both reach here with no identifier, and both need the caller to say
 /// what the asset is instead.
-fn identity_of(p: &dpp_domain::Passport) -> AssetIdentity<'_> {
+fn identity_of(p: &Passport) -> AssetIdentity<'_> {
     AssetIdentity::from_passport(p).unwrap_or(AssetIdentity::Named {
         name: "assetKey",
         value: "urn:odal-node:test-asset:1",

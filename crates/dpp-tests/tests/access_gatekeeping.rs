@@ -21,7 +21,7 @@ use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy, filter_by_audi
 fn filter_by_audience(
     data: &serde_json::Value,
     policy: &ProductGroupAccessPolicy,
-    audience: dpp_domain::Audience,
+    audience: Audience,
 ) -> dpp_domain::access::PolicyDecision {
     filter_by_audience_in_scope(data, policy, audience, DocumentScope::ProductGroupData)
 }

@@ -261,7 +261,7 @@ impl std::fmt::Display for RegistryValidationError {
 impl std::error::Error for RegistryValidationError {}
 
 /// Error categories for EU registry operations.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EuRegistryErrorKind {

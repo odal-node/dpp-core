@@ -17,7 +17,6 @@ rust-version.workspace = true
 dpp-rules   = { workspace = true, features = ["bundle"] }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
-serde_with  = { workspace = true }
 # v7+serde+js: v7 generates time-sortable UUIDs (B-tree friendly); js enables
 # getrandom's JS backend so crypto.getRandomValues is used on wasm32-unknown-unknown.
 uuid        = { version = "1.14", features = ["v7", "serde", "js"] }
