@@ -311,7 +311,7 @@ boundary (credential shapes, signing, status lists) is here and works without on
 
 ## Minimum Rust version
 
-1.99, enforced in CI.
+1.100, enforced in CI.
 
 ## Licence
 
