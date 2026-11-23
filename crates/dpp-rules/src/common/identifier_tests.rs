@@ -3,6 +3,7 @@
 //! plugin tier used to let through before both tiers shared them.
 
 use super::identifier::*;
+use alloc::format;
 
 #[test]
 fn an_absolute_web_url_needs_a_host() {
