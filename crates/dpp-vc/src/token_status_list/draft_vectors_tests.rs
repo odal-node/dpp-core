@@ -99,7 +99,7 @@ fn a_list_built_entry_by_entry_holds_the_drafts_bytes() {
         let read = TokenStatusList::from_encoded(vector.bits, &vector.lst).unwrap();
         assert_eq!(built, read, "{}", vector.name);
         assert_eq!(
-            TokenStatusList::from_encoded(vector.bits, &built.encode()),
+            TokenStatusList::from_encoded(vector.bits, &built.encode().expect("compresses")),
             Ok(read),
             "{} did not survive being encoded",
             vector.name

@@ -184,7 +184,7 @@ fn a_claim_that_is_missing_or_of_the_wrong_type_is_refused() {
 #[test]
 fn a_list_that_cannot_be_read_is_refused() {
     let key = key();
-    let lst = list().encode();
+    let lst = list().encode().expect("compresses");
     let cases = [
         (
             json!({ "lst": lst }),
@@ -371,4 +371,57 @@ fn an_entry_nobody_has_registered_is_never_read_as_valid() {
         token.status(&reference(2), now()),
         Err(TokenStatusListError::UnregisteredStatus(0x10))
     );
+}
+
+/// RFC 7519 clause 4.1.5: a token is not to be accepted before its `nbf`, and is
+/// accepted from it, to the second. A token with none is not held back, and one whose
+/// `nbf` is not a number is refused and not read as having none.
+#[test]
+fn a_token_is_refused_before_its_nbf() {
+    let key = key();
+    let start = now().timestamp();
+    let with_nbf = |nbf: Value| {
+        let mut payload = claims(&list());
+        payload["nbf"] = nbf;
+        verified(&key, &payload)
+    };
+
+    assert_eq!(
+        with_nbf(json!(start + 1)).err(),
+        Some(TokenStatusListError::NotYetValid)
+    );
+    assert!(with_nbf(json!(start)).is_ok(), "accepted from its nbf");
+    assert!(with_nbf(json!(start - 1)).is_ok());
+    assert_eq!(
+        with_nbf(json!(start as f64 + 0.5)).err(),
+        Some(TokenStatusListError::NotYetValid),
+        "a NumericDate may be fractional"
+    );
+    for malformed in [json!("soon"), json!(null), json!(true)] {
+        assert_eq!(
+            with_nbf(malformed.clone()).err(),
+            Some(TokenStatusListError::BadClaim("nbf")),
+            "nbf {malformed}"
+        );
+    }
+}
+
+/// RFC 7797: with `b64` false the signed payload is the segment as it stands. The
+/// signature over that verifies, and the segment decodes to claims this crate would
+/// read, so only the header says the signer meant something else.
+#[test]
+fn a_token_with_an_unencoded_payload_is_refused() {
+    let key = key();
+    let payload = claims(&list());
+    let with_b64 = |b64: Value| {
+        let mut header = header(&key);
+        header["b64"] = b64;
+        StatusListToken::verify(&forge(&key, &header, &payload), &key.public_key(), now())
+    };
+
+    assert_eq!(
+        with_b64(json!(false)).err(),
+        Some(TokenStatusListError::UnencodedPayload)
+    );
+    assert!(with_b64(json!(true)).is_ok(), "b64 true is the default");
 }

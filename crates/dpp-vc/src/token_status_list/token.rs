@@ -40,8 +40,9 @@ impl StatusListToken {
     /// nothing about it. Fetching the token is I/O and not this crate's job.
     ///
     /// Checks, in order: the signature, so nothing after it reasons about claims
-    /// from an unauthenticated token; `typ`; the claims section 5.1 requires, `sub`,
-    /// `iat` and `status_list`; `exp` against `now`; `ttl` where present; and the
+    /// from an unauthenticated token; that `b64` is not false; `typ`; the claims
+    /// section 5.1 requires, `sub`, `iat` and `status_list`; `nbf` and `exp` against
+    /// `now`; `ttl` where present; and the
     /// list, which must declare 1, 2, 4 or 8 `bits` and decompress within
     /// [`MAX_DECODED_BYTES`](super::MAX_DECODED_BYTES). Only signatures are
     /// accepted; the draft's MAC form is not read.
@@ -62,6 +63,14 @@ impl StatusListToken {
         }
 
         let header = jwt_part(token, 0).ok_or(TokenStatusListError::BadSignature)?;
+        // RFC 7797 clause 3: with `b64` false the payload is the segment as it
+        // stands, and not the base64url of the claims. `verify_jws` does not read the
+        // member, and `jwt_part` always decodes, so a token signed that way would mean
+        // one thing to the signer and another here. Refused, as the JOSE verifier in
+        // this crate refuses it.
+        if header.get("b64") == Some(&Value::Bool(false)) {
+            return Err(TokenStatusListError::UnencodedPayload);
+        }
         let typ = header
             .get("typ")
             .and_then(Value::as_str)
@@ -81,6 +90,9 @@ impl StatusListToken {
         // token they fetched.
         numeric_date(&claims, "iat")?.ok_or(TokenStatusListError::BadClaim("iat"))?;
         let expires_at = numeric_date(&claims, "exp")?;
+        // RFC 7519 clause 4.1.5, and section 5.1 of the draft: a token that is not
+        // valid in every other respect of RFC 7519 is refused.
+        let not_before = numeric_date(&claims, "nbf")?;
         let ttl = ttl(&claims)?;
 
         let list = list_of(&claims)?;
@@ -90,6 +102,12 @@ impl StatusListToken {
             expires_at,
             ttl,
         };
+        // The start is not looked at again by `status`: time only moves on, so a
+        // token that has started has started for good, where one that has expired
+        // can be kept past it.
+        if not_before.is_some_and(|start| seconds(now) < start) {
+            return Err(TokenStatusListError::NotYetValid);
+        }
         token.check_not_expired(now)?;
         Ok(token)
     }

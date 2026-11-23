@@ -67,7 +67,7 @@ fn status_list_token(
         "sub": uri,
         "iat": at.timestamp(),
         "ttl": 3600,
-        "status_list": { "bits": list.bits(), "lst": list.encode() },
+        "status_list": { "bits": list.bits(), "lst": list.encode().expect("compresses") },
     });
     let kid = store
         .public_key(KEY_ID)
@@ -236,4 +236,33 @@ fn a_status_with_a_mechanism_this_crate_does_not_read_passes() {
         "status_list": { "idx": 3, "uri": "https://status.example/1" },
     });
     assert!(check(&store, &credential_with(&store, &[("status", both)]), now()).is_ok());
+}
+
+/// `StatusReference` has public fields, so a caller can build one `verify` refuses.
+/// Signing it would make a credential this crate then rejects, so `issue` holds the
+/// reference to the same reading first.
+#[test]
+fn a_reference_that_verify_would_refuse_is_not_issued() {
+    let store = temp_store("sdjwtvc-status-empty-uri", KEY_ID);
+    let unreadable = StatusReference {
+        idx: 0,
+        uri: String::new(),
+    };
+
+    let issued = issue(
+        &store,
+        KEY_ID,
+        &payload(),
+        &policy(),
+        &Issuance {
+            issuer: ISSUER,
+            vct: &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
+            issued_at: ISSUED_AT,
+            expires_at: Some(EXPIRES_AT),
+            not_before: None,
+            holder_key: None,
+            status: Some(&unreadable),
+        },
+    );
+    assert_eq!(issued.err(), Some(SdJwtVcError::MalformedStatus));
 }

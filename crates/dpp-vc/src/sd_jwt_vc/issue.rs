@@ -115,7 +115,9 @@ pub struct Issuance<'a> {
 /// [`SdJwtVcError::PayloadNotAnObject`] if `payload` is not a JSON object,
 /// [`SdJwtVcError::EmptyValidityWindow`] if the credential would expire when it is
 /// issued or before it starts, [`SdJwtVcError::Unbounded`] if it has neither an `exp`
-/// nor a status reference, and [`SdJwtVcError::Signing`] if the key store cannot
+/// nor a status reference, [`SdJwtVcError::MalformedStatus`] if the status reference
+/// is one [`verify`](super::verify) would refuse, an empty `uri`, and
+/// [`SdJwtVcError::Signing`] if the key store cannot
 /// sign.
 pub fn issue(
     store: &KeyStore,
@@ -143,6 +145,14 @@ pub fn issue(
         // With no `exp`, only a status list can end it.
         None if credential.status.is_none() => return Err(SdJwtVcError::Unbounded),
         None => {}
+    }
+    // `verify` holds `status` to a reference it can read. `StatusReference` has public
+    // fields, so one it cannot read, an empty `uri`, could otherwise be signed into
+    // a credential this crate then refuses. Held to the same reading before signing.
+    if let Some(reference) = credential.status {
+        let mut written = Map::new();
+        written.insert("status".to_owned(), reference.to_claim());
+        StatusReference::from_claims(&written).map_err(|_| SdJwtVcError::MalformedStatus)?;
     }
 
     let mut claims = Map::new();

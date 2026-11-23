@@ -43,7 +43,7 @@ pub(super) fn claims(list: &TokenStatusList) -> Value {
         "iat": ISSUED_AT,
         "exp": EXPIRES_AT,
         "ttl": 43_200,
-        "status_list": { "bits": list.bits(), "lst": list.encode() },
+        "status_list": { "bits": list.bits(), "lst": list.encode().expect("compresses") },
     })
 }
 

@@ -139,8 +139,8 @@
 //! a presentation, and [`verify`] enforces them.
 //!
 //! **It is withdrawn early.** The profile's clause 2.2.2.3 registers an OPTIONAL
-//! `status` claim — *"the information on how to read the status of the Verifiable
-//! Credential"*, by reference to the IETF Token Status List draft — and clause 2.4
+//! `status` claim, *"the information on how to read the status of the Verifiable
+//! Credential"*, by reference to the IETF Token Status List draft, and clause 2.4
 //! says a verifier SHOULD check it when present. [`issue`] writes that claim when
 //! [`Issuance::status`] names a
 //! [`StatusReference`](crate::token_status_list::StatusReference): an index into a

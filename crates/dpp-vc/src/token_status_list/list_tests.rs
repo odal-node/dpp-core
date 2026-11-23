@@ -70,8 +70,8 @@ fn the_drafts_two_bit_list_reads_as_the_draft_lays_it_out() {
 fn encoding_the_drafts_lists_writes_the_drafts_strings() {
     let one = TokenStatusList::from_bytes(1, ONE_BIT_BYTES.to_vec()).unwrap();
     let two = TokenStatusList::from_bytes(2, TWO_BIT_BYTES.to_vec()).unwrap();
-    assert_eq!(one.encode(), ONE_BIT_LST);
-    assert_eq!(two.encode(), TWO_BIT_LST);
+    assert_eq!(one.encode().unwrap(), ONE_BIT_LST);
+    assert_eq!(two.encode().unwrap(), TWO_BIT_LST);
 }
 
 #[test]
@@ -87,7 +87,8 @@ fn every_width_keeps_what_was_set() {
         for (idx, value) in (0u64..).zip(&values) {
             list.set(idx, *value).unwrap();
         }
-        let again = TokenStatusList::from_encoded(bits, &list.encode()).unwrap();
+        let again =
+            TokenStatusList::from_encoded(bits, &list.encode().expect("compresses")).unwrap();
         for (idx, value) in (0u64..).zip(&values) {
             assert_eq!(again.get(idx), Some(*value), "bits {bits}, idx {idx}");
         }
@@ -166,7 +167,8 @@ fn a_list_too_large_to_hold_is_refused() {
 fn a_list_that_expands_past_the_budget_is_refused() {
     let lst = TokenStatusList::from_bytes(8, vec![0; 4096])
         .unwrap()
-        .encode();
+        .encode()
+        .unwrap();
     assert!(matches!(
         TokenStatusList::from_encoded_within(8, &lst, 1024),
         Err(TokenStatusListError::TooLarge(1024))
@@ -181,7 +183,8 @@ fn a_list_that_expands_past_the_budget_is_refused() {
 fn a_small_input_that_expands_past_the_default_budget_is_refused() {
     let lst = TokenStatusList::from_bytes(8, vec![0; MAX_DECODED_BYTES + 1])
         .unwrap()
-        .encode();
+        .encode()
+        .unwrap();
     assert!(lst.len() < 64 * 1024, "the fixture should compress well");
     assert_eq!(
         TokenStatusList::from_encoded(8, &lst),
