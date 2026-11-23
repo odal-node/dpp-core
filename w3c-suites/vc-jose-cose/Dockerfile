@@ -13,7 +13,7 @@
 # bytes that were read. Dependabot does not watch them; moving one is a deliberate
 # edit. The tag in front of each digest says what was pinned.
 
-FROM rust:1.99.1-slim-bookworm@sha256:f2c004e3d2d8b547e8cf7ffbc29205385f4e71d23e53e4e383065db5e9f822cd AS build
+FROM rust:1.100.0-slim-bookworm@sha256:7c7d4eb4d05b7781187a327809466cfddf29753f6defdc3d19a0e291951b7a37 AS build
 
 WORKDIR /src
 # The workspace manifest and its members, because a crate taken by path reads the

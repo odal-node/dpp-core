@@ -119,7 +119,7 @@ assert!(entry.public_key().verify(message, &signature));
 
 ## Minimum Rust version
 
-1.99, enforced in CI.
+1.100, enforced in CI.
 
 ## Licence
 
