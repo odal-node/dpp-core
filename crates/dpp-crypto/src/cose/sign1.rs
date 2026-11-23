@@ -2,7 +2,7 @@
 
 use cbor4ii::core::utils::SliceReader;
 
-use super::algorithm::cose_alg;
+use super::algorithm::{accepts_cose_alg, cose_alg};
 use super::cbor::{self, Out, Reader};
 use super::cwt::CwtClaims;
 use super::error::CoseError;
@@ -176,9 +176,11 @@ pub(super) fn to_be_signed(protected: &[u8], payload: &[u8]) -> Result<Vec<u8>, 
 ///   verifier does not (RFC 9052 §3.1);
 /// - `typ` is not in the unprotected header (RFC 9596 §2), and nor is the CWT Claims header
 ///   parameter (RFC 9597 §1: nothing there is protected, so no claim may be used);
-/// - the **protected** header carries `alg`, and it is the algorithm of `key` (see
-///   [`super::algorithm::cose_alg`]). The key decides the algorithm and the header may
-///   only confirm it, so a header cannot move a signature to another algorithm;
+/// - the **protected** header carries `alg`, and it names the algorithm of `key`: the
+///   value this crate writes ([`super::algorithm::cose_alg`]) or the fully specified
+///   one RFC 9864 registers for it (see [`super::algorithm::accepts_cose_alg`]). The
+///   key decides the algorithm and the header may only confirm it, so a header cannot
+///   move a signature to another algorithm;
 /// - the payload is a byte string, not `nil`: a detached payload (RFC 9052 §4.1) is
 ///   refused, because the credential is the payload;
 /// - the signature is a byte string of the length of the key's algorithm, and is its
@@ -285,7 +287,7 @@ fn check_headers(
     match protected.alg {
         None if unprotected.alg.is_some() => Err(CoseError::AlgorithmNotProtected),
         None => Err(CoseError::MissingAlgorithm),
-        Some(Alg::Integer(alg)) if alg == cose_alg(key.algorithm()) => Ok(()),
+        Some(Alg::Integer(alg)) if accepts_cose_alg(key.algorithm(), alg) => Ok(()),
         Some(_) => Err(CoseError::AlgorithmMismatch),
     }
 }

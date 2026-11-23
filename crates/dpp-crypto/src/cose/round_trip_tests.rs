@@ -5,7 +5,8 @@ use super::algorithm::cose_alg;
 use super::error::CoseError;
 use super::sign1::{ContentType, sign_sign1, verify_sign1};
 use super::test_support::{
-    ALGORITHMS, key_pair, message, no_unprotected, protected_map, public_key,
+    ALGORITHMS, bstr, key_pair, map, message, nint, no_unprotected, protected_map, public_key,
+    tstr, uint,
 };
 use crate::jws::SignatureLengthError;
 
@@ -36,6 +37,36 @@ fn every_algorithm_signs_and_verifies() {
         assert_eq!(
             verified.content_type,
             Some(ContentType::Text("application/vc".to_owned())),
+            "{name}"
+        );
+    }
+}
+
+/// What is written is the polymorphic value, byte for byte, and not the fully specified
+/// one this crate also reads. The expected message is built by hand and signed by the
+/// same key, and signatures are deterministic, so the two are equal only if the
+/// protected header is exactly this one.
+#[test]
+fn what_is_written_is_the_polymorphic_value() {
+    for (name, alg) in ALGORITHMS {
+        let key = key_pair(name);
+        let written = sign_sign1(
+            &key,
+            b"payload",
+            KID,
+            Some("application/vc+cose"),
+            Some("application/vc"),
+        )
+        .unwrap();
+        let protected = map(&[
+            (uint(1), nint(alg)),
+            (uint(3), tstr("application/vc")),
+            (uint(4), bstr(KID)),
+            (uint(16), tstr("application/vc+cose")),
+        ]);
+        assert_eq!(
+            written,
+            message(&key, &protected, &no_unprotected(), b"payload"),
             "{name}"
         );
     }
