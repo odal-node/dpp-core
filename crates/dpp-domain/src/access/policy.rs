@@ -812,4 +812,96 @@ impl ProductGroupAccessPolicy {
     pub fn disclosure_for_field(&self, field_name: &str) -> Disclosure {
         self.disclosure_for_key(field_name, DocumentScope::ProductGroupData)
     }
+
+    /// How many members the object at `path` can hold that this policy classes above
+    /// `Public`: the number of digests an issuer's `_sd` array for that object has to
+    /// reach for a passport that carries none of them to look like one that carries
+    /// them all.
+    ///
+    /// `path` is the chain of object keys from the root of the scope's document to the
+    /// object, innermost last. It is empty for the passport itself under
+    /// [`DocumentScope::Envelope`], and empty for `productGroupData` under
+    /// [`DocumentScope::ProductGroupData`], where the schema's keys are written from.
+    /// Array indices are not segments, as in [`Self::disclosure_for_path`]: the objects
+    /// in an array sit at the array's own path.
+    ///
+    /// # Counted at the position, not by suffix
+    ///
+    /// [`Self::disclosure_for_path`] matches a key against the tail of a path, so a bare
+    /// name classes a member at any depth. This counts the other way, from the keys: a
+    /// key `usageHistory.recordedAt` counts for the object at `["usageHistory"]` and for
+    /// no other, and a bare name counts for the object at `[]`, where a schema's
+    /// top-level properties sit. Counting a bare name at every depth would pad each
+    /// nested object with the names of all the others.
+    ///
+    /// That makes the count an upper bound at the root. The schema walk also records a
+    /// shared definition's properties as bare names, so a name that belongs to a
+    /// definition is counted there as well as where the definition is used. A count
+    /// above the number a passport can hold costs decoys, and hides nothing less.
+    ///
+    /// # Counted at the class the issuer hides it at
+    ///
+    /// The keys say which members an object can hold, and not which of them are hidden:
+    /// that is [`Self::disclosure_for_path`], the lookup the issuer makes for each member
+    /// it meets, and it raises a universal conformity field such as `jwsSignature` above
+    /// whatever class a schema gave it, at any depth. A member counts when that lookup
+    /// puts it above `Public`, so a schema that declares `container.jwsSignature` public
+    /// still has it counted, and the count cannot fall below what the issuer hides.
+    ///
+    /// Members are counted by the name a key writes. `recordedAt` and `recorded_at` are
+    /// two members of a document, and an issuer hides both when both are there, even
+    /// though a policy lookup treats them as one name. Counting both overshoots for a
+    /// document that uses one spelling, which costs a decoy and hides nothing less.
+    ///
+    /// # What `0` means
+    ///
+    /// `0` says the policy names no such member at this position, and it also says it
+    /// cannot tell: a policy that classes unlisted fields above `Public` has no limit to
+    /// count, and a position the schema does not describe, such as the entries of a map,
+    /// has no keys. A caller treats `0` as "no count" and falls back to a bucket.
+    #[must_use]
+    pub fn concealable_members(&self, path: &[&str], scope: DocumentScope) -> usize {
+        if self.default_disclosure != Disclosure::Public {
+            return 0;
+        }
+
+        // The names the policy writes for this position, whatever class it gives them.
+        let mut names: Vec<&str> = Vec::new();
+        match scope {
+            DocumentScope::Envelope if path.is_empty() => {
+                names.extend(
+                    self.envelope_disclosure
+                        .keys()
+                        .filter(|key| !key.contains('.'))
+                        .map(String::as_str),
+                );
+            }
+            DocumentScope::Envelope => {}
+            DocumentScope::ProductGroupData => {
+                for key in self.field_disclosure.keys() {
+                    let mut segments: Vec<&str> = key.split('.').collect();
+                    let Some(leaf) = segments.pop() else { continue };
+                    let here = segments.len() == path.len()
+                        && segments
+                            .iter()
+                            .zip(path)
+                            .all(|(segment, step)| keys_match_normalized(segment, step));
+                    if here {
+                        names.push(leaf);
+                    }
+                }
+            }
+        }
+        names.sort_unstable();
+        names.dedup();
+
+        names
+            .into_iter()
+            .filter(|name| {
+                let mut member = path.to_vec();
+                member.push(name);
+                self.disclosure_for_path(&member, scope) != Disclosure::Public
+            })
+            .count()
+    }
 }

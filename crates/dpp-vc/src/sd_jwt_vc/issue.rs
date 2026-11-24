@@ -3,7 +3,7 @@
 use serde_json::{Map, Value};
 
 use dpp_crypto::keystore::KeyBackend;
-use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal, holder_key_confirmation};
+use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal_to, holder_key_confirmation};
 use dpp_domain::Disclosure as DisclosureClass;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
 
@@ -194,7 +194,11 @@ pub fn issue(
     )?;
     claims.insert(PASSPORT_CLAIM.to_owned(), Value::Object(concealed));
 
-    let jwt_payload = build_payload(claims, !disclosures.is_empty());
+    // `_sd_alg` goes once, at the root, when any object carries an `_sd` array. An object
+    // that could hide a member and hides none carries decoys alone, so the disclosures
+    // are not the test.
+    let carries_sd = claims.values().any(carries_sd);
+    let jwt_payload = build_payload(claims, carries_sd);
     // The `kid` is the key's thumbprint URI, which is the `kid` of its entry in
     // the issuer metadata's key set (clause 4.2) and not the DID URL a
     // `did:web` verifier would use: this profile names no DID method. It is taken
@@ -238,7 +242,23 @@ fn conceal_object(
         }
     }
 
-    let (mut kept, mut produced) = conceal(object, |name| hide.contains(name))?;
+    // How many members the schema lets this object hold above `Public`. The `_sd` array
+    // is padded to that, so a passport that lacks an optional member carries as many
+    // digests as one that has it. `0` is no count, and `conceal_to` then rounds to a
+    // bucket. The position is the object's path from the root of the scope's document,
+    // which for `productGroupData` is the path below it, where the schema's keys start.
+    let from_root = segments.iter().map(String::as_str);
+    let position: Vec<&str> = if scope == DocumentScope::ProductGroupData {
+        from_root
+            .skip_while(|segment| *segment != PRODUCT_GROUP_DATA)
+            .skip(1)
+            .collect()
+    } else {
+        from_root.collect()
+    };
+    let at_least = policy.concealable_members(&position, scope);
+
+    let (mut kept, mut produced) = conceal_to(object, |name| hide.contains(name), at_least)?;
     disclosures.append(&mut produced);
 
     // Descend into the members that stayed in cleartext.
@@ -261,6 +281,15 @@ fn conceal_object(
     }
 
     Ok(kept)
+}
+
+/// Whether any object in `value` carries an `_sd` array.
+fn carries_sd(value: &Value) -> bool {
+    match value {
+        Value::Object(map) => map.contains_key("_sd") || map.values().any(carries_sd),
+        Value::Array(items) => items.iter().any(carries_sd),
+        _ => false,
+    }
 }
 
 /// Walk into a value that stayed in cleartext.
