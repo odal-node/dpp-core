@@ -38,6 +38,11 @@ anyhow           = { workspace = true }
 tracing          = { workspace = true }
 uuid             = { workspace = true }
 
+[features]
+# `MemoryKeyStore`, a `KeyBackend` that keeps its keys in memory, for tests of the
+# code that signs through a backend. Not for production use.
+test-utils = []
+
 [dev-dependencies]
 uuid          = { version = "1.14", features = ["v4"] }
 tracing-test  = "0.2.5"

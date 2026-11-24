@@ -59,7 +59,7 @@
 
 use dpp_crypto::jws::signer;
 use dpp_crypto::jws::verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
-use dpp_crypto::keystore::KeyStore;
+use dpp_crypto::keystore::KeyBackend;
 
 use super::types::DppAccessCredential;
 use super::verify::VerificationResult;
@@ -102,7 +102,7 @@ const CTY: &str = "vc";
 /// [`build_did_document`]: crate::did_builder::build_did_document
 pub fn sign_access_credential(
     credential: &DppAccessCredential,
-    store: &KeyStore,
+    store: &dyn KeyBackend,
     key_id: &str,
 ) -> anyhow::Result<String> {
     let payload = serde_json::to_value(credential)?;

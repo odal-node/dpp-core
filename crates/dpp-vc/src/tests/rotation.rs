@@ -45,7 +45,7 @@ fn did_document(store: &KeyStore) -> serde_json::Value {
 }
 
 /// Whether `jws` resolves in `doc` to a key it verifies under.
-fn verifies_in(doc: &serde_json::Value, jws: &str) -> bool {
+pub(super) fn verifies_in(doc: &serde_json::Value, jws: &str) -> bool {
     dpp_crypto::jws::verifier::resolve_verification_key(doc, jws)
         .is_some_and(|key| dpp_crypto::jws::verifier::verify_jws(jws, &key).expect("verify"))
 }
@@ -283,14 +283,14 @@ fn a_token_whose_kid_names_the_other_key_of_its_document_is_refused() {
 }
 
 /// The `kid` a compact JWS names, as a verifier reads it.
-fn kid_named(jws: &str) -> String {
+pub(super) fn kid_named(jws: &str) -> String {
     dpp_crypto::jws::verifier::extract_kid_from_jws(jws).expect("the token names a kid")
 }
 
 /// The output of a future that awaits nothing, as `sign_passport`'s does: it signs
 /// in process. Polled once on this thread, so many threads can sign at once without
 /// a runtime each.
-fn without_waiting<F: Future>(future: F) -> F::Output {
+pub(super) fn without_waiting<F: Future>(future: F) -> F::Output {
     let mut future = std::pin::pin!(future);
     let mut context = std::task::Context::from_waker(std::task::Waker::noop());
     match future.as_mut().poll(&mut context) {
@@ -309,7 +309,7 @@ fn without_waiting<F: Future>(future: F) -> F::Output {
 fn passports_signed_while_the_key_rotates_verify_against_the_document_published_after() {
     let store = Arc::new(rotation_store("passport-while-rotating"));
     let svc = LocalIdentityService::new(
-        Arc::clone(&store),
+        Arc::<KeyStore>::clone(&store),
         "issuer".to_owned(),
         ROTATION_BASE_URL.to_owned(),
     );

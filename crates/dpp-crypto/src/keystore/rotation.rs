@@ -18,9 +18,14 @@ const MAX_ROTATION_ATTEMPTS: usize = 3;
 /// made with the overwritten key would then never verify again. `load_archived_keys`'s
 /// `entries.sort_by_key` still recovers chronological order, since a v7 UUID's
 /// leading bits are a millisecond timestamp.
-fn archived_key_name(key_id: &str) -> String {
-    format!("{key_id}#archived-{}", uuid::Uuid::now_v7())
+pub(super) fn archived_key_name(key_id: &str) -> String {
+    format!("{key_id}{ARCHIVE_MARKER}{}", uuid::Uuid::now_v7())
 }
+
+/// What an archived record's key carries between the key's id and its time-ordered suffix.
+/// A key id that contains it is an archive, and one that starts with `{key_id}` and this is
+/// an archive of `key_id`.
+pub(super) const ARCHIVE_MARKER: &str = "#archived-";
 
 /// The algorithm a rotation of `key_id` keeps: the current record's, or the
 /// default when the key has no record yet.
@@ -82,7 +87,7 @@ impl KeyStore {
         self.rotate_inner(key_id, true, None)
     }
 
-    fn rotate_inner(
+    pub(super) fn rotate_inner(
         &self,
         key_id: &str,
         revoke_old: bool,

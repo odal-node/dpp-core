@@ -79,4 +79,16 @@ pub enum CoseError {
     /// The signing key is revoked, and a revoked key signs nothing.
     #[error(transparent)]
     KeyRevoked(#[from] crate::keystore::KeyRevoked),
+    /// The backend that holds the signing key could not sign. The text is the backend's.
+    #[error("the key could not sign: {0}")]
+    Signing(String),
+}
+
+impl From<crate::keystore::SignError> for CoseError {
+    fn from(refusal: crate::keystore::SignError) -> Self {
+        match refusal {
+            crate::keystore::SignError::Revoked(revoked) => Self::KeyRevoked(revoked),
+            crate::keystore::SignError::Backend(reason) => Self::Signing(reason),
+        }
+    }
 }

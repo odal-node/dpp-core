@@ -1,7 +1,7 @@
 //! Errors of the keystore module.
 //!
 // LAYOUT-DEVIATION: rule 1 counts three public types as a file that is no longer about
-// one thing, but it is a rule about types that have gravity. None of these three has an
+// one thing, but it is a rule about types that have gravity. None of these four has an
 // `impl` block or a serde derive, and each runs 15 to 30 lines with its docs. Each is one
 // way the key store refuses, and rule 14 asks for a module's failure modes to be read in
 // one file without reading the module.
@@ -78,4 +78,21 @@ pub struct KeyStoreLocked {
 pub struct KeyRevoked {
     /// The revoked key's fingerprint, the hex SHA-256 of its public key.
     pub fingerprint: String,
+}
+
+/// Why a key did not sign.
+///
+/// [`KeyEntry::sign`](super::KeyEntry::sign) returns it, and so does a
+/// [`KeySigner`](super::KeySigner), whose key may sit behind a device or a service
+/// that fails for reasons a key held in memory does not.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum SignError {
+    /// The key is revoked, and a revoked key signs nothing.
+    #[error(transparent)]
+    Revoked(#[from] KeyRevoked),
+    /// The backend that holds the key could not sign: the device or service was not
+    /// reachable, or refused. The text is the backend's own and carries no key material.
+    #[error("the key could not sign: {0}")]
+    Backend(String),
 }

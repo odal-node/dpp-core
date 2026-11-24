@@ -18,6 +18,7 @@ use super::crypto::{
 };
 use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
 use super::lock::StoreLock;
+use super::rotation::ARCHIVE_MARKER;
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
@@ -109,6 +110,18 @@ impl From<&KeyRecord> for PublicKeyInfo {
 }
 
 impl PublicKeyInfo {
+    /// The public half of a key and its revocation state, for a
+    /// [`KeyBackend`](super::KeyBackend) to answer
+    /// [`public_key`](super::KeyBackend::public_key) with.
+    #[must_use]
+    pub fn new(public_key: &PublicKey, revoked: bool) -> Self {
+        Self {
+            verifying_key_hex: hex::encode(public_key.as_bytes()),
+            revoked,
+            algorithm: public_key.algorithm(),
+        }
+    }
+
     /// The recorded public key, validated as a key of the recorded algorithm.
     ///
     /// # Errors
@@ -555,7 +568,7 @@ impl KeyStore {
     /// timestamp order as [`Self::load_archived_keys`], without decrypting any
     /// private key material.
     pub fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
-        let prefix = format!("{key_id}#archived-");
+        let prefix = format!("{key_id}{ARCHIVE_MARKER}");
         let map = self.records.read().expect("key store read lock poisoned");
 
         let mut entries: Vec<(&str, &KeyRecord)> = map
@@ -573,7 +586,7 @@ impl KeyStore {
 
     /// Return all archived keys for the given identifier in ascending timestamp order.
     pub fn load_archived_keys(&self, key_id: &str) -> Vec<KeyEntry> {
-        let prefix = format!("{key_id}#archived-");
+        let prefix = format!("{key_id}{ARCHIVE_MARKER}");
         let map = self.records.read().expect("key store read lock poisoned");
 
         let mut entries: Vec<(&str, &KeyRecord)> = map

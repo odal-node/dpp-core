@@ -6,28 +6,61 @@ use zeroize::Zeroizing;
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
-use super::error::KeyRevoked;
+use super::error::{KeyRevoked, SignError};
+use super::signer::KeySigner;
 
-/// A decrypted key pair.
+/// A key pair, ready to sign.
 ///
-/// The private material is not public: it is reached only through
-/// [`Self::sign`], so no caller can hold a curve-specific type and every
-/// signature this crate makes goes through one per-algorithm `match`.
-/// [`Self::algorithm`] is the algorithm the key signs under; it is what a verifier
-/// binds the JWS `alg` header to. The struct is `#[non_exhaustive]` so that adding an
-/// algorithm does not break downstream construction.
+/// The private half is not public: it is reached only through [`Self::sign`], so no
+/// caller can hold a curve-specific type and every signature this crate makes goes
+/// through one per-algorithm `match`, or through the [`KeySigner`] of a key that is not
+/// held in memory. [`Self::algorithm`] is the algorithm the key signs under; it is what a
+/// verifier binds the JWS `alg` header to. The struct is `#[non_exhaustive]` so that
+/// adding an algorithm does not break downstream construction.
+///
+/// A [`KeyBackend`](super::KeyBackend) returns one from [`load_key`](super::KeyBackend::load_key),
+/// and it is one key for as long as it lives: a caller that takes the `kid` from it and
+/// then signs with it has a token whose header names the key that signed.
 #[non_exhaustive]
 pub struct KeyEntry {
-    material: SigningMaterial,
+    signer: Signer,
     pub fingerprint: String,
     /// Whether this key has been revoked (see `KeyRecord::revoked`).
     pub revoked: bool,
 }
 
+/// Where the private half is.
+// Not boxed: the in-memory variant is the one every file-store entry has, and boxing it
+// would add an allocation to each `load_key` to save a few hundred bytes on a value that
+// lives for one signature.
+#[allow(clippy::large_enum_variant)]
+enum Signer {
+    /// In memory: the file store decrypted it, or the caller supplied it.
+    Local(SigningMaterial),
+    /// Behind a [`KeySigner`], which signs without the key leaving where it is kept.
+    Backend(Box<dyn KeySigner>),
+}
+
 impl KeyEntry {
     pub(crate) fn new(material: SigningMaterial, fingerprint: String, revoked: bool) -> Self {
         Self {
-            material,
+            signer: Signer::Local(material),
+            fingerprint,
+            revoked,
+        }
+    }
+
+    /// A key that signs through `signer`, for a [`KeyBackend`](super::KeyBackend) whose
+    /// keys are not held in memory.
+    ///
+    /// The fingerprint is the hex SHA-256 of the signer's public key, which is the one the
+    /// file store records, so a key has the same fingerprint wherever it is kept.
+    /// `revoked` is the backend's own record of whether the key is revoked.
+    #[must_use]
+    pub fn from_signer(signer: Box<dyn KeySigner>, revoked: bool) -> Self {
+        let fingerprint = fingerprint_of(&signer.public_key());
+        Self {
+            signer: Signer::Backend(signer),
             fingerprint,
             revoked,
         }
@@ -36,13 +69,19 @@ impl KeyEntry {
     /// The algorithm the key signs under, read from the key itself.
     #[must_use]
     pub fn algorithm(&self) -> KeyAlgorithm {
-        self.material.algorithm()
+        match &self.signer {
+            Signer::Local(material) => material.algorithm(),
+            Signer::Backend(signer) => signer.algorithm(),
+        }
     }
 
     /// The public half, with its algorithm.
     #[must_use]
     pub fn public_key(&self) -> PublicKey {
-        self.material.public_key()
+        match &self.signer {
+            Signer::Local(material) => material.public_key(),
+            Signer::Backend(signer) => signer.public_key(),
+        }
     }
 
     /// Sign `message` under this key's algorithm and return the raw signature:
@@ -53,22 +92,30 @@ impl KeyEntry {
     ///
     /// # Errors
     ///
-    /// [`KeyRevoked`] if the key is revoked. Every key set built from a key store
+    /// [`SignError::Revoked`] if the key is revoked. Every key set built from a key store
     /// leaves a revoked key out, so a signature by one is a signature no verifier
-    /// should accept.
-    pub fn sign(&self, message: &[u8]) -> Result<Vec<u8>, KeyRevoked> {
+    /// should accept. [`SignError::Backend`] if the key is not held in memory and the
+    /// backend that holds it could not sign.
+    pub fn sign(&self, message: &[u8]) -> Result<Vec<u8>, SignError> {
         if self.revoked {
             return Err(KeyRevoked {
                 fingerprint: self.fingerprint.clone(),
-            });
+            }
+            .into());
         }
-        Ok(self.material.sign(message))
+        match &self.signer {
+            Signer::Local(material) => Ok(material.sign(message)),
+            Signer::Backend(signer) => signer.sign(message),
+        }
     }
 
     /// The secret, for tests that prove it never leaks into output or logs.
     #[cfg(test)]
     pub(crate) fn secret_for_test(&self) -> Zeroizing<Vec<u8>> {
-        self.material.secret()
+        match &self.signer {
+            Signer::Local(material) => material.secret(),
+            Signer::Backend(_) => panic!("a key behind a signer has no secret to read"),
+        }
     }
 }
 

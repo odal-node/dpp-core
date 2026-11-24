@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 
-use dpp_crypto::keystore::{KeyStore, PublicKeyInfo};
+use dpp_crypto::keystore::{KeyBackend, PublicKeyInfo};
 
 /// The well-known path a verifier fetches, from
 /// draft-ietf-oauth-sd-jwt-vc-19 clause 4: inserted between the host and path
@@ -41,7 +41,7 @@ pub const WELL_KNOWN_PATH: &str = "/.well-known/jwt-vc-issuer";
 /// before a rotation must keep verifying, and one signed with a revoked key must
 /// stop. Returns `None` when nothing usable is left, rather than an empty key
 /// set, which would assert that this issuer signs nothing.
-pub fn build_issuer_metadata(store: &KeyStore, issuer: &str, key_id: &str) -> Option<Value> {
+pub fn build_issuer_metadata(store: &dyn KeyBackend, issuer: &str, key_id: &str) -> Option<Value> {
     let current = store.public_key(key_id)?;
     metadata_for_keys(issuer, &current, &store.archived_public_keys(key_id))
 }

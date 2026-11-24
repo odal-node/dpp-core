@@ -4,7 +4,7 @@
 use base64::Engine;
 use serde_json::Value;
 
-use crate::keystore::{KeyEntry, KeyRevoked, KeyStore};
+use crate::keystore::{KeyBackend, KeyEntry, KeyRevoked, SignError};
 
 /// Produces a compact JWS, signed under the key's own algorithm (`EdDSA` for Ed25519,
 /// `ES256` for P-256, `ES384` for P-384 or `ES512` for P-521), over the **RFC 8785 (JCS)
@@ -31,13 +31,18 @@ use crate::keystore::{KeyEntry, KeyRevoked, KeyStore};
 /// from the store ([`crate::keystore::PublicKeyInfo::thumbprint_uri`]) and then
 /// signs here reads the key twice, and a rotation between the two reads gives the
 /// token the replaced key's `kid` and the new key's signature, which no verifier
-/// accepts. Load the key once with [`KeyStore::load_key`], take the thumbprint from
+/// accepts. Load the key once with [`KeyBackend::load_key`], take the thumbprint from
 /// [`KeyEntry::public_key`], and sign with [`sign_typed_with`].
 ///
 /// The curve is *not* emitted as a JOSE header parameter: RFC 8037 defines
 /// `crv` as a JWK member, not a registered header parameter. It lives on the
 /// DID document's `publicKeyJwk` instead, where it is the spec-correct place.
-pub fn sign(store: &KeyStore, key_id: &str, payload: &Value, kid: &str) -> anyhow::Result<String> {
+pub fn sign(
+    store: &dyn KeyBackend,
+    key_id: &str,
+    payload: &Value,
+    kid: &str,
+) -> anyhow::Result<String> {
     sign_typed(store, key_id, payload, kid, None, None)
 }
 
@@ -50,7 +55,7 @@ pub fn sign(store: &KeyStore, key_id: &str, payload: &Value, kid: &str) -> anyho
 /// parameter after signing would invalidate the signature, so the only place
 /// one can be set is before the signing input is built.
 pub fn sign_typed(
-    store: &KeyStore,
+    store: &dyn KeyBackend,
     key_id: &str,
     payload: &Value,
     kid: &str,
@@ -99,7 +104,12 @@ pub fn sign_typed_with(
         header.insert("cty".to_owned(), Value::String(cty.to_owned()));
     }
     let canonical = super::canonical::canonicalize(payload)?;
-    Ok(sign_with_header(key, &header, &canonical)?)
+    sign_with_header(key, &header, &canonical).map_err(|refusal| match refusal {
+        // The revoked key's own error, so that a caller can still recover it with
+        // `downcast_ref::<KeyRevoked>()`.
+        SignError::Revoked(revoked) => anyhow::Error::new(revoked),
+        other => anyhow::Error::new(other),
+    })
 }
 
 /// The compact JWS of `payload` under the protected `header`, signed with `key`.
@@ -109,12 +119,13 @@ pub fn sign_typed_with(
 /// `alg` and `typ` and no `kid` (RFC 9901 clause 4.3).
 ///
 /// # Errors
-/// [`KeyRevoked`] if `key` is revoked.
+/// [`SignError::Revoked`] if `key` is revoked, and [`SignError::Backend`] if the backend
+/// that holds it could not sign.
 pub(crate) fn sign_with_header(
     key: &KeyEntry,
     header: &serde_json::Map<String, Value>,
     payload: &[u8],
-) -> Result<String, KeyRevoked> {
+) -> Result<String, SignError> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let header_b64 = b64.encode(Value::Object(header.clone()).to_string());
     let payload_b64 = b64.encode(payload);
@@ -131,7 +142,7 @@ pub(crate) fn sign_with_header(
 /// If `key_id` names no key, if the key is revoked ([`KeyRevoked`]), or if the
 /// signature is not base64url of the algorithm's length. A revoked key is refused
 /// rather than used, because every key set built from the store leaves it out.
-pub fn verify(store: &KeyStore, key_id: &str, jws: &str) -> anyhow::Result<bool> {
+pub fn verify(store: &dyn KeyBackend, key_id: &str, jws: &str) -> anyhow::Result<bool> {
     let parts: Vec<&str> = jws.splitn(3, '.').collect();
     if parts.len() != 3 {
         return Ok(false);

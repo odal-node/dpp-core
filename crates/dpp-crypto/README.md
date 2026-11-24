@@ -62,7 +62,14 @@ on the first save**, so choose the path deliberately and keep it outside the sou
 The directory has to exist. Opening also takes an exclusive lock on `<path>.lock`, beside
 the store, and holds it until the `KeyStore` is dropped: a second `open` of the same file,
 in this process or another, fails with `KeyStoreLocked` instead of risking a lost key, so
-share one handle (an `Arc<KeyStore>`) and do not open the file twice. A complete, runnable version including keystore
+share one handle (an `Arc<KeyStore>`) and do not open the file twice.
+
+Signing and publishing take a `&dyn KeyBackend`, so `KeyStore`, an encrypted file, is one
+place keys can live and not the only one. A backend hands out a `KeyEntry`, which is one
+key for as long as it lives, and rotation is the backend's own step. `MemoryKeyStore`,
+behind the `test-utils` feature, is a second backend for tests.
+
+A complete, runnable version including keystore
 setup is in [`examples/sign_and_verify.rs`](examples/sign_and_verify.rs):
 
 ```bash

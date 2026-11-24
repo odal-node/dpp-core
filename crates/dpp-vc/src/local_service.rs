@@ -11,12 +11,12 @@ use dpp_domain::{DppError, PassportId, SignedCredential};
 
 use dpp_crypto::jws::signer;
 use dpp_crypto::jws::verifier::{resolve_verification_key, verify_jws};
-use dpp_crypto::keystore::KeyStore;
+use dpp_crypto::keystore::KeyBackend;
 
 use crate::did_builder::{build_did_document, did_for};
 use crate::passport_credential::build_passport_credential;
 
-/// Concrete `IdentityPort` backed by a local `KeyStore`.
+/// Concrete `IdentityPort` backed by a local [`KeyBackend`], such as a `KeyStore`.
 ///
 /// Signs passports **in-process** with the store's signing key, under whichever
 /// algorithm that key is recorded as using (Ed25519, ES256, ES384 or ES512), and
@@ -30,13 +30,13 @@ use crate::passport_credential::build_passport_credential;
 /// it. A rotation that archives that key, rather than revoking it, leaves the
 /// passport verifiable against the DID document published afterwards.
 pub struct LocalIdentityService {
-    store: Arc<KeyStore>,
+    store: Arc<dyn KeyBackend>,
     key_id: String,
     base_url: String,
 }
 
 impl LocalIdentityService {
-    pub fn new(store: Arc<KeyStore>, key_id: String, base_url: String) -> Self {
+    pub fn new(store: Arc<dyn KeyBackend>, key_id: String, base_url: String) -> Self {
         Self {
             store,
             key_id,
