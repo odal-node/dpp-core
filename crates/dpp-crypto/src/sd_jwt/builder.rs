@@ -71,7 +71,33 @@ fn decoys_for(real: usize) -> usize {
 /// within eight, and whether an object concealed anything at all.
 pub fn conceal(
     object: &Map<String, Value>,
+    conceal_if: impl FnMut(&str) -> bool,
+) -> Result<(Map<String, Value>, Vec<Disclosure>), SdJwtError> {
+    conceal_to(object, conceal_if, 0)
+}
+
+/// [`conceal`] for a caller that knows how many members the object could hide.
+///
+/// `at_least` is that count, and `_sd` is padded with decoys to the larger of it and
+/// the number actually hidden, with no bucket. Every object of one shape then carries
+/// the same number of digests whatever it hides, from none to all, and a passport that
+/// lacks an optional member looks like one that has it. A bucket cannot do that: it
+/// does not know how many members an object could hold, so it hides the count only to
+/// within eight.
+///
+/// When `at_least` is above zero, an object that hides nothing still gets an `_sd`
+/// array, of decoys alone, so that it looks like one that did. That object returns no
+/// disclosures, and [`build_payload`] adds `_sd_alg` only when it is told something was
+/// concealed, so a caller must tell it so whenever any `_sd` array was written, not
+/// only when a disclosure was returned.
+///
+/// A count below the number hidden adds no decoys: the token is valid and shows the
+/// exact number, as an object with no count would. `at_least` of zero is [`conceal`]:
+/// a bucket of eight, and no `_sd` at all when nothing is hidden.
+pub fn conceal_to(
+    object: &Map<String, Value>,
     mut conceal_if: impl FnMut(&str) -> bool,
+    at_least: usize,
 ) -> Result<(Map<String, Value>, Vec<Disclosure>), SdJwtError> {
     let mut kept = Map::new();
     let mut disclosures = Vec::new();
@@ -84,7 +110,12 @@ pub fn conceal(
         }
     }
 
-    if !disclosures.is_empty() {
+    let decoys = if at_least == 0 {
+        decoys_for(disclosures.len())
+    } else {
+        at_least.saturating_sub(disclosures.len())
+    };
+    if !disclosures.is_empty() || decoys > 0 {
         // Clause 4.2.4.1: "The Issuer MUST hide the original order of the claims
         // in the array." Sorting satisfies it deterministically — the clause
         // names sorting alphanumerically as an acceptable method and says the
@@ -100,7 +131,7 @@ pub fn conceal(
             .iter()
             .map(|d| Value::String(d.digest()))
             .collect();
-        digests.extend((0..decoys_for(disclosures.len())).map(|_| Value::String(decoy_digest())));
+        digests.extend((0..decoys).map(|_| Value::String(decoy_digest())));
         digests.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
         kept.insert(SD_CLAIM.to_owned(), Value::Array(digests));
     }

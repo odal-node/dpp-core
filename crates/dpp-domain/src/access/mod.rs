@@ -11,6 +11,8 @@
 #[cfg(test)]
 mod classification_tests;
 #[cfg(test)]
+mod concealable_members_tests;
+#[cfg(test)]
 mod envelope_opening_tests;
 pub mod filter;
 #[cfg(test)]

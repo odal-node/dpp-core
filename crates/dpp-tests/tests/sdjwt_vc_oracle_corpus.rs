@@ -57,8 +57,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use dpp_crypto::keystore::{KeyEntry, KeyStore};
 use dpp_crypto::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt, holder_key_confirmation};
 use dpp_domain::access::ProductGroupAccessPolicy;
-use dpp_domain::{ProductGroup, ProductGroupCatalog, ProductGroupData};
-use dpp_tests::fixtures::base_passport;
+use dpp_domain::{ProductGroup, ProductGroupCatalog};
+use dpp_tests::fixtures::{
+    passport_with, schema_compat_fixture as fixture_for, with_restricted_envelope_members,
+    with_restricted_members,
+};
 use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, SdJwtVcError, issue, vct_for, verify};
 use serde_json::{Map, Number, Value, json};
 
@@ -94,41 +97,6 @@ fn policy_of(challenge: &Value) -> Option<KeyBindingPolicy> {
         max_age: window,
         leeway: window,
     })
-}
-
-/// The group's fixture at its current schema version.
-fn fixture_for(key: &str, version: &str) -> Value {
-    let path: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../dpp-domain/tests/fixtures/schema-compat")
-        .join(key)
-        .join(format!("v{version}.json"));
-    let raw = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("no schema-compat fixture for '{key}' at {version}: {e}"));
-    serde_json::from_str(&raw).expect("a fixture is JSON")
-}
-
-/// A passport's wire form with its product group data replaced by `data`.
-///
-/// The envelope comes from the real serialiser, and only `productGroupData` is
-/// swapped, as JSON, so the credential carries exactly the keys the fixture holds.
-fn passport_with(group: &ProductGroup, version: &str, data: Value) -> Value {
-    let placeholder: ProductGroupData = serde_json::from_value(json!({
-        "productGroup": "packaging",
-        "materialFamily": "placeholder",
-    }))
-    .expect("an unmodelled product group deserialises");
-    let mut passport = serde_json::to_value(base_passport(group.clone(), placeholder, version))
-        .expect("a passport serialises");
-
-    let tag = serde_json::to_value(group).expect("a product group serialises");
-    let mut data = data;
-    data.as_object_mut()
-        .expect("product group data is an object")
-        .insert("productGroup".to_owned(), tag.clone());
-    let wire = passport.as_object_mut().expect("a passport is an object");
-    wire.insert("productGroup".to_owned(), tag);
-    wire.insert("productGroupData".to_owned(), data);
-    passport
 }
 
 struct Issuer {
@@ -264,7 +232,7 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
         let passport = passport_with(&group, version, fixture_for(key, version));
         let policy = ProductGroupAccessPolicy::for_passport(key, version)
             .unwrap_or_else(|| panic!("no access policy for {key} {version}"));
-        let vct = vct_for(group, version);
+        let vct = vct_for(group.clone(), version);
 
         let credential = issue_for(issuer, &passport, &policy, &vct, false);
         let digests: Vec<String> = credential
@@ -342,6 +310,27 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
                 "intended": "refuse",
                 "clause": "RFC 9901 clause 4: a Verifier that expects an SD-JWT MUST find the last segment empty",
                 "ours": verdict(&token, issuer, &vct, None),
+            }));
+        }
+
+        // The same group with every restricted member its schema names, and with none:
+        // the credentials of a product group share a shape, whatever the passport holds.
+        // The fixtures above hold no restricted product group data, so these are the cases
+        // that carry `_sd` arrays below the root, for both libraries to read.
+        for (name, carry) in [("shape-full", true), ("shape-empty", false)] {
+            let data = with_restricted_members(fixture_for(key, version), &policy, carry);
+            let mut shaped = passport_with(&group, version, data);
+            with_restricted_envelope_members(&mut shaped, &policy, carry);
+            let credential = issue_for(issuer, &shaped, &policy, &vct, false);
+            let token = credential.serialise();
+            cases.push(json!({
+                "id": format!("{key}/{version}/{name}"),
+                "productGroup": key,
+                "schemaVersion": version,
+                "disclosures": credential.disclosures().len(),
+                "token": token,
+                "ours": verdict(&token, issuer, &vct, None),
+                "expected": full_disclosure_of(&shaped, &vct, None),
             }));
         }
     }

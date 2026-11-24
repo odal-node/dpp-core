@@ -812,4 +812,91 @@ impl ProductGroupAccessPolicy {
     pub fn disclosure_for_field(&self, field_name: &str) -> Disclosure {
         self.disclosure_for_key(field_name, DocumentScope::ProductGroupData)
     }
+
+    /// How many members the object at `path` can hold that this policy classes above
+    /// `Public`: the number of digests an issuer's `_sd` array for that object has to
+    /// reach for a passport that carries none of them to look like one that carries
+    /// them all.
+    ///
+    /// `path` is the chain of object keys from the root of the scope's document to the
+    /// object, innermost last. It is empty for the passport itself under
+    /// [`DocumentScope::Envelope`], and empty for `productGroupData` under
+    /// [`DocumentScope::ProductGroupData`], where the schema's keys are written from.
+    /// Array indices are not segments, as in [`Self::disclosure_for_path`]: the objects
+    /// in an array sit at the array's own path.
+    ///
+    /// # Counted at the position, not by suffix
+    ///
+    /// [`Self::disclosure_for_path`] matches a key against the tail of a path, so a bare
+    /// name classes a member at any depth. This counts the other way, from the keys: a
+    /// key `usageHistory.recordedAt` counts for the object at `["usageHistory"]` and for
+    /// no other, and a bare name counts for the object at `[]`, where a schema's
+    /// top-level properties sit. Counting a bare name at every depth would pad each
+    /// nested object with the names of all the others.
+    ///
+    /// That makes the count an upper bound at the root. The schema walk also records a
+    /// shared definition's properties as bare names, so a name that belongs to a
+    /// definition is counted there as well as where the definition is used. A count
+    /// above the number a passport can hold costs decoys, and hides nothing less.
+    ///
+    /// # What `0` means
+    ///
+    /// `0` says the policy names no such member at this position, and it also says it
+    /// cannot tell: a policy that classes unlisted fields above `Public` has no limit to
+    /// count, and a position the schema does not describe, such as the entries of a map,
+    /// has no keys. A caller treats `0` as "no count" and falls back to a bucket.
+    /// Members are counted once however their names are spelled, as policy lookups
+    /// treat `recordedAt` and `recorded_at` as one.
+    #[must_use]
+    pub fn concealable_members(&self, path: &[&str], scope: DocumentScope) -> usize {
+        if self.default_disclosure != Disclosure::Public {
+            return 0;
+        }
+        let mut names: Vec<String> = Vec::new();
+        let mut count = |leaf: &str| {
+            let name = normalized(leaf);
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        };
+
+        match scope {
+            DocumentScope::Envelope if path.is_empty() => {
+                for (key, class) in &self.envelope_disclosure {
+                    let opened = self
+                        .public_envelope_fields
+                        .iter()
+                        .any(|field| keys_match_normalized(field, key));
+                    if *class != Disclosure::Public && !key.contains('.') && !opened {
+                        count(key);
+                    }
+                }
+            }
+            DocumentScope::Envelope => {}
+            DocumentScope::ProductGroupData => {
+                for (key, class) in &self.field_disclosure {
+                    let mut segments: Vec<&str> = key.split('.').collect();
+                    let Some(leaf) = segments.pop() else { continue };
+                    let here = segments.len() == path.len()
+                        && segments
+                            .iter()
+                            .zip(path)
+                            .all(|(segment, step)| keys_match_normalized(segment, step));
+                    if *class != Disclosure::Public && here {
+                        count(leaf);
+                    }
+                }
+            }
+        }
+        names.len()
+    }
+}
+
+/// `name` with what [`keys_match_normalized`] ignores dropped, for comparing it as a
+/// stored value: ASCII alphanumerics only, folded to lower case.
+fn normalized(name: &str) -> String {
+    name.chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect()
 }

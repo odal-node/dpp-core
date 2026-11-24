@@ -46,7 +46,7 @@ import {
   libraryVersion,
   same,
   sdArrays,
-  unpadded,
+  sdShape,
   verifyingInstance,
 } from "./lib.mjs";
 
@@ -98,13 +98,15 @@ const issued = corpus.cases.find((c) => c.id.endsWith("/issued"));
     const [h, p, s] = jwt.split(".");
     const flipped = [[h, p, (s[0] === "A" ? "B" : "A") + s.slice(1)].join("."), ...rest].join("~");
     if ((await judge(instance, flipped, options)).accepts) problems.push("a changed signature was accepted");
-    // The padding check has to be able to fail too: the same credential with its
-    // passport's _sd array cut to three digests. Whether this crate's own credentials
-    // pass is the loop's to report, naming the credential.
+    // The shape check has to be able to fail too: the same credential with its passport's
+    // _sd array cut to three digests no longer has the shape it had. Whether this crate's
+    // own credentials share a shape is the loop's to report, naming the product group.
     const cut = JSON.parse(Buffer.from(p, "base64url"));
     cut.passport._sd = cut.passport._sd.slice(0, 3);
     const cutToken = [[h, Buffer.from(JSON.stringify(cut)).toString("base64url"), s].join("."), ...rest].join("~");
-    if (unpadded(cutToken).length === 0) problems.push("a credential whose _sd array holds three digests is not flagged");
+    if (JSON.stringify(sdShape(cutToken)) === JSON.stringify(sdShape(issued.token))) {
+      problems.push("a credential whose _sd array was cut has the shape it had");
+    }
   }
   // Key Binding has to be able to fail too: a bound credential, another nonce.
   const bound = corpus.cases.find((c) => c.challenge && c.ours.accepts);
@@ -138,9 +140,15 @@ if (corpus.kid !== expectedKid) fail("corpus", `the corpus says the kid is ${cor
 const groups = new Set();
 const listed = [];
 let orderArrays = 0;
-let paddedCredentials = 0;
+const shapes = {};
 for (const c of corpus.cases) {
   groups.add(c.productGroup);
+  // Clause 4.2.5 and RFC 9901 section 10.4: the _sd arrays must not give the number of
+  // restricted members a passport carries, or whether it carries one. Two credentials of a
+  // group, one with every restricted member its schema names and one with none, are
+  // compared below.
+  const shaped = /\/shape-(full|empty)$/.exec(c.id);
+  if (shaped) (shapes[c.productGroup] ??= {})[shaped[1]] = sdShape(c.token);
   // Clause 4.2.4.1: the order of an _sd array must not be the order of the claims. Sorted
   // is a function of the salted digests alone, and is the method the clause names.
   for (const digests of sdArrays(c.token)) {
@@ -162,12 +170,6 @@ for (const c of corpus.cases) {
     if (theirs.accepts && known) listed.push([c.id, known[1]]);
     continue;
   }
-  // Clause 4.2.5: the length of an _sd array must not be the number of claims hidden. A
-  // token meant to be refused may have had a digest added, so only the others are held to it.
-  paddedCredentials++;
-  for (const problem of unpadded(c.token)) {
-    fail(c.id, `${problem}, so its length gives the number hidden (clause 4.2.5)`);
-  }
   if (!c.ours.accepts) fail(c.id, `this crate refuses its own credential: ${c.ours.error}`);
   if (!theirs.accepts) {
     fail(c.id, `the library refuses it: ${theirs.error}`);
@@ -185,10 +187,29 @@ for (const suffix of Object.keys(KNOWN_DISAGREEMENTS)) {
   if (!corpus.cases.some((c) => c.id.endsWith(suffix))) fail(suffix, "listed as a difference, but no case has that id");
 }
 
+let nestedArrays = 0;
+for (const [group, pair] of Object.entries(shapes)) {
+  if (!pair.full || !pair.empty) {
+    fail(`${group}/shape`, "the corpus lacks one of the two credentials to compare");
+    continue;
+  }
+  if (JSON.stringify(pair.full) !== JSON.stringify(pair.empty)) {
+    fail(
+      `${group}/shape`,
+      `the _sd arrays depend on which restricted members the passport carries, so their length gives the number hidden: ${JSON.stringify(pair.full)} against ${JSON.stringify(pair.empty)}`,
+    );
+  }
+  // Below productGroupData: /passport/productGroupData/<object>, at least four segments with the empty first.
+  nestedArrays += Object.keys(pair.full).filter((path) => path.split("/").length > 3).length;
+}
+if (Object.keys(shapes).length === 0) fail("corpus", "the corpus has no shape credentials");
+
 const bound = corpus.cases.filter((c) => c.challenge).length;
 console.log(`${corpus.cases.length} credentials across ${groups.size} product groups, ${bound} bound to a Holder; kid ${expectedKid}`);
 console.log(`claim order (clause 4.2.4.1): ${orderArrays} _sd arrays of two or more digests; each strictly ascending`);
-console.log(`decoy padding (clause 4.2.5): every _sd array a multiple of eight, in each of ${paddedCredentials} credentials`);
+console.log(
+  `decoy padding (clause 4.2.5): in each of ${Object.keys(shapes).length} product groups the _sd arrays are the same with every restricted member and with none, ${nestedArrays} of them below productGroupData`,
+);
 console.log(`known differences, each argued above: ${listed.length}`);
 for (const [id, k] of listed) console.log(`  ${id}\n    this crate refuses; RFC supports ${k.supports}. ${k.reason}`);
 

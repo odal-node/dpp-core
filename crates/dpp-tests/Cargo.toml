@@ -33,6 +33,8 @@ dpp-domain = { workspace = true }
 dpp-crypto = { workspace = true }
 dpp-vc     = { workspace = true }
 chrono     = { workspace = true }
+# The fixtures that build a passport's wire form (`schema_compat_fixture`, `passport_with`).
+serde_json = { workspace = true }
 
 # Integration tests in `tests/` exercise multiple core crates together
 # (domain + crypto + gs1), so they live in a dedicated member crate rather
@@ -49,7 +51,6 @@ dpp-registry        = { workspace = true }
 # `verify_bundle`; `dpp-calc` already enables it across the workspace, but a
 # `-p dpp-tests` build must not depend on that.
 dpp-rules           = { workspace = true, features = ["bundle"] }
-serde_json = { workspace = true }
 # `carrier_resolution` drives the repository port, whose lookups are async.
 async-trait = { workspace = true }
 tokio      = { version = "1.40", features = ["macros", "rt"] }

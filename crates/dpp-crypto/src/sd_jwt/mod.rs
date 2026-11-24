@@ -51,8 +51,11 @@
 //!   same number of digests. That is a bucket, so one past a multiple of eight
 //!   carries sixteen, and the length still tells a reader which bucket. An object
 //!   that hides nothing carries no `_sd` array, so whether an object hides anything
-//!   stays visible. A decoy has no Disclosure, and a digest with no Disclosure is
-//!   ignored, which is all a decoy is.
+//!   stays visible. A caller that knows how many members an object can hold states
+//!   it to [`conceal_to`], which pads to that count and hides the number exactly,
+//!   and writes an `_sd` of decoys alone for an object that hides none. A decoy has
+//!   no Disclosure, and a digest with no Disclosure is ignored, which is all a decoy
+//!   is.
 //!
 //! # Array elements
 //!
@@ -111,6 +114,8 @@ mod select;
 #[cfg(test)]
 mod array_tests;
 #[cfg(test)]
+mod decoy_count_tests;
+#[cfg(test)]
 mod decoy_tests;
 #[cfg(test)]
 mod holder_key_tests;
@@ -141,7 +146,7 @@ mod select_tests;
 #[cfg(test)]
 mod tests;
 
-pub use builder::{SdJwt, build_payload, conceal, conceal_elements};
+pub use builder::{SdJwt, build_payload, conceal, conceal_elements, conceal_to};
 pub use disclosure::{Disclosure, SD_HASH_ALG, digest_of};
 pub use error::{DisclosureError, SdJwtError};
 pub use key_binding::{KeyBinding, KeyBindingPolicy, holder_key_confirmation};

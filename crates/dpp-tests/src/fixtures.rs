@@ -182,3 +182,135 @@ pub fn unsold_goods_report() -> dpp_domain::UnsoldGoodsReport {
         measures_planned: "Extending the donation offer window to twelve weeks.".into(),
     }
 }
+
+/// The schema-compat fixture of a product group at a schema version: a payload that
+/// version's schema accepts, as the wire carries it.
+///
+/// # Panics
+///
+/// If the group has no fixture at that version, which is a gap in the fixtures.
+pub fn schema_compat_fixture(key: &str, version: &str) -> serde_json::Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../dpp-domain/tests/fixtures/schema-compat")
+        .join(key)
+        .join(format!("v{version}.json"));
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("no schema-compat fixture for '{key}' at {version}: {e}"));
+    serde_json::from_str(&raw).expect("a fixture is JSON")
+}
+
+/// A passport's wire form with its product group data replaced by `data`.
+///
+/// The envelope comes from the real serialiser, and only `productGroupData` is swapped,
+/// as JSON, so the credential carries exactly the keys `data` holds.
+///
+/// # Panics
+///
+/// If `data` is not an object.
+pub fn passport_with(
+    group: &ProductGroup,
+    version: &str,
+    data: serde_json::Value,
+) -> serde_json::Value {
+    let placeholder: ProductGroupData = serde_json::from_value(serde_json::json!({
+        "productGroup": "packaging",
+        "materialFamily": "placeholder",
+    }))
+    .expect("an unmodelled product group deserialises");
+    let mut passport = serde_json::to_value(base_passport(group.clone(), placeholder, version))
+        .expect("a passport serialises");
+
+    let tag = serde_json::to_value(group).expect("a product group serialises");
+    let mut data = data;
+    data.as_object_mut()
+        .expect("product group data is an object")
+        .insert("productGroup".to_owned(), tag.clone());
+    let wire = passport.as_object_mut().expect("a passport is an object");
+    wire.insert("productGroup".to_owned(), tag);
+    wire.insert("productGroupData".to_owned(), data);
+    passport
+}
+
+/// `data` with the members `policy` classes above `Public`, each where its key puts it:
+/// `usageHistory.recordedAt` is `recordedAt` of the object at `usageHistory`, made if
+/// the fixture has none, and of every object of an array that holds it.
+///
+/// With `carry` every such member is there. Without it the objects that would hold them
+/// are there with one member of no class instead, so the two shapes differ in nothing
+/// but what is hidden. Credentials issued from both show whether an issuer's output
+/// depends on how many restricted members a passport happens to carry.
+///
+/// A member already in `data` is kept as it is.
+pub fn with_restricted_members(
+    mut data: serde_json::Value,
+    policy: &dpp_domain::access::ProductGroupAccessPolicy,
+    carry: bool,
+) -> serde_json::Value {
+    let mut keys: Vec<&String> = policy
+        .field_disclosure
+        .iter()
+        .filter(|(_, class)| **class != dpp_domain::Disclosure::Public)
+        .map(|(key, _)| key)
+        .collect();
+    keys.sort();
+    for key in keys {
+        let mut segments: Vec<&str> = key.split('.').collect();
+        let leaf = segments.pop().expect("a key has a leaf");
+        place_member(&mut data, &segments, leaf, carry);
+    }
+    data
+}
+
+fn place_member(node: &mut serde_json::Value, parents: &[&str], leaf: &str, carry: bool) {
+    use serde_json::{Value, json};
+    match node {
+        Value::Array(items) => {
+            for item in items {
+                place_member(item, parents, leaf, carry);
+            }
+        }
+        Value::Object(map) => match parents.split_first() {
+            Some((first, rest)) => {
+                let child = map.entry((*first).to_owned()).or_insert_with(|| json!({}));
+                place_member(child, rest, leaf, carry);
+            }
+            None if carry => {
+                map.entry(leaf.to_owned())
+                    .or_insert_with(|| json!("restricted"));
+            }
+            None => {
+                map.entry("publicNote".to_owned())
+                    .or_insert_with(|| json!("public"));
+            }
+        },
+        _ => {}
+    }
+}
+
+/// `passport`'s envelope with every field `policy` classes above `Public` there, or with
+/// none of them, to match [`with_restricted_members`] for the envelope. A field the
+/// product group opens to the public is left as it is.
+///
+/// # Panics
+///
+/// If `passport` is not an object.
+pub fn with_restricted_envelope_members(
+    passport: &mut serde_json::Value,
+    policy: &dpp_domain::access::ProductGroupAccessPolicy,
+    carry: bool,
+) {
+    let envelope = passport.as_object_mut().expect("a passport is an object");
+    for (name, class) in &policy.envelope_disclosure {
+        let opened = policy.public_envelope_fields.contains(name);
+        if *class == dpp_domain::Disclosure::Public || name.contains('.') || opened {
+            continue;
+        }
+        if carry {
+            envelope
+                .entry(name.clone())
+                .or_insert_with(|| serde_json::json!("restricted"));
+        } else {
+            envelope.remove(name);
+        }
+    }
+}

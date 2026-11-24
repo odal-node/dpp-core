@@ -492,6 +492,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   positions. The number is hidden to within eight, and whether an object conceals anything at
   all stays visible, which section 10.4 of the RFC also names as a side channel. A caller that read an `_sd` array's length as the number of claims hidden
   counts the disclosures instead. (#653)
+- **An SD-JWT VC pads each object to the most its schema lets it hold, so a passport that lacks
+  an optional restricted member carries as many digests as one that has it.**
+  `ProductGroupAccessPolicy::concealable_members(path, scope)` returns how many members the
+  object at a path can hold above `Public`, counted from the keys the policy holds and at the
+  position each is written for. `dpp_crypto::sd_jwt::conceal_to(object, conceal_if, at_least)`
+  pads `_sd` to the larger of that count and the number hidden, with no bucket, and an object
+  that could hide a member and hides none still gets an `_sd` array, of decoys alone, which
+  RFC 9901 section 10.4 asks for where a claim may be absent. `sd_jwt_vc::issue` asks the
+  policy for each object it conceals in, and writes `_sd_alg` wherever it wrote an `_sd`.
+  `conceal` is `conceal_to` with a count of zero, so a caller that states none keeps the bucket
+  of eight, as does `jose::disclose`. The count at the root of `productGroupData` is an upper
+  bound: the schema walk records a shared definition's properties as bare names too, so some
+  are counted that no passport can hold there, which costs decoys and hides nothing less. What
+  stays visible is whether an optional object is present at all, and a count below the number
+  hidden adds no decoys. A credential grows by the decoys of the members its passport lacks,
+  about 61 bytes each. (#675)
 - **`dpp_crypto::cose` reads RFC 9864's fully specified `alg` values.** `verify_sign1`
   accepts `-9` (ESP256), `-51` (ESP384), `-52` (ESP512) and `-19` (Ed25519) beside the
   polymorphic `-7`, `-35`, `-36` and `-8`, each for its own key's algorithm only: `-9` on a

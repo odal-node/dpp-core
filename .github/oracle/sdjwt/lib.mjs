@@ -229,6 +229,36 @@ export function unpadded(token) {
   return found;
 }
 
+/**
+ * Where the signed payload of a token carries an `_sd` array, and how long each is: the
+ * path of the object that carries it (array indices left out, so the objects of one array
+ * share a path), and the lengths of its arrays, ascending. Paths are in sorted order, so
+ * two shapes compare as text.
+ *
+ * What an observer sees of how many claims were hidden. Two credentials of one product
+ * group that differ only in which restricted members the passport carries must have the
+ * same shape, and that can be read from the tokens alone.
+ */
+export function sdShape(token) {
+  const shape = {};
+  const walk = (value, path) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => walk(item, path));
+    } else if (value && typeof value === "object") {
+      if (Array.isArray(value._sd)) (shape[path] ??= []).push(value._sd.length);
+      for (const [key, inner] of Object.entries(value)) {
+        if (key !== "_sd") walk(inner, `${path}/${key}`);
+      }
+    }
+  };
+  walk(JSON.parse(Buffer.from(token.split("~")[0].split(".")[1], "base64url")), "");
+  return Object.fromEntries(
+    Object.entries(shape)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([path, lengths]) => [path, lengths.sort((a, b) => a - b)]),
+  );
+}
+
 /** A deterministic generator (mulberry32), so a seed names one corpus. */
 export function prng(seed) {
   let a = seed >>> 0;
