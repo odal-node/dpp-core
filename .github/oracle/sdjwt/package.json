@@ -6,6 +6,6 @@
     "node": ">=26"
   },
   "dependencies": {
-    "@sd-jwt/core": "0.22.0"
+    "@sd-jwt/core": "0.25.0"
   }
 }

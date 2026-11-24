@@ -72,6 +72,13 @@ const RFC_ISSUER_KEY = {
  * defect here. Keyed by case id. Each entry names which side the RFC supports.
  * Anything not listed that differs fails the run, and so does an entry that no
  * longer differs.
+ *
+ * Two entries were removed when the library moved to 0.25.0, because it now agrees
+ * with this crate on both. `bound/reject/crit-names-an-extension`: the library
+ * refuses a Key Binding JWT whose `crit` names a parameter it does not understand,
+ * which RFC 7515 clause 4.1.11 requires. `bound/edge/typ-with-the-application-prefix`:
+ * the library compares `typ` as a media type, so `application/kb+jwt` is `kb+jwt`
+ * (RFC 7515 clause 4.1.9), as this crate reads it; at 0.22.0 it compared the spelling.
  */
 const KNOWN_DISAGREEMENTS = {
   "adversarial/reject/jwt-payload-is-an-array": {
@@ -94,20 +101,6 @@ const KNOWN_DISAGREEMENTS = {
     supports: "both",
     reason:
       "No clause limits nesting. serde_json refuses a document nested more than 127 deep, and a receiver sets its own limit.",
-  },
-  "bound/reject/crit-names-an-extension": {
-    ours: "refuse",
-    theirs: "accept",
-    supports: "ours",
-    reason:
-      "RFC 7515 clause 4.1.11: a recipient that does not understand an extension `crit` lists MUST reject the JWS, and clause 7.3 step 5.h asks for a Key Binding JWT valid in all other respects. The library does not read `crit`.",
-  },
-  "bound/edge/typ-with-the-application-prefix": {
-    ours: "accept",
-    theirs: "refuse",
-    supports: "both",
-    reason:
-      "Clause 4.3 says `typ` MUST be kb+jwt. RFC 7515 clause 4.1.9 says a recipient reads a `typ` with no '/' as if application/ came before it, which makes application/kb+jwt the same media type; this crate compares media types, the library compares the spelling.",
   },
   "bound/reject/holder-key-declares-another-algorithm": {
     ours: "refuse",
