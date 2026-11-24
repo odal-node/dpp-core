@@ -1,6 +1,8 @@
 //! Art. 77(1) passport scope — the three categories it names, the threshold it
 //! attaches to one of them, and the date it all starts from.
 
+use alloc::vec::Vec;
+
 use super::passport_scope::{
     INDUSTRIAL_PASSPORT_THRESHOLD_KWH, PASSPORT_REQUIRED_FROM, PassportScope, passport_scope,
 };
@@ -162,4 +164,53 @@ fn only_required_reports_an_obligation() {
         assert!(!s.is_required(), "{s:?} must not report an obligation");
     }
     assert!(PassportScope::Required.is_required());
+}
+
+/// `ALL` names every outcome once. The match below has no wildcard, so a variant
+/// added to the enum is a compile error here until it is added to `ALL` too.
+#[test]
+fn all_lists_every_outcome_once() {
+    fn position(s: PassportScope) -> usize {
+        match s {
+            PassportScope::NotCovered => 0,
+            PassportScope::BelowThreshold => 1,
+            PassportScope::CapacityUnknown => 2,
+            PassportScope::NotYetBinding => 3,
+            PassportScope::Required => 4,
+        }
+    }
+    let seen: Vec<usize> = PassportScope::ALL.iter().map(|s| position(*s)).collect();
+    assert_eq!(seen, [0, 1, 2, 3, 4]);
+}
+
+/// The spelling a caller puts on the wire is core's, and it is camelCase. A
+/// rename here is a break for everything that reads the answer, so it is pinned.
+#[cfg(feature = "bundle")]
+#[test]
+fn every_outcome_is_spelt_camel_case_and_reads_back() {
+    let wire: Vec<String> = PassportScope::ALL
+        .iter()
+        .map(|s| {
+            serde_json::to_value(s)
+                .expect("serialises")
+                .as_str()
+                .expect("a string")
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(
+        wire,
+        [
+            "notCovered",
+            "belowThreshold",
+            "capacityUnknown",
+            "notYetBinding",
+            "required"
+        ]
+    );
+    for s in PassportScope::ALL {
+        let back: PassportScope =
+            serde_json::from_value(serde_json::to_value(s).unwrap()).expect("reads back");
+        assert_eq!(back, s);
+    }
 }

@@ -78,8 +78,9 @@ pub use crate::{
         OperatorRole, ResponsibilityBasis, ResponsibleOperator, ResponsibleOperatorSnapshot,
     },
     passport::{
-        CarrierQualifier, FacilitySnapshot, ManufacturerInfo, MaterialEntry, PASSPORT_PROOF_FIELDS,
-        PASSPORT_WIRE_KEYS, Passport, PassportId, PassportView, RETENTION_MUTABLE_FIELDS,
+        CarrierLevel, CarrierQualifier, FacilitySnapshot, ManufacturerInfo, MaterialEntry,
+        PASSPORT_PROOF_FIELDS, PASSPORT_WIRE_KEYS, Passport, PassportId, PassportView,
+        RETENTION_MUTABLE_FIELDS,
     },
     personal_data::{HeldOutside, LawfulBasis, PersonalDataRecordId, PersonalDataStatement},
     product::ProductIdentity,

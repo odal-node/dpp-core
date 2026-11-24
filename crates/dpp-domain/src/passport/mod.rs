@@ -48,7 +48,7 @@ mod wire_keys_tests;
 pub use crate::facility::FacilitySnapshot;
 pub use crate::manufacturer::ManufacturerInfo;
 pub use crate::material::MaterialEntry;
-pub use carrier::CarrierQualifier;
+pub use carrier::{CarrierLevel, CarrierQualifier};
 pub use component::{ComponentRef, Quantity};
 pub use derivation::{DerivationRef, SecondLifeOperation};
 pub use id::PassportId;

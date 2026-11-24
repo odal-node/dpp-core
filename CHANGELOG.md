@@ -426,6 +426,28 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   and a time that is not finite are refused, and other claims are ignored. `dpp_vc::jose`
   applies `iss`, `exp`, `nbf` and `aud` as it applies the same JWT claims. (#633)
 
+- **`ErasureReceipt` is serialisable.** It derives `Serialize` and `Deserialize`,
+  with camelCase keys (`record`, `passportId`, `field`, `erasedAt`). A holder of
+  erasable records answers an erasure with this receipt, and until now each one that
+  put it on a wire had to declare its own copy of it. (#672)
+
+- **`PassportScope` is serialisable behind `bundle`, and lists its outcomes.** The
+  Art. 77(1) answer serialises as `required`, `notCovered`, `belowThreshold`,
+  `capacityUnknown` or `notYetBinding`, and reads back. `PassportScope::ALL` lists
+  the five, for a caller that has to account for each one: the enum is
+  `#[non_exhaustive]`, so a match from another crate cannot be exhaustive. (#672)
+
+- **`FieldError` is serialisable.** It derives `Serialize` and `Deserialize` as
+  `{"field", "message"}`, the two members it already had. A caller that reports a
+  validation failure to the person who sent the input no longer has to declare a
+  copy of it to do so. (#672)
+
+- **`CarrierLevel` is the level a `CarrierQualifier` claims, without its value.**
+  `CarrierQualifier::level()` answers `Model`, `Batch` or `Serial`, and
+  `CarrierLevel::as_str()` spells it `model`, `batch` or `serial`, stable enough for
+  a metric label. A caller that only needs the level no longer has to re-declare the
+  three names, nor match a `#[non_exhaustive]` enum with a wildcard. (#672)
+
 ### Changed
 
 - **`dpp_crypto::cose` reads RFC 9864's fully specified `alg` values.** `verify_sign1`

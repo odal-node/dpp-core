@@ -9,5 +9,7 @@
 //! checked direction and not cycles.
 
 mod error;
+#[cfg(test)]
+mod tests;
 
 pub use error::{FieldError, ValidationErrors};

@@ -56,7 +56,14 @@ pub const PASSPORT_REQUIRED_FROM: CalendarDate = CalendarDate::new(2027, 2, 18);
 /// them into `false` reports an exemption the Regulation does not grant — or
 /// hides one it does. The same reasoning shapes
 /// [`Art8Phase`](super::recycled_content::Art8Phase).
+///
+/// With the `bundle` feature it is serialisable, spelt camelCase (`required`,
+/// `notCovered`, `belowThreshold`, `capacityUnknown`, `notYetBinding`), so a
+/// caller that reports the answer puts core's own words on the wire and does not
+/// translate them into strings it then has to keep in step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "bundle", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bundle", serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub enum PassportScope {
     /// Art. 77(1) does not name this category — portable and SLI. No passport is
@@ -86,6 +93,20 @@ pub enum PassportScope {
 }
 
 impl PassportScope {
+    /// Every outcome, in the order they are declared.
+    ///
+    /// For a caller that must account for each one (a schema that lists them, a
+    /// test that checks each is spelt). The enum is `#[non_exhaustive]`, so a
+    /// match from another crate cannot be exhaustive; this is the list that stays
+    /// in step with the enum.
+    pub const ALL: [Self; 5] = [
+        Self::NotCovered,
+        Self::BelowThreshold,
+        Self::CapacityUnknown,
+        Self::NotYetBinding,
+        Self::Required,
+    ];
+
     /// Whether a passport is owed **now**, on the strength of this answer alone.
     ///
     /// `true` only for [`Required`](Self::Required). Every other variant is a
