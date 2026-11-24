@@ -400,6 +400,14 @@ private val KNOWN = mapOf(
             "if application/ came before it, which makes application/kb+jwt the same media type; this crate compares " +
             "media types, Nimbus's type check compares the spelling. The first oracle compares media types from 0.25.0.",
     ),
+    "bound/edge/typ-in-capitals" to Known(
+        true,
+        "this crate",
+        "Clause 4.3 says `typ` MUST be kb+jwt. RFC 7515 clause 4.1.9 says that, per RFC 2045, media type and subtype " +
+            "values are case insensitive, and RFC 2045 clause 5.1 says matching of them is always case-insensitive, so " +
+            "Application/KB+JWT is the same media type. This crate lowercases before it compares; Nimbus's type check " +
+            "compares the spelling. The first oracle compares media types from 0.25.0.",
+    ),
     "bound/edge/holder-key-disclosed-not-in-the-clear" to Known(
         true,
         "this crate",

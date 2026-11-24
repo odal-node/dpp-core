@@ -366,13 +366,51 @@ fn the_type_is_compared_as_a_media_type() {
     let presented = issued(&key)
         .present_with_key_binding(&[], &binding(), &key)
         .unwrap();
-    for typ in ["kb+jwt", "KB+JWT", "application/kb+jwt"] {
+    for typ in [
+        "kb+jwt",
+        "KB+JWT",
+        "application/kb+jwt",
+        "Application/KB+JWT",
+        "APPLICATION/kb+jwt",
+    ] {
         let header = json!({ "alg": "EdDSA", "typ": typ });
         assert!(
             rebound(&presented, &key, header, good_claims(&presented))
                 .disclosed_payload_with_key_binding(&policy())
                 .is_ok(),
             "{typ}"
+        );
+    }
+}
+
+/// Only case and the omitted `application/` make another spelling the same type. A value
+/// that merely looks like `kb+jwt` is another media type, or no media type, and is refused.
+/// The RFC says nothing about matching a media type that carries parameters, so a `typ`
+/// with one is refused, which is the strict reading of clause 4.3's "MUST be kb+jwt".
+#[test]
+fn a_type_that_only_looks_like_kb_jwt_is_refused() {
+    let key = holder("kb-typ-lookalike");
+    let presented = issued(&key)
+        .present_with_key_binding(&[], &binding(), &key)
+        .unwrap();
+    for typ in [
+        "text/kb+jwt",
+        "application/kb+jwt;x=1",
+        "application//kb+jwt",
+        "application/application/kb+jwt",
+        "kb+jwt/",
+        "kb+jwt ",
+        " kb+jwt",
+        "application/kb+jwt2",
+        "",
+    ] {
+        let header = json!({ "alg": "EdDSA", "typ": typ });
+        assert_eq!(
+            rebound(&presented, &key, header, good_claims(&presented))
+                .disclosed_payload_with_key_binding(&policy())
+                .err(),
+            Some(SdJwtError::KeyBindingRejected("typ")),
+            "{typ:?}"
         );
     }
 }
