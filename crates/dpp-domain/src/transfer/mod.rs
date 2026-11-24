@@ -24,6 +24,8 @@ pub mod status;
 #[cfg(test)]
 mod chain_outcome_tests;
 #[cfg(test)]
+mod chain_read_tests;
+#[cfg(test)]
 mod chain_tests;
 #[cfg(test)]
 mod reason_all_tests;
@@ -31,6 +33,6 @@ mod reason_all_tests;
 mod tests;
 
 pub use chain::TransferChain;
-pub use error::TransferError;
+pub use error::{ChainReadError, TransferError};
 pub use record::{TransferReason, TransferRecord};
 pub use status::TransferStatus;

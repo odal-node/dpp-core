@@ -96,7 +96,10 @@ pub use crate::{
         UnmodelledPayload, UsageHistory,
     },
     status::PassportStatus,
-    transfer::{TransferChain, TransferError, TransferReason, TransferRecord, TransferStatus},
+    transfer::{
+        ChainReadError, TransferChain, TransferError, TransferReason, TransferRecord,
+        TransferStatus,
+    },
     // The unsold-goods disclosure, whose shape is fixed by Impl. Reg. (EU)
     // 2026/2 Annex I — see `unsold_goods`.
     unsold_goods::{
