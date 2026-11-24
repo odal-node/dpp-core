@@ -203,6 +203,14 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Added
 
+- **`TransferChain::from_value`: a stored chain read with its refusal as a value.** It applies
+  the check `Deserialize` applies, and returns `ChainReadError`. `Refused` holds
+  `TransferError::InvalidChain`, which names the passport and the record that breaks the
+  chain's invariant, and `Malformed` holds the `serde_json::Error` for a value that is not the
+  shape of a chain. A host tells the two apart by the variant, where it had to recognise the
+  wording of a `serde` error. `Deserialize` is unchanged, so every existing reader still
+  refuses an invalid chain. The argument is borrowed, so a chain embedded in a larger
+  document is read in place.
 - **`dpp_crypto::keystore::KeyBackend`: where signing keys live.** A trait of `load_key`,
   `public_key`, `archived_public_keys`, `list`, `generate_key_with` and `rotate`, with
   `generate_key`, `rotate_key`, `rotate_key_to`, `revoke_and_rotate` and `has_key` provided.

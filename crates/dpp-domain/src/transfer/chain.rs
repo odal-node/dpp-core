@@ -23,7 +23,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::error::{ChainFault, TransferError};
+use super::error::{ChainFault, ChainReadError, TransferError};
 use super::record::TransferRecord;
 use super::status::TransferStatus;
 use crate::operator::ResponsibleOperator;
@@ -88,6 +88,26 @@ impl TransferChain {
             original_operator,
             transfers: Vec::new(),
         }
+    }
+
+    /// Reads a stored chain, and says why it was not one.
+    ///
+    /// Applies the check `Deserialize` applies, and returns its refusal as a
+    /// value. [`ChainReadError::Refused`] holds [`TransferError::InvalidChain`],
+    /// which names the passport and the record that breaks the invariant, and
+    /// [`ChainReadError::Malformed`] means the value is not the shape of a chain,
+    /// so the invariant was never reached. A host tells the two apart by the
+    /// variant and never by the wording of a message.
+    ///
+    /// `Deserialize` is unchanged: a chain read through it is refused by the same
+    /// check, as a `serde` error.
+    ///
+    /// # Errors
+    /// [`ChainReadError::Malformed`] when `value` is not a transfer chain, and
+    /// [`ChainReadError::Refused`] when it is one that breaks the invariant.
+    pub fn from_value(value: &serde_json::Value) -> Result<Self, ChainReadError> {
+        let raw = TransferChainRaw::deserialize(value).map_err(ChainReadError::Malformed)?;
+        Self::try_from(raw).map_err(ChainReadError::Refused)
     }
 
     /// The passport this chain belongs to.

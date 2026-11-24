@@ -73,6 +73,46 @@ impl std::fmt::Display for TransferError {
 
 impl std::error::Error for TransferError {}
 
+/// Why [`TransferChain::from_value`](super::TransferChain::from_value) did not
+/// return a chain.
+///
+/// The two cases are different faults and a host answers them differently: a
+/// document that is not a transfer chain at all, and a transfer chain whose
+/// history breaks the chain's invariant, so that it names no single responsible
+/// operator.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ChainReadError {
+    /// The value is not the shape of a transfer chain: a member is missing, or
+    /// one has the wrong type. The invariant was never checked.
+    Malformed(serde_json::Error),
+    /// The value reads as a transfer chain, and the chain breaks its invariant.
+    ///
+    /// Always [`TransferError::InvalidChain`], which names the passport and
+    /// locates the record that breaks the invariant.
+    Refused(TransferError),
+}
+
+impl std::fmt::Display for ChainReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChainReadError::Malformed(error) => {
+                write!(f, "not a transfer chain: {error}")
+            }
+            ChainReadError::Refused(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for ChainReadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ChainReadError::Malformed(error) => Some(error),
+            ChainReadError::Refused(error) => Some(error),
+        }
+    }
+}
+
 /// Where a chain's check stopped: the first record that breaks the invariant.
 ///
 /// Crate-private. Appending a record returns its `reason`, and reading a chain
