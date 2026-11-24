@@ -1,6 +1,8 @@
 //! Art. 77(1) passport scope — the three categories it names, the threshold it
 //! attaches to one of them, and the date it all starts from.
 
+use alloc::vec::Vec;
+
 use super::passport_scope::{
     INDUSTRIAL_PASSPORT_THRESHOLD_KWH, PASSPORT_REQUIRED_FROM, PassportScope, passport_scope,
 };
