@@ -15,6 +15,22 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **Signing and publishing take a `KeyBackend`, not a `KeyStore`.** `jws::sign`,
+  `jws::sign_typed`, `jws::verify`, `build_did_document`, `build_issuer_metadata`,
+  `sd_jwt_vc::issue` and `sign_access_credential` take `&dyn KeyBackend`, and
+  `LocalIdentityService::new` takes `Arc<dyn KeyBackend>`, so a key that never leaves a
+  device or a service can sign without the code that signs changing. A caller that passes
+  `&KeyStore` or `&Arc<KeyStore>` compiles as before. The one exception is
+  `Arc::clone(&store)` handed straight to `LocalIdentityService::new`, whose type is now
+  inferred from the parameter: write `Arc::<KeyStore>::clone(&store)`. `KeyEntry::sign`
+  returns `SignError`, which is `Revoked(KeyRevoked)`, the error it returned before, or
+  `Backend(String)`, a signer that failed. `CoseError` and `SdJwtError` gain
+  `Signing(String)` for the second, and `jws::sign_typed_with` still returns a revoked
+  key's own `KeyRevoked`, so `downcast_ref::<KeyRevoked>()` keeps working.
+  `KeyStore::generate_key_with` and the rotations now refuse a key id that contains
+  `#archived-`, which is how an archived key is named: a current key by that name was left
+  out of the listing and read as an archive of another key. (#646)
+
 - **Verification takes a `PublicKey`, not base64 text.**
   `jws::verifier::verify_jws` takes `&PublicKey`, a validated key that carries the
   algorithm it is used under. Build the key once with
@@ -186,6 +202,21 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   save over it: never run one against a file a newer build has open. (#624)
 
 ### Added
+
+- **`dpp_crypto::keystore::KeyBackend`: where signing keys live.** A trait of `load_key`,
+  `public_key`, `archived_public_keys`, `list`, `generate_key_with` and `rotate`, with
+  `generate_key`, `rotate_key`, `rotate_key_to`, `revoke_and_rotate` and `has_key` provided.
+  `KeyStore` implements it, and so does an `Arc` of any backend. `load_key` returns a
+  `KeyEntry`, which is one key for as long as it lives, so a caller that takes the `kid` from
+  it and then signs cannot be handed a different key by a rotation in between. There is no
+  `sign(key_id, message)`, which would bring that race back. Rotation is on the trait because
+  archiving the old key and installing the new one is one write in the backend, and a
+  compromise has to revoke every copy of the key in that write. `KeySigner` is the private
+  half of a key that is not held in memory; `KeyEntry::from_signer` makes an entry over one,
+  and `PublicKeyInfo::new` makes the public view, so a backend outside this crate can
+  implement the trait. `MemoryKeyStore`, behind the `test-utils` feature, is a second
+  backend, and the signing, rotation and DID-document tests run against it as well as the
+  file store. No hardware or remote backend ships. (#646)
 
 - **An issued SD-JWT VC can expire.** `sd_jwt_vc::issue` writes `exp` and `nbf` when they
   are given, at the root, where neither is ever concealed (RFC 9901 clause 9.7): a Holder

@@ -6,7 +6,10 @@
 //!
 //! ## Module layout
 //!
-//! - `entry` — [`KeyEntry`], the decrypted in-memory key handed back to callers.
+//! - `backend`: [`KeyBackend`], where signing keys live, which [`KeyStore`] implements.
+//! - `signer`: [`KeySigner`], the private half of a key that is not held in memory.
+//! - `memory`: `MemoryKeyStore`, a second backend, behind the `test-utils` feature.
+//! - `entry`: [`KeyEntry`], the key handed back to callers, which signs.
 //! - `error`: [`PrivateJwkError`], why a JWK was refused as a private key, and
 //!   [`KeyStoreLocked`], why a store was refused because it is open elsewhere.
 //! - `lock`: the exclusive lock on `<store file>.lock` that gives a store one handle.
@@ -33,12 +36,19 @@
 //! are then the file's, and no write can discard another handle's key. See
 //! [`KeyStore`] for why the lock is on a sibling file, and for what it does not stop.
 
+mod backend;
+#[cfg(test)]
+mod backend_tests;
 mod crypto;
 mod entry;
 mod error;
 mod lock;
 #[cfg(test)]
 mod lock_tests;
+#[cfg(any(test, feature = "test-utils"))]
+mod memory;
+#[cfg(test)]
+mod memory_tests;
 mod migration;
 #[cfg(test)]
 mod persist_tests;
@@ -50,12 +60,19 @@ mod private_jwk_tests;
 #[cfg(test)]
 mod rfc9106_vector_tests;
 mod rotation;
+mod signer;
+#[cfg(test)]
+mod signer_tests;
 mod store;
 #[cfg(test)]
 mod tests;
 
+pub use backend::KeyBackend;
 pub use entry::KeyEntry;
 #[cfg(test)]
 pub(crate) use entry::SigningMaterial;
-pub use error::{KeyRevoked, KeyStoreLocked, PrivateJwkError};
+pub use error::{KeyRevoked, KeyStoreLocked, PrivateJwkError, SignError};
+#[cfg(any(test, feature = "test-utils"))]
+pub use memory::MemoryKeyStore;
+pub use signer::KeySigner;
 pub use store::{KeyStore, PublicKeyInfo, UpgradeNeeded};

@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use dpp_crypto::keystore::KeyStore;
+use dpp_crypto::keystore::KeyBackend;
 use dpp_crypto::sd_jwt::{Disclosure, SdJwt, build_payload, conceal, holder_key_confirmation};
 use dpp_domain::Disclosure as DisclosureClass;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
@@ -120,7 +120,7 @@ pub struct Issuance<'a> {
 /// [`SdJwtVcError::Signing`] if the key store cannot
 /// sign.
 pub fn issue(
-    store: &KeyStore,
+    store: &dyn KeyBackend,
     key_id: &str,
     payload: &Value,
     policy: &ProductGroupAccessPolicy,

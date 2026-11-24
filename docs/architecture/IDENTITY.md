@@ -104,6 +104,28 @@ if it means to wait. The lock is on a sibling file because each write renames a 
 over the store. A build older than the lock takes none, so never run one against a file a
 newer build has open.
 
+### Key backends
+
+Everything that signs, verifies or publishes a key takes a `&dyn KeyBackend`, not a
+`KeyStore`. The encrypted file is one backend, and a device or a service that signs
+without the key leaving it can be another. The trait holds what those callers use:
+`load_key`, `public_key`, `archived_public_keys`, `list`, `generate_key_with` and
+`rotate`. It assumes no key or signature size: the algorithm comes from the key.
+
+`load_key` returns a `KeyEntry`, which signs and reports its own public key, and which is
+one key for as long as it lives. The trait has no `sign(key_id, message)`. A caller that
+read the public key and then signed by id could be handed a different key by a rotation
+in between, and the token would carry the old key's `kid` and the new key's signature.
+A key that is not held in memory is a `KeySigner`, and `KeyEntry::from_signer` makes an
+entry over it.
+
+Rotation is the backend's. Archiving the old key and installing the new one is one write,
+so a crash leaves the old state or the new one, and a compromise revokes every copy of the
+key in that write. How a backend is opened, and the file store's lock, integrity tag and
+upgrade path, are not part of the trait. `MemoryKeyStore`, behind the `test-utils`
+feature, is a second backend, and the signing, rotation and DID-document tests run
+against it as well as the file.
+
 ### Key identifiers
 
 A key is identified by its RFC 7638 SHA-256 thumbprint, written as an RFC 9278 URI:

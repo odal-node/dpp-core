@@ -11,7 +11,7 @@ use base64::Engine as _;
 use serde_json::{Value, json};
 
 use dpp_crypto::jws::{KeyAlgorithm, PublicKey};
-use dpp_crypto::keystore::{KeyEntry, KeyStore};
+use dpp_crypto::keystore::{KeyBackend, KeyEntry, KeyStore};
 
 use crate::jose::{KeyBindingRequirement, VerifyOptions};
 
@@ -68,7 +68,7 @@ const SIGNERS: usize = 4;
 /// and so tokens under more than one key are not left to the scheduler. The test fails
 /// if a rotation fails or a signer panics.
 pub(crate) fn sign_while_rotating<T: Send>(
-    store: &KeyStore,
+    store: &dyn KeyBackend,
     key_id: &str,
     sign: impl Fn() -> T + Sync,
 ) -> Vec<T> {

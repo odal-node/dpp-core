@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 
-use dpp_crypto::keystore::{KeyRevoked, KeyStore};
+use dpp_crypto::keystore::{KeyRevoked, KeyStore, SignError};
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::ports::identity::IdentityPort;
 use dpp_domain::{PassportId, ProductGroup};
@@ -121,7 +121,10 @@ async fn every_signer_refuses(store: &Arc<KeyStore>) {
     assert!(key.revoked, "the current key reads back revoked");
     let fingerprint = key.fingerprint.clone();
 
-    let refused: KeyRevoked = key.sign(b"anything").expect_err("the key itself refuses");
+    let SignError::Revoked(refused) = key.sign(b"anything").expect_err("the key itself refuses")
+    else {
+        panic!("the key refuses for its revocation");
+    };
     assert_eq!(refused.fingerprint, fingerprint);
     assert!(
         refused.to_string().contains("revoke_and_rotate"),
@@ -145,7 +148,11 @@ async fn every_signer_refuses(store: &Arc<KeyStore>) {
         "{credential}"
     );
 
-    let service = LocalIdentityService::new(Arc::clone(store), KEY_ID.into(), BASE_URL.into());
+    let service = LocalIdentityService::new(
+        Arc::<KeyStore>::clone(store),
+        KEY_ID.into(),
+        BASE_URL.into(),
+    );
     let passport = service
         .sign_passport(PassportId::new(), &json!({"productGroup": "battery"}))
         .await

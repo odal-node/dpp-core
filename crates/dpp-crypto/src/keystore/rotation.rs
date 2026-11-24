@@ -18,8 +18,30 @@ const MAX_ROTATION_ATTEMPTS: usize = 3;
 /// made with the overwritten key would then never verify again. `load_archived_keys`'s
 /// `entries.sort_by_key` still recovers chronological order, since a v7 UUID's
 /// leading bits are a millisecond timestamp.
-fn archived_key_name(key_id: &str) -> String {
-    format!("{key_id}#archived-{}", uuid::Uuid::now_v7())
+pub(super) fn archived_key_name(key_id: &str) -> String {
+    format!("{key_id}{ARCHIVE_MARKER}{}", uuid::Uuid::now_v7())
+}
+
+/// What an archived record's key carries between the key's id and its time-ordered suffix.
+/// A key id that contains it is an archive, and one that starts with `{key_id}` and this is
+/// an archive of `key_id`.
+pub(super) const ARCHIVE_MARKER: &str = "#archived-";
+
+/// Refuse a key id that could be read as an archive.
+///
+/// An archived record is told from a current one by [`ARCHIVE_MARKER`] in its key, so a
+/// current key named with it would be left out of `list` and returned as a predecessor of
+/// the key whose id it begins with. Every path that records a current key checks this first.
+///
+/// # Errors
+/// When `key_id` contains [`ARCHIVE_MARKER`].
+pub(super) fn check_key_id(key_id: &str) -> Result<()> {
+    anyhow::ensure!(
+        !key_id.contains(ARCHIVE_MARKER),
+        "key id {key_id:?} cannot contain `{ARCHIVE_MARKER}`: a rotation names an archived \
+         key that way, and a current key with that name would be read as an archive"
+    );
+    Ok(())
 }
 
 /// The algorithm a rotation of `key_id` keeps: the current record's, or the
@@ -82,12 +104,13 @@ impl KeyStore {
         self.rotate_inner(key_id, true, None)
     }
 
-    fn rotate_inner(
+    pub(super) fn rotate_inner(
         &self,
         key_id: &str,
         revoke_old: bool,
         algorithm: Option<KeyAlgorithm>,
     ) -> Result<KeyEntry> {
+        check_key_id(key_id)?;
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \

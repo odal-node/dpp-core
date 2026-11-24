@@ -85,6 +85,9 @@ pub enum SdJwtError {
     /// The Holder key is revoked, and a revoked key signs nothing.
     #[error(transparent)]
     KeyRevoked(#[from] crate::keystore::KeyRevoked),
+    /// The backend that holds the Holder key could not sign. The text is the backend's.
+    #[error("the Holder key could not sign: {0}")]
+    Signing(String),
     /// The Key Binding JWT failed one of the checks of clause 7.3 step 5, named
     /// here: `alg` or the signature (5.b, 5.c), `typ` (5.d), `iat` (5.e), `nonce`
     /// or `aud` (5.f), `sd_hash` (5.g), or the JWT itself, its `exp` or its `nbf`
@@ -167,4 +170,13 @@ pub enum SdJwtError {
     /// a defect in this crate, never a property of the token.
     #[error("choosing the Disclosures for {0} disagreed with reading the token a second way")]
     SelectionDisagrees(String),
+}
+
+impl From<crate::keystore::SignError> for SdJwtError {
+    fn from(refusal: crate::keystore::SignError) -> Self {
+        match refusal {
+            crate::keystore::SignError::Revoked(revoked) => Self::KeyRevoked(revoked),
+            crate::keystore::SignError::Backend(reason) => Self::Signing(reason),
+        }
+    }
 }

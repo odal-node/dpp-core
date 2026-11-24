@@ -287,9 +287,12 @@ fn a_revoked_key_signs_nothing() {
     let key = store.load_key("iss").expect("a revoked key still loads");
     assert!(key.revoked);
 
-    let refused = key
+    let super::SignError::Revoked(refused) = key
         .sign(b"message")
-        .expect_err("a revoked key refuses to sign");
+        .expect_err("a revoked key refuses to sign")
+    else {
+        panic!("a revoked key is refused for its revocation");
+    };
     assert_eq!(refused.fingerprint, key.fingerprint);
     assert!(
         refused.to_string().contains("revoke_and_rotate"),

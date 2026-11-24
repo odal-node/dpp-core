@@ -21,7 +21,7 @@
 
 use serde_json::{Map, Value, json};
 
-use dpp_crypto::keystore::{KeyStore, PublicKeyInfo};
+use dpp_crypto::keystore::{KeyBackend, PublicKeyInfo};
 
 /// The DID of the issuer whose documents are served from `base_url`.
 ///
@@ -49,7 +49,7 @@ pub fn did_for(base_url: &str) -> String {
 /// publishes the same keys as [`build_issuer_metadata`]. A store's own calls never
 /// leave its current key revoked, but a store whose file says so opens: one written
 /// before key stores carried an integrity tag, sealed by
-/// [`KeyStore::open_and_migrate`]. Such a key signs nothing either
+/// [`KeyStore::open_and_migrate`](dpp_crypto::keystore::KeyStore::open_and_migrate). Such a key signs nothing either
 /// ([`KeyRevoked`](dpp_crypto::keystore::KeyRevoked)).
 ///
 /// With no current key, `authentication` is left out rather than empty: DID Core
@@ -59,7 +59,11 @@ pub fn did_for(base_url: &str) -> String {
 /// and the document holds its `@context` and `id` alone.
 ///
 /// [`build_issuer_metadata`]: crate::sd_jwt_vc::build_issuer_metadata
-pub fn build_did_document(store: &KeyStore, base_url: &str, key_id: &str) -> anyhow::Result<Value> {
+pub fn build_did_document(
+    store: &dyn KeyBackend,
+    base_url: &str,
+    key_id: &str,
+) -> anyhow::Result<Value> {
     if !store.has_key(key_id) {
         store.generate_key(key_id)?;
     }
