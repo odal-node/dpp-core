@@ -17,6 +17,7 @@ use super::crypto::{
     verify_envelope_hmac,
 };
 use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
+use super::lock::StoreLock;
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
@@ -205,11 +206,37 @@ impl UpgradeNeeded {
 /// refused by [`Self::open`] and upgraded in place by
 /// [`Self::open_and_migrate`]; see [`UpgradeNeeded`].
 ///
-/// One writer per file at a time. Every write replaces the file from this handle's
-/// in-memory map, so a second handle on the same file overwrites the first one's
-/// writes; the store takes no cross-process lock.
+/// # One handle per file
+///
+/// [`Self::open`] and [`Self::open_and_migrate`] take an exclusive lock on
+/// `<store file>.lock`, beside the store, and hold it until the handle is dropped or
+/// the process ends. A second open of the same file, from this process or another,
+/// is refused at once with [`KeyStoreLocked`](super::KeyStoreLocked), which names the
+/// lock file. Nothing waits or retries: a host whose restart overlaps the old
+/// process opens the store again itself.
+///
+/// Every write replaces the file from this handle's in-memory map, and with one
+/// handle that map is the file. So no write discards another handle's key, and a key
+/// revoked through one handle cannot go on signing or being published through another.
+/// The lock is on a file beside the store because each write renames a temp file over
+/// the store, which would leave a lock on the old file guarding nothing. The lock
+/// file is left in place when the handle is dropped, since removing it would race an
+/// open, and it holds nothing.
+///
+/// The store file is resolved before it is locked, so a relative path, an absolute one,
+/// a `..` and a symlink to the file are one store, and the handle reads and saves
+/// through the resolved path: a save replaces the file a link points at, and not the
+/// link. A store file cannot be named `*.lock`, which is the name of a lock file.
+///
+/// What this does not stop: a build older than the lock takes none, so it can open
+/// the file beside a newer build and save over what the newer one wrote since. It
+/// does refuse, on open, a file that holds a record of an algorithm it does not
+/// know. Never run an older build against a file a newer one has open.
 pub struct KeyStore {
     pub(crate) path: std::path::PathBuf,
+    /// The lock that makes this the only handle on the file. Held for as long as the
+    /// handle is, and moved, not released, when `open_and_migrate` re-opens the file.
+    pub(crate) lock: StoreLock,
     pub(crate) cipher: Aes256Gcm,
     /// 32-byte key used for HMAC-SHA256 file integrity checks.
     pub(crate) integrity_key: [u8; 32],
@@ -248,12 +275,27 @@ impl KeyStore {
     /// [`Self::open_and_migrate`] upgrades and opens them. What changes is that
     /// the weak path now requires a caller who asked for it by name.
     ///
+    /// # Locking
+    ///
+    /// Takes the exclusive lock described under "One handle per file" on [`KeyStore`], and
+    /// holds it until the handle is dropped. The lock is taken before the file is
+    /// read, so what is read is what no other handle will change under it.
+    ///
     /// # Errors
     ///
-    /// Names the specific property the store predates, and points at
-    /// `open_and_migrate`.
+    /// [`KeyStoreLocked`](super::KeyStoreLocked) if another handle on the file is open,
+    /// in this process or another. Names the specific property the store predates, and
+    /// points at `open_and_migrate`.
     pub fn open(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
-        let store = Self::open_permissively(path, passphrase)?;
+        let lock = StoreLock::acquire(path.as_ref())?;
+        Self::open_strictly(passphrase, lock)
+    }
+
+    /// [`Self::open`], under a lock that is already held, on the file the lock is for.
+    /// A failure drops the lock.
+    pub(crate) fn open_strictly(passphrase: &str, lock: StoreLock) -> Result<Self> {
+        let path = lock.store_path().to_owned();
+        let store = Self::read_store(path, passphrase, lock)?;
         if let Some(reason) = store.upgrade_needed {
             anyhow::bail!(
                 "key store {}; open it with `KeyStore::open_and_migrate` to upgrade it in place",
@@ -268,6 +310,14 @@ impl KeyStore {
     /// `pub(crate)` — [`Self::open`] and [`Self::open_and_migrate`] are the two
     /// doors, and this is deliberately not a third.
     pub(crate) fn open_permissively(path: impl AsRef<Path>, passphrase: &str) -> Result<Self> {
+        let lock = StoreLock::acquire(path.as_ref())?;
+        let path = lock.store_path().to_owned();
+        Self::read_store(path, passphrase, lock)
+    }
+
+    /// Read the store at `path`, or make a new one, holding `lock` on it. `path` is the
+    /// one the lock settled on, and is what the handle reads and saves through.
+    fn read_store(path: impl AsRef<Path>, passphrase: &str, lock: StoreLock) -> Result<Self> {
         if path.as_ref().exists() {
             let bytes = std::fs::read(&path).context("Failed to read key store file")?;
 
@@ -343,6 +393,7 @@ impl KeyStore {
 
                 Ok(Self {
                     path: path.as_ref().to_owned(),
+                    lock,
                     cipher,
                     integrity_key,
                     salt,
@@ -381,6 +432,7 @@ impl KeyStore {
 
                 Ok(Self {
                     path: path.as_ref().to_owned(),
+                    lock,
                     cipher,
                     integrity_key,
                     salt,
@@ -402,6 +454,7 @@ impl KeyStore {
 
             Ok(Self {
                 path: path.as_ref().to_owned(),
+                lock,
                 cipher,
                 integrity_key,
                 salt,

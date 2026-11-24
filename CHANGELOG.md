@@ -165,6 +165,26 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `not_before: None` to write no `nbf`. A credential issued before this change has
   neither and still verifies, so issue it again. (#659)
 
+- **A second `KeyStore::open` of one file is refused.** `KeyStore::open` and
+  `open_and_migrate` take an exclusive lock on `<store file>.lock`, beside the store, and
+  hold it until the handle is dropped or the process ends. A second open of the same file,
+  from this process or another, fails at once with `KeyStoreLocked`, which names the lock
+  file and is read with `error.downcast_ref::<KeyStoreLocked>()`; nothing waits or retries.
+  Before, two handles on one file lost each other's writes: each save replaced the file with
+  that handle's own map, so a key the other had generated or rotated was dropped, and a key
+  revoked through one went on signing through the other. **Migration:** a caller that opened
+  one file twice drops the first handle before the second open, or shares one handle, such
+  as an `Arc<KeyStore>`. A host whose restart overlaps the old process retries the open.
+  The directory of the store must now exist when it is opened, where a missing one failed at
+  the first save; and a platform that cannot lock files refuses the open, since an unlocked
+  store is the defect. The store file is resolved before it is locked, so a relative path, an
+  absolute one, a `..` and a symlink to the file are one store, and the handle saves through
+  the resolved path: a save replaces the file a symlink points at, where it replaced the
+  symlink. A store file cannot be named `*.lock`, which is the name of a lock file, and such
+  a path is refused when it is opened. The lock file stays in place after the handle is dropped. A build
+  older than this one takes no lock, so it can still open the file beside a newer build and
+  save over it: never run one against a file a newer build has open. (#624)
+
 ### Added
 
 - **An issued SD-JWT VC can expire.** `sd_jwt_vc::issue` writes `exp` and `nbf` when they

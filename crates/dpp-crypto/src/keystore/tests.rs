@@ -137,6 +137,17 @@ fn legacy_sha256_store_can_be_opened_and_migrated() {
     let raw_file = std::fs::read_to_string(&path).expect("read");
     assert!(raw_file.contains("argon2id"), "file must be migrated");
 
+    // The lock was held through the upgrade and the re-open, and the handle that came
+    // back still holds it: a second handle is refused.
+    let Err(second) = KeyStore::open(&path, passphrase) else {
+        panic!("a second handle opened a store that a migrated handle holds");
+    };
+    assert!(
+        second.downcast_ref::<super::KeyStoreLocked>().is_some(),
+        "{second:#}"
+    );
+    drop(store);
+
     // And it is now openable strictly — which is the property that says the
     // upgrade actually finished rather than merely ran.
     KeyStore::open(&path, passphrase).expect("migrated store opens strictly");
@@ -663,6 +674,7 @@ fn a_store_with_unbound_records_is_refused_then_upgraded() {
         fingerprint,
         "the key survives the upgrade unchanged"
     );
+    drop(upgraded);
     KeyStore::open(&path, passphrase).expect("opens strictly once upgraded");
 }
 
