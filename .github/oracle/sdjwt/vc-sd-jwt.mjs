@@ -18,9 +18,11 @@
  *   the Disclosures           Every Disclosure's digest, recomputed here, is one the
  *                             signed payload refers to, in an `_sd` array or as the
  *                             `...` placeholder of an array element, in the payload
- *                             itself or inside another Disclosure. A token issued
- *                             whole refers to no digest it has no Disclosure for,
- *                             since this crate issues no decoys.
+ *                             itself or inside another Disclosure. A digest no
+ *                             Disclosure answers to is a decoy (clause 4.2.5), and
+ *                             this crate pads every `_sd` array, and every array of
+ *                             placeholders, to a multiple of eight, so that the length
+ *                             does not give the number hidden.
  *   `_sd_alg`                 `sha-256`, and present exactly when something is hidden.
  *   the header                `typ` is `vc+sd-jwt` or `vp+sd-jwt`, `cty` is `vc` or
  *                             `vp`, `alg` is the key's, and `kid` is the one the
@@ -56,6 +58,7 @@ import {
   libraryVersion,
   same,
   sdArrays,
+  unpadded,
   verifyingInstance,
 } from "./lib.mjs";
 
@@ -117,6 +120,13 @@ const instanceFor = (c) => verifyingInstance(c.jwk, c.alg);
     if ((await judge(instanceFor(issued), `${issued.token}${extra}~`)).accepts) {
       problems.push("a Disclosure that matches no digest was accepted");
     }
+    // The padding check has to be able to fail too: the same token with its
+    // credentialSubject's _sd array cut to three digests. Whether this crate's own tokens
+    // pass is the loop's to report, naming the token.
+    const cut = JSON.parse(Buffer.from(p, "base64url"));
+    cut.credentialSubject._sd = cut.credentialSubject._sd.slice(0, 3);
+    const cutToken = [[h, Buffer.from(JSON.stringify(cut)).toString("base64url"), s].join("."), ...disclosures, ""].join("~");
+    if (unpadded(cutToken).length === 0) problems.push("a token whose _sd array holds three digests is not flagged");
   }
   // Key Binding has to be able to fail too: the bound control, another nonce.
   const boundControl = corpus.cases.find((c) => c.id === "bound/vc-ed25519/valid");
@@ -146,6 +156,7 @@ const instanceFor = (c) => verifyingInstance(c.jwk, c.alg);
 const algs = new Set();
 let withDisclosures = 0;
 let orderArrays = 0;
+let paddedTokens = 0;
 let boundCases = 0;
 let refusedAsRequired = 0;
 for (const c of corpus.cases) {
@@ -175,8 +186,12 @@ for (const c of corpus.cases) {
   for (const digest of held) {
     if (!referenced.has(digest)) fail(c.id, `a Disclosure's digest ${digest} is referred to nowhere`);
   }
-  if (c.id.endsWith("/issued") && referenced.size !== held.size) {
-    fail(c.id, `${referenced.size} digests are referred to and ${held.size} Disclosures travel, and no decoys are issued`);
+  // Every token here is one this crate issued or presented in part, so each is held to
+  // the padding. A decoy is a digest that no Disclosure answers to, so the tokens refer to
+  // at least as many digests as travel Disclosures.
+  paddedTokens++;
+  for (const problem of unpadded(c.token)) {
+    fail(c.id, `${problem}, so its length gives the number hidden (clause 4.2.5)`);
   }
   if (held.size !== disclosures.length) fail(c.id, "two Disclosures have one digest");
   if (disclosures.length > 0) withDisclosures++;
@@ -223,6 +238,7 @@ for (const id of ["suite/row-17/issued", "suite/row-18/issued", "suite/row-19/is
 console.log(`${corpus.cases.length} tokens, ${withDisclosures} with Disclosures; algorithms ${[...algs].sort().join(", ")}`);
 console.log(`Key Binding required: ${boundCases} bound cases, ${refusedAsRequired} of them negative controls refused by the library and by this crate`);
 console.log(`claim order (clause 4.2.4.1): ${orderArrays} _sd arrays of two or more digests; each strictly ascending`);
+console.log(`decoy padding (clause 4.2.5): every _sd array and every array of placeholders a multiple of eight, in each of ${paddedTokens} tokens`);
 
 if (failures.length) {
   console.error(`\n${failures.length} FAILURE(S):`);

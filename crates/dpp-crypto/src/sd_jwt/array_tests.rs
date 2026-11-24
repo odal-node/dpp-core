@@ -22,6 +22,16 @@ fn placeholder_of(d: &Disclosure) -> Value {
     json!({ "...": d.digest() })
 }
 
+/// `kept` without the decoy placeholders `conceal_elements` added: every element that
+/// is not a placeholder for one of `disclosures`, in the order it came.
+fn without_decoys(kept: &[Value], disclosures: &[Disclosure]) -> Vec<Value> {
+    let held: Vec<Value> = disclosures.iter().map(placeholder_of).collect();
+    kept.iter()
+        .filter(|item| held.contains(item) || item.get("...").is_none())
+        .cloned()
+        .collect()
+}
+
 #[test]
 fn an_element_disclosure_encodes_the_pair_clause_4_2_2_defines() {
     use base64::Engine;
@@ -61,8 +71,13 @@ fn two_equal_elements_get_two_salts_and_so_two_digests() {
     assert_eq!(disclosures.len(), 2);
     assert_ne!(disclosures[0].salt(), disclosures[1].salt());
     assert_ne!(disclosures[0].digest(), disclosures[1].digest());
-    assert_eq!(kept[0], placeholder_of(&disclosures[0]));
-    assert_eq!(kept[1], placeholder_of(&disclosures[1]));
+    assert_eq!(
+        without_decoys(&kept, &disclosures),
+        vec![
+            placeholder_of(&disclosures[0]),
+            placeholder_of(&disclosures[1])
+        ]
+    );
 }
 
 #[test]
@@ -70,12 +85,18 @@ fn concealing_keeps_each_placeholder_in_the_position_it_replaced() {
     let items = [json!("a"), json!("b"), json!("c"), json!("d")];
     let (kept, disclosures) = conceal_elements(&items, |position, _| position % 2 == 1);
 
-    assert_eq!(kept.len(), 4);
-    assert_eq!(kept[0], json!("a"));
-    assert_eq!(kept[2], json!("c"));
+    // Two placeholders stand for something, and the rest are decoys up to eight.
+    assert_eq!(kept.len(), 2 + 8);
     // Not sorted: the second hidden element's digest need not follow the first's.
-    assert_eq!(kept[1], placeholder_of(&disclosures[0]));
-    assert_eq!(kept[3], placeholder_of(&disclosures[1]));
+    assert_eq!(
+        without_decoys(&kept, &disclosures),
+        vec![
+            json!("a"),
+            placeholder_of(&disclosures[0]),
+            json!("c"),
+            placeholder_of(&disclosures[1]),
+        ]
+    );
     assert_eq!(disclosures[0].claim_value(), &json!("b"));
     assert_eq!(disclosures[1].claim_value(), &json!("d"));
 }

@@ -36,6 +36,11 @@
  * array in every token this crate issues must be strictly ascending, and so must
  * the RFC's own, which shows the convention is theirs and not ours.
  *
+ * The padding with decoy digests (clause 4.2.5) is judged the same way, for it too can
+ * be seen by anyone: every `_sd` array, and every array of placeholders, in a token this
+ * crate issues has a number of digests that is a multiple of eight, so that the length
+ * does not give the number of claims hidden. The RFC's own tokens are not held to it.
+ *
  * What the signature check is: Node's `crypto`, in `lib.mjs`, doing the Ed25519
  * arithmetic (OpenSSL, which shares nothing with this crate's `ed25519-dalek`). The
  * library builds the JWS signing input and calls back for the check, so it frames
@@ -54,6 +59,7 @@ import {
   libraryVersion,
   same,
   sdArrays,
+  unpadded,
   verifyingInstance,
 } from "./lib.mjs";
 
@@ -170,6 +176,14 @@ async function negativeControls() {
     problems.push("a token whose _sd array is in descending order is not flagged");
   }
 
+  // The padding check has to be able to fail, on a real token: the same token with its
+  // _sd array cut to three digests. Whether this crate's own tokens pass is the loop's
+  // to report, as a failure naming the token, and not a reason to distrust the judge.
+  const cut = JSON.parse(Buffer.from(p, "base64url"));
+  cut._sd = cut._sd.slice(0, 3);
+  const cutToken = [[h, Buffer.from(JSON.stringify(cut)).toString("base64url"), s].join("."), ...rest].join("~");
+  if (unpadded(cutToken).length === 0) problems.push("a token whose _sd array holds three digests is not flagged");
+
   // Key Binding has to be able to fail too: the same bound token, another nonce.
   const bound = byId.get("bound/control/every-disclosure");
   if (!bound) {
@@ -222,9 +236,19 @@ function checkOrder(whose, id, token) {
   }
 }
 
+/** Every `_sd` array and every array of placeholders in the token is a multiple of eight. */
+const padding = { tokens: 0 };
+function checkPadding(id, token) {
+  padding.tokens++;
+  for (const problem of unpadded(token)) {
+    fail(id, `${problem}, so its length gives the number hidden (clause 4.2.5)`);
+  }
+}
+
 for (const c of corpus.cases.filter((c) => c.group === "issued" || c.group === "presented")) {
   tally(c.group);
   checkOrder("ours", c.id, c.token);
+  checkPadding(c.id, c.token);
   const theirs = await judge(ed25519, c.token);
   if (!c.ours.accepts) fail(c.id, `this crate refuses its own token: ${c.ours.error}`);
   if (!theirs.accepts) {
@@ -332,6 +356,10 @@ console.log(
   `claim order (clause 4.2.4.1): ${order.ours.arrays} _sd arrays of two or more digests in ` +
     `${order.ours.tokens} tokens this crate issued, ${order.rfc.arrays} in the RFC's ` +
     `${order.rfc.tokens} vendored tokens; each strictly ascending`,
+);
+console.log(
+  `decoy padding (clause 4.2.5): every _sd array and every array of placeholders a multiple of eight, ` +
+    `in each of ${padding.tokens} tokens this crate issued`,
 );
 console.log(`known disagreements, each argued in the script: ${seenDisagreements.size}`);
 for (const id of seenDisagreements) {

@@ -76,9 +76,10 @@ fn row_17_a_basic_credential_is_issued_with_two_claims_concealed_and_verifies_ba
     assert_eq!(harness(&issued), "success");
     let sd_jwt = issued.expect("issued");
     let signed = payload_of(sd_jwt.jwt());
+    // Two digests for the claims, padded with decoys to a multiple of eight.
     assert_eq!(
         signed["credentialSubject"]["_sd"].as_array().map(Vec::len),
-        Some(2)
+        Some(8)
     );
     assert_eq!(signed["credentialSubject"]["birthDate"], "1990-01-01");
     assert!(signed["credentialSubject"].get("firstName").is_none());
@@ -115,10 +116,12 @@ fn row_18_a_complex_credential_is_issued_with_nested_members_and_an_element_conc
     let sd_jwt = issued.expect("issued");
     let signed = payload_of(sd_jwt.jwt());
     let subject = &signed["credentialSubject"];
-    assert_eq!(subject["address"]["_sd"].as_array().map(Vec::len), Some(2));
+    assert_eq!(subject["address"]["_sd"].as_array().map(Vec::len), Some(8));
     assert_eq!(subject["address"]["country"], "USA");
-    assert!(subject["phoneNumbers"][0]["..."].is_string());
-    assert_eq!(subject["phoneNumbers"][1]["type"], "mobile");
+    // The first number is a placeholder among seven decoys, and the second stays in the clear.
+    let phones = subject["phoneNumbers"].as_array().expect("an array");
+    assert_eq!(phones.iter().filter(|p| p["..."].is_string()).count(), 8);
+    assert_eq!(phones.iter().filter(|p| p["type"] == "mobile").count(), 1);
     assert_eq!(sd_jwt.disclosures().len(), 3);
     let suite_own = SdJwt::parse(&token("credential-sdjwt-nested.txt")).expect("an SD-JWT");
     assert_eq!(

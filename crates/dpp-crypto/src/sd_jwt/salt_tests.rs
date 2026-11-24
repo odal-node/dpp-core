@@ -28,9 +28,19 @@ fn digest_order_does_not_follow_claim_order() {
         .collect();
     let in_claim_order: Vec<String> = disclosures.iter().map(Disclosure::digest).collect();
 
+    // The array holds decoys beside the real digests, and the whole of it is sorted.
+    assert!(
+        published.windows(2).all(|pair| pair[0] <= pair[1]),
+        "digests must be published sorted"
+    );
     let mut sorted = in_claim_order.clone();
     sorted.sort();
-    assert_eq!(published, sorted, "digests must be published sorted");
+    let real_in_published_order: Vec<&str> = published
+        .iter()
+        .copied()
+        .filter(|digest| sorted.iter().any(|real| real == digest))
+        .collect();
+    assert_eq!(real_in_published_order, sorted);
 
     // The sorted order must be a genuine reordering for at least one salt draw,
     // otherwise this test would pass on an implementation that does not sort.
@@ -38,13 +48,14 @@ fn digest_order_does_not_follow_claim_order() {
     // differs, which is overwhelmingly the first iteration.
     let reordered = (0..32).any(|_| {
         let (c, d) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
+        let claim_order: Vec<String> = d.iter().map(Disclosure::digest).collect();
         let pub_order: Vec<String> = c["_sd"]
             .as_array()
             .unwrap()
             .iter()
             .map(|v| v.as_str().unwrap().to_owned())
+            .filter(|digest| claim_order.contains(digest))
             .collect();
-        let claim_order: Vec<String> = d.iter().map(Disclosure::digest).collect();
         pub_order != claim_order
     });
     assert!(reordered, "sorting never reordered — suspect a no-op sort");

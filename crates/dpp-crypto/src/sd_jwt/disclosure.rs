@@ -224,6 +224,20 @@ impl Disclosure {
     }
 }
 
+/// A digest that stands for no Disclosure: a decoy, RFC 9901 clause 4.2.5.
+///
+/// The clause recommends hashing a cryptographically secure random number, which is
+/// what this does with as many random bits as a salt has. The result is a digest in
+/// the same encoding as a real one and nothing a reader can tell from it.
+///
+/// It is not checked against the digests beside it. Clause 4.1 forbids a digest
+/// twice, and two draws of 128 random bits meeting is not a case worth a branch.
+pub(super) fn decoy_digest() -> String {
+    let mut random = [0u8; SALT_BYTES];
+    crate::os_rng().fill_bytes(&mut random);
+    digest_of(&b64().encode(random))
+}
+
 /// The digest of an already-encoded string: base64url(SHA-256(ASCII(`encoded`))).
 ///
 /// Free function because not everything hashed this way is a Disclosure. A

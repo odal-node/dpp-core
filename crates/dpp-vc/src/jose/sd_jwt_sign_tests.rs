@@ -98,9 +98,10 @@ fn a_concealed_claim_is_a_digest_in_the_token_and_the_whole_document_is_what_rea
     let payload = segment(sd_jwt.jwt(), 1);
     assert_eq!(payload["_sd_alg"], "sha-256");
     assert!(payload["credentialSubject"].get("name").is_none());
+    // One digest for the claim, padded with decoys to a multiple of eight.
     assert_eq!(
         payload["credentialSubject"]["_sd"].as_array().map(Vec::len),
-        Some(1)
+        Some(8)
     );
     assert!(payload.get("_sd").is_none());
     assert!(!payload.to_string().contains("Example"));
@@ -157,23 +158,47 @@ fn a_nested_member_is_concealed_in_the_object_it_sits_in() {
     let payload = segment(sd_jwt.jwt(), 1);
     let address = &payload["credentialSubject"]["address"];
     assert_eq!(address.as_object().map(|a| a.len()), Some(1));
-    assert_eq!(address["_sd"].as_array().map(Vec::len), Some(2));
+    assert_eq!(address["_sd"].as_array().map(Vec::len), Some(8));
     assert!(payload["credentialSubject"].get("_sd").is_none());
     assert_eq!(sd_jwt.disclosures().len(), 2);
 }
 
-/// An element is replaced in place by `{"...": digest}`, so the array keeps its length and
-/// the other elements keep their positions (RFC 9901 clause 4.2.2).
+/// An element is replaced by `{"...": digest}` (RFC 9901 clause 4.2.2), among decoy
+/// placeholders that pad the array to eight (clause 4.2.5). The elements left in the clear
+/// keep their order, and the one placeholder that stands for something is the Disclosure's.
 #[test]
-fn an_array_element_is_a_placeholder_in_its_own_position() {
-    let sd_jwt = sign(&rich(), &[path(&json!(["credentialSubject", "phones", 1]))]).expect("signs");
+fn an_array_element_is_a_placeholder_among_decoys_and_the_others_keep_their_order() {
+    let document = rich();
+    let sd_jwt = sign(
+        &document,
+        &[path(&json!(["credentialSubject", "phones", 1]))],
+    )
+    .expect("signs");
 
-    let phones = &segment(sd_jwt.jwt(), 1)["credentialSubject"]["phones"];
-    assert_eq!(phones[0], "+1-555-0001");
-    assert_eq!(phones[2], "+1-555-0003");
-    assert_eq!(phones[1].as_object().map(|p| p.len()), Some(1));
-    assert!(phones[1]["..."].is_string());
-    assert!(sd_jwt.disclosures()[0].is_array_element());
+    let phones = segment(sd_jwt.jwt(), 1)["credentialSubject"]["phones"]
+        .as_array()
+        .expect("an array")
+        .clone();
+    let clear: Vec<&Value> = phones.iter().filter(|item| item.is_string()).collect();
+    assert_eq!(clear, vec![&json!("+1-555-0001"), &json!("+1-555-0003")]);
+    let placeholders: Vec<&Value> = phones.iter().filter(|item| item.is_object()).collect();
+    assert_eq!(
+        placeholders.len(),
+        8,
+        "one for the element and seven decoys"
+    );
+    assert!(
+        placeholders
+            .iter()
+            .all(|p| p.as_object().map(|p| p.len()) == Some(1) && p["..."].is_string())
+    );
+    let element = &sd_jwt.disclosures()[0];
+    assert!(element.is_array_element());
+    assert!(placeholders.contains(&&json!({ "...": element.digest() })));
+    assert_eq!(
+        Value::Object(sd_jwt.disclosed_payload().expect("reads back")),
+        document
+    );
 }
 
 #[test]

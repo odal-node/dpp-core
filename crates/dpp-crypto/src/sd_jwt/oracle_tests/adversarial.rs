@@ -97,6 +97,19 @@ impl<'a> Base<'a> {
     }
 }
 
+/// Where the placeholder for `digest` sits in the `nat` array.
+///
+/// The issuer puts decoy placeholders among the elements, so the one that stands for
+/// an element is not at the position of the element it hides.
+fn nat_placeholder(payload: &Value, digest: &str) -> usize {
+    payload["nat"]
+        .as_array()
+        .expect("the payload has nat")
+        .iter()
+        .position(|item| item["..."] == json!(digest))
+        .expect("the placeholder is in nat")
+}
+
 /// A Disclosure written by hand: its encoding and its SHA-256 digest.
 fn raw(json_text: &str) -> (String, String) {
     let encoded = B64.encode(json_text);
@@ -229,14 +242,18 @@ fn wrong_structure(base: &Base<'_>, out: &mut Vec<Adversarial>) {
         out,
         "reject/digest-in-sd-and-in-an-array",
         "clause 4.1 and 7.1 step 3.c.iii.1",
-        base.altered(|p, _| p["nat"][1] = json!({"...": given_digest})),
+        base.altered(|p, _| {
+            let at = nat_placeholder(p, &nat_digest);
+            p["nat"][at] = json!({"...": given_digest});
+        }),
     );
     add(
         out,
         "reject/array-disclosure-named-by-an-sd-digest",
         "clause 7.1 step 3.c.ii.1: a two-element Disclosure where a three-element one belongs",
         base.altered(|p, _| {
-            p["nat"][1] = json!("FR");
+            let at = nat_placeholder(p, &nat_digest);
+            p["nat"][at] = json!("FR");
             sd(p).push(json!(nat_digest));
         }),
     );
@@ -246,7 +263,8 @@ fn wrong_structure(base: &Base<'_>, out: &mut Vec<Adversarial>) {
         "clause 7.1 step 3.c.iii.1: a three-element Disclosure where a two-element one belongs",
         base.altered(|p, _| {
             sd(p).retain(|d| *d != json!(given_digest));
-            p["nat"][1] = json!({"...": given_digest});
+            let at = nat_placeholder(p, &nat_digest);
+            p["nat"][at] = json!({"...": given_digest});
         }),
     );
     add(
@@ -335,13 +353,19 @@ fn wrong_structure(base: &Base<'_>, out: &mut Vec<Adversarial>) {
         out,
         "reject/placeholder-with-a-second-key",
         "clause 4.2.2: the placeholder is an object with the one key",
-        base.altered(|p, _| p["nat"][1] = json!({"...": nat_digest, "x": 1})),
+        base.altered(|p, _| {
+            let at = nat_placeholder(p, &nat_digest);
+            p["nat"][at] = json!({"...": nat_digest, "x": 1});
+        }),
     );
     add(
         out,
         "reject/placeholder-value-not-a-string",
         "clause 4.2.2: the digest is a string",
-        base.altered(|p, _| p["nat"][1] = json!({"...": 5})),
+        base.altered(|p, _| {
+            let at = nat_placeholder(p, &nat_digest);
+            p["nat"][at] = json!({"...": 5});
+        }),
     );
     add(
         out,

@@ -44,10 +44,15 @@
 //!   expects an SD-JWT MUST find the last segment empty (clause 4). Such a caller
 //!   refuses a token for which [`SdJwt::has_key_binding`] is true.
 //!   [`SdJwt::present`] refuses one itself.
-//! - **It does not issue decoy digests** (clause 4.2.5). They are optional, and
-//!   they buy concealment of *how many* claims or elements were withheld, which
-//!   the digest count already reveals only in aggregate. Reading them works: a
-//!   digest with no Disclosure is ignored, which is all a decoy is.
+//! - **It hides the number of claims withheld only to within eight.** [`conceal`]
+//!   and [`conceal_elements`] add decoy digests (clause 4.2.5) until an `_sd` array,
+//!   or the placeholders of an array, number a multiple of eight, so the length is
+//!   not the count: an object that hides two claims and one that hides six carry the
+//!   same number of digests. That is a bucket, so one past a multiple of eight
+//!   carries sixteen, and the length still tells a reader which bucket. An object
+//!   that hides nothing carries no `_sd` array, so whether an object hides anything
+//!   stays visible. A decoy has no Disclosure, and a digest with no Disclosure is
+//!   ignored, which is all a decoy is.
 //!
 //! # Array elements
 //!
@@ -105,6 +110,8 @@ mod select;
 
 #[cfg(test)]
 mod array_tests;
+#[cfg(test)]
+mod decoy_tests;
 #[cfg(test)]
 mod holder_key_tests;
 #[cfg(test)]
