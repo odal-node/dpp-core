@@ -481,6 +481,17 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Changed
 
+- **Concealing pads with decoy digests, so the length of `_sd` does not give the number of
+  claims withheld.** `conceal` adds decoy digests (RFC 9901 clause 4.2.5) to the `_sd` array
+  of an object that hides something, and `conceal_elements` adds decoy placeholders to an
+  array that hides an element, until the number is a multiple of eight. Two passports that
+  withhold two claims and six carry `_sd` arrays of one length. A decoy has no Disclosure,
+  which a verifier ignores (clause 7.1), and a position chosen with `digests_for_paths` does
+  not count it. The disclosures returned are the real ones only. In an `_sd` array the decoys
+  sit among the real digests, which stay sorted by value, and in an array they go at random
+  positions. The number is hidden to within eight, and whether an object conceals anything at
+  all stays visible, which section 10.4 of the RFC also names as a side channel. A caller that read an `_sd` array's length as the number of claims hidden
+  counts the disclosures instead. (#653)
 - **`dpp_crypto::cose` reads RFC 9864's fully specified `alg` values.** `verify_sign1`
   accepts `-9` (ESP256), `-51` (ESP384), `-52` (ESP512) and `-19` (Ed25519) beside the
   polymorphic `-7`, `-35`, `-36` and `-8`, each for its own key's algorithm only: `-9` on a

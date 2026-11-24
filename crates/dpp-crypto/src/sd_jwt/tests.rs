@@ -60,8 +60,8 @@ fn concealed_claims_leave_no_cleartext_in_the_payload() {
     for name in HIDDEN {
         assert!(!concealed.contains_key(name), "{name} left in cleartext");
     }
-    let digests = concealed["_sd"].as_array().unwrap();
-    assert_eq!(digests.len(), 4);
+    // Four digests that stand for a claim, and decoys up to the next multiple of eight.
+    assert_eq!(concealed["_sd"].as_array().unwrap().len(), 8);
 }
 
 #[test]

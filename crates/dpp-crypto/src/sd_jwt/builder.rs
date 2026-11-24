@@ -1,8 +1,9 @@
 //! Concealing claims, and reading a concealed token back.
 
+use rand::RngExt;
 use serde_json::{Map, Value};
 
-use super::disclosure::{Disclosure, SD_HASH_ALG, digest_of};
+use super::disclosure::{Disclosure, SD_HASH_ALG, decoy_digest, digest_of};
 use super::error::SdJwtError;
 
 /// The claim carrying an object's digests, RFC 9901 clause 4.2.4.1.
@@ -21,6 +22,29 @@ pub(crate) const ARRAY_ELEMENT_CLAIM: &str = "...";
 /// for one Disclosure and not for Disclosures nested inside one another.
 /// Processing recurses on the depth, so it needs a bound of its own.
 const MAX_DEPTH: usize = 127;
+/// The count the digests of one object, or the placeholders of one array, are
+/// rounded up to a multiple of.
+///
+/// Clause 4.2.5's decoys exist so that the length of an `_sd` array does not tell a
+/// reader how many claims were withheld. The RFC gives no count: its privacy
+/// considerations (section 10.4) call the number a trade-off between the size of the
+/// token and the privacy of the data. The count is rounded, and not drawn at
+/// random, so that issuing the same data twice gives the same length and an observer
+/// of several tokens cannot take the smallest as the real count. It is rounded up to
+/// a multiple, and not to a fixed minimum, so that a large object does not show its
+/// exact count past the minimum. An object that hides one claim and one that hides
+/// eight carry the same number of digests; one that hides nine carries sixteen.
+///
+/// Eight keeps the cost of an object that hides little to seven decoys, about 430
+/// bytes in the token. A constant cannot know how many an object could hold, so it
+/// does not hide that for every object.
+const DECOY_BUCKET: usize = 8;
+
+/// How many decoys an object or array that hides `real` things carries. None when
+/// it hides nothing, because it then carries no `_sd` array at all.
+fn decoys_for(real: usize) -> usize {
+    real.next_multiple_of(DECOY_BUCKET) - real
+}
 
 /// Replace the named members of `object` with digests, returning the rewritten
 /// object and the disclosures that reopen it.
@@ -38,6 +62,13 @@ const MAX_DEPTH: usize = 127;
 /// `_sd` is omitted entirely when nothing is concealed, per clause 4.2.4.1's
 /// note that an issuer may omit it to save space; `_sd_alg` is added only at the
 /// top level by [`build_payload`].
+///
+/// **When something is concealed, `_sd` is padded with decoy digests** (clause
+/// 4.2.5) until its length is a multiple of eight, so the length does not give the
+/// number of claims withheld. A decoy has no Disclosure, which a verifier reads as a
+/// digest nobody holds and ignores (clause 7.1 step 3.c.i). The returned
+/// disclosures are the real ones only. What this does not hide is the number to
+/// within eight, and whether an object concealed anything at all.
 pub fn conceal(
     object: &Map<String, Value>,
     mut conceal_if: impl FnMut(&str) -> bool,
@@ -61,10 +92,15 @@ pub fn conceal(
         // original order of elements". Deterministic beats random here because
         // it makes the issued bytes reproducible from the disclosures for a
         // given salt set, which is what lets a test pin them.
+        //
+        // The decoys go in before the sort, so they land among the real digests at
+        // positions that follow the digests' values and nothing else. Appended
+        // after it, the last ones would be the decoys.
         let mut digests: Vec<Value> = disclosures
             .iter()
             .map(|d| Value::String(d.digest()))
             .collect();
+        digests.extend((0..decoys_for(disclosures.len())).map(|_| Value::String(decoy_digest())));
         digests.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
         kept.insert(SD_CLAIM.to_owned(), Value::Array(digests));
     }
@@ -83,12 +119,17 @@ pub fn conceal(
 /// an unordered set, so clause 4.2.4.1 asks the issuer to hide their order; an
 /// array's order is the data, and the placeholders have to keep it.
 ///
-/// **Two things this does not do, both on purpose.** It does not pad the array
-/// with decoy digests (clause 4.2.5), so the array's length is the number of
-/// elements it had, and a verifier handed it learns that. And it does not descend:
-/// an element that is itself an array or an object is hidden whole or left whole,
-/// and a caller wanting something inside it concealed calls [`conceal`] or this
-/// on that value first.
+/// **When an element is hidden, the array gains decoy placeholders** (clause 4.2.5)
+/// until the number of placeholders is a multiple of eight, so the array's length
+/// does not give the number hidden. A decoy is `{"...": "<digest>"}` with no
+/// Disclosure, and a verifier removes it with any other placeholder it holds
+/// nothing for (clause 7.1 step 3.d). Each goes at a position drawn uniformly among
+/// the array's, so the placeholders that stand for something are not the ones
+/// before the decoys. The returned disclosures are the real ones only.
+///
+/// **It does not descend,** on purpose: an element that is itself an array or an
+/// object is hidden whole or left whole, and a caller wanting something inside it
+/// concealed calls [`conceal`] or this on that value first.
 pub fn conceal_elements(
     items: &[Value],
     mut conceal_if: impl FnMut(usize, &Value) -> bool,
@@ -104,6 +145,13 @@ pub fn conceal_elements(
         } else {
             kept.push(item.clone());
         }
+    }
+
+    // One at a time, each into any of the gaps the array has by then. That draws
+    // every arrangement of the decoys among the elements with equal probability.
+    for _ in 0..decoys_for(disclosures.len()) {
+        let at = crate::os_rng().random_range(0..=kept.len());
+        kept.insert(at, placeholder(&decoy_digest()));
     }
 
     (kept, disclosures)

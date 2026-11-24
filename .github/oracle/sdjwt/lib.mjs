@@ -178,6 +178,57 @@ export function sdArrays(token) {
  */
 export const ascending = (digests) => digests.every((d, i) => i === 0 || digests[i - 1] < d);
 
+/**
+ * What `dpp_crypto::sd_jwt` rounds to: an `_sd` array, and the placeholders of an array
+ * that hides an element, are padded with decoy digests (clause 4.2.5) until they number
+ * a multiple of this, so that their length does not give the number hidden.
+ */
+export const DECOY_BUCKET = 8;
+
+const isPlaceholder = (item) =>
+  item !== null &&
+  typeof item === "object" &&
+  !Array.isArray(item) &&
+  Object.keys(item).length === 1 &&
+  typeof item["..."] === "string";
+
+/**
+ * Where a token's digests would give away how many claims were hidden: an `_sd` array
+ * whose length is not a multiple of eight, or an array whose `{"...": digest}`
+ * placeholders are not. Read in the signed payload and in the values of the Disclosures,
+ * as `sdArrays` reads them, and nothing else is checked. The padding is observable by
+ * anyone, as the order of an `_sd` array is, and that is what makes it a claim an
+ * independent reader can hold this crate to.
+ *
+ * Only a token this crate issued is held to it. The RFC's own tokens, and one written
+ * by hand, pad by no rule.
+ */
+export function unpadded(token) {
+  const found = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) {
+      const placeholders = value.filter(isPlaceholder).length;
+      if (placeholders % DECOY_BUCKET !== 0) found.push(`an array holds ${placeholders} placeholders`);
+      value.forEach(walk);
+    } else if (value && typeof value === "object") {
+      for (const [key, inner] of Object.entries(value)) {
+        if (key === "_sd" && Array.isArray(inner) && inner.length % DECOY_BUCKET !== 0) {
+          found.push(`an _sd array holds ${inner.length} digests`);
+        }
+        walk(inner);
+      }
+    }
+  };
+  const [jwt, ...rest] = token.split("~");
+  walk(JSON.parse(Buffer.from(jwt.split(".")[1], "base64url")));
+  for (const segment of rest) {
+    // A Key Binding JWT has dots; a Disclosure, being base64url alone, never does.
+    if (segment === "" || segment.includes(".")) continue;
+    walk(JSON.parse(Buffer.from(segment, "base64url")).at(-1));
+  }
+  return found;
+}
+
 /** A deterministic generator (mulberry32), so a seed names one corpus. */
 export function prng(seed) {
   let a = seed >>> 0;
