@@ -30,7 +30,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
-  SDJwtInstance,
+  SdJwtInstance,
   ascending,
   b64u,
   ed25519FromSeed,
@@ -48,7 +48,7 @@ const issuer = ed25519FromSeed("sdjwt-oracle issuer, reverse direction");
 const holder = ed25519FromSeed("sdjwt-oracle holder, reverse direction");
 const rng = prng(0x5d3a_9001);
 
-const sd = new SDJwtInstance({
+const sd = new SdJwtInstance({
   hasher,
   hashAlg: "sha-256",
   signAlg: "EdDSA",
@@ -299,8 +299,8 @@ for (let n = 0; n < TREES; n++) {
 // format only, so these must be refused, not misread.
 {
   const issued = await sd.issue({ iss: "https://issuer.example", a: 1, b: 2 }, { _sd: ["a"] });
-  cases.push({ id: "json/flattened", verdict: "refuse", token: JSON.stringify(sd.toFlattenJSON(issued)) });
-  cases.push({ id: "json/general", verdict: "refuse", token: JSON.stringify(sd.toGeneralJSON(issued)) });
+  cases.push({ id: "json/flattened", verdict: "refuse", token: JSON.stringify(sd.toFlattenJson(issued)) });
+  cases.push({ id: "json/general", verdict: "refuse", token: JSON.stringify(sd.toGeneralJson(issued)) });
 }
 
 // ---- Credentials, for `dpp_vc` ----------------------------------------------

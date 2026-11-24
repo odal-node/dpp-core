@@ -398,7 +398,7 @@ private val KNOWN = mapOf(
         "both",
         "Clause 4.3 says `typ` MUST be kb+jwt. RFC 7515 clause 4.1.9 says a recipient reads a `typ` with no '/' as " +
             "if application/ came before it, which makes application/kb+jwt the same media type; this crate compares " +
-            "media types, Nimbus's type check compares the spelling, as the first oracle does.",
+            "media types, Nimbus's type check compares the spelling. The first oracle compares media types from 0.25.0.",
     ),
     "bound/edge/holder-key-disclosed-not-in-the-clear" to Known(
         true,

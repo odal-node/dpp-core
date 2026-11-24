@@ -30,7 +30,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const modulesDir = process.env.SDJWT_ORACLE_MODULES ?? path.join(here, "node_modules");
 const require = createRequire(path.join(modulesDir, "x.js"));
 
-export const { SDJwtInstance } = require("@sd-jwt/core");
+export const { SdJwtInstance } = require("@sd-jwt/core");
 export const libraryVersion = require("@sd-jwt/core/package.json").version;
 
 const NODE_HASH = { "sha-256": "sha256", "sha-384": "sha384", "sha-512": "sha512" };
@@ -71,7 +71,7 @@ export function kbVerifier(data, signature, payload) {
 
 /** An instance that verifies `jwk`'s signatures: `alg` is `EdDSA` or `ES256`. */
 export function verifyingInstance(jwk, alg) {
-  return new SDJwtInstance({
+  return new SdJwtInstance({
     hasher,
     hashAlg: "sha-256",
     signAlg: alg,
