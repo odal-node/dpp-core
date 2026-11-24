@@ -20,7 +20,8 @@ use dpp_crypto::sd_jwt::SdJwt;
 use dpp_domain::access::{DocumentScope, ProductGroupAccessPolicy};
 use dpp_domain::{ProductGroup, ProductGroupCatalog};
 use dpp_tests::fixtures::{
-    passport_with, schema_compat_fixture, with_restricted_envelope_members, with_restricted_members,
+    passport_with, schema_compat_fixture, schema_for, with_restricted_envelope_members,
+    with_restricted_members,
 };
 use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, issue, vct_for};
 use serde_json::Value;
@@ -73,7 +74,12 @@ fn issue_for(store: &KeyStore, key: &str, version: &str, carry: bool) -> Issued 
     let group = ProductGroup::from_wire_tag(key);
     let policy = ProductGroupAccessPolicy::for_passport(key, version)
         .unwrap_or_else(|| panic!("no access policy for {key} {version}"));
-    let data = with_restricted_members(schema_compat_fixture(key, version), &policy, carry);
+    let data = with_restricted_members(
+        schema_compat_fixture(key, version),
+        &schema_for(key, version),
+        &policy,
+        carry,
+    );
     let mut passport = passport_with(&group, version, data);
     with_restricted_envelope_members(&mut passport, &policy, carry);
 
@@ -182,7 +188,9 @@ fn each_array_is_as_long_as_the_policy_says_its_object_can_hold() {
     let _ = std::fs::remove_file(path);
 }
 
-/// The test above would pass if no group ever had an object below the root. One does.
+/// The test above would pass if no group ever had an object below the root. One does, and
+/// it is the elements of an array: battery's critical raw materials, each padded for the
+/// members its schema lets it hold.
 #[test]
 fn some_group_carries_an_sd_array_below_the_root() {
     let (store, path) = store();
@@ -191,15 +199,28 @@ fn some_group_carries_an_sd_array_below_the_root() {
         .into_iter()
         .find(|(key, _)| key == "battery")
         .expect("battery is in the catalog");
-    let battery = issue_for(&store, "battery", &version, false);
-    let nested = sd_shape(&battery.payload)
-        .keys()
-        .filter(|at| at.starts_with(&below))
-        .count();
-    assert!(
-        nested > 0,
-        "battery has no `_sd` array below productGroupData"
-    );
+    for carry in [true, false] {
+        let battery = issue_for(&store, "battery", &version, carry);
+        let nested = sd_shape(&battery.payload)
+            .keys()
+            .filter(|at| at.starts_with(&below))
+            .count();
+        assert!(
+            nested > 0,
+            "battery has no `_sd` array below productGroupData"
+        );
+
+        let materials = battery.payload[PASSPORT_CLAIM][PRODUCT_GROUP_DATA]["criticalRawMaterials"]
+            .as_array()
+            .unwrap_or_else(|| panic!("criticalRawMaterials is not an array (carry {carry})"));
+        assert!(
+            !materials.is_empty()
+                && materials
+                    .iter()
+                    .all(|element| element.get("_sd").is_some_and(Value::is_array)),
+            "an element of criticalRawMaterials carries no `_sd` (carry {carry})"
+        );
+    }
     let _ = std::fs::remove_file(path);
 }
 

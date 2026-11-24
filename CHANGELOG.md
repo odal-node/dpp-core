@@ -508,8 +508,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   pads `_sd` to the larger of that count and the number hidden, with no bucket, and an object
   that could hide a member and hides none still gets an `_sd` array, of decoys alone, which
   RFC 9901 section 10.4 asks for where a claim may be absent. `sd_jwt_vc::issue` asks the
-  policy for each object it conceals in, and writes `_sd_alg` wherever it wrote an `_sd`.
-  `conceal` is `conceal_to` with a count of zero, so a caller that states none keeps the bucket
+  policy for each object it conceals in, and writes `_sd_alg` once, at the root of the JWT,
+  when any object carries an `_sd`. `conceal` is `conceal_to` with a count of zero, so a caller that states none keeps the bucket
   of eight, as does `jose::disclose`. The count at the root of `productGroupData` is an upper
   bound: the schema walk records a shared definition's properties as bare names too, so some
   are counted that no passport can hold there, which costs decoys and hides nothing less. What

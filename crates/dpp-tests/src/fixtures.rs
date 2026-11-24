@@ -231,9 +231,64 @@ pub fn passport_with(
     passport
 }
 
+/// The published schema of a product group at a version, as JSON.
+///
+/// # Panics
+///
+/// If the group has no schema at that version.
+pub fn schema_for(key: &str, version: &str) -> serde_json::Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../dpp-domain/schemas")
+        .join(key)
+        .join(format!("v{version}.json"));
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("no schema for '{key}' at {version}: {e}"));
+    serde_json::from_str(&raw).expect("a schema is JSON")
+}
+
+/// `node` with a `$ref` into the schema's own definitions followed.
+fn resolved<'a>(
+    schema: &'a serde_json::Value,
+    node: &'a serde_json::Value,
+) -> &'a serde_json::Value {
+    node.get("$ref")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|reference| reference.strip_prefix('#'))
+        .and_then(|pointer| schema.pointer(pointer))
+        .unwrap_or(node)
+}
+
+/// For each step of `parents`, from the root of the data, whether the schema types that
+/// member as an array. A step the schema does not describe is taken as an object.
+fn parent_kinds<'a>(schema: &serde_json::Value, parents: &[&'a str]) -> Vec<(&'a str, bool)> {
+    let mut node = Some(resolved(schema, schema));
+    parents
+        .iter()
+        .map(|name| {
+            node = node.and_then(|parent| {
+                let parent = resolved(schema, parent);
+                // The elements of an array sit at the array's own path.
+                let parent = parent.get("items").map_or(parent, |i| resolved(schema, i));
+                parent
+                    .get("properties")
+                    .and_then(|properties| properties.get(*name))
+                    .map(|member| resolved(schema, member))
+            });
+            let array = node.is_some_and(|member| match member.get("type") {
+                Some(serde_json::Value::String(kind)) => kind == "array",
+                Some(serde_json::Value::Array(kinds)) => kinds.iter().any(|k| k == "array"),
+                _ => member.get("items").is_some(),
+            });
+            (*name, array)
+        })
+        .collect()
+}
+
 /// `data` with the members `policy` classes above `Public`, each where its key puts it:
 /// `usageHistory.recordedAt` is `recordedAt` of the object at `usageHistory`, made if
-/// the fixture has none, and of every object of an array that holds it.
+/// the fixture has none, and of every object of an array that holds it. A parent the
+/// fixture lacks is made as the schema types it, so a member of an array's elements sits
+/// in an array of one object, as a passport carries it.
 ///
 /// With `carry` every such member is there. Without it the objects that would hold them
 /// are there with one member of no class instead, so the two shapes differ in nothing
@@ -243,6 +298,7 @@ pub fn passport_with(
 /// A member already in `data` is kept as it is.
 pub fn with_restricted_members(
     mut data: serde_json::Value,
+    schema: &serde_json::Value,
     policy: &dpp_domain::access::ProductGroupAccessPolicy,
     carry: bool,
 ) -> serde_json::Value {
@@ -256,12 +312,13 @@ pub fn with_restricted_members(
     for key in keys {
         let mut segments: Vec<&str> = key.split('.').collect();
         let leaf = segments.pop().expect("a key has a leaf");
-        place_member(&mut data, &segments, leaf, carry);
+        let parents = parent_kinds(schema, &segments);
+        place_member(&mut data, &parents, leaf, carry);
     }
     data
 }
 
-fn place_member(node: &mut serde_json::Value, parents: &[&str], leaf: &str, carry: bool) {
+fn place_member(node: &mut serde_json::Value, parents: &[(&str, bool)], leaf: &str, carry: bool) {
     use serde_json::{Value, json};
     match node {
         Value::Array(items) => {
@@ -270,8 +327,10 @@ fn place_member(node: &mut serde_json::Value, parents: &[&str], leaf: &str, carr
             }
         }
         Value::Object(map) => match parents.split_first() {
-            Some((first, rest)) => {
-                let child = map.entry((*first).to_owned()).or_insert_with(|| json!({}));
+            Some(((first, array), rest)) => {
+                let child = map
+                    .entry((*first).to_owned())
+                    .or_insert_with(|| if *array { json!([{}]) } else { json!({}) });
                 place_member(child, rest, leaf, carry);
             }
             None if carry => {

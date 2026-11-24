@@ -61,15 +61,51 @@ fn a_bare_name_is_not_counted_below_the_root_and_a_dotted_key_not_by_suffix() {
 fn a_path_is_matched_the_way_the_policy_matches_names() {
     let policy = policy(&[
         ("usageHistory.recordedAt", Disclosure::Individual),
-        ("usageHistory.recorded_at", Disclosure::Individual),
+        ("usage_history.recordedAt", Disclosure::Individual),
         ("usageHistory.note", Disclosure::Public),
     ]);
 
     assert_eq!(
         at(&policy, &["usage_history"]),
         1,
-        "recordedAt and recorded_at are one member, and a public one is not counted"
+        "one member written through two spellings of its parent, and a public one is not counted"
     );
+}
+
+/// A policy lookup reads `recordedAt` and `recorded_at` as one name, but a document holds
+/// them as two members and the issuer hides both. One count for the two would leave the
+/// object that holds both a digest longer than the object that holds neither.
+#[test]
+fn two_spellings_of_a_name_are_two_members() {
+    let policy = policy(&[
+        ("usageHistory.recordedAt", Disclosure::Individual),
+        ("usageHistory.recorded_at", Disclosure::Individual),
+    ]);
+
+    assert_eq!(at(&policy, &["usageHistory"]), 2);
+}
+
+/// The issuer hides a member by what `disclosure_for_path` says, and that raises a
+/// universal conformity field above the class a schema gave it, at any depth.
+#[test]
+fn a_member_the_conformity_floor_raises_is_counted() {
+    let policy = policy(&[
+        ("container.secret", Disclosure::Restricted),
+        ("container.jwsSignature", Disclosure::Public),
+        ("container.note", Disclosure::Public),
+        ("jwsSignature", Disclosure::Public),
+    ]);
+
+    assert_eq!(
+        policy.disclosure_for_path(
+            &["container", "jwsSignature"],
+            DocumentScope::ProductGroupData
+        ),
+        Disclosure::Conformity,
+        "the premise: the issuer hides it"
+    );
+    assert_eq!(at(&policy, &["container"]), 2, "secret and jwsSignature");
+    assert_eq!(at(&policy, &[]), 1, "the bare jwsSignature, raised as well");
 }
 
 #[test]

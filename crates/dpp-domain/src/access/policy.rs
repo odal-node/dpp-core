@@ -839,42 +839,46 @@ impl ProductGroupAccessPolicy {
     /// definition is counted there as well as where the definition is used. A count
     /// above the number a passport can hold costs decoys, and hides nothing less.
     ///
+    /// # Counted at the class the issuer hides it at
+    ///
+    /// The keys say which members an object can hold, and not which of them are hidden:
+    /// that is [`Self::disclosure_for_path`], the lookup the issuer makes for each member
+    /// it meets, and it raises a universal conformity field such as `jwsSignature` above
+    /// whatever class a schema gave it, at any depth. A member counts when that lookup
+    /// puts it above `Public`, so a schema that declares `container.jwsSignature` public
+    /// still has it counted, and the count cannot fall below what the issuer hides.
+    ///
+    /// Members are counted by the name a key writes. `recordedAt` and `recorded_at` are
+    /// two members of a document, and an issuer hides both when both are there, even
+    /// though a policy lookup treats them as one name. Counting both overshoots for a
+    /// document that uses one spelling, which costs a decoy and hides nothing less.
+    ///
     /// # What `0` means
     ///
     /// `0` says the policy names no such member at this position, and it also says it
     /// cannot tell: a policy that classes unlisted fields above `Public` has no limit to
     /// count, and a position the schema does not describe, such as the entries of a map,
     /// has no keys. A caller treats `0` as "no count" and falls back to a bucket.
-    /// Members are counted once however their names are spelled, as policy lookups
-    /// treat `recordedAt` and `recorded_at` as one.
     #[must_use]
     pub fn concealable_members(&self, path: &[&str], scope: DocumentScope) -> usize {
         if self.default_disclosure != Disclosure::Public {
             return 0;
         }
-        let mut names: Vec<String> = Vec::new();
-        let mut count = |leaf: &str| {
-            let name = normalized(leaf);
-            if !names.contains(&name) {
-                names.push(name);
-            }
-        };
 
+        // The names the policy writes for this position, whatever class it gives them.
+        let mut names: Vec<&str> = Vec::new();
         match scope {
             DocumentScope::Envelope if path.is_empty() => {
-                for (key, class) in &self.envelope_disclosure {
-                    let opened = self
-                        .public_envelope_fields
-                        .iter()
-                        .any(|field| keys_match_normalized(field, key));
-                    if *class != Disclosure::Public && !key.contains('.') && !opened {
-                        count(key);
-                    }
-                }
+                names.extend(
+                    self.envelope_disclosure
+                        .keys()
+                        .filter(|key| !key.contains('.'))
+                        .map(String::as_str),
+                );
             }
             DocumentScope::Envelope => {}
             DocumentScope::ProductGroupData => {
-                for (key, class) in &self.field_disclosure {
+                for key in self.field_disclosure.keys() {
                     let mut segments: Vec<&str> = key.split('.').collect();
                     let Some(leaf) = segments.pop() else { continue };
                     let here = segments.len() == path.len()
@@ -882,21 +886,22 @@ impl ProductGroupAccessPolicy {
                             .iter()
                             .zip(path)
                             .all(|(segment, step)| keys_match_normalized(segment, step));
-                    if *class != Disclosure::Public && here {
-                        count(leaf);
+                    if here {
+                        names.push(leaf);
                     }
                 }
             }
         }
-        names.len()
-    }
-}
+        names.sort_unstable();
+        names.dedup();
 
-/// `name` with what [`keys_match_normalized`] ignores dropped, for comparing it as a
-/// stored value: ASCII alphanumerics only, folded to lower case.
-fn normalized(name: &str) -> String {
-    name.chars()
-        .filter(char::is_ascii_alphanumeric)
-        .map(|c| c.to_ascii_lowercase())
-        .collect()
+        names
+            .into_iter()
+            .filter(|name| {
+                let mut member = path.to_vec();
+                member.push(name);
+                self.disclosure_for_path(&member, scope) != Disclosure::Public
+            })
+            .count()
+    }
 }

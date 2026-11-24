@@ -59,8 +59,8 @@ use dpp_crypto::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt, holder_key_confirm
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::{ProductGroup, ProductGroupCatalog};
 use dpp_tests::fixtures::{
-    passport_with, schema_compat_fixture as fixture_for, with_restricted_envelope_members,
-    with_restricted_members,
+    passport_with, schema_compat_fixture as fixture_for, schema_for,
+    with_restricted_envelope_members, with_restricted_members,
 };
 use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, SdJwtVcError, issue, vct_for, verify};
 use serde_json::{Map, Number, Value, json};
@@ -318,7 +318,12 @@ fn corpus(issuer: &Issuer) -> Vec<Value> {
         // The fixtures above hold no restricted product group data, so these are the cases
         // that carry `_sd` arrays below the root, for both libraries to read.
         for (name, carry) in [("shape-full", true), ("shape-empty", false)] {
-            let data = with_restricted_members(fixture_for(key, version), &policy, carry);
+            let data = with_restricted_members(
+                fixture_for(key, version),
+                &schema_for(key, version),
+                &policy,
+                carry,
+            );
             let mut shaped = passport_with(&group, version, data);
             with_restricted_envelope_members(&mut shaped, &policy, carry);
             let credential = issue_for(issuer, &shaped, &policy, &vct, false);

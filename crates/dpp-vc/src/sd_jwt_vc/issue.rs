@@ -194,8 +194,9 @@ pub fn issue(
     )?;
     claims.insert(PASSPORT_CLAIM.to_owned(), Value::Object(concealed));
 
-    // `_sd_alg` goes where an `_sd` array does. An object that could hide a member and
-    // hides none carries decoys alone, so the disclosures are not the test.
+    // `_sd_alg` goes once, at the root, when any object carries an `_sd` array. An object
+    // that could hide a member and hides none carries decoys alone, so the disclosures
+    // are not the test.
     let carries_sd = claims.values().any(carries_sd);
     let jwt_payload = build_payload(claims, carries_sd);
     // The `kid` is the key's thumbprint URI, which is the `kid` of its entry in
