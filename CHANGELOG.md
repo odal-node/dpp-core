@@ -210,7 +210,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   shape of a chain. A host tells the two apart by the variant, where it had to recognise the
   wording of a `serde` error. `Deserialize` is unchanged, so every existing reader still
   refuses an invalid chain. The argument is borrowed, so a chain embedded in a larger
-  document is read in place.
+  document is read in place. (#630)
 - **`dpp_crypto::keystore::KeyBackend`: where signing keys live.** A trait of `load_key`,
   `public_key`, `archived_public_keys`, `list`, `generate_key_with` and `rotate`, with
   `generate_key`, `rotate_key`, `rotate_key_to`, `revoke_and_rotate` and `has_key` provided.
