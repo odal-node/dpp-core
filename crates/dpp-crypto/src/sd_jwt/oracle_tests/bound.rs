@@ -355,6 +355,13 @@ pub(super) fn cases(issuer: &Issuer, now: i64) -> Vec<Bound> {
             header_with("typ", json!("application/kb+jwt")),
             claims.clone(),
         ),
+        (
+            "edge/typ-in-capitals",
+            "RFC 7515 clause 4.1.9 and RFC 2045 clause 5.1: media types compare without regard to case",
+            &key,
+            header_with("typ", json!("Application/KB+JWT")),
+            claims.clone(),
+        ),
     ] {
         add(&mut out, id, clause, bind(&base, signer, &h, &c));
     }
