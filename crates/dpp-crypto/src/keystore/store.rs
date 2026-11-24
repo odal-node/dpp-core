@@ -18,7 +18,7 @@ use super::crypto::{
 };
 use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
 use super::lock::StoreLock;
-use super::rotation::ARCHIVE_MARKER;
+use super::rotation::{ARCHIVE_MARKER, check_key_id};
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
 
@@ -489,8 +489,10 @@ impl KeyStore {
     /// Generate a key of `algorithm` under `key_id`, replacing any key there.
     ///
     /// # Errors
-    /// When the store still needs migration, or cannot be written.
+    /// When `key_id` contains `#archived-`, which is how a rotation names an archived
+    /// key, when the store still needs migration, or when it cannot be written.
     pub fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        check_key_id(key_id)?;
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \

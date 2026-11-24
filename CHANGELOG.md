@@ -26,7 +26,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   returns `SignError`, which is `Revoked(KeyRevoked)`, the error it returned before, or
   `Backend(String)`, a signer that failed. `CoseError` and `SdJwtError` gain
   `Signing(String)` for the second, and `jws::sign_typed_with` still returns a revoked
-  key's own `KeyRevoked`, so `downcast_ref::<KeyRevoked>()` keeps working. (#646)
+  key's own `KeyRevoked`, so `downcast_ref::<KeyRevoked>()` keeps working.
+  `KeyStore::generate_key_with` and the rotations now refuse a key id that contains
+  `#archived-`, which is how an archived key is named: a current key by that name was left
+  out of the listing and read as an archive of another key. (#646)
 
 - **Verification takes a `PublicKey`, not base64 text.**
   `jws::verifier::verify_jws` takes `&PublicKey`, a validated key that carries the

@@ -47,6 +47,8 @@ mod lock;
 mod lock_tests;
 #[cfg(any(test, feature = "test-utils"))]
 mod memory;
+#[cfg(test)]
+mod memory_tests;
 mod migration;
 #[cfg(test)]
 mod persist_tests;

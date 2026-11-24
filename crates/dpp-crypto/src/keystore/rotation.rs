@@ -27,6 +27,23 @@ pub(super) fn archived_key_name(key_id: &str) -> String {
 /// an archive of `key_id`.
 pub(super) const ARCHIVE_MARKER: &str = "#archived-";
 
+/// Refuse a key id that could be read as an archive.
+///
+/// An archived record is told from a current one by [`ARCHIVE_MARKER`] in its key, so a
+/// current key named with it would be left out of `list` and returned as a predecessor of
+/// the key whose id it begins with. Every path that records a current key checks this first.
+///
+/// # Errors
+/// When `key_id` contains [`ARCHIVE_MARKER`].
+pub(super) fn check_key_id(key_id: &str) -> Result<()> {
+    anyhow::ensure!(
+        !key_id.contains(ARCHIVE_MARKER),
+        "key id {key_id:?} cannot contain `{ARCHIVE_MARKER}`: a rotation names an archived \
+         key that way, and a current key with that name would be read as an archive"
+    );
+    Ok(())
+}
+
 /// The algorithm a rotation of `key_id` keeps: the current record's, or the
 /// default when the key has no record yet.
 fn algorithm_of(map: &KeyRecordMap, key_id: &str) -> KeyAlgorithm {
@@ -93,6 +110,7 @@ impl KeyStore {
         revoke_old: bool,
         algorithm: Option<KeyAlgorithm>,
     ) -> Result<KeyEntry> {
+        check_key_id(key_id)?;
         if *self.needs_migration.read().expect("lock") {
             anyhow::bail!(
                 "key store requires KDF migration before writes are allowed — \

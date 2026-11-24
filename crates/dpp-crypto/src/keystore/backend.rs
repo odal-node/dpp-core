@@ -17,6 +17,11 @@ use crate::jws::algorithm::KeyAlgorithm;
 /// leaving it can be another. A backend names its keys by an id, and under each id it
 /// keeps a **current** key and the **archived** predecessors a rotation left behind.
 ///
+/// An id cannot contain `#archived-`. The file store names an archived record that way, so
+/// a current key with it would be left out of [`list`](Self::list) and read as a
+/// predecessor of another key. [`generate_key_with`](Self::generate_key_with) and
+/// [`rotate`](Self::rotate) refuse such an id, in every backend.
+///
 /// # What a caller gets
 ///
 /// [`load_key`](Self::load_key) returns a [`KeyEntry`], which signs and reports its own
@@ -82,7 +87,7 @@ pub trait KeyBackend: Send + Sync {
     ///
     /// # Errors
     ///
-    /// When the backend cannot generate or record the key.
+    /// When `key_id` contains `#archived-`, or the backend cannot generate or record the key.
     fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry>;
 
     /// Archive the current key under `key_id` and install a fresh one, in one step, and
@@ -102,7 +107,8 @@ pub trait KeyBackend: Send + Sync {
     ///
     /// # Errors
     ///
-    /// When the backend cannot generate or record the new key. The old state is kept.
+    /// When `key_id` contains `#archived-`, or the backend cannot generate or record the
+    /// new key. The old state is kept.
     fn rotate(
         &self,
         key_id: &str,
@@ -187,8 +193,26 @@ impl<T: KeyBackend + ?Sized> KeyBackend for Arc<T> {
         (**self).rotate(key_id, revoke_old, algorithm)
     }
 
+    // The provided methods are forwarded too, and not left to their defaults: a backend
+    // may override any of them, and a call through an `Arc` must reach the override.
     fn has_key(&self, key_id: &str) -> bool {
         (**self).has_key(key_id)
+    }
+
+    fn generate_key(&self, key_id: &str) -> Result<KeyEntry> {
+        (**self).generate_key(key_id)
+    }
+
+    fn rotate_key(&self, key_id: &str) -> Result<KeyEntry> {
+        (**self).rotate_key(key_id)
+    }
+
+    fn rotate_key_to(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        (**self).rotate_key_to(key_id, algorithm)
+    }
+
+    fn revoke_and_rotate(&self, key_id: &str) -> Result<KeyEntry> {
+        (**self).revoke_and_rotate(key_id)
     }
 }
 

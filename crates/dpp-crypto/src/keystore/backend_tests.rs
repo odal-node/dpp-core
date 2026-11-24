@@ -4,9 +4,13 @@
 //! passes it has the behaviour the signers and the key-set builders rely on. The file
 //! store and the in-memory store are listed at the bottom, and a new backend is one line.
 
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use anyhow::Result;
 use serde_json::json;
 
-use super::{KeyBackend, KeyStore, MemoryKeyStore};
+use super::{KeyBackend, KeyEntry, KeyStore, MemoryKeyStore, PublicKeyInfo};
 use crate::jws::algorithm::KeyAlgorithm;
 
 const EVERY_ALGORITHM: [KeyAlgorithm; 4] = [
@@ -16,8 +20,24 @@ const EVERY_ALGORITHM: [KeyAlgorithm; 4] = [
     KeyAlgorithm::EcdsaP521,
 ];
 
-fn file_store() -> KeyStore {
-    crate::test_support::open_empty_store(&crate::test_support::temp_path("backend-contract"))
+/// A directory removed when it drops, with the store file and the lock file beside it.
+struct TempDir(PathBuf);
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        // Best effort: a test that leaves a directory behind has still passed or failed.
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// A file store in a directory of its own, and the directory's owner. Bind them in that
+/// order: the store drops first, so its lock is released before the directory goes, and
+/// both drop when a scenario panics.
+fn file_store() -> (TempDir, KeyStore) {
+    let dir = crate::test_support::temp_dir("backend-contract");
+    std::fs::create_dir_all(&dir).expect("make the directory");
+    let store = crate::test_support::open_empty_store(&dir.join("keys.json"));
+    (TempDir(dir), store)
 }
 
 mod scenarios {
@@ -173,6 +193,37 @@ mod scenarios {
         assert!(backend.archived_public_keys("k").is_empty());
     }
 
+    /// An id that carries the archive marker is refused where a key is recorded, so no
+    /// current key is ever read as an archive: not left out of the list, and not returned
+    /// as a predecessor of the key whose id it begins with.
+    pub(super) fn a_key_id_cannot_pose_as_an_archive(backend: &dyn KeyBackend) {
+        backend.generate_key("issuer").expect("generate");
+        backend.rotate_key("issuer").expect("rotate");
+
+        for id in ["issuer#archived-manual", "#archived-", "other#archived-x"] {
+            let refused = [
+                backend.generate_key(id),
+                backend.generate_key_with(id, KeyAlgorithm::EcdsaP256),
+                backend.rotate_key(id),
+                backend.revoke_and_rotate(id),
+            ];
+            for result in refused {
+                let message = result.err().map(|e| e.to_string()).unwrap_or_default();
+                assert!(message.contains("#archived-"), "{id}: {message:?}");
+            }
+            assert!(!backend.has_key(id), "{id} was not recorded");
+        }
+
+        let listed = backend.list().expect("list");
+        assert_eq!(listed.len(), 1, "only the current key");
+        assert_eq!(listed[0].0, "issuer");
+        assert_eq!(
+            backend.archived_public_keys("issuer").len(),
+            1,
+            "only the archive a rotation made"
+        );
+    }
+
     pub(super) fn the_list_names_the_current_keys_by_id(backend: &dyn KeyBackend) {
         backend
             .generate_key_with("b", KeyAlgorithm::EcdsaP384)
@@ -200,58 +251,156 @@ macro_rules! contract_on {
         mod $backend {
             use super::*;
 
+            /// Run `scenario` on a fresh backend. The owner is declared first, so it drops last.
+            fn each(scenario: fn(&dyn KeyBackend)) {
+                let (_owner, backend) = $make;
+                scenario(&backend);
+            }
+
             #[test]
             fn every_algorithm_signs_and_verifies() {
-                scenarios::every_algorithm_signs_and_verifies(&$make);
+                each(scenarios::every_algorithm_signs_and_verifies);
             }
 
             #[test]
             fn an_unknown_key_is_not_there() {
-                scenarios::an_unknown_key_is_not_there(&$make);
+                each(scenarios::an_unknown_key_is_not_there);
             }
 
             #[test]
             fn the_key_loaded_is_the_key_published() {
-                scenarios::the_key_loaded_is_the_key_published(&$make);
+                each(scenarios::the_key_loaded_is_the_key_published);
             }
 
             #[test]
             fn an_entry_stays_the_key_it_was_loaded_as() {
-                scenarios::an_entry_stays_the_key_it_was_loaded_as(&$make);
+                each(scenarios::an_entry_stays_the_key_it_was_loaded_as);
             }
 
             #[test]
             fn a_rotation_archives_the_old_key_and_installs_a_new_one() {
-                scenarios::a_rotation_archives_the_old_key_and_installs_a_new_one(&$make);
+                each(scenarios::a_rotation_archives_the_old_key_and_installs_a_new_one);
             }
 
             #[test]
             fn archives_come_oldest_first() {
-                scenarios::archives_come_oldest_first(&$make);
+                each(scenarios::archives_come_oldest_first);
             }
 
             #[test]
             fn a_rotation_keeps_the_algorithm_unless_told_otherwise() {
-                scenarios::a_rotation_keeps_the_algorithm_unless_told_otherwise(&$make);
+                each(scenarios::a_rotation_keeps_the_algorithm_unless_told_otherwise);
             }
 
             #[test]
             fn a_compromise_archives_the_old_key_revoked() {
-                scenarios::a_compromise_archives_the_old_key_revoked(&$make);
+                each(scenarios::a_compromise_archives_the_old_key_revoked);
             }
 
             #[test]
             fn generating_replaces_and_archives_nothing() {
-                scenarios::generating_replaces_and_archives_nothing(&$make);
+                each(scenarios::generating_replaces_and_archives_nothing);
+            }
+
+            #[test]
+            fn a_key_id_cannot_pose_as_an_archive() {
+                each(scenarios::a_key_id_cannot_pose_as_an_archive);
             }
 
             #[test]
             fn the_list_names_the_current_keys_by_id() {
-                scenarios::the_list_names_the_current_keys_by_id(&$make);
+                each(scenarios::the_list_names_the_current_keys_by_id);
             }
         }
     };
 }
 
 contract_on!(file_backend, file_store());
-contract_on!(memory_backend, MemoryKeyStore::new());
+contract_on!(memory_backend, ((), MemoryKeyStore::new()));
+
+/// A backend that overrides every method the trait provides, and refuses through each.
+struct Overriding(MemoryKeyStore);
+
+impl KeyBackend for Overriding {
+    fn load_key(&self, key_id: &str) -> Result<KeyEntry> {
+        self.0.load_key(key_id)
+    }
+
+    fn public_key(&self, key_id: &str) -> Option<PublicKeyInfo> {
+        self.0.public_key(key_id)
+    }
+
+    fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
+        self.0.archived_public_keys(key_id)
+    }
+
+    fn list(&self) -> Result<Vec<(String, PublicKeyInfo)>> {
+        self.0.list()
+    }
+
+    fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        self.0.generate_key_with(key_id, algorithm)
+    }
+
+    fn rotate(
+        &self,
+        key_id: &str,
+        revoke_old: bool,
+        algorithm: Option<KeyAlgorithm>,
+    ) -> Result<KeyEntry> {
+        self.0.rotate(key_id, revoke_old, algorithm)
+    }
+
+    fn has_key(&self, _key_id: &str) -> bool {
+        true
+    }
+
+    fn generate_key(&self, _key_id: &str) -> Result<KeyEntry> {
+        anyhow::bail!("overridden generate_key")
+    }
+
+    fn rotate_key(&self, _key_id: &str) -> Result<KeyEntry> {
+        anyhow::bail!("overridden rotate_key")
+    }
+
+    fn rotate_key_to(&self, _key_id: &str, _algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        anyhow::bail!("overridden rotate_key_to")
+    }
+
+    fn revoke_and_rotate(&self, _key_id: &str) -> Result<KeyEntry> {
+        anyhow::bail!("overridden revoke_and_rotate")
+    }
+}
+
+/// What a backend overrides is reached through an `Arc` as it is directly. The `Arc`
+/// forwards every method, the provided ones included, and does not fall back to their
+/// defaults.
+#[test]
+fn an_arc_reaches_what_a_backend_overrides() {
+    let direct = Overriding(MemoryKeyStore::new());
+    let shared: Arc<dyn KeyBackend> = Arc::new(Overriding(MemoryKeyStore::new()));
+
+    for (how, backend) in [
+        ("directly", &direct as &dyn KeyBackend),
+        ("in an Arc", &shared),
+    ] {
+        assert!(backend.has_key("absent"), "{how}: has_key");
+        let refused = [
+            ("generate_key", backend.generate_key("k")),
+            ("rotate_key", backend.rotate_key("k")),
+            (
+                "rotate_key_to",
+                backend.rotate_key_to("k", KeyAlgorithm::Ed25519),
+            ),
+            ("revoke_and_rotate", backend.revoke_and_rotate("k")),
+        ];
+        for (name, result) in refused {
+            let message = result.err().map(|e| e.to_string());
+            assert_eq!(
+                message.as_deref(),
+                Some(format!("overridden {name}").as_str()),
+                "{how}: {name}"
+            );
+        }
+    }
+}

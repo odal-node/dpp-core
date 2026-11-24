@@ -1,14 +1,14 @@
 //! [`MemoryKeyStore`], a [`KeyBackend`] that holds its keys in memory.
 
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use anyhow::Result;
 use zeroize::Zeroizing;
 
 use super::backend::KeyBackend;
 use super::entry::{KeyEntry, SigningMaterial, fingerprint_of};
-use super::rotation::{ARCHIVE_MARKER, archived_key_name};
+use super::rotation::{ARCHIVE_MARKER, archived_key_name, check_key_id};
 use super::store::{PublicKeyInfo, default_algorithm};
 use crate::jws::algorithm::KeyAlgorithm;
 use crate::jws::public_key::PublicKey;
@@ -76,24 +76,45 @@ impl MemoryKeyStore {
     pub fn new() -> Self {
         Self::default()
     }
+
+    // A poisoned lock is recovered and not turned into a panic or an error. Each method
+    // changes the map only after the one step that can fail, so a thread that panicked
+    // while it held the lock left the map as it was, and the next caller can use it.
+    fn read(&self) -> RwLockReadGuard<'_, HashMap<String, Record>> {
+        self.records.read().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn write(&self) -> RwLockWriteGuard<'_, HashMap<String, Record>> {
+        self.records.write().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Poison the lock, as a thread that panics while it holds it does.
+    #[cfg(test)]
+    pub(super) fn poison_for_test(&self) {
+        let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _held = self.records.write().unwrap_or_else(PoisonError::into_inner);
+            panic!("a thread panicked while it held the lock");
+        }));
+        assert!(poisoned.is_err());
+    }
 }
 
 impl KeyBackend for MemoryKeyStore {
     fn load_key(&self, key_id: &str) -> Result<KeyEntry> {
-        let map = self.records.read().expect("key store read lock poisoned");
+        let map = self.read();
         map.get(key_id)
             .ok_or_else(|| anyhow::anyhow!("no key found for {key_id}"))?
             .entry()
     }
 
     fn public_key(&self, key_id: &str) -> Option<PublicKeyInfo> {
-        let map = self.records.read().expect("key store read lock poisoned");
+        let map = self.read();
         map.get(key_id).map(Record::info)
     }
 
     fn archived_public_keys(&self, key_id: &str) -> Vec<PublicKeyInfo> {
         let prefix = format!("{key_id}{ARCHIVE_MARKER}");
-        let map = self.records.read().expect("key store read lock poisoned");
+        let map = self.read();
         let mut archived: Vec<(&String, &Record)> = map
             .iter()
             .filter(|(name, _)| name.starts_with(&prefix))
@@ -107,7 +128,7 @@ impl KeyBackend for MemoryKeyStore {
     }
 
     fn list(&self) -> Result<Vec<(String, PublicKeyInfo)>> {
-        let map = self.records.read().expect("key store read lock poisoned");
+        let map = self.read();
         let mut keys: Vec<(String, PublicKeyInfo)> = map
             .iter()
             .filter(|(name, _)| !name.contains(ARCHIVE_MARKER))
@@ -118,8 +139,9 @@ impl KeyBackend for MemoryKeyStore {
     }
 
     fn generate_key_with(&self, key_id: &str, algorithm: KeyAlgorithm) -> Result<KeyEntry> {
+        check_key_id(key_id)?;
         let (record, entry) = Record::generate(algorithm);
-        let mut map = self.records.write().expect("key store write lock poisoned");
+        let mut map = self.write();
         map.insert(key_id.to_owned(), record);
         Ok(entry)
     }
@@ -130,7 +152,8 @@ impl KeyBackend for MemoryKeyStore {
         revoke_old: bool,
         algorithm: Option<KeyAlgorithm>,
     ) -> Result<KeyEntry> {
-        let mut map = self.records.write().expect("key store write lock poisoned");
+        check_key_id(key_id)?;
+        let mut map = self.write();
         let algorithm = algorithm.unwrap_or_else(|| {
             map.get(key_id)
                 .map_or_else(default_algorithm, |record| record.algorithm)
