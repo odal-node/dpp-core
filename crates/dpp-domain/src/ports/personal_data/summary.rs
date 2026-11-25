@@ -1,4 +1,4 @@
-//! [`HeldSummary`] — what a listing says about a held record, without its data.
+//! [`HeldSummary`]: what a listing says about a held record, without its data.
 
 use chrono::{DateTime, Utc};
 
