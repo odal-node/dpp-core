@@ -26,8 +26,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   returns `SignError`, which is `Revoked(KeyRevoked)`, the error it returned before, or
   `Backend(String)`, a signer that failed. `CoseError` and `SdJwtError` gain
   `Signing(String)` for the second, and `jws::sign_typed_with` still returns a revoked
-  key's own `KeyRevoked`, so `downcast_ref::<KeyRevoked>()` keeps working.
-  `KeyStore::generate_key_with` and the rotations now refuse a key id that contains
+  key's own `KeyRevoked`, so `downcast_ref::<KeyRevoked>()` keeps working. `KeyEntry` and
+  `LocalIdentityService` now hold a trait object, so neither is `UnwindSafe` or
+  `RefUnwindSafe` any more, and a caller that moves one into `catch_unwind` has to wrap it in
+  `AssertUnwindSafe`. `KeyStore::generate_key_with` and the rotations now refuse a key id that contains
   `#archived-`, which is how an archived key is named: a current key by that name was left
   out of the listing and read as an archive of another key. (#646)
 
@@ -47,10 +49,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Before, such a token resolved to the key and was refused by `verify_jws`. Treat
   `None` as the answer for those tokens. (#586)
 
-- **Invalid keys are refused where they are read.** `PublicKeyInfo::thumbprint_uri`,
-  `build_did_document` and the SD-JWT VC issuer metadata now refuse a recorded public
-  key that is not an Ed25519 point, with an error, where they derived an identifier
-  from its bytes before. A Holder key in `cnf` that is not a point is refused as
+- **Invalid keys are refused where they are read.** `PublicKeyInfo::thumbprint_uri` and
+  `build_did_document` now refuse a recorded public key that is not a point on its curve,
+  with an error, where they derived an identifier from its bytes before, and
+  `build_issuer_metadata` leaves such a key out of the set it publishes, and returns
+  `None` when the current key is one. A Holder key in `cnf` that is not a point is refused as
   `SdJwtError::UnsupportedHolderKey`, where it was refused as `HolderKeyMismatch` or
   as a bad signature before. Keys a store generates are always points, so no stored
   key is affected unless the store was edited by hand. Migration: none. (#586)
@@ -150,9 +153,9 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the CWT claims, whose times are floating-point numbers, so it is `PartialEq` and no longer
   `Eq`. (#633)
 
-- **A revoked key signs nothing.** `KeyEntry::sign` returns `Result<Vec<u8>, KeyRevoked>`
-  and refuses a key whose `revoked` flag is set, with an error that names its fingerprint and
-  `KeyStore::revoke_and_rotate`. Every signature `dpp-crypto` makes passes through it, so
+- **A revoked key signs nothing.** `KeyEntry::sign` refuses a key whose `revoked` flag is
+  set, with a `KeyRevoked` that names its fingerprint and `KeyStore::revoke_and_rotate`,
+  returned as `SignError::Revoked` (see the entry on `KeyBackend`). Every signature `dpp-crypto` makes passes through it, so
   `jws::sign`, `jws::sign_typed`, `jws::sign_typed_with`, `cose::sign_sign1`
   (`CoseError::KeyRevoked`) and `SdJwt::present_with_key_binding` (`SdJwtError::KeyRevoked`)
   refuse one too, and so do the `dpp-vc` signers built on them; `jws::verify` refuses to
@@ -200,6 +203,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a path is refused when it is opened. The lock file stays in place after the handle is dropped. A build
   older than this one takes no lock, so it can still open the file beside a newer build and
   save over it: never run one against a file a newer build has open. (#624)
+
+- **`dpp_registry::EuRegistryErrorKind` is `Copy`.** It derives `Copy` beside `Clone`, so a
+  non-`move` closure that used a value of it now captures it by reference where it moved
+  it. Migration: none for code that does not depend on the move. (#663)
 
 ### Added
 
@@ -457,7 +464,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `cose-oracle.yml`. No conformance is claimed. (#633)
 
 - **`dpp_crypto::cose` reads the CWT Claims header parameter** (label 15, RFC 9597) from the
-  protected header, and `VerifiedSign1::cwt_claims` returns `iss`, `sub`, `aud`, `exp`, `nbf`
+  protected header, and `VerifiedSign1::cwt_claims` carries `iss`, `sub`, `aud`, `exp`, `nbf`
   and `iat` as `CwtClaims` (RFC 8392 §4). The parameter is refused in the unprotected header
   (`CoseError::CwtClaimsNotProtected`), since RFC 9597 §1 says a recipient "MUST NOT use the
   information in the CWT Claims header parameter beyond the integrity protection or
@@ -535,7 +542,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   repository builds and tests with moves to 1.100.0, the latest stable release,
   and `rust-version` follows it, so CI still enforces the floor every crate's
   README states. The W3C `vc-jose-cose` harness image builds on
-  `rust:1.100.0-slim-bookworm`.
+  `rust:1.100.0-slim-bookworm`. (#667)
 
 - **A verifier no longer holds the `kid` to an absolute URL when there is no `iss`.**
   VC-JOSE-COSE §4.2 opens "When using controlled identifier documents with this
@@ -568,6 +575,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   suite's own presentation (row 7) envelops a `vc+cose` whose base64 has no padding and ends in
   a line feed, and expects success. A `vc+jwt` or `vc+sd-jwt` envelope in `;base64` form is
   read the same way. (#633)
+
+- **The dependencies of the published crates moved, and some were removed.** `serde_jcs`, the
+  RFC 8785 canonicalisation under `jws::canonicalize`, moves from 0.2 to 0.4, and
+  `jsonschema`, which no public item names, from 0.61 to 0.63. `dpp-crypto` no longer
+  depends on `flate2` or `async-trait`, `dpp-domain` on `serde_with`, and `dpp-registry` on
+  `thiserror`. (#663)
 
 ### Fixed
 
