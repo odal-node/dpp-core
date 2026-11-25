@@ -487,6 +487,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   a metric label. A caller that only needs the level no longer has to re-declare the
   three names, nor match a `#[non_exhaustive]` enum with a wildcard. (#672)
 
+- **`PersonalDataPort::summaries_for` lists what is held for a passport without its data.** It
+  returns a `HeldSummary` for each record, present or erased, in the order stored: a present
+  record's identifier, passport, field and storage time, or an erased record's
+  `ErasureReceipt`. It is provided, so existing holders keep compiling. (#682)
+
 ### Changed
 
 - **Concealing pads with decoy digests, so the length of `_sd` does not give the number of

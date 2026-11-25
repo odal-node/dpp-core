@@ -5,6 +5,7 @@ use async_trait::async_trait;
 
 use super::held::HeldRecord;
 use super::receipt::ErasureReceipt;
+use super::summary::HeldSummary;
 use crate::error::DppError;
 use crate::passport::PassportId;
 use crate::personal_data::PersonalDataRecordId;
@@ -47,6 +48,23 @@ pub trait PersonalDataPort: Send + Sync {
     /// failed before writing the statement naming it. A record that no
     /// statement names is personal data held for no purpose.
     async fn records_for(&self, passport_id: PassportId) -> Result<Vec<HeldRecord>, DppError>;
+
+    /// Every record held for a passport, present or erased, in the order they
+    /// were stored, without their data: a [`HeldSummary`] for each.
+    ///
+    /// Finding a record whose identifier was lost needs its passport, its field
+    /// and its state, not its content, and reading the content widens what is
+    /// processed (GDPR Art. 25(2)). The default reads each record through
+    /// [`records_for`](Self::records_for) and drops the data, so a holder that
+    /// can read less overrides this method. The answer is the same either way.
+    async fn summaries_for(&self, passport_id: PassportId) -> Result<Vec<HeldSummary>, DppError> {
+        Ok(self
+            .records_for(passport_id)
+            .await?
+            .iter()
+            .map(HeldSummary::from)
+            .collect())
+    }
 
     /// Erase a record's data, keeping its tombstone.
     ///
