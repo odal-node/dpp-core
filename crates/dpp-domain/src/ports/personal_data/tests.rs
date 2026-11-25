@@ -1,9 +1,10 @@
 //! The personal-data port's contract, held to by its in-memory implementation.
 
+use async_trait::async_trait;
 use serde_json::json;
 
 use super::stub::InMemoryPersonalData;
-use super::{HeldRecord, PersonalDataPort};
+use super::{ErasureReceipt, HeldRecord, HeldSummary, PersonalDataPort};
 use crate::error::DppError;
 use crate::passport::PassportId;
 use crate::personal_data::PersonalDataRecordId;
@@ -204,4 +205,124 @@ fn a_receipt_serialises_camel_case_and_reads_back() {
 
     let back: ErasureReceipt = serde_json::from_value(wire).expect("reads back");
     assert_eq!(back, receipt);
+}
+
+/// Answers the listing itself, and refuses every other read. A call that fell
+/// through to the default `summaries_for` would reach `records_for` and panic.
+struct AnswersItself(HeldSummary);
+
+#[async_trait]
+impl PersonalDataPort for AnswersItself {
+    async fn store(
+        &self,
+        _: PassportId,
+        _: &str,
+        _: &serde_json::Value,
+    ) -> Result<PersonalDataRecordId, DppError> {
+        unreachable!()
+    }
+
+    async fn fetch(&self, _: &PersonalDataRecordId) -> Result<Option<HeldRecord>, DppError> {
+        unreachable!()
+    }
+
+    async fn records_for(&self, _: PassportId) -> Result<Vec<HeldRecord>, DppError> {
+        unreachable!()
+    }
+
+    async fn summaries_for(&self, _: PassportId) -> Result<Vec<HeldSummary>, DppError> {
+        Ok(vec![self.0.clone()])
+    }
+
+    async fn erase(&self, _: &PersonalDataRecordId) -> Result<ErasureReceipt, DppError> {
+        unreachable!()
+    }
+}
+
+/// A listing carries the identifier, passport, field and time a record was
+/// stored, and none of its content.
+#[tokio::test]
+async fn a_present_record_is_summarised_without_its_content() {
+    let port = InMemoryPersonalData::new();
+    let passport = PassportId::new();
+    port.store(passport, FIELD, &json!("sentinel-content-9c1e"))
+        .await
+        .unwrap();
+
+    let held = port.records_for(passport).await.unwrap();
+    let HeldRecord::Present(record) = &held[0] else {
+        panic!("a stored record is present");
+    };
+    let summaries = port.summaries_for(passport).await.unwrap();
+    assert_eq!(
+        summaries,
+        [HeldSummary::Present {
+            record: record.id.clone(),
+            passport_id: record.passport_id,
+            field: record.field.clone(),
+            stored_at: record.stored_at,
+        }]
+    );
+    assert!(
+        !format!("{:?}", summaries[0]).contains("sentinel-content-9c1e"),
+        "the summary carries none of the content"
+    );
+}
+
+#[tokio::test]
+async fn an_erased_record_is_summarised_as_its_receipt() {
+    let port = InMemoryPersonalData::new();
+    let passport = PassportId::new();
+    let id = port.store(passport, FIELD, &json!("x")).await.unwrap();
+    let receipt = port.erase(&id).await.unwrap();
+
+    assert_eq!(
+        port.summaries_for(passport).await.unwrap(),
+        [HeldSummary::Erased(receipt)]
+    );
+}
+
+#[tokio::test]
+async fn summaries_come_in_the_order_stored_for_the_passport_asked_about() {
+    let port = InMemoryPersonalData::new();
+    let passport = PassportId::new();
+    let elsewhere = PassportId::new();
+    let first = port.store(passport, FIELD, &json!("a")).await.unwrap();
+    let other = port.store(elsewhere, FIELD, &json!("b")).await.unwrap();
+    let last = port.store(passport, FIELD, &json!("c")).await.unwrap();
+    let receipt = port.erase(&first).await.unwrap();
+
+    let summaries = port.summaries_for(passport).await.unwrap();
+    assert_eq!(summaries.len(), 2, "only this passport's records");
+    assert_eq!(summaries[0], HeldSummary::Erased(receipt));
+    let HeldSummary::Present { record, .. } = &summaries[1] else {
+        panic!("the record stored second is still present");
+    };
+    assert_eq!(record, &last);
+
+    let theirs = port.summaries_for(elsewhere).await.unwrap();
+    let [HeldSummary::Present { record, .. }] = theirs.as_slice() else {
+        panic!("the other passport's one record is listed alone");
+    };
+    assert_eq!(record, &other);
+}
+
+/// A holder that answers the listing itself is asked for it, through the trait
+/// object the rest of the crate holds.
+#[tokio::test]
+async fn a_holder_that_overrides_the_listing_is_asked_for_it() {
+    use chrono::{TimeZone, Utc};
+
+    let answer = HeldSummary::Present {
+        record: PersonalDataRecordId::new("canned"),
+        passport_id: PassportId::new(),
+        field: FIELD.to_owned(),
+        stored_at: Utc.with_ymd_and_hms(2026, 11, 25, 9, 0, 0).unwrap(),
+    };
+    let holder = AnswersItself(answer.clone());
+    let port: &dyn PersonalDataPort = &holder;
+    assert_eq!(
+        port.summaries_for(PassportId::new()).await.unwrap(),
+        [answer]
+    );
 }

@@ -28,7 +28,8 @@
 //!   record.
 //! - **Nothing held is out of reach.** Every record a passport has can be
 //!   listed, erased ones included, so a record whose identifier was lost on the
-//!   way back from `store` can still be found and erased.
+//!   way back from `store` can still be found and erased. A listing that needs
+//!   no data has its own read, `summaries_for`.
 //! - **Nothing here is part of the passport's other copies.** The back-up copy of
 //!   ESPR Art. 10(4) and the archive of past versions hold the passport, and so
 //!   only the statement. A record lodged with them could not be erased with
@@ -48,6 +49,7 @@ mod receipt;
 mod record;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod stub;
+mod summary;
 #[cfg(test)]
 mod tests;
 
@@ -55,3 +57,4 @@ pub use held::HeldRecord;
 pub use port::PersonalDataPort;
 pub use receipt::ErasureReceipt;
 pub use record::PersonalDataRecord;
+pub use summary::HeldSummary;

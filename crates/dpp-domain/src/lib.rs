@@ -132,7 +132,9 @@ pub use ports::backup::{
 };
 pub use ports::compliance::{ComplianceRegistry, ComplianceStrategy};
 pub use ports::passport_repo::PROTECTED_PATCH_FIELDS;
-pub use ports::personal_data::{ErasureReceipt, HeldRecord, PersonalDataPort, PersonalDataRecord};
+pub use ports::personal_data::{
+    ErasureReceipt, HeldRecord, HeldSummary, PersonalDataPort, PersonalDataRecord,
+};
 pub use ports::registry_sync::{
     GhostRegistrySync, RegistrationRequest, RegistryRecord, RegistryStatus, RegistrySyncPort,
     SubmissionAcknowledgement, SubmissionConfirmation, SubmissionLookup, SubmissionReport,
