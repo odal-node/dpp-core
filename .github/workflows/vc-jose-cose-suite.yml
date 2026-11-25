@@ -1,5 +1,6 @@
 # Runs the W3C's own VC-JOSE-COSE test suite against `dpp-vc`, through the command
-# line in `w3c-suites/vc-jose-cose/` and an image built in this job.
+# line in `crates/dpp-tests/src/bin/vc_jose_cose_suite/`, built in this job and run in
+# a stock container image.
 #
 # Its own workflow rather than a job in `ci.yml`, for the same reason the DID suite
 # and the oracles are: the suite is Node and Docker, and `cargo build --workspace`
@@ -23,7 +24,7 @@
 # `check-run.mjs` reads the machine-readable report and fails unless every row of
 # every enabled feature ran and got the expected verdict, every row of a disabled
 # feature was skipped, and no other implementation ran. The enabled features are in
-# `w3c-suites/vc-jose-cose/localConfig.cjs`, the one place that says so.
+# `.github/oracle/vc-jose-cose/localConfig.cjs`, the one place that says so.
 name: W3C VC-JOSE-COSE suite
 
 on:
@@ -57,6 +58,10 @@ jobs:
     name: dpp-vc gets the expected verdict on every row of the features it implements
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # The harness binary the step below builds, as the absolute path
+      # `.github/oracle/vc-jose-cose/compose.yml` bind-mounts into its container.
+      SUITE_HARNESS: ${{ github.workspace }}/target/debug/vc-jose-cose-suite
     steps:
       # Neither checkout keeps the token. This job installs a few hundred npm
       # packages and nothing here ever pushes.
@@ -82,24 +87,27 @@ jobs:
 
       # No Rust toolchain action. `rust-toolchain.toml` pins the channel, and rustup
       # is already on the runner, so invoking cargo selects the pinned toolchain by
-      # itself, from this directory as from the root.
+      # itself.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: w3c-suites/vc-jose-cose
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      # The harness is in no workspace, so nothing else formats, lints or tests it.
+      # The harness is a binary of `dpp-tests`, in the root workspace. `just check`
+      # formats and lints the workspace; this step holds the harness to the same, and
+      # runs its own tests, so a job that is required to pass cannot go green on a
+      # harness that was never checked.
       - name: The harness is formatted, lints clean and passes its tests
-        working-directory: w3c-suites/vc-jose-cose
         run: |
-          cargo fmt --check
-          cargo clippy --locked --all-targets -- -D warnings
-          cargo test --locked
+          cargo fmt --check -p dpp-tests
+          cargo clippy --locked -p dpp-tests --all-targets -- -D warnings
+          cargo test --locked -p dpp-tests --bin vc-jose-cose-suite --test vc_jose_cose_suite_usage_error
 
-      # The image is built here, from this commit, and the compose file never pulls:
-      # what the suite runs is what this commit builds, and not a published image.
-      - name: Build the image
-        run: docker build --file w3c-suites/vc-jose-cose/Dockerfile --tag vc-jose-cose-suite:local .
+      # Built here, from this commit, on the runner. The suite runs this binary, in a
+      # container that holds the C runtime and nothing else, so what it runs is what
+      # this commit builds. The debug profile is enough: the harness does little work
+      # per row.
+      - name: Build the harness
+        run: cargo build --locked -p dpp-tests --bin vc-jose-cose-suite
 
       # From the suite's own lockfile, with install scripts off. The suite's one git
       # dependency is named there by commit.
@@ -113,7 +121,7 @@ jobs:
       - name: The checker passes its own tests
         env:
           SUITE_ROOT: target/vc-jose-cose-test-suite
-        run: node --test w3c-suites/vc-jose-cose/check-run.test.mjs
+        run: node --test .github/oracle/vc-jose-cose/check-run.test.mjs
 
       # The two files the suite has no other way to be given. `localConfig.cjs` is the
       # supported way to register an implementation with its
@@ -123,15 +131,22 @@ jobs:
       # one that lists this implementation alone.
       - name: Register the implementation
         run: |
-          cp w3c-suites/vc-jose-cose/localConfig.cjs target/vc-jose-cose-test-suite/localConfig.cjs
-          cp w3c-suites/vc-jose-cose/compose.yml target/vc-jose-cose-test-suite/implementations/compose.yml
+          cp .github/oracle/vc-jose-cose/localConfig.cjs target/vc-jose-cose-test-suite/localConfig.cjs
+          cp .github/oracle/vc-jose-cose/compose.yml target/vc-jose-cose-test-suite/implementations/compose.yml
+
+      # The base image the harness runs in, which the compose file names by digest.
+      # Pulled here once, so that no row of the suite spends its timeout on a pull.
+      - name: Pull the base image
+        run: docker compose --file target/vc-jose-cose-test-suite/implementations/compose.yml pull
 
       - name: Record what is actually being run
         working-directory: target/vc-jose-cose-test-suite
         run: |
           echo "node $(node --version)"
           git log -1 --format='w3c/vc-jose-cose-test-suite %H (%cs)'
-          docker image inspect vc-jose-cose-suite:local --format 'image {{.Id}}, user {{.Config.User}}'
+          sha256sum "$SUITE_HARNESS"
+          base="$(docker compose --file implementations/compose.yml config --images)"
+          docker image inspect "$base" --format 'base image {{index .RepoDigests 0}}, user {{.Config.User}}'
 
       # The `json` reporter, because the suite's own reporter writes an HTML page. The
       # container runs as the runner's user: it writes its verdicts into the
@@ -147,7 +162,7 @@ jobs:
       - name: Every row of every enabled feature ran and got the expected verdict
         if: ${{ !cancelled() && steps.suite.outcome != 'skipped' }}
         working-directory: target/vc-jose-cose-test-suite
-        run: node ../../w3c-suites/vc-jose-cose/check-run.mjs report.json
+        run: node ../../.github/oracle/vc-jose-cose/check-run.mjs report.json
 
       # What failed, in a form that can be read without rerunning anything.
       - name: Keep the verdicts

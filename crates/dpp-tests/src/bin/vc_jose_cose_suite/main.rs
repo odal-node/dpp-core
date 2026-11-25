@@ -1,11 +1,16 @@
 //! The command line the W3C VC-JOSE-COSE test suite runs against `dpp-vc`.
 //!
 //! The suite starts this program once per row, in a container, with the arguments of
-//! `tests/test-util.js`, and reads the JSON file named by `--output`. See `README.md`.
+//! `tests/test-util.js`, and reads the JSON file named by `--output`. See
+//! `.github/oracle/vc-jose-cose/README.md`.
 //!
 //! Exit status: 0 when a verdict was written, whichever it is (a refusal is a correct
 //! answer to a row that expects one), and 2 when none could be, with the reason on
 //! stderr and no output file.
+
+// A command line says why it refused on stderr: that is its contract (see above), and
+// the suite shows it beside the verdict.
+#![allow(clippy::print_stderr)]
 
 use std::process::ExitCode;
 use std::{fs, io};
