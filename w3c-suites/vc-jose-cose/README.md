@@ -152,13 +152,6 @@ skipped, and it skips a row for any feature its manifest does not declare `true`
 The expected number of rows is the number of rows of the enabled features, read from the
 suite's own table. Today that is 35 of 35, and nothing here says so.
 
-`.github/workflows/vc-jose-cose-image.yml` builds the same image from a pushed `v*`
-tag and pushes it to `ghcr.io/<owner>/vc-jose-cose-suite`, tagged with the version.
-A second job then points `latest` at the highest `vMAJOR.MINOR.PATCH` release whose
-image is published, retagging it in the registry without a rebuild. It does not point
-`latest` at its own release, so a rerun of an older release cannot move `latest` back,
-and it does not matter which of several queued runs survives.
-
 ## Run it locally
 
 Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. From the repository root:
