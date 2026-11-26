@@ -618,6 +618,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the two reads, each of the three signers produced such a token in each of three
   runs. Migration: none. (#622)
 
+- **A JAdES header never carries a thumbprint that contradicts its chain.** For a
+  `CertificateRef::ChainWithThumbprint`, `JadesHeader::to_json_bytes` and `prepare` now
+  compare `x5t#S256` with the SHA-256 digest of `chain[0]`, and refuse the header with the
+  new `JadesError::ThumbprintMismatch` when they differ or when `chain[0]` is not base64.
+  Before, both were written, so the header referenced one certificate and carried another.
+  `is_eu_recognised_profile` still answers only whether the format is present. Migration:
+  none for a reference built by `chain_of_der`, which takes the digest from the chain; a
+  reference built by hand must carry the digest of its first certificate. (#700)
+
 ## [0.24.0] - 2026-11-16
 
 ### Breaking
